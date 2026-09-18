@@ -841,6 +841,208 @@ def convex_time_of_impact(
     raise ConvexQueryError("convex TOI iteration bound exceeded")
 
 
+def _validate_convex_plane_pair(
+    convex: RigidBody,
+    plane: RigidBody,
+) -> None:
+    if not isinstance(convex, RigidBody) or not isinstance(plane, RigidBody):
+        raise PhysicsValidationError(
+            "convex-plane TOI requires rigid bodies"
+        )
+    if convex.body_id == plane.body_id:
+        raise PhysicsValidationError(
+            "convex-plane TOI requires distinct bodies"
+        )
+    if isinstance(convex.shape, PlaneShape):
+        raise PhysicsValidationError(
+            "convex-plane TOI requires finite convex first body"
+        )
+    if not isinstance(
+        convex.shape,
+        (SphereShape, BoxShape, CapsuleShape, CylinderShape),
+    ):
+        raise PhysicsValidationError(
+            "convex-plane TOI requires supported finite convex shape"
+        )
+    if not isinstance(plane.shape, PlaneShape):
+        raise PhysicsValidationError(
+            "convex-plane TOI second body must be plane"
+        )
+    if plane.angular_velocity.length_squared() > 1.0e-24:
+        raise PhysicsValidationError(
+            "rotating infinite plane CCD is unsupported"
+        )
+
+
+def _plane_support_at_time(
+    convex: RigidBody,
+    plane: RigidBody,
+    time: float,
+) -> tuple[float, Vec3, Vec3, Vec3]:
+    convex_transform = _predicted_transform(convex, time)
+    plane_transform = _predicted_transform(plane, time)
+    plane_shape = plane.shape
+    assert isinstance(plane_shape, PlaneShape)
+
+    plane_normal, plane_offset = plane_shape.world_equation(
+        plane_transform
+    )
+    point_convex = convex.shape.support(
+        -plane_normal,
+        convex_transform,
+    )
+    signed_distance = plane_normal.dot(point_convex) - plane_offset
+    point_plane = point_convex - plane_normal * signed_distance
+
+    # Result normal is finite-convex A -> infinite-plane B.
+    normal = -plane_normal
+    return signed_distance, normal, point_convex, point_plane
+
+
+def _refine_convex_plane_toi(
+    convex: RigidBody,
+    plane: RigidBody,
+    low: float,
+    high: float,
+    *,
+    distance_tolerance: float,
+    time_tolerance: float,
+) -> tuple[float, tuple[float, Vec3, Vec3, Vec3]]:
+    result = _plane_support_at_time(convex, plane, high)
+    for _ in range(64):
+        if high - low <= time_tolerance:
+            break
+        middle = (low + high) * 0.5
+        candidate = _plane_support_at_time(
+            convex,
+            plane,
+            middle,
+        )
+        if candidate[0] <= distance_tolerance:
+            high = middle
+            result = candidate
+        else:
+            low = middle
+    return high, result
+
+
+def convex_plane_time_of_impact(
+    convex: RigidBody,
+    plane: RigidBody,
+    dt: float,
+    *,
+    max_iterations: int = 32,
+    distance_tolerance: float = 1.0e-6,
+    time_tolerance: float = 1.0e-9,
+) -> ConvexTOIResult | None:
+    """Conservative TOI for a finite convex body against an infinite plane.
+
+    The plane may translate but must not rotate.  The finite convex body may
+    translate and rotate.  The support point in -plane-normal gives exact
+    signed separation at each sampled transform; angular motion is bounded by
+    the finite shape sweep radius.
+    """
+
+    _validate_convex_plane_pair(convex, plane)
+    if isinstance(dt, bool) or not isinstance(dt, (int, float)):
+        raise PhysicsValidationError(
+            "convex-plane TOI dt must be numeric"
+        )
+    dt = float(dt)
+    if not math.isfinite(dt) or dt <= 0.0:
+        raise PhysicsValidationError(
+            "convex-plane TOI dt must be positive"
+        )
+    if (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or not 1 <= max_iterations <= MAX_CONVEX_TOI_ITERATIONS
+    ):
+        raise PhysicsValidationError(
+            "convex-plane TOI max_iterations outside supported range"
+        )
+    for name, value in (
+        ("distance_tolerance", distance_tolerance),
+        ("time_tolerance", time_tolerance),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) <= 0.0
+        ):
+            raise PhysicsValidationError(f"{name} must be positive")
+    distance_tolerance = float(distance_tolerance)
+    time_tolerance = float(time_tolerance)
+
+    sweep_radius = _shape_sweep_radius(convex)
+    angular_bound = convex.angular_velocity.length() * sweep_radius
+    relative_linear = convex.linear_velocity - plane.linear_velocity
+
+    time = 0.0
+    previous_separated_time = 0.0
+
+    for iteration in range(1, max_iterations + 1):
+        (
+            distance,
+            normal,
+            point_convex,
+            point_plane,
+        ) = _plane_support_at_time(convex, plane, time)
+
+        if distance <= distance_tolerance:
+            if time > 0.0:
+                time, refined = _refine_convex_plane_toi(
+                    convex,
+                    plane,
+                    previous_separated_time,
+                    time,
+                    distance_tolerance=distance_tolerance,
+                    time_tolerance=time_tolerance,
+                )
+                (
+                    distance,
+                    normal,
+                    point_convex,
+                    point_plane,
+                ) = refined
+            return ConvexTOIResult(
+                body_a=convex.body_id,
+                body_b=plane.body_id,
+                fraction=min(1.0, max(0.0, time / dt)),
+                time=time,
+                normal=normal,
+                point_a=point_convex,
+                point_b=point_plane,
+                iterations=iteration,
+                initial_overlap=time <= time_tolerance,
+            )
+
+        plane_normal = -normal
+        closing_bound = max(
+            0.0,
+            -relative_linear.dot(plane_normal) + angular_bound,
+        )
+        if closing_bound <= EPSILON:
+            return None
+
+        advance = (
+            distance - distance_tolerance
+        ) / closing_bound
+        if advance <= 0.0:
+            advance = time_tolerance
+
+        previous_separated_time = time
+        next_time = time + max(advance, time_tolerance)
+        if next_time > dt + time_tolerance:
+            return None
+        time = min(dt, next_time)
+
+    raise ConvexQueryError(
+        "convex-plane TOI iteration bound exceeded"
+    )
+
+
 def _triple_product(a: Vec3, b: Vec3, c: Vec3) -> Vec3:
     return a.cross(b).cross(c)
 

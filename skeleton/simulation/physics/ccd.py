@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
-from .convex import convex_time_of_impact
+from .convex import convex_plane_time_of_impact, convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
@@ -138,6 +138,54 @@ class ContinuousCollisionDetector:
         if not isinstance(body.shape, SphereShape):
             motion += body.angular_velocity.length() * radius * dt
         return motion > radius * self.motion_threshold
+
+    @staticmethod
+    def _continuous_finite_body(body: RigidBody) -> bool:
+        return (
+            body.continuous
+            and body.body_type is BodyType.DYNAMIC
+            and body.awake
+            and isinstance(
+                body.shape,
+                (SphereShape, BoxShape, CapsuleShape, CylinderShape),
+            )
+        )
+
+    def _pair_requires_general_ccd(
+        self,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        dt: float,
+    ) -> bool:
+        continuous = tuple(
+            body
+            for body in (body_a, body_b)
+            if self._continuous_finite_body(body)
+        )
+        if not continuous:
+            return False
+
+        relative_travel = (
+            body_b.linear_velocity - body_a.linear_velocity
+        ).length() * dt
+
+        angular_travel = 0.0
+        for body in (body_a, body_b):
+            radius = self._finite_sweep_radius(body)
+            if radius is not None:
+                angular_travel += (
+                    body.angular_velocity.length() * radius * dt
+                )
+
+        threshold_radius = min(
+            radius
+            for body in continuous
+            if (radius := self._finite_sweep_radius(body)) is not None
+        )
+        return (
+            relative_travel + angular_travel
+            > threshold_radius * self.motion_threshold
+        )
 
     def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
         if (
@@ -381,9 +429,10 @@ class ContinuousCollisionDetector:
                 pair = (body_a.body_id, body_b.body_id)
                 if pair in events:
                     continue
-                if not (
-                    self._eligible_continuous_body(body_a, dt)
-                    or self._eligible_continuous_body(body_b, dt)
+                if not self._pair_requires_general_ccd(
+                    body_a,
+                    body_b,
+                    dt,
                 ):
                     continue
                 if not isinstance(body_a.shape, finite_shapes) or not isinstance(
@@ -422,6 +471,72 @@ class ContinuousCollisionDetector:
                     fraction=hit.fraction,
                     time=hit.time,
                     normal=hit.normal,
+                )
+                events[pair] = event
+
+        for convex in ordered:
+            if not self._continuous_finite_body(convex):
+                continue
+
+            for plane in ordered:
+                if plane.body_id == convex.body_id:
+                    continue
+                if not isinstance(plane.shape, PlaneShape):
+                    continue
+
+                pair = tuple(
+                    sorted((convex.body_id, plane.body_id))
+                )
+                if pair in events:
+                    # Exact sphere/static-plane sweeps and any earlier
+                    # canonical event remain authoritative.
+                    continue
+                if not self._pair_requires_general_ccd(
+                    convex,
+                    plane,
+                    dt,
+                ):
+                    continue
+
+                checks += 1
+                if checks > self.max_checks:
+                    raise PhysicsValidationError(
+                        "CCD check bound exceeded"
+                    )
+
+                hit = convex_plane_time_of_impact(
+                    convex,
+                    plane,
+                    dt,
+                    max_iterations=64,
+                    distance_tolerance=1.0e-6,
+                    time_tolerance=1.0e-9,
+                )
+                if hit is None:
+                    continue
+
+                if hit.time <= EPSILON:
+                    relative_velocity = (
+                        plane.velocity_at_world_point(hit.point_b)
+                        - convex.velocity_at_world_point(hit.point_a)
+                    )
+                    if (
+                        relative_velocity.dot(hit.normal)
+                        >= -EPSILON
+                    ):
+                        continue
+
+                if convex.body_id < plane.body_id:
+                    normal = hit.normal
+                else:
+                    normal = -hit.normal
+
+                event = TOIEvent(
+                    body_a=pair[0],
+                    body_b=pair[1],
+                    fraction=hit.fraction,
+                    time=hit.time,
+                    normal=normal,
                 )
                 events[pair] = event
 
