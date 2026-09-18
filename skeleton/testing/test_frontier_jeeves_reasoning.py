@@ -681,3 +681,28 @@ def test_adaptive_specialist_generation_uses_virtual_model_call_dispatch() -> No
     assert len(candidates) == 1
     assert candidates[0].metadata["provider"] == "dispatch-test"
     assert candidates[0].metadata["model"] == "spy-model"
+
+
+
+def test_frontier_uncertainty_uses_strongest_unresolved_signal() -> None:
+    decision = SimpleNamespace(
+        diagnostics=SimpleNamespace(
+            normalized_entropy=0.40,
+            action_disagreement=0.55,
+            outcome_disagreement=0.25,
+        ),
+        consensus=SimpleNamespace(
+            normalized_entropy=0.72,
+            agreement=0.80,
+        ),
+    )
+
+    value = AdaptiveJeevesRuntime._frontier_uncertainty(decision)
+
+    assert value == 0.72
+
+
+def test_adaptive_config_has_positive_stagnation_threshold() -> None:
+    config = AdaptiveConfig()
+
+    assert 0.0 < config.minimum_frontier_uncertainty_reduction < 1.0
