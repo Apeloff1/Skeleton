@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.attempt_recovery import AIExecutionAttemptRecoveryInspector, AttemptRecoveryDisposition, AttemptRecoveryExpectation, AttemptRecoveryReport
+
 from skeleton.shells.ai.execution_attempt import AIExecutionAttempt, AIExecutionAttemptStore, AttemptTrackingExecutionBackend, ExecutionAttemptConflict, ExecutionAttemptRecovery, ExecutionAttemptSessionHead, ExecutionAttemptState, StoredExecutionAttempt
 
 from skeleton.shells.ai.runtime_trust_store import RuntimeTrustPin, RuntimeTrustPinConflict, RuntimeTrustPinStore, RuntimeTrustPinVerification, SignedRuntimeTrustPin
