@@ -42,6 +42,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_convex",
     "skeleton.testing.test_simulation_physics_convex_collision",
     "skeleton.testing.test_simulation_physics_convex_queries",
+    "skeleton.testing.test_simulation_physics_convex_toi",
     "skeleton.testing.test_simulation_physics_fixed_slider",
     "skeleton.testing.test_simulation_physics_foundation",
     "skeleton.testing.test_simulation_physics_hinge",
@@ -49,6 +50,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_joint_cache_coloring",
     "skeleton.testing.test_simulation_physics_manifolds",
     "skeleton.testing.test_simulation_physics_obb_edges",
+    "skeleton.testing.test_simulation_physics_plane_toi",
     "skeleton.testing.test_simulation_physics_replay",
 )
 

@@ -682,6 +682,16 @@ def test_failure_after_contact_solver_restores_warm_cache_atomically() -> None:
             angular_damping=0.0,
         )
     )
+    world.add_body(
+        RigidBody.dynamic(
+            "anchor",
+            SphereShape(0.25),
+            position=Vec3(2.0, 0.5, 0.0),
+            linear_damping=0.0,
+            angular_damping=0.0,
+        )
+    )
+    world.add_joint(DistanceJoint("link", "ball", "anchor", rest_length=2.0))
     before_digest = world.state_digest
     before_cache = world.contact_cache_size()
     before_tick = world.tick
