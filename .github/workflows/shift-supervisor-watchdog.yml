@@ -1,0 +1,131 @@
+name: Shift Supervisor Watchdog
+
+on:
+  # Event-driven fallback for periods where GitHub delays or omits cron events.
+  # PR Automation Index is a trusted default-branch workflow and completes from
+  # normal repository activity, so this gives the supervisor a second wake path
+  # without creating a Supervisor -> Watchdog -> Supervisor loop.
+  workflow_run:
+    workflows: ['PR Automation Index']
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: shift-supervisor-watchdog
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  recover:
+    if: >-
+      github.repository == 'Apeloff1/Skeleton' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      issues: read
+    env:
+      REPO: ${{ github.repository }}
+      PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
+      PLAN_FRESHNESS_SECONDS: '1200'
+      FALLBACK_COOLDOWN_SECONDS: '1200'
+      SUPERVISOR_WORKFLOW: shift-supervisor-control.yml
+
+    steps:
+      - name: Gate recovery on key, freshness, and cooldown
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dispatch='false'
+          reason='fresh-or-recent'
+
+          # Never dispatch a model-driven supervisor without its repository
+          # secret. The value is intentionally never printed or persisted.
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            reason='missing-openai-api-key'
+            echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # workflow_run events must originate from the trusted default branch.
+          if [[ "$EVENT_NAME" == 'workflow_run' && "$SOURCE_HEAD_BRANCH" != 'main' ]]; then
+            reason='untrusted-source-branch'
+            echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          updated=$(gh issue list --repo "$REPO" --state open --limit 100 \
+            --json title,updatedAt \
+            --jq 'map(select(.title == env.PLAN_TITLE)) | first | .updatedAt // ""')
+          if [[ -n "$updated" ]]; then
+            updated_epoch=$(date -u -d "$updated" +%s)
+            now_epoch=$(date -u +%s)
+            age_seconds=$(( now_epoch - updated_epoch ))
+            if (( age_seconds >= 0 && age_seconds < PLAN_FRESHNESS_SECONDS )); then
+              reason='canonical-plan-fresh'
+              echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
+              echo "reason=$reason" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          # Collapse repeated fallback signals. Manual dispatch deliberately
+          # bypasses this cooldown so an operator can recover immediately after
+          # fixing a missing secret or other external prerequisite.
+          if [[ "$EVENT_NAME" != 'workflow_dispatch' ]]; then
+            last_created=$(gh run list --repo "$REPO" \
+              --workflow "$SUPERVISOR_WORKFLOW" --limit 1 \
+              --json createdAt --jq '.[0].createdAt // ""')
+            if [[ -n "$last_created" ]]; then
+              last_epoch=$(date -u -d "$last_created" +%s)
+              now_epoch=$(date -u +%s)
+              age_seconds=$(( now_epoch - last_epoch ))
+              if (( age_seconds >= 0 && age_seconds < FALLBACK_COOLDOWN_SECONDS )); then
+                reason='supervisor-run-recent'
+                echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
+                echo "reason=$reason" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+
+          dispatch='true'
+          reason='canonical-plan-stale-or-missing'
+          echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch Shift Supervisor Control
+        if: steps.gate.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run "$SUPERVISOR_WORKFLOW" --repo "$REPO" --ref main
+
+      - name: Record watchdog decision
+        if: always()
+        env:
+          DISPATCH: ${{ steps.gate.outputs.dispatch }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        shell: bash
+        run: |
+          {
+            echo '## Shift Supervisor Watchdog'
+            echo
+            echo "Dispatch: ${DISPATCH:-false}"
+            echo "Reason: ${REASON:-gate-not-reached}"
+            echo
+            echo 'The watchdog never prints or persists OPENAI_API_KEY.'
+          } >> "$GITHUB_STEP_SUMMARY"
