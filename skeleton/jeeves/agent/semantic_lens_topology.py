@@ -93,6 +93,7 @@ class SemanticTopologySnapshot:
     conflict_edge_ids: tuple[str, ...]
     reinforcement_edge_ids: tuple[str, ...]
     family_pair_counts: tuple[tuple[str, str, int], ...]
+    candidate_bridge_count: int
     fingerprint: str
 
 
@@ -123,8 +124,8 @@ class SemanticLensTopology:
         for edge in self._edges:
             self._adjacency[edge.left_key].add(edge.right_key)
             self._adjacency[edge.right_key].add(edge.left_key)
-        self._snapshot = self._build_snapshot()
         self._bridge_candidates = self._build_bridge_candidates()
+        self._snapshot = self._build_snapshot()
 
     def _build_edges(
         self,
@@ -272,6 +273,8 @@ class SemanticLensTopology:
                     node.role.value,
                     node.degree,
                     node.cross_family_degree,
+                    node.rare,
+                    self._specs[node.lens_key].activation_cues,
                     [family.value for family in node.neighbor_families],
                 )
                 for node in nodes
@@ -290,6 +293,16 @@ class SemanticLensTopology:
             "isolated": isolated,
             "bridges": bridges,
             "family_pairs": pairs,
+            "bridge_candidates": [
+                (
+                    item.candidate_id,
+                    item.left_key,
+                    item.right_key,
+                    item.score,
+                    item.shared_cues,
+                )
+                for item in self._bridge_candidates
+            ],
         }
         return SemanticTopologySnapshot(
             nodes=tuple(nodes),
@@ -301,6 +314,7 @@ class SemanticLensTopology:
             conflict_edge_ids=conflicts,
             reinforcement_edge_ids=reinforces,
             family_pair_counts=pairs,
+            candidate_bridge_count=len(self._bridge_candidates),
             fingerprint=stable_fingerprint(payload),
         )
 
