@@ -413,6 +413,24 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
         'from pathlib import Path\ntarget = "/etc/passwd"\nPath(target).read_text()\n',
     ],
 )
+def test_dynamic_filesystem_targets_fail_closed_even_with_filesystem_grant(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+
+    decision = box.admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}
+    assert decision.operation.target == "<dynamic>"
+    assert "dynamic filesystem target" in decision.reason
+
+
 @pytest.mark.parametrize(
     "source",
     [
@@ -421,16 +439,7 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
         'runner = eval\nrunner("1 + 1")\n',
     ],
 )
-@pytest.mark.parametrize(
-    "source",
-    [
-        '__builtins__["open"]("/etc/passwd", "r")\n',
-        '(lambda fn: fn)(open)("/etc/passwd", "r")\n',
-        '__builtins__.open("/etc/passwd", "r")\n',
-        '__builtins__.eval("1 + 1")\n',
-    ],
-)
-def test_dynamic_and_builtin_callable_dispatch_fails_closed(
+def test_sensitive_callable_aliases_cannot_bypass_python_inspection(
     tmp_path: Path,
     source: str,
 ) -> None:
@@ -443,7 +452,16 @@ def test_dynamic_and_builtin_callable_dispatch_fails_closed(
     }
 
 
-def test_sensitive_callable_aliases_cannot_bypass_python_inspection(
+@pytest.mark.parametrize(
+    "source",
+    [
+        '__builtins__["open"]("/etc/passwd", "r")\n',
+        '(lambda fn: fn)(open)("/etc/passwd", "r")\n',
+        '__builtins__.open("/etc/passwd", "r")\n',
+        '__builtins__.eval("1 + 1")\n',
+    ],
+)
+def test_dynamic_and_builtin_callable_dispatch_fails_closed(
     tmp_path: Path,
     source: str,
 ) -> None:
@@ -485,25 +503,6 @@ def test_aliased_open_still_enforces_workspace_containment_with_filesystem_grant
     assert decision.operation is not None
     assert decision.operation.target == "/etc/passwd"
     assert "path escapes" in decision.reason
-
-
-def test_dynamic_filesystem_targets_fail_closed_even_with_filesystem_grant(
-    tmp_path: Path,
-    source: str,
-) -> None:
-    box = GeneratedCodeSandbox(
-        workspace_root=tmp_path,
-        grants={SandboxCapability.FILESYSTEM},
-    )
-    box.seal()
-
-    decision = box.admit(source, kind=PayloadKind.PYTHON)
-    assert decision.allowed is False
-    assert decision.operation is not None
-    assert decision.operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}
-    assert decision.operation.target == "<dynamic>"
-    assert "dynamic filesystem target" in decision.reason
-
 
 def test_secret_symlink_cannot_bypass_secrets_capability(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
