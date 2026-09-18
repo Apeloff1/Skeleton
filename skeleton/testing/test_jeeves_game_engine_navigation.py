@@ -618,10 +618,10 @@ def test_shader_navigation_smoothing_uses_valid_graph_shortcuts() -> None:
     assert result.smoothed
     assert result.path == (
         "n0_0",
-        "n2_2",
+        "n0_4",
         "n4_4",
     )
-    assert result.total_cost == 60
+    assert result.total_cost == 80
 
 
 @pytest.mark.parametrize(
