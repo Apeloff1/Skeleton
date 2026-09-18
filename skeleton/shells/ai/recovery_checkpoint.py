@@ -21,6 +21,7 @@ class AIRecoveryCheckpoint:
     authority_health_policy_digest: str = ""
     execution_attempt_id: str = ""
     execution_attempt_authority_digest: str = ""
+    session_integrity_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -33,6 +34,7 @@ class AIRecoveryCheckpoint:
             "runtime_trust_digest",
             "authority_health_policy_digest",
             "execution_attempt_authority_digest",
+            "session_integrity_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -62,6 +64,7 @@ class AIRecoveryCheckpoint:
             "execution_attempt_authority_digest": (
                 self.execution_attempt_authority_digest
             ),
+            "session_integrity_digest": self.session_integrity_digest,
         }
 
     @property
@@ -86,6 +89,7 @@ class AIRecoveryCheckpoint:
         authority_health_policy_digest: str = "",
         execution_attempt_id: str = "",
         execution_attempt_authority_digest: str = "",
+        session_integrity_digest: str = "",
     ) -> "AIRecoveryCheckpoint":
         return cls(
             2,
@@ -98,4 +102,5 @@ class AIRecoveryCheckpoint:
             authority_health_policy_digest,
             execution_attempt_id,
             execution_attempt_authority_digest,
+            session_integrity_digest,
         )
