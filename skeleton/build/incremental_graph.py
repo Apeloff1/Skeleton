@@ -667,7 +667,7 @@ def _repo_index_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
     digest = hashlib.sha256()
     for item in files:
         effective_mode = item["working_mode"] or item["mode"]
-        digest.update(os.fsencode(item["path"]))
+        digest.update(item["path"].encode("utf-8"))
         digest.update(b"\0")
         digest.update(item["mode"].encode("ascii"))
         digest.update(b"\0")
@@ -728,7 +728,7 @@ def _validated_repo_index(raw: Any, *, max_nodes: int) -> tuple[dict[str, Any], 
     )
     canonical_paths = sorted(
         (item["path"] for item in normalized),
-        key=os.fsencode,
+        key=lambda path: path.encode("utf-8"),
     )
     actual_paths = [item["path"] for item in normalized]
     if actual_paths != canonical_paths:
