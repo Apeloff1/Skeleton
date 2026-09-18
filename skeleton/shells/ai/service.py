@@ -16,6 +16,7 @@ from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
 from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
 from skeleton.shells.ai.preconditions import Preconditions, PreconditionChecker, PreconditionReport
 from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
+from skeleton.shells.ai.runtime_trust import AIRuntimeTrustGuard, RuntimeTrustReport
 from skeleton.shells.ai.sandbox_backend import VerifiedSandboxExecutionBackend
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
 from skeleton.shells.ai.session import AIShellSession
@@ -32,6 +33,7 @@ class AIServiceStatus:
     governance: dict[str, object]
     shell_phase: str
     release: dict[str, object] | None = None
+    runtime_trust: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -42,6 +44,8 @@ class AIServiceStatus:
         }
         if self.release is not None:
             data["release"] = dict(self.release)
+        if self.runtime_trust is not None:
+            data["runtime_trust"] = dict(self.runtime_trust)
         return data
 
 
@@ -58,6 +62,7 @@ class AIShellService:
         release_expectation: RuntimeReleaseExpectation | None = None,
         assurance: AIExecutionAssuranceInspector | None = None,
         approval_quorum: AIApprovalQuorumStore | None = None,
+        runtime_trust: AIRuntimeTrustGuard | None = None,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -68,7 +73,9 @@ class AIShellService:
         self.release_expectation = release_expectation
         self.assurance = assurance
         self.approval_quorum = approval_quorum
+        self.runtime_trust = runtime_trust
         self._release_report: StartupReleaseReport | None = None
+        self._runtime_trust_report: RuntimeTrustReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
         self.stale_guard = AIPlanStaleGuard()
@@ -96,6 +103,15 @@ class AIShellService:
                     reason="AI release/channel verification failed",
                 )
                 return report
+        if self.runtime_trust is not None:
+            try:
+                self._runtime_trust_report = self.runtime_trust.pin()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI runtime trust verification failed",
+                )
+                return report
         self.state.transition(AIServicePhase.READY)
         return report
 
@@ -116,16 +132,32 @@ class AIShellService:
             )
         raise RuntimeError("AI release/channel verification failed")
 
+    def _require_runtime_trust_current(self) -> None:
+        if self.runtime_trust is None:
+            return
+        try:
+            report = self.runtime_trust.require_current()
+        except RuntimeError:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason="AI runtime trust drift detected",
+                )
+            raise RuntimeError("AI runtime trust verification failed") from None
+        self._runtime_trust_report = report
+
     def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_runtime_trust_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
 
     def review(self, session: AIShellSession) -> tuple[AIReviewBundle, AIReviewView]:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_runtime_trust_current()
         bundle = self.orchestrator.review(session)
         proposal = bundle.planning.response.proposal
         self.governance.require_not_quarantined(
@@ -261,6 +293,7 @@ class AIShellService:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_runtime_trust_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         proposal = review.planning.response.proposal
@@ -331,6 +364,7 @@ class AIShellService:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_runtime_trust_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -490,6 +524,7 @@ class AIShellService:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_runtime_trust_current()
         self._require_assurance(
             review,
             execution_backend=execution_backend,
@@ -543,4 +578,9 @@ class AIShellService:
             self.governance.snapshot().to_dict(),
             self.orchestrator.shell_service.state.phase.value,
             None if self._release_report is None else self._release_report.to_dict(),
+            (
+                None
+                if self._runtime_trust_report is None
+                else self._runtime_trust_report.to_dict()
+            ),
         )
