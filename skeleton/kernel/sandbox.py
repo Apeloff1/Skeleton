@@ -171,14 +171,20 @@ class Sandbox:
     # ------------------------------------------------------------------
 
     def grants_for(self, holder: str) -> Tuple[Grant, ...]:
+        now = time.time()
         out: List[Grant] = []
         for (h, _), grants in self._grants.items():
             if h == holder:
-                out.extend(g for g in grants if not g.expired())
+                out.extend(g for g in grants if not g.expired(now))
         return tuple(out)
 
     def holders(self) -> Set[str]:
-        return {h for (h, _) in self._grants}
+        now = time.time()
+        return {
+            holder
+            for (holder, _), grants in self._grants.items()
+            if any(not grant.expired(now) for grant in grants)
+        }
 
     def audit_trail(self, limit: Optional[int] = None) -> Tuple[AuditRecord, ...]:
         return tuple(self._audit[-limit:] if limit else self._audit)
