@@ -30,9 +30,22 @@ def test_rejects_pull_request_target_regression() -> None:
     assert "pull_request_target is forbidden" in _messages(source)
 
 
-def test_rejects_cancellation_that_can_starve_trusted_clear() -> None:
-    source = _replace_once(_source(), "  cancel-in-progress: false", "  cancel-in-progress: true")
-    assert "must not cancel in-flight trusted clears" in _messages(source)
+def test_rejects_global_cancellation_that_can_starve_trusted_clear() -> None:
+    source = _replace_once(
+        _source(),
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}",
+        "  cancel-in-progress: true",
+    )
+    assert "only trusted same-repository PR lifecycle events may cancel" in _messages(source)
+
+
+def test_rejects_pr_cancellation_without_same_repository_guard() -> None:
+    source = _replace_once(
+        _source(),
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}",
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+    )
+    assert "only trusted same-repository PR lifecycle events may cancel" in _messages(source)
 
 
 def test_rejects_loss_of_same_repository_pr_guard() -> None:
