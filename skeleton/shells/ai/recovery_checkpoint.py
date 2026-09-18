@@ -17,6 +17,8 @@ class AIRecoveryCheckpoint:
     session_journal_digest: str = ""
     release_evidence_digest: str = ""
     sandbox_binding_digest: str = ""
+    runtime_trust_digest: str = ""
+    authority_health_policy_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -26,6 +28,8 @@ class AIRecoveryCheckpoint:
             "session_journal_digest",
             "release_evidence_digest",
             "sandbox_binding_digest",
+            "runtime_trust_digest",
+            "authority_health_policy_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -39,6 +43,10 @@ class AIRecoveryCheckpoint:
             "session_journal_digest": self.session_journal_digest,
             "release_evidence_digest": self.release_evidence_digest,
             "sandbox_binding_digest": self.sandbox_binding_digest,
+            "runtime_trust_digest": self.runtime_trust_digest,
+            "authority_health_policy_digest": (
+                self.authority_health_policy_digest
+            ),
         }
 
     @property
@@ -59,6 +67,8 @@ class AIRecoveryCheckpoint:
         session_journal_digest: str = "",
         release_evidence_digest: str = "",
         sandbox_binding_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
     ) -> "AIRecoveryCheckpoint":
         return cls(
             2,
@@ -67,4 +77,6 @@ class AIRecoveryCheckpoint:
             session_journal_digest,
             release_evidence_digest,
             sandbox_binding_digest,
+            runtime_trust_digest,
+            authority_health_policy_digest,
         )
