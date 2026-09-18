@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 from types import MappingProxyType
@@ -51,7 +51,7 @@ class AIToolResult:
     observation: AIObservation | None
     status: str
     message: str = ""
-    metadata: Mapping[str, str] = MappingProxyType({})
+    metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.call_id or len(self.call_id) > 160:
