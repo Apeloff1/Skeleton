@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.trust_snapshot import AITrustSnapshot, AITrustSnapshotBuilder, SignedAITrustSnapshot
+
 from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthPolicy, AuthorityHealthReport, AuthorityHealthResult, AuthorityHealthState, CallableAuthorityHealthProbe, VersionedStateHealthProbe
 from skeleton.shells.ai.audit_witness import AIAuditWitness, AIAuditWitnessStore, AuditWitnessHead, AuditWitnessVerification, SignedAIAuditWitness
 from skeleton.shells.ai.runtime_trust import AIRuntimeTrustGuard, RuntimeModelBinding, RuntimeTrustEpoch, RuntimeTrustReport, RuntimeTrustSurface
