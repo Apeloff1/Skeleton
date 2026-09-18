@@ -24,6 +24,7 @@ LIVE_EXAMPLES = (
     ("scripts/check_architecture_boundaries.py", "first-party"),
     ("tests/test_architecture_boundaries.py", "first-party"),
     ("docs/CANONICAL_MODULE_BOUNDARIES.md", "first-party"),
+    ("examples/shells_secure_workflows.py", "first-party"),
     (".github/workflows/provenance-policy.yml", "first-party"),
     ("README.md", "first-party"),
     ("satellites/gameforge-middleware/README.md", "first-party"),
@@ -122,6 +123,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("scripts/check_source_path_inventory.py"), "first-party")
         self.assertEqual(policy.classify_path("tests/test_provenance_source_path_inventory.py"), "first-party")
         self.assertEqual(policy.classify_path("docs/CANONICAL_MODULE_BOUNDARIES.md"), "first-party")
+        self.assertEqual(policy.classify_path("examples/shells_secure_workflows.py"), "first-party")
         self.assertEqual(policy.classify_path(".github/workflows/ci.yml"), "first-party")
         self.assertEqual(policy.classify_path("satellites/gameforge-middleware/README.md"), "first-party")
         self.assertEqual(policy.classify_path("README.md"), "first-party")
