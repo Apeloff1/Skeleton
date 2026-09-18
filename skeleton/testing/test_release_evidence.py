@@ -160,6 +160,60 @@ def valid_observed() -> dict[str, bytes]:
     return {"wheel": WHEEL}
 
 
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "../escape.whl",
+        "/absolute.whl",
+        "dist\\windows.whl",
+        "dist//double.whl",
+        "dist/./dot.whl",
+        "C:/drive.whl",
+    ],
+)
+def test_noncanonical_release_paths_fail_closed(bad_name: str) -> None:
+    artifact = _artifact("wheel", "skeleton-16.0.0-py3-none-any.whl", WHEEL)
+    artifact["name"] = bad_name
+    with pytest.raises(EvidenceSchemaError, match="name"):
+        build_evidence(**valid_kwargs(artifacts=[artifact]))
+
+
+def test_non_string_artifact_and_evidence_ids_fail_closed() -> None:
+    bad_artifact = _artifact("wheel", "skeleton-16.0.0-py3-none-any.whl", WHEEL)
+    bad_artifact["artifact_id"] = 7
+    with pytest.raises(EvidenceSchemaError, match="artifact_id"):
+        build_evidence(**valid_kwargs(artifacts=[bad_artifact]))
+
+    bad_test = _test()
+    bad_test["evidence_id"] = 7
+    with pytest.raises(EvidenceSchemaError, match="test evidence id"):
+        build_evidence(**valid_kwargs(test_evidence=[bad_test]))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "reason"),
+    [
+        ("schema_version", 2, "incompatible release evidence schema"),
+        ("source_date_epoch", -1, "source_date_epoch must be a non-negative integer"),
+        ("source_date_epoch", True, "source_date_epoch must be a non-negative integer"),
+    ],
+)
+def test_typed_release_evidence_root_metadata_fails_closed(
+    field: str,
+    value: object,
+    reason: str,
+) -> None:
+    evidence = valid_evidence()
+    object.__setattr__(evidence, field, value)
+    result = evaluate_release_ready(
+        evidence,
+        expected_commit=COMMIT,
+        observed_artifacts=valid_observed(),
+    )
+    assert result.release_ready is False
+    assert any(reason in item for item in result.reasons)
+
+
 def test_schema_version_is_stable_and_canonical() -> None:
     evidence = valid_evidence()
     payload = json.loads(serialize_evidence(evidence))
@@ -394,6 +448,25 @@ def test_large_artifact_uses_locator_not_git_history() -> None:
     )
     assert blocked.release_ready is False
     assert any("must not use normal Git history" in reason for reason in blocked.reasons)
+
+
+def test_artifact_asset_reference_binds_exact_provenance_digest() -> None:
+    artifact = _artifact(
+        "hero-artifact",
+        "hero.png",
+        b"different-bytes",
+        asset_id="hero",
+    )
+    result = evaluate_release_ready(
+        valid_evidence(artifacts=[artifact]),
+        expected_commit=COMMIT,
+        observed_artifacts={"hero-artifact": b"different-bytes"},
+    )
+    assert result.release_ready is False
+    assert any(
+        "digest does not match asset provenance hero" in reason
+        for reason in result.reasons
+    )
 
 
 def test_generated_package_cannot_use_git_lfs_lane() -> None:
