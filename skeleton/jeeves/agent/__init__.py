@@ -474,6 +474,20 @@ from .context_fabric import (
     MemoryManagerAdapter,
     RepositoryContextAdapter,
 )
+from .context_mesh import ContextRepositoryMesh, MultiplexedRepositoryAdapter
+from .context_repository import (
+    ContextConstitution,
+    ContextEntry,
+    ContextKind,
+    ContextNamespace,
+    ContextPatch,
+    ContextPatchItem,
+    ContextRepository,
+    ContextRepositoryError,
+    ContextSnapshot,
+    MergeStrategy,
+    PatchOperation,
+)
 from .predictive_memory import (
     MemoryPrediction,
     PredictionUpdate as MemoryPredictionUpdate,
