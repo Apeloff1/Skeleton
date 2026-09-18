@@ -1,0 +1,114 @@
+name: ARM64 Ubuntu Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "backend/**"
+      - "frontend/**"
+      - "skeleton/**"
+      - "pyproject.toml"
+      - "docker-compose.yml"
+      - ".github/workflows/arm64.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "backend/**"
+      - "frontend/**"
+      - "skeleton/**"
+      - "pyproject.toml"
+      - "docker-compose.yml"
+      - ".github/workflows/arm64.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  arm64:
+    name: Ubuntu ARM64 compatibility
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Verify native ARM64 userspace
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "aarch64"
+          python -c 'import platform; assert platform.machine() == "aarch64"'
+          python --version
+
+      - name: Install declared Skeleton runtime and test slice
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check . "pytest>=8,<9"
+
+      - name: Compile ARM64 Python runtime
+        run: python -m compileall -q skeleton
+
+      - name: Run ARM64 smoke tests
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python tests/run_unit.py
+          python -m pytest -q \
+            tests/test_run_unit_runner.py \
+            tests/test_architecture_boundaries.py \
+            tests/test_provider_runtime_boundary.py
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build ARM64 Skeleton image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: false
+          tags: skeleton:arm64
+          cache-from: type=gha,scope=arm64-skeleton
+          cache-to: type=gha,mode=max,scope=arm64-skeleton
+
+      - name: Build ARM64 backend image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          target: production
+          platforms: linux/arm64
+          push: false
+          tags: skeleton-backend:arm64
+          cache-from: type=gha,scope=arm64-backend
+          cache-to: type=gha,mode=max,scope=arm64-backend
+
+      - name: Build ARM64 frontend image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          platforms: linux/arm64
+          push: false
+          tags: skeleton-frontend:arm64
+          cache-from: type=gha,scope=arm64-frontend
+          cache-to: type=gha,mode=max,scope=arm64-frontend

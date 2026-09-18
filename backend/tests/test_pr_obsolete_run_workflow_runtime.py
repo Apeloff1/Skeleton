@@ -48,6 +48,7 @@ def test_privileged_drainer_starts_when_lifecycle_signal_is_requested() -> None:
     assert "types: [requested]" in text
     assert "types: [completed]" not in text
     assert 'branches:\n      - "*"\n      - "**"' in text
-    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
-    assert "WORKFLOW_RUN_PR_HINTS" in text
-    assert "pull_requests[0]" not in text
+    assert "group: pr-run-drain-${{ github.repository }}" in text
+    assert "cancel-in-progress: false" in text
+    assert text.count("python backend/scripts/pr_obsolete_run_sweep.py") == 2
+    assert "python backend/scripts/pr_obsolete_run_from_workflow_run.py" not in text
