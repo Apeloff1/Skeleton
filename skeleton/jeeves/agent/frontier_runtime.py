@@ -653,10 +653,17 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         candidates = running or list(state.plan.ready_steps())
         if not candidates:
             return RiskTier.READ_ONLY
-        return max(
-            (step.risk for step in candidates),
-            key=lambda risk: self._RISK_ORDER[risk],
-        )
+        risks: list[RiskTier] = []
+        for step in candidates:
+            risk = step.risk
+            if step.tool is not None:
+                registered = self.tools.get(step.tool)
+                if registered is not None:
+                    host_risk = registered.spec.risk
+                    if self._RISK_ORDER[host_risk] > self._RISK_ORDER[risk]:
+                        risk = host_risk
+            risks.append(risk)
+        return max(risks, key=lambda risk: self._RISK_ORDER[risk])
 
     def cortex_summary(self) -> Mapping[str, Any]:
         if self.cortex is None:
