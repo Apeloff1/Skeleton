@@ -201,10 +201,16 @@ def build_incremental_graph(
     _require_positive_bound(max_edges, "max_edges")
     _require_positive_bound(max_visits, "max_visits")
 
-    declared = [
-        _coerce_spec(item, max_dependencies=max_edges)
-        for item in _require_sequence(specs, field="specs", max_items=max_nodes)
-    ]
+    declared: list[NodeSpec] = []
+    declared_edges = 0
+    for item in _require_sequence(specs, field="specs", max_items=max_nodes):
+        # Enforce the graph-wide edge budget while coercing each node so a
+        # hostile input cannot materialize max_edges dependencies per node and
+        # only fail after the full declared graph has been buffered.
+        remaining_edges = max_edges - declared_edges
+        spec = _coerce_spec(item, max_dependencies=remaining_edges)
+        declared_edges += len(spec.dependencies)
+        declared.append(spec)
     sources = (
         _source_specs_from_repo_index(repo_index, max_nodes=max_nodes)
         if repo_index is not None
