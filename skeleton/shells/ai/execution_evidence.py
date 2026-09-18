@@ -35,6 +35,8 @@ class AIExecutionEvidence:
     quorum_approval_digest: str = ""
     runtime_trust_digest: str = ""
     authority_health_policy_digest: str = ""
+    execution_attempt_id: str = ""
+    execution_attempt_authority_digest: str = ""
     audit_witness_digest: str = ""
     audit_witness_sequence: int | None = None
     execution_attempt_id: str = ""
@@ -67,6 +69,7 @@ class AIExecutionEvidence:
             "quorum_approval_digest",
             "runtime_trust_digest",
             "authority_health_policy_digest",
+            "execution_attempt_authority_digest",
             "audit_witness_digest",
             "execution_attempt_authority_digest",
         )
@@ -76,6 +79,14 @@ class AIExecutionEvidence:
                 raise ValueError(f"{name} must be SHA-256 hex")
         if len(self.execution_seal_id) > 128:
             raise ValueError("execution_seal_id too long")
+        if len(self.execution_attempt_id) > 256:
+            raise ValueError("execution_attempt_id too long")
+        if bool(self.execution_attempt_id) != bool(
+            self.execution_attempt_authority_digest
+        ):
+            raise ValueError(
+                "execution attempt id and authority digest must be configured together"
+            )
         if len(self.execution_attempt_id) > 256:
             raise ValueError("execution_attempt_id too long")
         if len(self.execution_attempt_state) > 64:
@@ -125,6 +136,10 @@ class AIExecutionEvidence:
             "runtime_trust_digest": self.runtime_trust_digest,
             "authority_health_policy_digest": (
                 self.authority_health_policy_digest
+            ),
+            "execution_attempt_id": self.execution_attempt_id,
+            "execution_attempt_authority_digest": (
+                self.execution_attempt_authority_digest
             ),
             "audit_witness_digest": self.audit_witness_digest,
             "audit_witness_sequence": self.audit_witness_sequence,
@@ -192,6 +207,8 @@ class AIExecutionEvidenceBuilder:
         quorum_approval_digest: str = "",
         runtime_trust_digest: str = "",
         authority_health_policy_digest: str = "",
+        execution_attempt_id: str = "",
+        execution_attempt_authority_digest: str = "",
         audit_witness_digest: str = "",
         audit_witness_sequence: int | None = None,
         execution_attempt_id: str = "",
@@ -216,6 +233,8 @@ class AIExecutionEvidenceBuilder:
             quorum_approval_digest,
             runtime_trust_digest,
             authority_health_policy_digest,
+            execution_attempt_id,
+            execution_attempt_authority_digest,
             audit_witness_digest,
             audit_witness_sequence,
             execution_attempt_id,
@@ -288,6 +307,8 @@ class AIExecutionEvidenceStore:
             str(raw.get("quorum_approval_digest", "")),
             str(raw.get("runtime_trust_digest", "")),
             str(raw.get("authority_health_policy_digest", "")),
+            str(raw.get("execution_attempt_id", "")),
+            str(raw.get("execution_attempt_authority_digest", "")),
             str(raw.get("audit_witness_digest", "")),
             (
                 None
