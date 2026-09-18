@@ -381,6 +381,15 @@ from .game_engine_scripts import (
     script_build_patches,
     script_policy,
 )
+from .game_engine_benchmark import (
+    AttackVerdict,
+    EngineBenchmarkEntry,
+    EngineBenchmarkReport,
+    EraTournamentReport,
+    GameEngineBenchmarkArena,
+    QualityExpectation,
+    build_game_engine_benchmark_arena,
+)
 from .game_engine_runtime import (
     ERA_FAMILY,
     AdversarialEngineEvolution,
@@ -619,6 +628,13 @@ __all__ = [
     "default_legacy_tuning",
     "legacy_hardware",
     "normalize_legacy_tuning",
+    "AttackVerdict",
+    "EngineBenchmarkEntry",
+    "EngineBenchmarkReport",
+    "EraTournamentReport",
+    "GameEngineBenchmarkArena",
+    "QualityExpectation",
+    "build_game_engine_benchmark_arena",
     "ClockSnapshot",
     "DeterministicGameClock",
     "DomainSteps",

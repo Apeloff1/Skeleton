@@ -39,6 +39,8 @@ on:
       - "skeleton/testing/test_jeeves_game_engine_input.py"
       - "skeleton/testing/test_jeeves_game_engine_timing.py"
       - "skeleton/testing/test_jeeves_game_engine_project.py"
+      - "skeleton/jeeves/game_engine_benchmark.py"
+      - "skeleton/testing/test_jeeves_game_engine_benchmark.py"
       - ".github/workflows/jeeves-game-engine-era-lab.yml"
   push:
     branches: [main]
@@ -79,6 +81,8 @@ on:
       - "skeleton/testing/test_jeeves_game_engine_legacy.py"
       - "skeleton/testing/test_jeeves_game_engine_3d.py"
       - "skeleton/testing/test_jeeves_game_engine_modern.py"
+      - "skeleton/jeeves/game_engine_benchmark.py"
+      - "skeleton/testing/test_jeeves_game_engine_benchmark.py"
       - ".github/workflows/jeeves-game-engine-era-lab.yml"
 
 permissions:
@@ -113,6 +117,7 @@ jobs:
           skeleton/jeeves/game_engine_3d.py
           skeleton/jeeves/game_engine_modern.py
           skeleton/jeeves/game_engine_runtime.py
+          skeleton/jeeves/game_engine_benchmark.py
           skeleton/jeeves/game_engine_assets.py
           skeleton/jeeves/game_engine_scripts.py
           skeleton/jeeves/game_engine_physics.py
@@ -135,6 +140,7 @@ jobs:
           skeleton/testing/test_jeeves_game_engine_3d.py
           skeleton/testing/test_jeeves_game_engine_modern.py
           skeleton/testing/test_jeeves_game_engine_runtime.py
+          skeleton/testing/test_jeeves_game_engine_benchmark.py
           skeleton/testing/test_jeeves_game_engine_assets.py
           skeleton/testing/test_jeeves_game_engine_scripts.py
           skeleton/testing/test_jeeves_game_engine_physics.py
