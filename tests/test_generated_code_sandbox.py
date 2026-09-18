@@ -393,6 +393,47 @@ def test_model_tool_output_cannot_self_grant_on_canonical_orchestrator() -> None
     assert "denied capabilities: network" in record.error
 
 
+@pytest.mark.parametrize(
+    "nested_key",
+    ["policy", "grants", "capabilities", "permissions", "scopes"],
+)
+def test_nested_tool_policy_keys_cannot_bypass_self_grant_detection(
+    tmp_path: Path,
+    nested_key: str,
+) -> None:
+    box = _sandbox(tmp_path)
+    payload = json.dumps(
+        {
+            "name": "fetch",
+            "arguments": {
+                "options": {
+                    nested_key: {"network": "allow"},
+                }
+            },
+        }
+    )
+    decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind is OperationKind.POLICY_MUTATE
+    assert nested_key in decision.operation.target
+    assert box.granted_capabilities() == frozenset()
+
+
+def test_tool_json_structure_bound_fails_closed(tmp_path: Path) -> None:
+    box = _sandbox(tmp_path)
+    nested: object = {"value": "leaf"}
+    for _ in range(2200):
+        nested = [nested]
+    try:
+        payload = json.dumps({"name": "noop", "arguments": nested})
+    except RecursionError:
+        pytest.skip("local JSON encoder recursion limit is lower than traversal fixture")
+    decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
+    assert decision.allowed is False
+    assert "bound" in decision.reason or "parse" in decision.reason
+
+
 def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Path) -> None:
     box = _sandbox(tmp_path)
     payload = json.dumps({
