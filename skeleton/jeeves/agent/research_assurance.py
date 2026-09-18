@@ -282,6 +282,58 @@ class CompletionCertificate:
             if item.severity is AssuranceSeverity.WARNING
         )
 
+    @classmethod
+    def from_json(cls, value: Mapping[str, Any]) -> "CompletionCertificate":
+        payload = json_safe(dict(value))
+        findings = tuple(
+            AssuranceFinding(
+                finding_id=item["finding_id"],
+                severity=AssuranceSeverity(item["severity"]),
+                code=item["code"],
+                message=item["message"],
+                observed=item.get("observed"),
+                required=item.get("required"),
+            )
+            for item in payload.get("findings", ())
+        )
+        certificate = cls(
+            certificate_id=payload["certificate_id"],
+            obligation_id=payload["obligation_id"],
+            resolution=ResearchResolution(payload["resolution"]),
+            accepted=bool(payload["accepted"]),
+            provisional=bool(payload["provisional"]),
+            high_impact=bool(payload["high_impact"]),
+            findings=findings,
+            proof_debt=tuple(payload.get("proof_debt", ())),
+            evidence_fingerprint=payload["evidence_fingerprint"],
+            policy_fingerprint=payload["policy_fingerprint"],
+            fingerprint=payload["fingerprint"],
+        )
+        expected = stable_fingerprint(
+            {
+                "certificate": certificate.certificate_id,
+                "resolution": certificate.resolution.value,
+                "accepted": certificate.accepted,
+                "provisional": certificate.provisional,
+                "high_impact": certificate.high_impact,
+                "findings": [
+                    (
+                        item.severity.value,
+                        item.code,
+                        item.observed,
+                        item.required,
+                    )
+                    for item in certificate.findings
+                ],
+                "proof_debt": tuple(sorted(set(certificate.proof_debt))),
+            }
+        )
+        if expected != certificate.fingerprint:
+            raise AgentContractError(
+                "research completion certificate fingerprint mismatch"
+            )
+        return certificate
+
     def as_json(self) -> dict[str, Any]:
         return {
             "certificate_id": self.certificate_id,
