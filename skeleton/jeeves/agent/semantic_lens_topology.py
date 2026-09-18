@@ -363,9 +363,18 @@ class SemanticLensTopology:
         *,
         limit: int = 32,
         minimum_score: float = 0.18,
+        focus_keys: Sequence[str] = (),
     ) -> tuple[LensBridgeCandidate, ...]:
         maximum = positive_int("limit", limit, maximum=10_000)
         threshold = probability("minimum_score", minimum_score)
+        focus = {
+            str(key).strip().casefold()
+            for key in focus_keys
+            if str(key).strip()
+        }
+        unknown_focus = focus - set(self._specs)
+        if unknown_focus:
+            raise KeyError(sorted(unknown_focus)[0])
         specs = tuple(sorted(self._specs.values(), key=lambda spec: spec.key))
         existing = {
             tuple(sorted((edge.left_key, edge.right_key)))
@@ -374,6 +383,8 @@ class SemanticLensTopology:
         candidates: list[LensBridgeCandidate] = []
         for index, left in enumerate(specs):
             for right in specs[index + 1 :]:
+                if focus and left.key not in focus and right.key not in focus:
+                    continue
                 pair = tuple(sorted((left.key, right.key)))
                 if pair in existing:
                     continue
