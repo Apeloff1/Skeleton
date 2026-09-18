@@ -127,6 +127,9 @@ def test_loss_simulation_reports_gap_then_applies_retransmit():
     assert replica.ingest(snapshot).outcome is DeliveryOutcome.INITIALIZED
     buffered = replica.ingest(later)
     assert buffered.outcome is DeliveryOutcome.BUFFERED
+    assert buffered.ack is not None
+    assert buffered.ack.last_received_sequence == later.sequence
+    assert buffered.ack.missing_sequences == (2,)
     assert replica.missing_sequences() == (2,)
     assert replica.sequence == 1
     ack = replica.acknowledge()
