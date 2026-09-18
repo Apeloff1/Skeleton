@@ -25,7 +25,7 @@ class DistributedAIIdempotencyRegistry:
         backend: VersionedStateBackend,
         *,
         config: DistributedIdempotencyConfig | None = None,
-        clock: Callable[[], float] = time.monotonic,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self.backend = backend
         self.config = config or DistributedIdempotencyConfig()
