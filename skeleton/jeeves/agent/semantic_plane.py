@@ -47,6 +47,7 @@ from .semantic_lenses import (
     LensSelection,
     ReadingStatus,
     SemanticFinding,
+    SemanticLensSpec,
     SemanticObservation,
     SemanticRole,
     TangentSeed,
@@ -137,6 +138,9 @@ class SemanticPlanePolicy:
     frontier_max_per_family: int = 3
     topology_bridge_limit: int = 12
     topology_bridge_minimum_score: float = 0.18
+    enable_learned_companions: bool = True
+    max_learned_companions: int = 4
+    minimum_learned_companion_cue_support: float = 0.20
     require_selected_findings: bool = True
     require_observation_overlap: bool = True
     require_observation_subset: bool = True
@@ -154,6 +158,7 @@ class SemanticPlanePolicy:
             "frontier_max_per_axis",
             "frontier_max_per_family",
             "topology_bridge_limit",
+            "max_learned_companions",
         ):
             object.__setattr__(
                 self,
@@ -168,7 +173,23 @@ class SemanticPlanePolicy:
                 self.topology_bridge_minimum_score,
             ),
         )
-        object.__setattr__(self, "base_rate", probability("base_rate", self.base_rate))
+        object.__setattr__(
+            self,
+            "minimum_learned_companion_cue_support",
+            probability(
+                "minimum_learned_companion_cue_support",
+                self.minimum_learned_companion_cue_support,
+            ),
+        )
+        if not isinstance(self.enable_learned_companions, bool):
+            raise AgentContractError(
+                "enable_learned_companions must be boolean"
+            )
+        object.__setattr__(
+            self,
+            "base_rate",
+            probability("base_rate", self.base_rate),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +240,7 @@ class SemanticPlaneCoverage:
     topology_candidate_bridges: int
     topology_learned_bridges: int
     topology_active_learning_reports: int
+    learned_companion_lenses: int
     fingerprint: str
 
 
@@ -248,6 +270,7 @@ class SemanticPlaneSnapshot:
     topology: SemanticTopologySnapshot
     topology_learning: SemanticTopologyLearningSnapshot
     learned_topology_rules: tuple[LearnedTopologyRule, ...]
+    learned_companion_keys: tuple[str, ...]
     topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
@@ -709,6 +732,148 @@ class SemanticLensPlane:
             for key in source_keys
         )
 
+    def _cue_support(
+        self,
+        spec: SemanticLensSpec,
+        observations: Sequence[SemanticObservation],
+    ) -> float:
+        if not spec.activation_cues:
+            return 0.0
+        observation_tokens: set[str] = set()
+        for observation in observations:
+            observation_tokens.update(
+                self.router._tokens(observation.content)
+            )
+            observation_tokens.update(
+                str(tag).strip().casefold()
+                for tag in observation.tags
+                if str(tag).strip()
+            )
+        matched = 0
+        for cue in spec.activation_cues:
+            cue_tokens = self.router._tokens(cue)
+            if cue_tokens and cue_tokens.issubset(observation_tokens):
+                matched += 1
+        return matched / max(1, len(spec.activation_cues))
+
+    def _augment_with_learned_companions(
+        self,
+        selection: LensSelection,
+        observations: Sequence[SemanticObservation],
+        learned_rules: Sequence[LearnedTopologyRule],
+    ) -> tuple[LensSelection, tuple[str, ...]]:
+        if (
+            not self.policy.enable_learned_companions
+            or not learned_rules
+            or len(selection.lenses) >= self.policy.max_lenses
+        ):
+            return selection, ()
+
+        selected = list(selection.lenses)
+        selected_keys = {item.key for item in selected}
+        scores = dict(selection.activation_scores)
+        family_counts: dict[LensFamily, int] = {}
+        for spec in selected:
+            family_counts[spec.family] = (
+                family_counts.get(spec.family, 0) + 1
+            )
+
+        proposals: dict[str, tuple[float, SemanticLensSpec]] = {}
+        for learned in learned_rules:
+            left_key, right_key = learned.rule.key
+            left_selected = left_key in selected_keys
+            right_selected = right_key in selected_keys
+            if left_selected == right_selected:
+                continue
+            companion_key = right_key if left_selected else left_key
+            try:
+                companion = self.registry.get(companion_key)
+            except KeyError:
+                continue
+            if len(observations) < companion.minimum_observations:
+                continue
+            if (
+                family_counts.get(companion.family, 0)
+                >= self.policy.max_per_family
+            ):
+                continue
+            cue_support = self._cue_support(companion, observations)
+            if (
+                cue_support
+                < self.policy.minimum_learned_companion_cue_support
+            ):
+                continue
+            pair_bonus = (
+                0.08
+                if companion.pairwise and len(observations) >= 2
+                else 0.0
+            )
+            sequential_bonus = (
+                0.08
+                if companion.sequential and len(observations) >= 3
+                else 0.0
+            )
+            rarity_bonus = 0.04 if companion.rare else 0.0
+            activation = min(
+                1.0,
+                0.18
+                + 0.56 * cue_support
+                + pair_bonus
+                + sequential_bonus
+                + rarity_bonus
+                + 0.12,
+            )
+            prior = proposals.get(companion.key)
+            if prior is None or activation > prior[0]:
+                proposals[companion.key] = (activation, companion)
+
+        ordered = sorted(
+            proposals.values(),
+            key=lambda item: (
+                -item[0],
+                item[1].family.value,
+                item[1].key,
+            ),
+        )
+        added: list[str] = []
+        for activation, companion in ordered:
+            if (
+                len(selected) >= self.policy.max_lenses
+                or len(added) >= self.policy.max_learned_companions
+            ):
+                break
+            if companion.key in selected_keys:
+                continue
+            if (
+                family_counts.get(companion.family, 0)
+                >= self.policy.max_per_family
+            ):
+                continue
+            selected.append(companion)
+            selected_keys.add(companion.key)
+            family_counts[companion.family] = (
+                family_counts.get(companion.family, 0) + 1
+            )
+            scores[companion.key] = activation
+            added.append(companion.key)
+
+        if not added:
+            return selection, ()
+        return (
+            LensSelection(
+                lenses=tuple(selected),
+                activation_scores=scores,
+                families=tuple(
+                    sorted(
+                        {spec.family for spec in selected},
+                        key=lambda family: family.value,
+                    )
+                ),
+                perpendicular=selection.perpendicular,
+            ),
+            tuple(sorted(added)),
+        )
+
     def _coverage(
         self,
         *,
@@ -724,6 +889,7 @@ class SemanticLensPlane:
         topology: SemanticTopologySnapshot,
         topology_learning: SemanticTopologyLearningSnapshot,
         learned_topology_rules: Sequence[LearnedTopologyRule],
+        learned_companion_keys: Sequence[str],
         topology_bridge_candidates: Sequence[LensBridgeCandidate],
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
@@ -776,6 +942,9 @@ class SemanticLensPlane:
                 "learned_topology_rules": [
                     item.fingerprint for item in learned_topology_rules
                 ],
+                "learned_companion_keys": sorted(
+                    set(learned_companion_keys)
+                ),
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
@@ -808,6 +977,9 @@ class SemanticLensPlane:
             topology_learned_bridges=len(learned_topology_rules),
             topology_active_learning_reports=len(
                 topology_learning.active_report_ids
+            ),
+            learned_companion_lenses=len(
+                tuple(set(learned_companion_keys))
             ),
             fingerprint=fingerprint,
         )
