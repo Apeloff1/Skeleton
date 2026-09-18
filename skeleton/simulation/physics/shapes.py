@@ -353,11 +353,25 @@ class ConvexHullShape:
                 "convex hull vertices must be unique"
             )
 
+        minimum = vertices[0]
+        maximum = vertices[0]
+        for vertex in vertices[1:]:
+            minimum = minimum.min(vertex)
+            maximum = maximum.max(vertex)
+        span = maximum - minimum
+        geometry_scale = max(span.to_tuple())
+        if geometry_scale <= 0.0:
+            raise PhysicsValidationError(
+                "convex hull vertex span must be non-zero"
+            )
+        area_tolerance = geometry_scale * geometry_scale * 1.0e-12
+        plane_tolerance = geometry_scale**3 * 1.0e-10
+        volume_tolerance = geometry_scale**3 * 1.0e-12
+
         normalized_faces: list[tuple[int, int, int]] = []
         directed_edges: dict[tuple[int, int], int] = {}
         undirected_edges: dict[tuple[int, int], int] = {}
         seen_faces: set[tuple[int, int, int]] = set()
-        tolerance = 1.0e-10
 
         for face in faces:
             if len(face) != 3:
@@ -387,7 +401,7 @@ class ConvexHullShape:
 
             a, b, d = (vertices[index] for index in face)
             normal = (b - a).cross(d - a)
-            if normal.length_squared() <= tolerance * tolerance:
+            if normal.length_squared() <= area_tolerance * area_tolerance:
                 raise PhysicsValidationError(
                     "convex hull contains degenerate face"
                 )
@@ -397,9 +411,9 @@ class ConvexHullShape:
                 if index in face:
                     continue
                 distance = normal.dot(vertex - a)
-                if distance > tolerance:
+                if distance > plane_tolerance:
                     signs.add(1)
-                elif distance < -tolerance:
+                elif distance < -plane_tolerance:
                     signs.add(-1)
             if len(signs) > 1:
                 raise PhysicsValidationError(
@@ -435,7 +449,7 @@ class ConvexHullShape:
         for i, j, k in normalized_faces:
             a, b, d = vertices[i], vertices[j], vertices[k]
             signed_volume += a.dot(b.cross(d)) / 6.0
-        if abs(signed_volume) <= 1.0e-12:
+        if abs(signed_volume) <= volume_tolerance:
             raise PhysicsValidationError(
                 "convex hull enclosed volume must be non-zero"
             )
@@ -476,6 +490,13 @@ class ConvexHullShape:
 
     def mass_properties(self, density: float) -> MassProperties:
         density = _positive(density, name="density")
+        minimum = self.vertices[0]
+        maximum = self.vertices[0]
+        for vertex in self.vertices[1:]:
+            minimum = minimum.min(vertex)
+            maximum = maximum.max(vertex)
+        geometry_scale = max((maximum - minimum).to_tuple())
+        volume_tolerance = geometry_scale**3 * 1.0e-12
 
         volume = 0.0
         first = Vec3.zero()
@@ -528,7 +549,7 @@ class ConvexHullShape:
             int_xz += product_integral(xs, zs)
             int_yz += product_integral(ys, zs)
 
-        if abs(volume) <= 1.0e-12:
+        if abs(volume) <= volume_tolerance:
             raise PhysicsValidationError(
                 "convex hull enclosed volume must be non-zero"
             )
