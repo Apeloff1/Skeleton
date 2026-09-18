@@ -2,7 +2,10 @@ name: PR Hygiene
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
+    # Classification is derived only from changed files and line counts.
+    # Metadata edits, draft/readiness toggles, and close events cannot change
+    # those facts, so avoid creating no-op workflow generations for them.
+    types: [opened, reopened, synchronize]
 
 concurrency:
   group: pr-hygiene-${{ github.event.pull_request.number }}
@@ -15,7 +18,7 @@ permissions: {}
 jobs:
   classify:
     name: Classify pull request
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
