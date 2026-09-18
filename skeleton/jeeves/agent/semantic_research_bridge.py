@@ -58,11 +58,14 @@ class SemanticTopologyResearchBridge:
         include_rejected: bool = False,
         dependencies: Mapping[str, Sequence[str]] | None = None,
     ) -> SemanticTopologyResearchUpdate:
-        obligations = self.topology_learning.research_obligations(
+        frontier = self.control_plane.map_semantic_topology_frontier(
+            self.topology_learning,
             limit=limit,
             minimum_candidate_score=minimum_candidate_score,
             include_rejected=include_rejected,
+            dependencies=dependencies,
         )
+        obligations = frontier.obligations
         if any(
             not bool(item.metadata.get("semantic_topology"))
             for item in obligations
@@ -70,10 +73,6 @@ class SemanticTopologyResearchBridge:
             raise AgentContractError(
                 "topology research bridge received non-topology obligation"
             )
-        frontier = self.control_plane.map_epistemic_frontier(
-            obligations,
-            dependencies=dependencies,
-        )
         agenda = self.control_plane.research_agenda.snapshot()
         agenda_ids = tuple(
             sorted(
