@@ -152,3 +152,38 @@ def test_learning_queries_reject_malformed_known_sets():
         graph.ready_to_learn(["a"])  # type: ignore[arg-type]
     with pytest.raises(ConceptError, match="known"):
         graph.learning_path("c", {1})  # type: ignore[arg-type]
+
+
+
+def test_first_observation_samples_clock_once():
+    ticks = iter([10.0])
+    engine = AssessmentEngine(clock=lambda: next(ticks))
+
+    skill = engine.observe(InteractionEvidence("python", correct=True))
+
+    assert skill.skill_id == "python"
+    assert skill.attempts == 1
+    assert skill.last_updated == 10.0
+
+
+def test_failed_clock_read_cannot_publish_new_skill():
+    engine = AssessmentEngine(clock=lambda: math.nan)
+
+    with pytest.raises(AssessmentError, match="clock"):
+        engine.observe(InteractionEvidence("python", correct=True))
+
+    assert engine.mastery("python") is None
+
+
+def test_weakest_ties_are_independent_of_registration_order():
+    left = AssessmentEngine(clock=lambda: 1.0)
+    right = AssessmentEngine(clock=lambda: 1.0)
+
+    for skill_id in ("zeta", "alpha", "middle"):
+        left.register(skill_id)
+    for skill_id in ("middle", "zeta", "alpha"):
+        right.register(skill_id)
+
+    expected = ("alpha", "middle", "zeta")
+    assert tuple(skill.skill_id for skill in left.weakest(3)) == expected
+    assert tuple(skill.skill_id for skill in right.weakest(3)) == expected
