@@ -15,6 +15,13 @@ from .character import (
     build_character_state,
     verify_character_state,
 )
+from .character_rollback import (
+    CharacterCorrectionReceipt,
+    CharacterInputFrame,
+    CharacterRollbackReceipt,
+    CharacterRollbackSession,
+    CharacterStepReceipt,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -151,11 +158,16 @@ __all__ = [
     "CCDHit",
     "CharacterControllerSettings",
     "CharacterControllerState",
+    "CharacterCorrectionReceipt",
     "CharacterGroundState",
+    "CharacterInputFrame",
     "CharacterMoveResult",
     "CharacterRecoveryResult",
+    "CharacterRollbackReceipt",
+    "CharacterRollbackSession",
     "CharacterResizeResult",
     "CharacterRuntimeResult",
+    "CharacterStepReceipt",
     "CharacterSweepHit",
     "CommandCorrectionReceipt",
     "ConstraintColorBatch",
