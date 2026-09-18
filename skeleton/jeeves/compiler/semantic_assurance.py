@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence, Tuple
 
@@ -46,13 +46,10 @@ class SemanticPassObligation:
     kind: SemanticObligationKind
     status: SemanticObligationStatus
     message: str
-    metadata: Mapping[str, Any] = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.metadata is None:
-            object.__setattr__(self, "metadata", {})
-        else:
-            object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", dict(self.metadata))
 
 
 @dataclass(frozen=True, slots=True)
