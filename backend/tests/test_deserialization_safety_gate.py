@@ -48,6 +48,22 @@ def test_rejects_function_local_callable_alias(tmp_path: Path) -> None:
     assert any("pickle.loads() is forbidden" in finding for finding in findings)
 
 
+def test_rejects_walrus_alias_to_pickle_loads(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\nif (restore := pickle.loads):\n    value = restore(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_to_torch_load_without_weights_only(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\nif (restore := torch.load):\n    value = restore(path)\n",
+    )
+    assert any("weights_only=True" in finding for finding in findings)
+
+
 def test_rebound_callable_alias_is_not_assumed_to_keep_provenance(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
