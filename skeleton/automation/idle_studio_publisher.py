@@ -9,19 +9,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
 from .idle_studio import (
     ChangeProposal,
+    GitHubClient,
+    GitHubError,
     StudioConfig,
     WorkItem,
     WorkerSpec,
-    GitHubClient,
     _existing_studio_task_keys,
     _open_studio_pr_count,
     _proposal_body,
+    canonical_commit_oid,
     task_fingerprint,
 )
 from .idle_studio_v2 import ReviewDecision, read_package, unpack_entry
@@ -71,6 +73,10 @@ def publish_entries(
     entries = package.get("entries", [])
     if not base_sha or not isinstance(entries, list):
         raise ValueError("invalid package")
+    try:
+        base_sha = canonical_commit_oid(base_sha)
+    except GitHubError as exc:
+        raise ValueError("invalid package") from exc
 
     fresh_pulls = github.open_pulls()
     claimed = _existing_studio_task_keys(fresh_pulls)
