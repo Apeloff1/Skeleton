@@ -69,6 +69,19 @@ npc = LorebuffaNpcPipeline().run(
 
 The adapter reuses Skeleton's existing NPC verification and repair path instead of bypassing the control plane. Lorebuffa's game transport/UI/backend persistence code is intentionally not pulled into Skeleton's AI core.
 
+## ARM64 / Ubuntu
+
+Skeleton is validated on native Ubuntu ARM64 (`aarch64`) in CI. The Python and Docker runtime paths use multi-platform base images, and the ARM64 CI job compiles the full Skeleton package, runs focused regression tests, and builds both application images natively.
+
+For ARM64 hosts, use Docker/Compose normally; Docker selects the ARM64 variant of the pinned multi-platform base images. To explicitly build the ARM64 targets:
+
+```bash
+docker buildx build --platform linux/arm64 -t skeleton:arm64 .
+docker buildx build --platform linux/arm64 -f backend/Dockerfile --target production -t skeleton-backend:arm64 .
+```
+
+The ARM64 workflow is intentionally separate from the main x86 CI so ARM-native compatibility failures are visible without making every general-purpose test job depend on emulation.
+
 ## Developer CLI
 
 ```bash
