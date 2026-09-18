@@ -23,7 +23,7 @@ separate evidence/causal layer establishes them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Mapping, Sequence
 
 from .lens_fusion import LensFusionEngine, LensFusionResult, LensSignal
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
@@ -54,6 +54,13 @@ from .semantic_lens_topology import (
 )
 from .semantic_plane_interactions import plane_interaction_rules
 from .semantic_depth_interactions import depth_interaction_rules
+from .semantic_topology_learning import (
+    LearnedTopologyRule,
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    TopologyBridgeReport,
+    TopologyBridgeTrial,
+)
 from .semantic_prediction import (
     PredictionStatus,
     SemanticForecast,
@@ -203,6 +210,8 @@ class SemanticPlaneCoverage:
     topology_isolated_lenses: int
     topology_bridge_lenses: int
     topology_candidate_bridges: int
+    topology_learned_bridges: int
+    topology_active_learning_reports: int
     fingerprint: str
 
 
@@ -230,6 +239,8 @@ class SemanticPlaneSnapshot:
     tangent_ids: tuple[str, ...]
     frontier: FrontierSelection
     topology: SemanticTopologySnapshot
+    topology_learning: SemanticTopologyLearningSnapshot
+    learned_topology_rules: tuple[LearnedTopologyRule, ...]
     topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
@@ -254,6 +265,7 @@ class SemanticLensPlane:
         fusion: LensFusionEngine | None = None,
         tangent_graph: TangentGraph | None = None,
         topology: SemanticLensTopology | None = None,
+        topology_learning: SemanticTopologyLearningLab | None = None,
         policy: SemanticPlanePolicy | None = None,
     ) -> None:
         self.registry = registry or MaximalSemanticRegistry()
@@ -267,6 +279,14 @@ class SemanticLensPlane:
         self.fusion = fusion or LensFusionEngine()
         self.tangent_graph = tangent_graph or TangentGraph()
         self.topology = topology or SemanticLensTopology(self.registry)
+        self.topology_learning = (
+            topology_learning
+            or SemanticTopologyLearningLab(self.topology)
+        )
+        if self.topology_learning.topology is not self.topology:
+            raise ValueError(
+                "topology_learning must share the semantic topology"
+            )
         self.policy = policy or SemanticPlanePolicy()
 
     def select(
@@ -695,6 +715,8 @@ class SemanticLensPlane:
         tangent_ids: Sequence[str],
         frontier: FrontierSelection,
         topology: SemanticTopologySnapshot,
+        topology_learning: SemanticTopologyLearningSnapshot,
+        learned_topology_rules: Sequence[LearnedTopologyRule],
         topology_bridge_candidates: Sequence[LensBridgeCandidate],
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
@@ -743,6 +765,10 @@ class SemanticLensPlane:
                 "tangents": sorted(tangent_ids),
                 "frontier": frontier.fingerprint,
                 "topology": topology.fingerprint,
+                "topology_learning": topology_learning.fingerprint,
+                "learned_topology_rules": [
+                    item.fingerprint for item in learned_topology_rules
+                ],
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
@@ -772,6 +798,10 @@ class SemanticLensPlane:
             topology_isolated_lenses=len(topology.isolated_lens_keys),
             topology_bridge_lenses=len(topology.bridge_lens_keys),
             topology_candidate_bridges=len(topology_bridge_candidates),
+            topology_learned_bridges=len(learned_topology_rules),
+            topology_active_learning_reports=len(
+                topology_learning.active_report_ids
+            ),
             fingerprint=fingerprint,
         )
 
@@ -818,7 +848,14 @@ class SemanticLensPlane:
             selected_lens_keys=tuple(spec.key for spec in selection.lenses),
             maximum_axes=self.policy.max_perpendicular_axes,
         )
-        composition = self.composition.compose(audit.accepted)
+        learned_topology_rules = self.topology_learning.learned_rules()
+        topology_learning = self.topology_learning.snapshot()
+        composition = self.composition.compose(
+            audit.accepted,
+            supplemental_rules=tuple(
+                item.rule for item in learned_topology_rules
+            ),
+        )
 
         calibration_weights = dict(governance.predictive_weights)
         hypergraph = self.hypergraph.build(
@@ -880,10 +917,17 @@ class SemanticLensPlane:
             fusion=fusion,
         ) and not bool(audit.rejected)
         topology = self.topology.snapshot
-        topology_bridge_candidates = self.topology.bridge_candidates(
-            limit=self.policy.topology_bridge_limit,
-            minimum_score=self.policy.topology_bridge_minimum_score,
-            focus_keys=tuple(spec.key for spec in selection.lenses),
+        learned_candidate_ids = {
+            item.candidate_id for item in learned_topology_rules
+        }
+        topology_bridge_candidates = tuple(
+            item
+            for item in self.topology.bridge_candidates(
+                limit=self.policy.topology_bridge_limit,
+                minimum_score=self.policy.topology_bridge_minimum_score,
+                focus_keys=tuple(spec.key for spec in selection.lenses),
+            )
+            if item.candidate_id not in learned_candidate_ids
         )
         coverage = self._coverage(
             selection=selection,
@@ -896,6 +940,8 @@ class SemanticLensPlane:
             tangent_ids=tangent_ids,
             frontier=frontier,
             topology=topology,
+            topology_learning=topology_learning,
+            learned_topology_rules=learned_topology_rules,
             topology_bridge_candidates=topology_bridge_candidates,
         )
         fingerprint = stable_fingerprint(
@@ -918,6 +964,10 @@ class SemanticLensPlane:
                 "tangents": tangent_ids,
                 "frontier": frontier.fingerprint,
                 "topology": topology.fingerprint,
+                "topology_learning": topology_learning.fingerprint,
+                "learned_topology_rules": [
+                    item.fingerprint for item in learned_topology_rules
+                ],
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
@@ -941,12 +991,49 @@ class SemanticLensPlane:
             tangent_ids=tangent_ids,
             frontier=frontier,
             topology=topology,
+            topology_learning=topology_learning,
+            learned_topology_rules=learned_topology_rules,
             topology_bridge_candidates=topology_bridge_candidates,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
             fingerprint=fingerprint,
         )
+
+    def record_topology_bridge_trial(
+        self,
+        trial: TopologyBridgeTrial,
+    ) -> TopologyBridgeReport:
+        """Record a predeclared bridge trial and return its current report."""
+
+        recorded = self.topology_learning.record(trial)
+        return self.topology_learning.report(
+            recorded.candidate_id,
+            recorded.kind,
+        )
+
+    def topology_learning_summary(self) -> Mapping[str, Any]:
+        snapshot = self.topology_learning.snapshot()
+        return {
+            "trial_count": snapshot.trial_count,
+            "tested_bridge_count": snapshot.tested_bridge_count,
+            "active_report_ids": snapshot.active_report_ids,
+            "restricted_report_ids": snapshot.restricted_report_ids,
+            "rejected_report_ids": snapshot.rejected_report_ids,
+            "candidate_report_ids": snapshot.candidate_report_ids,
+            "learned_rule_keys": snapshot.learned_rule_keys,
+            "snapshot_fingerprint": snapshot.fingerprint,
+            "contract_fingerprint": (
+                self.topology_learning.contract_fingerprint
+            ),
+            "invariants": {
+                "cue_overlap_never_auto_promotes": True,
+                "learned_bridges_remain_interpretive": True,
+                "negative_controls_are_required": True,
+                "replication_across_runs_and_domains_is_required": True,
+                "learned_bridges_never_create_evidence": True,
+            },
+        }
 
     def resolve_forecast(
         self,
@@ -1062,6 +1149,9 @@ class SemanticLensPlane:
                     for spec in self.registry.all()
                 ],
                 "topology": self.topology.fingerprint,
+                "topology_learning_contract": (
+                    self.topology_learning.contract_fingerprint
+                ),
                 "interaction_rules": [
                     (
                         rule.key,
