@@ -203,7 +203,7 @@ class MemoryManager:
 
     def get_user_history(self, user_id: str, limit: int = 10) -> List[Session]:
         user_id = _bounded_identifier("user_id", user_id)
-        limit = _positive_limit("limit", limit, maximum=self._max_sessions)
+        limit = _positive_limit("limit", limit, maximum=10_000)
         ids = self._user_sessions.get(user_id, [])[-limit:]
         return [self._sessions[sid] for sid in ids if sid in self._sessions]
 
