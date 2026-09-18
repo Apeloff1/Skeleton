@@ -480,6 +480,40 @@ def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
     assert moving.linear_velocity.x < 9.0
 
 
+def test_capsule_cylinder_ccd_makes_progress_under_tight_substep_budget() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.5,
+            ccd_motion_threshold=0.1,
+            ccd_contact_slop=1.0e-6,
+            ccd_max_substeps=2,
+            sleep_after_seconds=10.0,
+        )
+    )
+    moving = _dynamic(
+        "capsule",
+        CapsuleShape(0.4, 0.7),
+        Vec3(-3.0, 0.0, 0.0),
+        Quat.from_axis_angle(Vec3.axis(2), 0.1),
+    )
+    moving.linear_velocity = Vec3(9.0, 0.0, 0.0)
+    target = _static(
+        "cylinder",
+        CylinderShape(0.5, 0.8),
+        Vec3.zero(),
+        Quat.from_axis_angle(Vec3.axis(0), -0.1),
+    )
+    world.add_body(moving)
+    world.add_body(target)
+
+    receipt = world.step()[0]
+
+    assert 1 <= receipt.ccd_clamps <= 2
+    assert moving.position.x < target.position.x
+    assert moving.linear_velocity.x < 9.0
+
+
 def test_general_convex_toi_tie_break_is_canonical() -> None:
     moving = _dynamic(
         "m",
