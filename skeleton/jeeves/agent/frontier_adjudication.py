@@ -189,6 +189,114 @@ class FrontierAdjudicationReport:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class HostCandidateAdjudicationReport:
+    """Host-derived evidence custody and contradiction assessment.
+
+    This richer report is intentionally separate from FrontierAdjudicationReport.
+    inspect preserves the historical scoring contract while adjudicate exposes
+    custody, fingerprint, source-diversity, and contradiction metrics.
+    """
+
+    candidate_id: str
+    score: float
+    custody_fraction: float
+    fingerprint_fraction: float
+    identity_fraction: float
+    source_diversity: float
+    confidence_quality: float
+    contradiction_count: int
+    contradiction_rate: float
+    known_evidence_count: int
+    unknown_evidence_count: int
+    fingerprint_mismatch_count: int
+    identity_mismatch_count: int
+    stale_evidence_count: int
+    rejected: bool
+    reasons: tuple[str, ...]
+    policy_fingerprint: str
+    ledger_fingerprint: str
+    fingerprint: str
+
+    def __post_init__(self) -> None:
+        for name in (
+            "score",
+            "custody_fraction",
+            "fingerprint_fraction",
+            "identity_fraction",
+            "source_diversity",
+            "confidence_quality",
+            "contradiction_rate",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                probability(name, getattr(self, name)),
+            )
+        for name in (
+            "contradiction_count",
+            "known_evidence_count",
+            "unknown_evidence_count",
+            "fingerprint_mismatch_count",
+            "identity_mismatch_count",
+            "stale_evidence_count",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise AgentContractError(
+                    f"{name} must be a non-negative integer"
+                )
+        if not self.candidate_id:
+            raise AgentContractError("candidate_id is required")
+        for name in (
+            "policy_fingerprint",
+            "ledger_fingerprint",
+            "fingerprint",
+        ):
+            value = getattr(self, name)
+            if len(value) != 64:
+                raise AgentContractError(
+                    f"{name} must be SHA-256 hex"
+                )
+
+    @property
+    def total_evidence_count(self) -> int:
+        return self.known_evidence_count + self.unknown_evidence_count
+
+    @property
+    def ok(self) -> bool:
+        return not self.rejected
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "candidate_id": self.candidate_id,
+            "score": self.score,
+            "custody_fraction": self.custody_fraction,
+            "fingerprint_fraction": self.fingerprint_fraction,
+            "identity_fraction": self.identity_fraction,
+            "source_diversity": self.source_diversity,
+            "confidence_quality": self.confidence_quality,
+            "contradiction_count": self.contradiction_count,
+            "contradiction_rate": self.contradiction_rate,
+            "known_evidence_count": self.known_evidence_count,
+            "unknown_evidence_count": self.unknown_evidence_count,
+            "fingerprint_mismatch_count": self.fingerprint_mismatch_count,
+            "identity_mismatch_count": self.identity_mismatch_count,
+            "stale_evidence_count": self.stale_evidence_count,
+            "total_evidence_count": self.total_evidence_count,
+            "rejected": self.rejected,
+            "ok": self.ok,
+            "reasons": list(self.reasons),
+            "policy_fingerprint": self.policy_fingerprint,
+            "ledger_fingerprint": self.ledger_fingerprint,
+            "fingerprint": self.fingerprint,
+        }
+
+
 class HostCandidateAdjudicator:
     """Verify candidate grounding using only host-trusted ledger state.
 
@@ -214,6 +322,256 @@ class HostCandidateAdjudicator:
 
     def score(self, candidate: CandidateProposal) -> float:
         return self.inspect(candidate).score
+
+    def adjudicate(
+        self,
+        candidate: CandidateProposal,
+    ) -> HostCandidateAdjudicationReport:
+        """Return host-trusted custody and contradiction metrics."""
+        if not isinstance(candidate, CandidateProposal):
+            raise TypeError("candidate must be CandidateProposal")
+
+        refs = candidate.evidence
+        if len(refs) > self.policy.maximum_evidence_refs:
+            return self._host_report(
+                candidate,
+                score=0.0,
+                custody_fraction=0.0,
+                fingerprint_fraction=0.0,
+                identity_fraction=0.0,
+                source_diversity=0.0,
+                confidence_quality=0.0,
+                contradiction_count=0,
+                contradiction_rate=0.0,
+                known_evidence_count=0,
+                unknown_evidence_count=len(refs),
+                fingerprint_mismatch_count=0,
+                identity_mismatch_count=0,
+                stale_evidence_count=0,
+                rejected=True,
+                reasons=(
+                    "evidence_reference_bound_exceeded="
+                    f"{len(refs)}>{self.policy.maximum_evidence_refs}",
+                ),
+            )
+
+        now = float(self._clock())
+        if not math.isfinite(now) or now < 0.0:
+            raise AgentContractError(
+                "frontier adjudication clock returned invalid time"
+            )
+
+        known_ids: list[str] = []
+        known_count = 0
+        unknown_count = 0
+        fingerprint_matches = 0
+        fingerprint_mismatches = 0
+        identity_matches = 0
+        identity_mismatches = 0
+        stale_count = 0
+        low_confidence_count = 0
+        sources: set[str] = set()
+        confidences: list[float] = []
+
+        for ref in refs:
+            artifact = self.ledger.get(ref.evidence_id)
+            if artifact is None:
+                unknown_count += 1
+                continue
+
+            known_count += 1
+            known_ids.append(artifact.evidence_id)
+            sources.add(artifact.source)
+            confidence = min(artifact.confidence, ref.confidence)
+            confidences.append(confidence)
+
+            if artifact.fingerprint == ref.fingerprint:
+                fingerprint_matches += 1
+            else:
+                fingerprint_mismatches += 1
+
+            if artifact.kind is ref.kind and artifact.source == ref.source:
+                identity_matches += 1
+            else:
+                identity_mismatches += 1
+
+            if confidence < self.policy.minimum_evidence_confidence:
+                low_confidence_count += 1
+
+            age_limit = self.policy.maximum_evidence_age_seconds
+            if age_limit is not None:
+                age = now - artifact.observed_at
+                if age < 0.0 or age > age_limit:
+                    stale_count += 1
+
+        total = len(refs)
+        custody_fraction = known_count / total if total else 0.0
+        fingerprint_fraction = (
+            fingerprint_matches / known_count if known_count else 0.0
+        )
+        identity_fraction = (
+            identity_matches / known_count if known_count else 0.0
+        )
+        source_diversity = (
+            len(sources) / known_count if known_count else 0.0
+        )
+        confidence_quality = (
+            sum(confidences) / len(confidences) if confidences else 0.0
+        )
+
+        contradictions = self.ledger.contradictions_for(known_ids)
+        pair_count = known_count * (known_count - 1) // 2
+        contradiction_rate = (
+            min(1.0, len(contradictions) / pair_count)
+            if pair_count
+            else 0.0
+        )
+        stale_fraction = stale_count / known_count if known_count else 0.0
+        low_confidence_fraction = (
+            low_confidence_count / known_count if known_count else 0.0
+        )
+
+        base = (
+            0.24 * candidate.confidence
+            + 0.28 * confidence_quality
+            + 0.18 * custody_fraction
+            + 0.12 * fingerprint_fraction
+            + 0.08 * identity_fraction
+            + 0.10 * source_diversity
+        )
+        integrity_penalty = (
+            0.50 * (1.0 - custody_fraction)
+            + 0.35 * (1.0 - fingerprint_fraction)
+            + 0.25 * (1.0 - identity_fraction)
+            + 0.50 * contradiction_rate
+            + 0.20 * stale_fraction
+            + 0.15 * low_confidence_fraction
+        )
+        score = max(
+            0.0,
+            min(
+                1.0,
+                base
+                - integrity_penalty
+                - self._candidate_penalty(candidate),
+            ),
+        )
+
+        reasons: list[str] = []
+        if unknown_count:
+            reasons.append(f"unknown_evidence={unknown_count}")
+        if fingerprint_mismatches:
+            reasons.append(
+                f"fingerprint_mismatch={fingerprint_mismatches}"
+            )
+        if identity_mismatches:
+            reasons.append(f"identity_mismatch={identity_mismatches}")
+        if stale_count:
+            reasons.append(f"stale_evidence={stale_count}")
+        if low_confidence_count:
+            reasons.append(
+                f"low_confidence_evidence={low_confidence_count}"
+            )
+        if contradictions:
+            reasons.append(
+                f"contradiction_count={len(contradictions)}"
+            )
+        reasons.extend(
+            (
+                f"custody_fraction={custody_fraction:.3f}",
+                f"fingerprint_fraction={fingerprint_fraction:.3f}",
+                f"source_diversity={source_diversity:.3f}",
+            )
+        )
+
+        rejected = bool(
+            unknown_count
+            or fingerprint_mismatches
+            or identity_mismatches
+            or stale_count
+            or low_confidence_count
+            or contradictions
+        )
+        return self._host_report(
+            candidate,
+            score=score,
+            custody_fraction=custody_fraction,
+            fingerprint_fraction=fingerprint_fraction,
+            identity_fraction=identity_fraction,
+            source_diversity=source_diversity,
+            confidence_quality=confidence_quality,
+            contradiction_count=len(contradictions),
+            contradiction_rate=contradiction_rate,
+            known_evidence_count=known_count,
+            unknown_evidence_count=unknown_count,
+            fingerprint_mismatch_count=fingerprint_mismatches,
+            identity_mismatch_count=identity_mismatches,
+            stale_evidence_count=stale_count,
+            rejected=rejected,
+            reasons=tuple(reasons),
+        )
+
+    def _host_report(
+        self,
+        candidate: CandidateProposal,
+        *,
+        score: float,
+        custody_fraction: float,
+        fingerprint_fraction: float,
+        identity_fraction: float,
+        source_diversity: float,
+        confidence_quality: float,
+        contradiction_count: int,
+        contradiction_rate: float,
+        known_evidence_count: int,
+        unknown_evidence_count: int,
+        fingerprint_mismatch_count: int,
+        identity_mismatch_count: int,
+        stale_evidence_count: int,
+        rejected: bool,
+        reasons: tuple[str, ...],
+    ) -> HostCandidateAdjudicationReport:
+        payload = {
+            "candidate": candidate.fingerprint,
+            "score": score,
+            "custody_fraction": custody_fraction,
+            "fingerprint_fraction": fingerprint_fraction,
+            "identity_fraction": identity_fraction,
+            "source_diversity": source_diversity,
+            "confidence_quality": confidence_quality,
+            "contradiction_count": contradiction_count,
+            "contradiction_rate": contradiction_rate,
+            "known_evidence_count": known_evidence_count,
+            "unknown_evidence_count": unknown_evidence_count,
+            "fingerprint_mismatch_count": fingerprint_mismatch_count,
+            "identity_mismatch_count": identity_mismatch_count,
+            "stale_evidence_count": stale_evidence_count,
+            "rejected": rejected,
+            "reasons": reasons,
+            "policy": self.policy.fingerprint,
+            "ledger": self.ledger.fingerprint,
+        }
+        return HostCandidateAdjudicationReport(
+            candidate_id=candidate.candidate_id,
+            score=score,
+            custody_fraction=custody_fraction,
+            fingerprint_fraction=fingerprint_fraction,
+            identity_fraction=identity_fraction,
+            source_diversity=source_diversity,
+            confidence_quality=confidence_quality,
+            contradiction_count=contradiction_count,
+            contradiction_rate=contradiction_rate,
+            known_evidence_count=known_evidence_count,
+            unknown_evidence_count=unknown_evidence_count,
+            fingerprint_mismatch_count=fingerprint_mismatch_count,
+            identity_mismatch_count=identity_mismatch_count,
+            stale_evidence_count=stale_evidence_count,
+            rejected=rejected,
+            reasons=reasons,
+            policy_fingerprint=self.policy.fingerprint,
+            ledger_fingerprint=self.ledger.fingerprint,
+            fingerprint=stable_fingerprint(payload),
+        )
 
     def inspect(
         self,
