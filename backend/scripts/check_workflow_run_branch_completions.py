@@ -55,7 +55,8 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
         return findings
 
-    has_all_branch_globs = ALL_BRANCH_GLOBS in text
+    workflow_run_block = _workflow_run_trigger_block(text)
+    has_all_branch_globs = ALL_BRANCH_GLOBS in workflow_run_block
     automation_main_only_exclusion = False
     if _is_named(path_name, AUTOMATION_WORKFLOW):
         match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(text)
@@ -67,7 +68,6 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
-    workflow_run_block = _workflow_run_trigger_block(text)
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
