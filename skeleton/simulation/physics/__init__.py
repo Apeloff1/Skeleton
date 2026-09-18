@@ -4,6 +4,7 @@ from .body import BodyType, RigidBody
 from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
 from .character import (
     CharacterControllerSettings,
+    CharacterControllerState,
     CharacterGroundState,
     CharacterMoveResult,
     CharacterRecoveryResult,
@@ -11,6 +12,8 @@ from .character import (
     CharacterRuntimeResult,
     CharacterSweepHit,
     KinematicCapsuleController,
+    build_character_state,
+    verify_character_state,
 )
 from .calculations import (
     PhysicsAggregate,
@@ -147,6 +150,7 @@ __all__ = [
     "BodyNotFoundError",
     "CCDHit",
     "CharacterControllerSettings",
+    "CharacterControllerState",
     "CharacterGroundState",
     "CharacterMoveResult",
     "CharacterRecoveryResult",
@@ -248,6 +252,7 @@ __all__ = [
     "aggregate_physics",
     "apply_physics_commands",
     "angular_momentum",
+    "build_character_state",
     "build_islands",
     "build_snapshot",
     "color_constraints",
@@ -272,6 +277,7 @@ __all__ = [
     "sphere_cast_body",
     "support_vertex",
     "step_physics_with_commands",
+    "verify_character_state",
     "verify_snapshot",
     "world_inertia",
 ]
