@@ -364,8 +364,8 @@ def test_distributed_idempotency_preserves_logical_key():
     backend = InMemoryFencedStore()
     registry = DistributedAIIdempotencyRegistry(backend)
     record = registry.register(
-        "operation-123",
+        "request-slot",
         request_digest=fp("a"),
         proposal_fingerprint=fp("b"),
     )
-    assert record.key == "operation-123"
+    assert record.key == "request-slot"
