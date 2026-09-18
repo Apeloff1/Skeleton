@@ -708,16 +708,52 @@ class LensCompositionEngine:
         right = str(right_key).casefold()
         return self._directed.get((left, right)) or self._symmetric.get(tuple(sorted((left, right))))
 
-    def compose(self, findings: Sequence[SemanticFinding]) -> SemanticComposition:
+    def compose(
+        self,
+        findings: Sequence[SemanticFinding],
+        *,
+        supplemental_rules: Iterable[LensInteractionRule] = (),
+    ) -> SemanticComposition:
         findings = tuple(findings)
         if any(not isinstance(item, SemanticFinding) for item in findings):
             raise TypeError("compose requires SemanticFinding values")
+
+        supplemental_symmetric: dict[tuple[str, str], LensInteractionRule] = {}
+        supplemental_directed: dict[tuple[str, str], LensInteractionRule] = {}
+        for rule in tuple(supplemental_rules):
+            if not isinstance(rule, LensInteractionRule):
+                raise TypeError(
+                    "supplemental_rules must contain LensInteractionRule values"
+                )
+            if self.rule_for(rule.left_key, rule.right_key) is not None:
+                raise AgentContractError(
+                    f"supplemental rule collides with static interaction: {rule.key}"
+                )
+            destination = (
+                supplemental_symmetric
+                if rule.symmetric
+                else supplemental_directed
+            )
+            if rule.key in destination:
+                raise AgentContractError(
+                    f"duplicate supplemental interaction rule: {rule.key}"
+                )
+            destination[rule.key] = rule
+
         interactions: list[LensInteraction] = []
         conflicts: list[str] = []
         tangent_seeds: list[TangentSeed] = []
         for i, left in enumerate(findings):
             for right in findings[i + 1 :]:
-                rule = self.rule_for(left.lens_key, right.lens_key)
+                directed_key = (left.lens_key, right.lens_key)
+                symmetric_key = tuple(
+                    sorted((left.lens_key, right.lens_key))
+                )
+                rule = (
+                    supplemental_directed.get(directed_key)
+                    or supplemental_symmetric.get(symmetric_key)
+                    or self.rule_for(left.lens_key, right.lens_key)
+                )
                 if rule is None:
                     continue
                 observations = tuple(sorted(set(left.observation_ids) | set(right.observation_ids)))
