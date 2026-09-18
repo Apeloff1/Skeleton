@@ -32,6 +32,10 @@ from skeleton.shells.ai.session_evidence import (
     SessionExecutionEvidence,
 )
 from skeleton.shells.ai.session_journal import SessionJournalEvidence
+from skeleton.shells.ai.session_integrity import (
+    SessionEvidenceIntegrityReport,
+    SessionEvidenceIntegrityVerifier,
+)
 
 
 @dataclass(frozen=True)
@@ -45,6 +49,7 @@ class FinalizedAIExecutionEvidence:
     execution_evidence: SignedAIExecutionEvidence | None = None
     finalization: AIExecutionFinalization | None = None
     recovery_commit: RecoveryCheckpointCommit | None = None
+    session_integrity: SessionEvidenceIntegrityReport | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -77,6 +82,11 @@ class FinalizedAIExecutionEvidence:
                 if self.recovery_commit is None
                 else self.recovery_commit.to_dict()
             ),
+            "session_integrity": (
+                None
+                if self.session_integrity is None
+                else self.session_integrity.to_dict()
+            ),
         }
 
 
@@ -99,6 +109,7 @@ class AIExecutionEvidenceFinalizer:
         execution_evidence_builder: AIExecutionEvidenceBuilder | None = None,
         finalizations: AIExecutionFinalizationStore | None = None,
         recovery_checkpoints: AIRecoveryCheckpointStore | None = None,
+        integrity_verifier: SessionEvidenceIntegrityVerifier | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -111,6 +122,13 @@ class AIExecutionEvidenceFinalizer:
         )
         self.finalizations = finalizations
         self.recovery_checkpoints = recovery_checkpoints
+        self.integrity_verifier = (
+            integrity_verifier
+            or SessionEvidenceIntegrityVerifier(
+                journal,
+                receipt_chain,
+            )
+        )
 
     def finalize(
         self,
@@ -299,10 +317,14 @@ class AIExecutionEvidenceFinalizer:
             self.journal,
             session.session_id,
         )
+        session_integrity = self.integrity_verifier.require(
+            session_journal,
+            evidence,
+        )
         checkpoint = AISessionCheckpoint.capture(
             session,
-            journal_root=self.journal.root_hash(),
-            receipt_root=self.receipt_chain.root_hash(),
+            journal_root=session_integrity.journal_root,
+            receipt_root=session_integrity.receipt_root,
             policy_fingerprint=policy_fingerprint,
             tool_catalog_digest=tool_catalog_digest,
             effect_digest=effect_digest,
@@ -319,6 +341,7 @@ class AIExecutionEvidenceFinalizer:
             execution_attempt_authority_digest=(
                 execution_attempt_authority_digest
             ),
+            session_integrity_digest=session_integrity.digest,
         )
         recovery_commit = None
         if self.recovery_checkpoints is not None:
@@ -447,6 +470,7 @@ class AIExecutionEvidenceFinalizer:
                     else audit_witness.witness.sequence
                 ),
                 execution_attempt_state=execution_attempt_state,
+                session_integrity_digest=session_integrity.digest,
             )
             signed_execution_evidence = self.execution_evidence.append_once(
                 final_bundle
@@ -519,4 +543,5 @@ class AIExecutionEvidenceFinalizer:
             signed_execution_evidence,
             finalization,
             recovery_commit,
+            session_integrity,
         )
