@@ -702,14 +702,19 @@ class AIShellService:
         if self.assurance is None:
             return
         active_backend = execution_backend or self.orchestrator.execution_backend
+        assurance_backend = getattr(
+            active_backend,
+            "assurance_backend",
+            active_backend,
+        )
         self.assurance.require(
             review.critique.risk.band,
             sealed=sealed,
             sandbox_verified=isinstance(
-                active_backend,
+                assurance_backend,
                 VerifiedSandboxExecutionBackend,
             ),
-            backend_id=active_backend.backend_id,
+            backend_id=assurance_backend.backend_id,
             release_verified=(
                 self._release_report is not None
                 and self._release_report.allowed
