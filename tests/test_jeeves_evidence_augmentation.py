@@ -365,3 +365,66 @@ def test_package_exports_evidence_core_and_result_contract():
 
     assert ExportedEvidenceJeevesCore is EvidenceJeevesCore
     assert ExportedEvidenceResult is EvidenceResult
+
+
+def test_negative_observed_at_is_rejected_without_freshness_window():
+    core, session, _ = _core(evidence_clock=lambda: 1_000.0)
+    core.register_evidence_tool(
+        "archive",
+        lambda payload: EvidenceResult(data={"fact": "safe"}, observed_at=-1.0),
+        source_id="fixture.archive",
+    )
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use archive evidence.",
+        context={"tool_calls": [{"name": "archive"}]},
+        allowed_tools=["archive"],
+    )
+
+    assert result["evidence"] == []
+    assert result["tools"] == []
+    assert result["tool_errors"] == [{"name": "archive", "error": "invalid_observed_at"}]
+    assert core.stats()["evidence_policy_failures"] == 1
+
+
+def test_far_future_observation_is_rejected_without_freshness_window():
+    core, session, _ = _core(evidence_clock=lambda: 1_000.0)
+    core.register_evidence_tool(
+        "archive",
+        lambda payload: EvidenceResult(data={"fact": "safe"}, observed_at=1_061.0),
+        source_id="fixture.archive",
+    )
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use archive evidence.",
+        context={"tool_calls": [{"name": "archive"}]},
+        allowed_tools=["archive"],
+    )
+
+    assert result["evidence"] == []
+    assert result["tools"] == []
+    assert result["tool_errors"] == [{"name": "archive", "error": "future_evidence"}]
+    assert core.stats()["evidence_policy_failures"] == 1
+
+
+def test_small_clock_skew_remains_accepted_without_freshness_window():
+    core, session, _ = _core(evidence_clock=lambda: 1_000.0)
+    core.register_evidence_tool(
+        "archive",
+        lambda payload: EvidenceResult(data={"fact": "safe"}, observed_at=1_030.0),
+        source_id="fixture.archive",
+    )
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use archive evidence.",
+        context={"tool_calls": [{"name": "archive"}]},
+        allowed_tools=["archive"],
+    )
+
+    assert result["tools"] == ["archive"]
+    provenance = result["evidence"][0]["result"]["provenance"]
+    assert provenance["observed_at"] == 1_030.0
+    assert "age_seconds" not in provenance
