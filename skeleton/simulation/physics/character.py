@@ -10,10 +10,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, replace
 
+from ..ecs.canonical import digest
 from .body import RigidBody
 from .collision import detect_collision
 from .convex import convex_plane_time_of_impact, convex_time_of_impact
-from .errors import PhysicsValidationError
+from .errors import PhysicsSnapshotError, PhysicsValidationError
 from .math3d import EPSILON, Quat, Vec3
 from .shapes import (
     BoxShape,
@@ -24,6 +25,43 @@ from .shapes import (
 )
 
 _SUPPORTED_FINITE = (SphereShape, BoxShape, CapsuleShape, CylinderShape)
+_CHARACTER_STATE_DOMAIN = "skeleton.simulation.physics.character_state.v1"
+_CHARACTER_STATE_VERSION = 1
+
+
+def _settings_record(
+    settings: "CharacterControllerSettings",
+) -> dict[str, object]:
+    return {
+        "radius": settings.radius,
+        "half_height": settings.half_height,
+        "skin_width": settings.skin_width,
+        "max_slope_angle": settings.max_slope_angle,
+        "step_height": settings.step_height,
+        "ground_probe_distance": settings.ground_probe_distance,
+        "max_slide_iterations": settings.max_slide_iterations,
+        "min_move_distance": settings.min_move_distance,
+        "max_recovery_iterations": settings.max_recovery_iterations,
+        "max_recovery_distance": settings.max_recovery_distance,
+    }
+
+
+def _character_state_material(
+    *,
+    body_id: str,
+    position: Vec3,
+    up: Vec3,
+    settings: "CharacterControllerSettings",
+) -> dict[str, object]:
+    return {
+        "domain": _CHARACTER_STATE_DOMAIN,
+        "version": _CHARACTER_STATE_VERSION,
+        "body_id": body_id,
+        "position": position.to_tuple(),
+        "up": up.to_tuple(),
+        "settings": _settings_record(settings),
+    }
+
 
 
 def _finite_positive(value: float, *, name: str) -> float:
@@ -151,6 +189,109 @@ class CharacterControllerSettings:
     @property
     def capsule(self) -> CapsuleShape:
         return CapsuleShape(self.radius, self.half_height)
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterControllerState:
+    version: int
+    body_id: str
+    position: Vec3
+    up: Vec3
+    settings: CharacterControllerSettings
+    state_digest: str
+
+    def __post_init__(self) -> None:
+        if self.version != _CHARACTER_STATE_VERSION:
+            raise PhysicsSnapshotError(
+                "unsupported character state version"
+            )
+        if not isinstance(self.body_id, str) or not self.body_id:
+            raise PhysicsSnapshotError(
+                "character state body_id must be non-empty"
+            )
+        if not isinstance(self.position, Vec3) or not isinstance(self.up, Vec3):
+            raise PhysicsSnapshotError(
+                "character state position/up must be Vec3"
+            )
+        if not isinstance(self.settings, CharacterControllerSettings):
+            raise PhysicsSnapshotError(
+                "character state settings contract mismatch"
+            )
+        if abs(self.up.length() - 1.0) > 1.0e-9:
+            raise PhysicsSnapshotError(
+                "character state up vector must be normalized"
+            )
+        if (
+            not isinstance(self.state_digest, str)
+            or len(self.state_digest) != 64
+        ):
+            raise PhysicsSnapshotError(
+                "character state digest must be sha256 hex"
+            )
+        try:
+            bytes.fromhex(self.state_digest)
+        except ValueError as exc:
+            raise PhysicsSnapshotError(
+                "character state digest is not hexadecimal"
+            ) from exc
+
+
+def build_character_state(
+    *,
+    body_id: str,
+    position: Vec3,
+    up: Vec3,
+    settings: CharacterControllerSettings,
+) -> CharacterControllerState:
+    if not isinstance(body_id, str) or not body_id:
+        raise PhysicsValidationError(
+            "character state body_id must be non-empty"
+        )
+    if not isinstance(position, Vec3) or not isinstance(up, Vec3):
+        raise PhysicsValidationError(
+            "character state position/up must be Vec3"
+        )
+    if not isinstance(settings, CharacterControllerSettings):
+        raise PhysicsValidationError(
+            "character state settings must be CharacterControllerSettings"
+        )
+    normalized_up = up.normalized()
+    material = _character_state_material(
+        body_id=body_id,
+        position=position,
+        up=normalized_up,
+        settings=settings,
+    )
+    return CharacterControllerState(
+        version=_CHARACTER_STATE_VERSION,
+        body_id=body_id,
+        position=position,
+        up=normalized_up,
+        settings=settings,
+        state_digest=digest(material),
+    )
+
+
+def verify_character_state(
+    state: CharacterControllerState,
+) -> CharacterControllerState:
+    if not isinstance(state, CharacterControllerState):
+        raise PhysicsValidationError(
+            "state must be CharacterControllerState"
+        )
+    expected = digest(
+        _character_state_material(
+            body_id=state.body_id,
+            position=state.position,
+            up=state.up,
+            settings=state.settings,
+        )
+    )
+    if expected != state.state_digest:
+        raise PhysicsSnapshotError(
+            "character state digest mismatch"
+        )
+    return state
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +478,45 @@ class KinematicCapsuleController:
     @property
     def shape(self) -> CapsuleShape:
         return self.settings.capsule
+
+    def state_record(self) -> dict[str, object]:
+        return _character_state_material(
+            body_id=self.body_id,
+            position=self.position,
+            up=self.up,
+            settings=self.settings,
+        )
+
+    @property
+    def state_digest(self) -> str:
+        return digest(self.state_record())
+
+    def capture_state(self) -> CharacterControllerState:
+        return build_character_state(
+            body_id=self.body_id,
+            position=self.position,
+            up=self.up,
+            settings=self.settings,
+        )
+
+    def restore_state(
+        self,
+        state: CharacterControllerState,
+    ) -> CharacterControllerState:
+        verified = verify_character_state(state)
+        if verified.body_id != self.body_id:
+            raise PhysicsSnapshotError(
+                "character state body identity mismatch"
+            )
+
+        new_up = verified.up.normalized()
+        new_orientation = _rotation_from_up(new_up)
+        # All validation and derived-state construction happens before mutation.
+        self.position = verified.position
+        self.up = new_up
+        self.orientation = new_orientation
+        self.settings = verified.settings
+        return verified
 
     def _query_body_with_shape(
         self,
