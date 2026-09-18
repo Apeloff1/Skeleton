@@ -795,9 +795,9 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                     break
             except Exception as e:
                 import traceback, time as _time
-                last_error = str(e)
+                last_error = "phase_failed"
                 traceback.print_exc()
-                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {last_error}")
+                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {type(e).__name__}")
                 if attempt < MAX_RETRIES:
                     backoff = 0.5 * (2 ** (attempt - 1))
                     _time.sleep(backoff)
@@ -2421,7 +2421,7 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
         with _worker_lock:
             _worker_stats["total_completed"] += 1
         return (batch_num, files, None)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
         with _worker_lock:
@@ -2434,11 +2434,11 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
                 build.get("title", "game"),
                 build.get("genre", "rpg"),
                 f"batch_{batch_num}",
-                f"worker-fallback: {str(e)[:120]}",
+                "batch_failed",
             ) or {}
-            return (batch_num, fb, str(e)[:200])
+            return (batch_num, fb, "batch_failed")
         except Exception:
-            return (batch_num, {}, str(e)[:200])
+            return (batch_num, {}, "batch_failed")
     finally:
         with _worker_lock:
             _worker_stats["active"] = max(0, _worker_stats["active"] - 1)

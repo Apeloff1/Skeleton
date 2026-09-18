@@ -150,6 +150,15 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "jeeves_media.py",
     REPO_ROOT / "backend" / "routes" / "final_build.py",
     REPO_ROOT / "backend" / "core" / "swarm_scheduler.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_agents.py",
+    REPO_ROOT / "backend" / "routes" / "pipeline_agents.py",
+    REPO_ROOT / "backend" / "routes" / "code_intelligence.py",
+    REPO_ROOT / "backend" / "routes" / "collaboration.py",
+    REPO_ROOT / "backend" / "routes" / "ai_toolkit_enhanced.py",
+    REPO_ROOT / "backend" / "core" / "text_gamefile.py",
+    REPO_ROOT / "backend" / "core" / "observability.py",
+    REPO_ROOT / "backend" / "services" / "jeeves_consultant.py",
+    REPO_ROOT / "backend" / "gameforge" / "runtime" / "agent_runtime.py",
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 SERVER = REPO_ROOT / "backend" / "server.py"
@@ -270,6 +279,17 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "self.last_error = str(e)" not in source
     assert '"error": str(e)[:300]' not in source
     assert '"error":       str(e)[:200]' not in source
+    assert "Agent temporarily unavailable:" not in source
+    assert "output pending —" not in source
+    assert 'f"Error: {str(e)}"' not in source
+    assert 'f"AI Error: {str(e)}"' not in source
+    assert "unreachable: {last_err}" not in source
+    assert 'res["error"] = str(e)' not in source
+    assert "err=str(e)[:300]" not in source
+    assert '_cp_err"] = str(e)' not in source
+    assert "work.error = str(e)" not in source
+    assert "last_error = str(e)" not in source
+    assert "worker-fallback:" not in source
 
 
 

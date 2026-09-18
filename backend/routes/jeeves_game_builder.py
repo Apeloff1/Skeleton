@@ -482,9 +482,9 @@ async def advance_build(req: BuildAdvanceRequest):
                 "completed_at": datetime.utcnow().isoformat(),
                 "aaa_enforced": True,
             }
-        except Exception as e:
+        except Exception:
             step_result = {
-                "raw": f"Agent {step_def['agent']} output pending — {str(e)[:100]}",
+                "raw": f"Agent {step_def['agent']} output pending",
                 "parsed": {"status": "pending", "agent": step_def["agent"]},
                 "agent": step_def["agent"],
                 "agent_name": step_def["name"],
