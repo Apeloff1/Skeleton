@@ -367,6 +367,28 @@ def test_package_exports_evidence_core_and_result_contract():
     assert ExportedEvidenceResult is EvidenceResult
 
 
+@pytest.mark.parametrize("clock_value", [True, False, float("nan"), float("inf"), -1.0, "bad"])
+def test_invalid_evidence_clock_is_redacted_as_policy_failure(clock_value):
+    core, session, provider = _core(evidence_clock=lambda: clock_value)
+    core.register_evidence_tool(
+        "archive",
+        lambda payload: EvidenceResult(data={"fact": "safe"}, observed_at=0.0),
+        source_id="archive",
+    )
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use archive evidence.",
+        context={"tool_calls": [{"name": "archive"}]},
+        allowed_tools=["archive"],
+    )
+
+    assert result["evidence"] == []
+    assert result["tool_errors"] == [{"name": "archive", "error": "invalid_clock"}]
+    assert core.stats()["evidence_policy_failures"] == 1
+    assert provider.calls == 1
+
+
 def test_negative_observed_at_is_rejected_without_freshness_window():
     core, session, _ = _core(evidence_clock=lambda: 1_000.0)
     core.register_evidence_tool(
