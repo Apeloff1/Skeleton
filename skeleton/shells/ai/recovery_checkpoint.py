@@ -19,6 +19,8 @@ class AIRecoveryCheckpoint:
     sandbox_binding_digest: str = ""
     runtime_trust_digest: str = ""
     authority_health_policy_digest: str = ""
+    execution_attempt_id: str = ""
+    execution_attempt_authority_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -30,10 +32,19 @@ class AIRecoveryCheckpoint:
             "sandbox_binding_digest",
             "runtime_trust_digest",
             "authority_health_policy_digest",
+            "execution_attempt_authority_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
                 raise ValueError(f"{name} must be SHA-256 hex")
+        if len(self.execution_attempt_id) > 256:
+            raise ValueError("execution_attempt_id too long")
+        if bool(self.execution_attempt_id) != bool(
+            self.execution_attempt_authority_digest
+        ):
+            raise ValueError(
+                "execution attempt id and authority digest must be configured together"
+            )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -46,6 +57,10 @@ class AIRecoveryCheckpoint:
             "runtime_trust_digest": self.runtime_trust_digest,
             "authority_health_policy_digest": (
                 self.authority_health_policy_digest
+            ),
+            "execution_attempt_id": self.execution_attempt_id,
+            "execution_attempt_authority_digest": (
+                self.execution_attempt_authority_digest
             ),
         }
 
@@ -69,6 +84,8 @@ class AIRecoveryCheckpoint:
         sandbox_binding_digest: str = "",
         runtime_trust_digest: str = "",
         authority_health_policy_digest: str = "",
+        execution_attempt_id: str = "",
+        execution_attempt_authority_digest: str = "",
     ) -> "AIRecoveryCheckpoint":
         return cls(
             2,
@@ -79,4 +96,6 @@ class AIRecoveryCheckpoint:
             sandbox_binding_digest,
             runtime_trust_digest,
             authority_health_policy_digest,
+            execution_attempt_id,
+            execution_attempt_authority_digest,
         )
