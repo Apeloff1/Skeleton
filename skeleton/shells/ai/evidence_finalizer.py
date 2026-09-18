@@ -256,6 +256,13 @@ class AIExecutionEvidenceFinalizer:
                 ),
                 runtime_trust_digest=runtime_trust_digest,
                 release_evidence_digest=release_evidence_digest,
+                require_recovery_checkpoint=(
+                    self.recovery_checkpoints is not None
+                ),
+                require_witness=(self.audit_witnesses is not None),
+                require_signed_evidence=(
+                    self.execution_evidence is not None
+                ),
             )
             finalization = stored_finalization.finalization
 
