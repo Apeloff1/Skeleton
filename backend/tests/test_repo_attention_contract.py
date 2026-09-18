@@ -51,8 +51,16 @@ def test_rejects_pr_cancellation_without_same_repository_guard() -> None:
 def test_rejects_loss_of_same_repository_pr_guard() -> None:
     source = _replace_once(
         _source(),
-        "      github.event.pull_request.head.repo.full_name == github.repository\n",
-        "      true\n",
+        "  clear-pr-attention:\n"
+        "    name: Clear attention after PR lifecycle activity\n"
+        "    if: >-\n"
+        "      github.event_name == 'pull_request' &&\n"
+        "      github.event.pull_request.head.repo.full_name == github.repository &&\n",
+        "  clear-pr-attention:\n"
+        "    name: Clear attention after PR lifecycle activity\n"
+        "    if: >-\n"
+        "      github.event_name == 'pull_request' &&\n"
+        "      true &&\n",
     )
     assert "PR label mutation must be restricted to same-repository heads" in _messages(source)
 
