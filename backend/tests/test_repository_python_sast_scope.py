@@ -154,3 +154,21 @@ def test_repository_python_sast_rejects_symlinked_required_root(
 
     assert main() == 1
     assert "must not be a symlink" in capsys.readouterr().err
+
+
+
+def test_repository_python_sast_reuses_module_alias_hardening(tmp_path: Path) -> None:
+    namespace = _scanner_namespace()
+    load_engine = namespace["_load_violation_engine"]
+    violations = load_engine()
+
+    sample = tmp_path / "unsafe_alias.py"
+    sample.write_text(
+        "import requests\n"
+        "network = requests\n"
+        "network.get(url, verify=False)\n",
+        encoding="utf-8",
+    )
+
+    findings = violations(sample)
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
