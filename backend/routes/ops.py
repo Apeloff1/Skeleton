@@ -12,6 +12,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.http_errors import internal_http_error, public_http_error
+
 from core.atomic_release_deployer import ReleaseDeploymentError
 from core.charter_policy import Rule
 from core.control_plane_deployment import control_plane_preflight_dict
@@ -178,7 +180,7 @@ async def product_control_deployment_checkpoints(limit: int = Query(50, ge=1, le
             "publications": [asdict(row) for row in selected],
         }
     except DeploymentCheckpointLedgerError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("deployment_checkpoint_ledger_error", exc) from None
 
 
 @router.get("/product-control/deployments/checkpoints/{sequence}")
@@ -190,7 +192,7 @@ async def product_control_deployment_checkpoint(sequence: int, token: str = Quer
         publication = next((row for row in _control_plane().deployments.checkpoints.history()
                             if row.sequence == sequence), None)
     except DeploymentCheckpointLedgerError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("deployment_checkpoint_ledger_error", exc) from None
     if publication is None:
         raise HTTPException(status_code=404, detail="deployment checkpoint not found")
     return asdict(publication)
@@ -296,7 +298,7 @@ async def product_control_current_release(target: str = Query(min_length=1, max_
     try:
         release = _control_plane().deployments.releases.current(target=target, environment=environment)
     except ReleaseDeploymentError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("release_lookup_failed", exc) from None
     return {"release": None if release is None else asdict(release)}
 
 
@@ -319,7 +321,7 @@ async def product_control_audit(limit: int = Query(50, ge=0, le=500), token: str
 async def product_control_receipts(limit: int = Query(50, ge=0, le=500), token: str = Query("")):
     _require_ops(token)
     try: return {"receipts": _control_plane().receipt_history(limit=limit)}
-    except ReceiptIntegrityError as exc: raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except ReceiptIntegrityError as exc: raise internal_http_error("receipt_integrity_error", exc) from None
 
 
 @router.get("/product-control/receipt/{operation_id}")
@@ -337,8 +339,9 @@ async def product_control_receipt_result(operation_id: str, token: str = Query("
     try: return _control_plane().receipt_result(operation_id)
     except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ReceiptIntegrityError as exc:
-        status = 404 if "not found" in str(exc).lower() else 500
-        raise HTTPException(status_code=status, detail=str(exc)) from exc
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail="receipt not found") from None
+        raise internal_http_error("receipt_integrity_error", exc) from None
 
 
 @router.get("/product-control/operation/{operation_id}/lifecycle")
@@ -353,7 +356,7 @@ async def product_control_execute(seq: int, token: str = Query("")):
     _require_ops(token)
     if seq < 0: raise HTTPException(status_code=400, detail="sequence cannot be negative")
     try: confirmed = await _control_plane().execute_registered(seq)
-    except OperationExecutionError as exc: raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except OperationExecutionError as exc: raise public_http_error(502, "operation_execution_failed", exc) from None
     return {"outbox_seq": seq, "confirmed": confirmed, "status": "executed" if confirmed else "deferred_or_unbound"}
 
 
@@ -377,7 +380,7 @@ async def product_control_admit(body: AdmitInput, token: str = Query("")):
         admitted = _control_plane().admit(capability_id=body.capability_id, domain=body.domain, action=body.action,
             principal=body.principal, actor_weight=body.actor_weight, payload=body.payload,
             quorum_approved=body.quorum_approved, idempotency_key=body.idempotency_key)
-    except OutboxFullError as exc: raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OutboxFullError as exc: raise public_http_error(503, "outbox_full", exc) from None
     except OperationRejected as exc: raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"operation_id": admitted.id, "capability_id": admitted.capability_id, "pillar": admitted.pillar,

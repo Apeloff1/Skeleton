@@ -72,12 +72,12 @@ class SagaOrchestrator:
                     "step": step.name, "status": "ok",
                     "ms": round((time.time() - t0) * 1000, 1),
                 })
-            except Exception as e:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 result.status = "failed"
-                result.error = f"{step.name}: {type(e).__name__}: {e}"
+                result.error = f"{step.name}: step_failed"
                 result.forward_trace.append({
                     "step": step.name, "status": "failed",
-                    "error": str(e), "ms": round((time.time() - t0) * 1000, 1),
+                    "error": "step_failed", "ms": round((time.time() - t0) * 1000, 1),
                 })
                 # ── compensate completed steps in reverse ──
                 for done in reversed(completed):
@@ -93,10 +93,10 @@ class SagaOrchestrator:
                             "step": done.name, "status": "compensated",
                             "ms": round((time.time() - c0) * 1000, 1),
                         })
-                    except Exception as ce:  # noqa: BLE001
+                    except Exception:  # noqa: BLE001
                         result.compensation_trace.append({
                             "step": done.name, "status": "compensation_failed",
-                            "error": str(ce),
+                            "error": "compensation_failed",
                         })
                 result.status = "compensated"
                 result.context = ctx

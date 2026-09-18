@@ -1,39 +1,67 @@
-"""Static GitHub Actions policy gate.
-
-The checker is dependency-free so it can run in the earliest CI phase. It
-requires immutable action references, explicit workflow permissions, hardened
-checkout credential handling, rejects workflow-wide token elevation and
-high-risk event/permission patterns, and prevents direct interpolation of
-attacker-controlled GitHub event fields into shell ``run`` commands.
-"""
+"""Static GitHub Actions policy gate."""
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 import re
 import sys
+
+if __package__:
+    from .check_workflow_container_security import violations as container_runtime_violations
+    from .check_workflow_input_security import (
+        _flow_mapping_entries,
+        _flow_style_steps,
+        _run_fragments as hardened_run_fragments,
+        violations as input_boundary_violations,
+    )
+else:
+    from check_workflow_container_security import violations as container_runtime_violations
+    from check_workflow_input_security import (
+        _flow_mapping_entries,
+        _flow_style_steps,
+        _run_fragments as hardened_run_fragments,
+        violations as input_boundary_violations,
+    )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-USES_RE = re.compile(r"^\s*(?:-\s*)?(?:\{\s*)?uses\s*:\s*[\"']?([^\"'\s,}#]+)")
-RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run\s*:\s*(?P<value>.*)$")
-EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
+USES_RE = re.compile(
+    r"^\s*(?:-\s*)?(?:\{\s*)?(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
+FLOW_USES_ENTRY_RE = re.compile(
+    r"^(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
+FLOW_WITH_ENTRY_RE = re.compile(
+    r"^(?:with|'with'|\"with\")\s*:\s*(?P<value>.*)$"
+)
+WITH_ENTRY_RE = re.compile(
+    r"^\s*(?:with|'with'|\"with\")\s*:\s*(?P<value>.*)$"
+)
 PERSIST_FALSE_RE = re.compile(
-    r"\bpersist-credentials\s*:\s*(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    r"^(?:persist-credentials|'persist-credentials'|\"persist-credentials\")\s*:\s*"
+    r"(?:false|['\"]false['\"])(?:\s*#.*)?$",
     re.IGNORECASE,
 )
+EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 PERMISSION_ENTRY_RE = re.compile(
-    r"^\s+(?P<scope>[A-Za-z0-9_-]+)\s*:\s*(?P<value>read|write|none)\s*(?:#.*)?$",
+    r"^\s+['\"]?(?P<scope>[A-Za-z0-9_-]+)['\"]?\s*:\s*"
+    r"(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
-BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
+TOP_LEVEL_ON_RE = re.compile(r"^(?:on|'on'|\"on\")\s*:\s*(?P<value>.*)$")
+NODE_PROPERTIES_RE = re.compile(
+    r"^(?:(?:[!&][^\s#]+)\s+)*(?P<value>.*)$"
+)
+PULL_REQUEST_TARGET_KEY_RE = re.compile(
+    r"^\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*:"
+)
+PULL_REQUEST_TARGET_SEQUENCE_RE = re.compile(
+    r"^\s*-\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*(?:#.*)?$"
+)
 CHECKOUT_ACTION = "actions/checkout@"
+FORBIDDEN_TRIGGER = "pull_request_target"
 
-# These fields can be controlled by pull-request authors, issue/comment authors,
-# or commit authors. They must cross the shell boundary through env/input data,
-# never by direct expression interpolation inside a run command.
 UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pull request title/body", re.compile(r"\bgithub\.event\.pull_request\.(?:title|body)\b")),
     ("pull request head ref/label", re.compile(r"\bgithub\.event\.pull_request\.head\.(?:ref|label)\b")),
@@ -69,47 +97,127 @@ def _indent_width(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
 
 
+def _flow_mapping_has_disabled_checkout_credentials(value: str) -> bool:
+    value = value.strip()
+    if not (value.startswith("{") and value.endswith("}")):
+        return False
+    return any(
+        PERSIST_FALSE_RE.fullmatch(entry.strip()) is not None
+        for entry in _flow_mapping_entries(value)
+    )
+
+
+def _flow_checkout_credentials_disabled(fragment: str) -> bool:
+    for entry in _flow_mapping_entries(fragment):
+        match = FLOW_WITH_ENTRY_RE.match(entry.strip())
+        if not match:
+            continue
+        return _flow_mapping_has_disabled_checkout_credentials(match.group("value"))
+    return False
+
+
 def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
-    """Return whether a checkout step explicitly disables credential persistence."""
     base_indent = _indent_width(lines[uses_index])
+    uses_is_sequence_key = lines[uses_index].lstrip().startswith("- ")
+    step_lines: list[tuple[int, str, int]] = []
     index = uses_index + 1
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
-        if stripped:
-            indent = _indent_width(line)
-            if indent < base_indent or (indent == base_indent and stripped.startswith("- ")):
-                break
-            if PERSIST_FALSE_RE.search(line):
-                return True
+        indent = _indent_width(line)
+        if stripped and indent < base_indent:
+            break
+        if stripped and indent == base_indent and stripped.startswith("- "):
+            break
+
+        minimum_property_indent = base_indent + 1 if uses_is_sequence_key else base_indent
+        if (
+            stripped
+            and not stripped.startswith("#")
+            and indent >= minimum_property_indent
+        ):
+            step_lines.append((index, line, indent))
         index += 1
+
+    if not step_lines:
+        return False
+
+    direct_indent = min(indent for _number, _line, indent in step_lines)
+    for position, (_number, line, indent) in enumerate(step_lines):
+        if indent != direct_indent:
+            continue
+        match = WITH_ENTRY_RE.match(line)
+        if not match:
+            continue
+
+        inline_value = match.group("value").split("#", 1)[0].strip()
+        if inline_value:
+            return _flow_mapping_has_disabled_checkout_credentials(inline_value)
+
+        children: list[tuple[str, int]] = []
+        for _child_number, child, child_indent in step_lines[position + 1 :]:
+            if child_indent <= direct_indent:
+                break
+            if child.strip() and not child.strip().startswith("#"):
+                children.append((child, child_indent))
+        if not children:
+            return False
+
+        input_indent = min(child_indent for _child, child_indent in children)
+        return any(
+            child_indent == input_indent
+            and PERSIST_FALSE_RE.fullmatch(child.strip()) is not None
+            for child, child_indent in children
+        )
+
     return False
+
+
+def _action_reference_findings(
+    path_name: str,
+    number: int,
+    reference: str,
+    *,
+    checkout_hardened: bool,
+) -> list[str]:
+    findings: list[str] = []
+    if reference.startswith(CHECKOUT_ACTION) and not checkout_hardened:
+        findings.append(
+            f"{path_name}:{number}: actions/checkout must set persist-credentials: false"
+        )
+    if _is_local(reference):
+        return findings
+    if reference.startswith("docker://"):
+        container_violation = _container_violation(reference)
+        if container_violation:
+            findings.append(f"{path_name}:{number}: {container_violation}: {reference}")
+        return findings
+    if "@" not in reference:
+        findings.append(
+            f"{path_name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}"
+        )
+        return findings
+    _action, revision = reference.rsplit("@", 1)
+    if not SHA40_RE.fullmatch(revision):
+        findings.append(
+            f"{path_name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}"
+        )
+    return findings
 
 
 def _top_level_permission_violations(
     lines: list[str], path_name: str
 ) -> tuple[bool, list[str]]:
-    """Require explicit read/none workflow defaults and job-local write elevation.
-
-    GitHub applies workflow-level permissions to every job unless overridden.
-    A global ``*: write`` therefore widens the token for unrelated jobs. This
-    gate requires all write scopes to be granted inside the specific job that
-    needs them. ``read-all`` is rejected for the same least-privilege reason:
-    workflows should name the read scopes they actually consume (or use ``{}``).
-    """
     findings: list[str] = []
     has_top_level = False
-
     for index, line in enumerate(lines):
         stripped = line.strip()
         if line != stripped or not stripped.startswith("permissions:"):
             continue
-
         has_top_level = True
         number = index + 1
         declaration = stripped.split("#", 1)[0].strip()
         inline = declaration.partition(":")[2].strip().lower()
-
         if inline in {"write-all", "write"}:
             findings.append(
                 f"{path_name}:{number}: workflow-wide write permissions are forbidden; grant write scopes only to the job that needs them"
@@ -121,13 +229,11 @@ def _top_level_permission_violations(
             )
             continue
         if inline:
-            # ``permissions: {}`` is an intentional no-permissions default.
             if inline != "{}":
                 findings.append(
                     f"{path_name}:{number}: unsupported top-level permissions scalar; use a scoped mapping or {{}}"
                 )
             continue
-
         child_index = index + 1
         while child_index < len(lines):
             child = lines[child_index]
@@ -139,36 +245,91 @@ def _top_level_permission_violations(
                     f"{path_name}:{child_index + 1}: workflow-wide {match.group('scope')}: write is forbidden; move elevation to the specific job"
                 )
             child_index += 1
-
     return has_top_level, findings
 
 
-def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
-    """Yield shell source fragments with their workflow line numbers."""
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        match = RUN_RE.match(line)
+def _yaml_key_name(entry: str) -> str:
+    key = entry.partition(":")[0].strip()
+    if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+        return key[1:-1]
+    return key
+
+
+def _strip_node_properties(value: str) -> str:
+    """Remove YAML tag/anchor properties that precede an inline node value."""
+    match = NODE_PROPERTIES_RE.fullmatch(value.strip())
+    if match is None:
+        return value.strip()
+    return match.group("value").strip()
+
+
+def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]:
+    findings: list[str] = []
+    for index, line in enumerate(lines):
+        if line != line.lstrip(" "):
+            continue
+        match = TOP_LEVEL_ON_RE.match(line)
         if not match:
-            index += 1
             continue
 
-        value = match.group("value").strip()
-        line_number = index + 1
-        if value not in BLOCK_SCALARS:
-            yield line_number, value
-            index += 1
+        number = index + 1
+        value = match.group("value").split("#", 1)[0].strip()
+        if value:
+            value = _strip_node_properties(value)
+            if value.startswith("*"):
+                findings.append(
+                    f"{path_name}:{number}: aliased workflow trigger configuration is forbidden because the security gate cannot resolve the referenced events"
+                )
+                continue
+
+            scalar = value
+            if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in {"'", '"'}:
+                scalar = scalar[1:-1]
+            if scalar == FORBIDDEN_TRIGGER:
+                findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                continue
+
+            if value.startswith("{"):
+                if any(
+                    _yaml_key_name(entry) == FORBIDDEN_TRIGGER
+                    for entry in _flow_mapping_entries(value)
+                ):
+                    findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                continue
+
+            if value.startswith("[") and value.endswith("]"):
+                for item in value[1:-1].split(","):
+                    event = item.strip()
+                    if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
+                        event = event[1:-1]
+                    if event == FORBIDDEN_TRIGGER:
+                        findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                        break
+                continue
             continue
 
-        base_indent = len(match.group("indent"))
-        index += 1
-        while index < len(lines):
-            child = lines[index]
-            if child.strip() and _indent_width(child) <= base_indent:
+        children: list[tuple[int, str, int]] = []
+        child_index = index + 1
+        while child_index < len(lines):
+            child = lines[child_index]
+            stripped_child = child.strip()
+            indent = _indent_width(child)
+            if stripped_child and indent == 0:
                 break
-            if child.strip():
-                yield index + 1, child.strip()
-            index += 1
+            if stripped_child and not stripped_child.startswith("#"):
+                children.append((child_index + 1, child, indent))
+            child_index += 1
+        if not children:
+            continue
+        direct_indent = min(indent for _line_number, _child, indent in children)
+        for child_number, child, indent in children:
+            if indent != direct_indent:
+                continue
+            if PULL_REQUEST_TARGET_KEY_RE.match(child) or PULL_REQUEST_TARGET_SEQUENCE_RE.match(child):
+                findings.append(
+                    f"{path_name}:{child_number}: pull_request_target is forbidden"
+                )
+    return findings
 
 
 def _untrusted_expression(fragment: str) -> str | None:
@@ -187,46 +348,53 @@ def violations(path: Path) -> list[str]:
         return [f"{path}: read failure: {exc}"]
 
     findings: list[str] = []
+    findings.extend(input_boundary_violations(path))
+    findings.extend(container_runtime_violations(path))
     lines = text.splitlines()
     has_top_level_permissions, permission_findings = _top_level_permission_violations(
         lines, path.name
     )
     findings.extend(permission_findings)
+    findings.extend(_forbidden_trigger_violations(lines, path.name))
+
+    flow_style_lines: set[int] = set()
+    for number, fragment in _flow_style_steps(lines):
+        fragment_lines = fragment.splitlines()
+        flow_style_lines.update(range(number, number + len(fragment_lines)))
+        for entry in _flow_mapping_entries(fragment):
+            match = FLOW_USES_ENTRY_RE.match(entry.strip())
+            if not match:
+                continue
+            reference = match.group(1).strip("\"'")
+            findings.extend(
+                _action_reference_findings(
+                    path.name,
+                    number,
+                    reference,
+                    checkout_hardened=_flow_checkout_credentials_disabled(fragment),
+                )
+            )
 
     for index, line in enumerate(lines):
         number = index + 1
-
-        if re.match(r"^\s*pull_request_target\s*:", line):
-            findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
-
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
             findings.append(f"{path.name}:{number}: write-all permissions are forbidden")
-
+        if number in flow_style_lines:
+            continue
         match = USES_RE.match(line)
         if not match:
             continue
         reference = match.group(1).strip("\"'")
-
-        if reference.startswith(CHECKOUT_ACTION) and not _checkout_credentials_disabled(lines, index):
-            findings.append(
-                f"{path.name}:{number}: actions/checkout must set persist-credentials: false"
+        findings.extend(
+            _action_reference_findings(
+                path.name,
+                number,
+                reference,
+                checkout_hardened=_checkout_credentials_disabled(lines, index),
             )
+        )
 
-        if _is_local(reference):
-            continue
-        if reference.startswith("docker://"):
-            container_violation = _container_violation(reference)
-            if container_violation:
-                findings.append(f"{path.name}:{number}: {container_violation}: {reference}")
-            continue
-        if "@" not in reference:
-            findings.append(f"{path.name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}")
-            continue
-        _action, revision = reference.rsplit("@", 1)
-        if not SHA40_RE.fullmatch(revision):
-            findings.append(f"{path.name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}")
-
-    for number, fragment in _run_fragments(lines):
+    for number, fragment in hardened_run_fragments(lines):
         label = _untrusted_expression(fragment)
         if label:
             findings.append(

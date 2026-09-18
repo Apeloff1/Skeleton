@@ -1,0 +1,29 @@
+# Repository/editor metadata
+.git
+.vscode
+.idea
+
+# Local dependency/build trees
+node_modules
+.expo
+web-build
+dist
+coverage
+
+# Never send local credentials or runtime configuration to the frontend builder.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+credentials*.json
+service-account*.json
+
+# Local scratch/log files
+*.log
+*.tmp
+*.bak

@@ -62,8 +62,8 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
         mcp = _get_mcp()
         res = await asyncio.to_thread(mcp.route_query, query, sources)
         return {"channel": "mcp", "query": query, "ok": True, "result": res}
-    except Exception as e:  # noqa: BLE001
-        return {"channel": "mcp", "query": query, "ok": False, "error": f"{type(e).__name__}: {e}"[:160]}
+    except Exception:  # noqa: BLE001
+        return {"channel": "mcp", "query": query, "ok": False, "error": "mcp_query_failed"}
 
 
 async def _api_query(target: dict) -> dict:
@@ -83,8 +83,8 @@ async def _api_query(target: dict) -> dict:
             body = r.text[:2000]
             return {"channel": "api", "target": name, "ok": r.is_success,
                     "status": r.status_code, "body": body}
-    except Exception as e:  # noqa: BLE001
-        return {"channel": "api", "target": name, "ok": False, "error": f"{type(e).__name__}: {e}"[:160]}
+    except Exception:  # noqa: BLE001
+        return {"channel": "api", "target": name, "ok": False, "error": "api_query_failed"}
 
 
 async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,

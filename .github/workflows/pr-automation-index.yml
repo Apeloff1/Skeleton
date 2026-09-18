@@ -1,0 +1,161 @@
+name: PR Automation Index
+
+on:
+  workflow_run:
+    # Merge Readiness is the canonical event-driven convergence point.
+    # Extra configured checks are still inspected fail-closed by the runner;
+    # if they complete later, the scheduled reconciliation observes them.
+    workflows:
+      - Merge Readiness
+    # Evaluate terminal workflow state only. Requested/in-progress transitions
+    # multiplied Actions load without adding merge-readiness information.
+    types: [completed]
+    # Main completions already fan out through the watched workflows.
+    # Keep PR/feature heads event-driven and reconcile default-branch state on
+    # the existing schedule/manual paths instead of multiplying privileged runs.
+    branches-ignore:
+      - main
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Optional PR number; blank scans recently updated open PRs"
+        required: false
+        type: string
+      mode:
+        description: "observe evaluates only; apply may merge after every configured gate passes"
+        required: true
+        default: observe
+        type: choice
+        options: [observe, apply]
+
+# Privileged evaluation is intentionally restricted to triggers whose workflow
+# definition is loaded from the trusted default branch. PR-head events are not
+# accepted. Automatic CI transitions arrive through workflow_run; review-only
+# state changes are repaired by the scheduled sweep or an explicit dispatch.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-automation-index
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      PR_AUTOMATION_INDEX: .pr-automation/index.sqlite3
+      PR_AUTOMATION_EXPORT: .pr-automation/index.jsonl
+      PR_AUTOMATION_ALLOWED_BASES: ${{ vars.PR_AUTOMATION_ALLOWED_BASES || 'main' }}
+      PR_AUTOMATION_REQUIRED_CHECKS: ${{ vars.PR_AUTOMATION_REQUIRED_CHECKS || 'Merge Readiness' }}
+      PR_AUTOMATION_REQUIRED_APPROVALS: ${{ vars.PR_AUTOMATION_REQUIRED_APPROVALS || '1' }}
+      PR_AUTOMATION_REQUIRE_CHECKS: ${{ vars.PR_AUTOMATION_REQUIRE_CHECKS || 'true' }}
+      PR_AUTOMATION_REQUIRE_NO_CHANGES_REQUESTED: ${{ vars.PR_AUTOMATION_REQUIRE_NO_CHANGES_REQUESTED || 'true' }}
+      PR_AUTOMATION_REQUIRE_RESOLVED_THREADS: ${{ vars.PR_AUTOMATION_REQUIRE_RESOLVED_THREADS || 'true' }}
+      PR_AUTOMATION_ALLOW_FORK_MERGE: ${{ vars.PR_AUTOMATION_ALLOW_FORK_MERGE || 'false' }}
+      PR_AUTOMATION_MERGE_WHEN_READY: ${{ vars.PR_AUTOMATION_MERGE_WHEN_READY || 'false' }}
+      PR_AUTOMATION_MERGE_METHOD: ${{ vars.PR_AUTOMATION_MERGE_METHOD || 'squash' }}
+      PR_AUTOMATION_MAX_CHANGED_FILES: ${{ vars.PR_AUTOMATION_MAX_CHANGED_FILES || '250' }}
+      PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
+      PR_AUTOMATION_MAX_MUTATIONS: "1"
+      PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
+
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Stage isolated trusted automation package
+        shell: bash
+        run: |
+          set -euo pipefail
+          trusted_root="$RUNNER_TEMP/trusted-pr-automation"
+          rm -rf "$trusted_root"
+          mkdir -p "$trusted_root"
+          cp -R skeleton/pr_automation "$trusted_root/pr_automation"
+          printf 'TRUSTED_PR_AUTOMATION_ROOT=%s\n' "$trusted_root" >> "$GITHUB_ENV"
+
+      - name: Restore durable PR index
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .pr-automation
+          key: pr-automation-index-${{ github.run_id }}
+          restore-keys: |
+            pr-automation-index-
+
+      - name: Resolve execution mode
+        id: mode
+        shell: bash
+        env:
+          DISPATCH_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || '' }}
+          DEFAULT_MODE: ${{ vars.PR_AUTOMATION_MODE || 'observe' }}
+        run: |
+          set -euo pipefail
+          mode="${DISPATCH_MODE:-$DEFAULT_MODE}"
+          case "$mode" in observe|apply) ;; *) echo "invalid mode: $mode" >&2; exit 2 ;; esac
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate pull request state
+        shell: bash
+        env:
+          PR_AUTOMATION_MODE: ${{ steps.mode.outputs.mode }}
+          WORKFLOW_RUN_PR_HINTS: ${{ github.event_name == 'workflow_run' && toJSON(github.event.workflow_run.pull_requests.*.number) || '[]' }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          WORKFLOW_RUN_HEAD_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          INPUT_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}
+        run: |
+          set -euo pipefail
+          run_pr_automation() {
+            python -I -c 'import sys; root=sys.argv.pop(1); sys.path.insert(0, root); from pr_automation.runner import main; raise SystemExit(main())' \
+              "$TRUSTED_PR_AUTOMATION_ROOT" "$@"
+          }
+
+          args=(--repo "$GITHUB_REPOSITORY")
+          pr="${INPUT_PR:-}"
+          if [[ -n "$pr" ]]; then
+            [[ "$pr" =~ ^[0-9]+$ ]] || { echo "invalid PR number: $pr" >&2; exit 2; }
+            args+=(--pr="$pr")
+          elif [[ -n "${WORKFLOW_RUN_HEAD_SHA}" || -n "${WORKFLOW_RUN_HEAD_REF}" ]]; then
+            if [[ -z "${WORKFLOW_RUN_HEAD_SHA}" || -z "${WORKFLOW_RUN_HEAD_REF}" ]]; then
+              echo "workflow_run completion is missing head SHA or branch" >&2
+              exit 2
+            fi
+            args+=(--head-sha="$WORKFLOW_RUN_HEAD_SHA" --head-ref="$WORKFLOW_RUN_HEAD_REF")
+            if [[ -n "${DEFAULT_BRANCH}" ]]; then
+              args+=(--default-branch="$DEFAULT_BRANCH")
+            fi
+            args+=(--pr-hints-json="${WORKFLOW_RUN_PR_HINTS:-[]}")
+          else
+            args+=(--limit 25)
+          fi
+          run_pr_automation "${args[@]}"
+
+      - name: Save durable PR index
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .pr-automation
+          key: pr-automation-index-${{ github.run_id }}
+
+      - name: Upload human-readable index
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr-automation-index-${{ github.run_id }}
+          path: .pr-automation/index.jsonl
+          if-no-files-found: warn
+          retention-days: 30

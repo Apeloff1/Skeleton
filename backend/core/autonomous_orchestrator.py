@@ -14,6 +14,7 @@ is never blocked. Deterministic forges by default; LLM only when a model is set.
 """
 from __future__ import annotations
 
+from collections import deque
 import re
 import threading
 import time
@@ -102,7 +103,7 @@ def plan_from_directive(build_id: str, directive: str,
         nid = f"n{i + 1}"
         node = {
             "id": nid, "kind": kind,
-            "target": st.get("target"),          # generator key (forge) or gid (gate/churn)
+            "target": st.get("target"),
             "text": st.get("text") or st.get("prompt") or directive[:200],
             "tier": st.get("tier"),
             "model": st.get("model"),
@@ -131,11 +132,29 @@ def _ready(node: dict, by_id: dict) -> bool:
     return True
 
 
+def _dependency_index(nodes: list[dict]) -> tuple[dict[str, dict], dict[str, list[str]]]:
+    """Build direct lookup plus reverse dependency edges without rescanning DAGs."""
+    by_id: dict[str, dict] = {}
+    for index in range(len(nodes)):
+        node = nodes[index]
+        by_id[node["id"]] = node
+
+    dependents: dict[str, list[str]] = {
+        node_id: []
+        for node_id in by_id
+    }
+    for index in range(len(nodes)):
+        node = nodes[index]
+        for dep_id in node.get("depends_on", []):
+            if dep_id in dependents:
+                dependents[dep_id].append(node["id"])
+    return by_id, dependents
+
+
 def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
     """Run a single node. Returns the node's result dict."""
     from core import text_gamefile as tg
     kind = node["kind"]
-    # resolve an upstream-produced gid for gate/churn nodes
     up_gid = None
     for dep in node.get("depends_on", []):
         d = by_id.get(dep) or {}
@@ -179,9 +198,9 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
         if kind == "review":
             node["status"] = "manual_review"
             return {"awaiting": "human sign-off", "note": node.get("text")}
-    except Exception as e:
+    except Exception:
         node["status"] = "error"
-        return {"error": str(e)}
+        return {"error": "node_failed"}
     node["status"] = "manual_review"
     return {"error": "unknown_kind"}
 
@@ -191,23 +210,50 @@ def execute_plan(plan_id: str, on_progress=None) -> dict:
     if not plan:
         return {"error": "plan_not_found"}
     nodes = plan["nodes"]
-    by_id = {n["id"]: n for n in nodes}
+    by_id, dependents = _dependency_index(nodes)
     plan["status"] = "running"
-    remaining = [n for n in nodes if n["status"] in ("planned", "error")]
-    guard = 0
-    while remaining and guard < len(nodes) * 3 + 5:
-        guard += 1
-        progressed = False
-        for n in list(remaining):
-            if _ready(n, by_id):
-                n["status"] = "running"
-                if on_progress:
-                    on_progress(n, plan)
-                n["result"] = _exec_node(plan["build_id"], n, by_id)
-                remaining = [x for x in remaining if x["status"] in ("planned", "error")]
-                progressed = True
-        if not progressed:
-            break          # blocked (cyclic / unmet manual_review deps)
+
+    # Prior errors remain retryable, but each node gets at most one attempt in a
+    # single execute_plan call. This prevents persistent failures from spinning
+    # repeatedly inside one worker invocation.
+    attemptable = {
+        node["id"] for node in nodes
+        if node["status"] in ("planned", "error")
+    }
+    pending_dependencies: dict[str, int] = {}
+    for node in nodes:
+        pending_dependencies[node["id"]] = sum(
+            1
+            for dep_id in node.get("depends_on", [])
+            if not (by_id.get(dep_id) and by_id[dep_id]["status"] in ("done", "skipped"))
+        )
+
+    ready = deque(
+        node["id"] for node in nodes
+        if node["id"] in attemptable and pending_dependencies[node["id"]] == 0
+    )
+    attempted: set[str] = set()
+
+    while ready:
+        node_id = ready.popleft()
+        if node_id in attempted or node_id not in attemptable:
+            continue
+        attempted.add(node_id)
+        node = by_id[node_id]
+        node["status"] = "running"
+        if on_progress:
+            on_progress(node, plan)
+        node["result"] = _exec_node(plan["build_id"], node, by_id)
+
+        if node["status"] not in ("done", "skipped"):
+            continue
+        for child_id in dependents.get(node_id, ()):
+            if child_id not in attemptable or child_id in attempted:
+                continue
+            pending_dependencies[child_id] -= 1
+            if pending_dependencies[child_id] == 0:
+                ready.append(child_id)
+
     done = sum(1 for n in nodes if n["status"] == "done")
     review = sum(1 for n in nodes if n["status"] == "manual_review")
     err = sum(1 for n in nodes if n["status"] == "error")
@@ -229,23 +275,25 @@ def replan_from(plan_id: str, node_id: str) -> dict:
     plan = get_plan(plan_id)
     if not plan:
         return {"error": "plan_not_found"}
-    by_id = {n["id"]: n for n in plan["nodes"]}
+    by_id, dependents = _dependency_index(plan["nodes"])
     if node_id not in by_id:
         return {"error": "node_not_found"}
-    # BFS over reverse-dependency edges
+
     to_reset = {node_id}
-    changed = True
-    while changed:
-        changed = False
-        for n in plan["nodes"]:
-            if n["id"] not in to_reset and any(d in to_reset for d in n.get("depends_on", [])):
-                to_reset.add(n["id"])
-                changed = True
-    for n in plan["nodes"]:
-        if n["id"] in to_reset:
-            n["status"] = "planned"
-            n["result"] = None
-            n["produced_gid"] = None
+    queue = deque([node_id])
+    while queue:
+        current = queue.popleft()
+        for child_id in dependents.get(current, ()):
+            if child_id in to_reset:
+                continue
+            to_reset.add(child_id)
+            queue.append(child_id)
+
+    for reset_id in to_reset:
+        node = by_id[reset_id]
+        node["status"] = "planned"
+        node["result"] = None
+        node["produced_gid"] = None
     plan["version"] += 1
     plan["status"] = "planned"
     _save_plan(plan)
@@ -293,7 +341,7 @@ def _put(jid: str, patch: dict):
     with _LOCK:
         _JOBS.setdefault(jid, {}).update(patch)
         if len(_JOBS) > 64:
-            oldest = sorted(_JOBS.items(), key=lambda kv: kv[1].get("started", 0))[0][0]
+            oldest = min(_JOBS, key=lambda key: _JOBS[key].get("started", 0))
             _JOBS.pop(oldest, None)
 
 
@@ -313,8 +361,8 @@ def start_execute_job(plan_id: str) -> str:
                 _put(jid, {"current": f"{node['kind']}:{node.get('target') or node['id']}"})
             res = execute_plan(plan_id, on_progress=_prog)
             _put(jid, {"status": "error" if res.get("error") else "done", "result": res})
-        except Exception as e:
-            _put(jid, {"status": "error", "error": str(e)})
+        except Exception:
+            _put(jid, {"status": "error", "error": "execute_failed"})
 
     threading.Thread(target=_worker, daemon=True, name=f"orch-{jid}").start()
     return jid

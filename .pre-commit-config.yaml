@@ -35,6 +35,13 @@ repos:
         pass_filenames: false
         files: ^(backend/pyproject\.toml|frontend/(package\.json|Dockerfile|scripts/(enforce-yarn-audit|test-enforce-yarn-audit)\.js)|\.github/workflows/(ci|backend-quality|dependency-security)\.yml|scripts/(check_toolchain_contract\.py|quality-gates\.sh)|\.pre-commit-config\.yaml)$
 
+      - id: canonical-quality-parity
+        name: canonical local and backend CI quality parity
+        entry: python scripts/check_quality_gate_parity.py
+        language: system
+        pass_filenames: false
+        files: ^(\.github/workflows/backend-quality\.yml|scripts/(check_quality_gate_parity\.py|quality-gates\.sh)|\.pre-commit-config\.yaml)$
+
       - id: repository-artifact-policy
         name: repository artifact placement and provenance policy
         entry: python scripts/check_artifact_policy.py --staged

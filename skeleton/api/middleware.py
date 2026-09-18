@@ -4,14 +4,17 @@ FastAPI doesn't ship with these; they live here so routes stay thin.
 
 Gate stack (outer → inner), sibling of Zaibatsu.Gate Program.cs::
 
-    RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+    HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
 
 Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 """
 
 from __future__ import annotations
 
+import math
 import os
+import re
+import threading
 import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -52,30 +55,83 @@ class BearerAuth:
         return payload
 
 
+def _positive_finite(value: object, name: str) -> float:
+    """Reject bools; ``float(True)`` must not become a 1.0 capacity/refill."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a positive finite number")
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{name} must be a positive finite number")
+    return number
+
+
 class RateLimiter:
-    """Token-bucket keyed by arbitrary string (IP, user-id, API key)."""
+    """Thread-safe token bucket keyed by arbitrary string (IP, user-id, API key)."""
+
+    _MIN_SWEEP_INTERVAL_S = 1.0
 
     def __init__(self, *, capacity: float = 100.0, refill_per_sec: float = 10.0) -> None:
-        self.capacity = capacity
-        self.refill_per_sec = refill_per_sec
-        self._buckets: Dict[str, tuple] = {}
+        self.capacity = _positive_finite(capacity, "capacity")
+        self.refill_per_sec = _positive_finite(refill_per_sec, "refill_per_sec")
+        self._buckets: Dict[str, Tuple[float, float]] = {}
+        self._lock = threading.Lock()
+        self._last_sweep: Optional[float] = None
+        self._sweep_interval_s = max(
+            self._MIN_SWEEP_INTERVAL_S,
+            self.capacity / self.refill_per_sec,
+        )
+
+    def _sweep(self, now: float) -> None:
+        """Drop keys whose buckets have fully refilled back to capacity."""
+        last_sweep = self._last_sweep
+        if last_sweep is not None and now - last_sweep < self._sweep_interval_s:
+            return
+        stale = [
+            key
+            for key, (current, last) in self._buckets.items()
+            if current
+            + max(0.0, now - last) * self.refill_per_sec
+            >= self.capacity
+        ]
+        for key in stale:
+            self._buckets.pop(key, None)
+        self._last_sweep = now
 
     def check(self, key: str, tokens: float = 1.0) -> None:
+        if isinstance(tokens, bool) or not isinstance(tokens, (int, float)):
+            raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        amount = float(tokens)
+        if not math.isfinite(amount) or not 0 < amount <= self.capacity:
+            raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        tokens = amount
         now = time.monotonic()
-        current, last = self._buckets.get(key, (self.capacity, now))
-        current = min(self.capacity, current + (now - last) * self.refill_per_sec)
-        if current < tokens:
-            self._buckets[key] = (current, now)
-            raise RateLimitError(
-                "rate limit exceeded",
-                context={"retry_after_s": round((tokens - current) / self.refill_per_sec, 2)},
-            )
-        self._buckets[key] = (current - tokens, now)
+        with self._lock:
+            self._sweep(now)
+            current, last = self._buckets.get(key, (self.capacity, now))
+            elapsed = max(0.0, now - last)
+            current = min(self.capacity, current + elapsed * self.refill_per_sec)
+            if current < tokens:
+                self._buckets[key] = (current, now)
+                raise RateLimitError(
+                    "rate limit exceeded",
+                    context={
+                        "retry_after_s": round(
+                            (tokens - current) / self.refill_per_sec,
+                            2,
+                        )
+                    },
+                )
+            self._buckets[key] = (current - tokens, now)
+
+
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 def get_request_id(header_value: Optional[str] = None) -> str:
-    """Provide or generate a request correlation id."""
-    return header_value or uuid.uuid4().hex[:16]
+    """Provide one normalized request correlation ID or mint a safe one."""
+    if isinstance(header_value, str) and _REQUEST_ID_RE.fullmatch(header_value):
+        return header_value
+    return uuid.uuid4().hex[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +160,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/ledger", "ledger"),
     ("/api/v1/scheduler", "scheduler"),
     ("/api/v1/genesis", "genesis"),
+    ("/api/v1/application", "application"),
     ("/api/v1/capabilities", "capabilities"),
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
@@ -204,8 +261,9 @@ class RequestSealMiddleware:
 
         request = Request(scope, receive=receive)
         path = request.url.path
-        header_val = request.headers.get("x-request-id")
-        seal = get_request_id(header_val if header_val and len(header_val) <= 128 else None)
+        request_ids = request.headers.getlist("x-request-id")
+        header_val = request_ids[0] if len(request_ids) == 1 else None
+        seal = get_request_id(header_val)
         scope.setdefault("state", {})
         # Starlette request.state is a State object once bound; stash on scope.
         if "state" not in scope or not hasattr(scope.get("state", None), "seal"):
@@ -250,24 +308,27 @@ class BodyBoundMiddleware:
 
     def __init__(self, app, *, max_body_bytes: Optional[int] = None) -> None:
         self.app = app
-        env = os.environ.get("SKELETON_GATE_MAX_BODY_BYTES")
-        configured = int(env) if env else (
-            max_body_bytes if max_body_bytes is not None else _DEFAULT_MAX_BODY
+        from skeleton.api.request_bounds import _positive_limit
+
+        self.max_body = _positive_limit(
+            "SKELETON_GATE_MAX_BODY_BYTES",
+            max_body_bytes,
+            _DEFAULT_MAX_BODY,
         )
-        if configured <= 0:
-            raise ValueError("max body size must be positive")
-        self.max_body = configured
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        headers = {
-            k.decode("latin-1").lower(): v.decode("latin-1")
-            for k, v in scope.get("headers") or []
-        }
-        cl = headers.get("content-length")
+        # ASGI already gives us byte headers. Scan only for the one value we
+        # need instead of allocating and decoding a complete header mapping on
+        # every request.
+        cl = None
+        for key, value in scope.get("headers") or ():
+            if key == b"content-length" or key.lower() == b"content-length":
+                cl = value
+                break
         if cl is not None:
             try:
                 declared = int(cl)
@@ -307,9 +368,13 @@ class BodyBoundMiddleware:
 
 
 class WormAuditMiddleware:
-    """WORM-before-service: append + verify_chain_or_refuse; audit-fail → 503.
+    """WORM-before-service: append a hash-linked event; audit-fail → 503.
 
-    Reuses #22 ``skeleton.vault.audit.AuditLog`` — does not fork the chain.
+    ``AuditLog`` verifies durable history when it is restored/opened, and
+    ``append`` computes the new hash link before publishing the new head. A
+    second full-chain scan after every request made total request-path hashing
+    quadratic in the number of audit entries, so full verification remains an
+    explicit boot/diagnostic operation rather than per-request work.
     """
 
     def __init__(self, app, *, audit_log: Any = None) -> None:
@@ -347,7 +412,6 @@ class WormAuditMiddleware:
                     "seal": seal,
                 },
             )
-            log.verify_chain_or_refuse()
         except AuditChainBroken:
             resp = _json_response(503, {"error": "audit_unavailable"})
             await resp(scope, receive, send)
@@ -456,9 +520,10 @@ def install_gate(
 
     Order (outer → inner), sibling of Zaibatsu.Gate + gf-server admit_write::
 
-        RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+        HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
     """
     from skeleton.api.admit_write import WriteAdmitMiddleware
+    from skeleton.api.request_bounds import HeaderBoundMiddleware
 
     policy = policy or GatePolicy()
     # Innermost first:
@@ -473,4 +538,5 @@ def install_gate(
         governor=write_governor,
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
+    app.add_middleware(HeaderBoundMiddleware)
     return app

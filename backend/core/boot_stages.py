@@ -104,9 +104,9 @@ class StageRegistry:
                 except asyncio.TimeoutError:
                     st.status = STATUS_TIMED_OUT
                     st.error = f"timeout>{st.timeout_s}s"
-                except Exception as e:  # noqa: BLE001
+                except Exception:  # noqa: BLE001
                     st.status = STATUS_FAILED
-                    st.error = f"{type(e).__name__}: {e}"
+                    st.error = "stage_failed"
                 st.ended_at = time.time()
                 _tl.emit(
                     "stage_failed", name=st.name, status=st.status,

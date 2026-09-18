@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   push:
     branches:
       - main
@@ -13,12 +14,22 @@ on:
 permissions:
   contents: read
 
+# Merge Readiness validates the repository's current integration state rather
+# than serving as the archival security record for every historical main SHA.
+# Collapse superseded PR and main-branch runs so rapid merge waves cannot pin
+# runner capacity behind stale integration evidence. Secret/malware/provenance
+# workflows retain their separate evidence policies.
+concurrency:
+  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.11.16"
   NODE_VERSION: "24.20.0"
 
 jobs:
   quarantine_policy:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Quarantine Policy
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -37,6 +48,7 @@ jobs:
         run: python scripts/check_flaky_quarantine.py
 
   unit:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -62,6 +74,7 @@ jobs:
         run: python tests/run_unit.py
 
   integration_smoke:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -70,7 +83,8 @@ jobs:
         working-directory: ./backend
     services:
       mongodb:
-        image: mongo:7.0
+        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
+        image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
         ports:
           - "27017:27017"
     steps:
@@ -84,22 +98,36 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Install backend runtime
-        run: |
-          uv venv
-          uv pip install -r requirements.txt
+      - name: Install backend and integration runtime
+        run: >-
+          uv venv && uv pip install -r requirements.txt
+          "pytest>=8,<9" "httpx>=0.27,<1"
       - name: Import application with live Mongo service
         env:
           MONGO_URL: mongodb://localhost:27017/test
           SKIP_HEAVY_SEED: "true"
+          PYTHONPATH: ".."
         run: >-
           uv run python -c "import server; assert server.app is not None;
           print('server import: OK')"
+      - name: Run canonical cross-subsystem integration matrix
+        working-directory: .
+        env:
+          PYTHONPATH: "."
+          GF_SEAL_SECRET: "integration-matrix-ci-secret"
+        run: >-
+          backend/.venv/bin/python -m pytest -q --noconftest
+          tests/test_cross_subsystem_integration.py
+          tests/test_frontier_runtime_memory_retrieval.py
+          tests/test_model_runtime.py
+          tests/test_model_routing.py
+          skeleton/testing/test_frontier_observability_correlation.py
 
   quality_security:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Check out full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,7 +148,7 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           "ruff==0.9.10" "pytest>=8,<9" "fastapi==0.136.1"
-          "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
+          "httpx>=0.27,<1" "pydantic-settings>=2.1,<3"
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --frozen-lockfile --non-interactive
       - name: Backend correctness lint
@@ -135,14 +163,47 @@ jobs:
           GITLEAKS_CONFIG: ".gitleaks.toml"
           GITLEAKS_ENABLE_COMMENTS: "false"
 
+  pr_automation:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    name: PR Automation Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Install focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
+      - name: Compile automation package
+        run: python -m compileall -q skeleton/pr_automation
+      - name: Run PR automation contracts
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_pr_automation.py
+          skeleton/testing/test_pr_automation_ruleset.py
+          skeleton/testing/test_pr_automation_sensitive_paths.py
+          skeleton/testing/test_pr_automation_workflow.py
+          skeleton/testing/test_pr_automation_branch_completions.py
+
   readiness:
     name: Merge Readiness
-    if: always()
+    if: ${{ always() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     needs:
       - quarantine_policy
       - unit
       - integration_smoke
       - quality_security
+      - pr_automation
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -152,6 +213,7 @@ jobs:
           UNIT_RESULT: ${{ needs.unit.result }}
           INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
           QUALITY_RESULT: ${{ needs.quality_security.result }}
+          PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
         run: |
           python - <<'PY'
           import os
@@ -162,6 +224,7 @@ jobs:
               "unit": os.environ["UNIT_RESULT"],
               "integration_smoke": os.environ["INTEGRATION_RESULT"],
               "quality_security": os.environ["QUALITY_RESULT"],
+              "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
           }
           failures = {
               name: result

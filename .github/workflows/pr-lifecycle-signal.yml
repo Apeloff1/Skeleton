@@ -1,0 +1,27 @@
+name: PR Lifecycle Signal
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, closed]
+
+# Only the newest lifecycle signal for a PR is useful to the default-branch
+# workflow_run drainer. The privileged drainer listens to workflow_run:requested,
+# which is emitted when this workflow run is created; the signal job itself never
+# needs runner capacity.
+concurrency:
+  group: pr-lifecycle-signal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# This workflow is only a read-only event envelope. It never checks out or
+# executes repository code and does not need a token capability of its own.
+permissions: {}
+
+jobs:
+  signal:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Runnerless lifecycle signal sentinel
+        run: ':'

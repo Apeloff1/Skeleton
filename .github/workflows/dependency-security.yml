@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, master]
     paths:
+      - "Dockerfile"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
+      - "frontend/nginx.conf"
       - "backend/requirements.txt"
       - "backend/pyproject.toml"
       - "frontend/package.json"
@@ -15,6 +19,10 @@ on:
       - ".github/workflows/dependency-security.yml"
   pull_request:
     paths:
+      - "Dockerfile"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
+      - "frontend/nginx.conf"
       - "backend/requirements.txt"
       - "backend/pyproject.toml"
       - "frontend/package.json"
@@ -24,13 +32,15 @@ on:
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
+  schedule:
+    - cron: "17 6 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: dependency-security-${{ github.ref }}
+  group: dependency-security-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -47,7 +57,7 @@ jobs:
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.11"
+          python-version: "3.11.16"
 
       - name: Install pinned dependency auditor
         run: python -m pip install --disable-pip-version-check "pip-audit==2.10.1"
@@ -74,7 +84,7 @@ jobs:
           name: python-cyclonedx-sbom
           path: ${{ runner.temp }}/python-sbom.cdx.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
       - name: Enforce Python vulnerability policy
         if: steps.python-audit.outputs.status != '0'
@@ -96,9 +106,13 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      - name: Install frozen frontend dependency graph
+      - name: Install frozen frontend dependency graph without lifecycle scripts
         working-directory: frontend
-        run: yarn install --frozen-lockfile --non-interactive
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Apply reviewed local node_modules security patches
+        working-directory: frontend
+        run: node scripts/patch-node-modules.js
 
       - name: Test JavaScript audit policy parser
         working-directory: frontend
@@ -139,7 +153,7 @@ jobs:
             ${{ runner.temp }}/yarn-audit.json
             ${{ runner.temp }}/frontend-sbom.cdx.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
       - name: Validate nonzero Yarn audit status before policy evaluation
         if: steps.yarn-audit.outputs.status != '0'
@@ -161,3 +175,96 @@ jobs:
           YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
+
+  container-audit:
+    name: "Container CVE Audit (${{ matrix.name }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: root
+            context: .
+            file: ./Dockerfile
+            target: ""
+            image: skeleton-root:security-scan
+          - name: backend
+            context: .
+            file: ./backend/Dockerfile
+            target: production
+            image: skeleton-backend:security-scan
+          - name: frontend
+            context: ./frontend
+            file: ./frontend/Dockerfile
+            target: production
+            image: skeleton-frontend:security-scan
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build image for vulnerability scanning
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          load: true
+          push: false
+          tags: ${{ matrix.image }}
+
+      - name: Verify frontend browser security headers
+        if: matrix.name == 'frontend'
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run -d -p 127.0.0.1:18080:8080 "${{ matrix.image }}")"
+          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+
+          ready=0
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error --output /dev/null http://127.0.0.1:18080/healthz; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != "1" ]]; then
+            docker logs "$container_id" >&2 || true
+            echo "Frontend container did not become healthy." >&2
+            exit 1
+          fi
+
+          headers="$(curl --fail --silent --show-error --head http://127.0.0.1:18080/)"
+          printf '%s\n' "$headers"
+          for expected in \
+            'X-Content-Type-Options: nosniff' \
+            'X-Frame-Options: SAMEORIGIN' \
+            'Referrer-Policy: strict-origin-when-cross-origin' \
+            'Permissions-Policy: camera=(), microphone=(), geolocation=()' \
+            "Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'" \
+            'X-Permitted-Cross-Domain-Policies: none'; do
+            if ! grep -Fqi "$expected" <<<"$headers"; then
+              echo "Missing required frontend security header: $expected" >&2
+              exit 1
+            fi
+          done
+
+          health_headers="$(curl --fail --silent --show-error --head http://127.0.0.1:18080/healthz)"
+          if ! grep -Fqi 'Cache-Control: no-store' <<<"$health_headers"; then
+            echo "Health endpoint must not be cached." >&2
+            exit 1
+          fi
+
+      - name: Fail on high or critical container vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          scan-ref: ${{ matrix.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: 1
+          format: table

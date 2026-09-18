@@ -80,6 +80,14 @@ class ContactEngine:
             for _ in range(8):
                 steps += int(lm.fit(texts, lr=0.05, schedule="cosine"))
 
+        # The historical contact path attached LoRA but only trained the base
+        # transformer. Feed the same next-token objective into the mergeable
+        # output adapter so contact writes actual adapter state, not metadata.
+        lora_steps = 0
+        bank = getattr(lm, "lora", None)
+        if bank is not None and hasattr(bank, "fit_output"):
+            lora_steps = int(bank.fit_output(lm, texts, lr=0.05))
+
         hebb = 0.0
         h_t = list(lm.hidden(stimulus or "plan tensor ttk")) if hasattr(lm, "hidden") else []
         h_n = neo._hidden(stimulus or "plan tensor ttk") if hasattr(neo, "_hidden") else []
@@ -116,6 +124,7 @@ class ContactEngine:
             "slot": slot,
             "backend": getattr(port, "name", type(port).__name__),
             "steps": steps,
+            "lora_steps": lora_steps,
             "hebb": hebb,
             "absorb": absorbed,
             "birth_ppl": birth if birth < 1e8 else None,

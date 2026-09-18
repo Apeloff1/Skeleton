@@ -1,0 +1,374 @@
+name: Idle Studio
+
+on:
+  workflow_run:
+    workflows: ['Shift Supervisor Control']
+    types: [completed]
+    branches:
+      - "*"
+      - "**"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Plan, review, and validate without publishing pull requests
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: idle-studio
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  pressure:
+    if: >-
+      github.repository == 'Apeloff1/Skeleton' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'))
+    name: Gate idle work on Actions pressure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    env:
+      REPO: ${{ github.repository }}
+      MAX_QUEUED_ACTIONS_RUNS: '40'
+    outputs:
+      proceed: ${{ steps.guard.outputs.proceed }}
+    steps:
+      - name: Read queued Actions pressure
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          queued_count=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count')
+          threshold="$MAX_QUEUED_ACTIONS_RUNS"
+          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+            echo '::error::Idle Studio queue guard received invalid queue evidence.'
+            exit 1
+          fi
+          if (( queued_count >= threshold )); then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## Idle Studio queue guard'
+              echo
+              echo 'Status: **safe no-op due to Actions queue pressure**.'
+              echo
+              echo "- Queued Actions runs: $queued_count"
+              echo "- Backpressure threshold: $threshold"
+              echo '- Model calls, branch publication, and PR publication: skipped'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  studio:
+    needs: pressure
+    # The pressure job is the single workflow_run trust boundary. This job only
+    # consumes its positive proceed output, avoiding duplicated identity guards
+    # that can drift independently and defeat mutation-based contract tests.
+    if: >-
+      needs.pressure.result == 'success' &&
+      needs.pressure.outputs.proceed == 'true'
+    name: 1000-worker idle control plane
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      IDLE_STUDIO_ACTIVE_WORKERS: ${{ vars.IDLE_STUDIO_ACTIVE_WORKERS }}
+      IDLE_STUDIO_TASKS_PER_RUN: ${{ vars.IDLE_STUDIO_TASKS_PER_RUN }}
+      IDLE_STUDIO_MAX_MODEL_CALLS: ${{ vars.IDLE_STUDIO_MAX_MODEL_CALLS }}
+      IDLE_STUDIO_MAX_OPEN_PRS: ${{ vars.IDLE_STUDIO_MAX_OPEN_PRS }}
+
+    steps:
+      - name: Checkout trusted default-branch snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Install focused trusted runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "fastapi>=0.141.1,<1"
+          "pydantic>=2.13.5,<3"
+          "pydantic-settings>=2.15.0,<3"
+
+      - name: Validate trusted idle-studio control plane
+        run: >-
+          python -m unittest -v
+          skeleton.testing.test_idle_studio
+          skeleton.testing.test_idle_studio_v2
+          skeleton.testing.test_idle_studio_publisher
+
+      - name: Snapshot live repository state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+          base_sha=$(git rev-parse HEAD)
+          BASE_SHA="$base_sha" CURRENT_RUN_ID="$GITHUB_RUN_ID" python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          REPO = os.environ["REPO"]
+          PAGE_SIZE = 50
+          MAX_PAGES = 10
+          COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
+          root = Path(".idle-studio-tmp")
+          base_sha = os.environ["BASE_SHA"].casefold()
+          if COMMIT_OID_RE.fullmatch(base_sha) is None:
+              raise SystemExit("idle-studio base SHA must be a 40-character hex commit OID")
+
+          def gh_json(path: str):
+              result = subprocess.run(
+                  ["gh", "api", path],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              return json.loads(result.stdout)
+
+          def list_pages(path: str, *, key: str | None = None) -> list:
+              items: list = []
+              separator = "&" if "?" in path else "?"
+              for page in range(1, MAX_PAGES + 1):
+                  payload = gh_json(f"{path}{separator}per_page={PAGE_SIZE}&page={page}")
+                  if key is None:
+                      batch = payload
+                  else:
+                      if not isinstance(payload, dict):
+                          raise SystemExit(f"malformed {path} payload")
+                      batch = payload.get(key) or []
+                  if not isinstance(batch, list):
+                      raise SystemExit(f"malformed {path} list")
+                  items.extend(item for item in batch if isinstance(item, dict))
+                  if len(batch) < PAGE_SIZE:
+                      return items
+              raise SystemExit(f"{path} exceeded bounded identity scan")
+
+          issues = [
+              item for item in list_pages(
+                  f"/repos/{REPO}/issues?state=open&sort=updated&direction=desc"
+              )
+              if not str(item.get("title", "")).strip().lower().startswith("bot:")
+          ]
+          state = {
+              "runs": list_pages(f"/repos/{REPO}/actions/runs", key="workflow_runs"),
+              "issues": issues,
+              "pulls": list_pages(
+                  f"/repos/{REPO}/pulls?state=open&sort=updated&direction=desc"
+              ),
+              "base_sha": base_sha,
+              "current_run_id": os.environ["CURRENT_RUN_ID"],
+          }
+          (root / "repo-state.json").write_text(
+              json.dumps(state, sort_keys=True, indent=2),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Load fresh canonical shift-supervisor plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m core.shift_supervisor.consumer_plan prepare \
+            --team idle \
+            --state .idle-studio-tmp/repo-state.json \
+            --summary .idle-studio-tmp/shift-supervisor-summary.md \
+            --plan-map .idle-studio-tmp/plan-map.json \
+            --max-age-minutes 20
+
+      - name: Plan, build, and independently review supervisor work
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          restore_backlog() {
+            if [[ -f .idle-studio-tmp/BACKLOG.md.saved ]]; then
+              mv .idle-studio-tmp/BACKLOG.md.saved BACKLOG.md
+            fi
+          }
+          trap restore_backlog EXIT
+          if [[ -f BACKLOG.md ]]; then
+            mv BACKLOG.md .idle-studio-tmp/BACKLOG.md.saved
+          fi
+          python -m skeleton.automation.idle_studio_v2 propose \
+            --state .idle-studio-tmp/repo-state.json \
+            --package .idle-studio-tmp/package.json \
+            --audit .idle-studio-tmp/audit.jsonl \
+            --report .idle-studio-tmp/report.md
+          restore_backlog
+          trap - EXIT
+          sha256sum .idle-studio-tmp/package.json > .idle-studio-tmp/package.sha256
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          package = json.loads(
+              Path('.idle-studio-tmp/package.json').read_text(encoding='utf-8')
+          )
+          if package.get('status') == 'missing-api-key':
+              raise SystemExit(
+                  'OPENAI_API_KEY repository secret is required for Idle Studio'
+              )
+          PY
+
+      - name: Revalidate sealed proposals without model or GitHub credentials
+        id: validation
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .idle-studio-tmp/package.sha256
+          python -m skeleton.automation.idle_studio_v2 validate \
+            --package .idle-studio-tmp/package.json
+
+      - name: Record final idle workforce snapshot
+        if: always()
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+          if [[ "$VALIDATION_OUTCOME" == 'success' && -s .idle-studio-tmp/package.json && -s .idle-studio-tmp/audit.jsonl ]]; then
+            python -m core.shift_supervisor.workforce_report idle \
+              --package .idle-studio-tmp/package.json \
+              --audit .idle-studio-tmp/audit.jsonl \
+              --output .idle-studio-tmp/worker-status.json
+            if [[ -s .idle-studio-tmp/plan-map.json ]]; then
+              python -m core.shift_supervisor.consumer_plan normalize-worker-status \
+                --status .idle-studio-tmp/worker-status.json \
+                --plan-map .idle-studio-tmp/plan-map.json
+            fi
+          else
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path('.idle-studio-tmp/worker-status.json').write_text(
+              json.dumps(
+                  {
+                      'version': 1,
+                      'team': 'idle',
+                      'updated_at': datetime.now(timezone.utc).isoformat(),
+                      'run_status': 'no_validated_work',
+                      'workers': [],
+                  },
+                  sort_keys=True,
+                  indent=2,
+              ) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          fi
+
+      - name: Persist append-only Idle Studio ledger and staffing status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+
+          if [[ -s .idle-studio-tmp/worker-status.json ]]; then
+            worker_title='[Shift Supervisor] Idle Worker Status'
+            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            if [[ -n "${worker_number:-}" ]]; then
+              gh issue edit "$worker_number" --repo "$REPO" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            else
+              gh issue create --repo "$REPO" --title "$worker_title" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            fi
+          fi
+
+          title='bot: idle studio ledger'
+          number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [[ -z "${number:-}" ]]; then
+            issue_url=$(gh issue create --repo "$REPO" --title "$title" --body 'Append-only ledger for Idle Studio runs. Every scheduled/manual run records its human report and redacted machine audit here, including no-op and rejected runs.')
+            number="${issue_url##*/}"
+          fi
+          {
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .idle-studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
+            if [[ -s .idle-studio-tmp/report.md ]]; then
+              cat .idle-studio-tmp/report.md
+            else
+              echo '# Idle Studio run'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            fi
+            if [[ -s .idle-studio-tmp/audit.jsonl ]]; then
+              echo
+              echo '<details><summary>Redacted machine audit</summary>'
+              echo
+              echo '```jsonl'
+              cat .idle-studio-tmp/audit.jsonl
+              echo '```'
+              echo '</details>'
+            fi
+          } > .idle-studio-tmp/ledger-comment.md
+          gh issue comment "$number" --repo "$REPO" --body-file .idle-studio-tmp/ledger-comment.md >/dev/null
+
+      - name: Publish independently approved work as reviewable pull requests
+        if: >-
+          success() &&
+          (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .idle-studio-tmp/package.sha256
+          python -m skeleton.automation.idle_studio_publisher \
+            --package .idle-studio-tmp/package.json
+
+      - name: Summarize idle studio run
+        if: always()
+        shell: bash
+        run: |
+          if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+            cat .idle-studio-tmp/shift-supervisor-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -s .idle-studio-tmp/report.md ]]; then
+            cat .idle-studio-tmp/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Idle Studio did not produce a report.' >> "$GITHUB_STEP_SUMMARY"
+          fi

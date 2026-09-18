@@ -1,0 +1,51 @@
+name: Merge Readiness Legacy Concurrency Drain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/merge-readiness-concurrency-drain.yml'
+
+permissions: {}
+
+concurrency:
+  # Keep this one-shot tombstone workflow isolated from active Merge Readiness
+  # groups while still giving the repository-wide concurrency audit an explicit
+  # top-level identity.
+  group: merge-readiness-legacy-drain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tombstone:
+    name: Retire legacy Merge Readiness ${{ matrix.sha }}
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        sha:
+          - 4cdb341dafaf1749f331f9896a2aace28a0acfa7
+          - cdd4b94c0061600fe7f596f8a6416d73aa6804cf
+          - 90c96d1a907bd5d946cfea6257d995fc965da00c
+          - 86886dbc615ac4c8fff72a4afcf64025324ff7f9
+          - a544262c57baaabc4c8f1c4cf0c0ee36f2515a2a
+          - b8e9c40e115c6001ee76dab65ef7520c42d19eb8
+    concurrency:
+      # Intentionally matches the pre-#1203 SHA-scoped Merge Readiness group.
+      # The current ref-scoped group is not present in this matrix.
+      group: merge-readiness-${{ matrix.sha }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm bounded tombstone identity
+        env:
+          LEGACY_SHA: ${{ matrix.sha }}
+          CURRENT_MAIN_SHA: ca257df6a2b4170cc9bdca501a96a5ae57d31bdd
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$LEGACY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CURRENT_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$LEGACY_SHA" != "$CURRENT_MAIN_SHA" ]]
+          printf 'retired legacy Merge Readiness concurrency group for %s\n' "$LEGACY_SHA"

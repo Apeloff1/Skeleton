@@ -66,6 +66,7 @@ class GameLogicSpec:
     quality: dict[str, Any] = field(default_factory=dict)
     quality_stats: dict[str, Any] = field(default_factory=dict)
     repair: dict[str, Any] = field(default_factory=dict)
+    speculative_rag: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,13 +83,15 @@ class GameLogicSpec:
             "quality": dict(self.quality),
             "quality_stats": dict(self.quality_stats),
             "repair": dict(self.repair),
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
 class GameLogicPipeline:
-    def __init__(self, bus: EventBus | None = None, *, root=None) -> None:
+    def __init__(self, bus: EventBus | None = None, *, root=None, genesis=None) -> None:
         self._bus = bus or EventBus()
         self._root = root
+        self._genesis = genesis
 
     def run(self, description: str, *, title: str = "untitled",
             max_level: int = 50, curve: str = "quadratic",
@@ -96,6 +99,7 @@ class GameLogicPipeline:
         from skeleton.intelligence.game_logic_repair import attempt_game_logic_repair
         from skeleton.intelligence.pipeline_verifier import PipelineVerifier
         from skeleton.organism.quality_state import append_quality
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
 
         if not description or not description.strip():
             raise ValidationError("description must be non-empty")
@@ -103,6 +107,13 @@ class GameLogicPipeline:
             raise ValidationError("unknown progression curve", context={"curve": curve})
         if not 1 <= max_level <= 1000:
             raise ValidationError("max_level out of range", context={"max_level": max_level})
+
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "game_logic",
+            {"description": description},
+            limit=3,
+        )
 
         run_id = str(PipelineRunId.new())
         start = self._bus.emit("pipeline.game_logic.started",
@@ -163,5 +174,6 @@ class GameLogicPipeline:
         ))
         self._bus.emit("pipeline.game_logic.completed",
                        {"run_id": run_id, "title": title},
-                       correlation_id=start.correlation_id, causation_id=start.event_id)
+                       correlation_id=start.correlation_id)
+        spec.speculative_rag = prefetch
         return spec

@@ -67,9 +67,9 @@ async def deep_health(probe_timeout: int = 45) -> HealthReport:
             report.headless_ok = profile.headless_ok
             if not profile.headless_ok:
                 report.problems.append("headless self-test failed")
-        except Exception as e:
+        except Exception:
             report.ok = False
-            report.problems.append(f"engine probe failed: {type(e).__name__}: {e}"[:200])
+            report.problems.append("engine_probe_failed")
         report.probe_ms = (time.monotonic() - started) * 1000
 
     try:

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
+
+from skeleton.observability.redaction import redact_text, safe_exception_text
 
 
 @dataclass
@@ -27,19 +29,36 @@ Probe = Callable[[], ProbeResult]
 
 def probe(name: str):
     """Decorator: wraps a plain function into a timed Probe."""
+
     def wrap(fn: Callable[[], Any]) -> Probe:
         def run() -> ProbeResult:
             t0 = time.perf_counter()
             try:
                 result = fn()
-                ok, detail = (True, "") if result is None else (
-                    bool(result.get("ok", True)), str(result.get("detail", "")))
-                return ProbeResult(name, ok, detail,
-                                   (time.perf_counter() - t0) * 1000.0)
+                ok, detail = (
+                    (True, "")
+                    if result is None
+                    else (
+                        bool(result.get("ok", True)),
+                        redact_text(str(result.get("detail", ""))),
+                    )
+                )
+                return ProbeResult(
+                    name,
+                    ok,
+                    detail,
+                    (time.perf_counter() - t0) * 1000.0,
+                )
             except Exception as exc:  # a crashing probe reports, never propagates
-                return ProbeResult(name, False, f"{type(exc).__name__}: {exc}",
-                                   (time.perf_counter() - t0) * 1000.0)
+                return ProbeResult(
+                    name,
+                    False,
+                    safe_exception_text(exc),
+                    (time.perf_counter() - t0) * 1000.0,
+                )
+
         return run
+
     return wrap
 
 
@@ -58,9 +77,18 @@ class HealthRegistry:
     def _run(probes: List[Probe]) -> Dict[str, Any]:
         results = [p() for p in probes]
         ok = all(r.ok for r in results)
-        return {"status": "up" if ok else "down",
-                "probes": [{"name": r.name, "ok": r.ok, "detail": r.detail,
-                            "latency_ms": round(r.latency_ms, 3)} for r in results]}
+        return {
+            "status": "up" if ok else "down",
+            "probes": [
+                {
+                    "name": r.name,
+                    "ok": r.ok,
+                    "detail": r.detail,
+                    "latency_ms": round(r.latency_ms, 3),
+                }
+                for r in results
+            ],
+        }
 
     def liveness(self) -> Dict[str, Any]:
         return self._run(self._liveness)

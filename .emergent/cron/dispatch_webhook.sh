@@ -10,6 +10,16 @@ WEBHOOK_ENV_FILE="${WEBHOOK_ENV_FILE:-/app/backend/.env}"
 AT_DATE="${AT_DATE:-}"
 END_DATE="${END_DATE:-}"
 
+# Keep the dispatcher on the narrow webhook method surface. In particular,
+# CONNECT/TRACE must never be exposed through scheduler-controlled input.
+case "$METHOD" in
+	GET|POST|PUT|PATCH|DELETE|HEAD) ;;
+	*)
+		echo "dispatch blocked (cron=$CRON_NAME): unsupported HTTP method" >&2
+		exit 64
+		;;
+esac
+
 # AT_DATE (one-time trigger): crond can't express the year, so the "M H D Mo *"
 # line re-fires this minute every year. Fire only when the current UTC minute
 # (first 16 chars of RFC3339) matches AT_DATE's minute.
@@ -29,6 +39,13 @@ if [ -n "$END_DATE" ]; then
 fi
 
 ENDPOINT="$(printf '%s' "$ENDPOINT_URL_B64" | base64 -d)"
+case "$ENDPOINT" in
+	https://*) ;;
+	*)
+		echo "dispatch blocked (cron=$CRON_NAME): webhook endpoint must use https" >&2
+		exit 64
+		;;
+esac
 
 strip_quotes() {
 	# Strip a single matching pair of surrounding quotes.
@@ -48,6 +65,10 @@ read_secret() {
 	printf '%s' "$value"
 }
 WEBHOOK_CRON_SECRET="$(read_secret)"
+if [ -z "$WEBHOOK_CRON_SECRET" ]; then
+	echo "dispatch blocked (cron=$CRON_NAME): WEBHOOK_CRON_SECRET is missing" >&2
+	exit 78
+fi
 
 # RUN_ID is the idempotency key: cron name + fire time (minute granularity
 # matches the schedule floor).
@@ -57,11 +78,15 @@ ENVELOPE="{\"event\":\"schedule.triggered\",\"schedule_id\":\"$CRON_NAME\",\"run
 
 # Fire-and-forget: one request, no retries, no run reporting. `|| true` keeps
 # `set -e` happy on a curl transport failure (000, non-zero exit).
-# --location-trusted: internal-cluster pods get a cross-host 307 to the
-# internal.<preview-host>; the Bearer must survive that same-platform redirect.
+#
+# Security boundary: `--location` deliberately replaces `--location-trusted`.
+# curl may follow same-platform redirects, but it will not forward Authorization
+# to a different host. Protocol restrictions also prevent redirect downgrade or
+# redirects into non-HTTP URL handlers while a Bearer credential is attached.
 HTTP_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' \
 	--max-time 10 \
-	--location-trusted --max-redirs 2 \
+	--proto '=https' --proto-redir '=https' \
+	--location --max-redirs 2 \
 	-X "$METHOD" \
 	-H "Authorization: Bearer $WEBHOOK_CRON_SECRET" \
 	-H "Content-Type: application/json" \

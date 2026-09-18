@@ -38,6 +38,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from core.http_errors import internal_http_error
 from typing import Optional, Union
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -794,9 +795,9 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                     break
             except Exception as e:
                 import traceback, time as _time
-                last_error = str(e)
+                last_error = "phase_failed"
                 traceback.print_exc()
-                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {last_error}")
+                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {type(e).__name__}")
                 if attempt < MAX_RETRIES:
                     backoff = 0.5 * (2 ** (attempt - 1))
                     _time.sleep(backoff)
@@ -1285,8 +1286,8 @@ Before any narrative payload is written to disk, the Playwright sub-swarm must:
             ])
             out["docs/STYLE_MANIFEST.md"] = "\n".join(sm_lines) + "\n"
 
-    except Exception as _e:
-        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection soft-failed: {_e})\n"
+    except Exception:
+        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection unavailable)\n"
     return out
 
 
@@ -1450,9 +1451,9 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
             }
         except Exception:
             pass
-    except Exception as _e:
+    except Exception:
         out["docs/GAME_KNOWLEDGE_VAULT.md"] = (
-            f"# {title} — Game Knowledge Vault\n\n(vault injection soft-failed: {_e})\n"
+            f"# {title} — Game Knowledge Vault\n\n(vault injection unavailable)\n"
         )
     return out
 
@@ -2420,7 +2421,7 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
         with _worker_lock:
             _worker_stats["total_completed"] += 1
         return (batch_num, files, None)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
         with _worker_lock:
@@ -2433,11 +2434,11 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
                 build.get("title", "game"),
                 build.get("genre", "rpg"),
                 f"batch_{batch_num}",
-                f"worker-fallback: {str(e)[:120]}",
+                "batch_failed",
             ) or {}
-            return (batch_num, fb, str(e)[:200])
+            return (batch_num, fb, "batch_failed")
         except Exception:
-            return (batch_num, {}, str(e)[:200])
+            return (batch_num, {}, "batch_failed")
     finally:
         with _worker_lock:
             _worker_stats["active"] = max(0, _worker_stats["active"] - 1)
@@ -2490,7 +2491,7 @@ async def _run_background_build(build_id: str, duration_minutes: int = 15, resum
             _bv.preserve_on_failure(build_id)
             build["_bg_status"] = "failed"
             build["status"] = "failed"
-            build["_bg_error"] = str(_runexc)
+            build["_bg_error"] = "background_runner_failed"
             build["_vault_preserved"] = True
             await _save_build(build)
         except Exception as _pfe:
@@ -2679,7 +2680,7 @@ async def _run_background_build_inner(build: dict, build_id: str,
                 break
             except Exception as e:
                 import traceback
-                batch_error = str(e)
+                batch_error = "batch failed"
                 build["_bg_retries"] += 1
                 traceback.print_exc()
                 print(f"[GALAXY BG] Batch {batch_num}/{TOTAL_BATCHES} '{batch_name}' attempt {attempt}/{MAX_BATCH_RETRIES} FAILED: {batch_error}")
@@ -3307,7 +3308,7 @@ async def start_background_build(req: StartBuildRequest):
     try:
         build = await _load_build(req.build_id)
     except Exception as _lerr:
-        raise HTTPException(500, f"Failed to load build: {_lerr}")
+        raise internal_http_error("Failed to load build", _lerr) from None
     if not build:
         raise HTTPException(404, "Build not found")
 
@@ -3424,12 +3425,12 @@ async def start_background_build(req: StartBuildRequest):
         # Restore status so frontend knows something went wrong
         build["_bg_status"] = "failed"
         build["status"] = "failed"
-        build["_bg_error"] = f"task_creation_failed: {_tke}"
+        build["_bg_error"] = "task_creation_failed"
         try:
             await _save_build(build)
         except Exception as _save_error:
             print(f"[GALAXY] failed-status save failed: {_save_error}", flush=True)
-        raise HTTPException(500, f"Failed to launch build task: {_tke}")
+        raise internal_http_error("Failed to launch build task", _tke) from None
 
     # ═══ AUTO-SCHEDULE THE SWARM DAG ═══
     # Kicking off a build also fires the Hierarchical Swarm Planner's async
@@ -3730,11 +3731,11 @@ async def deploy_build(build_id: str, expo_token: Optional[str] = None):
                 "error": result.stderr[:500],
                 "zip_url": f"/api/galaxy-studio/download/{build_id}",
             }
-    except Exception as e:
+    except Exception:
         return {
             "build_id": build_id,
             "status": "zip_ready",
-            "message": str(e),
+            "message": "EAS build failed",
             "zip_url": f"/api/galaxy-studio/download/{build_id}",
         }
 
@@ -4593,7 +4594,7 @@ async def _run_expansion_bg(build_id: str, exp_type: str, exp_desc: str,
             b = await _load_build(build_id)
             if b is not None:
                 ex = b.get("_expansion") or {}
-                ex.update({"status": "failed", "error": str(e)[:300],
+                ex.update({"status": "failed", "error": "expansion failed",
                            "completed_at": datetime.utcnow().isoformat()})
                 b["_expansion"] = ex
                 await _save_build(b)
@@ -4854,10 +4855,10 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
                 result["apk_status"] = "eas_error"
                 result["apk_error"] = eas_result.stderr[:500] if eas_result.stderr else "EAS build failed"
                 result["apk_message"] = "EAS build failed. ZIP is available for download."
-        except Exception as e:
+        except Exception:
             result["apk_status"] = "error"
-            result["apk_error"] = str(e)[:200]
-            result["apk_message"] = f"APK build error: {str(e)[:100]}. ZIP available."
+            result["apk_error"] = "apk_build_failed"
+            result["apk_message"] = "APK build error. ZIP available."
     else:
         try:
             apk_entry = _vault_save(build_id, "apk", build["title"], "", {
@@ -4870,9 +4871,9 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
             result["apk_status"] = "no_token"
             result["apk_vault_id"] = apk_entry.get("vault_id")
             result["apk_message"] = "No EXPO_TOKEN configured. Add token in backend/.env and restart backend for real EAS cloud compile."
-        except Exception as e:
+        except Exception:
             result["apk_status"] = "no_token"
-            result["apk_message"] = f"No EXPO_TOKEN available. ZIP created for manual APK build. ({str(e)[:60]})"
+            result["apk_message"] = "No EXPO_TOKEN available. ZIP created for manual APK build."
 
     return result
 
@@ -4910,7 +4911,7 @@ async def _run_apk_bg(build_id: str, token: str, slug: str):
             b = await _load_build(build_id)
             if b is not None:
                 st = b.get("_apk") or {}
-                st.update({"status": "failed", "error": str(e)[:300],
+                st.update({"status": "failed", "error": "apk_packaging_failed",
                            "completed_at": datetime.utcnow().isoformat()})
                 st.pop("_entries", None)
                 b["_apk"] = st
@@ -5118,7 +5119,8 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
         subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d)) and d not in {".", ".."}]
         actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
     except Exception as pe:
-        return {"build_id": build_id, "status": "package_error", "message": f"ZIP extract failed: {pe}"}
+        print(f"[GALAXY] ZIP extract failed: {type(pe).__name__}", flush=True)
+        return {"build_id": build_id, "status": "package_error", "message": "zip_extract_failed"}
 
     env = _os.environ.copy()
     env["EXPO_TOKEN"] = token
@@ -5184,10 +5186,10 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
             "message": "Galaxy Studio cloud compile triggered on Expo EAS.",
             "expo_dashboard": f"https://expo.dev/accounts/galaxystudio/builds/{eas_build_id}" if eas_build_id else None,
         }
-    except _sp.TimeoutExpired as te:
-        return {"build_id": build_id, "status": "timeout", "message": f"EAS step timed out: {te.cmd}"}
-    except Exception as e:
-        return {"build_id": build_id, "status": "error", "message": str(e)[:400]}
+    except _sp.TimeoutExpired:
+        return {"build_id": build_id, "status": "timeout", "message": "EAS step timed out"}
+    except Exception:
+        return {"build_id": build_id, "status": "error", "message": "EAS build failed"}
 
 
 @router.get("/eas-status/{build_id}")
@@ -5209,8 +5211,8 @@ async def galaxy_eas_status(build_id: str):
     # Delegate to the real EAS proxy
     try:
         return await eas_build_status(eas_id)  # type: ignore[name-defined]
-    except Exception as e:
-        return {"build_id": build_id, "eas_build_id": eas_id, "status": "error", "error": str(e)[:300]}
+    except Exception:
+        return {"build_id": build_id, "eas_build_id": eas_id, "status": "error", "error": "EAS status check failed"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -3,21 +3,25 @@ name: Artifact Policy
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   push:
     branches: [main, develop]
     paths-ignore:
       - '.github/workflows/branch-clean.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '41 4 * * 0'
 
 concurrency:
-  group: artifact-policy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: artifact-policy-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Artifact placement and provenance
     runs-on: ubuntu-latest
     timeout-minutes: 5

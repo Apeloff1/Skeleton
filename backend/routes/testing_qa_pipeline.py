@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -437,4 +438,4 @@ async def ai_generate_test_cases(request: AITestCaseRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI test case generation failed: {str(e)}")
+        raise internal_http_error("AI test case generation failed", e) from None

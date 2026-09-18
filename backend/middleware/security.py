@@ -31,6 +31,8 @@ from starlette.responses import JSONResponse
 log = logging.getLogger("middleware.security")
 
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_XFF_HOPS = 32
+_MAX_XFF_CHARS = 2048
 
 
 def _matches_route_boundary(path: str, route: str) -> bool:
@@ -61,7 +63,7 @@ def _canonical_ip(value: str) -> str | None:
 def _parse_trusted_proxy_networks(
     raw: str,
 ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    """Parse only explicit trusted proxy CIDRs; invalid entries never widen trust."""
+    """Parse proxy CIDRs fail-closed: one malformed entry disables XFF trust."""
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for entry in raw.split(","):
         entry = entry.strip()
@@ -70,7 +72,10 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(entry, strict=False))
         except ValueError:
-            log.warning("ignoring invalid CODEDOCK_TRUSTED_PROXY_CIDRS entry")
+            log.error(
+                "invalid CODEDOCK_TRUSTED_PROXY_CIDRS configuration; disabling proxy trust"
+            )
+            return ()
     return tuple(networks)
 
 
@@ -104,7 +109,8 @@ def _client_ip(
 
     The direct peer is authoritative unless it is explicitly configured as a
     trusted proxy. Trusted proxy chains are walked right-to-left; duplicate,
-    empty, malformed, or entirely trusted chains fail closed to the direct peer.
+    empty, malformed, oversized, overlong, or entirely trusted chains fail
+    closed to the direct peer.
     """
     networks = _trusted_proxy_networks() if networks is None else networks
     peer = (
@@ -122,8 +128,11 @@ def _client_ip(
     if len(forwarded_values) != 1:
         return peer_identity
 
-    parts = forwarded_values[0].split(",")
-    if not parts or any(not part.strip() for part in parts):
+    forwarded_value = forwarded_values[0]
+    if len(forwarded_value) > _MAX_XFF_CHARS:
+        return peer_identity
+    parts = forwarded_value.split(",")
+    if not parts or len(parts) > _MAX_XFF_HOPS or any(not part.strip() for part in parts):
         return peer_identity
 
     forwarded = [_canonical_ip(part) for part in parts]
@@ -405,7 +414,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception as exc:
-            error = _bounded_text(f"{type(exc).__name__}: {exc}", 500)
+            error = type(exc).__name__
             status = 500
             raise
         finally:

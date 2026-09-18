@@ -1,0 +1,68 @@
+# Canonical observability contract
+
+Issue #121 consolidates observability around the existing `skeleton.observability` package and the kernel `EventBus`. New runtime code should extend these primitives rather than create another logging, tracing, or metrics stack.
+
+## Correlation
+
+`DomainEvent.correlation_id` is the subsystem-neutral correlation field. `EventBus.emit(..., correlation_id=...)` preserves it on emitted events. API request IDs, orchestration run IDs, agent task IDs, and tool call IDs should be related through this field or included as explicit structured payload fields when crossing subsystem boundaries.
+
+Correlation identifiers are operational metadata, not a place to store credentials or user payloads.
+
+## Redaction
+
+`skeleton.observability.redaction` is the canonical telemetry sanitization boundary.
+
+- credential-shaped keys such as `authorization`, `cookie`, `password`, `secret`, `api_key`, and access/refresh tokens are replaced with `[REDACTED]`;
+- common inline `token=...`, `api-key=...`, password/secret assignments, and Bearer credentials are scrubbed from free text;
+- nested telemetry payloads have a bounded depth;
+- arbitrary exception messages are not persisted by shared health/tracing helpers; stable exception type names are retained instead.
+
+`StructuredLogger`, `Tracer`, health probes, and the event-to-metrics bridge all use the same redaction helpers. Callers should sanitize before exporting any additional telemetry surface.
+
+## Canonical runtime logging and tracing
+
+`ObservableOrchestrator` is the canonical observable execution boundary for API-, agent-, and tool-backed orchestration. It owns a `StructuredLogger` and `Tracer` by default, while allowing callers to inject shared instances when a larger runtime owns those sinks/exporters.
+
+Lifecycle logging is metadata-only. The structured logger records the same run/tool lifecycle topics emitted onto the event bus together with correlation, run, call, tool, status, attempt, duration, and stable error-type fields. Tool arguments, tool outputs, and arbitrary exception messages are not copied into the log context. In-memory log retention is bounded, and sink failures are isolated from the instrumented execution path.
+
+Each orchestration run creates an `orchestration.run` span whose trace ID is the canonical correlation ID. Tool execution creates child `orchestration.tool` spans, preserving the same trace ID and parent/child relation. Trace attributes remain metadata-only and use the shared redaction boundary. Failed tool spans retain stable exception types rather than exception messages supplied by handlers. Trace export is best-effort so collector/exporter failures cannot turn successful runtime work into application failures.
+
+Because the API correlation adapter and Genesis `Coordinator` both execute registered work through `ObservableOrchestrator`, the shared logging/tracing helpers now cover the canonical API → agent → tool execution path rather than existing only as standalone package utilities.
+
+## Structured event bridge
+
+`EventMetricsBridge` subscribes to kernel events without mutating the source event. It retains a bounded redacted event window and feeds the existing `MetricsRegistry`.
+
+`ObservableOrchestrator` owns an `EventBus` plus an attached `EventMetricsBridge` by default, which means selecting the observable runtime cannot silently discard lifecycle metrics. Callers with shared runtime infrastructure may inject an existing bus and bridge. When the supplied bus already owns the canonical bridge (for example the Genesis `JournaledBus`), the orchestrator reuses it instead of creating a parallel metrics path.
+
+Baseline metric names are:
+
+- `observability.events_total` — event count by topic;
+- `observability.failures_total` — failed events or HTTP-style status >= 500;
+- `observability.retries_total` — retry/retrying events;
+- `observability.rate_limits_total` — rate-limit events / status 429;
+- `observability.latency_ms` — duration histogram when `duration_ms` is present;
+- `observability.queue_depth` — latest non-negative queue depth gauge;
+- `observability.memory_bytes` — latest non-negative memory-use gauge.
+
+These names are the baseline contract for future API/runtime/agent/tool instrumentation. Provider- or subsystem-specific labels belong on the metric rather than in separate registries.
+
+## Existing package surface
+
+The package root exposes the canonical health, metrics-registry, structured-logging, tracing, event-bridge, and redaction primitives. Older specialist modules under `skeleton/observability/` remain implementation modules; they should converge on these shared contracts rather than define competing correlation or secret-handling rules.
+
+## Regression policy
+
+`tests/test_observability.py`, `skeleton/testing/test_frontier_observability_correlation.py`, and `tests/test_runtime_observability_bridge.py` are part of `scripts/quality-gates.sh`. Together they pin:
+
+- correlation preservation through `EventBus.emit`;
+- default runtime attachment and Genesis reuse of the event-to-metrics bridge;
+- API request correlation through run, agent, and tool lifecycle events;
+- structured lifecycle logs with shared correlation and no tool payload leakage;
+- bounded structured-log retention and isolation of failing sinks;
+- correlated run/tool trace parentage and metadata-only attributes;
+- stable, redacted failure diagnostics in logs and traces;
+- isolation of failing trace exporters from runtime execution;
+- health-probe exception redaction;
+- bounded event collection and baseline metric classification;
+- compatibility with the current `MetricsRegistry` API.

@@ -20,6 +20,23 @@ The contract covers:
 
 `ModelRuntime` is the registry and policy boundary. Adapters declare a `frozenset[ModelCapability]`; unsupported capabilities fail closed unless the caller explicitly opts into a documented fallback.
 
+## Routing and eval
+
+Issue #944 adds a product/runtime routing primitive on top of that execution boundary. `skeleton.frontier.model_routing.ModelRouter` selects among registered provider metadata by required capabilities, then executes through `ModelRuntime`. It is not a second planning plane and does not modify Supervisor, studio, or Jeeves model paths.
+
+The routing contract covers:
+
+- capability-based candidate filtering before any provider call;
+- deterministic fallback ordering (`priority`, estimated cost, timeout, then `provider_id`);
+- stable `ModelRouteRequest` / `ModelRouteResult` envelopes, including provenance;
+- bounded per-provider retries and an overall invocation deadline;
+- hard cost/output-token budgets that fail closed on exhaustion; and
+- redacted traces that must not retain secret material.
+
+Provider catalog entries are validated through `ProviderMetadata.from_mapping`. Missing keys, unknown keys, non-finite costs, empty identifiers, and adapters that lack claimed execution capabilities fail closed without mutating the catalog.
+
+`RouteEvalContract` judges routed results against expected status, selected provider, capabilities, provenance, and forbidden secret fragments. Offline fake-provider coverage lives in `tests/test_model_routing.py`.
+
 ## Adapters
 
 Two maintained dependency shapes are covered by the shared contract tests:
@@ -28,6 +45,16 @@ Two maintained dependency shapes are covered by the shared contract tests:
 - `LiteLLMAdapter` accepts an injected LiteLLM module/object exposing `acompletion` and `aembedding` and translates its OpenAI-compatible shapes into the same frontier types.
 
 Adapters intentionally use duck typing and do not import provider SDK packages from the frontier layer. This keeps `skeleton` importable without optional provider packages and prevents provider-specific types from leaking into orchestration code.
+
+## Current provider audit
+
+The production dependency graph previously carried `google-genai`, but the #116 audit found no active Python model-execution import or client call site for that SDK. The unused production dependency is therefore removed rather than creating an adapter for code that does not exist.
+
+`scripts/check_provider_runtime_boundary.py` makes that conclusion enforceable: direct or dynamic Google GenAI imports under runtime source roots fail CI. Adding Google later requires an intentional canonical `ProviderAdapter` plus the same shared contract tests used by the maintained adapters before the boundary gate is relaxed.
+
+`backend/server.py` still contains one legacy import of the repository-local, boot-safe `emergentintegrations.llm.chat` compatibility shim. The audit verifies that `LlmChat` and `UserMessage` are not used by the server and rejects retired Emergent imports anywhere else in runtime source. Any future attempt to turn that compatibility import into a live provider call therefore fails the canonical quality gate.
+
+The same boundary scanner rejects direct OpenAI, LiteLLM, Google, or Emergent SDK imports from `skeleton/frontier` and `skeleton/agents`, keeping provider-specific types out of core orchestration and agent execution code.
 
 ## Capability fallbacks
 

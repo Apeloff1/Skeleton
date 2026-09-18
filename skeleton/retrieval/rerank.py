@@ -45,9 +45,11 @@ class Reranker:
         trimmed = rescored[: top_k] if top_k else rescored
         return tuple(
             ScoredResult(
-                item_id=item.item_id,
+                fragment_id=item.fragment_id,
+                content=item.content,
                 score=round(boost, 6),
-                source=item.source,
+                plane=item.plane,
+                provenance=item.provenance,
                 metadata=item.metadata,
             )
             for boost, item in trimmed
@@ -57,7 +59,7 @@ class Reranker:
     def source_boost(source: str, boost: float, position: int = 0) -> RerankRule:
         return RerankRule(
             name=f"source-{source}",
-            predicate=lambda item: item.source == source,
+            predicate=lambda item: item.plane == source,
             boost=boost,
             position=position,
         )

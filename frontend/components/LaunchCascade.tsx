@@ -112,6 +112,7 @@ export default function LaunchCascade() {
   const [ready, setReady] = React.useState(false);
   const escalateLockRef = React.useRef(false);
   const watchdogRef = React.useRef<any>(null);
+  const tracedLayerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -169,6 +170,14 @@ export default function LaunchCascade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layer, ready]);
 
+  // Keep the crash breadcrumb, but record it once per layer transition instead
+  // of writing the complete trace to AsyncStorage on every React render.
+  React.useEffect(() => {
+    if (!ready || tracedLayerRef.current === layer) return;
+    tracedLayerRef.current = layer;
+    traceStepSync(`cascade_render_layer_${layer}`);
+  }, [layer, ready]);
+
   const escalate = React.useCallback((reason: string) => {
     if (escalateLockRef.current) return;
     escalateLockRef.current = true;
@@ -206,7 +215,6 @@ export default function LaunchCascade() {
     );
   }
 
-  traceStepSync(`cascade_render_layer_${layer}`);
   return (
     <LayerBoundary key={`layer-${layer}`} onError={() => escalate('boundary_caught')}>
       {layer === 0 && (

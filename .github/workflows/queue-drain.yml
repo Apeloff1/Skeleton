@@ -2,33 +2,47 @@ name: Drain superseded Actions queue
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Merge Readiness"]
+    types: [completed]
+    branches: [main]
   schedule:
-    - cron: "*/5 * * * *"
+    # Avoid top-of-five-minute scheduler hotspots while preserving 5-minute cadence.
+    - cron: "2-57/5 * * * *"
+  push:
+    branches: [main]
+    paths: ['.github/workflows/queue-drain.yml']
 
+# One live drainer plus one coalesced pending run. Do not trigger on every main
+# push: during merge storms GitHub replaces the pending run before it receives
+# a runner. Successful canonical main Merge Readiness completion provides a
+# lower-frequency recovery wake when scheduled workflows are delayed.
 concurrency:
-  group: queue-drain-${{ github.repository }}
-  cancel-in-progress: true
+  group: queue-drain-v2-${{ github.repository }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   drain:
-    # Run cleanup off the normal x64 pool. The write token exists only for this
-    # job and is used only to cancel obsolete or duplicate Actions runs.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     permissions:
       actions: write
       contents: read
-    runs-on: ubuntu-24.04-arm
+    # Queue recovery must not depend on the scarcer ARM lane it may be trying
+    # to recover when repository-wide workflow fanout is saturated.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
     steps:
-      - name: Cancel obsolete and superseded Actions runs
+      - name: Cancel obsolete workload runs without killing the control plane
         shell: bash
         run: |
           set -euo pipefail
@@ -50,6 +64,23 @@ jobs:
               'X-GitHub-Api-Version': '2022-11-28',
               'User-Agent': 'skeleton-queue-drainer',
           }
+          retryable = frozenset({0, 429, 500, 502, 503, 504})
+
+          # These workflows form the branch-flow / queue-recovery control plane.
+          # They are designed either to follow a moving main, provide canonical
+          # post-merge evidence, or reclaim stale queue capacity. They must never
+          # be garbage-collected as stale workload merely because a newer commit
+          # appears while they are queued.
+          control_plane_paths = frozenset({
+              '.github/workflows/actions-housekeeping-cli.yml',
+              '.github/workflows/branch-clean.yml',
+              '.github/workflows/branch-archive.yml',
+              '.github/workflows/branch-flow.yml',
+              '.github/workflows/branch-repair-100.yml',
+              '.github/workflows/merge-readiness.yml',
+              '.github/workflows/pr-obsolete-run-drain.yml',
+              '.github/workflows/queue-drain.yml',
+          })
 
           def request(path, *, method='GET'):
               req = urllib.request.Request(
@@ -64,68 +95,113 @@ jobs:
                       return response.status, json.loads(raw) if raw else None
               except urllib.error.HTTPError as exc:
                   return exc.code, None
+              except urllib.error.URLError:
+                  return 0, None
 
-          def resolve_main_sha():
-              status, branch = request(f'/repos/{repo}/branches/main')
-              if status != 200 or not isinstance(branch, dict):
+          def cancel(run_id):
+              status = 0
+              for attempt in range(3):
+                  status, _ = request(
+                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
+                      method='POST',
+                  )
+                  if status not in retryable:
+                      return status
+                  if attempt < 2:
+                      time.sleep(2 ** attempt)
+              return status
+
+          def main_sha():
+              status, payload = request(f'/repos/{repo}/branches/main')
+              sha = ((payload or {}).get('commit') or {}).get('sha', '')
+              if status != 200 or not sha:
                   raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
-              sha = ((branch.get('commit') or {}).get('sha') or '').strip()
-              if not sha:
-                  raise SystemExit('failed to resolve main HEAD SHA')
               return sha
 
-          def list_runs(run_status):
-              runs = []
+          def list_runs(run_status=None, head_sha=None):
+              out = []
               for page in range(1, 11):
-                  query = urllib.parse.urlencode({
-                      'status': run_status,
-                      'per_page': 100,
-                      'page': page,
-                  })
+                  params = {'per_page': 100, 'page': page}
+                  if run_status:
+                      params['status'] = run_status
+                  if head_sha:
+                      params['head_sha'] = head_sha
+                  query = urllib.parse.urlencode(params)
                   status, payload = request(f'/repos/{repo}/actions/runs?{query}')
                   if status != 200 or not isinstance(payload, dict):
-                      raise SystemExit(
-                          f'failed to list {run_status} runs: HTTP {status}'
-                      )
+                      raise SystemExit(f'failed to list Actions runs: HTTP {status}')
                   batch = payload.get('workflow_runs') or []
-                  runs.extend(batch)
+                  out.extend(batch)
                   if len(batch) < 100:
                       break
-              return runs
+              return out
+
+          def path(run):
+              return run.get('path') or ''
+
+          def is_control_plane(run):
+              return path(run) in control_plane_paths
+
+          def workflow_event_key(run):
+              return (int(run.get('workflow_id') or 0), run.get('event') or '')
+
+          def lane_key(run):
+              return (
+                  int(run.get('workflow_id') or 0),
+                  run.get('head_branch') or '',
+                  run.get('event') or '',
+              )
+
+          def usable_replacement(run):
+              return not (
+                  run.get('status') == 'completed'
+                  and run.get('conclusion') == 'cancelled'
+              )
 
           attempted = set()
+          transient = set()
           totals = {
-              'queued_inspected': 0,
-              'active_inspected': 0,
-              'selected': 0,
+              'queued_seen': 0,
+              'active_seen': 0,
+              'control_plane_preserved': 0,
               'obsolete_main': 0,
-              'duplicate': 0,
+              'duplicates': 0,
               'stale_dynamic_active': 0,
+              'last_validation_preserved': 0,
               'accepted': 0,
               'moved': 0,
+              'deferred': 0,
               'failed': 0,
           }
           pass_lines = []
-          latest_main_sha = ''
+          latest_main = ''
 
-          # GitHub-managed security and dependency runs can arrive several
-          # seconds after a push. Sweep repeatedly so delayed fanout is folded
-          # into one cleanup run. Stale in-progress work is only reclaimed when
-          # it is a GitHub-managed dynamic run on an obsolete main SHA; normal
-          # CI, deployments, PR work, and current-head jobs are never stopped.
-          for pass_number in range(1, 5):
-              main_sha = resolve_main_sha()
-              latest_main_sha = main_sha
-              queued = list_runs('queued')
-              active = list_runs('in_progress')
-              totals['queued_inspected'] += len(queued)
-              totals['active_inspected'] += len(active)
+          # Four passes catch GitHub-managed fanout that arrives seconds after a
+          # push. Each pass resolves main again, so the drainer follows the live
+          # repository rather than a stale workflow-event SHA.
+          for pass_no in range(1, 5):
+              head = main_sha()
+              latest_main = head
+              head_runs = list_runs(head_sha=head)
+              replacement_keys = {
+                  workflow_event_key(run)
+                  for run in head_runs
+                  if usable_replacement(run)
+              }
+              queued = list_runs(run_status='queued')
+              active = list_runs(run_status='in_progress')
+              live_ids = {
+                  int(run.get('id') or 0)
+                  for run in (*queued, *active)
+                  if int(run.get('id') or 0)
+              }
+              transient.intersection_update(live_ids)
+              totals['queued_seen'] += len(queued)
+              totals['active_seen'] += len(active)
 
-              seen = set()
               selected = []
-              obsolete_main = 0
-              duplicate = 0
-              stale_dynamic_active = 0
+              seen = set()
+              local = {key: 0 for key in totals}
 
               for run in sorted(
                   queued,
@@ -135,122 +211,145 @@ jobs:
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
                       continue
-
-                  if (
-                      (run.get('head_branch') or '') == 'main'
-                      and (run.get('head_sha') or '') != main_sha
-                  ):
-                      selected.append(run)
-                      obsolete_main += 1
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
                       continue
 
-                  key = (
-                      int(run.get('workflow_id') or 0),
-                      run.get('head_branch') or '',
-                      run.get('event') or '',
+                  lane = lane_key(run)
+                  replacement = workflow_event_key(run)
+                  old_main = (
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != head
                   )
-                  if key in seen:
-                      selected.append(run)
-                      duplicate += 1
-                  else:
-                      seen.add(key)
 
+                  if old_main:
+                      if replacement in replacement_keys:
+                          selected.append(run)
+                          totals['obsolete_main'] += 1
+                          local['obsolete_main'] += 1
+                          continue
+
+                      # For path-filtered validation lanes with no current-head
+                      # replacement, keep the newest outstanding result source.
+                      if lane in seen:
+                          selected.append(run)
+                          totals['duplicates'] += 1
+                          local['duplicates'] += 1
+                      else:
+                          seen.add(lane)
+                          totals['last_validation_preserved'] += 1
+                          local['last_validation_preserved'] += 1
+                      continue
+
+                  if lane in seen:
+                      selected.append(run)
+                      totals['duplicates'] += 1
+                      local['duplicates'] += 1
+                  else:
+                      seen.add(lane)
+
+              # Only dynamic generated workflows are cancelled while already
+              # running. Ordinary CI and all branch control-plane workflows finish.
               for run in active:
                   run_id = int(run.get('id') or 0)
-                  path = run.get('path') or ''
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
                       continue
                   if (
                       (run.get('head_branch') or '') == 'main'
-                      and (run.get('head_sha') or '') != main_sha
-                      and path.startswith('dynamic/')
+                      and (run.get('head_sha') or '') != head
+                      and path(run).startswith('dynamic/')
+                      and workflow_event_key(run) in replacement_keys
                   ):
                       selected.append(run)
-                      stale_dynamic_active += 1
+                      totals['stale_dynamic_active'] += 1
+                      local['stale_dynamic_active'] += 1
 
-              accepted = moved = failed = 0
+              accepted = moved = deferred = failed = 0
               for run in selected:
                   run_id = int(run['id'])
-                  attempted.add(run_id)
-                  status, _ = request(
-                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
-                      method='POST',
-                  )
+                  status = cancel(run_id)
                   if status in {200, 202}:
+                      attempted.add(run_id)
+                      transient.discard(run_id)
                       accepted += 1
                   elif status in {404, 409, 422}:
+                      attempted.add(run_id)
+                      transient.discard(run_id)
                       moved += 1
+                  elif status in retryable:
+                      transient.add(run_id)
+                      deferred += 1
                   else:
+                      attempted.add(run_id)
+                      transient.discard(run_id)
                       failed += 1
                       print(f'cancel failed: id={run_id} status={status}')
 
-              totals['selected'] += len(selected)
-              totals['obsolete_main'] += obsolete_main
-              totals['duplicate'] += duplicate
-              totals['stale_dynamic_active'] += stale_dynamic_active
               totals['accepted'] += accepted
               totals['moved'] += moved
+              totals['deferred'] += deferred
               totals['failed'] += failed
 
               line = (
-                  f'pass={pass_number} main_sha={main_sha} queued={len(queued)} '
+                  f'pass={pass_no} main={head} queued={len(queued)} '
                   f'active={len(active)} selected={len(selected)} '
-                  f'obsolete_main={obsolete_main} duplicate={duplicate} '
-                  f'stale_dynamic_active={stale_dynamic_active} '
-                  f'accepted={accepted} moved={moved} failed={failed}'
+                  f'control_plane_preserved={local["control_plane_preserved"]} '
+                  f'obsolete_main={local["obsolete_main"]} '
+                  f'duplicates={local["duplicates"]} '
+                  f'last_validation_preserved={local["last_validation_preserved"]} '
+                  f'accepted={accepted} moved={moved} deferred={deferred} '
+                  f'failed={failed}'
               )
               print(line)
               pass_lines.append(line)
-
-              if pass_number < 4:
+              if pass_no < 4:
                   time.sleep(8)
-
-          print(
-              'totals '
-              + ' '.join(f'{key}={value}' for key, value in totals.items())
-          )
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
-                  handle.write(f'- Latest live main SHA: `{latest_main_sha}`\n')
+                  handle.write(f'- Latest live main SHA: `{latest_main}`\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
                   handle.write(
-                      f'- Queued observations: {totals["queued_inspected"]}\n'
-                  )
-                  handle.write(
-                      f'- Active observations: {totals["active_inspected"]}\n'
+                      '- Branch control-plane observations preserved: '
+                      f'{totals["control_plane_preserved"]}\n'
                   )
                   handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'
                   )
                   handle.write(
-                      f'- Duplicate selections: {totals["duplicate"]}\n'
+                      f'- Duplicate selections: {totals["duplicates"]}\n'
                   )
                   handle.write(
-                      '- Stale dynamic in-progress selections: '
-                      f'{totals["stale_dynamic_active"]}\n'
+                      '- Last path-filtered validations preserved: '
+                      f'{totals["last_validation_preserved"]}\n'
                   )
                   handle.write(
                       f'- Cancel requests accepted: {totals["accepted"]}\n'
                   )
                   handle.write(
-                      f'- Already moved/completed: {totals["moved"]}\n'
+                      f'- Terminal cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
-                      f'- Cancellation failures: {totals["failed"]}\n'
+                      '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
+                      '`branch-repair-100.yml`, `merge-readiness.yml`, '
+                      '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
+                      'never cancellation targets; current main, PR work, and '
+                      'the newest path-filtered validation without a live-head '
+                      'replacement are preserved.\n\n'
                   )
-                  handle.write(
-                      '- Safety: current main HEAD, unique current-head work, '
-                      'normal in-progress CI/deployments, and PR work are preserved.\n'
-                  )
-                  handle.write('\n### Passes\n')
+                  handle.write('### Passes\n')
                   for line in pass_lines:
                       handle.write(f'- `{line}`\n')
 
           if totals['failed']:
               raise SystemExit(
-                  f'queue drain had {totals["failed"]} cancellation failure(s)'
+                  f'queue drain had {totals["failed"]} terminal cancellation failure(s)'
               )
           PY

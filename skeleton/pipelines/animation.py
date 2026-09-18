@@ -55,6 +55,7 @@ class AnimationSpec:
     state_machine: list[AnimState]
     blend_tree: dict[str, Any]
     generated_at: float = field(default_factory=time.time)
+    speculative_rag: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +68,7 @@ class AnimationSpec:
                                for s in self.state_machine],
             "blend_tree": self.blend_tree,
             "generated_at": self.generated_at,
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
@@ -84,15 +86,25 @@ def _procedural_clip(name: str, duration: float, *, loop: bool, amplitude: float
 class AnimationPipeline:
     """Orchestrates animation-set generation."""
 
-    def __init__(self, bus: EventBus | None = None) -> None:
+    def __init__(self, bus: EventBus | None = None, *, genesis=None) -> None:
         self._bus = bus or EventBus()
+        self._genesis = genesis
 
     def run(self, description: str, *,
             actions: tuple[str, ...] = ("idle", "walk", "run", "attack")) -> AnimationSpec:
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
         if not description or not description.strip():
             raise ValidationError("description must be non-empty")
         if not actions:
             raise ValidationError("at least one action is required")
+
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "animation",
+            {"description": description},
+            limit=3,
+        )
 
         run_id = str(PipelineRunId.new())
         start = self._bus.emit("pipeline.animation.started", {"run_id": run_id})
@@ -123,7 +135,8 @@ class AnimationPipeline:
         }
         spec = AnimationSpec(run_id=run_id, rig=HUMANOID_BONES, clips=clips,
                              state_machine=states, blend_tree=blend_tree)
+        spec.speculative_rag = prefetch
         self._bus.emit("pipeline.animation.completed",
                        {"run_id": run_id, "clips": len(clips)},
-                       correlation_id=start.correlation_id, causation_id=start.event_id)
+                       correlation_id=start.correlation_id)
         return spec

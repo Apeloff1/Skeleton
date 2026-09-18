@@ -24,6 +24,7 @@ from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel, Field
 
 from core.databases import client as _MONGO
+from core.http_errors import internal_http_error
 from routes.llm_router import route_complete
 
 router = APIRouter(prefix="/api/worldforge", tags=["worldforge"])
@@ -484,7 +485,7 @@ async def render_world(scale: str = Query("region"), seed: int = Query(1337),
             if master:
                 png = await __import__("asyncio").to_thread(upscale_png_bytes, png)
         except Exception as e:
-            raise HTTPException(500, f"thematic render failed: {e}")
+            raise internal_http_error("thematic render failed", e) from None
         return Response(content=png, media_type="image/png",
                         headers={"Cache-Control": "public, max-age=3600"})
     try:
@@ -492,7 +493,7 @@ async def render_world(scale: str = Query("region"), seed: int = Query(1337),
         if master:
             png = await __import__("asyncio").to_thread(upscale_png_bytes, png)
     except Exception as e:
-        raise HTTPException(500, f"render failed: {e}")
+        raise internal_http_error("render failed", e) from None
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=3600"})
 
@@ -527,7 +528,7 @@ async def render_gif(scale: str = Query("planet"), seed: int = Query(1337),
     try:
         gif = await __import__("asyncio").to_thread(_render_globe_gif, cfg)
     except Exception as e:
-        raise HTTPException(500, f"gif render failed: {e}")
+        raise internal_http_error("gif render failed", e) from None
     _GIF_CACHE[sig] = gif
     _GIF_CACHE.move_to_end(sig)
     while len(_GIF_CACHE) > _GIF_CACHE_MAX:
@@ -561,7 +562,7 @@ async def export_world(scale: str = Query("region"), seed: int = Query(1337),
     try:
         png = await __import__("asyncio").to_thread(_render_export, cfg, mode, cap)
     except Exception as e:
-        raise HTTPException(500, f"export failed: {e}")
+        raise internal_http_error("export failed", e) from None
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", cap)[:40] or "world"
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=3600",
@@ -637,7 +638,7 @@ async def heightmap(scale: str = Query("region"), seed: int = Query(1337),
     try:
         png = await __import__("asyncio").to_thread(_gen)
     except Exception as e:
-        raise HTTPException(500, f"heightmap failed: {e}")
+        raise internal_http_error("heightmap failed", e) from None
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=86400",
                              "Content-Disposition": 'inline; filename="heightmap_16bit.png"'})

@@ -11,6 +11,7 @@ Capabilities:
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -292,7 +293,7 @@ async def generate_world(request: WorldGenerationRequest):
         return world
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("World engine request failed", e) from None
 
 @router.post("/terrain")
 async def generate_terrain(request: TerrainRequest):

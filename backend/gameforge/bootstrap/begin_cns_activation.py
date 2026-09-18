@@ -64,20 +64,20 @@ class BeginCNSActivation:
             from gameforge.rooms.room_instantiation_engine import RoomInstantiationEngine
             self.room_engine = RoomInstantiationEngine(str(ROOT), str(ROOT))
             loaded.append("RoomInstantiationEngine")
-        except Exception as e:
-            self.errors.append(f"room_engine: {e}")
+        except Exception:
+            self.errors.append("room_engine_failed")
         try:
             from gameforge.agents.agent_spawning_engine import AgentSpawningEngine
             self.spawn_engine = AgentSpawningEngine(str(ROOT), str(ROOT))
             loaded.append("AgentSpawningEngine")
-        except Exception as e:
-            self.errors.append(f"spawn_engine: {e}")
+        except Exception:
+            self.errors.append("spawn_engine_failed")
         try:
             from gameforge.agents.agent_role_binding import AgentRoleBinding
             self.binder = AgentRoleBinding(str(ROOT), str(ROOT))
             loaded.append("AgentRoleBinding")
-        except Exception as e:
-            self.errors.append(f"binder: {e}")
+        except Exception:
+            self.errors.append("binder_failed")
         self.layers["loaded"] = loaded
         self.status = "LAYERS_LOADED"
 
@@ -100,8 +100,8 @@ class BeginCNSActivation:
         if self.room_engine and rooms:
             try:
                 self.room_engine.instantiate_all_rooms(rooms)
-            except Exception as e:
-                self.errors.append(f"instantiate: {e}")
+            except Exception:
+                self.errors.append("instantiate_failed")
         self.rooms_instantiated = len(rooms)
         self.status = "ROOMS_UP"
 
@@ -116,8 +116,8 @@ class BeginCNSActivation:
                 lookup = {a.get("role_id", "generalist"): {"name": a.get("role_id", "generalist")} for a in self.spawn_engine.spawned_agents.values()}
                 try:
                     self.binder.batch_bind(list(self.spawn_engine.spawned_agents.values()), lookup)
-                except Exception as e:
-                    self.errors.append(f"bind: {e}")
+                except Exception:
+                    self.errors.append("bind_failed")
         else:
             spawned = self.rooms_instantiated * 8
         self.agents_spawned = spawned

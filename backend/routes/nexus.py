@@ -16,6 +16,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from core.http_errors import public_http_error
+
 from core.curiosity_service import curiosity_service
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.truth_watch import TruthEventKind
@@ -66,7 +68,7 @@ async def nexus_orchestrator():
         return {"ok": True, "orchestrator": "NexusOrchestrator",
                 "methods": [m for m in dir(o) if not m.startswith("_") and callable(getattr(o, m))]}
     try: return _isolated(_load)
-    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+    except Exception: return JSONResponse({"ok": False, "error": "nexus_unavailable"}, status_code=207)
 
 
 class NexusEvent(BaseModel):
@@ -80,7 +82,7 @@ async def nexus_event(body: NexusEvent):
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         return NexusOrchestrator().process_important_event(body.event, body.source)
     try: return {"ok": True, "result": _isolated(_run)}
-    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+    except Exception: return JSONResponse({"ok": False, "error": "nexus_unavailable"}, status_code=207)
 
 
 class CuriosityPrompt(BaseModel):
@@ -307,7 +309,7 @@ async def curiosity_verify_claim(body: VerifyClaimBody):
 async def curiosity_research_now():
     try: return await curiosity_service().run_now()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"curiosity research unavailable: {type(exc).__name__}: {exc}"[:1000]) from exc
+        raise public_http_error(503, "curiosity_research_unavailable", exc) from None
 
 
 @router.post("/curiosity/boost")

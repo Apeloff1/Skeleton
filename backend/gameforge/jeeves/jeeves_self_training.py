@@ -228,8 +228,8 @@ def train_at_launch(db) -> dict:
             {"$set": {"trained": True, "at": time.time(), "counts": trained,
                       "target": TARGET_KNOWLEDGE, "fill_percent": fill_percent,
                       "domains": ["game_logic", "coding", "game_design", "mastermap"]}}, upsert=True)
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"[:160], "trained": trained}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "train_failed", "trained": trained}
     return {"ok": True, "trained": trained, "fill_percent": fill_percent, "target": TARGET_KNOWLEDGE}
 
 

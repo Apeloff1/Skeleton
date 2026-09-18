@@ -1,0 +1,161 @@
+name: Repair one stale branch safely
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Exact non-main branch to fast-forward when it has no unique commits'
+        required: true
+        type: string
+
+concurrency:
+  group: branch-repair-${{ github.repository }}-${{ inputs.branch }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  repair:
+    name: Safely fast-forward one explicit branch
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: ${{ inputs.branch }}
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - name: Validate requested branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${TARGET_BRANCH:-}"
+          if [[ -z "$branch" || "$branch" == main || "$branch" == refs/* || "$branch" == -* || "$branch" == *'..'* || "$branch" == *'~'* || "$branch" == *'^'* || "$branch" == *':'* || "$branch" == *'?'* || "$branch" == *'['* || "$branch" == *'\\'* || "$branch" == *' '* ]]; then
+            echo "Unsafe or invalid branch name: $branch" >&2
+            exit 2
+          fi
+          git check-ref-format "refs/heads/$branch"
+
+      - name: Fetch main and requested branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          auth_dir="$RUNNER_TEMP/branch-repair-auth"
+          mkdir -p "$auth_dir"
+          cat > "$auth_dir/askpass.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          case "${1:-}" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "$auth_dir/askpass.sh"
+          export GIT_ASKPASS="$auth_dir/askpass.sh"
+          export GIT_ASKPASS_REQUIRE=force
+          {
+            echo "GIT_ASKPASS=$GIT_ASKPASS"
+            echo 'GIT_ASKPASS_REQUIRE=force'
+          } >> "$GITHUB_ENV"
+
+          git init repo
+          cd repo
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --no-tags --filter=blob:none origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            "+refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+
+      - name: Repair only when the branch is provably behind
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+
+          branch="$TARGET_BRANCH"
+          main_ref=refs/remotes/origin/main
+          branch_ref="refs/remotes/origin/${branch}"
+          min_head_age_seconds=300
+
+          tip=$(git rev-parse "$branch_ref")
+          main=$(git rev-parse "$main_ref")
+
+          case "$branch" in
+            master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
+              echo "Refusing to rewrite protected long-lived branch: $branch" >&2
+              exit 2
+              ;;
+          esac
+
+          open_pr_count=$(gh api -X GET "/repos/${GITHUB_REPOSITORY}/pulls" \
+            -f state=open \
+            -f head="${GITHUB_REPOSITORY_OWNER}:${branch}" \
+            -f per_page=100 \
+            --jq '[.[] | select(.head.repo.full_name == .base.repo.full_name)] | length')
+          if [[ "${open_pr_count:-0}" != 0 ]]; then
+            echo "Branch backs an open PR; branch-flow owns PR freshness. No mutation." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          for state in requested waiting pending queued in_progress; do
+            active=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${tip}&status=${state}&per_page=1" \
+              --jq '.total_count')
+            if [[ "${active:-0}" != 0 ]]; then
+              echo "Branch has active CI at $tip; no mutation." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          committed=$(git show -s --format=%ct "$tip")
+          now=$(date +%s)
+          if (( now - committed < min_head_age_seconds )); then
+            echo "Branch head is less than ${min_head_age_seconds}s old; no mutation." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ "$tip" == "$main" ]]; then
+            echo "Branch is already aligned with main at $main." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if ! git merge-base --is-ancestor "$tip" "$main_ref"; then
+            if git merge-base --is-ancestor "$main_ref" "$tip"; then
+              echo "Branch is ahead of main and contains unique work; preserved." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Branch diverges from main and contains unique work; preserved." >> "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 0
+          fi
+
+          # Re-fetch both refs immediately before mutation. A normal fast-forward
+          # push cannot overwrite a concurrent unique commit.
+          git fetch --quiet --no-tags --filter=blob:none origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+          live_main=$(git rev-parse "$main_ref")
+          live_tip=$(git rev-parse "$branch_ref")
+
+          if [[ "$live_tip" != "$tip" ]]; then
+            echo "Branch moved during repair; preserved." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$live_tip" "$live_main"; then
+            echo "Branch is no longer a safe fast-forward; preserved." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git push --quiet origin "${live_main}:refs/heads/${branch}"
+
+          {
+            echo '## Manual branch repair'
+            echo "- Branch: \`$branch\`"
+            echo "- Previous tip: \`$live_tip\`"
+            echo "- New tip: \`$live_main\`"
+            echo '- Update was a server-accepted fast-forward.'
+            echo '- No force push or branch deletion was used.'
+            echo '- Automatic bulk branch repair on every main push is disabled.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,13 @@
+name: Skeleton CodeQL
+
+# Run the default CodeQL security queries plus the extended security suite.
+# Keep this in the CodeQL config (not the Actions workflow top level) so the
+# workflow schema stays valid and both language matrix entries inherit it.
+queries:
+  - uses: security-extended
+
+# Frozen branch snapshots are archival evidence, not supported production,
+# build, deploy, or dependency-management surfaces. Exclude only the canonical
+# archival tree so future similarly named paths remain scanned by default.
+paths-ignore:
+  - satellites/branch-snapshots/**
