@@ -251,3 +251,14 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+      - name: Verify published multi-arch manifests
+        env:
+          APP_IMAGE: ${{ env.IMAGE }}:latest
+          BACKEND_IMAGE: ${{ env.IMAGE }}/backend:latest
+          FRONTEND_IMAGE: ${{ env.IMAGE }}/frontend:latest
+        run: |
+          set -euo pipefail
+          for image in "$APP_IMAGE" "$BACKEND_IMAGE" "$FRONTEND_IMAGE"; do
+            docker buildx imagetools inspect "$image" | grep -q "linux/amd64"
+            docker buildx imagetools inspect "$image" | grep -q "linux/arm64"
+          done
