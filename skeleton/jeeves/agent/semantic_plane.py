@@ -1277,6 +1277,19 @@ class SemanticLensPlane:
             recorded.kind,
         )
 
+    def topology_learning_diagnostics(
+        self,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        return self.topology_learning.diagnostics(
+            candidate_id=candidate_id,
+            kind=kind,
+            limit=limit,
+        )
+
     def topology_research_obligations(
         self,
         *,
