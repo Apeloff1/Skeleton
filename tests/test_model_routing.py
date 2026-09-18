@@ -128,6 +128,19 @@ def _router_with(*pairs: tuple[dict, FakeAdapter]) -> ModelRouter:
     router = ModelRouter()
     for metadata, adapter in pairs:
         router.register(metadata, adapter)
+
+
+
+@pytest.mark.parametrize("max_attempts", [True, 1.5, "2"])
+def test_retry_policy_rejects_non_integer_attempt_counts(max_attempts) -> None:
+    with pytest.raises(TypeError, match="max_attempts"):
+        RetryPolicy(max_attempts=max_attempts)
+
+
+@pytest.mark.parametrize("backoff", [math.nan, math.inf, -math.inf])
+def test_retry_policy_rejects_non_finite_backoff(backoff: float) -> None:
+    with pytest.raises(ValueError, match="backoff_seconds"):
+        RetryPolicy(backoff_seconds=backoff)
     return router
 
 
@@ -229,6 +242,18 @@ def test_timeout_falls_back_then_fails_closed_when_deadline_elapses() -> None:
     assert lonely.calls
 
 
+def test_input_and_output_provider_limits_are_independent() -> None:
+    adapter = FakeAdapter("tight")
+    router = _router_with(
+        (
+            _metadata("tight", max_input_tokens=10, max_output_tokens=100),
+            adapter,
+        )
+    )
+    plan = router.plan(_request(estimated_input_tokens=10, max_output_tokens=100))
+    assert plan.provider_ids == ("tight",)
+
+
 def test_budget_exhaustion_fails_closed_without_calling_unaffordable_providers() -> None:
     expensive = FakeAdapter("gold")
     also_expensive = FakeAdapter("platinum")
@@ -298,6 +323,32 @@ def test_actual_usage_over_budget_is_not_reported_as_success() -> None:
     assert greedy.calls
 
 
+def test_actual_output_usage_over_token_budget_is_not_reported_as_success() -> None:
+    greedy = FakeAdapter(
+        "greedy-output",
+        usage=TokenUsage(input_tokens=1, output_tokens=11),
+    )
+    router = _router_with((_metadata("greedy-output"), greedy))
+    result = asyncio.run(
+        router.invoke(
+            _request(
+                budget=RouteBudget(
+                    max_cost=1.0,
+                    max_output_tokens=10,
+                    max_provider_attempts=1,
+                ),
+                estimated_input_tokens=1,
+                max_output_tokens=10,
+            )
+        )
+    )
+    assert result.status == "budget_exhausted"
+    assert result.response is None
+    assert result.attempts[0].outcome == "budget_exhausted"
+    assert result.budget.remaining_output_tokens == 0
+    assert greedy.calls
+
+
 def test_malformed_provider_metadata_fails_closed_and_is_atomic() -> None:
     router = ModelRouter()
     adapter = FakeAdapter("ok")
@@ -317,6 +368,16 @@ def test_malformed_provider_metadata_fails_closed_and_is_atomic() -> None:
         router.register(
             {**_metadata("caps-string"), "capabilities": "chat"},
             FakeAdapter("caps-string"),
+        )
+    with pytest.raises(ProviderMetadataError, match="normalized"):
+        router.register(
+            {**_metadata("caps-space"), "capabilities": (" chat",)},
+            FakeAdapter("caps-space"),
+        )
+    with pytest.raises(ProviderMetadataError, match="normalized"):
+        router.register(
+            {**_metadata("caps-case"), "capabilities": ("CHAT",)},
+            FakeAdapter("caps-case"),
         )
     with pytest.raises(ProviderMetadataError, match="adapter name"):
         router.register(_metadata("mismatch", adapter_name="other"), adapter)
