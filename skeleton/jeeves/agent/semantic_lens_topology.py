@@ -256,7 +256,7 @@ class SemanticLensTopology:
                     neighbor_families=neighbor_families,
                 )
             )
-        for edge in self._edges:
+        for edge in effective_edges:
             left = self._specs[edge.left_key].family.value
             right = self._specs[edge.right_key].family.value
             pair = tuple(sorted((left, right)))
