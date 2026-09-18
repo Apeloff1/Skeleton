@@ -180,6 +180,10 @@ from .frontier_consensus import (
     promote_consensus,
 )
 from .frontier_feedback import (
+    FrontierEvalComparison,
+    FrontierEvalFeedback,
+    FrontierEvalGate,
+    FrontierEvalReport,
     FrontierFeedbackRecommendation,
     FrontierFeedbackReport,
     FrontierFeedbackSample,
