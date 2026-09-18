@@ -687,7 +687,8 @@ def test_failure_after_contact_solver_restores_warm_cache_atomically() -> None:
     before_tick = world.tick
 
     class _FailingConstraintSolver:
-        def solve(self, bodies, joints, *, dt):
+        def solve(self, bodies, joints, *, dt, **kwargs):
+            del bodies, joints, dt, kwargs
             raise RuntimeError("constraint stage failure")
 
     world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
