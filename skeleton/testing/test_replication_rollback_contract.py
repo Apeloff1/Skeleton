@@ -139,6 +139,44 @@ def test_loss_simulation_reports_gap_then_applies_retransmit():
     assert replica.missing_sequences() == ()
 
 
+def test_acknowledgement_evidence_rejects_impossible_or_forged_state():
+    authority = Authority()
+    snapshot = authority.snapshot(0, _hero(0, 0))
+    replica = Replica("client-a")
+    replica.ingest(snapshot)
+    valid = replica.acknowledge()
+    assert authority.record_ack(valid).last_applied_sequence == 1
+
+    envelope_mismatch = replication_mod._wrap_packet("ack", 0, valid.payload)
+    with pytest.raises(SequenceError, match="packet sequence"):
+        authority.record_ack(envelope_mismatch)
+
+    future_payload = dict(valid.payload)
+    future_payload["last_applied_sequence"] = authority.sequence + 10
+    future_payload["last_received_sequence"] = authority.sequence + 10
+    future_payload["missing_sequences"] = []
+    future = replication_mod._wrap_packet(
+        "ack",
+        int(future_payload["last_applied_sequence"]),
+        future_payload,
+    )
+    with pytest.raises(SequenceError, match="future applied sequence"):
+        authority.record_ack(future)
+
+    wrong_digest_payload = dict(valid.payload)
+    wrong_digest_payload["last_applied_digest"] = "0" * 64
+    wrong_digest = replication_mod._wrap_packet("ack", valid.sequence, wrong_digest_payload)
+    with pytest.raises(ReplicationError, match="retained authority history"):
+        authority.record_ack(wrong_digest)
+
+    impossible_gap_payload = dict(valid.payload)
+    impossible_gap_payload["last_received_sequence"] = 3
+    impossible_gap_payload["missing_sequences"] = [1, 2]
+    impossible_gap = replication_mod._wrap_packet("ack", valid.sequence, impossible_gap_payload)
+    with pytest.raises(SequenceError, match="outside the reported gap"):
+        authority.record_ack(impossible_gap)
+
+
 def test_duplicate_delivery_does_not_mutate_state():
     authority = Authority()
     snapshot = authority.snapshot(0, _hero(0, 0))
