@@ -8,7 +8,7 @@ Skeleton host commands should be treated as a capability, not as arbitrary shell
 - Executables are registered by logical name and resolved from absolute paths when the policy is created. Runtime `PATH` lookup is not used.
 - Child processes receive only environment keys named by the policy. Full ambient environment inheritance is intentionally unavailable.
 - The working directory must resolve inside an allowed root.
-- Argument count/bytes, stdin bytes, combined stdout/stderr bytes, and wall-clock runtime are bounded.
+- Argument count/bytes, stdin bytes, total child-environment bytes, combined stdout/stderr bytes, and wall-clock runtime are bounded.
 - Timeouts and output-limit violations terminate the process; on POSIX the runner starts a new session and terminates the process group.
 - Error messages do not echo child output or argv, reducing accidental credential/log disclosure.
 
