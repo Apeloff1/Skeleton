@@ -47,6 +47,22 @@ def _resolved_directory(path: Path) -> Path:
     return resolved
 
 
+def _executable_identity(path: str) -> tuple[int, int, int, int, int]:
+    try:
+        stat = os.stat(path, follow_symlinks=False)
+    except OSError as exc:
+        raise ShellPolicyError("registered executable is unavailable") from exc
+    if not Path(path).is_file():
+        raise ShellPolicyError("registered executable must remain a file")
+    return (
+        int(stat.st_dev),
+        int(stat.st_ino),
+        int(stat.st_mode),
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+    )
+
+
 def _resolved_executable(path: str) -> str:
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
@@ -86,12 +102,15 @@ class ShellPolicy:
         if not self.executables:
             raise ShellPolicyError("at least one executable must be registered")
         normalized: dict[str, str] = {}
+        identities: dict[str, tuple[int, int, int, int, int]] = {}
         for name, path in self.executables.items():
             if not isinstance(name, str) or not _COMMAND_KEY.fullmatch(name):
                 raise ShellPolicyError("invalid executable policy key")
             if not isinstance(path, str):
                 raise ShellPolicyError("executable paths must be strings")
-            normalized[name] = _resolved_executable(path)
+            resolved = _resolved_executable(path)
+            normalized[name] = resolved
+            identities[name] = _executable_identity(resolved)
         roots = tuple(_resolved_directory(Path(root)) for root in self.cwd_roots)
         if not roots:
             raise ShellPolicyError("at least one working-directory root is required")
@@ -109,6 +128,11 @@ class ShellPolicy:
         if not inherited_env <= allowed_env:
             raise ShellPolicyError("inherited_env must be a subset of allowed_env")
         object.__setattr__(self, "executables", MappingProxyType(normalized))
+        object.__setattr__(
+            self,
+            "_executable_identities",
+            MappingProxyType(identities),
+        )
         object.__setattr__(self, "cwd_roots", roots)
         object.__setattr__(self, "allowed_env", allowed_env)
         object.__setattr__(self, "inherited_env", inherited_env)
@@ -175,6 +199,11 @@ class ShellRunner:
         executable = self.policy.executables.get(command.command)
         if executable is None:
             raise ShellPolicyError("command is not registered")
+        expected_identity = self.policy._executable_identities.get(command.command)
+        if expected_identity is None or _executable_identity(executable) != expected_identity:
+            raise ShellPolicyError(
+                "registered executable changed after policy construction"
+            )
         if len(command.args) > self.policy.max_args:
             raise ShellPolicyError("too many command arguments")
         argv = [executable]
