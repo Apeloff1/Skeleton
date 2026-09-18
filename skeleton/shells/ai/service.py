@@ -242,6 +242,7 @@ class AIShellService:
         preconditions: Preconditions | None = None,
         precondition_checker: PreconditionChecker | None = None,
         approval=None,
+        quorum_approval: QuorumApproval | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
     ) -> tuple[AIExecutionBundle, PreconditionReport | None, SealUse]:
         """Execute only after preconditions and a single-use signed seal pass."""
@@ -262,6 +263,12 @@ class AIShellService:
             precondition_report = precondition_checker.require(preconditions)
             precondition_digest = preconditions.digest
         approval_id = "" if approval is None else approval.approval_id
+        quorum_digest = self._quorum_digest(
+            session,
+            review,
+            principal=context.principal,
+            quorum_approval=quorum_approval,
+        )
         self._require_assurance(
             review,
             execution_backend=execution_backend,
@@ -273,6 +280,7 @@ class AIShellService:
                 review.critique.policy.requires_approval
                 and approval is not None
             ),
+            quorum_approved=bool(quorum_digest),
         )
         use = seal_registry.consume(
             seal,
@@ -282,7 +290,17 @@ class AIShellService:
             preconditions_digest=precondition_digest,
             approval_id=approval_id,
             release_evidence_digest=self._release_digest(),
+            assurance_digest=quorum_digest,
         )
+        if quorum_approval is not None:
+            if self.approval_quorum is None:
+                raise RuntimeError("quorum approval store is not configured")
+            self.approval_quorum.consume(
+                quorum_approval,
+                principal=context.principal,
+                intent_fingerprint=session.intent.fingerprint,
+                proposal_fingerprint=review.planning.response.proposal.fingerprint,
+            )
         result = self._execute_reviewed(
             session,
             review,
@@ -297,6 +315,7 @@ class AIShellService:
                 review.critique.policy.requires_approval
                 and approval is not None
             ),
+            quorum_approved=bool(quorum_digest),
         )
         return result, precondition_report, use
 
@@ -308,6 +327,7 @@ class AIShellService:
         sealed: bool,
         preconditions_verified: bool = False,
         human_approved: bool = False,
+        quorum_approved: bool = False,
     ) -> None:
         if self.assurance is None:
             return
@@ -326,6 +346,7 @@ class AIShellService:
             ),
             preconditions_verified=preconditions_verified,
             human_approved=human_approved,
+            quorum_approved=quorum_approved,
         )
 
     def execute(
@@ -349,6 +370,7 @@ class AIShellService:
                 review.critique.policy.requires_approval
                 and approval is not None
             ),
+            quorum_approved=False,
         )
 
     def _execute_reviewed(
@@ -362,6 +384,7 @@ class AIShellService:
         sealed: bool,
         preconditions_verified: bool = False,
         human_approved: bool = False,
+        quorum_approved: bool = False,
     ) -> AIExecutionBundle:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
@@ -372,6 +395,7 @@ class AIShellService:
             sealed=sealed,
             preconditions_verified=preconditions_verified,
             human_approved=human_approved,
+            quorum_approved=quorum_approved,
         )
         proposal = review.planning.response.proposal
         pin = self._pins.get(session.session_id)
