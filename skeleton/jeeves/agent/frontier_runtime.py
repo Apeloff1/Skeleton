@@ -282,6 +282,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         requested: Sequence[str] = (),
         base_rate: float | None = None,
         sequence: int = 0,
+        domain: str | None = None,
     ) -> SemanticPlaneSnapshot:
         """Run the governed semantic plane without bypassing runtime evidence rules."""
         return self.semantic_plane.analyze(
@@ -290,6 +291,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             requested=requested,
             base_rate=base_rate,
             sequence=sequence,
+            domain=domain,
         )
 
     def resolve_semantic_forecast(
