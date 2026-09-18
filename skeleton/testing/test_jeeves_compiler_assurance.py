@@ -49,7 +49,7 @@ def _module(*, provenance_confidence: float = 1.0, artifact_id: str = "unit") ->
 
 
 class AnnotatingEquivalentPass(CompilationPass):
-    contract = PassContract("annotate-equivalent")
+    contract = PassContract("annotate-equivalent", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -60,7 +60,7 @@ class AnnotatingEquivalentPass(CompilationPass):
 
 
 class CorruptingPass(CompilationPass):
-    contract = PassContract("corrupt")
+    contract = PassContract("corrupt", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -71,7 +71,7 @@ class CorruptingPass(CompilationPass):
 
 
 class ReplaceProvenancePass(CompilationPass):
-    contract = PassContract("replace-provenance")
+    contract = PassContract("replace-provenance", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -84,7 +84,7 @@ class ReplaceProvenancePass(CompilationPass):
 
 
 class WeakenProvenancePass(CompilationPass):
-    contract = PassContract("weaken-provenance")
+    contract = PassContract("weaken-provenance", replay_safe=True)
 
     def apply(self, module: IRModule) -> IRModule:
         function = module.functions[0]
@@ -101,6 +101,7 @@ class AddUnknownEffectPass(CompilationPass):
         "unknown-effect",
         allowed_new_effects=frozenset({Effect.UNKNOWN}),
         require_translation_validation=False,
+        replay_safe=True,
     )
 
     def apply(self, module: IRModule) -> IRModule:
