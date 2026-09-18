@@ -611,9 +611,11 @@ class TopologyBridgePolicy:
     minimum_independent_runs: int = 4
     minimum_domains: int = 2
     minimum_trials_per_domain: int = 2
+    minimum_independent_runs_per_domain: int = 2
     minimum_negative_controls: int = 2
     minimum_control_domains: int = 2
     minimum_controls_per_domain: int = 1
+    minimum_control_runs_per_domain: int = 1
     maximum_predictions: int = 500_000
     maximum_trials: int = 500_000
     maximum_unresolved_predictions: int = 50_000
@@ -636,9 +638,11 @@ class TopologyBridgePolicy:
             "minimum_independent_runs",
             "minimum_domains",
             "minimum_trials_per_domain",
+            "minimum_independent_runs_per_domain",
             "minimum_negative_controls",
             "minimum_control_domains",
             "minimum_controls_per_domain",
+            "minimum_control_runs_per_domain",
             "maximum_predictions",
             "maximum_trials",
             "maximum_unresolved_predictions",
@@ -717,10 +721,16 @@ class TopologyBridgePolicy:
                 "minimum_independent_runs": self.minimum_independent_runs,
                 "minimum_domains": self.minimum_domains,
                 "minimum_trials_per_domain": self.minimum_trials_per_domain,
+                "minimum_independent_runs_per_domain": (
+                    self.minimum_independent_runs_per_domain
+                ),
                 "minimum_negative_controls": self.minimum_negative_controls,
                 "minimum_control_domains": self.minimum_control_domains,
                 "minimum_controls_per_domain": (
                     self.minimum_controls_per_domain
+                ),
+                "minimum_control_runs_per_domain": (
+                    self.minimum_control_runs_per_domain
                 ),
                 "maximum_predictions": self.maximum_predictions,
                 "maximum_trials": self.maximum_trials,
@@ -757,6 +767,7 @@ class TopologyBridgeDomainReport:
     trial_count: int
     independent_run_count: int
     negative_control_count: int
+    negative_control_run_count: int
     mean_probability: float | None
     empirical_rate: float | None
     wilson_95: tuple[float, float] | None
@@ -774,6 +785,9 @@ class TopologyBridgeDomainReport:
                 "trial_count": self.trial_count,
                 "independent_run_count": self.independent_run_count,
                 "negative_control_count": self.negative_control_count,
+                "negative_control_run_count": (
+                    self.negative_control_run_count
+                ),
                 "mean_probability": self.mean_probability,
                 "empirical_rate": self.empirical_rate,
                 "wilson_95": self.wilson_95,
@@ -1434,13 +1448,29 @@ class SemanticTopologyLearningLab:
                 else sum(item.outcome for item in domain_controls)
                 / len(domain_controls)
             )
+            primary_run_count = len(
+                {
+                    item.independent_run
+                    for item in domain_primary
+                }
+            )
+            control_run_count = len(
+                {
+                    item.independent_run
+                    for item in domain_controls
+                }
+            )
             qualified_primary = (
                 len(domain_primary)
                 >= self.policy.minimum_trials_per_domain
+                and primary_run_count
+                >= self.policy.minimum_independent_runs_per_domain
             )
             qualified_control = (
                 len(domain_controls)
                 >= self.policy.minimum_controls_per_domain
+                and control_run_count
+                >= self.policy.minimum_control_runs_per_domain
             )
             fingerprint = stable_fingerprint(
                 {
@@ -1468,13 +1498,9 @@ class SemanticTopologyLearningLab:
                 TopologyBridgeDomainReport(
                     domain=domain,
                     trial_count=len(domain_primary),
-                    independent_run_count=len(
-                        {
-                            item.independent_run
-                            for item in domain_primary
-                        }
-                    ),
+                    independent_run_count=primary_run_count,
                     negative_control_count=len(domain_controls),
+                    negative_control_run_count=control_run_count,
                     mean_probability=mean_probability,
                     empirical_rate=empirical_rate,
                     wilson_95=interval,
@@ -2296,13 +2322,37 @@ class SemanticTopologyLearningLab:
                     )
                     for domain in {item.domain for item in controls}
                 }
+                domain_run_counts = {
+                    domain: len(
+                        {
+                            item.independent_run
+                            for item in primary
+                            if item.domain == domain
+                        }
+                    )
+                    for domain in domain_trial_counts
+                }
+                control_domain_run_counts = {
+                    domain: len(
+                        {
+                            item.independent_run
+                            for item in controls
+                            if item.domain == domain
+                        }
+                    )
+                    for domain in control_domain_counts
+                }
                 qualified_domain_count = sum(
                     count >= self.policy.minimum_trials_per_domain
-                    for count in domain_trial_counts.values()
+                    and domain_run_counts.get(domain, 0)
+                    >= self.policy.minimum_independent_runs_per_domain
+                    for domain, count in domain_trial_counts.items()
                 )
                 qualified_control_domain_count = sum(
                     count >= self.policy.minimum_controls_per_domain
-                    for count in control_domain_counts.values()
+                    and control_domain_run_counts.get(domain, 0)
+                    >= self.policy.minimum_control_runs_per_domain
+                    for domain, count in control_domain_counts.items()
                 )
                 trial_coverage = min(
                     1.0,
@@ -2488,11 +2538,15 @@ class SemanticTopologyLearningLab:
                         "negative_control_count": len(controls),
                         "independent_run_count": run_count,
                         "domain_count": len(domain_trial_counts),
+                        "domain_run_counts": dict(domain_run_counts),
                         "qualified_domain_count": (
                             qualified_domain_count
                         ),
                         "control_domain_count": len(
                             control_domain_counts
+                        ),
+                        "control_domain_run_counts": dict(
+                            control_domain_run_counts
                         ),
                         "qualified_control_domain_count": (
                             qualified_control_domain_count
