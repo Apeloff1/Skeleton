@@ -13,6 +13,7 @@ checks, and a frozen policy snapshot that untrusted input cannot mutate.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 import ipaddress
 import json
 from dataclasses import dataclass
@@ -104,6 +105,22 @@ _PROC_CALLS = frozenset({
     "pty.spawn", "ctypes.CDLL", "ctypes.PyDLL",
 })
 _EVAL_CALLS = frozenset({"eval", "exec", "compile", "__import__", "builtins.eval", "builtins.exec"})
+_TRACKED_CALLABLES = frozenset().union(
+    _FS_CALLS,
+    _NET_CALLS,
+    _PROC_CALLS,
+    _EVAL_CALLS,
+    {
+        "getattr",
+        "builtins.getattr",
+        "importlib.import_module",
+        "os.getenv",
+        "os.environ.get",
+        "os.environ.__getitem__",
+        "sandbox.grant",
+        "GeneratedCodeSandbox.grant",
+    },
+)
 
 
 class SandboxCapability(str, Enum):
@@ -508,7 +525,11 @@ def _inspect_python(source: str) -> list[Operation]:
         ) from exc
     operations: list[Operation] = []
     aliases: dict[str, str] = {}
-    for node in ast.walk(tree):
+    nodes = list(ast.walk(tree))
+
+    # Resolve imports before inspecting calls so source ordering cannot hide a
+    # sensitive callable behind an alias used earlier in the AST traversal.
+    for node in nodes:
         if isinstance(node, ast.Import):
             for item in node.names:
                 aliases[item.asname or item.name.split(".", 1)[0]] = item.name
@@ -522,7 +543,11 @@ def _inspect_python(source: str) -> list[Operation]:
                 full_name = f"{module}.{item.name}" if module else item.name
                 aliases[item.asname or item.name] = full_name
                 operations.extend(_import_operations(full_name))
-        elif isinstance(node, ast.Call):
+
+    aliases.update(_stable_callable_aliases(nodes, aliases))
+
+    for node in nodes:
+        if isinstance(node, ast.Call):
             operations.extend(_call_operations(node, aliases))
         elif isinstance(node, ast.Attribute):
             name = _dotted_name(node, aliases)
@@ -536,6 +561,48 @@ def _inspect_python(source: str) -> list[Operation]:
                     )
                 )
     return operations
+
+
+def _stable_callable_aliases(
+    nodes: Iterable[ast.AST],
+    import_aliases: Mapping[str, str],
+) -> dict[str, str]:
+    """Resolve stable local aliases to sensitive callables, including chains."""
+    node_list = list(nodes)
+    stores = Counter(
+        node.id
+        for node in node_list
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    resolved: dict[str, str] = {}
+
+    changed = True
+    while changed:
+        changed = False
+        aliases = {**import_aliases, **resolved}
+        for node in node_list:
+            value: ast.AST | None = None
+            names: list[str] = []
+            if isinstance(node, ast.Assign):
+                value = node.value
+                names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                value = node.value
+                names = [node.target.id]
+            elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+                value = node.value
+                names = [node.target.id]
+            if value is None or not names:
+                continue
+            source = _dotted_name(value, aliases)
+            if source not in _TRACKED_CALLABLES:
+                continue
+            for name in names:
+                if stores[name] != 1 or name in resolved:
+                    continue
+                resolved[name] = source
+                changed = True
+    return resolved
 
 
 def _inspect_tool_json(text: str) -> list[Operation]:
