@@ -608,6 +608,63 @@ from .verification import (
     VerificationReport,
     parse_advisory_json,
 )
+from .epistemic_frontier import (
+    EpistemicFrontierEngine,
+    EpistemicFrontierPolicy,
+    EpistemicGap,
+    ForecastContract,
+    ForecastSettlement,
+    FrontierSnapshot,
+    GapKind,
+    GapStatus,
+    KnowledgeObligation,
+    ProbeCandidate,
+    ProbeKind,
+)
+from .hypothesis_tournament import (
+    CompetingHypothesis,
+    DiscriminatingProbe,
+    HypothesisPrediction,
+    HypothesisTournament,
+    ProbeEvaluation,
+    TournamentPolicy,
+    TournamentRound,
+    TournamentUpdate,
+)
+from .research_agenda import (
+    AgendaItem,
+    AgendaSnapshot,
+    AgendaStatus,
+    AttemptResult,
+    RankedAgendaItem,
+    ResearchAgenda,
+    ResearchAgendaPolicy,
+)
+from .research_assurance import (
+    AssuranceFinding,
+    AssuranceSeverity,
+    CompletionCertificate,
+    ResearchAssuranceGate,
+    ResearchEvidenceSummary,
+    ResearchResolution,
+    ResearchStopPolicy,
+)
+from .research_synthesis import (
+    HypothesisProposal,
+    HypothesisSynthesisGate,
+    HypothesisSynthesisPolicy,
+    ProbeSeparation,
+    SynthesisFinding,
+    SynthesisReport,
+    SynthesisSeverity,
+)
+from .unknown_unknowns import (
+    SurpriseObservation,
+    SurpriseScoutPolicy,
+    SurpriseScoutSnapshot,
+    UnknownUnknownCandidate,
+    UnknownUnknownScout,
+)
 from .world_model import (
     BeliefConflict,
     BeliefEdge,
