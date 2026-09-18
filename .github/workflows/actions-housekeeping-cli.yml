@@ -11,9 +11,10 @@ on:
 
 concurrency:
   # queue-drain.yml and the owner-side drainer explicitly preserve this
-  # recovery lane; only a newer housekeeping generation supersedes it.
+  # recovery lane. Keep an active cleanup alive; newer triggers coalesce
+  # instead of repeatedly preempting the run that is reclaiming capacity.
   group: actions-housekeeping-cli-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
