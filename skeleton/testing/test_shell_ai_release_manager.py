@@ -177,3 +177,56 @@ def test_release_manager_registry_revision_is_signed():
     service = manager(base)
     prepared = service.prepare(evidence(base))
     assert prepared.registered.signature.artifact_digest == prepared.registered.evidence.digest
+
+
+def test_release_manager_runtime_tool_digest_mismatch_blocks():
+    base = AIShellPolicy()
+    governance = AIShellGovernance(AIPolicyStore(base))
+    registry = AIReleaseRegistry(ArtifactSigner("key", b"k" * 32))
+    service = AIReleaseManager(
+        registry,
+        governance,
+        expected_tool_catalog_digest=fp("x"),
+    )
+    with pytest.raises(RuntimeError, match="tool catalog"):
+        service.prepare(evidence(base))
+
+
+def test_release_manager_runtime_effect_digest_mismatch_blocks():
+    base = AIShellPolicy()
+    governance = AIShellGovernance(AIPolicyStore(base))
+    registry = AIReleaseRegistry(ArtifactSigner("key", b"k" * 32))
+    service = AIReleaseManager(
+        registry,
+        governance,
+        expected_effect_digest=fp("x"),
+    )
+    with pytest.raises(RuntimeError, match="effect"):
+        service.prepare(evidence(base))
+
+
+def test_release_manager_runtime_code_revision_mismatch_blocks():
+    base = AIShellPolicy()
+    governance = AIShellGovernance(AIPolicyStore(base))
+    registry = AIReleaseRegistry(ArtifactSigner("key", b"k" * 32))
+    service = AIReleaseManager(
+        registry,
+        governance,
+        expected_code_revision="different",
+    )
+    with pytest.raises(RuntimeError, match="code revision"):
+        service.prepare(evidence(base))
+
+
+def test_release_manager_matching_runtime_surfaces_allows():
+    base = AIShellPolicy()
+    governance = AIShellGovernance(AIPolicyStore(base))
+    registry = AIReleaseRegistry(ArtifactSigner("key", b"k" * 32))
+    service = AIReleaseManager(
+        registry,
+        governance,
+        expected_tool_catalog_digest=fp("t"),
+        expected_effect_digest=fp("e"),
+        expected_code_revision="abc",
+    )
+    assert service.prepare(evidence(base)).gate.allowed
