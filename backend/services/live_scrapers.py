@@ -64,6 +64,44 @@ def _literal_ip(host: str):
     return ip_address(packed)
 
 
+async def _host_resolves_public(host: str) -> bool:
+    """Fail closed unless every current DNS answer is a globally routable IP.
+
+    This blocks hostnames that resolve directly to loopback/private/link-local
+    space. It is a pre-connect guard, not DNS pinning: the HTTP transport still
+    performs its own resolution, so callers must not treat this as complete
+    DNS-rebinding protection.
+    """
+    literal = _literal_ip(host)
+    if literal is not None:
+        return literal.is_global
+
+    try:
+        answers = await asyncio.to_thread(
+            socket.getaddrinfo,
+            host,
+            443,
+            type=socket.SOCK_STREAM,
+        )
+    except (OSError, UnicodeError):
+        return False
+
+    if not answers:
+        return False
+
+    seen: set[str] = set()
+    for answer in answers:
+        try:
+            raw = answer[4][0]
+            resolved = ip_address(raw.split("%", 1)[0])
+        except (IndexError, TypeError, ValueError):
+            return False
+        if not resolved.is_global:
+            return False
+        seen.add(str(resolved))
+    return bool(seen)
+
+
 def _validated_scrape_url(url: str) -> tuple[str, str]:
     """Return normalized public HTTPS URL and hostname, or fail closed."""
     value = url.strip()
@@ -112,6 +150,10 @@ async def _polite_get(client: httpx.AsyncClient, url: str) -> str | None:
             current, host = _validated_scrape_url(current)
         except ValueError:
             log.warning("scrape URL rejected by outbound network policy")
+            return None
+
+        if not await _host_resolves_public(host):
+            log.warning("scrape hostname rejected by outbound DNS policy")
             return None
 
         await _respect_host_delay(host)
