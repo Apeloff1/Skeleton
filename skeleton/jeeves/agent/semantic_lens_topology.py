@@ -121,7 +121,7 @@ class SemanticLensTopology:
         self._specs = {spec.key: spec for spec in registry.all()}
         self._edges: tuple[LensTopologyEdge, ...] = self._build_edges(source_rules)
         self._adjacency: dict[str, set[str]] = {key: set() for key in self._specs}
-        for edge in self._edges:
+        for edge in effective_edges:
             self._adjacency[edge.left_key].add(edge.right_key)
             self._adjacency[edge.right_key].add(edge.left_key)
         self._bridge_candidates = self._build_bridge_candidates()
@@ -184,7 +184,10 @@ class SemanticLensTopology:
             )
         )
 
-    def _components(self) -> tuple[tuple[str, ...], ...]:
+    def _components_for(
+        self,
+        adjacency: Mapping[str, set[str]],
+    ) -> tuple[tuple[str, ...], ...]:
         unseen = set(self._specs)
         components: list[tuple[str, ...]] = []
         while unseen:
@@ -195,7 +198,7 @@ class SemanticLensTopology:
             while queue:
                 key = queue.pop()
                 members.append(key)
-                for neighbor in sorted(self._adjacency[key]):
+                for neighbor in sorted(adjacency[key]):
                     if neighbor in unseen:
                         unseen.remove(neighbor)
                         queue.append(neighbor)
@@ -207,11 +210,31 @@ class SemanticLensTopology:
             )
         )
 
-    def _build_snapshot(self) -> SemanticTopologySnapshot:
+    def _components(self) -> tuple[tuple[str, ...], ...]:
+        return self._components_for(self._adjacency)
+
+    def _build_snapshot(
+        self,
+        *,
+        edges: Sequence[LensTopologyEdge] | None = None,
+        adjacency: Mapping[str, set[str]] | None = None,
+        bridge_candidates: Sequence[LensBridgeCandidate] | None = None,
+    ) -> SemanticTopologySnapshot:
+        effective_edges = (
+            self._edges if edges is None else tuple(edges)
+        )
+        effective_adjacency = (
+            self._adjacency if adjacency is None else adjacency
+        )
+        effective_candidates = (
+            self._bridge_candidates
+            if bridge_candidates is None
+            else tuple(bridge_candidates)
+        )
         nodes: list[LensTopologyNode] = []
         family_pair_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
         for key, spec in sorted(self._specs.items()):
-            neighbors = self._adjacency[key]
+            neighbors = effective_adjacency[key]
             neighbor_families = tuple(
                 sorted(
                     {self._specs[value].family for value in neighbors},
@@ -239,7 +262,7 @@ class SemanticLensTopology:
             pair = tuple(sorted((left, right)))
             family_pair_counts[pair] += 1
 
-        components = self._components()
+        components = self._components_for(effective_adjacency)
         isolated = tuple(
             node.lens_key for node in nodes if node.degree == 0
         )
@@ -253,12 +276,12 @@ class SemanticLensTopology:
         )
         conflicts = tuple(
             edge.edge_id
-            for edge in self._edges
+            for edge in effective_edges
             if edge.kind is LensInteractionKind.CONFLICTS
         )
         reinforces = tuple(
             edge.edge_id
-            for edge in self._edges
+            for edge in effective_edges
             if edge.kind is LensInteractionKind.REINFORCES
         )
         pairs = tuple(
@@ -287,7 +310,7 @@ class SemanticLensTopology:
                     edge.source,
                     edge.cross_family,
                 )
-                for edge in self._edges
+                for edge in effective_edges
             ],
             "components": components,
             "isolated": isolated,
@@ -301,12 +324,12 @@ class SemanticLensTopology:
                     item.score,
                     item.shared_cues,
                 )
-                for item in self._bridge_candidates
+                for item in effective_candidates
             ],
         }
         return SemanticTopologySnapshot(
             nodes=tuple(nodes),
-            edges=self._edges,
+            edges=tuple(effective_edges),
             component_count=len(components),
             largest_component_size=max((len(values) for values in components), default=0),
             isolated_lens_keys=isolated,
@@ -314,13 +337,139 @@ class SemanticLensTopology:
             conflict_edge_ids=conflicts,
             reinforcement_edge_ids=reinforces,
             family_pair_counts=pairs,
-            candidate_bridge_count=len(self._bridge_candidates),
+            candidate_bridge_count=len(effective_candidates),
             fingerprint=stable_fingerprint(payload),
         )
 
     @property
     def snapshot(self) -> SemanticTopologySnapshot:
         return self._snapshot
+
+    def snapshot_with_rules(
+        self,
+        supplemental_rules: Sequence[LensInteractionRule],
+    ) -> SemanticTopologySnapshot:
+        """Return an immutable effective topology including validated rules."""
+
+        rules = tuple(supplemental_rules)
+        if not rules:
+            return self._snapshot
+        if any(not isinstance(item, LensInteractionRule) for item in rules):
+            raise TypeError(
+                "supplemental_rules must contain LensInteractionRule values"
+            )
+
+        static_identities = {
+            (edge.key[0], edge.key[1], edge.symmetric)
+            for edge in self._edges
+        }
+        for rule in rules:
+            identity = (
+                rule.key[0],
+                rule.key[1],
+                rule.symmetric,
+            )
+            if identity in static_identities:
+                raise AgentContractError(
+                    "learned topology rule collides with static edge: "
+                    + str(rule.key)
+                )
+
+        learned_edges = self._build_edges(
+            (("learned", rules),)
+        )
+        combined_edges = tuple(
+            sorted(
+                (*self._edges, *learned_edges),
+                key=lambda edge: (
+                    edge.left_key,
+                    edge.right_key,
+                    edge.kind.value,
+                    edge.source,
+                ),
+            )
+        )
+        adjacency: dict[str, set[str]] = {
+            key: set() for key in self._specs
+        }
+        for edge in combined_edges:
+            adjacency[edge.left_key].add(edge.right_key)
+            adjacency[edge.right_key].add(edge.left_key)
+
+        learned_pairs = {
+            tuple(sorted((edge.left_key, edge.right_key)))
+            for edge in learned_edges
+        }
+        remaining_candidates = tuple(
+            item
+            for item in self._bridge_candidates
+            if tuple(sorted((item.left_key, item.right_key)))
+            not in learned_pairs
+        )
+        return self._build_snapshot(
+            edges=combined_edges,
+            adjacency=adjacency,
+            bridge_candidates=remaining_candidates,
+        )
+
+    def neighbors_with_rules(
+        self,
+        lens_key: str,
+        supplemental_rules: Sequence[LensInteractionRule],
+    ) -> tuple[str, ...]:
+        snapshot = self.snapshot_with_rules(supplemental_rules)
+        key = str(lens_key).strip().casefold()
+        if key not in self._specs:
+            raise KeyError(key)
+        neighbors: set[str] = set()
+        for edge in snapshot.edges:
+            if edge.left_key == key:
+                neighbors.add(edge.right_key)
+            elif edge.right_key == key:
+                neighbors.add(edge.left_key)
+        return tuple(sorted(neighbors))
+
+    def shortest_path_with_rules(
+        self,
+        source_key: str,
+        target_key: str,
+        *,
+        supplemental_rules: Sequence[LensInteractionRule],
+        max_depth: int = 8,
+    ) -> tuple[str, ...]:
+        source = str(source_key).strip().casefold()
+        target = str(target_key).strip().casefold()
+        if source not in self._specs:
+            raise KeyError(source)
+        if target not in self._specs:
+            raise KeyError(target)
+        if source == target:
+            return (source,)
+        depth_limit = positive_int("max_depth", max_depth, maximum=100)
+        snapshot = self.snapshot_with_rules(supplemental_rules)
+        adjacency: dict[str, set[str]] = {
+            key: set() for key in self._specs
+        }
+        for edge in snapshot.edges:
+            adjacency[edge.left_key].add(edge.right_key)
+            adjacency[edge.right_key].add(edge.left_key)
+        queue: deque[tuple[str, tuple[str, ...]]] = deque(
+            [(source, (source,))]
+        )
+        seen = {source}
+        while queue:
+            current, path = queue.popleft()
+            if len(path) - 1 >= depth_limit:
+                continue
+            for neighbor in sorted(adjacency[current]):
+                if neighbor in seen:
+                    continue
+                next_path = (*path, neighbor)
+                if neighbor == target:
+                    return next_path
+                seen.add(neighbor)
+                queue.append((neighbor, next_path))
+        return ()
 
     def neighbors(self, lens_key: str) -> tuple[str, ...]:
         key = str(lens_key).strip().casefold()
