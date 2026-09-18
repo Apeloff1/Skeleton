@@ -37,6 +37,9 @@ class AIExecutionEvidence:
     authority_health_policy_digest: str = ""
     audit_witness_digest: str = ""
     audit_witness_sequence: int | None = None
+    execution_attempt_id: str = ""
+    execution_attempt_authority_digest: str = ""
+    execution_attempt_state: str = ""
     completed_at: float = 0.0
 
     def __post_init__(self) -> None:
@@ -65,6 +68,7 @@ class AIExecutionEvidence:
             "runtime_trust_digest",
             "authority_health_policy_digest",
             "audit_witness_digest",
+            "execution_attempt_authority_digest",
         )
         for name in optional:
             value = getattr(self, name)
@@ -72,6 +76,20 @@ class AIExecutionEvidence:
                 raise ValueError(f"{name} must be SHA-256 hex")
         if len(self.execution_seal_id) > 128:
             raise ValueError("execution_seal_id too long")
+        if len(self.execution_attempt_id) > 256:
+            raise ValueError("execution_attempt_id too long")
+        if len(self.execution_attempt_state) > 64:
+            raise ValueError("execution_attempt_state too long")
+        if bool(self.execution_attempt_id) != bool(
+            self.execution_attempt_authority_digest
+        ):
+            raise ValueError(
+                "execution attempt id and authority digest must be configured together"
+            )
+        if self.execution_attempt_state and not self.execution_attempt_id:
+            raise ValueError(
+                "execution attempt state requires execution attempt identity"
+            )
         if self.audit_witness_sequence is not None and (
             isinstance(self.audit_witness_sequence, bool)
             or not isinstance(self.audit_witness_sequence, int)
@@ -110,6 +128,11 @@ class AIExecutionEvidence:
             ),
             "audit_witness_digest": self.audit_witness_digest,
             "audit_witness_sequence": self.audit_witness_sequence,
+            "execution_attempt_id": self.execution_attempt_id,
+            "execution_attempt_authority_digest": (
+                self.execution_attempt_authority_digest
+            ),
+            "execution_attempt_state": self.execution_attempt_state,
             "completed_at": self.completed_at,
         }
 
@@ -171,6 +194,9 @@ class AIExecutionEvidenceBuilder:
         authority_health_policy_digest: str = "",
         audit_witness_digest: str = "",
         audit_witness_sequence: int | None = None,
+        execution_attempt_id: str = "",
+        execution_attempt_authority_digest: str = "",
+        execution_attempt_state: str = "",
     ) -> AIExecutionEvidence:
         return AIExecutionEvidence(
             1,
@@ -192,6 +218,9 @@ class AIExecutionEvidenceBuilder:
             authority_health_policy_digest,
             audit_witness_digest,
             audit_witness_sequence,
+            execution_attempt_id,
+            execution_attempt_authority_digest,
+            execution_attempt_state,
             self._clock(),
         )
 
@@ -265,6 +294,9 @@ class AIExecutionEvidenceStore:
                 if raw.get("audit_witness_sequence") is None
                 else int(raw["audit_witness_sequence"])
             ),
+            str(raw.get("execution_attempt_id", "")),
+            str(raw.get("execution_attempt_authority_digest", "")),
+            str(raw.get("execution_attempt_state", "")),
             float(raw["completed_at"]),
         )
 
