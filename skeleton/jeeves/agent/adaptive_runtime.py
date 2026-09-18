@@ -111,6 +111,7 @@ class AdaptiveConfig:
     enable_self_consistency: bool = True
     maximum_frontier_rounds: int = 2
     frontier_escalation_min_budget: float = 0.15
+    minimum_frontier_uncertainty_reduction: float = 0.03
     fail_closed_on_evidence_gap: bool = True
 
     def __post_init__(self) -> None:
@@ -121,6 +122,14 @@ class AdaptiveConfig:
                 raise ValueError(f"{name} must be positive integer")
         object.__setattr__(self, "minimum_experience_similarity", probability("minimum_experience_similarity", self.minimum_experience_similarity))
         object.__setattr__(self, "frontier_escalation_min_budget", probability("frontier_escalation_min_budget", self.frontier_escalation_min_budget))
+        object.__setattr__(
+            self,
+            "minimum_frontier_uncertainty_reduction",
+            probability(
+                "minimum_frontier_uncertainty_reduction",
+                self.minimum_frontier_uncertainty_reduction,
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +158,8 @@ class SpecialistSearchRecord:
     frontier_disposition: str | None = None
     consensus_fingerprint: str | None = None
     escalation_rounds: int = 0
+    frontier_stagnated: bool = False
+    uncertainty_reduction: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,6 +313,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             else None
         )
         escalation_rounds = 0
+        frontier_stagnated = False
+        frontier_uncertainty_reduction = 0.0
+        previous_uncertainty = (
+            self._frontier_uncertainty(decision) if decision is not None else 0.0
+        )
 
         while (
             decision is not None
@@ -324,6 +340,32 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             search = merge_search_results(search, extra)
             escalation_rounds += 1
             decision = self.frontier_reasoning.decide(search, risk=step.risk)
+            current_uncertainty = self._frontier_uncertainty(decision)
+            frontier_uncertainty_reduction = max(
+                0.0,
+                previous_uncertainty - current_uncertainty,
+            )
+            if (
+                decision.disposition is InferenceDisposition.DELIBERATE
+                and frontier_uncertainty_reduction
+                < self.adaptive_config.minimum_frontier_uncertainty_reduction
+            ):
+                frontier_stagnated = True
+                state.trace.emit(
+                    "frontier.escalation_stagnated",
+                    {
+                        "step_id": step.step_id,
+                        "round": escalation_rounds,
+                        "previous_uncertainty": previous_uncertainty,
+                        "current_uncertainty": current_uncertainty,
+                        "uncertainty_reduction": frontier_uncertainty_reduction,
+                        "minimum_reduction": self.adaptive_config.minimum_frontier_uncertainty_reduction,
+                        "decision": decision.fingerprint,
+                    },
+                )
+                self.metrics.increment("agent.frontier.escalation_stagnated")
+                break
+            previous_uncertainty = current_uncertainty
 
         adaptive = self._adaptive_state(state.run_id)
         if decision is not None:
@@ -350,6 +392,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     else None
                 ),
                 escalation_rounds=escalation_rounds,
+                frontier_stagnated=frontier_stagnated,
+                uncertainty_reduction=frontier_uncertainty_reduction,
             )
         )
         state.trace.emit(
@@ -372,6 +416,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     else None
                 ),
                 "escalation_rounds": escalation_rounds,
+                "frontier_stagnated": frontier_stagnated,
+                "uncertainty_reduction": frontier_uncertainty_reduction,
             },
         )
 
@@ -578,6 +624,20 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 }
             ),
         )
+
+    @staticmethod
+    def _frontier_uncertainty(decision) -> float:
+        if decision is None:
+            return 0.0
+        values = [
+            decision.diagnostics.normalized_entropy,
+            decision.diagnostics.action_disagreement,
+            decision.diagnostics.outcome_disagreement,
+        ]
+        if decision.consensus is not None:
+            values.append(decision.consensus.normalized_entropy)
+            values.append(1.0 - decision.consensus.agreement)
+        return max(0.0, min(1.0, max(values, default=0.0)))
 
     @staticmethod
     def _frontier_block_reason(decision) -> str:
