@@ -225,13 +225,35 @@ class AIExecutionFinalizationReconciler:
                 digest,
                 "" if verified else "recovery checkpoint digest mismatch",
             )
+
+        checkpoint = stored.record.checkpoint
+        verified = (
+            checkpoint.session.session_id == item.session_id
+            and checkpoint.release_evidence_digest
+            == item.release_evidence_digest
+            and checkpoint.runtime_trust_digest
+            == item.runtime_trust_digest
+            and checkpoint.execution_attempt_id
+            == item.execution_attempt_id
+            and checkpoint.execution_attempt_authority_digest
+            == item.execution_attempt_authority_digest
+            and (
+                not item.session_evidence_digest
+                or checkpoint.session_evidence_digest
+                == item.session_evidence_digest
+            )
+        )
         return FinalizationLayerReport(
             True,
             expected,
             True,
-            False,
+            verified,
             digest,
-            "recovery checkpoint exists before state binds its digest",
+            (
+                ""
+                if verified
+                else "unbound recovery checkpoint authority mismatch"
+            ),
         )
 
     def _anchor(
