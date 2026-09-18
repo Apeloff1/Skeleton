@@ -158,7 +158,7 @@ jobs:
                 ancestor_count=$((ancestor_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
-              elif [[ "$(git rev-parse \"$tip^{tree}\")" == "$(git rev-parse \"$main_ref^{tree}\")" ]]; then
+              elif [[ "$(git rev-parse "$tip^{tree}")" == "$(git rev-parse "$main_ref^{tree}")" ]]; then
                 # Histories may differ after rebase/squash/cherry-pick while the
                 # complete repository snapshot is byte-for-byte identical.
                 # In that case the branch carries no unique file content.
