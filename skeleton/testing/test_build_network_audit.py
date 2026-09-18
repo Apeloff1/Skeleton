@@ -46,6 +46,7 @@ def test_unknown_commands_are_never_classified_offline() -> None:
         "yarn --cwd frontend typecheck",
         "python -m skeleton eras",
         "python -c 'from mystery import run; run()'",
+        "git config user.email 'bot@users.noreply.github.com'",
     )
     for command in samples:
         classification, reasons = classify_command(command)
@@ -69,6 +70,9 @@ def test_curl_wget_and_live_hosts_are_network_required() -> None:
         classification, reasons = classify_command(command)
         assert classification == CLASSIFICATION_NETWORK_REQUIRED, command
         assert reason in reasons, (command, reasons)
+
+    email = classify_command("git config user.email 'bot@users.noreply.github.com'")
+    assert email[0] == CLASSIFICATION_NETWORK_UNKNOWN
 
 
 def test_pip_and_npm_install_without_offline_are_network_required() -> None:

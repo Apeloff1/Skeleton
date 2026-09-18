@@ -40,7 +40,7 @@ _SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _URL_RE = re.compile(r"""(?:https?|git|ssh|ftp|sftp|ftps)://[^\s'"`]+""", re.IGNORECASE)
 _HOST_RE = re.compile(
-    r"""(?<![A-Za-z0-9_./-])(?:[A-Za-z0-9-]+\.)+(?:com|net|org|io|dev|ai|info|edu|gov|xyz)(?::\d{2,5})?(?:/|\b)""",
+    r"""(?<![A-Za-z0-9_./@-])(?:[A-Za-z0-9-]+\.)+(?:com|net|org|io|dev|ai|info|edu|gov|xyz)(?::\d{2,5})?(?:/|\b)""",
     re.IGNORECASE,
 )
 _ENV_ASSIGN_RE = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\s;]+)\s+)+")
