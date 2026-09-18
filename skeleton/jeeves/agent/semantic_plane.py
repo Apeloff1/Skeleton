@@ -142,6 +142,7 @@ class SemanticPlanePolicy:
     enable_learned_companions: bool = True
     max_learned_companions: int = 4
     minimum_learned_companion_cue_support: float = 0.20
+    minimum_learned_companion_bridge_quality: float = 0.55
     require_selected_findings: bool = True
     require_observation_overlap: bool = True
     require_observation_subset: bool = True
@@ -182,6 +183,14 @@ class SemanticPlanePolicy:
                 self.minimum_learned_companion_cue_support,
             ),
         )
+        object.__setattr__(
+            self,
+            "minimum_learned_companion_bridge_quality",
+            probability(
+                "minimum_learned_companion_bridge_quality",
+                self.minimum_learned_companion_bridge_quality,
+            ),
+        )
         if not isinstance(self.enable_learned_companions, bool):
             raise AgentContractError(
                 "enable_learned_companions must be boolean"
@@ -212,6 +221,60 @@ class SemanticFindingAudit:
     evidence_mismatch_ids: tuple[str, ...]
     duplicate_finding_ids: tuple[str, ...]
     fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class LearnedCompanionActivation:
+    lens_key: str
+    source_lens_key: str
+    candidate_id: str
+    report_id: str
+    interaction_kind: LensInteractionKind
+    cue_support: float
+    bridge_quality: float
+    activation_score: float
+    fingerprint: str
+
+    def __post_init__(self) -> None:
+        for name in (
+            "lens_key",
+            "source_lens_key",
+            "candidate_id",
+            "report_id",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise AgentContractError(f"{name} is required")
+            object.__setattr__(self, name, value)
+        if not isinstance(self.interaction_kind, LensInteractionKind):
+            object.__setattr__(
+                self,
+                "interaction_kind",
+                LensInteractionKind(str(self.interaction_kind)),
+            )
+        for name in (
+            "cue_support",
+            "bridge_quality",
+            "activation_score",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                probability(name, getattr(self, name)),
+            )
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "lens_key": self.lens_key,
+            "source_lens_key": self.source_lens_key,
+            "candidate_id": self.candidate_id,
+            "report_id": self.report_id,
+            "interaction_kind": self.interaction_kind.value,
+            "cue_support": self.cue_support,
+            "bridge_quality": self.bridge_quality,
+            "activation_score": self.activation_score,
+            "fingerprint": self.fingerprint,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,6 +335,10 @@ class SemanticPlaneSnapshot:
     topology_learning: SemanticTopologyLearningSnapshot
     learned_topology_rules: tuple[LearnedTopologyRule, ...]
     learned_companion_keys: tuple[str, ...]
+    learned_companion_activations: tuple[
+        LearnedCompanionActivation,
+        ...,
+    ]
     topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
