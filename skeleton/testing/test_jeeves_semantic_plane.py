@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from skeleton.jeeves.agent.lens_fusion import (
+    LensDependenceKind,
+    LensFusionEngine,
+    LensSignal,
+)
 from skeleton.jeeves.agent.lens_governance import (
     LensPermission,
     ScientificGrade,
@@ -8,6 +13,7 @@ from skeleton.jeeves.agent.lens_hypergraph import SemanticLensHypergraph
 from skeleton.jeeves.agent.semantic_governance_bridge import SemanticGovernanceBridge
 from skeleton.jeeves.agent.semantic_lenses import (
     LensFamily,
+    ReadingStatus,
     SemanticFinding,
     SemanticObservation,
     SemanticRole,
@@ -425,3 +431,219 @@ def test_interaction_forecast_calibrates_composite_not_constituent_lenses_twice(
             "interaction:backdoor_confounding+covariate_shift"
         )
     ) == 1
+
+
+
+def test_semantic_plane_rejects_duplicate_unknown_reference_and_unbacked_evidence() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=32,
+            max_per_family=5,
+            minimum_rare_when_supported=2,
+        )
+    )
+    observations = _observations()
+    selection = plane.select(
+        observations,
+        requested=("backdoor_confounding",),
+    )
+    duplicate_a = _finding(
+        "dup",
+        "backdoor_confounding",
+        LensFamily.CAUSAL,
+    )
+    duplicate_b = _finding(
+        "dup",
+        "backdoor_confounding",
+        LensFamily.CAUSAL,
+    )
+    unknown_reference = SemanticFinding(
+        finding_id="unknown-reference",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1", "missing-observation"),
+        interpretation="References an observation outside the active plane.",
+        prediction="Should be rejected by provenance.",
+        confidence=0.8,
+        ambiguity=0.2,
+        novelty=0.5,
+        evidence_ids=("ev-1",),
+    )
+    unbacked_evidence = SemanticFinding(
+        finding_id="unbacked-evidence",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1",),
+        interpretation="Claims evidence not attached to the referenced observation.",
+        prediction="Should be rejected by evidence provenance.",
+        confidence=0.8,
+        ambiguity=0.2,
+        novelty=0.5,
+        evidence_ids=("ev-2",),
+    )
+
+    audit = plane.audit_findings(
+        (
+            duplicate_a,
+            duplicate_b,
+            unknown_reference,
+            unbacked_evidence,
+        ),
+        observations=observations,
+        selection=selection,
+    )
+
+    assert audit.duplicate_finding_ids == ("dup",)
+    assert "unknown-reference" in audit.unknown_observation_reference_ids
+    assert "unbacked-evidence" in audit.evidence_mismatch_ids
+    assert not audit.accepted
+    rejected = {item.finding_id: set(item.reasons) for item in audit.rejected}
+    assert "duplicate_finding_id" in rejected["dup"]
+    assert "unknown_observation_reference" in rejected["unknown-reference"]
+    assert "evidence_not_provenanced_by_observations" in rejected["unbacked-evidence"]
+
+
+def test_semantic_plane_persists_perpendicular_and_composition_tangents() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=40,
+            max_per_family=6,
+            minimum_rare_when_supported=2,
+            max_perpendicular_axes=10,
+            frontier_limit=8,
+            frontier_max_per_axis=2,
+            frontier_max_per_family=2,
+        )
+    )
+    findings = (
+        _finding("tangent-causal", "backdoor_confounding", LensFamily.CAUSAL),
+        _finding("tangent-shift", "covariate_shift", LensFamily.PREDICTIVE),
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        findings=findings,
+        requested=("backdoor_confounding", "covariate_shift"),
+        sequence=7,
+    )
+
+    assert snapshot.tangent_ids
+    assert snapshot.coverage.tangent_count == len(set(snapshot.tangent_ids))
+    assert snapshot.frontier.tangent_ids
+    assert snapshot.coverage.frontier_tangent_count == len(snapshot.frontier.tangent_ids)
+    assert len(snapshot.frontier.tangent_ids) <= 8
+    assert any(
+        node.created_sequence == 7
+        for node in plane.tangent_graph.snapshot()
+        if node.tangent_id in set(snapshot.tangent_ids)
+    )
+
+
+def test_shared_semantic_provenance_is_discounted_even_without_shared_observations() -> None:
+    signals = (
+        LensSignal(
+            signal_id="signal-a",
+            lens_key="backdoor_confounding",
+            family=LensFamily.CAUSAL,
+            probability=0.8,
+            confidence=0.8,
+            ambiguity=0.1,
+            reliability=0.8,
+            epistemic_strength=0.8,
+            observation_ids=("obs-a",),
+            evidence_ids=("ev-a",),
+            calibration_group="group-a",
+            provenance_ids=("finding-root",),
+        ),
+        LensSignal(
+            signal_id="signal-b",
+            lens_key="concept_drift",
+            family=LensFamily.PREDICTIVE,
+            probability=0.75,
+            confidence=0.8,
+            ambiguity=0.1,
+            reliability=0.8,
+            epistemic_strength=0.8,
+            observation_ids=("obs-b",),
+            evidence_ids=("ev-b",),
+            calibration_group="group-b",
+            provenance_ids=("finding-root",),
+        ),
+    )
+
+    dependencies = LensFusionEngine().infer_dependencies(signals)
+
+    assert any(
+        edge.kind is LensDependenceKind.SHARED_PROVENANCE
+        and edge.strength > 0.0
+        for edge in dependencies
+    )
+
+
+def test_cross_family_interaction_forecast_uses_predictive_fusion_family() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=36,
+            max_per_family=6,
+            minimum_rare_when_supported=2,
+        )
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        findings=(
+            _finding("family-causal", "backdoor_confounding", LensFamily.CAUSAL),
+            _finding("family-shift", "covariate_shift", LensFamily.PREDICTIVE),
+        ),
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+
+    interaction = next(
+        item
+        for item in snapshot.fusion.contributions
+        if item.lens_key == "backdoor_confounding+covariate_shift"
+    )
+    assert interaction.family is LensFamily.PREDICTIVE
+
+
+def test_falsified_finding_cannot_emit_plane_forecast_or_interaction_forecast() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=36,
+            max_per_family=6,
+            minimum_rare_when_supported=2,
+        )
+    )
+    falsified = SemanticFinding(
+        finding_id="falsified-causal",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1", "plane-o2"),
+        interpretation="A falsified causal reading.",
+        prediction="This forecast must not be emitted.",
+        confidence=0.9,
+        ambiguity=0.1,
+        novelty=0.4,
+        status=ReadingStatus.FALSIFIED,
+        evidence_ids=("ev-1", "ev-2"),
+    )
+    shift = _finding("live-shift", "covariate_shift", LensFamily.PREDICTIVE)
+
+    snapshot = plane.analyze(
+        _observations(),
+        findings=(falsified, shift),
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+
+    assert all(
+        "falsified-causal" not in forecast.source_finding_ids
+        for forecast in snapshot.forecasts
+    )
+    blocked_interactions = {
+        interaction.interaction_id
+        for interaction in snapshot.composition.interactions
+        if interaction.left_finding_id == "falsified-causal"
+        or interaction.right_finding_id == "falsified-causal"
+    }
+    assert all(
+        not (set(forecast.source_interaction_ids) & blocked_interactions)
+        for forecast in snapshot.forecasts
+    )
