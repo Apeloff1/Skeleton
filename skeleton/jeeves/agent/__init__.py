@@ -205,6 +205,14 @@ from .frontier_reasoning import (
     InferenceDiagnostics as FrontierInferenceDiagnostics,
     InferenceDisposition,
 )
+from .frontier_trials import (
+    FrontierPassAtKCase,
+    FrontierTrialComparison,
+    FrontierTrialEvaluator,
+    FrontierTrialGate,
+    FrontierTrialObservation,
+    FrontierTrialReport,
+)
 from .interpretive_science import (
     DomainCalibration,
     JuxtapositionTrial,
