@@ -489,12 +489,18 @@ def _execute(
         )
         previous_tick = step.at_tick
     state_digest = canonical_digest(state)
+    normalized_inputs = {key: inputs.get(key) for key in _INPUT_KEYS}
     result_digest = canonical_digest(
         {
             "schema": REPLAY_SCHEMA,
             "schema_version": REPLAY_SCHEMA_VERSION,
             "seed": seed,
             "tick": tick,
+            # Bind the normalized source specs directly. Generated mechanics are
+            # not guaranteed to be injective: a custom AI behavior can overlap
+            # a generated default and be deduplicated without changing
+            # spec_digest. Result identity must still distinguish those inputs.
+            "inputs": normalized_inputs,
             "spec_digest": spec_digest,
             "state_digest": state_digest,
             "step_digests": step_digests,
@@ -505,7 +511,7 @@ def _execute(
         schema_version=REPLAY_SCHEMA_VERSION,
         seed=seed,
         tick=tick,
-        inputs={key: inputs.get(key) for key in _INPUT_KEYS},
+        inputs=normalized_inputs,
         steps=tuple(steps),
         spec_digest=spec_digest,
         state_digest=state_digest,
