@@ -1,0 +1,63 @@
+"""Decision provenance envelopes for AI-assisted shell execution."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import hashlib
+import json
+
+
+@dataclass(frozen=True)
+class AIDecisionProvenance:
+    intent_fingerprint: str
+    proposal_fingerprint: str
+    tool_catalog_digest: str
+    effect_digest: str
+    policy_fingerprint: str
+    schema_digest: str
+    model_id: str
+    risk_score: int
+    approval_id: str = ""
+    receipt_root: str = ""
+
+    def __post_init__(self) -> None:
+        for name in (
+            "intent_fingerprint",
+            "proposal_fingerprint",
+            "tool_catalog_digest",
+            "effect_digest",
+            "policy_fingerprint",
+            "schema_digest",
+        ):
+            value = getattr(self, name)
+            if len(value) != 64:
+                raise ValueError(f"{name} must be SHA-256 hex")
+        if not 0 <= self.risk_score <= 100:
+            raise ValueError("risk_score out of range")
+        if len(self.model_id) > 256 or len(self.approval_id) > 128:
+            raise ValueError("provenance identity field too long")
+        if self.receipt_root and len(self.receipt_root) != 64:
+            raise ValueError("receipt_root must be SHA-256 hex")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "intent_fingerprint": self.intent_fingerprint,
+            "proposal_fingerprint": self.proposal_fingerprint,
+            "tool_catalog_digest": self.tool_catalog_digest,
+            "effect_digest": self.effect_digest,
+            "policy_fingerprint": self.policy_fingerprint,
+            "schema_digest": self.schema_digest,
+            "model_id": self.model_id,
+            "risk_score": self.risk_score,
+            "approval_id": self.approval_id,
+            "receipt_root": self.receipt_root,
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
