@@ -69,6 +69,16 @@ class TokenUsage:
     input_tokens: int = 0
     output_tokens: int = 0
 
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("input_tokens", self.input_tokens),
+            ("output_tokens", self.output_tokens),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{field_name} must be an integer")
+            if value < 0:
+                raise ValueError(f"{field_name} must be non-negative")
+
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
