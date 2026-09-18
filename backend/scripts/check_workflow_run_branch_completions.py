@@ -10,7 +10,7 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 ALL_BRANCH_GLOBS = 'branches:\n      - "*"\n      - "**"'
 WORKFLOW_RUN_TRIGGER_RE = re.compile(r"(?m)^  workflow_run:\s*(?:#.*)?$")
 QUEUE_WORKFLOW_RUN_JOB_IF_RE = re.compile(
-    r"(?ms)^    if:\s*>-\s*\n(?P<body>(?:      .*\n)+)"
+    r"(?m)^    if:\s*>-\s*\n(?P<body>(?:      [^\n]*\n)+)"
 )
 HINT_ARRAY_EXPR = "toJSON(github.event.workflow_run.pull_requests.*.number)"
 COMMIT_OID_PATTERN = r"^[0-9a-f]{40}$"
