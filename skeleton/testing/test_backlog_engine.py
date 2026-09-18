@@ -195,3 +195,34 @@ def test_capacity_errors_do_not_silently_evict(monkeypatch) -> None:
     state.ingest(_finding("event-1", signature="one"))
     with pytest.raises(BacklogCapacityError):
         state.ingest(_finding("event-2", signature="two"))
+
+
+def test_hot_root_bounded_history_round_trips_without_losing_idempotency(tmp_path) -> None:
+    import skeleton.automation.backlog_engine as engine
+
+    state = BacklogState()
+    total = engine.MAX_EVENTS_PER_ROOT + 5
+    for index in range(total):
+        state.ingest(
+            _finding(
+                f"event-{index}",
+                signature="hot-root",
+                observed=index,
+            )
+        )
+
+    root = next(iter(state.roots.values()))
+    assert root.occurrences == total
+    assert len(root.event_ids) == engine.MAX_EVENTS_PER_ROOT
+    assert len(state.events) == total
+
+    path = tmp_path / "hot-root.json"
+    state.save(path)
+    loaded = BacklogState.load(path)
+
+    assert loaded.roots[root.root_id].occurrences == total
+    assert len(loaded.events) == total
+    _, changed = loaded.ingest(
+        _finding("event-0", signature="hot-root", observed=999)
+    )
+    assert changed is False
