@@ -31,6 +31,14 @@ def test_accepts_reviewed_third_party_action(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_accepts_reviewed_docker_qemu_action(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\\non: [push]\\npermissions: {{}}\\njobs:\\n  test:\\n    steps:\\n      - uses: docker/setup-qemu-action@{PIN}\\n",
+    )
+    assert findings == []
+
+
 def test_rejects_unreviewed_third_party_action_even_when_sha_pinned(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
