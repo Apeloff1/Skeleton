@@ -502,15 +502,7 @@ def _coerce_repo_index(raw: Any) -> Mapping[str, Any]:
     elif isinstance(raw, Mapping):
         payload = dict(raw)
     else:
-        required = (
-            "schema",
-            "head",
-            "object_format",
-            "source_digest",
-            "tracked_files",
-            "tracked_bytes",
-            "files",
-        )
+        required = tuple(sorted(_REPO_INDEX_KEYS))
         missing = [name for name in required if not hasattr(raw, name)]
         if missing:
             raise IncrementalGraphError(
@@ -521,6 +513,12 @@ def _coerce_repo_index(raw: Any) -> Mapping[str, Any]:
     if not isinstance(payload, Mapping):
         raise IncrementalGraphError("repo index payload must be a mapping")
     _unknown_keys(payload, _REPO_INDEX_KEYS, field="repo_index")
+    missing = sorted(_REPO_INDEX_KEYS.difference(payload))
+    if missing:
+        raise IncrementalGraphError(
+            "repo index is missing required keys",
+            context={"keys": missing},
+        )
     return payload
 
 
@@ -594,7 +592,7 @@ def _coerce_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
             context={"keys": missing},
         )
 
-    path = _require_repo_path(payload["path"])
+    path = _require_repo_path(payload.get("path"))
     mode = _require_git_mode(payload.get("mode"), field="tracked file mode")
     index_blob = _require_object_id(
         payload.get("index_blob"),
