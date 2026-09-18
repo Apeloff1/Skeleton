@@ -501,3 +501,107 @@ def test_semantic_plane_audit_rejects_unknown_evidence_and_duplicate_ids() -> No
     assert all("duplicate_finding_id" in reasons for reasons in duplicate_reasons)
     bad = next(item for item in audit.rejected if item.finding_id == "bad-evidence")
     assert "evidence_not_provenanced_by_observations" in bad.reasons
+
+
+def test_resolved_forecast_is_not_silently_reopened_and_revision_gets_new_identity() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=32,
+            max_per_family=5,
+            minimum_rare_when_supported=2,
+        )
+    )
+    original = _finding(
+        "lifecycle-concept-drift",
+        "concept_drift",
+        LensFamily.PREDICTIVE,
+        confidence=0.80,
+        ambiguity=0.20,
+    )
+    first = plane.analyze(
+        _observations(),
+        findings=(original,),
+        requested=("concept_drift",),
+    )
+    first_forecast = next(
+        item
+        for item in first.forecasts
+        if item.source_finding_ids == ("lifecycle-concept-drift",)
+    )
+    plane.resolve_forecast(
+        first_forecast.forecast_id,
+        outcome=True,
+        domain="lifecycle",
+        independent_run="lifecycle-001",
+    )
+
+    unchanged = plane.analyze(
+        _observations(),
+        findings=(original,),
+        requested=("concept_drift",),
+    )
+    assert all(
+        item.forecast_id != first_forecast.forecast_id
+        for item in unchanged.forecasts
+    )
+
+    revised = _finding(
+        "lifecycle-concept-drift",
+        "concept_drift",
+        LensFamily.PREDICTIVE,
+        confidence=0.92,
+        ambiguity=0.10,
+    )
+    second = plane.analyze(
+        _observations(),
+        findings=(revised,),
+        requested=("concept_drift",),
+    )
+    second_forecast = next(
+        item
+        for item in second.forecasts
+        if item.source_finding_ids == ("lifecycle-concept-drift",)
+    )
+    assert second_forecast.forecast_id != first_forecast.forecast_id
+
+
+def test_interaction_calibration_conservatively_updates_future_fusion_reliability() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=36,
+            max_per_family=6,
+            minimum_rare_when_supported=2,
+        )
+    )
+    findings = (
+        _finding("cal-causal", "backdoor_confounding", LensFamily.CAUSAL),
+        _finding("cal-shift", "covariate_shift", LensFamily.PREDICTIVE),
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        findings=findings,
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+    interaction_forecast = next(
+        item
+        for item in snapshot.forecasts
+        if item.source_interaction_ids
+        and set(item.source_lens_keys)
+        == {"backdoor_confounding", "covariate_shift"}
+    )
+    before = plane._reliability_for_forecast(
+        interaction_forecast,
+        snapshot.governance,
+    )
+    plane.resolve_forecast(
+        interaction_forecast.forecast_id,
+        outcome=False,
+        domain="calibration-loop",
+        independent_run="calibration-loop-001",
+    )
+    after = plane._reliability_for_forecast(
+        interaction_forecast,
+        snapshot.governance,
+    )
+
+    assert 0.0 <= after <= before <= 1.0
