@@ -432,7 +432,6 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
     workflows = root / ".github" / "workflows"
     expected = 'branches:\n      - "*"\n      - "**"'
     consumers = {
-        "pr-automation-index.yml": "types: [completed]",
         "repair-intake.yml": "types: [completed]",
         "idle-studio.yml": "types: [completed]",
         "pr-obsolete-run-drain.yml": "types: [requested]",
@@ -443,6 +442,13 @@ def test_workflow_run_consumers_match_every_completing_branch() -> None:
         assert event_type in text
         assert expected in text, f"{name} must match every completing head"
         assert "pull_requests[0]" not in text, f"{name} must not treat pull_requests[0] as identity"
+    pr_automation = (workflows / "pr-automation-index.yml").read_text(encoding="utf-8")
+    assert "workflow_run:" in pr_automation
+    assert "types: [completed]" in pr_automation
+    assert "branches-ignore:\n      - main" in pr_automation
+    assert expected not in pr_automation
+    assert "pull_requests[0]" not in pr_automation
+
     idle = (workflows / "idle-studio.yml").read_text(encoding="utf-8")
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in idle
     assert "exceeded bounded identity scan" in idle
