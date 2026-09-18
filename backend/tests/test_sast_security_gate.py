@@ -374,3 +374,56 @@ def test_main_accepts_nonempty_clean_scan_surfaces(tmp_path: Path, monkeypatch, 
 
     assert sast.main() == 0
     assert "1 Python, 1 JS/TS files" in capsys.readouterr().out
+
+
+
+def test_rejects_requests_module_alias_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "http = requests\n"
+        "http.get(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_httpx_module_alias_client_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import httpx\n"
+        "network = httpx\n"
+        "client = network.Client(verify=False)\n",
+    )
+    assert any("httpx.Client" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_builtins_module_alias_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import builtins\n"
+        "runtime = builtins\n"
+        "runtime.eval(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_security_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "first = requests\n"
+        "second = first\n"
+        "second.post(url, verify=False)\n",
+    )
+    assert any("requests.post" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_reassigned_security_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "http = requests\n"
+        "http = custom_client\n"
+        "http.get(url, verify=False)\n",
+    )
+    assert findings == []
