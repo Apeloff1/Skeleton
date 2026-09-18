@@ -54,6 +54,7 @@ from .semantic_prediction import (
     SemanticPredictionLedger,
     SemanticPredictiveModel,
 )
+from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph, TangentNode
 from .types import (
     AgentContractError,
     positive_int,
@@ -62,6 +63,45 @@ from .types import (
     stable_fingerprint,
     stable_id,
 )
+
+
+_FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
+    LensFamily.FILM: ExplorationAxis.CINEMATIC,
+    LensFamily.LITERATURE: ExplorationAxis.LITERARY,
+    LensFamily.GAME: ExplorationAxis.LUDIC,
+    LensFamily.NARRATIVE: ExplorationAxis.SEMANTIC,
+    LensFamily.SEMIOTIC: ExplorationAxis.SEMANTIC,
+    LensFamily.COGNITIVE: ExplorationAxis.MEMORY,
+    LensFamily.RHETORIC: ExplorationAxis.SEMANTIC,
+    LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
+    LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
+    LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
+    LensFamily.CAUSAL: ExplorationAxis.CAUSAL,
+    LensFamily.INFORMATION: ExplorationAxis.SEMANTIC,
+    LensFamily.COMPUTATIONAL: ExplorationAxis.SYSTEM,
+    LensFamily.METACOGNITIVE: ExplorationAxis.ADVERSARIAL,
+    LensFamily.PROBABILITY: ExplorationAxis.PROBABILISTIC,
+    LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
+}
+
+_AXIS_TAG: dict[str, ExplorationAxis] = {
+    "causal": ExplorationAxis.CAUSAL,
+    "probability": ExplorationAxis.PROBABILISTIC,
+    "probabilistic": ExplorationAxis.PROBABILISTIC,
+    "predictive": ExplorationAxis.PROBABILISTIC,
+    "temporal": ExplorationAxis.TEMPORAL,
+    "semantic": ExplorationAxis.SEMANTIC,
+    "cinematic": ExplorationAxis.CINEMATIC,
+    "literary": ExplorationAxis.LITERARY,
+    "ludic": ExplorationAxis.LUDIC,
+    "social": ExplorationAxis.SOCIAL,
+    "adversarial": ExplorationAxis.ADVERSARIAL,
+    "system": ExplorationAxis.SYSTEM,
+    "memory": ExplorationAxis.MEMORY,
+    "computational": ExplorationAxis.SYSTEM,
+    "metacognitive": ExplorationAxis.ADVERSARIAL,
+    "information": ExplorationAxis.SEMANTIC,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,7 +266,8 @@ class SemanticLensPlane:
         if any(not isinstance(item, SemanticFinding) for item in findings):
             raise TypeError("findings must contain SemanticFinding values")
 
-        observation_ids = {item.observation_id for item in observations}
+        observation_map = {item.observation_id: item for item in observations}
+        observation_ids = set(observation_map)
         selected = {spec.key for spec in selection.lenses}
         accepted: list[SemanticFinding] = []
         rejected: list[FindingRejection] = []
@@ -234,9 +275,18 @@ class SemanticLensPlane:
         family_mismatch: set[str] = set()
         unselected: set[str] = set()
         orphan: set[str] = set()
+        unknown_observation_reference: set[str] = set()
+        evidence_mismatch: set[str] = set()
+        duplicate_ids: set[str] = set()
+        seen_finding_ids: set[str] = set()
 
         for finding in findings:
             reasons: list[str] = []
+            if finding.finding_id in seen_finding_ids:
+                duplicate_ids.add(finding.finding_id)
+                reasons.append("duplicate_finding_id")
+            seen_finding_ids.add(finding.finding_id)
+
             try:
                 spec = self.registry.get(finding.lens_key)
             except KeyError:
@@ -261,12 +311,32 @@ class SemanticLensPlane:
                 orphan.add(finding.finding_id)
                 reasons.append("no_overlap_with_current_observations")
 
+            if (
+                self.policy.require_observation_subset
+                and not finding_observations.issubset(observation_ids)
+            ):
+                unknown_observation_reference.add(finding.finding_id)
+                reasons.append("unknown_observation_reference")
+
+            referenced_evidence = {
+                evidence_id
+                for observation_id in finding_observations
+                if observation_id in observation_map
+                for evidence_id in observation_map[observation_id].evidence_ids
+            }
+            if (
+                self.policy.require_evidence_provenance
+                and not set(finding.evidence_ids).issubset(referenced_evidence)
+            ):
+                evidence_mismatch.add(finding.finding_id)
+                reasons.append("evidence_not_backed_by_referenced_observations")
+
             if reasons:
                 rejected.append(
                     FindingRejection(
                         finding_id=finding.finding_id,
                         lens_key=finding.lens_key,
-                        reasons=tuple(reasons),
+                        reasons=tuple(dict.fromkeys(reasons)),
                     )
                 )
             else:
@@ -283,6 +353,9 @@ class SemanticLensPlane:
                 "family_mismatch": sorted(family_mismatch),
                 "unselected": sorted(unselected),
                 "orphan": sorted(orphan),
+                "unknown_observation_reference": sorted(unknown_observation_reference),
+                "evidence_mismatch": sorted(evidence_mismatch),
+                "duplicate_ids": sorted(duplicate_ids),
             }
         )
         return SemanticFindingAudit(
@@ -292,6 +365,9 @@ class SemanticLensPlane:
             family_mismatch_ids=tuple(sorted(family_mismatch)),
             unselected_ids=tuple(sorted(unselected)),
             orphan_observation_ids=tuple(sorted(orphan)),
+            unknown_observation_reference_ids=tuple(sorted(unknown_observation_reference)),
+            evidence_mismatch_ids=tuple(sorted(evidence_mismatch)),
+            duplicate_finding_ids=tuple(sorted(duplicate_ids)),
             fingerprint=fingerprint,
         )
 
@@ -315,11 +391,13 @@ class SemanticLensPlane:
             if family not in families:
                 families.append(family)
         if not families:
-            return LensFamily.SYSTEM
-        # A multi-family interaction still needs a primary family for the
-        # current LensFusionEngine family budget. Pick deterministically and
-        # retain the full family path in signal metadata.
-        return sorted(families, key=lambda family: family.value)[0]
+            return LensFamily.PREDICTIVE
+        if len(families) == 1:
+            return families[0]
+        # Cross-family interactions are derived predictive signals. Assigning
+        # them to one source family would consume that family's fusion budget
+        # arbitrarily and can double-count one side of the interaction.
+        return LensFamily.PREDICTIVE
 
     def _reliability_for_forecast(
         self,
