@@ -74,6 +74,12 @@ _CAPABILITY_VIEW_FLAGS = (
     "admit_audit",
     "limit_audit",
     "shared_audit",
+    "stack_audit",
+    "allow_audit",
+    "version_audit",
+    "authz_audit",
+    "dev_audit",
+    "token_audit",
 )
 
 
@@ -109,6 +115,30 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["token_audit"]:
+            from .dev_token_audit import dev_token_audit_snapshot, get_dev_token_audit_row
+
+            return _lookup_row(payload, "token_id", get_dev_token_audit_row, dev_token_audit_snapshot)
+        if flags["dev_audit"]:
+            from .open_dev_audit import get_open_dev_audit_row, open_dev_audit_snapshot
+
+            return _lookup_row(payload, "prefix_id", get_open_dev_audit_row, open_dev_audit_snapshot)
+        if flags["authz_audit"]:
+            from .authz_audit import authz_audit_snapshot, get_authz_audit_row
+
+            return _lookup_row(payload, "command_id", get_authz_audit_row, authz_audit_snapshot)
+        if flags["version_audit"]:
+            from .version_audit import get_version_audit_row, version_audit_snapshot
+
+            return _lookup_row(payload, "source_id", get_version_audit_row, version_audit_snapshot)
+        if flags["allow_audit"]:
+            from .allow_list_audit import allow_list_audit_snapshot, get_allow_list_audit_row
+
+            return _lookup_row(payload, "handler_id", get_allow_list_audit_row, allow_list_audit_snapshot)
+        if flags["stack_audit"]:
+            from .gate_stack_audit import gate_stack_audit_snapshot, get_gate_stack_audit_row
+
+            return _lookup_row(payload, "layer_id", get_gate_stack_audit_row, gate_stack_audit_snapshot)
         if flags["shared_audit"]:
             from .cli_shared_audit import cli_shared_audit_snapshot, get_cli_shared_audit_row
 

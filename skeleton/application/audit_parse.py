@@ -1517,3 +1517,144 @@ def main_cli_shared_command_map() -> list[dict[str, object]]:
         break
     return rows
 
+
+def install_gate_middleware_order() -> list[str]:
+    tree = parse_module_tree("skeleton.api.middleware")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    names: list[str] = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "install_gate":
+            continue
+        for child in node.body:
+            call = child.value if isinstance(child, ast.Expr) else None
+            if not isinstance(call, ast.Call):
+                continue
+            func = call.func
+            if not isinstance(func, ast.Attribute) or func.attr != "add_middleware" or not call.args:
+                continue
+            arg = call.args[0]
+            if isinstance(arg, ast.Name):
+                names.append(arg.id)
+        break
+    return names
+
+
+_ALLOW_LIST_CATALOGS = frozenset({"MATERIALISE_TARGETS", "PROGRESSION_CURVES"})
+_ALLOW_LIST_MODULES = (
+    "skeleton.api.routes",
+    "skeleton.application.runtime_commands",
+)
+
+
+def allow_list_usages() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for module in _ALLOW_LIST_MODULES:
+        tree = parse_module_tree(module)
+        if tree is None or not isinstance(tree, ast.Module):
+            continue
+        for node in tree.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            catalogs: list[str] = []
+            for child in ast.walk(node):
+                if not isinstance(child, ast.Call):
+                    continue
+                for keyword in child.keywords:
+                    if keyword.arg != "allowed":
+                        continue
+                    value = keyword.value
+                    if isinstance(value, ast.Name) and value.id in _ALLOW_LIST_CATALOGS:
+                        catalogs.append(value.id)
+            for catalog in dict.fromkeys(catalogs):
+                key = (module, node.name, catalog)
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append(
+                    {
+                        "key": f"{module}:{node.name}",
+                        "module": module,
+                        "handler": node.name,
+                        "catalog": catalog,
+                    }
+                )
+    return rows
+
+
+AUDITED_VERSION_NAMES = (
+    ("skeleton", "__version__"),
+    ("skeleton.architecture", "ARCHITECTURE_VERSION"),
+    ("skeleton.application.runtime_commands", "APP_VERSION"),
+    ("skeleton.setup_config", "VERSION"),
+)
+
+
+def fastapi_version_literals() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for module in ("skeleton.api.server", "skeleton.deploy.harness"):
+        tree = parse_module_tree(module)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not _is_named_call(node, "FastAPI"):
+                continue
+            for keyword in node.keywords:
+                if keyword.arg != "version":
+                    continue
+                if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                    rows.append({"source": f"{module}:FastAPI.version", "value": keyword.value.value})
+    return rows
+
+
+def class_assigned_str_constant(module: str, class_name: str, attr: str) -> str | None:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != class_name:
+            continue
+        for child in node.body:
+            value: ast.AST | None = None
+            if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and child.target.id == attr:
+                value = child.value
+            elif isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name) and target.id == attr:
+                        value = child.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                return value.value
+        break
+    return None
+
+
+def version_identity_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for module, name in AUDITED_VERSION_NAMES:
+        rows.append(
+            {
+                "source": f"{module}:{name}",
+                "value": assigned_str_constant(parse_module_tree(module), name) or "",
+            }
+        )
+    settings = class_assigned_str_constant("skeleton.config.settings", "Settings", "version")
+    rows.append({"source": "skeleton.config.settings:Settings.version", "value": settings or ""})
+    rows.extend(fastapi_version_literals())
+    return rows
+
+
+def public_dev_surface_tokens() -> list[str]:
+    tree = parse_module_tree("skeleton.api.server")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "_public_dev_surfaces_enabled":
+            continue
+        for child in ast.walk(node):
+            if isinstance(child, ast.Set):
+                return literal_str_collection(child)
+        break
+    return []
+
+

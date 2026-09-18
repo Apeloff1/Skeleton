@@ -411,3 +411,17 @@ def test_http_forge_component_and_wire_items_fail_closed() -> None:
         asyncio.run(routes.forge_blueprint({"wires": [{"from": "ab", "to": ["x", "y"]}]}, _HttpState()))
 
 
+def test_require_charter_rejects_bool_default_weight_and_non_integer_header() -> None:
+    from fastapi import HTTPException
+
+    from skeleton.api.charter_gate import require_charter
+
+    with pytest.raises(TypeError, match="integer"):
+        require_charter("forge", "blueprint", default_weight=True)
+    gate = require_charter("forge", "blueprint")
+    with pytest.raises(HTTPException) as bad:
+        gate(attester="bot", x_gf_actor_weight="1.5")
+    assert bad.value.status_code == 400
+    assert bad.value.detail == {"error": "invalid_actor_weight"}
+    assert "1.5" not in str(bad.value.detail)
+

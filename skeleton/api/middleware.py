@@ -4,7 +4,7 @@ FastAPI doesn't ship with these; they live here so routes stay thin.
 
 Gate stack (outer → inner), sibling of Zaibatsu.Gate Program.cs::
 
-    RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+    HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
 
 Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 """
@@ -510,9 +510,10 @@ def install_gate(
 
     Order (outer → inner), sibling of Zaibatsu.Gate + gf-server admit_write::
 
-        RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+        HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
     """
     from skeleton.api.admit_write import WriteAdmitMiddleware
+    from skeleton.api.request_bounds import HeaderBoundMiddleware
 
     policy = policy or GatePolicy()
     # Innermost first:
@@ -527,4 +528,5 @@ def install_gate(
         governor=write_governor,
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
+    app.add_middleware(HeaderBoundMiddleware)
     return app

@@ -40,6 +40,12 @@ Commands:
                 Use `capabilities --admit-audit` for WriteAdmit mutating methods
                 Use `capabilities --limit-audit` for SKELETON_GATE_* body/header limits
                 Use `capabilities --shared-audit` for status/config shared-command mapping
+                Use `capabilities --stack-audit` for install_gate middleware order
+                Use `capabilities --allow-audit` for MATERIALISE_TARGETS / curve allow-lists
+                Use `capabilities --version-audit` for advertised version identity
+                Use `capabilities --authz-audit` for mutating vs auth_required
+                Use `capabilities --dev-audit` for opt-in public-dev HMAC prefixes
+                Use `capabilities --token-audit` for SKELETON_PUBLIC_DEV_SURFACES tokens
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -88,6 +94,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         admit_write_audit_snapshot,
         gate_limit_audit_snapshot,
         cli_shared_audit_snapshot,
+        gate_stack_audit_snapshot,
+        allow_list_audit_snapshot,
+        version_audit_snapshot,
+        authz_audit_snapshot,
+        open_dev_audit_snapshot,
+        dev_token_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -117,6 +129,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "admit_audit": {"--admit-audit", "admit-audit", "--admit_audit", "admit_audit"},
         "limit_audit": {"--limit-audit", "limit-audit", "--limit_audit", "limit_audit"},
         "shared_audit": {"--shared-audit", "shared-audit", "--shared_audit", "shared_audit"},
+        "stack_audit": {"--stack-audit", "stack-audit", "--stack_audit", "stack_audit"},
+        "allow_audit": {"--allow-audit", "allow-audit", "--allow_audit", "allow_audit"},
+        "version_audit": {"--version-audit", "version-audit", "--version_audit", "version_audit"},
+        "authz_audit": {"--authz-audit", "authz-audit", "--authz_audit", "authz_audit"},
+        "dev_audit": {"--dev-audit", "dev-audit", "--dev_audit", "dev_audit"},
+        "token_audit": {"--token-audit", "token-audit", "--token_audit", "token_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -128,7 +146,19 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "shared_audit":
+    if view == "token_audit":
+        payload = dev_token_audit_snapshot()
+    elif view == "dev_audit":
+        payload = open_dev_audit_snapshot()
+    elif view == "authz_audit":
+        payload = authz_audit_snapshot()
+    elif view == "version_audit":
+        payload = version_audit_snapshot()
+    elif view == "allow_audit":
+        payload = allow_list_audit_snapshot()
+    elif view == "stack_audit":
+        payload = gate_stack_audit_snapshot()
+    elif view == "shared_audit":
         payload = cli_shared_audit_snapshot()
     elif view == "limit_audit":
         payload = gate_limit_audit_snapshot()

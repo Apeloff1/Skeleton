@@ -4,6 +4,25 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-52..F-59 header bounds, actor weight, and identity audits
+
+- `install_gate` now mounts `HeaderBoundMiddleware` outermost so oversized
+  header sets 431 before HMAC work. Actor-weight headers accept only optional
+  minus plus digits; 400 responses no longer echo the attacker value. Bool
+  `default_weight` fails closed.
+- Additive `gate_stack_audit` locks inner-first registration (PolicyGate →
+  HeaderBound) and outer-first runtime order.
+- Additive `allow_list_audit` locks `MATERIALISE_TARGETS` / `PROGRESSION_CURVES`
+  call sites on HTTP forge/GameForge plus the shared run handler.
+- Additive `version_audit` locks advertised `16.0.0` across package,
+  architecture, setup, Settings, and FastAPI constructors with zero drift.
+- Additive `authz_audit` locks mutating⇒auth; `memory` remains the sealed read.
+- Additive `open_dev_audit` locks opt-in `_DEV_OPEN_PREFIXES` so they do not
+  leak into HMAC defaults.
+- Additive `dev_token_audit` locks `1|true|yes|on` without reopening F-43 names.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
 ## 2026-09-18 — F-44..F-51 forge item types, body limits, and gate/CLI audits
 
 - Forge HTTP component/wire items use `require_mapping` plus `require_text` for

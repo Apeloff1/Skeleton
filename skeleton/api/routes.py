@@ -706,6 +706,132 @@ async def application_cli_shared_audit() -> Dict[str, Any]:
     return cli_shared_audit_snapshot()
 
 
+@router.get("/application/stack/audit/{layer_id}")
+async def application_gate_stack_audit_row(layer_id: str) -> Dict[str, Any]:
+    """Return one install_gate middleware-order audit row."""
+    from skeleton.application import get_gate_stack_audit_row
+
+    try:
+        return get_gate_stack_audit_row(layer_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/stack/audit")
+async def application_gate_stack_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --stack-audit``."""
+    from skeleton.application import gate_stack_audit_snapshot
+
+    return gate_stack_audit_snapshot()
+
+
+@router.get("/application/allow/audit/{handler_id:path}")
+async def application_allow_list_audit_row(handler_id: str) -> Dict[str, Any]:
+    """Return one allow-list usage audit row by module:handler key."""
+    from skeleton.application import get_allow_list_audit_row
+
+    try:
+        return get_allow_list_audit_row(handler_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/allow/audit")
+async def application_allow_list_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --allow-audit``."""
+    from skeleton.application import allow_list_audit_snapshot
+
+    return allow_list_audit_snapshot()
+
+
+@router.get("/application/version/audit/{source_id:path}")
+async def application_version_audit_row(source_id: str) -> Dict[str, Any]:
+    """Return one advertised-version audit row by source key."""
+    from skeleton.application import get_version_audit_row
+
+    try:
+        return get_version_audit_row(source_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/version/audit")
+async def application_version_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --version-audit``."""
+    from skeleton.application import version_audit_snapshot
+
+    return version_audit_snapshot()
+
+
+@router.get("/application/authz/audit/{command_id}")
+async def application_authz_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one mutating/auth_required audit row by command name."""
+    from skeleton.application import get_authz_audit_row
+
+    try:
+        return get_authz_audit_row(command_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/authz/audit")
+async def application_authz_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --authz-audit``."""
+    from skeleton.application import authz_audit_snapshot
+
+    return authz_audit_snapshot()
+
+
+@router.get("/application/open-dev/audit/{prefix_id:path}")
+async def application_open_dev_audit_row(prefix_id: str) -> Dict[str, Any]:
+    """Return one public-dev prefix audit row."""
+    from skeleton.application import get_open_dev_audit_row
+
+    try:
+        return get_open_dev_audit_row(prefix_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/open-dev/audit")
+async def application_open_dev_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --dev-audit``."""
+    from skeleton.application import open_dev_audit_snapshot
+
+    return open_dev_audit_snapshot()
+
+
+@router.get("/application/tokens/audit/{token_id}")
+async def application_dev_token_audit_row(token_id: str) -> Dict[str, Any]:
+    """Return one public-dev surface token audit row."""
+    from skeleton.application import get_dev_token_audit_row
+
+    try:
+        return get_dev_token_audit_row(token_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/tokens/audit")
+async def application_dev_token_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --token-audit``."""
+    from skeleton.application import dev_token_audit_snapshot
+
+    return dev_token_audit_snapshot()
+
+
 @router.get("/application/planes/audit/{plane_id}")
 async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
     """Return one F-15 plane audit row by stable ID."""
