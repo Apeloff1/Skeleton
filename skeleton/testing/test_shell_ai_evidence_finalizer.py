@@ -11,6 +11,10 @@ from skeleton.shells.ai.audit_anchor import AIAuditAnchorStore
 from skeleton.shells.ai.audit_witness import AIAuditWitnessStore
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttempt,
+    ExecutionAttemptState,
+)
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore
 from skeleton.shells.ai.journal import AIDecisionJournal
 from skeleton.shells.ai.provenance import AIDecisionProvenance
@@ -785,3 +789,355 @@ def test_finalizer_attempt_binding_changes_recovery_digest():
     )
     assert first.recovery_checkpoint.digest != second.recovery_checkpoint.digest
     assert first.audit_anchor.anchor.digest != second.audit_anchor.anchor.digest
+
+
+def _successful_attempt(
+    bundle,
+    *,
+    attempt_id="seal-1",
+    session_id="session",
+    principal="alice",
+    worker_id="worker-1",
+    seal_id="seal-1",
+    backend_id="shell-service-host",
+    runtime_trust_digest="",
+    release_evidence_digest=fp("l"),
+    terminal_evidence_digest=None,
+):
+    return AIExecutionAttempt(
+        1,
+        attempt_id,
+        session_id,
+        principal,
+        worker_id,
+        bundle.report.fingerprint,
+        seal_id,
+        ExecutionAttemptState.SUCCEEDED,
+        1.0,
+        2.0,
+        runtime_trust_digest=runtime_trust_digest,
+        release_evidence_digest=release_evidence_digest,
+        execution_backend_id=backend_id,
+        terminal_evidence_digest=(
+            bundle.provenance.digest
+            if terminal_evidence_digest is None
+            else terminal_evidence_digest
+        ),
+    )
+
+
+def test_finalizer_binds_successful_execution_attempt_into_recovery_and_anchor():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(bundle)
+    result = finalizer.finalize(
+        session,
+        bundle,
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+        execution_seal_id="seal-1",
+        execution_attempt=attempt,
+    )
+    assert result.recovery_checkpoint.execution_attempt_id == "seal-1"
+    assert (
+        result.recovery_checkpoint.execution_attempt_authority_digest
+        == attempt.authority_digest
+    )
+    assert result.audit_anchor.anchor.execution_attempt_id == "seal-1"
+    assert (
+        result.audit_anchor.anchor.execution_attempt_authority_digest
+        == attempt.authority_digest
+    )
+
+
+def test_finalizer_attempt_runtime_trust_matches_provenance_and_argument():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(
+        session,
+        proposal,
+        receipts,
+        runtime_trust_digest=fp("u"),
+    )
+    attempt = _successful_attempt(
+        bundle,
+        runtime_trust_digest=fp("u"),
+    )
+    result = finalizer.finalize(
+        session,
+        bundle,
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+        runtime_trust_digest=fp("u"),
+        execution_seal_id="seal-1",
+        execution_attempt=attempt,
+    )
+    assert result.recovery_checkpoint.runtime_trust_digest == fp("u")
+    assert (
+        result.recovery_checkpoint.execution_attempt_authority_digest
+        == attempt.authority_digest
+    )
+
+
+def test_finalizer_rejects_attempt_session_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(bundle, session_id="other")
+    with pytest.raises(RuntimeError, match="attempt session"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_plan_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = replace(
+        _successful_attempt(bundle),
+        plan_fingerprint=fp("z"),
+    )
+    with pytest.raises(RuntimeError, match="attempt plan"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_seal_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(bundle, seal_id="different")
+    with pytest.raises(RuntimeError, match="attempt seal"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_backend_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(bundle, backend_id="other")
+    with pytest.raises(RuntimeError, match="attempt backend"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_runtime_trust_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(
+        session,
+        proposal,
+        receipts,
+        runtime_trust_digest=fp("u"),
+    )
+    attempt = _successful_attempt(
+        bundle,
+        runtime_trust_digest=fp("x"),
+    )
+    with pytest.raises(RuntimeError, match="attempt runtime trust"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            runtime_trust_digest=fp("u"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_release_substitution():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(
+        bundle,
+        release_evidence_digest=fp("x"),
+    )
+    with pytest.raises(RuntimeError, match="attempt release"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_completed_session_requires_successful_attempt():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = AIExecutionAttempt(
+        1,
+        "seal-1",
+        session.session_id,
+        "alice",
+        "worker-1",
+        bundle.report.fingerprint,
+        "seal-1",
+        ExecutionAttemptState.FAILED,
+        1.0,
+        2.0,
+        release_evidence_digest=fp("l"),
+        execution_backend_id="shell-service-host",
+        terminal_evidence_digest=bundle.provenance.digest,
+        error_type="SyntheticFailure",
+    )
+    with pytest.raises(RuntimeError, match="successful execution attempt"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_rejects_attempt_terminal_provenance_mismatch():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    attempt = _successful_attempt(
+        bundle,
+        terminal_evidence_digest=fp("z"),
+    )
+    with pytest.raises(RuntimeError, match="terminal evidence"):
+        finalizer.finalize(
+            session,
+            bundle,
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            release_evidence_digest=fp("l"),
+            execution_seal_id="seal-1",
+            execution_attempt=attempt,
+        )
+
+
+def test_finalizer_legacy_flow_without_attempt_remains_supported():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    result = finalizer.finalize(
+        session,
+        bundle,
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+    )
+    assert result.recovery_checkpoint.execution_attempt_id == ""
+    assert result.recovery_checkpoint.execution_attempt_authority_digest == ""
