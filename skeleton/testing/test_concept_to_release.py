@@ -292,6 +292,26 @@ def test_fixture_is_reproducible_and_bounded() -> None:
     assert scored["run"]["summary"]["dimensions"]["release_completeness"]["value"] == 1.0
 
 
+def test_rejected_correctness_evidence_scores_zero_not_positive() -> None:
+    bundle = make_reproducible_fixture(
+        overlay={"correctness": {"accepted": False, "score": 0.99}},
+    )
+    result = score_concept_to_release(bundle)
+    row = result["run"]["summary"]["dimensions"]["correctness"]
+    assert row["status"] == "scored"
+    assert row["value"] == 0.0
+
+
+@pytest.mark.parametrize("dimension", ["provenance", "release_completeness"])
+def test_release_evidence_must_match_benchmark_source_commit(dimension: str) -> None:
+    bundle = make_reproducible_fixture(
+        source_commit="a" * 40,
+        overlay={dimension: {"source": {"commit": "b" * 40}}},
+    )
+    with pytest.raises(ConceptToReleaseError, match="source commit does not match"):
+        score_concept_to_release(bundle)
+
+
 def test_scored_zero_is_distinct_from_missing() -> None:
     bundle = make_reproducible_fixture(
         overlay={"determinism_replay": {"live_digest": "d" * 64}},
