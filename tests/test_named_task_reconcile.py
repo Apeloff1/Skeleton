@@ -98,7 +98,9 @@ def test_unknown_fields_and_types_fail_closed() -> None:
     assert classify_named_task(_task(929, kind="ticket")) == "unknown"
     assert classify_named_task(_task(929, merge_state="maybe")) == "unknown"
     assert classify_named_task(_task(1000)) == "unknown"
-    assert classify_named_task(_task(929, issue=True)) == "unknown"
+    boolean_issue = _task(929)
+    boolean_issue["issue"] = True
+    assert classify_named_task(boolean_issue) == "unknown"
 
 
 def test_inconsistent_merge_and_open_or_living_pr_fail_closed() -> None:
