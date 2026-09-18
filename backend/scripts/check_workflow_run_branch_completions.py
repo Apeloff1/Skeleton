@@ -47,7 +47,7 @@ def _workflow_run_trigger_block(text: str) -> str:
     if match is None:
         return ""
     tail = text[match.end():]
-    next_trigger = re.search(r"(?m)^  [A-Za-z0-9_-]+:\\s*(?:#.*)?$", tail)
+    next_trigger = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*(?:#.*)?$", tail)
     return tail if next_trigger is None else tail[: next_trigger.start()]
 
 def violations_for_text(path_name: str, text: str) -> list[str]:
