@@ -36,8 +36,24 @@ index 1111111..2222222 100644
 """
 
 
+def _research_payload() -> dict[str, object]:
+    return {
+        "findings": ["The planned reporting path is isolated and deterministic."],
+        "risks": ["A patch outside the planned path must fail closed."],
+        "recommended_checks": ["studio report focused suite"],
+    }
+
+
+def _verification_payload() -> dict[str, object]:
+    return {
+        "approve": True,
+        "reasons": ["Patch and review evidence satisfy the planned boundary."],
+        "required_checks": ["studio report focused suite"],
+    }
+
+
 def test_offline_studio_pipeline_smoke(tmp_path: Path) -> None:
-    """Exercise planner -> builder -> independent reviewer without credentials."""
+    """Exercise planner -> scout -> builder -> reviewer -> tester offline."""
 
     assert STUDIO_SIZE == 1000
     cohort = select_cohort("smoke-run", size=15)
@@ -68,7 +84,8 @@ def test_offline_studio_pipeline_smoke(tmp_path: Path) -> None:
     assert tasks[0].paths == ("skeleton/automation/studio_report.py",)
 
     patch = _safe_patch()
-    builder_and_reviewer = ScriptedReasoner(
+    squad_reasoner = ScriptedReasoner(
+        _research_payload(),
         {
             "patch": patch,
             "summary": "Keep the reporting path deterministic.",
@@ -78,14 +95,25 @@ def test_offline_studio_pipeline_smoke(tmp_path: Path) -> None:
             "approve": True,
             "reasons": ["Patch remains within the planned source boundary."],
         },
+        _verification_payload(),
     )
-    reviewed = _build_and_review(builder_and_reviewer, tasks[0], seed="smoke-run")
+    reviewed = _build_and_review(squad_reasoner, tasks[0], seed="smoke-run")
 
-    assert builder_and_reviewer.calls == 2
+    assert squad_reasoner.calls == 4
     assert reviewed is not None
+    assert reviewed.researcher.mode == "scout"
     assert reviewed.builder.mode == "builder"
     assert reviewed.reviewer.mode == "reviewer"
-    assert reviewed.builder.bot_id != reviewed.reviewer.bot_id
+    assert reviewed.verifier.mode == "tester"
+    assert len(
+        {
+            reviewed.researcher.bot_id,
+            reviewed.builder.bot_id,
+            reviewed.reviewer.bot_id,
+            reviewed.verifier.bot_id,
+        }
+    ) == 4
+    assert reviewed.required_checks == ("studio report focused suite",)
     assert _changed_paths(reviewed.patch) == tasks[0].paths
 
 
@@ -98,7 +126,7 @@ def test_offline_studio_pipeline_fails_closed_on_reviewer_rejection(tmp_path: Pa
             "tasks": [
                 {
                     "title": "Review-only rejection path",
-                    "objective": "Verify senior review remains authoritative.",
+                    "objective": "Verify adversarial review remains authoritative.",
                     "division": "qa_verification",
                     "paths": ["skeleton/automation/studio_report.py"],
                 }
@@ -107,6 +135,7 @@ def test_offline_studio_pipeline_fails_closed_on_reviewer_rejection(tmp_path: Pa
     )
     task = _plan(planner, cohort, max_tasks=1, backlog_path=backlog)[0]
     reasoner = ScriptedReasoner(
+        _research_payload(),
         {
             "patch": _safe_patch(),
             "summary": "Candidate patch for rejection-path smoke coverage.",
@@ -119,4 +148,4 @@ def test_offline_studio_pipeline_fails_closed_on_reviewer_rejection(tmp_path: Pa
     )
 
     assert _build_and_review(reasoner, task, seed="smoke-reject") is None
-    assert reasoner.calls == 2
+    assert reasoner.calls == 3
