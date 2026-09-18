@@ -407,6 +407,12 @@ def test_schema_migration_from_legacy_documents():
     assert parse_manifest(manifest.serialize()).digest() == manifest.digest()
 
 
+def test_manifest_json_duplicate_keys_fail_closed() -> None:
+    raw = '{"schema_version":1,"schema_version":0,"assets":[]}'
+    with pytest.raises(SerializationError, match="duplicate keys"):
+        parse_manifest(raw)
+
+
 def test_unknown_schema_version_fails_closed():
     with pytest.raises(SchemaCompatibilityError, match="incompatible"):
         migrate_manifest({"schema_version": 99, "assets": []})
