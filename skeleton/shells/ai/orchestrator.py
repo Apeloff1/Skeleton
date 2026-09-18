@@ -218,66 +218,85 @@ class AIShellOrchestrator:
 
         session.transition(AISessionPhase.EXECUTING)
         started = self._clock()
-        report = self.shell_service.execute_plan(
-            review.compiled.plan,
-            context=context,
-        )
-        duration_ms = max(0.0, (self._clock() - started) * 1000.0)
-        session.transition(AISessionPhase.VERIFYING)
-        self.budget.verification_round()
-        verification = self.verifier.verify(session.intent, report)
+        try:
+            report = self.shell_service.execute_plan(
+                review.compiled.plan,
+                context=context,
+            )
+            duration_ms = max(0.0, (self._clock() - started) * 1000.0)
+            session.transition(AISessionPhase.VERIFYING)
+            self.budget.verification_round()
+            verification = self.verifier.verify(session.intent, report)
 
-        for action, step in zip(proposal.actions, report.steps):
-            if step.dispatch is not None:
-                observation = self.observations.dispatch(step.dispatch)
-                self.guards.check_output(action, observation)
+            for action, step in zip(proposal.actions, report.steps):
+                if step.dispatch is not None:
+                    observation = self.observations.dispatch(step.dispatch)
+                    self.guards.check_output(action, observation)
 
-        success = report.ok and verification.verified
-        self.memory.record(
-            intent_fingerprint=session.intent.fingerprint,
-            proposal_fingerprint=proposal.fingerprint,
-            risk_score=review.critique.risk.score,
-            success=success,
-            duration_ms=duration_ms,
-            verified=verification.verified,
-            command_count=len(proposal.actions),
-            model_id=proposal.model_id or self.planner.model.model_id,
-        )
-        model_key = proposal.model_id or self.planner.model.model_id
-        self.calibration.record(
-            model_key,
-            predicted_confidence=proposal.confidence,
-            success=report.ok,
-            verified=verification.verified,
-            latency_ms=duration_ms,
-        )
-        provenance = AIDecisionProvenance(
-            intent_fingerprint=session.intent.fingerprint,
-            proposal_fingerprint=proposal.fingerprint,
-            tool_catalog_digest=self.planner.catalog.digest,
-            effect_digest=self.compiler.effects.digest,
-            policy_fingerprint=self.planner.policy_fingerprint,
-            schema_digest=schema_digest(),
-            model_id=model_key,
-            risk_score=review.critique.risk.score,
-            approval_id=approval_id,
-            receipt_root=self.shell_service.receipts.root_hash(),
-        )
-        self.journal.append(
-            "ai.plan.completed",
-            session_id=session.session_id,
-            intent_id=session.intent.intent_id,
-            proposal_id=proposal.proposal_id,
-            summary="AI shell plan execution and verification completed",
-            data={
-                "ok": success,
-                "verified": verification.verified,
-                "duration_ms": duration_ms,
-                "provenance_digest": provenance.digest,
-            },
-        )
-        if success:
-            session.transition(AISessionPhase.COMPLETE)
-        else:
-            session.transition(AISessionPhase.FAILED, reason="execution or verification failed")
-        return AIExecutionBundle(review, report, verification, provenance)
+            success = report.ok and verification.verified
+            self.memory.record(
+                intent_fingerprint=session.intent.fingerprint,
+                proposal_fingerprint=proposal.fingerprint,
+                risk_score=review.critique.risk.score,
+                success=success,
+                duration_ms=duration_ms,
+                verified=verification.verified,
+                command_count=len(proposal.actions),
+                model_id=proposal.model_id or self.planner.model.model_id,
+            )
+            model_key = proposal.model_id or self.planner.model.model_id
+            self.calibration.record(
+                model_key,
+                predicted_confidence=proposal.confidence,
+                success=report.ok,
+                verified=verification.verified,
+                latency_ms=duration_ms,
+            )
+            provenance = AIDecisionProvenance(
+                intent_fingerprint=session.intent.fingerprint,
+                proposal_fingerprint=proposal.fingerprint,
+                tool_catalog_digest=self.planner.catalog.digest,
+                effect_digest=self.compiler.effects.digest,
+                policy_fingerprint=self.planner.policy_fingerprint,
+                schema_digest=schema_digest(),
+                model_id=model_key,
+                risk_score=review.critique.risk.score,
+                approval_id=approval_id,
+                receipt_root=self.shell_service.receipts.root_hash(),
+            )
+            self.journal.append(
+                "ai.plan.completed",
+                session_id=session.session_id,
+                intent_id=session.intent.intent_id,
+                proposal_id=proposal.proposal_id,
+                summary="AI shell plan execution and verification completed",
+                data={
+                    "ok": success,
+                    "verified": verification.verified,
+                    "duration_ms": duration_ms,
+                    "provenance_digest": provenance.digest,
+                },
+            )
+            if success:
+                session.transition(AISessionPhase.COMPLETE)
+            else:
+                session.transition(
+                    AISessionPhase.FAILED,
+                    reason="execution or verification failed",
+                )
+            return AIExecutionBundle(review, report, verification, provenance)
+        except BaseException as exc:
+            if session.phase in {AISessionPhase.EXECUTING, AISessionPhase.VERIFYING}:
+                session.transition(
+                    AISessionPhase.FAILED,
+                    reason=f"AI shell execution failed: {type(exc).__name__}",
+                )
+            self.journal.append(
+                "ai.plan.failed",
+                session_id=session.session_id,
+                intent_id=session.intent.intent_id,
+                proposal_id=proposal.proposal_id,
+                summary="AI shell execution path raised before successful completion",
+                data={"error_type": type(exc).__name__},
+            )
+            raise
