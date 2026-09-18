@@ -10,6 +10,10 @@ from skeleton.shells.ai.recovery import (
     RecoveryAction,
 )
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttemptStore,
+    ExecutionAttemptRecovery,
+)
 from skeleton.shells.ai.session_evidence import SessionEvidenceStore
 from skeleton.shells.ai.session_journal import SessionJournalEvidence
 
@@ -27,6 +31,8 @@ class StrictRecoveryReport:
     sandbox_binding_matches: bool
     runtime_trust_matches: bool
     authority_health_policy_matches: bool
+    execution_attempt_matches: bool
+    execution_attempt_recovery: str
 
     @property
     def safe_to_resume(self) -> bool:
@@ -48,7 +54,28 @@ class StrictRecoveryReport:
             "authority_health_policy_matches": (
                 self.authority_health_policy_matches
             ),
+            "execution_attempt_matches": self.execution_attempt_matches,
+            "execution_attempt_recovery": self.execution_attempt_recovery,
         }
+
+
+_RECOVERY_PRIORITY = {
+    RecoveryAction.NONE: 0,
+    RecoveryAction.RESUME_REVIEW: 1,
+    RecoveryAction.MARK_FAILED: 2,
+    RecoveryAction.REQUIRE_REPLAN: 3,
+    RecoveryAction.REQUIRE_VERIFICATION: 4,
+    RecoveryAction.MANUAL_REVIEW: 5,
+}
+
+
+def _stronger(
+    current: RecoveryAction,
+    candidate: RecoveryAction,
+) -> RecoveryAction:
+    if _RECOVERY_PRIORITY[candidate] > _RECOVERY_PRIORITY[current]:
+        return candidate
+    return current
 
 
 class StrictAIRecoveryManager:
@@ -100,6 +127,7 @@ class StrictAIRecoveryManager:
         current_sandbox_binding_digest: str = "",
         current_runtime_trust_digest: str = "",
         current_authority_health_policy_digest: str = "",
+        execution_attempts: AIExecutionAttemptStore | None = None,
     ) -> StrictRecoveryReport:
         session = checkpoint.session
         journal_valid = journal.verify()
@@ -146,6 +174,26 @@ class StrictAIRecoveryManager:
             or checkpoint.authority_health_policy_digest
             == current_authority_health_policy_digest
         )
+
+        execution_attempt_matches = True
+        execution_attempt_recovery = ""
+        attempt = None
+        if checkpoint.execution_attempt_id:
+            if execution_attempts is None:
+                execution_attempt_matches = False
+            else:
+                stored_attempt = execution_attempts.current(
+                    checkpoint.execution_attempt_id
+                )
+                if stored_attempt is None:
+                    execution_attempt_matches = False
+                else:
+                    attempt = stored_attempt.attempt
+                    execution_attempt_matches = (
+                        attempt.authority_digest
+                        == checkpoint.execution_attempt_authority_digest
+                    )
+                    execution_attempt_recovery = attempt.recovery.value
 
         # The legacy global receipt root is passed as its checkpoint value here.
         # Session-scoped evidence below is authoritative for cross-session
@@ -207,6 +255,54 @@ class StrictAIRecoveryManager:
             reasons.append(
                 "authority health policy changed since checkpoint"
             )
+        if checkpoint.execution_attempt_id:
+            if not execution_attempt_matches:
+                action = _stronger(
+                    action,
+                    RecoveryAction.MANUAL_REVIEW,
+                )
+                reasons.append(
+                    "execution attempt evidence is missing or differs from checkpoint"
+                )
+            elif attempt is not None:
+                if attempt.recovery is ExecutionAttemptRecovery.NOT_STARTED:
+                    action = _stronger(
+                        action,
+                        RecoveryAction.REQUIRE_REPLAN,
+                    )
+                    reasons.append(
+                        "execution seal was consumed but process boundary was not entered"
+                    )
+                elif (
+                    attempt.recovery
+                    is ExecutionAttemptRecovery.REQUIRE_VERIFICATION
+                ):
+                    action = _stronger(
+                        action,
+                        RecoveryAction.REQUIRE_VERIFICATION,
+                    )
+                    reasons.append(
+                        "execution attempt crossed process boundary without terminal evidence"
+                    )
+                elif (
+                    attempt.recovery
+                    is ExecutionAttemptRecovery.TERMINAL_FAILURE
+                ):
+                    action = _stronger(
+                        action,
+                        RecoveryAction.MARK_FAILED,
+                    )
+                    reasons.append(
+                        "execution attempt recorded terminal failure"
+                    )
+                elif attempt.recovery is ExecutionAttemptRecovery.ABANDONED:
+                    action = _stronger(
+                        action,
+                        RecoveryAction.REQUIRE_REPLAN,
+                    )
+                    reasons.append(
+                        "execution attempt was abandoned before process boundary"
+                    )
         if not session_evidence_matches:
             if session.phase in {"executing", "verifying", "complete"}:
                 action = self._stronger(
@@ -237,4 +333,6 @@ class StrictAIRecoveryManager:
             sandbox_matches,
             runtime_trust_matches,
             authority_health_policy_matches,
+            execution_attempt_matches,
+            execution_attempt_recovery,
         )
