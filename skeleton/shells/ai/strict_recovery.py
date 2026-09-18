@@ -59,6 +59,33 @@ class StrictAIRecoveryManager:
     ) -> None:
         self.base = base or AIRecoveryManager()
 
+    @staticmethod
+    def _stronger(
+        current: RecoveryAction,
+        candidate: RecoveryAction,
+    ) -> RecoveryAction:
+        """Return the action that preserves the stricter recovery obligation.
+
+        Integrity uncertainty dominates all automated recovery. Interrupted
+        execution verification dominates replanning because side effects may
+        already have occurred. Terminal failure remains terminal. Ordinary
+        replan dominates a resumable review.
+        """
+
+        priority = {
+            RecoveryAction.NONE: 0,
+            RecoveryAction.RESUME_REVIEW: 10,
+            RecoveryAction.REQUIRE_REPLAN: 30,
+            RecoveryAction.MARK_FAILED: 40,
+            RecoveryAction.REQUIRE_VERIFICATION: 50,
+            RecoveryAction.MANUAL_REVIEW: 60,
+        }
+        return (
+            candidate
+            if priority[candidate] > priority[current]
+            else current
+        )
+
     def inspect(
         self,
         checkpoint: AIRecoveryCheckpoint,
@@ -136,35 +163,64 @@ class StrictAIRecoveryManager:
         action = base.action
 
         if not journal_valid:
-            action = RecoveryAction.MANUAL_REVIEW
+            action = self._stronger(
+                action,
+                RecoveryAction.MANUAL_REVIEW,
+            )
             if "AI decision journal integrity failure" not in reasons:
                 reasons.append("AI decision journal integrity failure")
         elif not session_journal_matches:
-            action = RecoveryAction.MANUAL_REVIEW
+            action = self._stronger(
+                action,
+                RecoveryAction.MANUAL_REVIEW,
+            )
             reasons.append("AI session journal commitment differs from checkpoint")
         if not receipt_valid:
-            action = RecoveryAction.MANUAL_REVIEW
+            action = self._stronger(
+                action,
+                RecoveryAction.MANUAL_REVIEW,
+            )
             reasons.append("global shell receipt chain integrity failure")
         if not release_matches:
-            action = RecoveryAction.REQUIRE_REPLAN
+            action = self._stronger(
+                action,
+                RecoveryAction.REQUIRE_REPLAN,
+            )
             reasons.append("release evidence changed since checkpoint")
         if not sandbox_matches:
-            action = RecoveryAction.REQUIRE_REPLAN
+            action = self._stronger(
+                action,
+                RecoveryAction.REQUIRE_REPLAN,
+            )
             reasons.append("sandbox binding changed since checkpoint")
         if not runtime_trust_matches:
-            action = RecoveryAction.REQUIRE_REPLAN
+            action = self._stronger(
+                action,
+                RecoveryAction.REQUIRE_REPLAN,
+            )
             reasons.append("runtime trust epoch changed since checkpoint")
         if not authority_health_policy_matches:
-            action = RecoveryAction.REQUIRE_REPLAN
+            action = self._stronger(
+                action,
+                RecoveryAction.REQUIRE_REPLAN,
+            )
             reasons.append(
                 "authority health policy changed since checkpoint"
             )
         if not session_evidence_matches:
             if session.phase in {"executing", "verifying", "complete"}:
-                action = RecoveryAction.REQUIRE_VERIFICATION
-                reasons.append("session-scoped execution evidence differs from checkpoint")
+                action = self._stronger(
+                    action,
+                    RecoveryAction.REQUIRE_VERIFICATION,
+                )
+                reasons.append(
+                    "session-scoped execution evidence differs from checkpoint"
+                )
             elif checkpoint.session_evidence_digest:
-                action = RecoveryAction.MANUAL_REVIEW
+                action = self._stronger(
+                action,
+                RecoveryAction.MANUAL_REVIEW,
+            )
                 reasons.append("unexpected session execution evidence drift")
 
         # De-duplicate while preserving diagnostic order.
