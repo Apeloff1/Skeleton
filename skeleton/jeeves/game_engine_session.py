@@ -1021,6 +1021,23 @@ def _sample_from_document(
     pointer = pair(
         "pointer"
     )
+    if (
+        not isinstance(
+            value[
+                "device"
+            ],
+            str,
+        )
+        or type(
+            value[
+                "buttons"
+            ]
+        )
+        is not int
+    ):
+        raise GameEngineLabError(
+            "replay input enum encoding is invalid"
+        )
     try:
         device = InputDevice(
             value[
