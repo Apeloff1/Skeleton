@@ -436,6 +436,7 @@ class CognitiveContextFabric:
         records: list[DeepContextRecord] = []
         stale: set[str] = set()
         resolved_refs: set[str] = set()
+        canonical_fingerprints: dict[tuple[SourceTier, str], set[str]] = {}
         budget_remaining = self.policy.maximum_tokens
 
         # Targeted canonical rehydration comes before any broad retrieval.
@@ -468,9 +469,20 @@ class CognitiveContextFabric:
                         records.append(record)
                         budget_remaining = max(0, budget_remaining - record.token_estimate)
                         resolved_refs.add(record.source_ref)
-                        for card in card_by_source.get((record.source_tier, record.source_ref), ()):
-                            if card.source_fingerprint != record.source_fingerprint:
-                                stale.add(card.card_id)
+                        source_key = (record.source_tier, record.source_ref)
+                        canonical_fingerprints.setdefault(source_key, set()).add(record.source_fingerprint)
+
+            # A card is stale only when canonical providers resolved its source
+            # and none of them agree with the indexed fingerprint.  With
+            # multiple providers per tier, eagerly marking on the first
+            # disagreement would create false staleness.
+            for source_key, cards in card_by_source.items():
+                fingerprints = canonical_fingerprints.get(source_key)
+                if not fingerprints:
+                    continue
+                for card in cards:
+                    if card.source_fingerprint not in fingerprints:
+                        stale.add(card.card_id)
 
         fast_is_weak = (
             fast.fallback_to_deep_context
