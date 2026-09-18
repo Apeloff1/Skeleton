@@ -84,7 +84,16 @@ jobs:
           load_merged_pr_head_tips() {
             local branch tip
             merged_pr_head_tips=()
-            while IFS=
+            while read -r branch tip; do
+              [[ -n "$branch" && -n "$tip" ]] || continue
+              merged_pr_head_tips["${branch}:${tip}"]=1
+            done < <(
+              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+                --jq '.[] | select(.merged_at != null and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv'
+            )
+          }
+
+          for ((round=1; round<=max_rounds; round++)); do
             # Refresh every branch before classification. If main moves during
             # the pass we retry without deleting anything from stale ancestry.
             git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
