@@ -27,6 +27,13 @@ from .action_model import (
     SkillSelection,
     SkillSpec,
 )
+from .adaptive_context import (
+    AdaptiveContextGovernor,
+    AdaptiveContextResolution,
+    ContextDescentPolicy,
+    TierBelief,
+    TierDecision,
+)
 from .associative_memory import (
     AssociationHit,
     AssociationKind,
@@ -114,6 +121,18 @@ from .epistemic_tool_gate import (
     ToolExecutionIntent,
     bind_intent_metadata,
 )
+from .episodic_scaffold import (
+    AnchorKind,
+    EpisodicAnchor,
+    EpisodicScaffoldIndex,
+    EpisodicScaffoldPolicy,
+    EpisodicScaffoldStore,
+    ProspectiveProbe,
+    ScaffoldEpisode,
+    ScaffoldError,
+    ScaffoldHit,
+    ScaffoldedMemoryGameIndex,
+)
 from .evidence import (
     Contradiction,
     EvidenceArtifact,
@@ -159,6 +178,15 @@ from .interpretive_science import (
     ScientificLensPolicy,
     ScientificLensReport,
     ScientificLensStatus,
+)
+from .lens_fusion import (
+    LensContribution,
+    LensDependence,
+    LensDependenceKind,
+    LensFusionEngine,
+    LensFusionPolicy,
+    LensFusionResult,
+    LensSignal,
 )
 from .lens_hypergraph import (
     HyperedgeKind,
