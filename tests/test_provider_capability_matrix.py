@@ -9,7 +9,7 @@ from scripts.check_provider_capability_matrix import (
     ROUTING_FIELDS,
     SCHEMA_VERSION,
     STATUSES,
-    TASK_KEY,
+    TASK_ID,
     VENDOR_ALIASES,
     capability_status,
     main,
@@ -45,7 +45,7 @@ def _doc(**overrides):
 
 def test_schema_contract_is_capability_matrix_not_model_routing() -> None:
     assert SCHEMA_VERSION == 1
-    assert TASK_KEY == "reserve-S051-provider-capability-matrix"
+    assert TASK_ID == "reserve-S051-provider-capability-matrix"
     assert CONFLICT_DOMAIN == "ai.spec.provider_capabilities"
     assert STATUSES == ("supported", "unsupported", "unknown")
     assert "unknown" in STATUSES

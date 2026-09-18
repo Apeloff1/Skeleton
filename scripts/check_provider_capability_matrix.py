@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S051-provider-capability-matrix"
+TASK_ID = "reserve-S051-provider-capability-matrix"
 CONFLICT_DOMAIN = "ai.spec.provider_capabilities"
 KNOWN_CAPABILITIES: tuple[str, ...] = (
     "chat",
