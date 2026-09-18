@@ -58,6 +58,24 @@ def test_rejects_alias_of_jwt_decode_signature_disable(tmp_path: Path) -> None:
     assert any("must not disable signature verification" in finding for finding in findings)
 
 
+def test_rejects_walrus_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "if (runner := eval):\n    runner(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "if (fetch := requests.get):\n"
+        "    fetch(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
 def test_allows_reassigned_sensitive_alias_to_avoid_unsafe_inference(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
