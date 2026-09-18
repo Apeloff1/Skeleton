@@ -139,6 +139,43 @@ jobs:
                       break
               return out
 
+          def list_open_pr_heads():
+              heads = {}
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'state': 'open',
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, payload = request(f'/repos/{repo}/pulls?{query}')
+                  if status != 200 or not isinstance(payload, list):
+                      raise SystemExit(f'failed to list open pull requests: HTTP {status}')
+                  for pull in payload:
+                      if not isinstance(pull, dict):
+                          raise SystemExit('malformed open pull-request payload')
+                      head = pull.get('head') or {}
+                      head_repo = (head.get('repo') or {}).get('full_name') or ''
+                      if head_repo != repo:
+                          continue
+                      branch = head.get('ref') or ''
+                      sha = head.get('sha') or ''
+                      if not branch or not sha:
+                          raise SystemExit('same-repository open PR has incomplete head identity')
+                      heads.setdefault(branch, set()).add(sha)
+                  if len(payload) < 100:
+                      break
+              return heads
+
+          def stale_pr_run(run, open_pr_heads):
+              if run.get('event') != 'pull_request':
+                  return False
+              run_repo = ((run.get('head_repository') or {}).get('full_name') or '')
+              branch = run.get('head_branch') or ''
+              sha = run.get('head_sha') or ''
+              if run_repo != repo or not branch or branch == 'main' or not sha:
+                  return False
+              return sha not in open_pr_heads.get(branch, set())
+
           def path(run):
               return run.get('path') or ''
 
@@ -170,6 +207,8 @@ jobs:
               'obsolete_main': 0,
               'duplicates': 0,
               'stale_dynamic_active': 0,
+              'obsolete_pr_queued': 0,
+              'obsolete_pr_active': 0,
               'last_validation_preserved': 0,
               'accepted': 0,
               'moved': 0,
@@ -193,6 +232,7 @@ jobs:
               }
               queued = list_runs(run_status='queued')
               active = list_runs(run_status='in_progress')
+              open_pr_heads = list_open_pr_heads()
               live_ids = {
                   int(run.get('id') or 0)
                   for run in (*queued, *active)
@@ -213,6 +253,11 @@ jobs:
               ):
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if stale_pr_run(run, open_pr_heads):
+                      selected.append(run)
+                      totals['obsolete_pr_queued'] += 1
+                      local['obsolete_pr_queued'] += 1
                       continue
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
@@ -257,6 +302,11 @@ jobs:
               for run in active:
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if stale_pr_run(run, open_pr_heads):
+                      selected.append(run)
+                      totals['obsolete_pr_active'] += 1
+                      local['obsolete_pr_active'] += 1
                       continue
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
@@ -303,6 +353,8 @@ jobs:
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
                   f'obsolete_main={local["obsolete_main"]} '
+                  f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
+                  f'obsolete_pr_active={local["obsolete_pr_active"]} '
                   f'duplicates={local["duplicates"]} '
                   f'last_validation_preserved={local["last_validation_preserved"]} '
                   f'accepted={accepted} moved={moved} deferred={deferred} '
@@ -327,6 +379,12 @@ jobs:
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'
                   )
                   handle.write(
+                      f'- Obsolete queued PR selections: {totals["obsolete_pr_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete active PR selections: {totals["obsolete_pr_active"]}\n'
+                  )
+                  handle.write(
                       f'- Duplicate selections: {totals["duplicates"]}\n'
                   )
                   handle.write(
@@ -343,8 +401,10 @@ jobs:
                       '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
                       '`branch-repair-100.yml`, `merge-readiness.yml`, '
                       '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
-                      'never cancellation targets; current main, PR work, and '
-                      'the newest path-filtered validation without a live-head '
+                      'never cancellation targets unless a pull_request run is proven '
+                      'obsolete against the fresh same-repository open-PR head map; '
+                      'current main, authoritative open-PR heads, cross-repository PRs, '
+                      'and the newest path-filtered validation without a live-head '
                       'replacement are preserved.\n\n'
                   )
                   handle.write('### Passes\n')
