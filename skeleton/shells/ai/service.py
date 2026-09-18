@@ -569,17 +569,17 @@ class AIShellService:
             human_approved=human_approved,
             quorum_approved=bool(quorum_digest),
         )
-        use = seal_registry.consume(
-            seal,
-            principal=context.principal,
-            session_id=session.session_id,
-            plan_pin=pin,
-            preconditions_digest=precondition_digest,
-            approval_id=approval_id,
-            release_evidence_digest=self._release_digest(),
-            assurance_digest=assurance_digest,
-        )
         try:
+            use = seal_registry.consume(
+                seal,
+                principal=context.principal,
+                session_id=session.session_id,
+                plan_pin=pin,
+                preconditions_digest=precondition_digest,
+                approval_id=approval_id,
+                release_evidence_digest=self._release_digest(),
+                assurance_digest=assurance_digest,
+            )
             if quorum_approval is not None:
                 if self.approval_quorum is None:
                     raise RuntimeError("quorum approval store is not configured")
