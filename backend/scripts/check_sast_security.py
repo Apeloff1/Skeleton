@@ -226,6 +226,8 @@ def _assigned_names(node: ast.AST) -> list[str]:
         return [target.id for target in node.targets if isinstance(target, ast.Name)]
     if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
         return [node.target.id]
+    if isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+        return [node.target.id]
     return []
 
 
@@ -233,6 +235,8 @@ def _assignment_value(node: ast.AST) -> ast.AST | None:
     if isinstance(node, ast.Assign):
         return node.value
     if isinstance(node, ast.AnnAssign):
+        return node.value
+    if isinstance(node, ast.NamedExpr):
         return node.value
     return None
 
