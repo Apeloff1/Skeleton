@@ -89,6 +89,14 @@ class _ScientificRuntimeMixin:
                 )
             cards = resolver.cards
             if resolver.relations is None:
+                if relational_memory is not None:
+                    if relational_memory.cards is not cards:
+                        raise ValueError(
+                            "relational_memory must use context_resolver cards"
+                        )
+                    relations = relational_memory
+                else:
+                    relations = RelationalMemoryIndex(cards, clock=wall_clock)
                 resolver.relations = relations
             elif relational_memory is not None and resolver.relations is not relational_memory:
                 raise ValueError(
