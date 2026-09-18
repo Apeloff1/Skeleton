@@ -47,6 +47,7 @@ class _StatefulClaimedDeterministicPass(CompilationPass):
         "stateful-deterministic",
         require_translation_validation=False,
         deterministic=True,
+        replay_safe=True,
     )
 
     def __init__(self) -> None:
@@ -80,6 +81,40 @@ class _AnalysisDeclaringNoopPass(CompilationPass):
 
     def apply(self, module: IRModule) -> IRModule:
         return module
+
+
+
+
+class _ReplayUnsafePass(CompilationPass):
+    contract = PassContract(
+        "replay-unsafe",
+        require_translation_validation=False,
+        deterministic=True,
+    )
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def apply(self, module: IRModule) -> IRModule:
+        self.calls += 1
+        return module
+
+
+def test_declared_determinism_requires_explicit_replay_safety_before_execution() -> None:
+    source = _base_module()
+    compiler_pass = _ReplayUnsafePass()
+
+    result, record = PassManager().run_pass(source, compiler_pass)
+
+    assert result.fingerprint == source.fingerprint
+    assert record.committed is False
+    assert compiler_pass.calls == 0
+    assert record.determinism_verified is False
+    assert record.analysis_contract["replay_safe"] == ("false",)
+    assert any(
+        "replay_safe=True" in reason and "not executed" in reason
+        for reason in record.rejected_reasons
+    )
 
 
 def test_declared_deterministic_pass_rolls_back_when_replay_changes() -> None:
