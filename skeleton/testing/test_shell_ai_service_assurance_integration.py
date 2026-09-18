@@ -6,13 +6,13 @@ import sys
 
 import pytest
 
-from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
+from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector, AIExecutionAssurancePolicy, AssuranceLevel
 from skeleton.shells.ai.catalog import AIToolCatalog
 from skeleton.shells.ai.compiler import AIPlanCompiler
 from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
-from skeleton.shells.ai.execution_seal import ExecutionSealAuthority
+from skeleton.shells.ai.execution_seal import ExecutionSealAuthority, ExecutionSealError
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.isolation_compiler import AIIsolationCompiler
 from skeleton.shells.ai.model_port import CallableAIModelPort
@@ -338,6 +338,7 @@ def test_high_risk_sealed_verified_sandbox_execution_succeeds(tmp_path):
         review,
         principal="alice",
         authority=authority,
+        execution_backend=backend,
     )
     result, _, _ = service.execute_sealed(
         session,
@@ -401,3 +402,99 @@ def test_critical_assurance_policy_denies_even_sealed_verified_backend():
             sandbox_verified=True,
             backend_id="sandbox:fake",
         )
+
+
+def test_high_risk_seal_binds_exact_verified_sandbox_backend(tmp_path):
+    service, effects = build_service(
+        tmp_path,
+        high_contract(),
+        auto_band=RiskBand.HIGH,
+    )
+    intent_value = intent()
+    session = service.new_session(intent_value, session_id="high-binding")
+    review, _ = service.review(session)
+    first_backend, first_fake = verified_backend(review, intent_value, effects)
+    second_backend, second_fake = verified_backend(review, intent_value, effects)
+    # Distinguish the second backend capability identity without making it
+    # incompatible with the contract.
+    second_fake._capabilities = SandboxCapabilities(
+        backend_id="fake-two",
+        backend_version="1",
+        max_level="sandboxed",
+        private_tmp=True,
+        clean_environment=True,
+        readonly_source=True,
+        network_namespace=True,
+        home_hiding=True,
+        process_group=True,
+        no_new_privileges=True,
+        syscall_filter=True,
+        resource_limits=True,
+        max_profile=second_fake._capabilities.max_profile,
+    )
+    second_backend = VerifiedSandboxExecutionBackend(
+        second_fake,
+        second_backend.contract,
+        plan_fingerprint=review.compiled.plan.fingerprint,
+    )
+
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=first_backend,
+    )
+    with pytest.raises(ExecutionSealError, match="assurance"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_backend=second_backend,
+        )
+    assert not registry.used(seal.seal_id)
+    assert first_fake.calls == []
+    assert second_fake.calls == []
+
+
+def test_assurance_policy_change_after_sealing_invalidates_seal(tmp_path):
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+    )
+    session = service.new_session(intent(), session_id="policy-binding")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    # Change a policy field that does not alter the medium band's immediate
+    # requirement. Execution would still be sealed/allowed, but the assurance
+    # policy identity changed and therefore the old seal must be rejected.
+    service.assurance = AIExecutionAssuranceInspector(
+        AIExecutionAssurancePolicy(
+            low=AssuranceLevel.SEALED,
+            medium=AssuranceLevel.SEALED,
+            high=AssuranceLevel.SANDBOXED,
+            critical=AssuranceLevel.DENIED,
+        )
+    )
+    with pytest.raises(ExecutionSealError, match="assurance"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
