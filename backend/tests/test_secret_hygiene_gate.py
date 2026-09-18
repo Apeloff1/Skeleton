@@ -164,6 +164,40 @@ def test_detects_google_api_key(tmp_path: Path) -> None:
     assert any("Google API key" in finding for finding in findings)
 
 
+def test_detects_high_entropy_provider_neutral_secret_assignment(tmp_path: Path) -> None:
+    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
+    findings = _scan(tmp_path, f"CLIENT_SECRET={value}\n")
+    assert any("high-entropy secret-like assignment" in finding for finding in findings)
+
+
+def test_detects_high_entropy_json_secret_assignment(tmp_path: Path) -> None:
+    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
+    findings = _scan(tmp_path, f'{{"api_key":"{value}"}}\n')
+    assert any("high-entropy secret-like assignment" in finding for finding in findings)
+
+
+def test_high_entropy_non_secret_assignment_is_allowed(tmp_path: Path) -> None:
+    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
+    assert _scan(tmp_path, f"CHECKSUM={value}\n") == []
+
+
+def test_low_entropy_and_placeholder_secret_assignments_are_allowed(tmp_path: Path) -> None:
+    low_entropy = "A" * 48
+    placeholder = "placeholder_N7qL2vR9xD4kT8mW3pC6zF1"
+    findings = _scan(
+        tmp_path,
+        f"API_KEY={low_entropy}\nCLIENT_SECRET={placeholder}\n",
+    )
+    assert findings == []
+
+
+def test_high_entropy_finding_does_not_echo_candidate_value(tmp_path: Path) -> None:
+    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
+    findings = _scan(tmp_path, f"AUTH_TOKEN={value}\n")
+    assert findings
+    assert all(value not in finding for finding in findings)
+
+
 def test_detects_database_uri_credentials(tmp_path: Path) -> None:
     scheme = "postgresql://"
     credentials = "realuser:" + "realpass123"
