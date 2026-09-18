@@ -169,7 +169,54 @@ from .execution_audit import (
     ReplayIssueKind,
     ReplayReport,
 )
+from .frontier_adjudication import (
+    CandidateAdjudication,
+    HostCandidateAdjudicator,
+)
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .frontier_consensus import (
+    ConsensusCluster,
+    ConsensusMember,
+    ConsensusPolicy,
+    ConsensusResult,
+    ConsensusSelector,
+    merge_search_results,
+    promote_consensus,
+)
+from .frontier_feedback import (
+    FrontierComputeEfficiency,
+    FrontierEvalComparison,
+    FrontierEvalFeedback,
+    FrontierEvalGate,
+    FrontierEvalReport,
+    FrontierFeedbackRecommendation,
+    FrontierFeedbackReport,
+    FrontierFeedbackSample,
+    FrontierReasoningFeedback,
+)
+from .frontier_policy_tuning import (
+    FrontierPolicyBounds,
+    FrontierPolicyProposal,
+    FrontierPolicyTuner,
+)
+from .frontier_reasoning import (
+    CandidateAssessment as FrontierCandidateAssessment,
+    EscalationCause as FrontierEscalationCause,
+    FrontierReasoningCoordinator,
+    FrontierReasoningDecision,
+    FrontierReasoningError,
+    FrontierReasoningPolicy,
+    InferenceDiagnostics as FrontierInferenceDiagnostics,
+    InferenceDisposition,
+)
+from .frontier_trials import (
+    FrontierPassAtKCase,
+    FrontierTrialComparison,
+    FrontierTrialEvaluator,
+    FrontierTrialGate,
+    FrontierTrialObservation,
+    FrontierTrialReport,
+)
 from .interpretive_science import (
     DomainCalibration,
     JuxtapositionTrial,
@@ -376,6 +423,13 @@ from .scientific_runtime import (
     MaximalScientificJeevesRuntime,
     ScientificAdaptiveJeevesRuntime,
     ScientificJeevesRuntime,
+)
+from .adaptive_runtime import (
+    AdaptiveConfig,
+    AdaptiveJeevesRuntime,
+    AdaptiveRunReport,
+    FrontierAdaptiveJeevesRuntime,
+    SpecialistSearchRecord,
 )
 from .semantic_extreme_lenses import (
     LensMaturity,
