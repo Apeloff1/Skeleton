@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S500-morning-handoff"
+TASK_ID = "reserve-S500-morning-handoff"
 CONFLICT_DOMAIN = "ops.morning_master_handoff"
 SECTIONS: tuple[str, ...] = ("shipped", "validated", "failed_closed", "ready_next")
 SECTION_SET = frozenset(SECTIONS)
