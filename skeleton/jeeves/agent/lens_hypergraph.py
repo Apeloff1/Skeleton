@@ -29,6 +29,12 @@ class HyperedgeKind(str, Enum):
     PERSPECTIVE_SPLIT = "perspective_split"
     TEMPORAL_CHAIN = "temporal_chain"
     SYSTEMIC = "systemic"
+    CAUSAL_CHAIN = "causal_chain"
+    INFORMATION_FLOW = "information_flow"
+    COMPUTATIONAL_CONSTRAINT = "computational_constraint"
+    EPISTEMIC_CONTROL = "epistemic_control"
+    PROBABILISTIC_DEPENDENCE = "probabilistic_dependence"
+    PREDICTIVE_REGIME = "predictive_regime"
     EXPLORATORY = "exploratory"
 
 
@@ -135,6 +141,12 @@ _FAMILY_QUESTIONS: dict[LensFamily, str] = {
     LensFamily.SOCIAL: "Test actor-specific incentives, norms, roles, common knowledge, and strategic signaling.",
     LensFamily.TEMPORAL: "Change the time scale and reconstruct ordering, delay, recurrence, and horizon effects.",
     LensFamily.SYSTEM: "Search for invariants, feedback loops, interfaces, hidden state, failure modes, and alternative abstractions.",
+    LensFamily.CAUSAL: "Construct competing causal graphs, interventions, confounders, mediators, and reverse-direction alternatives.",
+    LensFamily.INFORMATION: "Measure uncertainty reduction, redundancy, synergy, bottlenecks, and value of additional observations.",
+    LensFamily.COMPUTATIONAL: "Test complexity, concurrency, transactional boundaries, representation invariance, and abstraction leakage.",
+    LensFamily.METACOGNITIVE: "Audit calibration, stopping, hypothesis diversity, reasoning loops, and unresolved epistemic debt.",
+    LensFamily.PROBABILITY: "Reconstruct priors, dependence, tail mass, sequential validity, model mixtures, and uncertainty decomposition.",
+    LensFamily.PREDICTIVE: "Stress horizons, dataset shift, regime change, indicators, interval coverage, and forecast coherence.",
 }
 
 
@@ -166,6 +178,18 @@ class SemanticLensHypergraph:
         roles = {item.metadata.get("role") for item in items if item.metadata.get("role")}
         if LensFamily.TEMPORAL in families or any("temporal" in item.lens_key for item in items):
             return HyperedgeKind.TEMPORAL_CHAIN
+        if LensFamily.CAUSAL in families:
+            return HyperedgeKind.CAUSAL_CHAIN
+        if LensFamily.INFORMATION in families:
+            return HyperedgeKind.INFORMATION_FLOW
+        if LensFamily.COMPUTATIONAL in families:
+            return HyperedgeKind.COMPUTATIONAL_CONSTRAINT
+        if LensFamily.METACOGNITIVE in families:
+            return HyperedgeKind.EPISTEMIC_CONTROL
+        if LensFamily.PROBABILITY in families:
+            return HyperedgeKind.PROBABILISTIC_DEPENDENCE
+        if LensFamily.PREDICTIVE in families:
+            return HyperedgeKind.PREDICTIVE_REGIME
         if sum(item.family in {LensFamily.NARRATIVE, LensFamily.FILM, LensFamily.LITERATURE} for item in items) >= 2:
             return HyperedgeKind.PERSPECTIVE_SPLIT
         if LensFamily.SYSTEM in families or LensFamily.GAME in families:
@@ -180,14 +204,21 @@ class SemanticLensHypergraph:
         self,
         items: Sequence[SemanticFinding],
         calibration_weights: Mapping[str, float],
-        total_family_count: int,
     ) -> LensHyperedge | None:
         observation_sets = [set(item.observation_ids) for item in items]
         overlap = self._jaccard(observation_sets)
         if overlap < self.policy.minimum_observation_overlap:
             return None
         families = {item.family for item in items}
-        family_diversity = min(1.0, len(families) / max(1, total_family_count))
+        # Diversity must be intrinsic to this edge. Using the size of the
+        # global LensFamily enum made existing edges weaker whenever the
+        # catalog gained a new family. Normalize by the maximum diversity the
+        # current edge order can express instead.
+        family_diversity = (
+            1.0
+            if len(items) <= 1
+            else (len(families) - 1) / max(1, len(items) - 1)
+        )
         if family_diversity < self.policy.minimum_family_diversity:
             return None
         calibration = [
@@ -299,11 +330,10 @@ class SemanticLensHypergraph:
             key=lambda item: (item.confidence * (1.0 - 0.5 * item.ambiguity), item.novelty, item.finding_id),
             reverse=True,
         )[: self.policy.max_findings]
-        family_count = max(1, len(LensFamily))
         edges: list[LensHyperedge] = []
         for order in range(2, min(self.policy.max_order, len(ranked)) + 1):
             for combo in itertools.combinations(ranked, order):
-                edge = self._edge(combo, calibration_weights, family_count)
+                edge = self._edge(combo, calibration_weights)
                 if edge is not None:
                     edges.append(edge)
                 if len(edges) >= self.policy.max_edges:

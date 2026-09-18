@@ -17,6 +17,9 @@ from typing import Sequence
 from .interpretive_science import ScientificLensLab
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
 from .semantic_extreme_lenses import register_rare_lenses
+from .semantic_research_lenses import register_research_lenses
+from .semantic_plane_lenses import register_plane_lenses
+from .semantic_plane_interactions import plane_interaction_rules
 from .semantic_frontier import (
     FrontierLensRouter,
     FrontierSemanticRegistry,
@@ -29,11 +32,13 @@ from .types import AgentContractError, positive_int, stable_fingerprint
 
 
 class MaximalSemanticRegistry(FrontierSemanticRegistry):
-    """Base + frontier + rare lenses, de-duplicated by stable lens key."""
+    """Base + frontier + rare + research lenses, de-duplicated by stable lens key."""
 
     def __init__(self) -> None:
         super().__init__()
         register_rare_lenses(self, ignore_existing=True)
+        register_research_lenses(self, ignore_existing=True)
+        register_plane_lenses(self, ignore_existing=True)
 
 
 class MaximalLensRouter(FrontierLensRouter):
@@ -71,6 +76,12 @@ _FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
     LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
     LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
     LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
+    LensFamily.CAUSAL: ExplorationAxis.CAUSAL,
+    LensFamily.INFORMATION: ExplorationAxis.SEMANTIC,
+    LensFamily.COMPUTATIONAL: ExplorationAxis.SYSTEM,
+    LensFamily.METACOGNITIVE: ExplorationAxis.ADVERSARIAL,
+    LensFamily.PROBABILITY: ExplorationAxis.PROBABILISTIC,
+    LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
 }
 
 
@@ -102,7 +113,7 @@ class MaximalSemanticRuntime:
         self.lab = lab or ScientificLensLab()
         self.graph = graph or TangentGraph()
         self.hypergraph = hypergraph or SemanticLensHypergraph()
-        self.pairwise = pairwise or LensCompositionEngine()
+        self.pairwise = pairwise or LensCompositionEngine(plane_interaction_rules())
 
     def select(
         self,
