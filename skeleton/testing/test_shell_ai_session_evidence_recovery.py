@@ -11,6 +11,7 @@ from skeleton.shells.ai.distributed_journal import DistributedAIDecisionJournal
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.recovery import RecoveryAction
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
+from skeleton.shells.ai.session_journal import SessionJournalEvidence
 from skeleton.shells.ai.session_evidence import (
     SessionEvidenceConflict,
     SessionEvidenceStore,
@@ -291,6 +292,10 @@ def recovery_environment(phase="review", *, session_evidence_digest=""):
     recovery = AIRecoveryCheckpoint.wrap(
         base,
         session_evidence_digest=session_evidence_digest,
+        session_journal_digest=SessionJournalEvidence.from_journal(
+            journal,
+            "session",
+        ).digest,
         release_evidence_digest=fp("l"),
         sandbox_binding_digest=fp("s"),
     )
@@ -472,3 +477,53 @@ def test_recovery_checkpoint_rejects_invalid_digest():
             checkpoint(),
             session_evidence_digest="bad",
         )
+
+
+def test_strict_recovery_unrelated_global_journal_advance_is_tolerated():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+    journal.append(
+        "other-session-event",
+        session_id="other-session",
+        intent_id="other-intent",
+    )
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+    )
+    assert result.action is RecoveryAction.RESUME_REVIEW
+    assert not result.journal_root_matches
+    assert result.session_journal_matches
+
+
+def test_strict_recovery_same_session_journal_advance_requires_manual_review():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+    journal.append(
+        "same-session-event",
+        session_id="session",
+        intent_id="intent",
+    )
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+    )
+    assert result.action is RecoveryAction.MANUAL_REVIEW
+    assert not result.session_journal_matches
+
+
+def test_recovery_checkpoint_digest_changes_with_session_journal():
+    base = checkpoint()
+    first = AIRecoveryCheckpoint.wrap(
+        base,
+        session_journal_digest=fp("a"),
+    )
+    second = AIRecoveryCheckpoint.wrap(
+        base,
+        session_journal_digest=fp("b"),
+    )
+    assert first.digest != second.digest
