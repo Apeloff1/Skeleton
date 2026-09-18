@@ -15,6 +15,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
 from .context_fabric import CognitiveContextFabric
+from .context_mesh import ContextRepositoryMesh
+from .context_repository import ContextRepository
 from .cognition import (
     ContextCompiler,
     ContextSection,
@@ -387,6 +389,8 @@ class JeevesAgentRuntime:
         verification_policy: VerificationPolicy | None = None,
         context_compiler: ContextCompiler | None = None,
         context_fabric: CognitiveContextFabric | None = None,
+        context_mesh: ContextRepositoryMesh | None = None,
+        context_repositories: Sequence[ContextRepository] = (),
         predictive_memory: PredictiveMemoryEngine | None = None,
         historical_frontier: ChronologicalScientificFrontier | None = None,
         historical_knowledge_year: int = 2026,
@@ -419,6 +423,13 @@ class JeevesAgentRuntime:
         self.verification_policy = verification_policy or VerificationPolicy()
         self.context = context_compiler or ContextCompiler()
         self.context_fabric = context_fabric or CognitiveContextFabric()
+        if context_mesh is not None and context_mesh.fabric is not self.context_fabric:
+            raise AgentContractError("context_mesh must be bound to the runtime context_fabric")
+        self.context_mesh = context_mesh or ContextRepositoryMesh(self.context_fabric)
+        for repository in tuple(context_repositories):
+            if not isinstance(repository, ContextRepository):
+                raise TypeError("context_repositories must contain ContextRepository values")
+            self.context_mesh.attach(repository)
         if predictive_memory is not None and predictive_memory.index is not self.context_fabric.index:
             raise AgentContractError("predictive_memory must use the runtime context_fabric index")
         self.predictive_memory = predictive_memory or PredictiveMemoryEngine(self.context_fabric.index)
@@ -503,6 +514,23 @@ class JeevesAgentRuntime:
                 return
             self.historical_context.index_cards(self.context_fabric.index, key)
             self._historical_indexed_namespaces.add(key)
+
+    def attach_context_repository(
+        self,
+        repository: ContextRepository,
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Attach one namespace-owned durable context repository.
+
+        The repository is multiplexed by namespace across storage tiers, so
+        journals/logs/diaries/annals/chronicles/DB/cache/file records can be
+        canonically rehydrated without cross-tenant adapter replacement.
+        """
+        self.context_mesh.attach(repository, replace=replace)
+
+    def detach_context_repository(self, namespace_key: str) -> bool:
+        return self.context_mesh.detach(namespace_key)
 
     def cancel(self, run_id: str) -> None:
         run_id = require_id("run_id", run_id)
