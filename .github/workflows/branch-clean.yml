@@ -5,6 +5,10 @@ on:
   schedule:
     # Avoid push-storm starvation: one durable cleanup sweep every five minutes.
     - cron: '3-58/5 * * * *'
+  push:
+    branches: [main]
+    # Immediate kick only when this maintenance workflow itself changes.
+    paths: ['.github/workflows/branch-clean.yml']
 
 # Keep one cleanup sweep alive while main is moving rapidly. New triggers
 # coalesce behind the active worker instead of repeatedly cancelling it.
