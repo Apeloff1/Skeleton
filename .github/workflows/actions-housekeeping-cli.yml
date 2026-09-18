@@ -20,7 +20,8 @@ permissions: {}
 jobs:
   cleanup:
     name: Prune cold Actions state
-    runs-on: ubuntu-24.04-arm
+    # Housekeeping is a recovery path and must not depend on the scarcer ARM lane it may be cleaning up.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       actions: write
