@@ -138,6 +138,22 @@ def test_rejects_repr_and_ascii_string_commands(tmp_path: Path) -> None:
         assert any("argument vector, not a string" in finding for finding in findings)
 
 
+def test_rejects_assigned_string_command_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\nsubprocess.run(cmd, shell=False)\n",
+    )
+    assert any("argument vector" in finding for finding in findings)
+
+
+def test_reassigned_command_alias_remains_dynamic(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\ncmd = build_command()\nsubprocess.run(cmd)\n",
+    )
+    assert not any("argument vector" in finding for finding in findings)
+
+
 def test_unknown_strip_receiver_is_not_classified_as_string(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
