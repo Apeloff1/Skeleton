@@ -121,6 +121,11 @@ def test_branch_cleanup_keeps_all_redundancy_proofs_and_race_leases() -> None:
 def test_branch_cleanup_trigger_is_bounded() -> None:
     text = _source()
 
+    assert 'workflows: ["Actions Housekeeping CLI"]' in text
+    assert "types: [completed]" in text
+    assert "branches: [main]" in text
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in text
+    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in text
     assert "- cron: '3-58/5 * * * *'" in text
     assert "paths: ['.github/workflows/branch-clean.yml']" in text
     assert "group: branch-clean-v2-${{ github.repository }}" in text
