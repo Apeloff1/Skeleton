@@ -10,7 +10,14 @@ from skeleton.automation.idle_studio import (
     WorkItem,
 )
 from skeleton.automation.idle_studio_publisher import publish_entries
-from skeleton.automation.idle_studio_v2 import ReviewDecision, choose_reviewer, entry_for
+from skeleton.automation.idle_studio_v2 import (
+    PACKAGE_VERSION,
+    ResearchDecision,
+    ReviewDecision,
+    VerificationDecision,
+    choose_squad,
+    entry_for,
+)
 
 
 class _FakeGitHub:
@@ -75,7 +82,7 @@ class IdleStudioPublisherTests(unittest.TestCase):
         self.config = StudioConfig(
             active_workers=8,
             tasks_per_run=4,
-            max_model_calls=6,
+            max_model_calls=9,
             max_files_per_change=4,
             max_file_bytes=10_000,
             max_total_change_bytes=20_000,
@@ -91,49 +98,60 @@ class IdleStudioPublisherTests(unittest.TestCase):
             100,
         )
         self.builder = next(worker for worker in FLEET if worker.role == "security")
-        self.reviewer = choose_reviewer(self.task, self.builder)
+        self.squad = choose_squad(self.task, self.builder)
         self.proposal = ChangeProposal(
             summary="Add a focused regression-safe helper.",
             files=(ProposedFile("skeleton/example.py", "def answer():\n    return 42\n"),),
             verification_notes=("CI must validate the helper",),
         )
+        self.research = ResearchDecision(
+            findings=("The trust boundary is narrow.",),
+            recommended_checks=("focused security regression",),
+        )
+        self.review = ReviewDecision(True, "Scoped and independently reviewable.")
+        self.verification = VerificationDecision(
+            True,
+            "Credential-free CI can validate this change.",
+            ("focused security regression",),
+        )
         self.entry = entry_for(
             self.task,
-            self.builder,
-            self.reviewer,
-            ReviewDecision(True, "Scoped and independently reviewable."),
+            self.squad,
+            self.research,
+            self.review,
+            self.verification,
             self.proposal,
         )
 
     def package(self):
         return {
-            "version": 1,
+            "version": PACKAGE_VERSION,
             "status": "ready",
             "base_sha": self.base_sha,
             "planner": None,
             "entries": [self.entry],
         }
 
-    def test_publish_rechecks_main_and_opens_review_pr(self) -> None:
+    def test_publish_rechecks_main_and_opens_review_pr_with_squad_provenance(self) -> None:
         github = _FakeGitHub(self.base_sha)
-        published = publish_entries(
-            self.package(), self.config, github, run_id="123", attempt="2"
-        )
+        published = publish_entries(self.package(), self.config, github, run_id="123", attempt="2")
         self.assertEqual(len(published), 1)
         self.assertEqual(len(github.refs), 1)
         self.assertEqual(len(github.created_pulls), 1)
         self.assertTrue(github.refs[0][0].startswith(f"idle-studio/{self.builder.worker_id}/"))
         body = github.created_pulls[0]["body"]
-        self.assertIn(self.reviewer.worker_id, body)
+        for worker_id in self.squad.worker_ids:
+            self.assertIn(worker_id, body)
+        self.assertIn("Four-agent squad provenance", body)
+        self.assertIn("Required deterministic checks", body)
         self.assertIn("idle-studio-task:issue:4242", body)
+        self.assertEqual(published[0]["squad"], list(self.squad.worker_ids))
 
     def test_main_move_before_final_branch_boundary_aborts_mutation(self) -> None:
         moved = "b" * 40
         github = _FakeGitHub(self.base_sha, [self.base_sha, moved])
         with self.assertRaises(RuntimeError):
-            publish_entries(
-                self.package(), self.config, github, run_id="123", attempt="1"
-            )
+            publish_entries(self.package(), self.config, github, run_id="123", attempt="1")
         self.assertEqual(github.refs, [])
         self.assertEqual(github.created_pulls, [])
 
@@ -141,9 +159,7 @@ class IdleStudioPublisherTests(unittest.TestCase):
         moved = "c" * 40
         github = _FakeGitHub(self.base_sha, [self.base_sha, self.base_sha, moved])
         with self.assertRaises(RuntimeError):
-            publish_entries(
-                self.package(), self.config, github, run_id="123", attempt="1"
-            )
+            publish_entries(self.package(), self.config, github, run_id="123", attempt="1")
         self.assertEqual(len(github.refs), 1)
         self.assertEqual(github.created_pulls, [])
 
@@ -155,9 +171,7 @@ class IdleStudioPublisherTests(unittest.TestCase):
             }
         ]
         github = _FakeGitHub(self.base_sha, pulls=pulls)
-        published = publish_entries(
-            self.package(), self.config, github, run_id="123", attempt="1"
-        )
+        published = publish_entries(self.package(), self.config, github, run_id="123", attempt="1")
         self.assertEqual(published, [])
         self.assertEqual(github.refs, [])
         self.assertEqual(github.created_pulls, [])
@@ -168,11 +182,19 @@ class IdleStudioPublisherTests(unittest.TestCase):
             for index in range(self.config.max_open_studio_prs)
         ]
         github = _FakeGitHub(self.base_sha, pulls=pulls)
-        published = publish_entries(
-            self.package(), self.config, github, run_id="123", attempt="1"
-        )
+        published = publish_entries(self.package(), self.config, github, run_id="123", attempt="1")
         self.assertEqual(published, [])
         self.assertEqual(github.refs, [])
+
+
+    def test_malformed_package_base_sha_is_rejected(self) -> None:
+        github = _FakeGitHub(self.base_sha)
+        package = self.package()
+        package["base_sha"] = "not-an-oid"
+        with self.assertRaises(ValueError):
+            publish_entries(package, self.config, github, run_id="123", attempt="1")
+        self.assertEqual(github.refs, [])
+        self.assertEqual(github.created_pulls, [])
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from typing import Any
 REDACTED = "[REDACTED]"
 TRUNCATED = "[TRUNCATED]"
 
-_SENSITIVE_KEYS = {
+SENSITIVE_KEYS = frozenset({
     "authorization",
     "cookie",
     "set_cookie",
@@ -23,7 +23,8 @@ _SENSITIVE_KEYS = {
     "refresh_token",
     "credential",
     "credentials",
-}
+})
+_SENSITIVE_KEYS = SENSITIVE_KEYS
 _AUTHORIZATION_RE = re.compile(
     r"(?i)\bauthorization\b\s*[:=]\s*(?:(?:basic|bearer)\s+)?[^\s,;]+"
 )

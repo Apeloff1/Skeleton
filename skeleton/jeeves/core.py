@@ -111,6 +111,8 @@ class Jeeves:
         self._sessions: dict[str, Session] = {}
         self._brain = None  # lazy TacticalBrain
         self._cortex = None  # lazy JeevesCortex — the model in training
+        self._game_engines = None  # lazy executable historical engine lab
+        self._game_projects = None  # lazy composite runtime + asset project lab
         self.era = "extraction_now"
         self.last_plan = None
         self.last_walk = None
@@ -232,6 +234,1126 @@ class Jeeves:
 
     def get_session(self, session_id: str) -> Session:
         return self._get(session_id)
+
+    @property
+    def game_engines(self):
+        """Lazy Pong-to-next executable engine laboratory."""
+        if self._game_engines is None:
+            from skeleton.jeeves.game_engine_runtime import ExecutableGameEngineLab
+            self._game_engines = ExecutableGameEngineLab()
+        return self._game_engines
+
+    def build_game_engine(self, era, *, gameplay_dialect: str | None = None):
+        """Create an isolated executable era sandbox owned by Jeeves."""
+        sandbox = self.game_engines.create(era, gameplay_dialect)
+        self._bus.emit(
+            "jeeves.game_engine.created",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "tree_digest": sandbox.tree.digest,
+            },
+        )
+        return sandbox
+
+    @property
+    def game_projects(self):
+        """Lazy complete project lab over all deterministic engine evidence planes."""
+        if self._game_projects is None:
+            from skeleton.jeeves.game_engine_project import ExecutableGameProjectLab
+
+            self._game_projects = ExecutableGameProjectLab(
+                self.game_engines
+            )
+        return self._game_projects
+
+    def compile_game_navigation(
+        self,
+        sandbox,
+        source,
+    ):
+        """Compile one bounded historical navigation graph into a sandbox."""
+        from skeleton.jeeves.game_engine_navigation import (
+            attach_navigation_build,
+            compile_navigation_build,
+        )
+
+        build = compile_navigation_build(
+            sandbox.era,
+            source,
+        )
+        compiled = attach_navigation_build(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "source_digest": build.source_digest,
+                "policy_digest": build.policy_digest,
+                "manifest_digest": build.manifest_digest,
+                "node_count": len(source.nodes),
+                "edge_count": len(source.edges),
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_navigation(
+        self,
+        sandbox,
+        source,
+    ):
+        """Attest compiled navigation, path optimality, hierarchy, and steering."""
+        from skeleton.jeeves.game_engine_navigation import NavigationAdversary
+
+        report = NavigationAdversary().evaluate(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def game_navigation(
+        self,
+        era,
+        source=None,
+    ):
+        """Create a deterministic historical navigation runtime."""
+        from skeleton.jeeves.game_engine_navigation import build_navigation_runtime
+
+        runtime = build_navigation_runtime(
+            era,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_created",
+            {
+                "era": runtime.era.value,
+                "mode": runtime.policy.mode.value,
+                "nodes": len(runtime.source.nodes),
+                "edges": len(runtime.source.edges),
+                "dynamic_obstacles": runtime.policy.dynamic_obstacles,
+                "hierarchical": runtime.policy.hierarchical,
+                "crowd_steering": runtime.policy.crowd_steering,
+            },
+        )
+        return runtime
+
+    def query_game_navigation(
+        self,
+        runtime,
+        query,
+    ):
+        """Execute one deterministic navigation query."""
+        result = runtime.path(
+            query
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_queried",
+            {
+                "era": result.era.value,
+                "mode": result.mode.value,
+                "start": result.start,
+                "goal": result.goal,
+                "found": result.found,
+                "path_nodes": len(result.path),
+                "cost": result.total_cost,
+                "expanded_nodes": result.expanded_nodes,
+                "digest": result.digest,
+            },
+        )
+        return result
+
+    def game_loop(
+        self,
+        sandbox,
+    ):
+        """Bind one engine sandbox to deterministic timing, input, and replay."""
+        from skeleton.jeeves.game_engine_session import (
+            build_game_loop,
+        )
+
+        loop = build_game_loop(
+            sandbox
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_created",
+            {
+                "era": loop.era.value,
+                "family": sandbox.family.value,
+                "tree_digest": sandbox.tree.digest,
+                "machine_digest": loop.machine.fingerprint(),
+                "clock_digest": loop.clock.fingerprint(),
+                "chain_digest": loop.chain_digest,
+            },
+        )
+        return loop
+
+    def advance_game_loop(
+        self,
+        loop,
+        delta_ns: int,
+        samples=(),
+    ):
+        """Advance one presentation interval through clock, input, and machine."""
+        result = loop.advance(
+            delta_ns,
+            samples,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_advanced",
+            {
+                "era": result.era.value,
+                "presentation_index": result.presentation_index,
+                "simulation_steps": result.timing.simulation_steps,
+                "dropped_simulation_steps":
+                    result.timing.dropped_simulation_steps,
+                "simulation_tick": result.timing.simulation_tick,
+                "input_records": sum(
+                    len(
+                        item.input_digests
+                    )
+                    for item
+                    in result.simulation
+                ),
+                "machine_digest": result.machine_digest,
+                "clock_digest": result.clock_digest,
+                "chain_digest": result.chain_digest,
+                "digest": result.digest,
+            },
+        )
+        return result
+
+    def verify_game_loop_replay(
+        self,
+        loop,
+    ):
+        """Replay a loop from fresh sandbox state and compare all authority."""
+        verification = (
+            loop.verify_replay()
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_verified",
+            {
+                "era": loop.era.value,
+                "passed": verification.passed,
+                "advances": verification.advances,
+                "failure_index": verification.failure_index,
+                "chain_digest": verification.chain_digest,
+                "machine_digest": verification.machine_digest,
+                "clock_digest": verification.clock_digest,
+                "detail": verification.detail,
+            },
+        )
+        return verification
+    def export_game_loop_replay(
+        self,
+        loop,
+    ) -> bytes:
+        """Serialize one verified deterministic game-loop replay tape."""
+        from skeleton.jeeves.game_engine_session import (
+            build_replay_tape,
+            serialize_replay_tape,
+        )
+
+        tape = build_replay_tape(
+            loop
+        )
+        data = serialize_replay_tape(
+            tape
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_exported",
+            {
+                "era": tape.era.value,
+                "tree_digest": tape.tree_digest,
+                "advances": len(tape.advances),
+                "tape_digest": tape.digest,
+                "bytes": len(data),
+            },
+        )
+        return data
+
+    def verify_game_loop_replay_tape(
+        self,
+        sandbox,
+        data: bytes,
+    ):
+        """Parse and replay a portable tape against the exact sandbox authority."""
+        from skeleton.jeeves.game_engine_session import (
+            parse_replay_tape,
+            verify_replay_tape,
+        )
+
+        tape = parse_replay_tape(
+            data
+        )
+        verification = verify_replay_tape(
+            sandbox,
+            tape,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_tape_verified",
+            {
+                "era": tape.era.value,
+                "tree_digest": tape.tree_digest,
+                "tape_digest": tape.digest,
+                "passed": verification.passed,
+                "advances": verification.advances,
+                "failure_index": verification.failure_index,
+                "chain_digest": verification.chain_digest,
+                "machine_digest": verification.machine_digest,
+                "clock_digest": verification.clock_digest,
+                "detail": verification.detail,
+            },
+        )
+        return verification
+
+
+    def game_clock(
+        self,
+        era,
+    ):
+        """Create the exact-rational caller-driven game simulation clock."""
+        from skeleton.jeeves.game_engine_timing import (
+            build_game_clock,
+        )
+
+        clock = build_game_clock(
+            era
+        )
+        self._bus.emit(
+            "jeeves.game_engine.clock_created",
+            {
+                "era": clock.era.value,
+                "mode": clock.policy.mode.value,
+                "simulation_hz": clock.policy.simulation_hz,
+                "presentation_hz": clock.policy.presentation_hz,
+                "max_catchup_steps": clock.policy.max_catchup_steps,
+                "domains": [
+                    {
+                        "name": item.name,
+                        "hz": item.hz,
+                    }
+                    for item
+                    in clock.policy.domains
+                ],
+            },
+        )
+        return clock
+
+    def advance_game_clock(
+        self,
+        clock,
+        delta_ns: int,
+    ):
+        """Advance a deterministic game clock by caller-supplied nanoseconds."""
+        frame = clock.advance(
+            delta_ns
+        )
+        self._bus.emit(
+            "jeeves.game_engine.clock_advanced",
+            {
+                "era": frame.era.value,
+                "presentation_index": frame.presentation_index,
+                "simulation_steps": frame.simulation_steps,
+                "dropped_simulation_steps": frame.dropped_simulation_steps,
+                "simulation_tick": frame.simulation_tick,
+                "interpolation_alpha": frame.interpolation_alpha,
+                "digest": frame.digest,
+            },
+        )
+        return frame
+
+    def game_input_normalizer(
+        self,
+        era,
+    ):
+        """Create the deterministic device-to-era input lowering boundary."""
+        from skeleton.jeeves.game_engine_input import (
+            build_input_normalizer,
+        )
+
+        normalizer = build_input_normalizer(
+            era
+        )
+        self._bus.emit(
+            "jeeves.game_engine.input_normalizer_created",
+            {
+                "era": normalizer.era.value,
+                "devices": [
+                    item.value
+                    for item
+                    in normalizer.policy.devices
+                ],
+                "max_players": normalizer.policy.max_players,
+                "haptic_mode": normalizer.policy.haptic_mode.value,
+            },
+        )
+        return normalizer
+
+    def normalize_game_input(
+        self,
+        era,
+        sample,
+    ):
+        """Normalize one host-independent device sample for an engine era."""
+        normalizer = self.game_input_normalizer(
+            era
+        )
+        value = normalizer.normalize(
+            sample
+        )
+        self._bus.emit(
+            "jeeves.game_engine.input_normalized",
+            {
+                "era": value.era.value,
+                "tick": value.tick,
+                "player": value.player,
+                "device": value.device.value,
+                "digest": value.digest,
+                "buttons": int(
+                    value.compatibility.buttons
+                ),
+            },
+        )
+        return value
+
+    def normalize_game_haptic(
+        self,
+        era,
+        request,
+    ):
+        """Normalize one deterministic haptic request through era capabilities."""
+        from skeleton.jeeves.game_engine_input import (
+            normalize_haptic,
+        )
+
+        value = normalize_haptic(
+            era,
+            request,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.haptic_normalized",
+            {
+                "era": value.era.value,
+                "tick": value.tick,
+                "player": value.player,
+                "mode": value.mode.value,
+                "channel": value.channel,
+                "digest": value.digest,
+            },
+        )
+        return value
+
+    def game_save_manager(
+        self,
+        era,
+        store=None,
+        *,
+        namespace: str = "jeeves-game",
+    ):
+        """Create historical save semantics over the existing SnapshotStore."""
+        from skeleton.jeeves.game_engine_saves import (
+            build_game_save_manager,
+        )
+
+        manager = build_game_save_manager(
+            era,
+            store,
+            namespace=namespace,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.save_manager_created",
+            {
+                "era": manager.era.value,
+                "medium": manager.policy.medium.value,
+                "integrity": manager.policy.integrity.value,
+                "player_state": manager.policy.player_state,
+                "max_slots": manager.policy.max_slots,
+            },
+        )
+        return manager
+
+    def build_game_project(
+        self,
+        era,
+        *,
+        gameplay_dialect: str | None = None,
+        sources=None,
+        scripts=None,
+        physics=None,
+        audio=None,
+        animation=None,
+        navigation=None,
+    ):
+        """Create an executable era project with all deterministic evidence planes."""
+        project = self.game_projects.create(
+            era,
+            gameplay_dialect,
+            sources=sources,
+            scripts=scripts,
+            physics=physics,
+            audio=audio,
+            animation=animation,
+            navigation=navigation,
+        )
+        self._bus.emit(
+            "jeeves.game_project.created",
+            {
+                "era": project.era.value,
+                "family": project.family.value,
+                "asset_count": len(project.sources),
+                "script_count": len(project.scripts),
+                "physics_bodies": len(project.physics.bodies),
+                "audio_sounds": len(project.audio.sounds),
+                "animation_clips": len(project.animation.clips),
+                "navigation_nodes": len(project.navigation.nodes),
+                "navigation_edges": len(project.navigation.edges),
+                "tree_digest": project.tree.digest,
+            },
+        )
+        return project
+
+    def evaluate_game_project(self, project):
+        """Evaluate all seven deterministic project quality planes equally."""
+        report = self.game_projects.evaluate(
+            project
+        )
+        self._bus.emit(
+            "jeeves.game_project.evaluated",
+            {
+                "era": project.era.value,
+                "score": report.score,
+                "runtime_score": report.runtime_score,
+                "asset_score": report.asset_score,
+                "script_score": report.script_score,
+                "physics_score": report.physics_score,
+                "audio_score": report.audio_score,
+                "animation_score": report.animation_score,
+                "navigation_score": report.navigation_score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def evolve_game_project(
+        self,
+        project,
+        *,
+        proposer=None,
+        target: float = 1.0,
+        max_rounds: int = 12,
+        max_candidates: int = 32,
+    ):
+        """Adversarially improve a complete project without plane regressions."""
+        from skeleton.jeeves.game_engine_project import (
+            AdversarialGameProjectEvolution,
+        )
+
+        evolution = AdversarialGameProjectEvolution(
+            self.game_projects
+        )
+        session = evolution.start(
+            project
+        )
+        strategy = (
+            proposer
+            or evolution.canonical_candidates
+        )
+        result = evolution.evolve(
+            session,
+            strategy,
+            target=target,
+            max_rounds=max_rounds,
+            max_candidates=max_candidates,
+        )
+        self._bus.emit(
+            "jeeves.game_project.evolved",
+            {
+                "era": project.era.value,
+                "target": target,
+                "target_met": result.target_met,
+                "rounds": len(result.rounds),
+                "checkpoints": len(result.session.checkpoints),
+                "tree_digest": result.session.sandbox.tree.digest,
+            },
+        )
+        return result
+
+    def package_game_project(
+        self,
+        project,
+        *,
+        require_quality: bool = True,
+    ):
+        """Create a deterministic hash-attested portable project package."""
+        from skeleton.jeeves.game_engine_export import (
+            build_project_package,
+        )
+
+        package = build_project_package(
+            project,
+            lab=self.game_projects,
+            require_quality=require_quality,
+        )
+        self._bus.emit(
+            "jeeves.game_project.packaged",
+            {
+                "era": project.era.value,
+                "tree_digest": package.tree_digest,
+                "package_digest": package.package_digest,
+                "file_count": package.file_count,
+                "total_bytes": package.total_bytes,
+            },
+        )
+        return package
+
+    def archive_game_project(
+        self,
+        project,
+        *,
+        require_quality: bool = True,
+    ):
+        """Emit deterministic portable ZIP bytes for a quality-gated project."""
+        from skeleton.jeeves.game_engine_export import (
+            archive_project_package,
+        )
+
+        package = self.package_game_project(
+            project,
+            require_quality=require_quality,
+        )
+        archive = archive_project_package(
+            package
+        )
+        self._bus.emit(
+            "jeeves.game_project.archived",
+            {
+                "era": project.era.value,
+                "package_digest": package.package_digest,
+                "archive_digest": archive.digest,
+                "archive_bytes": len(archive.data),
+            },
+        )
+        return archive
+
+    def materialise_game_project(
+        self,
+        project,
+        *,
+        materialiser: str = "json",
+        require_quality: bool = True,
+    ) -> bytes:
+        """Reuse Forge materialisers for a structured game-project export."""
+        from skeleton.jeeves.game_engine_export import (
+            materialise_project_package,
+        )
+
+        package = self.package_game_project(
+            project,
+            require_quality=require_quality,
+        )
+        data = materialise_project_package(
+            package,
+            materialiser=materialiser,
+        )
+        self._bus.emit(
+            "jeeves.game_project.materialised",
+            {
+                "era": project.era.value,
+                "package_digest": package.package_digest,
+                "materialiser": materialiser,
+                "bytes": len(data),
+            },
+        )
+        return data
+
+    def publish_game_project(
+        self,
+        project,
+        lafs,
+        *,
+        name: str | None = None,
+        chunk_bytes: int | None = None,
+        require_quality: bool = True,
+    ):
+        """Publish a deterministic game-project archive through existing LAFS."""
+        from skeleton.forge.lafs import CHUNK_MAX_BYTES
+        from skeleton.jeeves.game_engine_export import (
+            publish_project_package,
+        )
+
+        package = self.package_game_project(
+            project,
+            require_quality=require_quality,
+        )
+        publication = publish_project_package(
+            package,
+            lafs,
+            name=name,
+            chunk_bytes=(
+                CHUNK_MAX_BYTES
+                if chunk_bytes is None
+                else chunk_bytes
+            ),
+        )
+        self._bus.emit(
+            "jeeves.game_project.published",
+            {
+                "era": project.era.value,
+                "package_digest": package.package_digest,
+                "archive_digest": publication.archive_digest,
+                "manifest": publication.name,
+                "chunks": len(publication.chunk_digests),
+                "bytes": publication.total_bytes,
+            },
+        )
+        return publication
+
+    def compile_game_assets(self, sandbox, sources):
+        """Compile deterministic era-constrained assets into a sandbox."""
+        from skeleton.jeeves.game_engine_assets import (
+            attach_asset_build,
+            compile_asset_build,
+        )
+
+        source_values = tuple(sources)
+        build = compile_asset_build(
+            sandbox.era,
+            source_values,
+        )
+        compiled = attach_asset_build(
+            sandbox,
+            source_values,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.assets_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "asset_count": len(build.assets),
+                "manifest_digest": build.manifest_digest,
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_assets(self, sandbox, sources):
+        """Validate compiled assets against their source recipes and era."""
+        from skeleton.jeeves.game_engine_assets import AssetCompilerAdversary
+
+        report = AssetCompilerAdversary().evaluate(
+            sandbox,
+            tuple(sources),
+        )
+        self._bus.emit(
+            "jeeves.game_engine.assets_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def compile_game_scripts(self, sandbox, sources):
+        """Compile bounded deterministic behavior programs into a sandbox."""
+        from skeleton.jeeves.game_engine_scripts import (
+            attach_script_build,
+            compile_script_build,
+        )
+
+        source_values = tuple(sources)
+        build = compile_script_build(
+            sandbox.era,
+            source_values,
+        )
+        compiled = attach_script_build(
+            sandbox,
+            source_values,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.scripts_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "script_count": len(build.scripts),
+                "manifest_digest": build.manifest_digest,
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_scripts(self, sandbox, sources):
+        """Validate compiled scripts, replay determinism, and gas bounds."""
+        from skeleton.jeeves.game_engine_scripts import ScriptAdversary
+
+        report = ScriptAdversary().evaluate(
+            sandbox,
+            tuple(sources),
+        )
+        self._bus.emit(
+            "jeeves.game_engine.scripts_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def execute_game_script(
+        self,
+        sandbox,
+        source,
+        *,
+        inputs=(),
+        state=(),
+    ):
+        """Compile and execute one bounded behavior recipe in the era VM."""
+        from skeleton.jeeves.game_engine_scripts import (
+            EraScriptCompiler,
+            ScriptVM,
+        )
+
+        compiled = EraScriptCompiler().compile(
+            sandbox.era,
+            source,
+        )
+        result = ScriptVM(
+            sandbox.era
+        ).run(
+            compiled,
+            inputs=tuple(inputs),
+            state=tuple(state),
+        )
+        self._bus.emit(
+            "jeeves.game_engine.script_executed",
+            {
+                "era": sandbox.era.value,
+                "script_id": compiled.script_id,
+                "steps": result.steps,
+                "halted": result.halted,
+                "exhausted": result.exhausted,
+                "digest": result.digest,
+            },
+        )
+        return result
+
+    def compile_game_physics(self, sandbox, source):
+        """Compile an era-constrained deterministic physics scene."""
+        from skeleton.jeeves.game_engine_physics import (
+            attach_physics_build,
+            compile_physics_build,
+        )
+
+        build = compile_physics_build(
+            sandbox.era,
+            source,
+        )
+        compiled = attach_physics_build(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.physics_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "source_digest": build.source_digest,
+                "policy_digest": build.policy_digest,
+                "manifest_digest": build.manifest_digest,
+                "body_count": len(source.bodies),
+                "constraint_count": len(source.constraints),
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_physics(self, sandbox, source):
+        """Validate deterministic replay, contacts, snapshots, and constraints."""
+        from skeleton.jeeves.game_engine_physics import PhysicsAdversary
+
+        report = PhysicsAdversary().evaluate(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.physics_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def simulate_game_physics(
+        self,
+        sandbox,
+        source,
+        *,
+        steps: int = 1,
+    ):
+        """Compile a source scene into the era solver and advance fixed steps."""
+        from skeleton.jeeves.game_engine_physics import world_from_source
+
+        world = world_from_source(
+            sandbox.era,
+            source,
+        )
+        world.step(steps)
+        self._bus.emit(
+            "jeeves.game_engine.physics_simulated",
+            {
+                "era": sandbox.era.value,
+                "steps": steps,
+                "tick": world.tick,
+                "body_count": len(world.bodies),
+                "contacts": len(world.last_contacts),
+                "fingerprint": world.fingerprint(),
+            },
+        )
+        return world
+
+    def compile_game_audio(self, sandbox, source):
+        """Compile an era-constrained deterministic runtime audio scene."""
+        from skeleton.jeeves.game_engine_audio import (
+            attach_audio_build,
+            compile_audio_build,
+        )
+
+        build = compile_audio_build(
+            sandbox.era,
+            source,
+        )
+        compiled = attach_audio_build(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.audio_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "source_digest": build.source_digest,
+                "policy_digest": build.policy_digest,
+                "manifest_digest": build.manifest_digest,
+                "sound_count": len(source.sounds),
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_audio(self, sandbox, source):
+        """Validate replay, snapshot, voice budget, and spatial audio contracts."""
+        from skeleton.jeeves.game_engine_audio import AudioAdversary
+
+        report = AudioAdversary().evaluate(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.audio_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def simulate_game_audio(
+        self,
+        sandbox,
+        source,
+        *,
+        ticks: int = 32,
+        schedule=None,
+    ):
+        """Run the deterministic era mixer without host audio side effects."""
+        from skeleton.jeeves.game_engine_audio import HistoricalAudioMixer
+
+        mixer = HistoricalAudioMixer(
+            sandbox.era,
+            listener=source.listener,
+        )
+        active_schedule = (
+            schedule
+            if schedule is not None
+            else {
+                index * 3: (sound,)
+                for index, sound
+                in enumerate(source.sounds)
+            }
+        )
+        frames = mixer.run(
+            active_schedule,
+            ticks,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.audio_simulated",
+            {
+                "era": sandbox.era.value,
+                "ticks": ticks,
+                "frames": len(frames),
+                "active_voices": len(mixer.voices),
+                "fingerprint": mixer.fingerprint(),
+            },
+        )
+        return frames, mixer
+
+    def compile_game_animation(self, sandbox, source):
+        """Compile bounded era-specific animation data into a sandbox."""
+        from skeleton.jeeves.game_engine_animation import (
+            attach_animation_build,
+            compile_animation_build,
+        )
+
+        build = compile_animation_build(
+            sandbox.era,
+            source,
+        )
+        compiled = attach_animation_build(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.animation_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "clip_count": len(build.clips),
+                "source_digest": build.source_digest,
+                "policy_digest": build.policy_digest,
+                "manifest_digest": build.manifest_digest,
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_animation(self, sandbox, source):
+        """Validate animation replay, snapshots, blending, root motion, and IK."""
+        from skeleton.jeeves.game_engine_animation import AnimationAdversary
+
+        report = AnimationAdversary().evaluate(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.animation_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def simulate_game_animation(
+        self,
+        sandbox,
+        source,
+        *,
+        clip_id=None,
+        steps: int = 32,
+        playback_rate: float = 1.0,
+    ):
+        """Run fixed-tick deterministic animation playback without host timing."""
+        from skeleton.jeeves.game_engine_animation import HistoricalAnimator
+
+        animator = HistoricalAnimator(
+            sandbox.era,
+            source,
+        )
+        if clip_id is not None:
+            animator.play(
+                clip_id,
+                playback_rate=playback_rate,
+            )
+        poses = animator.step(
+            steps
+        )
+        self._bus.emit(
+            "jeeves.game_engine.animation_simulated",
+            {
+                "era": sandbox.era.value,
+                "steps": steps,
+                "poses": len(poses),
+                "clip_id": animator.clip_id,
+                "fingerprint": animator.fingerprint(),
+            },
+        )
+        return poses, animator
+
+    def evaluate_game_engine(self, sandbox):
+        """Run the era-specific adversarial quality suite."""
+        report = self.game_engines.evaluate(sandbox)
+        self._bus.emit(
+            "jeeves.game_engine.evaluated",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def evolve_game_engine(
+        self,
+        sandbox,
+        *,
+        proposer=None,
+        target: float = 1.0,
+        max_rounds: int = 12,
+        max_candidates: int = 32,
+    ):
+        """Snapshot and adversarially improve a sandbox until its gate passes."""
+        from skeleton.jeeves.game_engine_runtime import AdversarialEngineEvolution
+
+        evolution = AdversarialEngineEvolution(self.game_engines)
+        session = evolution.start(sandbox)
+        strategy = proposer or evolution.canonical_candidates
+        result = evolution.evolve(
+            session,
+            strategy,
+            target=target,
+            max_rounds=max_rounds,
+            max_candidates=max_candidates,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.evolved",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "target": target,
+                "target_met": result.target_met,
+                "rounds": len(result.rounds),
+                "checkpoints": len(result.session.checkpoints),
+                "tree_digest": result.session.sandbox.tree.digest,
+            },
+        )
+        return result
 
     def _brain_get(self):
         if self._brain is None:

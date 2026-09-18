@@ -4,6 +4,12 @@ The contract layer deliberately owns transport-neutral semantics only: command
 names, payload validation boundaries, normalized errors, exit codes, HTTP
 status mappings, and feature-parity metadata. Runtime-specific handlers are
 registered by adapters in :mod:`skeleton.application.runtime_commands`.
+
+Issue #953 adds a versioned request schema, deterministic argument
+normalization, secret-safe public payloads, bounded output, and explicit
+sync/async boundaries. Those envelope rules live in
+:mod:`skeleton.application.unified_invoke`; this module stays the shared
+command family + error lattice.
 """
 
 from __future__ import annotations
@@ -12,7 +18,11 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
+from skeleton.observability.redaction import redact_payload, redact_text
+
 CONTRACT_VERSION = "1.0"
+SCHEMA_VERSION = 1
+SUPPORTED_MODE = "sync"
 MATERIALISE_TARGETS = ("json", "yaml", "godot")
 PROGRESSION_CURVES = ("linear", "quadratic", "exponential")
 
@@ -223,6 +233,21 @@ _SPECS = (
         mutating=True,
         auth_required=True,
     ),
+    CommandSpec(
+        "retrieve",
+        "Query the canonical four-plane retrieval subsystem.",
+        auth_required=True,
+    ),
+    CommandSpec(
+        "plan",
+        "Invoke canonical creator/game planning without a second planner.",
+        auth_required=True,
+    ),
+    CommandSpec(
+        "evidence",
+        "Query canonical learning evidence or provenance records.",
+        auth_required=True,
+    ),
 )
 
 
@@ -242,7 +267,10 @@ def parity_matrix() -> Dict[str, Any]:
         row["parity"] = surfaces.issuperset({"api", "cli"})
         rows.append(row)
     return {
+        "schema_version": SCHEMA_VERSION,
         "contract_version": CONTRACT_VERSION,
+        "mode": SUPPORTED_MODE,
+        "async_supported": False,
         "commands": rows,
         "full_surface_parity": all(row["parity"] for row in rows),
     }
@@ -252,12 +280,24 @@ _ERROR_DEFAULTS: Mapping[str, tuple[int, int]] = {
     # code -> (CLI exit code, HTTP status)
     "invalid_command": (2, 404),
     "invalid_argument": (2, 422),
+    "unknown_version": (2, 422),
+    "payload_too_large": (2, 413),
     "unsupported_operation": (3, 501),
+    "async_unsupported": (3, 501),
     "unavailable": (3, 503),
     "forbidden": (4, 403),
     "conflict": (5, 409),
     "internal_error": (70, 500),
 }
+
+_MAX_PUBLIC_MESSAGE_CHARS = 256
+
+
+def _safe_public_message(message: str) -> str:
+    cleaned = redact_text(str(message or ""))
+    if len(cleaned) > _MAX_PUBLIC_MESSAGE_CHARS:
+        return cleaned[:_MAX_PUBLIC_MESSAGE_CHARS] + "…"
+    return cleaned
 
 
 class CommandError(Exception):
@@ -272,18 +312,18 @@ class CommandError(Exception):
         exit_code: Optional[int] = None,
         http_status: Optional[int] = None,
     ) -> None:
-        super().__init__(message)
         default_exit, default_http = _ERROR_DEFAULTS.get(code, _ERROR_DEFAULTS["internal_error"])
         self.code = code
-        self.message = message
-        self.details = dict(details or {})
+        self.message = _safe_public_message(message)
+        super().__init__(self.message)
+        self.details = dict(redact_payload(dict(details or {})))
         self.exit_code = default_exit if exit_code is None else int(exit_code)
         self.http_status = default_http if http_status is None else int(http_status)
 
     def to_dict(self) -> Dict[str, Any]:
         body: Dict[str, Any] = {"code": self.code, "message": self.message}
         if self.details:
-            body["details"] = self.details
+            body["details"] = dict(self.details)
         return body
 
 
@@ -295,6 +335,9 @@ class CommandResult:
     ok: bool
     data: Mapping[str, Any] = field(default_factory=dict)
     error: Optional[CommandError] = None
+    correlation_id: str = ""
+    mode: str = SUPPORTED_MODE
+    schema_version: int = SCHEMA_VERSION
 
     @property
     def exit_code(self) -> int:
@@ -305,13 +348,18 @@ class CommandResult:
         return 200 if self.ok else (self.error.http_status if self.error else 500)
 
     def to_payload(self) -> Dict[str, Any]:
+        from skeleton.application.contract_safety import public_contract_payload
+
         payload: Dict[str, Any] = {
+            "schema_version": int(self.schema_version or SCHEMA_VERSION),
             "contract_version": CONTRACT_VERSION,
             "command": self.command,
             "ok": self.ok,
+            "mode": self.mode or SUPPORTED_MODE,
+            "correlation_id": self.correlation_id,
         }
         if self.ok:
-            payload["data"] = dict(self.data)
+            payload["data"] = public_contract_payload(dict(self.data))
         else:
             payload["error"] = (self.error or CommandError("internal_error", "command failed")).to_dict()
         return payload

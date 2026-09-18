@@ -6,10 +6,15 @@ import unittest
 from skeleton.automation.idle_studio import (
     FLEET,
     FLEET_SIZE,
+    MAX_SNAPSHOT_PAGES,
     ROLE_PROFILES,
+    SNAPSHOT_PAGE_SIZE,
+    GitHubClient,
+    GitHubError,
     StudioConfig,
     WorkItem,
     assign_workers,
+    canonical_commit_oid,
     parse_proposal,
     repository_is_idle,
     safe_change_path,
@@ -117,6 +122,81 @@ class IdleStudioTests(unittest.TestCase):
         b = WorkItem("issue:2", "backlog", "One", "x", 1)
         self.assertEqual(task_fingerprint(a), task_fingerprint(a))
         self.assertNotEqual(task_fingerprint(a), task_fingerprint(b))
+
+    def test_recent_runs_paginates_complete_prefix(self) -> None:
+        client = GitHubClient("Apeloff1/Skeleton", "token")
+        calls: list[str] = []
+
+        def fake_api(method: str, path: str, payload=None):
+            calls.append(path)
+            self.assertEqual(method, "GET")
+            if path.endswith("page=1"):
+                return {"workflow_runs": [{"id": n} for n in range(SNAPSHOT_PAGE_SIZE)]}
+            if path.endswith("page=2"):
+                return {"workflow_runs": [{"id": 99}]}
+            raise AssertionError(path)
+
+        client._api = fake_api  # type: ignore[method-assign]
+        runs = client.recent_runs()
+        self.assertEqual(len(runs), SNAPSHOT_PAGE_SIZE + 1)
+        self.assertEqual(runs[-1]["id"], 99)
+        self.assertEqual(len(calls), 2)
+
+    def test_recent_runs_scan_bound_fails_closed(self) -> None:
+        client = GitHubClient("Apeloff1/Skeleton", "token")
+        calls: list[str] = []
+
+        def fake_api(method: str, path: str, payload=None):
+            calls.append(path)
+            return {"workflow_runs": [{"id": n} for n in range(SNAPSHOT_PAGE_SIZE)]}
+
+        client._api = fake_api  # type: ignore[method-assign]
+        with self.assertRaises(GitHubError) as ctx:
+            client.recent_runs()
+        self.assertIn("bounded identity scan", str(ctx.exception))
+        self.assertEqual(len(calls), MAX_SNAPSHOT_PAGES)
+
+    def test_branch_sha_canonicalizes_and_rejects_malformed_oid(self) -> None:
+        client = GitHubClient("Apeloff1/Skeleton", "token")
+        sha = "a" * 40
+
+        def ok_api(method: str, path: str, payload=None):
+            self.assertEqual(method, "GET")
+            self.assertEqual(path, "/git/ref/heads/main")
+            return {"object": {"sha": sha.upper()}}
+
+        client._api = ok_api  # type: ignore[method-assign]
+        self.assertEqual(client.branch_sha("main"), sha)
+        self.assertEqual(canonical_commit_oid(sha.upper()), sha)
+
+        def bad_api(method: str, path: str, payload=None):
+            return {"object": {"sha": "abc123"}}
+
+        client._api = bad_api  # type: ignore[method-assign]
+        with self.assertRaises(GitHubError) as ctx:
+            client.branch_sha("main")
+        self.assertIn("40-character hex commit OID", str(ctx.exception))
+
+    def test_commit_tree_sha_quotes_canonical_oid_before_lookup(self) -> None:
+        client = GitHubClient("Apeloff1/Skeleton", "token")
+        sha = "b" * 40
+        tree = "c" * 40
+        calls: list[str] = []
+
+        def fake_api(method: str, path: str, payload=None):
+            calls.append(path)
+            self.assertEqual(method, "GET")
+            return {"tree": {"sha": tree.upper()}}
+
+        client._api = fake_api  # type: ignore[method-assign]
+        self.assertEqual(client.commit_tree_sha(sha.upper()), tree)
+        self.assertEqual(calls, [f"/git/commits/{sha}"])
+        self.assertNotIn(sha.upper(), calls[0])
+
+        with self.assertRaises(GitHubError) as ctx:
+            client.commit_tree_sha("abc123")
+        self.assertIn("40-character hex commit OID", str(ctx.exception))
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

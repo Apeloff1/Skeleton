@@ -171,6 +171,25 @@ class CuriosityEngine:
                 handle.write(json.dumps(asdict(signal), ensure_ascii=False, separators=(",", ":")) + "\n"); handle.flush(); os.fsync(handle.fileno())
             return signal
 
+    def orientation_pack(
+        self,
+        query: str,
+        *,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Project knowledge through the engine-level orientation boundary."""
+        if (
+            type(limit) is not int
+            or not 0 <= limit <= 100
+        ):
+            raise ValueError(
+                "orientation limit must be between 0 and 100"
+            )
+        return self.fabric.orientation_pack(
+            query,
+            limit=limit,
+        )
+
     def _score_topic(self, topic: FrontierTopic, *, now: float) -> tuple[float, str]:
         existing = self.fabric.search(topic.subject, limit=8)
         coverage = min(1.0, len(existing) / 6.0); mean_conf = sum(r.confidence for r in existing) / len(existing) if existing else 0.0

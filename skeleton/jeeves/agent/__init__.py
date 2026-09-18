@@ -4,7 +4,8 @@ Public imports are explicit enough for application code to assemble the runtime
 without reaching through implementation paths. The package surface exposes the
 bounded runtime plus scientific layers for cue-first associative context, typed
 probability and uncertainty, semantic nuance with empirical validation,
-perpendicular tangent continuity, and factorized causal control.
+perpendicular tangent continuity, factorized causal control, and guarded
+execution with tamper-evident replay.
 """
 
 from .action_model import (
@@ -34,6 +35,14 @@ from .associative_memory import (
     AssociativeMemoryMesh,
     MemoryAssociation,
     SequencePrediction,
+)
+from .context_acquisition import (
+    AcquisitionTrace,
+    CueFirstContextSystem,
+    InteractionAcquisitionEngine,
+    InteractionAcquisitionPolicy,
+    RecallTrace,
+    build_cue_first_context_system,
 )
 from .cognition import (
     CognitionError,
@@ -126,6 +135,21 @@ from .evaluation import (
     EvaluationSuite,
     RunEvaluator,
 )
+from .execution_audit import (
+    AuditEventKind,
+    AuditSeverity,
+    ExecutionAuditCheckpoint,
+    ExecutionAuditEntry,
+    ExecutionAuditError,
+    ExecutionAuditLedger,
+    ExecutionReplayVerifier,
+    GENESIS_HASH,
+    InMemoryExecutionAuditStore,
+    OperationReplay,
+    ReplayIssue,
+    ReplayIssueKind,
+    ReplayReport,
+)
 from .frontier_control_plane import FrontierCognitiveControlPlane
 from .interpretive_science import (
     DomainCalibration,
@@ -136,14 +160,13 @@ from .interpretive_science import (
     ScientificLensReport,
     ScientificLensStatus,
 )
-from .lens_governance import (
-    LensGovernanceDecision,
-    LensPermission,
-    LensScienceProfile,
-    LensScienceRegistry,
-    ResearchReference,
-    ScientificGrade,
-    explicit_profiles,
+from .lens_hypergraph import (
+    HyperedgeKind,
+    HypergraphPolicy,
+    LensHyperedge,
+    PerpendicularRestartBundle,
+    SemanticHypergraphSnapshot,
+    SemanticLensHypergraph,
 )
 from .memory import (
     ConsolidationCandidate,
@@ -187,15 +210,6 @@ from .metacognition import (
     budget_pressure,
     epistemic_signals,
     progress_signals,
-)
-from .nuance_runtime import (
-    FrontierUncertaintyRouter,
-    NuanceFrame,
-    NuanceRuntimeError,
-    NuanceRuntimePolicy,
-    NuanceUpdate,
-    ScientificNuanceRuntime,
-    UncertaintyRecommendation,
 )
 from .planning import (
     ModelPlanParser,
@@ -252,6 +266,15 @@ from .probability_lenses import (
     possibility_necessity_support,
     transition_probability,
 )
+from .predictive_fusion import (
+    FusedPrediction,
+    FusionPolicy,
+    PredictiveFusionEngine,
+    PredictiveSignal,
+    PredictiveSource,
+    ReliabilityPosterior,
+    SignalAttribution,
+)
 from .provider import (
     CircuitBreaker,
     CircuitState,
@@ -265,9 +288,39 @@ from .provider import (
 from .runtime import (
     AgentConfig,
     InMemoryCheckpointer,
-    JeevesAgentRuntime,
+    JeevesAgentRuntime as LegacyJeevesAgentRuntime,
     RunCheckpoint,
     RunInputs,
+)
+from .runtime_abstraction import (
+    ArgumentAbstractionPolicy,
+    ArgumentAbstractor,
+    GeneralizingRuntimeEpistemicGuard,
+)
+from .runtime_guard import (
+    GuardAdmissionMode,
+    GuardFinalization,
+    GuardedToolExecution,
+    RiskGuardProfile,
+    RuntimeEpistemicGuard,
+    RuntimeGuardDenied,
+    RuntimeGuardError,
+    RuntimeGuardPolicy,
+    RuntimeGuardRequest,
+    RuntimeGuardSignals,
+)
+from .strict_runtime import StrictJeevesAgentRuntime
+from .frontier_runtime import (
+    FrontierJeevesAgentRuntime,
+    HardenedJeevesAgentRuntime,
+)
+from .semantic_extreme_lenses import (
+    LensMaturity,
+    RareLensDefinition,
+    definitions_by_family,
+    rare_semantic_definitions,
+    rare_semantic_specs,
+    register_rare_lenses,
 )
 from .semantic_frontier import (
     FrontierLensRouter,
@@ -279,6 +332,12 @@ from .semantic_frontier import (
     SemanticComposition,
     default_interaction_rules,
     frontier_semantic_lenses,
+)
+from .semantic_maximal import (
+    MaximalLensRouter,
+    MaximalSemanticRegistry,
+    MaximalSemanticRuntime,
+    MaximalSemanticSnapshot,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,
@@ -408,6 +467,25 @@ from .world_model import (
     reliability_to_likelihood_ratio,
 )
 
+from .lens_governance import (
+    LensGovernanceDecision,
+    LensPermission,
+    LensScienceProfile,
+    LensScienceRegistry,
+    ResearchReference,
+    ScientificGrade,
+    explicit_profiles,
+)
+
+from .nuance_runtime import (
+    FrontierUncertaintyRouter,
+    NuanceFrame,
+    NuanceRuntimeError,
+    NuanceRuntimePolicy,
+    NuanceUpdate,
+    ScientificNuanceRuntime,
+    UncertaintyRecommendation,
+)
 
 # Scientific inference, fast memory, semantic lenses, and context fabric.
 from .probability_lenses import (
@@ -618,5 +696,10 @@ from .semantic_decompiler import (
     RecoveryMapping,
     SemanticDecompiler,
 )
+
+# New application code gets the guarded/generalizing runtime by default. The
+# pre-enforcement runtime remains explicitly available for compatibility and
+# controlled regression comparisons only.
+JeevesAgentRuntime = FrontierJeevesAgentRuntime
 
 __all__ = [name for name in globals() if not name.startswith("_")]

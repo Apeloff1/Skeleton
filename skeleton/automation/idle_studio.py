@@ -26,6 +26,8 @@ from urllib import error, parse, request
 from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
 
 FLEET_SIZE = 1_000
+SNAPSHOT_PAGE_SIZE = 50
+MAX_SNAPSHOT_PAGES = 10
 SAFE_PREFIXES = ("skeleton/", "backend/", "tests/", "docs/")
 BLOCKED_PREFIXES = (
     ".github/",
@@ -302,6 +304,19 @@ class GitHubError(RuntimeError):
     pass
 
 
+COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def canonical_commit_oid(value: str) -> str:
+    """Return a lowercase 40-hex Git commit OID, or fail closed."""
+    if not isinstance(value, str):
+        raise GitHubError("commit SHA must be a 40-character hex commit OID")
+    oid = value.casefold()
+    if COMMIT_OID_RE.fullmatch(oid) is None:
+        raise GitHubError("commit SHA must be a 40-character hex commit OID")
+    return oid
+
+
 class GitHubClient:
     def __init__(self, repo: str, token: str, *, timeout: float = 30.0) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
@@ -344,18 +359,35 @@ class GitHubClient:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise GitHubError("GitHub API returned invalid JSON") from exc
 
+    def _paged_list(self, path: str, *, key: str | None = None) -> list[Mapping[str, Any]]:
+        items: list[Mapping[str, Any]] = []
+        separator = "&" if "?" in path else "?"
+        for page in range(1, MAX_SNAPSHOT_PAGES + 1):
+            payload = self._api(
+                "GET",
+                f"{path}{separator}per_page={SNAPSHOT_PAGE_SIZE}&page={page}",
+            )
+            if key is None:
+                batch = payload
+            else:
+                if not isinstance(payload, dict):
+                    raise GitHubError(f"malformed {path} payload")
+                batch = payload.get(key) or []
+            if not isinstance(batch, list):
+                raise GitHubError(f"malformed {path} list")
+            items.extend(item for item in batch if isinstance(item, dict))
+            if len(batch) < SNAPSHOT_PAGE_SIZE:
+                return items
+        raise GitHubError(f"{path} exceeded bounded identity scan")
+
     def recent_runs(self) -> list[Mapping[str, Any]]:
-        data = self._api("GET", "/actions/runs?per_page=50")
-        runs = data.get("workflow_runs", []) if isinstance(data, dict) else []
-        return [item for item in runs if isinstance(item, dict)]
+        return self._paged_list("/actions/runs", key="workflow_runs")
 
     def open_issues(self) -> list[Mapping[str, Any]]:
-        data = self._api("GET", "/issues?state=open&per_page=50&sort=updated&direction=desc")
-        return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+        return self._paged_list("/issues?state=open&sort=updated&direction=desc")
 
     def open_pulls(self) -> list[Mapping[str, Any]]:
-        data = self._api("GET", "/pulls?state=open&per_page=50&sort=updated&direction=desc")
-        return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+        return self._paged_list("/pulls?state=open&sort=updated&direction=desc")
 
     def branch_sha(self, branch: str) -> str:
         encoded = parse.quote(branch, safe="")
@@ -364,15 +396,17 @@ class GitHubClient:
         sha = obj.get("sha") if isinstance(obj, dict) else None
         if not isinstance(sha, str) or not sha:
             raise GitHubError("missing branch SHA")
-        return sha
+        return canonical_commit_oid(sha)
 
     def commit_tree_sha(self, commit_sha: str) -> str:
-        data = self._api("GET", f"/git/commits/{commit_sha}")
+        commit_sha = canonical_commit_oid(commit_sha)
+        quoted_sha = parse.quote(commit_sha, safe="")
+        data = self._api("GET", f"/git/commits/{quoted_sha}")
         tree = data.get("tree", {}) if isinstance(data, dict) else {}
         sha = tree.get("sha") if isinstance(tree, dict) else None
         if not isinstance(sha, str) or not sha:
             raise GitHubError("missing commit tree SHA")
-        return sha
+        return canonical_commit_oid(sha)
 
     def create_blob(self, content: str) -> str:
         data = self._api("POST", "/git/blobs", {"content": content, "encoding": "utf-8"})
@@ -426,6 +460,7 @@ class GitHubClient:
         proposal: ChangeProposal,
     ) -> Mapping[str, Any]:
         current = self.branch_sha("main")
+        base_sha = canonical_commit_oid(base_sha)
         if current != base_sha:
             raise GitHubError("main moved during idle-studio run; refusing stale mutation")
         base_tree = self.commit_tree_sha(base_sha)

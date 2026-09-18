@@ -32,3 +32,9 @@ def test_pr_automation_keeps_required_trigger_coverage() -> None:
 
     assert "schedule:" in text
     assert "workflow_dispatch:" in text
+    assert "branches-ignore:\n      - main" in text
+    assert 'branches:\n      - "*"\n      - "**"' not in text
+    assert "--head-sha" in text
+    assert "--pr-hints-json" in text
+    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
+    assert "pull_requests[0]" not in text
