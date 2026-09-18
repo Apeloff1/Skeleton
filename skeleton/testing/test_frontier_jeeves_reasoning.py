@@ -125,7 +125,7 @@ def _council(verdict: Verdict, *, lower: float = 0.8) -> CouncilVerdict:
     )
 
 
-def _strong_search() -> SearchResult:
+def _strong_search(*, trace: str = "search-trace") -> SearchResult:
     first = _candidate(
         "primary",
         confidence=0.95,
@@ -160,6 +160,7 @@ def _strong_search() -> SearchResult:
                 risk_penalty=0.20,
             ),
         ),
+        trace=trace,
     )
 
 
