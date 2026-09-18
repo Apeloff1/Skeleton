@@ -7,6 +7,8 @@ on:
       - "requirements.txt"
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
       - "scripts/testing/test_release_provenance.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
@@ -18,6 +20,8 @@ on:
       - "requirements.txt"
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
       - "scripts/testing/test_release_provenance.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
@@ -67,9 +71,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r source-a/requirements-build.txt
 
       - name: Run release provenance regression tests
+        env:
+          PYTHONPATH: source-a
         run: |
           python -m pip install --disable-pip-version-check "pytest==8.4.2"
-          python -m pytest -q source-a/scripts/testing/test_release_provenance.py
+          python -m pytest -q \
+            source-a/scripts/testing/test_release_provenance.py \
+            source-a/skeleton/testing/test_release_evidence.py
 
       - name: Build release A
         working-directory: source-a
