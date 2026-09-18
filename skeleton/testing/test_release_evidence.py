@@ -408,6 +408,25 @@ def test_large_artifact_uses_locator_not_git_history() -> None:
     assert any("must not use normal Git history" in reason for reason in blocked.reasons)
 
 
+def test_artifact_asset_reference_binds_exact_provenance_digest() -> None:
+    artifact = _artifact(
+        "hero-artifact",
+        "hero.png",
+        b"different-bytes",
+        asset_id="hero",
+    )
+    result = evaluate_release_ready(
+        valid_evidence(artifacts=[artifact]),
+        expected_commit=COMMIT,
+        observed_artifacts={"hero-artifact": b"different-bytes"},
+    )
+    assert result.release_ready is False
+    assert any(
+        "digest does not match asset provenance hero" in reason
+        for reason in result.reasons
+    )
+
+
 def test_generated_package_cannot_use_git_lfs_lane() -> None:
     wheel = _artifact(
         "wheel",
