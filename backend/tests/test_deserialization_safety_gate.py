@@ -72,6 +72,30 @@ def test_rebound_callable_alias_is_not_assumed_to_keep_provenance(tmp_path: Path
     assert findings == []
 
 
+def test_rejects_stable_pickle_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\ncodec = pickle\nvalue = codec.loads(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_stable_deserializer_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\nfirst = torch\nsecond = first\nvalue = second.load(path)\n",
+    )
+    assert any("weights_only=True" in finding for finding in findings)
+
+
+def test_reassigned_deserializer_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\ncodec = pickle\ncodec = safe_codec\nvalue = codec.loads(payload)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_joblib_load(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import joblib\nvalue = joblib.load(path)\n")
     assert any("joblib.load() is forbidden" in finding for finding in findings)
