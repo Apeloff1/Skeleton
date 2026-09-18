@@ -40,6 +40,7 @@ from .semantic_governance_bridge import (
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
+    ReadingStatus,
     SemanticFinding,
     SemanticObservation,
     SemanticRole,
@@ -53,7 +54,6 @@ from .semantic_prediction import (
     SemanticPredictiveModel,
 )
 from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph, TangentNode
-from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph
 from .types import (
     AgentContractError,
     bounded_text,
@@ -102,26 +102,6 @@ _AXIS_TAG: dict[str, ExplorationAxis] = {
     "information": ExplorationAxis.SEMANTIC,
 }
 
-
-
-_FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
-    LensFamily.FILM: ExplorationAxis.CINEMATIC,
-    LensFamily.LITERATURE: ExplorationAxis.LITERARY,
-    LensFamily.GAME: ExplorationAxis.LUDIC,
-    LensFamily.NARRATIVE: ExplorationAxis.SEMANTIC,
-    LensFamily.SEMIOTIC: ExplorationAxis.SEMANTIC,
-    LensFamily.COGNITIVE: ExplorationAxis.MEMORY,
-    LensFamily.RHETORIC: ExplorationAxis.SEMANTIC,
-    LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
-    LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
-    LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
-    LensFamily.CAUSAL: ExplorationAxis.CAUSAL,
-    LensFamily.INFORMATION: ExplorationAxis.SEMANTIC,
-    LensFamily.COMPUTATIONAL: ExplorationAxis.SYSTEM,
-    LensFamily.METACOGNITIVE: ExplorationAxis.ADVERSARIAL,
-    LensFamily.PROBABILITY: ExplorationAxis.PROBABILISTIC,
-    LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -511,10 +491,9 @@ class SemanticLensPlane:
         family: LensFamily | None,
     ) -> ExplorationAxis:
         for tag in seed.tags:
-            try:
-                return ExplorationAxis(tag)
-            except ValueError:
-                continue
+            axis = _AXIS_TAG.get(str(tag).casefold())
+            if axis is not None:
+                return axis
         if family is not None:
             return _FAMILY_AXIS[family]
         return ExplorationAxis.SEMANTIC
@@ -777,7 +756,8 @@ class SemanticLensPlane:
         forecast_findings = tuple(
             finding
             for finding in audit.accepted
-            if finding.lens_key not in governance.forecast_blocked_lens_keys
+            if finding.status is not ReadingStatus.FALSIFIED
+            and finding.lens_key not in governance.forecast_blocked_lens_keys
         )
         proposal = self.predictive.propose(
             forecast_findings,
@@ -785,10 +765,23 @@ class SemanticLensPlane:
                 composition if self.policy.include_interaction_forecasts else None
             ),
         )
+        falsified_finding_ids = {
+            finding.finding_id
+            for finding in audit.accepted
+            if finding.status is ReadingStatus.FALSIFIED
+        }
+        blocked_interaction_ids = {
+            interaction.interaction_id
+            for interaction in composition.interactions
+            if interaction.left_finding_id in falsified_finding_ids
+            or interaction.right_finding_id in falsified_finding_ids
+        }
         forecasts = tuple(
             self.prediction_ledger.add(forecast)
             for forecast in proposal
             if self._forecast_allowed(forecast, governance)
+            and not (set(forecast.source_finding_ids) & falsified_finding_ids)
+            and not (set(forecast.source_interaction_ids) & blocked_interaction_ids)
         )
         signals = self._signals(forecasts, governance)
         rate = self.policy.base_rate if base_rate is None else probability(
@@ -809,7 +802,7 @@ class SemanticLensPlane:
             governance=governance,
             composition=composition,
             fusion=fusion,
-        )
+        ) and not bool(audit.rejected)
         coverage = self._coverage(
             selection=selection,
             audit=audit,
@@ -997,8 +990,8 @@ class SemanticLensPlane:
                     "frontier_max_per_family": self.policy.frontier_max_per_family,
                     "require_selected": self.policy.require_selected_findings,
                     "require_overlap": self.policy.require_observation_overlap,
-                    "require_subset": self.policy.require_observation_subset,
-                    "require_evidence": self.policy.require_evidence_provenance,
+                    "require_observation_subset": self.policy.require_observation_subset,
+                    "require_evidence_provenance": self.policy.require_evidence_provenance,
                     "interaction_forecasts": self.policy.include_interaction_forecasts,
                     "base_rate": self.policy.base_rate,
                 },
