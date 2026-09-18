@@ -48,6 +48,7 @@ from .research_synthesis import (
     SynthesisReport,
 )
 from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
+from .types import AgentContractError, json_safe, stable_fingerprint
 
 
 class FrontierCognitiveControlPlane(CognitiveControlPlane):
@@ -101,6 +102,8 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             policy=research_stop_policy,
         )
         self._completion_certificates: dict[str, CompletionCertificate] = {}
+        self._forecast_settlements: list[ForecastSettlement] = []
+        self._restored_frontier_audit: Mapping[str, Any] | None = None
         self._last_frontier_snapshot: FrontierSnapshot | None = None
         self._last_agenda_snapshot: AgendaSnapshot | None = None
         self._tournaments: dict[str, HypothesisTournament] = {}
@@ -264,20 +267,154 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         )
         if reopened:
             self._last_agenda_snapshot = self.research_agenda.snapshot()
+        self._forecast_settlements.append(settlement)
         return settlement
 
     def dump_research_state(self) -> dict[str, Any]:
-        """Return JSON-safe agenda state suitable for context/database storage."""
+        """Checkpoint the full epistemic research program with an integrity hash."""
 
-        return self.research_agenda.dump_state()
+        agenda_state = self.research_agenda.dump_state()
+        forecast_state = self.epistemic_frontier.dump_forecasts()
+        tournaments = [
+            item.dump_state()
+            for item in sorted(
+                self._tournaments.values(),
+                key=lambda value: value.tournament_id,
+            )
+        ]
+        certificates = [
+            item.as_json()
+            for item in sorted(
+                self._completion_certificates.values(),
+                key=lambda value: value.certificate_id,
+            )
+        ]
+        settlements = [
+            {
+                "forecast_id": item.forecast_id,
+                "observed_outcome": item.observed_outcome,
+                "probability_assigned": item.probability_assigned,
+                "brier_score": item.brier_score,
+                "surprise_bits": item.surprise_bits,
+                "settlement_fingerprint": item.settlement_fingerprint,
+            }
+            for item in self._forecast_settlements
+        ]
+        frontier_audit = (
+            self._last_frontier_snapshot.as_json()
+            if self._last_frontier_snapshot is not None
+            else self._restored_frontier_audit
+        )
+        component_fingerprint = stable_fingerprint(
+            {
+                "agenda": agenda_state["fingerprint"],
+                "forecasts": forecast_state["fingerprint"],
+                "tournaments": [
+                    stable_fingerprint(item) for item in tournaments
+                ],
+                "certificates": [
+                    item["fingerprint"] for item in certificates
+                ],
+                "settlements": [
+                    item["settlement_fingerprint"] for item in settlements
+                ],
+                "frontier": (
+                    frontier_audit.get("fingerprint")
+                    if isinstance(frontier_audit, Mapping)
+                    else None
+                ),
+            }
+        )
+        return {
+            "version": 2,
+            "agenda": agenda_state,
+            "forecasts": forecast_state,
+            "tournaments": tournaments,
+            "certificates": certificates,
+            "settlements": settlements,
+            "frontier_audit": frontier_audit,
+            "fingerprint": component_fingerprint,
+        }
 
     def restore_research_state(self, state: Mapping[str, Any]) -> AgendaSnapshot:
-        """Replace the agenda from a deterministic serialized checkpoint."""
+        """Restore a research program and verify deterministic replay integrity."""
+
+        payload = json_safe(dict(state))
+        # Backward-compatible agenda-only checkpoints from the first research
+        # agenda implementation.
+        if payload.get("version") == 1 and "items" in payload:
+            self.research_agenda = ResearchAgenda.from_state(
+                payload,
+                clock=self._clock,
+            )
+            self._last_agenda_snapshot = self.research_agenda.snapshot()
+            return self._last_agenda_snapshot
+        if payload.get("version") != 2:
+            raise AgentContractError("unsupported research program state version")
 
         self.research_agenda = ResearchAgenda.from_state(
-            state,
+            dict(payload["agenda"]),
             clock=self._clock,
         )
+        self.epistemic_frontier.restore_forecasts(
+            dict(payload["forecasts"]),
+            replace_existing=True,
+        )
+
+        tournaments: dict[str, HypothesisTournament] = {}
+        for value in payload.get("tournaments", ()):
+            tournament = HypothesisTournament.from_state(dict(value))
+            if tournament.tournament_id in tournaments:
+                raise AgentContractError(
+                    "duplicate tournament_id in research checkpoint"
+                )
+            tournaments[tournament.tournament_id] = tournament
+        self._tournaments = tournaments
+
+        certificates: dict[str, CompletionCertificate] = {}
+        for value in payload.get("certificates", ()):
+            certificate = CompletionCertificate.from_json(dict(value))
+            if certificate.certificate_id in certificates:
+                raise AgentContractError(
+                    "duplicate completion certificate in research checkpoint"
+                )
+            certificates[certificate.certificate_id] = certificate
+        self._completion_certificates = certificates
+
+        settlements: list[ForecastSettlement] = []
+        for value in payload.get("settlements", ()):
+            settlement = ForecastSettlement(
+                forecast_id=value["forecast_id"],
+                observed_outcome=value["observed_outcome"],
+                probability_assigned=value["probability_assigned"],
+                brier_score=value["brier_score"],
+                surprise_bits=value["surprise_bits"],
+                settlement_fingerprint=value["settlement_fingerprint"],
+            )
+            expected = stable_fingerprint(
+                {
+                    "commitment": self.epistemic_frontier.forecast(
+                        settlement.forecast_id
+                    ).commitment,
+                    "observed": settlement.observed_outcome,
+                    "assigned": settlement.probability_assigned,
+                    "brier": settlement.brier_score,
+                    "surprise_bits": settlement.surprise_bits,
+                }
+            )
+            if expected != settlement.settlement_fingerprint:
+                raise AgentContractError(
+                    "forecast settlement fingerprint mismatch during restore"
+                )
+            settlements.append(settlement)
+        self._forecast_settlements = settlements
+        self._restored_frontier_audit = payload.get("frontier_audit")
+
+        rebuilt = self.dump_research_state()
+        if rebuilt["fingerprint"] != payload.get("fingerprint"):
+            raise AgentContractError(
+                "research program fingerprint mismatch after deterministic replay"
+            )
         self._last_agenda_snapshot = self.research_agenda.snapshot()
         return self._last_agenda_snapshot
 
