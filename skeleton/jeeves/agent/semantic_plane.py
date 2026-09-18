@@ -48,6 +48,7 @@ from .semantic_lenses import (
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .semantic_plane_interactions import plane_interaction_rules
 from .semantic_prediction import (
+    PredictionStatus,
     SemanticForecast,
     SemanticPredictionLedger,
     SemanticPredictiveModel,
@@ -393,7 +394,43 @@ class SemanticLensPlane:
             governance.weight_for(key, 0.0)
             for key in forecast.source_lens_keys
         ]
-        return min(weights) if weights else 0.0
+        component_weight = min(weights) if weights else 0.0
+        source_keys = tuple(sorted(set(forecast.source_lens_keys)))
+        if len(source_keys) <= 1:
+            return component_weight
+
+        interaction_key = "interaction:" + "+".join(source_keys)
+        interaction_trials = self.governance.registry.lab.trials(interaction_key)
+        if not interaction_trials:
+            return component_weight
+        interaction_weight = self.governance.registry.lab.routing_weight(
+            interaction_key,
+            default_shadow_weight=component_weight,
+        )
+        # An interaction cannot become more reliable than its weakest governed
+        # constituent merely because the composite accumulated favorable trials.
+        return min(component_weight, interaction_weight)
+
+    def _register_open_forecasts(
+        self,
+        proposals: Sequence[SemanticForecast],
+        governance: SemanticGovernanceSnapshot,
+    ) -> tuple[SemanticForecast, ...]:
+        registered: list[SemanticForecast] = []
+        for forecast in proposals:
+            if not self._forecast_allowed(forecast, governance):
+                continue
+            existing = self.prediction_ledger.get(forecast.forecast_id)
+            if existing is None:
+                registered.append(self.prediction_ledger.add(forecast))
+                continue
+            if existing.status is PredictionStatus.OPEN:
+                registered.append(self.prediction_ledger.add(forecast))
+                continue
+            # A resolved/invalidated semantic proposition is not silently
+            # reopened. New evidence or changed epistemic state yields a new
+            # forecast id; an unchanged proposition remains closed.
+        return tuple(registered)
 
     def _signals(
         self,
@@ -745,10 +782,9 @@ class SemanticLensPlane:
                 composition if self.policy.include_interaction_forecasts else None
             ),
         )
-        forecasts = tuple(
-            self.prediction_ledger.add(forecast)
-            for forecast in proposal
-            if self._forecast_allowed(forecast, governance)
+        forecasts = self._register_open_forecasts(
+            proposal,
+            governance,
         )
         signals = self._signals(forecasts, governance)
         rate = self.policy.base_rate if base_rate is None else probability(
