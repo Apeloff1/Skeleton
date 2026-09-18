@@ -44,7 +44,8 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "- Merge Readiness" in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
-    assert 'branches:\n      - "*"\n      - "**"' in text
+    assert "branches-ignore:\n      - main" in text
+    assert 'branches:\n      - "*"\n      - "**"' not in text
 
 
 def test_workflow_resolves_all_branch_completions_from_head_identity():
