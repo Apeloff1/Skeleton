@@ -162,6 +162,72 @@ class ContextFabricResult:
     token_estimate: int
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        namespace_key = str(self.namespace_key).strip()
+        if not namespace_key or len(namespace_key) > 2048:
+            raise AgentContractError("namespace_key is invalid")
+        object.__setattr__(self, "namespace_key", namespace_key)
+
+        query = str(self.query)
+        if len(query) > 256_000:
+            raise AgentContractError("context fabric query is too large")
+        object.__setattr__(self, "query", query)
+
+        if not isinstance(self.fast_recall, RecallPacket):
+            raise AgentContractError("fast_recall must be RecallPacket")
+        if not isinstance(self.lenses, LensBundle):
+            raise AgentContractError("lenses must be LensBundle")
+
+        governance = tuple(self.lens_governance)
+        if any(not isinstance(item, LensGovernanceDecision) for item in governance):
+            raise AgentContractError(
+                "lens_governance must contain LensGovernanceDecision values"
+            )
+        object.__setattr__(self, "lens_governance", governance)
+
+        records = tuple(self.records)
+        if any(not isinstance(item, DeepContextRecord) for item in records):
+            raise AgentContractError(
+                "records must contain DeepContextRecord values"
+            )
+        object.__setattr__(self, "records", records)
+
+        stale = tuple(
+            sorted({str(value).strip() for value in self.stale_card_ids if str(value).strip()})
+        )
+        unresolved = tuple(
+            sorted(
+                {
+                    str(value).strip()
+                    for value in self.unresolved_source_refs
+                    if str(value).strip()
+                }
+            )
+        )
+        object.__setattr__(self, "stale_card_ids", stale)
+        object.__setattr__(self, "unresolved_source_refs", unresolved)
+
+        if not isinstance(self.broad_search_used, bool):
+            raise AgentContractError("broad_search_used must be boolean")
+        if (
+            isinstance(self.token_estimate, bool)
+            or not isinstance(self.token_estimate, int)
+            or self.token_estimate < 0
+        ):
+            raise AgentContractError("token_estimate must be a non-negative integer")
+        expected_tokens = sum(record.token_estimate for record in records)
+        if self.token_estimate != expected_tokens:
+            raise AgentContractError(
+                "token_estimate does not match packed context records"
+            )
+
+        fingerprint = str(self.fingerprint).strip().lower()
+        if len(fingerprint) != 64 or any(
+            character not in "0123456789abcdef" for character in fingerprint
+        ):
+            raise AgentContractError("fabric fingerprint must be sha256 hex")
+        object.__setattr__(self, "fingerprint", fingerprint)
+
     def render_payload(self) -> list[dict[str, Any]]:
         return [
             {
