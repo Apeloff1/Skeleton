@@ -129,8 +129,8 @@ def test_rejects_missing_active_ci_state() -> None:
 def test_rejects_action_checkout() -> None:
     source = _replace_once(
         _source(),
-        "    steps:\n      - name: Advance only stable same-repository PR branches\n",
-        "    steps:\n      - uses: actions/checkout@0000000000000000000000000000000000000000\n      - name: Advance only stable same-repository PR branches\n",
+        "    steps:\n      - name: Gate branch refresh on Actions pressure\n",
+        "    steps:\n      - uses: actions/checkout@0000000000000000000000000000000000000000\n      - name: Gate branch refresh on Actions pressure\n",
     )
     assert "must remain checkout/action-free" in _messages(source)
 
