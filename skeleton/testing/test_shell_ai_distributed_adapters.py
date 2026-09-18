@@ -273,3 +273,12 @@ def test_distributed_review_stale_claim_cannot_decide_after_reacquire():
     with pytest.raises(Exception):
         queue.decide(first, approve=True)
     assert queue.decide(second, approve=True).state is ReviewState.APPROVED
+
+
+def test_distributed_review_same_timestamp_still_gets_unique_ids():
+    now = [0.0]
+    backend = InMemoryFencedStore(clock=lambda: now[0])
+    queue = DistributedAIReviewQueue(backend, clock=lambda: now[0])
+    first = queue.enqueue(review())
+    second = queue.enqueue(review())
+    assert first.item_id != second.item_id
