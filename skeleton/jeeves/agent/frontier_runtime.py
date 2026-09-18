@@ -625,6 +625,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
             "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_topology_learning_fingerprint": (
+                self.semantic_plane.topology_learning.fingerprint
+            ),
         }
         if lineage is not None:
             metadata.update(
@@ -652,7 +655,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             metadata=metadata,
         )
         binding_payload = {
-            "frontier_binding_version": 2,
+            "frontier_binding_version": 3,
             "checkpoint_sequence": checkpoint.sequence,
             "checkpoint_fingerprint": checkpoint.fingerprint,
             "audit_head_before": audit.head_hash,
@@ -662,6 +665,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
             "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_topology_learning_fingerprint": (
+                self.semantic_plane.topology_learning.fingerprint
+            ),
         }
         if lineage is not None:
             binding_payload.update(
@@ -1007,6 +1013,21 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "semantic plane contract fingerprint changed on resume"
             )
 
+        expected_topology_learning = checkpoint.metadata.get(
+            "semantic_topology_learning_fingerprint"
+        )
+        if expected_topology_learning is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic topology learning root"
+            )
+        current_topology_learning = (
+            self.semantic_plane.topology_learning.fingerprint
+        )
+        if expected_topology_learning != current_topology_learning:
+            raise ExecutionAuditError(
+                "semantic topology learning fingerprint changed on resume"
+            )
+
         if isinstance(self.runtime_guard, ScopedGeneralizingRuntimeEpistemicGuard):
             try:
                 lineage_count = int(
@@ -1094,6 +1115,17 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 checkpoint_semantic_plane is not None
                 and payload.get("semantic_plane_fingerprint")
                 != checkpoint_semantic_plane
+            ):
+                continue
+            checkpoint_topology_learning = checkpoint.metadata.get(
+                "semantic_topology_learning_fingerprint"
+            )
+            if (
+                checkpoint_topology_learning is None
+                or payload.get(
+                    "semantic_topology_learning_fingerprint"
+                )
+                != checkpoint_topology_learning
             ):
                 continue
             checkpoint_lineage = checkpoint.metadata.get(
