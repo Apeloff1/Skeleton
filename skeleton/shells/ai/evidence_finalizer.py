@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from skeleton.shells.ai.audit_anchor import AIAuditAnchorStore, SignedAIAuditAnchor
 from skeleton.shells.ai.checkpoint import AISessionCheckpoint
 from skeleton.shells.ai.orchestrator import AIExecutionBundle
+from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.session_evidence import (
@@ -23,6 +24,7 @@ class FinalizedAIExecutionEvidence:
     session_evidence: SessionExecutionEvidence
     session_journal: SessionJournalEvidence
     audit_anchor: SignedAIAuditAnchor
+    execution_evidence: SignedAIExecutionEvidence | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -35,6 +37,11 @@ class FinalizedAIExecutionEvidence:
             "session_journal": self.session_journal.to_dict(),
             "session_journal_digest": self.session_journal.digest,
             "audit_anchor": self.audit_anchor.to_dict(),
+            "execution_evidence": (
+                None
+                if self.execution_evidence is None
+                else self.execution_evidence.to_dict()
+            ),
         }
 
 
@@ -52,11 +59,17 @@ class AIExecutionEvidenceFinalizer:
         receipt_chain,
         session_evidence: SessionEvidenceStore,
         audit_anchors: AIAuditAnchorStore,
+        execution_evidence: AIExecutionEvidenceStore | None = None,
+        execution_evidence_builder: AIExecutionEvidenceBuilder | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
         self.session_evidence = session_evidence
         self.audit_anchors = audit_anchors
+        self.execution_evidence = execution_evidence
+        self.execution_evidence_builder = (
+            execution_evidence_builder or AIExecutionEvidenceBuilder()
+        )
 
     def finalize(
         self,
@@ -68,6 +81,9 @@ class AIExecutionEvidenceFinalizer:
         effect_digest: str,
         release_evidence_digest: str = "",
         sandbox_binding_digest: str = "",
+        model_attestation_digest: str = "",
+        execution_seal_id: str = "",
+        quorum_approval_digest: str = "",
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
             raise RuntimeError("AI execution evidence may only finalize a completed attempt")
@@ -141,10 +157,37 @@ class AIExecutionEvidenceFinalizer:
         )
         if not self.audit_anchors.verify():
             raise RuntimeError("AI audit anchor chain failed verification after append")
+
+        signed_execution_evidence = None
+        if self.execution_evidence is not None:
+            final_bundle = self.execution_evidence_builder.build(
+                session_id=session.session_id,
+                intent_fingerprint=session.intent.fingerprint,
+                proposal_fingerprint=session.proposal.fingerprint,
+                provenance_digest=execution.provenance.digest,
+                checkpoint_digest=recovery.digest,
+                session_evidence_digest=evidence.digest,
+                session_journal_digest=session_journal.digest,
+                audit_anchor_digest=anchor.anchor.digest,
+                audit_chain_node_hash=anchor.chain_node_hash,
+                release_evidence_digest=release_evidence_digest,
+                sandbox_binding_digest=sandbox_binding_digest,
+                model_attestation_digest=model_attestation_digest,
+                execution_seal_id=execution_seal_id,
+                quorum_approval_digest=quorum_approval_digest,
+            )
+            signed_execution_evidence = self.execution_evidence.append(
+                final_bundle
+            )
+            if not self.execution_evidence.verify():
+                raise RuntimeError(
+                    "AI execution evidence chain failed verification after append"
+                )
         return FinalizedAIExecutionEvidence(
             checkpoint,
             recovery,
             evidence,
             session_journal,
             anchor,
+            signed_execution_evidence,
         )
