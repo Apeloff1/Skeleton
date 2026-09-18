@@ -422,16 +422,15 @@ def test_nested_tool_policy_keys_cannot_bypass_self_grant_detection(
 
 def test_tool_json_structure_bound_fails_closed(tmp_path: Path) -> None:
     box = _sandbox(tmp_path)
-    nested: object = {"value": "leaf"}
-    for _ in range(2200):
-        nested = [nested]
-    try:
-        payload = json.dumps({"name": "noop", "arguments": nested})
-    except RecursionError:
-        pytest.skip("local JSON encoder recursion limit is lower than traversal fixture")
+    payload = json.dumps(
+        {
+            "name": "noop",
+            "arguments": [{} for _ in range(2100)],
+        }
+    )
     decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
     assert decision.allowed is False
-    assert "bound" in decision.reason or "parse" in decision.reason
+    assert "structure exceeds bound" in decision.reason
 
 
 def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Path) -> None:
