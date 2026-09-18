@@ -225,6 +225,16 @@ def test_missing_test_evidence_blocks_release_ready() -> None:
     assert any("missing required test evidence" in reason for reason in result.reasons)
 
 
+def test_missing_eval_evidence_blocks_release_ready() -> None:
+    result = evaluate_release_ready(
+        valid_evidence(eval_evidence=[]),
+        expected_commit=COMMIT,
+        observed_artifacts=valid_observed(),
+    )
+    assert result.release_ready is False
+    assert any("missing required eval evidence" in reason for reason in result.reasons)
+
+
 def test_tampered_digest_fails_closed() -> None:
     evidence = valid_evidence()
     result = evaluate_release_ready(
