@@ -144,6 +144,8 @@ class PassRecord:
     determinism_replay_fingerprint: Optional[str] = None
     determinism_verified: bool = False
     analysis_contract: Mapping[str, Tuple[str, ...]] = field(default_factory=dict)
+    replay_safe_declared: bool = False
+    thread_safe_declared: bool = False
 
     @property
     def fingerprint(self) -> str:
@@ -160,6 +162,8 @@ class PassRecord:
             "analysis_contract": {
                 key: list(value) for key, value in sorted(self.analysis_contract.items())
             },
+            "replay_safe_declared": self.replay_safe_declared,
+            "thread_safe_declared": self.thread_safe_declared,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -601,9 +605,9 @@ class PassManager:
                 "required": tuple(sorted(item.value for item in contract.required_analyses)),
                 "preserved": tuple(sorted(item.value for item in contract.preserved_analyses)),
                 "invalidated": tuple(sorted(item.value for item in contract.invalidated_analyses)),
-                "replay_safe": ("true",) if contract.replay_safe else ("false",),
-                "thread_safe": ("true",) if contract.thread_safe else ("false",),
             },
+            replay_safe_declared=False if contract is None else contract.replay_safe,
+            thread_safe_declared=False if contract is None else contract.thread_safe,
         )
 
 
