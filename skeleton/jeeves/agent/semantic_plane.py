@@ -730,11 +730,14 @@ class SemanticLensPlane:
         findings: Sequence[SemanticFinding] = (),
         requested: Sequence[str] = (),
         base_rate: float | None = None,
+        sequence: int = 0,
     ) -> SemanticPlaneSnapshot:
         if not observations:
             raise AgentContractError("semantic plane requires observations")
         if any(not isinstance(item, SemanticObservation) for item in observations):
             raise TypeError("observations must contain SemanticObservation values")
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise AgentContractError("sequence must be a non-negative integer")
         observation_ids = [item.observation_id for item in observations]
         if len(observation_ids) != len(set(observation_ids)):
             raise AgentContractError("semantic observation ids must be unique")
@@ -744,7 +747,6 @@ class SemanticLensPlane:
             selection,
             observations=observations,
         )
-        # The bridge itself must preserve the semantic evidence ceiling.
         if (
             governance.factual_assertion_authorized
             or governance.causal_assertion_authorized
@@ -766,9 +768,7 @@ class SemanticLensPlane:
         )
         composition = self.composition.compose(audit.accepted)
 
-        calibration_weights = {
-            key: weight for key, weight in governance.predictive_weights
-        }
+        calibration_weights = dict(governance.predictive_weights)
         hypergraph = self.hypergraph.build(
             audit.accepted,
             calibration_weights=calibration_weights,
@@ -796,6 +796,20 @@ class SemanticLensPlane:
         )
         fusion = self.fusion.fuse(signals, base_rate=rate)
 
+        tangent_ids, frontier = self._seed_tangent_frontier(
+            observations=observations,
+            audit=audit,
+            perpendicular=perpendicular,
+            composition=composition,
+            hypergraph=hypergraph,
+            sequence=sequence,
+        )
+        decision_feature_authorized = self._decision_feature_authorized(
+            forecasts=forecasts,
+            governance=governance,
+            composition=composition,
+            fusion=fusion,
+        )
         coverage = self._coverage(
             selection=selection,
             audit=audit,
@@ -804,6 +818,8 @@ class SemanticLensPlane:
             hypergraph=hypergraph,
             forecasts=forecasts,
             fusion=fusion,
+            tangent_ids=tangent_ids,
+            frontier=frontier,
         )
         fingerprint = stable_fingerprint(
             {
@@ -822,7 +838,10 @@ class SemanticLensPlane:
                 "hypergraph": hypergraph.fingerprint,
                 "forecasts": [item.fingerprint for item in forecasts],
                 "fusion": fusion.fingerprint,
+                "tangents": tangent_ids,
+                "frontier": frontier.fingerprint,
                 "coverage": coverage.fingerprint,
+                "decision_feature_authorized": decision_feature_authorized,
                 "factual": False,
                 "causal": False,
             }
@@ -838,6 +857,9 @@ class SemanticLensPlane:
             forecasts=forecasts,
             fusion=fusion,
             coverage=coverage,
+            tangent_ids=tangent_ids,
+            frontier=frontier,
+            decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
             fingerprint=fingerprint,
