@@ -11,6 +11,7 @@ import hashlib
 import inspect
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -413,6 +414,64 @@ def test_unknown_schema_version_fails_closed():
         migrate_manifest({"schema_version": "1", "assets": []})
     empty = parse_manifest({"schema_version": 1, "assets": []})
     assert empty.assets == ()
+
+
+def test_typed_target_constraints_reject_noncanonical_sequences_and_duplicates():
+    record = AssetRecord.from_bytes(
+        asset_id="typed-targets",
+        kind="image",
+        data=b"asset-bytes",
+    )
+
+    bad_engines = replace(
+        record,
+        targets=TargetConstraints(engines="pc"),  # type: ignore[arg-type]
+    )
+    with pytest.raises(SerializationError, match="engines must be a tuple"):
+        validate_manifest(AssetManifest(schema_version=SCHEMA_VERSION, assets=(bad_engines,)))
+
+    duplicate_constraints = replace(
+        record,
+        targets=TargetConstraints(
+            constraints=(("quality", 1), ("quality", 2)),
+        ),
+    )
+    with pytest.raises(SerializationError, match="duplicate keys"):
+        validate_manifest(
+            AssetManifest(schema_version=SCHEMA_VERSION, assets=(duplicate_constraints,))
+        )
+
+
+def test_from_bytes_lineage_iterable_is_hard_bounded():
+    def endless_lineage():
+        index = 0
+        while True:
+            yield LineageStep(
+                step=index,
+                operator="noop",
+                input_digest="",
+                output_digest="0" * 64,
+                parameters=(),
+            )
+            index += 1
+
+    with pytest.raises(LineageError, match="lineage exceeds step bound"):
+        AssetRecord.from_bytes(
+            asset_id="bounded-lineage",
+            kind="image",
+            data=b"asset-bytes",
+            lineage=endless_lineage(),
+        )
+
+
+def test_from_bytes_rejects_truthy_non_boolean_release_flag():
+    with pytest.raises(SerializationError, match="release_marked"):
+        AssetRecord.from_bytes(
+            asset_id="typed-asset",
+            kind="image",
+            data=b"asset-bytes",
+            release_marked="false",  # type: ignore[arg-type]
+        )
 
 
 def test_release_marked_missing_rights_or_source_fails_closed():
