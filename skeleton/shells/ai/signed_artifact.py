@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import time
+from types import MappingProxyType
 from typing import Callable, Mapping
 
 
@@ -32,6 +33,10 @@ class SignedArtifact:
             raise ValueError("invalid key_id")
         if len(self.signature) != 64:
             raise ValueError("signature must be SHA-256 HMAC")
+        metadata = dict(self.metadata)
+        if len(metadata) > 64:
+            raise ValueError("too many signed artifact metadata fields")
+        object.__setattr__(self, "metadata", MappingProxyType(metadata))
 
     def unsigned_dict(self) -> dict[str, object]:
         return {
