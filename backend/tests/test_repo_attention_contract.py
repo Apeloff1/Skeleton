@@ -30,9 +30,22 @@ def test_rejects_pull_request_target_regression() -> None:
     assert "pull_request_target is forbidden" in _messages(source)
 
 
-def test_rejects_cancellation_that_can_starve_trusted_clear() -> None:
-    source = _replace_once(_source(), "  cancel-in-progress: false", "  cancel-in-progress: true")
-    assert "must not cancel in-flight trusted clears" in _messages(source)
+def test_rejects_global_cancellation_that_can_starve_trusted_clear() -> None:
+    source = _replace_once(
+        _source(),
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}",
+        "  cancel-in-progress: true",
+    )
+    assert "only trusted same-repository PR lifecycle events may cancel" in _messages(source)
+
+
+def test_rejects_pr_cancellation_without_same_repository_guard() -> None:
+    source = _replace_once(
+        _source(),
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}",
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+    )
+    assert "only trusted same-repository PR lifecycle events may cancel" in _messages(source)
 
 
 def test_rejects_loss_of_same_repository_pr_guard() -> None:
@@ -128,3 +141,38 @@ def test_repository_attention_uses_general_runner_capacity() -> None:
 
     assert source.count("runs-on: ubuntu-latest") == 5
     assert "runs-on: ubuntu-24.04-arm" not in source
+
+
+def test_managed_label_presence_guards_skip_empty_clear_jobs() -> None:
+    source = _source()
+
+    required = (
+        "contains(github.event.pull_request.labels.*.name, 'needs-attention')",
+        "contains(github.event.pull_request.labels.*.name, 'stale-draft')",
+        "contains(github.event.issue.labels.*.name, 'needs-attention')",
+        "contains(github.event.issue.labels.*.name, 'stale-draft')",
+    )
+    for marker in required:
+        assert marker in source
+
+
+def test_rejects_loss_of_pr_label_presence_guard() -> None:
+    source = _replace_once(
+        _source(),
+        "      (contains(github.event.pull_request.labels.*.name, 'needs-attention') ||\n"
+        "       contains(github.event.pull_request.labels.*.name, 'stale-draft'))\n",
+        "      true\n",
+    )
+    messages = _messages(source)
+    assert "PR clear job must skip runner allocation without managed label" in messages
+
+
+def test_rejects_loss_of_comment_label_presence_guard() -> None:
+    source = _replace_once(
+        _source(),
+        "      (contains(github.event.issue.labels.*.name, 'needs-attention') ||\n"
+        "       contains(github.event.issue.labels.*.name, 'stale-draft'))\n",
+        "      true\n",
+    )
+    messages = _messages(source)
+    assert "comment clear job must skip runner allocation without managed label" in messages
