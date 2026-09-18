@@ -155,15 +155,56 @@ def execute_schedule(
 
     verification = planner.verify_plan(plan)
 
-    # Lazy import — keeps core.swarm_planner pure and avoids a DB import at module load.
-    from core import platoons as platoons_mod
+    if persist:
+        # Lazy import — persistent runs use the full platoon/whisper/ledger stack.
+        from core import platoons as platoons_mod
 
-    def _executor(phase_id: str, prev_handoff: str | None, rotation_idx: int, _wave: int) -> dict:
-        return platoons_mod.run_platoon(
-            build_id=build_id, phase_id=phase_id, game_ctx=game_ctx,
-            rotation_idx=rotation_idx, prev_handoff=prev_handoff,
-            rounds=rounds, size=platoon_size, persist=persist,
-        )
+        def _executor(phase_id: str, prev_handoff: str | None, rotation_idx: int, _wave: int) -> dict:
+            return platoons_mod.run_platoon(
+                build_id=build_id, phase_id=phase_id, game_ctx=game_ctx,
+                rotation_idx=rotation_idx, prev_handoff=prev_handoff,
+                rounds=rounds, size=platoon_size, persist=True,
+            )
+    else:
+        # Hermetic execution must stay DB-free. Reuse the planner's already
+        # deterministic worker assignment instead of importing core.platoons,
+        # whose module initialization intentionally binds persistence stores.
+        workers_by_phase = {
+            node["phase_id"]: tuple(node.get("workers") or ())
+            for node in plan["nodes"]
+            if node.get("tier") == "platoon"
+        }
+
+        def _executor(phase_id: str, prev_handoff: str | None, rotation_idx: int, wave: int) -> dict:
+            workers = workers_by_phase.get(phase_id, ())
+            members = [
+                {
+                    "code": worker.get("code"),
+                    "agent": worker.get("agent"),
+                    "category": worker.get("category"),
+                }
+                for worker in workers
+            ]
+            transcript = [
+                {
+                    "round": round_index + 1,
+                    "phase_id": phase_id,
+                    "speaker_code": member.get("code"),
+                    "text": f"{phase_id}:deterministic-hermetic-pass:{round_index + 1}",
+                }
+                for round_index in range(max(0, rounds))
+                for member in members
+            ]
+            inherited = f":inherits:{prev_handoff}" if prev_handoff else ""
+            return {
+                "members": members,
+                "transcript": transcript,
+                "whisper_count": 0,
+                "handoff": (
+                    f"HO[{phase_id}:r{rotation_idx}:w{wave}]"
+                    + inherited
+                )[:300],
+            }
 
     execution = run_with_executor(plan, _executor)
 
