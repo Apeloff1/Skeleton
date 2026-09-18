@@ -61,7 +61,6 @@ from .frontier_reasoning import (
 from .frontier_runtime import FrontierJeevesAgentRuntime
 from .runtime import (
     AgentResult,
-    JeevesAgentRuntime as BaseJeevesAgentRuntime,
     RunCheckpoint,
     RunInputs,
     RuntimeErrorBase,
@@ -773,8 +772,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 f"Specialist role: {role.value}. Number of candidates: {width}."
             )
             user_payload = json.dumps({"task": task, "parent": parent_context}, ensure_ascii=False, sort_keys=True)
-            response = BaseJeevesAgentRuntime._model_call(
-                self,
+            response = self._model_call(
                 state,
                 messages=(ModelMessage("system", instruction), ModelMessage("user", user_payload)),
                 requested_max_tokens=min(4096, max(1024, width * 700)),
