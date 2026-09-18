@@ -72,6 +72,10 @@ from .semantic_research_bridge import (
     SemanticTopologyResearchBridge,
     SemanticTopologyResearchUpdate,
 )
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    SemanticLearningScope,
+)
 from .strict_runtime import StrictJeevesAgentRuntime
 from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
 
@@ -264,12 +268,16 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         argument_abstractor: ArgumentAbstractor | None = None,
         runtime_guard: RuntimeEpistemicGuard | None = None,
         semantic_plane: SemanticLensPlane | None = None,
+        semantic_scope_pool: ScopedSemanticPlanePool | None = None,
+        semantic_scoping_enabled: bool = True,
         cortex: JeevesCortex | None = None,
         cortex_enabled: bool = True,
         cortex_required: bool = False,
         wall_clock: Callable[[], float] = time.time,
         **kwargs: Any,
     ) -> None:
+        if not isinstance(semantic_scoping_enabled, bool):
+            raise TypeError("semantic_scoping_enabled must be boolean")
         if not isinstance(cortex_enabled, bool):
             raise TypeError("cortex_enabled must be boolean")
         if not isinstance(cortex_required, bool):
@@ -311,6 +319,29 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 )
 
         self.semantic_plane = semantic_plane or SemanticLensPlane()
+        if (
+            semantic_scope_pool is not None
+            and not isinstance(
+                semantic_scope_pool,
+                ScopedSemanticPlanePool,
+            )
+        ):
+            raise TypeError(
+                "semantic_scope_pool must be ScopedSemanticPlanePool or None"
+            )
+        if (
+            semantic_scope_pool is not None
+            and semantic_scope_pool.template.fingerprint
+            != self.semantic_plane.fingerprint
+        ):
+            raise ValueError(
+                "semantic_scope_pool template contract differs from semantic_plane"
+            )
+        self.semantic_scoping_enabled = semantic_scoping_enabled
+        self.semantic_scope_pool = (
+            semantic_scope_pool
+            or ScopedSemanticPlanePool(self.semantic_plane)
+        )
         self.cortex_required = cortex_required
         self.cortex = cortex if cortex_enabled else None
         if cortex_enabled and self.cortex is None:
@@ -320,6 +351,66 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             )
         self._cortex_lock = threading.RLock()
         self._cortex_assessments: dict[str, Mapping[str, Any]] = {}
+
+    def semantic_learning_scope(
+        self,
+        inputs: RunInputs,
+    ) -> SemanticLearningScope:
+        if not isinstance(inputs, RunInputs):
+            raise TypeError("inputs must be RunInputs")
+        return SemanticLearningScope(
+            tenant_id=inputs.tenant_id,
+            user_id=inputs.user_id,
+            workspace_id=inputs.workspace_id,
+        )
+
+    def semantic_plane_for(
+        self,
+        inputs: RunInputs,
+    ) -> SemanticLensPlane:
+        """Return mutable semantic state isolated to one learning scope."""
+
+        if not isinstance(inputs, RunInputs):
+            raise TypeError("inputs must be RunInputs")
+        if not self.semantic_scoping_enabled:
+            return self.semantic_plane
+        return self.semantic_scope_pool.get(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+        )
+
+    def semantic_plane_for_scope(
+        self,
+        tenant_id: str,
+        user_id: str,
+        workspace_id: str,
+    ) -> SemanticLensPlane:
+        if not self.semantic_scoping_enabled:
+            return self.semantic_plane
+        return self.semantic_scope_pool.get(
+            tenant_id,
+            user_id,
+            workspace_id,
+        )
+
+    def analyze_scoped_semantics(
+        self,
+        inputs: RunInputs,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        sequence: int = 0,
+    ) -> SemanticPlaneSnapshot:
+        return self.semantic_plane_for(inputs).analyze(
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=sequence,
+        )
 
     def analyze_semantics(
         self,
