@@ -46,6 +46,19 @@ class ValidationStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class AnalysisDomain(str, Enum):
+    CFG = "cfg"
+    DOMINANCE = "dominance"
+    SSA = "ssa"
+    TYPES = "types"
+    EFFECTS = "effects"
+    PROVENANCE = "provenance"
+    ABSTRACT_INTERPRETATION = "abstract_interpretation"
+    ALIAS = "alias"
+    CAPABILITIES = "capabilities"
+    NONDETERMINISM = "nondeterminism"
+
+
 @dataclass(frozen=True)
 class PassContract:
     pass_id: str
@@ -55,12 +68,34 @@ class PassContract:
     allowed_new_effects: FrozenSet[Effect] = frozenset()
     preserve_provenance: bool = True
     maximum_validation_steps: int = 10_000
+    required_analyses: FrozenSet[AnalysisDomain] = frozenset()
+    preserved_analyses: FrozenSet[AnalysisDomain] = frozenset()
+    invalidated_analyses: FrozenSet[AnalysisDomain] = frozenset()
+    deterministic: bool = True
+    thread_safe: bool = True
 
     def __post_init__(self) -> None:
         if not self.pass_id:
             raise ValueError("pass_id must be non-empty")
         if self.maximum_validation_steps <= 0:
             raise ValueError("maximum_validation_steps must be positive")
+        required = frozenset(
+            item if isinstance(item, AnalysisDomain) else AnalysisDomain(str(item))
+            for item in self.required_analyses
+        )
+        preserved = frozenset(
+            item if isinstance(item, AnalysisDomain) else AnalysisDomain(str(item))
+            for item in self.preserved_analyses
+        )
+        invalidated = frozenset(
+            item if isinstance(item, AnalysisDomain) else AnalysisDomain(str(item))
+            for item in self.invalidated_analyses
+        )
+        if preserved & invalidated:
+            raise ValueError("an analysis cannot be both preserved and invalidated")
+        object.__setattr__(self, "required_analyses", required)
+        object.__setattr__(self, "preserved_analyses", preserved)
+        object.__setattr__(self, "invalidated_analyses", invalidated)
 
 
 class CompilationPass(ABC):
@@ -99,6 +134,9 @@ class PassRecord:
     output_verification: Optional[VerificationReport]
     validation: Optional[TranslationValidation]
     rejected_reasons: Tuple[str, ...] = ()
+    determinism_replay_fingerprint: Optional[str] = None
+    determinism_verified: bool = False
+    analysis_contract: Mapping[str, Tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def fingerprint(self) -> str:
@@ -110,6 +148,11 @@ class PassRecord:
             "accepted": self.committed,
             "rejected_reasons": list(self.rejected_reasons),
             "validation_status": self.validation.status.value if self.validation else None,
+            "determinism_replay": self.determinism_replay_fingerprint,
+            "determinism_verified": self.determinism_verified,
+            "analysis_contract": {
+                key: list(value) for key, value in sorted(self.analysis_contract.items())
+            },
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -356,10 +399,12 @@ class PassManager:
         verifier: Optional[IRVerifier] = None,
         validator: Optional[TranslationValidator] = None,
         allow_approximate: bool = False,
+        verify_declared_determinism: bool = True,
     ) -> None:
         self.verifier = verifier or IRVerifier()
         self.validator = validator or TranslationValidator()
         self.allow_approximate = bool(allow_approximate)
+        self.verify_declared_determinism = bool(verify_declared_determinism)
 
     def run_pass(
         self,
@@ -374,12 +419,14 @@ class PassManager:
         if contract.requires_verified_input and not input_report.valid:
             reasons.append("input IR failed verification")
             return module, self._record(
-                contract.pass_id, module, None, module, False, input_report, None, None, reasons
+                contract.pass_id, module, None, module, False, input_report, None, None, reasons,
+                contract=contract,
             )
         if contract.semantics == PassSemantics.APPROXIMATE and not self.allow_approximate:
             reasons.append("approximate pass requires explicit opt-in")
             return module, self._record(
-                contract.pass_id, module, None, module, False, input_report, None, None, reasons
+                contract.pass_id, module, None, module, False, input_report, None, None, reasons,
+                contract=contract,
             )
 
         try:
@@ -387,13 +434,32 @@ class PassManager:
         except Exception as exc:
             reasons.append("pass raised %s" % type(exc).__name__)
             return module, self._record(
-                contract.pass_id, module, None, module, False, input_report, None, None, reasons
+                contract.pass_id, module, None, module, False, input_report, None, None, reasons,
+                contract=contract,
             )
         if not isinstance(candidate, IRModule):
             reasons.append("pass did not return IRModule")
             return module, self._record(
-                contract.pass_id, module, None, module, False, input_report, None, None, reasons
+                contract.pass_id, module, None, module, False, input_report, None, None, reasons,
+                contract=contract,
             )
+
+        determinism_replay_fingerprint = None
+        determinism_verified = False
+        if self.verify_declared_determinism and contract.deterministic:
+            try:
+                replay_candidate = compiler_pass.apply(module)
+            except Exception as exc:
+                reasons.append("determinism replay raised %s" % type(exc).__name__)
+            else:
+                if not isinstance(replay_candidate, IRModule):
+                    reasons.append("determinism replay did not return IRModule")
+                else:
+                    determinism_replay_fingerprint = replay_candidate.fingerprint
+                    if replay_candidate.fingerprint != candidate.fingerprint:
+                        reasons.append("pass declared deterministic but replay fingerprint changed")
+                    else:
+                        determinism_verified = True
 
         output_report = self.verifier.verify(candidate)
         if not output_report.valid:
@@ -435,6 +501,9 @@ class PassManager:
             output_report,
             validation,
             reasons,
+            contract=contract,
+            determinism_replay_fingerprint=determinism_replay_fingerprint,
+            determinism_verified=determinism_verified,
         )
 
     def run_pipeline(
@@ -491,6 +560,10 @@ class PassManager:
         output_report: Optional[VerificationReport],
         validation: Optional[TranslationValidation],
         reasons: Sequence[str],
+        *,
+        contract: Optional[PassContract] = None,
+        determinism_replay_fingerprint: Optional[str] = None,
+        determinism_verified: bool = False,
     ) -> PassRecord:
         return PassRecord(
             pass_id=pass_id,
@@ -502,6 +575,13 @@ class PassManager:
             output_verification=output_report,
             validation=validation,
             rejected_reasons=tuple(reasons),
+            determinism_replay_fingerprint=determinism_replay_fingerprint,
+            determinism_verified=determinism_verified,
+            analysis_contract={} if contract is None else {
+                "required": tuple(sorted(item.value for item in contract.required_analyses)),
+                "preserved": tuple(sorted(item.value for item in contract.preserved_analyses)),
+                "invalidated": tuple(sorted(item.value for item in contract.invalidated_analyses)),
+            },
         )
 
 
