@@ -81,6 +81,10 @@ class CommandCatalog:
             )
         )
 
+    def snapshot(self) -> tuple[CommandDefinition, ...]:
+        """Return definitions in deterministic logical-name order."""
+        return tuple(self._definitions[name] for name in sorted(self._definitions))
+
     def freeze(self) -> Mapping[str, CommandDefinition]:
         self._frozen = True
         return MappingProxyType(dict(self._definitions))
