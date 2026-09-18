@@ -56,14 +56,19 @@ def test_live_reaper_preserves_security_and_unlinked_runs() -> None:
     assert 'pull_request) ;;' in workflow
 
 
-def test_live_reaper_fails_closed_on_api_or_cancel_errors() -> None:
+def test_live_reaper_preserves_ambiguous_runs_without_blocking_cold_cleanup() -> None:
     workflow = _workflow()
+    reaper = workflow.split("      - name: Cancel obsolete live PR runs", 1)[1].split(
+        "      - name: Prune only cold Actions caches", 1
+    )[0]
 
-    assert 'failed=$((failed + 1))' in workflow
-    assert 'if (( failed > 0 )); then' in workflow
-    assert 'exit 1' in workflow
-    assert '[[ "$id" != "$GITHUB_RUN_ID" ]] || continue' in workflow
-    assert '[[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]' in workflow
+    assert 'ambiguous=$((ambiguous + 1))' in reaper
+    assert 'Ambiguous live runs preserved: $ambiguous' in reaper
+    assert '::warning::Live-run reaper preserved ${ambiguous} runs' in reaper
+    assert 'if (( failed > 0 )); then' not in reaper
+    assert 'exit 1' not in reaper
+    assert '[[ "$id" != "$GITHUB_RUN_ID" ]] || continue' in reaper
+    assert '[[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]' in reaper
 
 
 def test_housekeeping_drain_uses_independent_arm_pool_and_supersedes_itself() -> None:
