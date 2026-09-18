@@ -313,6 +313,68 @@ class AIAuditWitnessStore:
         )
         return SignedAIAuditWitness(witness, signature)
 
+    def find(
+        self,
+        audit_root: str,
+        *,
+        runtime_trust_digest: str = "",
+        release_evidence_digest: str = "",
+    ) -> SignedAIAuditWitness | None:
+        audit_root = _digest("audit_root", audit_root)
+        runtime_trust_digest = _digest(
+            "runtime_trust_digest",
+            runtime_trust_digest,
+            optional=True,
+        )
+        release_evidence_digest = _digest(
+            "release_evidence_digest",
+            release_evidence_digest,
+            optional=True,
+        )
+        current = self.current_head()
+        if current is None:
+            return None
+        _, head = current
+        if head.sequence > self.max_witnesses:
+            raise RuntimeError("audit witness head exceeds configured bound")
+        for sequence in range(head.sequence, 0, -1):
+            item = self.get(sequence)
+            witness = item.witness
+            if witness.audit_root != audit_root:
+                continue
+            if witness.runtime_trust_digest != runtime_trust_digest:
+                continue
+            if witness.release_evidence_digest != release_evidence_digest:
+                continue
+            try:
+                self.signer.verify(item.signature)
+            except ArtifactSignatureError as exc:
+                raise RuntimeError(
+                    "matching audit witness signature verification failed"
+                ) from exc
+            return item
+        return None
+
+    def publish_once(
+        self,
+        audit_root: str,
+        *,
+        runtime_trust_digest: str = "",
+        release_evidence_digest: str = "",
+    ) -> SignedAIAuditWitness:
+        existing = self.find(
+            audit_root,
+            runtime_trust_digest=runtime_trust_digest,
+            release_evidence_digest=release_evidence_digest,
+        )
+        if existing is not None:
+            return existing
+        return self.publish(
+            audit_root,
+            runtime_trust_digest=runtime_trust_digest,
+            release_evidence_digest=release_evidence_digest,
+        )
+
     def publish(
         self,
         audit_root: str,
