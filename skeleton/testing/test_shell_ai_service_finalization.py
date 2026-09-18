@@ -1012,4 +1012,3 @@ def test_recovery_commit_binds_same_finalization_identity(tmp_path):
         finalized.recovery_commit.stored.record.checkpoint.digest
         == finalized.recovery_checkpoint.digest
     )
-
