@@ -780,6 +780,81 @@ class EpistemicFrontierEngine:
         except KeyError as exc:
             raise AgentContractError("unknown forecast_id") from exc
 
+    def dump_forecasts(self) -> dict[str, Any]:
+        """Serialize immutable forecast commitments for replay/audit."""
+
+        forecasts = tuple(
+            sorted(self._forecasts.values(), key=lambda item: item.forecast_id)
+        )
+        return {
+            "version": 1,
+            "forecasts": [
+                {
+                    "forecast_id": item.forecast_id,
+                    "obligation_id": item.obligation_id,
+                    "distribution": dict(item.distribution),
+                    "created_at": item.created_at,
+                    "commitment": item.commitment,
+                }
+                for item in forecasts
+            ],
+            "fingerprint": stable_fingerprint(
+                [item.commitment for item in forecasts]
+            ),
+        }
+
+    def restore_forecasts(
+        self,
+        state: Mapping[str, Any],
+        *,
+        replace_existing: bool = True,
+    ) -> tuple[ForecastContract, ...]:
+        """Restore commitments and verify every commitment hash."""
+
+        payload = json_safe(dict(state))
+        if payload.get("version") != 1:
+            raise AgentContractError("unsupported forecast state version")
+        restored: dict[str, ForecastContract] = {}
+        for value in payload.get("forecasts", ()):
+            contract = ForecastContract(
+                forecast_id=value["forecast_id"],
+                obligation_id=value["obligation_id"],
+                distribution=dict(value["distribution"]),
+                created_at=value["created_at"],
+                commitment="",
+            )
+            if contract.commitment != value.get("commitment"):
+                raise AgentContractError(
+                    "forecast commitment mismatch during restore"
+                )
+            if contract.forecast_id in restored:
+                raise AgentContractError("duplicate forecast_id in state")
+            restored[contract.forecast_id] = contract
+        expected = payload.get("fingerprint")
+        actual = stable_fingerprint(
+            [
+                item.commitment
+                for item in sorted(
+                    restored.values(),
+                    key=lambda item: item.forecast_id,
+                )
+            ]
+        )
+        if expected is not None and expected != actual:
+            raise AgentContractError("forecast state fingerprint mismatch")
+        if replace_existing:
+            self._forecasts = restored
+        else:
+            overlap = set(restored) & set(self._forecasts)
+            if overlap:
+                raise AgentContractError(
+                    "forecast restore collides with existing commitments"
+                )
+            self._forecasts.update(restored)
+        return tuple(
+            sorted(restored.values(), key=lambda item: item.forecast_id)
+        )
+
     @staticmethod
     def _lookup(
         obligations: Sequence[KnowledgeObligation],
