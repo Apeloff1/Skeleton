@@ -30,7 +30,15 @@ def _load_backend_gate() -> ModuleType:
     if spec is None or spec.loader is None:
         raise RuntimeError("unable to load canonical dynamic-import scanner")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # dataclasses and other import-time helpers resolve the defining module
+    # through sys.modules. Mirror normal import semantics while executing the
+    # canonical scanner, and fail closed without leaving a half-loaded module.
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(spec.name, None)
+        raise
     return module
 
 
