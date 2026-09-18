@@ -565,6 +565,15 @@ def test_semantic_plane_activates_bridge_only_after_empirical_promotion() -> Non
     assert interactions[0].rule.kind is LensInteractionKind.REINFORCES
     assert interactions[0].metadata["interpretive_only"] is True
     assert interactions[0].metadata["may_promote_to_evidence"] is False
+    provenance = interactions[0].metadata["rule_provenance"]
+    assert provenance["rule_source"] == "learned_topology"
+    assert provenance["candidate_id"] == candidate.candidate_id
+    assert provenance["report_id"] == after.learned_topology_rules[0].report_id
+    assert provenance["report_fingerprint"] == (
+        after.learned_topology_rules[0].report_fingerprint
+    )
+    assert provenance["evidence_ceiling"] == "interpretive_only"
+    assert provenance["may_promote_to_evidence"] is False
     assert len(after.learned_topology_rules) == 1
     assert after.coverage.topology_learned_bridges == 1
     assert after.coverage.topology_active_learning_reports == 1
