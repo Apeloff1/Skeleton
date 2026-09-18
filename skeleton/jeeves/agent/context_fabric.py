@@ -40,6 +40,7 @@ class DeepContextRecord:
     confidence: float
     salience: float
     token_estimate: int
+    source_provider: str = ""
     tags: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -52,6 +53,11 @@ class DeepContextRecord:
                 raise AgentContractError(f"{name} cannot be empty")
             object.__setattr__(self, name, value[:2048])
         object.__setattr__(self, "content", str(self.content))
+        object.__setattr__(
+            self,
+            "source_provider",
+            str(self.source_provider).strip()[:512],
+        )
         for name in ("trust", "confidence", "salience"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
         object.__setattr__(self, "token_estimate", positive_int("token_estimate", max(1, self.token_estimate), maximum=10_000_000))
@@ -122,6 +128,7 @@ class ContextFabricResult:
             {
                 "source_tier": record.source_tier.value,
                 "source_ref": record.source_ref,
+                "source_provider": record.source_provider,
                 "source_fingerprint": record.source_fingerprint,
                 "content": record.content,
                 "canonical": record.canonical,
@@ -141,6 +148,7 @@ class RepositoryContextAdapter:
     def __init__(self, repository: ContextRepository, *, branch: str = "main") -> None:
         self.repository = repository
         self.branch = str(branch)
+        self.source_provider = f"context-repository:{repository.namespace.key}"
 
     def fetch_refs(
         self,
@@ -203,6 +211,7 @@ class RepositoryContextAdapter:
             confidence=entry.confidence,
             salience=entry.salience,
             token_estimate=max(1, len(entry.content) // 4),
+            source_provider=f"context-repository:{entry.namespace.key}",
             tags=entry.tags,
             metadata={
                 "entry_id": entry.entry_id,
@@ -221,6 +230,7 @@ class MemoryManagerAdapter:
     def __init__(self, manager: MemoryManager, namespace: MemoryNamespace) -> None:
         self.manager = manager
         self.namespace = namespace
+        self.source_provider = f"memory-store:{namespace.key}"
 
     def fetch_refs(
         self,
@@ -287,6 +297,7 @@ class MemoryManagerAdapter:
             confidence=record.trust,
             salience=record.salience,
             token_estimate=max(1, len(record.content) // 4),
+            source_provider=f"memory-store:{record.namespace.key}",
             tags=record.tags,
             metadata={
                 "kind": record.kind.value,
@@ -306,8 +317,10 @@ class CallableContextAdapter:
         *,
         fetcher: Callable[[str, Sequence[str], int, int], Sequence[DeepContextRecord]],
         searcher: Callable[[str, str, int, int], Sequence[DeepContextRecord]],
+        source_provider: str = "",
     ) -> None:
         self.source_tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
+        self.source_provider = str(source_provider).strip()[:512]
         self._fetcher = fetcher
         self._searcher = searcher
 
@@ -441,9 +454,10 @@ class CognitiveContextFabric:
 
         # Targeted canonical rehydration comes before any broad retrieval.
         refs_by_tier: dict[SourceTier, list[str]] = {}
-        card_by_source: dict[tuple[SourceTier, str], list[Any]] = {}
+        card_by_source: dict[tuple[SourceTier, str, str], list[Any]] = {}
         for hit in fast.all_hits:
-            key = (hit.card.source_tier, hit.card.source_ref)
+            provider = hit.card.source_provider
+            key = (hit.card.source_tier, provider, hit.card.source_ref)
             refs_by_tier.setdefault(hit.card.source_tier, []).append(hit.card.source_ref)
             card_by_source.setdefault(key, []).append(hit.card)
 
@@ -455,9 +469,21 @@ class CognitiveContextFabric:
                 for adapter in tier_adapters:
                     if budget_remaining <= 0:
                         break
+                    adapter_provider = str(getattr(adapter, "source_provider", "")).strip()
+                    eligible_refs = tuple(
+                        dict.fromkeys(
+                            card.source_ref
+                            for hit in fast.all_hits
+                            for card in (hit.card,)
+                            if card.source_tier is tier
+                            and (not card.source_provider or card.source_provider == adapter_provider)
+                        )
+                    )
+                    if not eligible_refs:
+                        continue
                     fetched = adapter.fetch_refs(
                         namespace_key,
-                        tuple(dict.fromkeys(refs)),
+                        eligible_refs,
                         max_records=self.policy.deep_limit,
                         max_tokens=max(1, budget_remaining),
                     )
@@ -469,8 +495,18 @@ class CognitiveContextFabric:
                         records.append(record)
                         budget_remaining = max(0, budget_remaining - record.token_estimate)
                         resolved_refs.add(record.source_ref)
-                        source_key = (record.source_tier, record.source_ref)
+                        source_key = (
+                            record.source_tier,
+                            record.source_provider,
+                            record.source_ref,
+                        )
                         canonical_fingerprints.setdefault(source_key, set()).add(record.source_fingerprint)
+                        # Legacy cards without a provider are wildcards and may
+                        # match any provider in the same tier.
+                        canonical_fingerprints.setdefault(
+                            (record.source_tier, "", record.source_ref),
+                            set(),
+                        ).add(record.source_fingerprint)
 
             # A card is stale only when canonical providers resolved its source
             # and none of them agree with the indexed fingerprint.  With
@@ -576,6 +612,7 @@ class CognitiveContextFabric:
             source_ref=record.source_ref,
             source_fingerprint=record.source_fingerprint,
             cue=cue or record.content[:2048],
+            source_provider=record.source_provider,
             preview=record.content[:8192],
             kind=kind,
             salience=record.salience,
