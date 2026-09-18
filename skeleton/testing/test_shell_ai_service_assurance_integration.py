@@ -40,7 +40,14 @@ from skeleton.shells.runner import ShellPolicy, ShellRunner
 from skeleton.shells.shell_service import ShellService
 
 
-def build_service(tmp_path, contract, *, auto_band):
+def build_service(
+    tmp_path,
+    contract,
+    *,
+    auto_band,
+    runtime_trust=None,
+    authority_health=None,
+):
     command_catalog = CommandCatalog(
         (
             CommandDefinition(
@@ -117,10 +124,61 @@ def build_service(tmp_path, contract, *, auto_band):
         AIShellDiagnostics(tools, effects, policy, model),
         AIShellGovernance(AIPolicyStore(policy)),
         assurance=AIExecutionAssuranceInspector(),
+        runtime_trust=runtime_trust,
+        authority_health=authority_health,
     )
     service.start()
     return service, effects
 
+
+
+
+class _ToggleReport:
+    def __init__(self, kind):
+        self.kind = kind
+
+    def to_dict(self):
+        return {"ok": True, "kind": self.kind}
+
+
+class _ToggleRuntimeTrust:
+    def __init__(self, *, allowed=True):
+        self.allowed = allowed
+        self.pin_calls = 0
+        self.require_calls = 0
+
+    def pin(self):
+        self.pin_calls += 1
+        if not self.allowed:
+            raise RuntimeError("runtime trust unavailable")
+        return _ToggleReport("runtime-trust")
+
+    def require_current(self):
+        self.require_calls += 1
+        if not self.allowed:
+            raise RuntimeError("runtime trust drift")
+        return _ToggleReport("runtime-trust")
+
+
+class _ToggleAuthorityHealth:
+    def __init__(self, *, allowed=True):
+        self.allowed = allowed
+        self.require_calls = 0
+
+    def require(self):
+        self.require_calls += 1
+        if not self.allowed:
+            raise RuntimeError("authority health failed")
+        return _ToggleReport("authority-health")
+
+
+def low_contract():
+    return EffectContract(
+        "python",
+        frozenset({EffectKind.READ_FILESYSTEM}),
+        idempotent=True,
+        reversible=True,
+    )
 
 def medium_contract():
     return EffectContract(
@@ -563,3 +621,215 @@ def test_assurance_only_approval_not_burned_by_unsealed_denial(tmp_path):
             intent_fingerprint=session.intent.fingerprint,
             proposal_fingerprint=proposal.fingerprint,
         )
+
+
+
+def test_runtime_trust_failure_at_start_is_fail_closed(tmp_path):
+    trust = _ToggleRuntimeTrust(allowed=False)
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        runtime_trust=trust,
+    )
+    assert service.state.phase.value == "failed"
+    assert trust.pin_calls == 1
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_authority_health_failure_at_start_is_fail_closed(tmp_path):
+    health = _ToggleAuthorityHealth(allowed=False)
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        authority_health=health,
+    )
+    assert service.state.phase.value == "failed"
+    assert health.require_calls == 1
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_runtime_trust_drift_degrades_service_before_new_session(tmp_path):
+    trust = _ToggleRuntimeTrust()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        runtime_trust=trust,
+    )
+    assert service.state.phase.value == "ready"
+    trust.allowed = False
+    with pytest.raises(RuntimeError, match="runtime trust"):
+        service.new_session(intent(), session_id="trust-drift")
+    assert service.state.phase.value == "degraded"
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_authority_health_failure_blocks_unsealed_low_risk_child(tmp_path):
+    health = _ToggleAuthorityHealth()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        authority_health=health,
+    )
+    session = service.new_session(intent(), session_id="health-low")
+    review, _ = service.review(session)
+    assert review.critique.risk.band is RiskBand.LOW
+    health.allowed = False
+    with pytest.raises(RuntimeError, match="authority dependency health"):
+        service.execute(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+        )
+    assert service.state.phase.value == "degraded"
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_authority_health_failure_blocks_seal_issuance(tmp_path):
+    health = _ToggleAuthorityHealth()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        authority_health=health,
+    )
+    session = service.new_session(intent(), session_id="health-seal")
+    review, _ = service.review(session)
+    health.allowed = False
+    with pytest.raises(RuntimeError, match="authority dependency health"):
+        service.seal_review(
+            session,
+            review,
+            principal="alice",
+            authority=ExecutionSealAuthority(b"k" * 32),
+        )
+    assert service.state.phase.value == "degraded"
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_authority_health_failure_does_not_consume_existing_seal(tmp_path):
+    health = _ToggleAuthorityHealth()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        authority_health=health,
+    )
+    session = service.new_session(intent(), session_id="health-consume")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    health.allowed = False
+    with pytest.raises(RuntimeError, match="authority dependency health"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_runtime_trust_drift_does_not_consume_existing_seal(tmp_path):
+    trust = _ToggleRuntimeTrust()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        runtime_trust=trust,
+    )
+    session = service.new_session(intent(), session_id="trust-consume")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    trust.allowed = False
+    with pytest.raises(RuntimeError, match="runtime trust"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_service_status_reports_runtime_trust_and_authority_health(tmp_path):
+    trust = _ToggleRuntimeTrust()
+    health = _ToggleAuthorityHealth()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        runtime_trust=trust,
+        authority_health=health,
+    )
+    data = service.status().to_dict()
+    assert data["runtime_trust"] == {
+        "ok": True,
+        "kind": "runtime-trust",
+    }
+    assert data["authority_health"] == {
+        "ok": True,
+        "kind": "authority-health",
+    }
+
+
+def test_authority_health_is_rechecked_at_execution_boundary(tmp_path):
+    health = _ToggleAuthorityHealth()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        authority_health=health,
+    )
+    startup_calls = health.require_calls
+    session = service.new_session(intent(), session_id="health-recheck")
+    review, _ = service.review(session)
+    service.execute(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+    )
+    assert health.require_calls > startup_calls
+    assert service.orchestrator.shell_service.receipts.snapshot()
+
+
+def test_runtime_trust_is_rechecked_across_session_review_and_execution(tmp_path):
+    trust = _ToggleRuntimeTrust()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        runtime_trust=trust,
+    )
+    session = service.new_session(intent(), session_id="trust-recheck")
+    after_session = trust.require_calls
+    review, _ = service.review(session)
+    after_review = trust.require_calls
+    service.execute(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+    )
+    assert after_session >= 1
+    assert after_review > after_session
+    assert trust.require_calls > after_review
