@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import gzip
 import hashlib
+import io
 import json
 import os
 import threading
@@ -28,6 +29,9 @@ from pathlib import Path
 from typing import Any
 
 _MAGIC = "GZ1:"  # marks a packed payload so unpack() is back-compat safe
+MAX_PACKED_BYTES = 8 * 1024 * 1024
+MAX_UNPACKED_BYTES = 32 * 1024 * 1024
+_MAX_BASE64_BYTES = ((MAX_PACKED_BYTES + 2) // 3) * 4 + 4
 
 # ── codec stats (since boot) ─────────────────────────────────────────────────
 _STATS = {
@@ -57,18 +61,56 @@ def is_packed(blob: Any) -> bool:
     return isinstance(blob, str) and blob.startswith(_MAGIC)
 
 
+def _decode_packed_payload(blob: str) -> bytes:
+    """Decode a GZ1 payload without permitting unbounded expansion."""
+    encoded = blob[len(_MAGIC):]
+    if len(encoded) > _MAX_BASE64_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+    try:
+        compressed = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("invalid packed payload encoding") from exc
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+
+    with gzip.GzipFile(fileobj=io.BytesIO(compressed), mode="rb") as stream:
+        raw = stream.read(MAX_UNPACKED_BYTES + 1)
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("decompressed payload exceeds size limit")
+    return raw
+
+
+def _read_bounded_gzip_file(path: Path) -> bytes:
+    """Read and decompress a gzip file under the same expansion limits."""
+    with path.open("rb") as handle:
+        compressed = handle.read(MAX_PACKED_BYTES + 1)
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("compressed manifest exceeds size limit")
+    with gzip.GzipFile(fileobj=io.BytesIO(compressed), mode="rb") as stream:
+        raw = stream.read(MAX_UNPACKED_BYTES + 1)
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("decompressed manifest exceeds size limit")
+    return raw
+
+
 def unpack(blob: Any) -> Any:
     """Decompress on demand. Plain (unpacked) values pass straight through."""
     if not is_packed(blob):
         return blob
-    key = hashlib.blake2b(blob.encode("ascii"), digest_size=16).hexdigest()
+    if len(blob) - len(_MAGIC) > _MAX_BASE64_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+    try:
+        encoded_blob = blob.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ValueError("invalid packed payload encoding") from exc
+    key = hashlib.blake2b(encoded_blob, digest_size=16).hexdigest()
     with _LOCK:
         if key in _CACHE:
             _CACHE.move_to_end(key)
             _STATS["cache_hits"] += 1
             return _CACHE[key]
         _STATS["cache_misses"] += 1
-    raw = gzip.decompress(base64.b64decode(blob[len(_MAGIC):]))
+    raw = _decode_packed_payload(blob)
     obj = json.loads(raw)
     with _LOCK:
         _CACHE[key] = obj
@@ -122,7 +164,7 @@ def read_manifest_json(path: str | Path) -> Any:
     p = Path(path)
     gz = p.with_suffix(p.suffix + ".gz")
     if gz.exists():
-        return json.loads(gzip.decompress(gz.read_bytes()))
+        return json.loads(_read_bounded_gzip_file(gz))
     if p.exists():
         return json.loads(p.read_text())
     return {}
