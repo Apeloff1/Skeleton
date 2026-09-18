@@ -11,6 +11,10 @@ from skeleton.shells.ai.assurance_binding import AssuranceBinding
 from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
+from skeleton.shells.ai.execution_fence import (
+    AIExecutionFence,
+    AIExecutionFenceManager,
+)
 from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
@@ -68,9 +72,21 @@ class AIShellService:
         approval_quorum: AIApprovalQuorumStore | None = None,
         runtime_trust: AIRuntimeTrustGuard | None = None,
         authority_health: AIAuthorityHealthGuard | None = None,
+        execution_fences: AIExecutionFenceManager | None = None,
+        worker_id: str = "",
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
+        if execution_fences is not None and assurance is None:
+            raise ValueError(
+                "execution fencing requires an assurance inspector"
+            )
+        if execution_fences is not None and (
+            not worker_id or len(worker_id) > 256
+        ):
+            raise ValueError(
+                "execution fencing requires a valid worker_id"
+            )
         self.orchestrator = orchestrator
         self.diagnostics = diagnostics
         self.governance = governance
@@ -80,6 +96,8 @@ class AIShellService:
         self.approval_quorum = approval_quorum
         self.runtime_trust = runtime_trust
         self.authority_health = authority_health
+        self.execution_fences = execution_fences
+        self.worker_id = worker_id
         self._release_report: StartupReleaseReport | None = None
         self._runtime_trust_report: RuntimeTrustReport | None = None
         self._authority_health_report: AuthorityHealthReport | None = None
@@ -133,6 +151,20 @@ class AIShellService:
 
     def _release_digest(self) -> str:
         return "" if self._release_report is None else self._release_report.evidence_digest
+
+    def _runtime_trust_digest(self) -> str:
+        return (
+            ""
+            if self._runtime_trust_report is None
+            else self._runtime_trust_report.epoch_digest
+        )
+
+    def _authority_health_policy_digest(self) -> str:
+        return (
+            ""
+            if self._authority_health_report is None
+            else self._authority_health_report.policy_digest
+        )
 
     def _require_release_current(self) -> None:
         if self.release_guard is None or self.release_expectation is None:
@@ -267,6 +299,75 @@ class AIShellService:
         )
         return current.digest
 
+    def acquire_execution_fence(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        ttl_seconds: float | None = None,
+    ) -> AIExecutionFence:
+        if self.execution_fences is None:
+            raise RuntimeError("execution fence manager is not configured")
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_authority_health()
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        proposal = review.planning.response.proposal
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
+        return self.execution_fences.acquire(
+            review.compiled.plan,
+            session_id=session.session_id,
+            principal=principal,
+            worker_id=self.worker_id,
+            runtime_trust_digest=self._runtime_trust_digest(),
+            release_evidence_digest=self._release_digest(),
+            ttl_seconds=ttl_seconds,
+        )
+
+    def _execution_fence_digest(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        execution_fence: AIExecutionFence | None,
+    ) -> str:
+        if self.execution_fences is None:
+            if execution_fence is not None:
+                raise RuntimeError(
+                    "execution fence provided but manager is not configured"
+                )
+            return ""
+        if execution_fence is None:
+            raise RuntimeError("distributed execution fence is required")
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        current = self.execution_fences.require(
+            execution_fence,
+            review.compiled.plan,
+            session_id=session.session_id,
+            principal=principal,
+            worker_id=self.worker_id,
+            runtime_trust_digest=self._runtime_trust_digest(),
+            release_evidence_digest=self._release_digest(),
+        )
+        return current.digest
+
     def _assurance_digest(
         self,
         review: AIReviewBundle,
@@ -275,6 +376,7 @@ class AIShellService:
         preconditions_digest: str,
         approval_id: str,
         quorum_digest: str,
+        execution_fence_digest: str = "",
     ) -> str:
         if self.assurance is None:
             return quorum_digest
@@ -298,11 +400,8 @@ class AIShellService:
             quorum_digest=quorum_digest,
             execution_backend_id=active_backend.backend_id,
             sandbox_binding_digest=sandbox_binding_digest,
-            runtime_trust_digest=(
-                ""
-                if self._runtime_trust_report is None
-                else self._runtime_trust_report.epoch_digest
-            ),
+            runtime_trust_digest=self._runtime_trust_digest(),
+            execution_fence_digest=execution_fence_digest,
         )
         return binding.digest
 
@@ -317,6 +416,7 @@ class AIShellService:
         approval=None,
         quorum_approval: QuorumApproval | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
         ttl_seconds: float = 60.0,
     ) -> ExecutionSeal:
         """Issue short-lived signed authority for one exact reviewed plan.
@@ -363,12 +463,19 @@ class AIShellService:
             quorum_approval=quorum_approval,
         )
         preconditions_digest = "" if preconditions is None else preconditions.digest
+        execution_fence_digest = self._execution_fence_digest(
+            session,
+            review,
+            principal=principal,
+            execution_fence=execution_fence,
+        )
         assurance_digest = self._assurance_digest(
             review,
             execution_backend=execution_backend,
             preconditions_digest=preconditions_digest,
             approval_id=approval_id,
             quorum_digest=quorum_digest,
+            execution_fence_digest=execution_fence_digest,
         )
         return authority.issue(
             principal=principal,
@@ -394,6 +501,7 @@ class AIShellService:
         approval=None,
         quorum_approval: QuorumApproval | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
     ) -> tuple[AIExecutionBundle, PreconditionReport | None, SealUse]:
         """Execute only after preconditions and a single-use signed seal pass."""
 
@@ -437,12 +545,19 @@ class AIShellService:
             principal=context.principal,
             quorum_approval=quorum_approval,
         )
+        execution_fence_digest = self._execution_fence_digest(
+            session,
+            review,
+            principal=context.principal,
+            execution_fence=execution_fence,
+        )
         assurance_digest = self._assurance_digest(
             review,
             execution_backend=execution_backend,
             preconditions_digest=precondition_digest,
             approval_id=approval_id,
             quorum_digest=quorum_digest,
+            execution_fence_digest=execution_fence_digest,
         )
         self._require_assurance(
             review,
@@ -464,29 +579,37 @@ class AIShellService:
             release_evidence_digest=self._release_digest(),
             assurance_digest=assurance_digest,
         )
-        if quorum_approval is not None:
-            if self.approval_quorum is None:
-                raise RuntimeError("quorum approval store is not configured")
-            self.approval_quorum.consume(
-                quorum_approval,
-                principal=context.principal,
-                intent_fingerprint=session.intent.fingerprint,
-                proposal_fingerprint=review.planning.response.proposal.fingerprint,
+        try:
+            if quorum_approval is not None:
+                if self.approval_quorum is None:
+                    raise RuntimeError("quorum approval store is not configured")
+                self.approval_quorum.consume(
+                    quorum_approval,
+                    principal=context.principal,
+                    intent_fingerprint=session.intent.fingerprint,
+                    proposal_fingerprint=(
+                        review.planning.response.proposal.fingerprint
+                    ),
+                )
+            result = self._execute_reviewed(
+                session,
+                review,
+                context=context,
+                approval=approval,
+                execution_backend=execution_backend,
+                sealed=True,
+                execution_fenced=bool(execution_fence_digest),
+                preconditions_verified=(
+                    precondition_report is not None
+                    and precondition_report.ok
+                ),
+                human_approved=human_approved,
+                quorum_approved=bool(quorum_digest),
             )
-        result = self._execute_reviewed(
-            session,
-            review,
-            context=context,
-            approval=approval,
-            execution_backend=execution_backend,
-            sealed=True,
-            preconditions_verified=(
-                precondition_report is not None and precondition_report.ok
-            ),
-            human_approved=human_approved,
-            quorum_approved=bool(quorum_digest),
-        )
-        return result, precondition_report, use
+            return result, precondition_report, use
+        finally:
+            if execution_fence is not None and self.execution_fences is not None:
+                self.execution_fences.release(execution_fence)
 
     def _require_assurance(
         self,
@@ -494,6 +617,7 @@ class AIShellService:
         *,
         execution_backend: AIPlanExecutionBackend | None,
         sealed: bool,
+        execution_fenced: bool = False,
         preconditions_verified: bool = False,
         human_approved: bool = False,
         quorum_approved: bool = False,
@@ -527,6 +651,10 @@ class AIShellService:
         approval=None,
         execution_backend: AIPlanExecutionBackend | None = None,
     ) -> AIExecutionBundle:
+        if self.execution_fences is not None:
+            raise RuntimeError(
+                "configured distributed execution fencing requires execute_sealed"
+            )
         human_approved = self._validate_human_approval(
             session,
             review,
@@ -563,6 +691,8 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        if self.execution_fences is not None and not execution_fenced:
+            raise RuntimeError("distributed execution fence was not verified")
         self._require_assurance(
             review,
             execution_backend=execution_backend,
