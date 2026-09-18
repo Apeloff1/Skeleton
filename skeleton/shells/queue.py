@@ -116,6 +116,38 @@ class ShellWorkQueue:
     def fail(self, item: QueueItem) -> QueueItem:
         return self._transition(item, QueueState.FAILED)
 
+    def requeue(self, item: QueueItem, *, priority: int | None = None) -> QueueItem:
+        """Return a currently claimed item to the runnable queue.
+
+        The claim token must still be current.  Requeueing clears ownership and
+        issues a fresh sequence number so stale claim objects cannot mutate the
+        item after it becomes runnable again.
+        """
+        with self._lock:
+            current = self._items.get(item.item_id)
+            if current is None or current.claim_id != item.claim_id or current.state is not QueueState.CLAIMED:
+                raise RuntimeError("queue item claim is stale")
+            self._sequence += 1
+            now = self._clock()
+            updated = QueueItem(
+                current.item_id,
+                current.command,
+                current.priority if priority is None else priority,
+                current.created_at,
+                self._sequence,
+                state=QueueState.QUEUED,
+                owner=None,
+                claim_id=None,
+                updated_at=now,
+            )
+            self._items[item.item_id] = updated
+            heapq.heappush(self._heap, (updated.priority, updated.sequence, updated.item_id))
+            return updated
+
+    def release_claim(self, item: QueueItem, *, priority: int | None = None) -> QueueItem:
+        """Compatibility alias for :meth:`requeue` used by worker code."""
+        return self.requeue(item, priority=priority)
+
     def cancel(self, item_id: str) -> QueueItem:
         with self._lock:
             current = self._items[item_id]
