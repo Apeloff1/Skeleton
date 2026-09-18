@@ -304,6 +304,21 @@ def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) 
         + "\n",
         encoding="utf-8",
     )
+    evals = tmp_path / "evals.json"
+    evals.write_text(
+        json.dumps(
+            [
+                {
+                    "evidence_id": "eval",
+                    "name": "eval.json",
+                    "sha256": "b" * 64,
+                    "result": "pass",
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     observed = [
         f"skeleton-16.0.0-py3-none-any.whl={wheel}",
         f"release-sbom.cdx.json={sbom}",
@@ -313,7 +328,7 @@ def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) 
         output=str(evidence_path),
         source_commit=COMMIT,
         test_evidence=[str(tests)],
-        eval_evidence=[],
+        eval_evidence=[str(evals)],
         asset_provenance=None,
         observed=observed,
         gate=True,
