@@ -17,6 +17,7 @@ from typing import Sequence
 from .interpretive_science import ScientificLensLab
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
 from .semantic_extreme_lenses import register_rare_lenses
+from .semantic_depth_lenses import register_depth_lenses
 from .semantic_research_lenses import register_research_lenses
 from .semantic_plane_lenses import register_plane_lenses
 from .semantic_plane_interactions import plane_interaction_rules
@@ -32,13 +33,14 @@ from .types import AgentContractError, positive_int, stable_fingerprint
 
 
 class MaximalSemanticRegistry(FrontierSemanticRegistry):
-    """Base + frontier + rare + research lenses, de-duplicated by stable lens key."""
+    """Base + frontier + rare + research + plane + depth lenses, de-duplicated by stable lens key."""
 
     def __init__(self) -> None:
         super().__init__()
         register_rare_lenses(self, ignore_existing=True)
         register_research_lenses(self, ignore_existing=True)
         register_plane_lenses(self, ignore_existing=True)
+        register_depth_lenses(self, ignore_existing=True)
 
 
 class MaximalLensRouter(FrontierLensRouter):
