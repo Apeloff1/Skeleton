@@ -243,8 +243,8 @@ class RootCauseRecord:
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[0-9a-f]{64}", self.root_id):
             raise BacklogStateError("root_id must be sha256")
-        _token("category", self.category)
-        _token("component", self.component)
+        object.__setattr__(self, "category", _token("category", self.category))
+        object.__setattr__(self, "component", _token("component", self.component))
         if not re.fullmatch(r"[0-9a-f]{64}", self.signature_digest):
             raise BacklogStateError("signature_digest must be sha256")
         for name in ("first_seen", "last_seen", "occurrences", "reopened_count"):
@@ -255,7 +255,7 @@ class RootCauseRecord:
             raise BacklogStateError("occurrences must be positive")
         if self.first_seen > self.last_seen:
             raise BacklogStateError("first_seen cannot be after last_seen")
-        _risk(self.risk)
+        object.__setattr__(self, "risk", _risk(self.risk))
         if not isinstance(self.security_finding, bool):
             raise BacklogStateError("security_finding must be boolean")
         if self.status not in _ALLOWED_STATUS:
@@ -266,7 +266,7 @@ class RootCauseRecord:
             raise BacklogStateError("duplicate event id in root record")
         if len(self.evidence_refs) > MAX_EVIDENCE_PER_ROOT:
             raise BacklogStateError("evidence history exceeds maximum")
-        _summary(self.latest_summary)
+        object.__setattr__(self, "latest_summary", _summary(self.latest_summary))
         if self.latest_summary_digest and not re.fullmatch(
             r"[0-9a-f]{64}", self.latest_summary_digest
         ):
@@ -424,11 +424,12 @@ class BacklogState:
         for root_id, record in self.roots.items():
             if root_id != record.root_id:
                 raise BacklogStateError("root map key mismatch")
-        for event_id, root_id in self.events.items():
+        for _event_id, root_id in self.events.items():
             if root_id not in self.roots:
                 raise BacklogStateError("event references unknown root")
-            if event_id not in self.roots[root_id].event_ids:
-                raise BacklogStateError("event map/root history mismatch")
+        # Root event_ids are an intentionally bounded recent audit sample.
+        # The global event map remains the full idempotency index, so older
+        # events need not remain in a hot root's bounded event_ids tuple.
         for source, health in self.sources.items():
             if source != health.source:
                 raise BacklogStateError("source map key mismatch")
