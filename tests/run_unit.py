@@ -42,6 +42,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_convex",
     "skeleton.testing.test_simulation_physics_convex_collision",
     "skeleton.testing.test_simulation_physics_convex_queries",
+    "skeleton.testing.test_simulation_physics_convex_toi",
     "skeleton.testing.test_simulation_physics_fixed_slider",
     "skeleton.testing.test_simulation_physics_foundation",
     "skeleton.testing.test_simulation_physics_hinge",
