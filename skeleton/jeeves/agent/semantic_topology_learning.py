@@ -1792,7 +1792,26 @@ class SemanticTopologyLearningLab:
                 run_count = len(
                     {item.independent_run for item in primary}
                 )
-                domain_count = len({item.domain for item in primary})
+                domain_trial_counts = {
+                    domain: sum(
+                        1 for item in primary if item.domain == domain
+                    )
+                    for domain in {item.domain for item in primary}
+                }
+                control_domain_counts = {
+                    domain: sum(
+                        1 for item in controls if item.domain == domain
+                    )
+                    for domain in {item.domain for item in controls}
+                }
+                qualified_domain_count = sum(
+                    count >= self.policy.minimum_trials_per_domain
+                    for count in domain_trial_counts.values()
+                )
+                qualified_control_domain_count = sum(
+                    count >= self.policy.minimum_controls_per_domain
+                    for count in control_domain_counts.values()
+                )
                 trial_coverage = min(
                     1.0,
                     len(primary) / self.policy.minimum_trials,
@@ -1803,11 +1822,21 @@ class SemanticTopologyLearningLab:
                 )
                 domain_coverage = min(
                     1.0,
-                    domain_count / self.policy.minimum_domains,
+                    qualified_domain_count
+                    / self.policy.minimum_domains,
                 )
-                control_coverage = min(
+                control_count_coverage = min(
                     1.0,
                     len(controls) / self.policy.minimum_negative_controls,
+                )
+                control_domain_coverage = min(
+                    1.0,
+                    qualified_control_domain_count
+                    / self.policy.minimum_control_domains,
+                )
+                control_coverage = min(
+                    control_count_coverage,
+                    control_domain_coverage,
                 )
                 evidence_coverage = min(
                     1.0,
@@ -1966,7 +1995,16 @@ class SemanticTopologyLearningLab:
                         "primary_trial_count": len(primary),
                         "negative_control_count": len(controls),
                         "independent_run_count": run_count,
-                        "domain_count": domain_count,
+                        "domain_count": len(domain_trial_counts),
+                        "qualified_domain_count": (
+                            qualified_domain_count
+                        ),
+                        "control_domain_count": len(
+                            control_domain_counts
+                        ),
+                        "qualified_control_domain_count": (
+                            qualified_control_domain_count
+                        ),
                         "topology_learning_contract": (
                             self.contract_fingerprint
                         ),
