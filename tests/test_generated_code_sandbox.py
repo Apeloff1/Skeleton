@@ -421,6 +421,28 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
         'runner = eval\nrunner("1 + 1")\n',
     ],
 )
+@pytest.mark.parametrize(
+    "source",
+    [
+        '__builtins__["open"]("/etc/passwd", "r")\n',
+        '(lambda fn: fn)(open)("/etc/passwd", "r")\n',
+        '__builtins__.open("/etc/passwd", "r")\n',
+        '__builtins__.eval("1 + 1")\n',
+    ],
+)
+def test_dynamic_and_builtin_callable_dispatch_fails_closed(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {
+        OperationKind.FS_READ,
+        OperationKind.UNSAFE_EVAL,
+    }
+
+
 def test_sensitive_callable_aliases_cannot_bypass_python_inspection(
     tmp_path: Path,
     source: str,
