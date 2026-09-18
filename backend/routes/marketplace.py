@@ -215,8 +215,8 @@ async def checkout(body: CheckoutBody, request: Request):
     )
     try:
         session = await sc.create_checkout_session(req)
-    except Exception as e:
-        return {"error": f"stripe error: {str(e)[:200]}"}
+    except Exception:
+        return {"error": "stripe_error"}
 
     # Persist the transaction BEFORE returning (status=initiated).
     await _db.payment_transactions.insert_one({
@@ -285,8 +285,8 @@ async def checkout_status(session_id: str, request: Request):
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
-    except Exception as e:
-        return {"error": f"stripe error: {str(e)[:200]}", "payment_status": txn.get("payment_status")}
+    except Exception:
+        return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
 
     await _db.payment_transactions.update_one(
         {"session_id": session_id},
@@ -316,8 +316,8 @@ async def stripe_webhook(request: Request):
     sc = _checkout(str(request.base_url))
     try:
         ev = await sc.handle_webhook(body, sig)
-    except Exception as e:
-        return {"received": False, "error": str(e)[:200]}
+    except Exception:
+        return {"received": False, "error": "webhook_rejected"}
     if ev.session_id:
         await _db.payment_transactions.update_one(
             {"session_id": ev.session_id},

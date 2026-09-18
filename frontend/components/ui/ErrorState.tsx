@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/tokens';
 import { Button } from './Button';
+import { isDevErrorDetails, safeErrorDetails } from '../../utils/safeError';
 
 interface ErrorStateProps {
   title?: string;
@@ -33,14 +34,10 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   message = 'We hit an unexpected snag rendering this screen. The rest of the app is fine — you can keep going.',
   error, onRetry, hideRetry, fallbackAction, showDetailsDefault,
 }) => {
-  const [showDetails, setShowDetails] = useState(!!showDetailsDefault);
+  const [showDetails, setShowDetails] = useState(!!showDetailsDefault && isDevErrorDetails());
   const [copied, setCopied] = useState(false);
 
-  const errText = error
-    ? typeof error === 'string'
-      ? error
-      : (error.stack || error.message || String(error))
-    : '';
+  const errText = isDevErrorDetails() ? safeErrorDetails(error) : '';
 
   const copy = () => {
     try {

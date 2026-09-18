@@ -16,8 +16,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
+
+log = logging.getLogger("codedock.provenance")
 
 GENESIS = "0" * 64
 
@@ -64,7 +67,8 @@ def append(build_id: str, kind: str, data: dict | None = None,
         event.pop("_id", None)
         return event
     except Exception as e:
-        return {"error": str(e), "build_id": build_id, "kind": kind}
+        log.warning("provenance append failed: %s", type(e).__name__)
+        return {"error": "append_failed", "build_id": build_id, "kind": kind}
 
 
 def chain(build_id: str, limit: int = 200) -> dict:
@@ -83,7 +87,8 @@ def verify(build_id: str) -> dict:
     try:
         rows = list(_coll().find({"build_id": build_id}, {"_id": 0}).sort("seq", 1))
     except Exception as e:
-        return {"valid": False, "error": str(e)}
+        log.warning("provenance verify failed: %s", type(e).__name__)
+        return {"valid": False, "error": "verify_failed"}
     prev = GENESIS
     broken = []
     for i, ev in enumerate(rows):

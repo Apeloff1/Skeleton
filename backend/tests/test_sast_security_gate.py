@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts import check_sast_security as sast
 from scripts.check_sast_security import javascript_violations, violations
 
 
@@ -25,6 +26,81 @@ def test_rejects_eval(tmp_path: Path) -> None:
 def test_rejects_exec(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "exec(user_input)\n")
     assert any("exec() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_direct_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "runner = eval\nrunner(user_input)\n")
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_imported_builtins_eval_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "from builtins import eval as runner\nrunner(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_direct_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nfetch = requests.get\nfetch(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_alias_of_jwt_decode_signature_disable(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import jwt\ndecode = jwt.decode\n"
+        "decode(token, options={\"verify_signature\": False})\n",
+    )
+    assert any("must not disable signature verification" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "if (runner := eval):\n    runner(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "if (fetch := requests.get):\n"
+        "    fetch(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_chained_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "runner = eval\nexecute = runner\nexecute(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_chained_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nfetch = requests.get\ncall = fetch\ncall(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_allows_reassigned_sensitive_alias_to_avoid_unsafe_inference(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "fetch = requests.get\n"
+        "fetch = custom_fetch\n"
+        "fetch(url, verify=False)\n",
+    )
+    assert findings == []
 
 
 def test_rejects_tempfile_mktemp(tmp_path: Path) -> None:
@@ -278,3 +354,92 @@ def test_js_comment_markers_inside_strings_do_not_hide_following_code(tmp_path: 
         'const url = "https://example.com/path";\nconst result = eval(userInput);\n',
     )
     assert any("dynamic eval() is forbidden" in finding for finding in findings)
+
+
+def test_main_fails_closed_when_backend_python_surface_is_empty(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    safe_js = tmp_path / "safe.ts"
+    safe_js.write_text("const value = 1;\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter(()))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter((safe_js,)))
+
+    assert sast.main() == 1
+    assert "no backend Python files were scanned" in capsys.readouterr().err
+
+
+def test_main_fails_closed_when_frontend_js_surface_is_empty(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    safe_py = tmp_path / "safe.py"
+    safe_py.write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter((safe_py,)))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter(()))
+
+    assert sast.main() == 1
+    assert "no frontend JavaScript/TypeScript files were scanned" in capsys.readouterr().err
+
+
+def test_main_accepts_nonempty_clean_scan_surfaces(tmp_path: Path, monkeypatch, capsys) -> None:
+    safe_py = tmp_path / "safe.py"
+    safe_js = tmp_path / "safe.ts"
+    safe_py.write_text("value = 1\n", encoding="utf-8")
+    safe_js.write_text("const value = 1;\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter((safe_py,)))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter((safe_js,)))
+
+    assert sast.main() == 0
+    assert "1 Python, 1 JS/TS files" in capsys.readouterr().out
+
+
+
+def test_rejects_requests_module_alias_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "http = requests\n"
+        "http.get(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_httpx_module_alias_client_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import httpx\n"
+        "network = httpx\n"
+        "client = network.Client(verify=False)\n",
+    )
+    assert any("httpx.Client" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_builtins_module_alias_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import builtins\n"
+        "runtime = builtins\n"
+        "runtime.eval(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_security_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "first = requests\n"
+        "second = first\n"
+        "second.post(url, verify=False)\n",
+    )
+    assert any("requests.post" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_reassigned_security_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "http = requests\n"
+        "http = custom_client\n"
+        "http.get(url, verify=False)\n",
+    )
+    assert findings == []

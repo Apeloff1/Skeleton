@@ -135,9 +135,9 @@ class GodotPipeline:
             except asyncio.CancelledError:
                 job.status = JobStatus.CANCELLED
                 raise
-            except Exception as exc:
+            except Exception:
                 job.status = JobStatus.FAILED
-                job.error = f"{type(exc).__name__}: {exc}"
+                job.error = "godot_job_failed"
 
         await scheduler.run(job_id, execute)
         return job

@@ -246,7 +246,7 @@ async def download_build_apk(build_id: str):
     import asyncio as _a
     art = await _a.get_event_loop().run_in_executor(None, binary_builder.build_apk, apk_build)
     if not art.get("is_installable"):
-        raise HTTPException(503, f"APK toolchain unavailable or build failed: {art.get('signature_info','')[:200]}")
+        raise HTTPException(503, "APK toolchain unavailable")
     filename = f"{(build.get('title') or 'game').lower().replace(' ', '-')[:20]}-galaxy.apk"
     return FileResponse(
         art["path"],

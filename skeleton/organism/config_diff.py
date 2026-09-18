@@ -77,8 +77,18 @@ class ConfigDiff:
     def _is_sensitive(self, path: str) -> bool:
         return any(s in path.lower() for s in SENSITIVE_KEYS)
 
+    def _contains_sensitive_key(self, value: Any) -> bool:
+        if isinstance(value, dict):
+            for key, nested in value.items():
+                if self._is_sensitive(str(key)) or self._contains_sensitive_key(nested):
+                    return True
+            return False
+        if isinstance(value, (list, tuple)):
+            return any(self._contains_sensitive_key(item) for item in value)
+        return False
+
     def _risk_for(self, path: str, kind: str, old: Any, new: Any) -> str:
-        if self._is_sensitive(path):
+        if self._is_sensitive(path) or self._contains_sensitive_key(old) or self._contains_sensitive_key(new):
             return "critical"
         if kind == "removed":
             return "high"

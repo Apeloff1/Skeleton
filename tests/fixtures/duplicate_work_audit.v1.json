@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "prs": [
+    {
+      "number": 101,
+      "title": "Versioned queue trend schema",
+      "head": "cursor/queue-report-schema-6ac8",
+      "files": [
+        "scripts/check_queue_report_schema.py",
+        "tests/test_queue_report_schema.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 102,
+      "title": "Run-state classification",
+      "head": "cursor/run-state-classification-6ac8",
+      "files": [
+        "scripts/check_run_state_classification.py",
+        "tests/test_run_state_classification.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 201,
+      "title": "WIP duplicate-work first take",
+      "head": "cursor/duplicate-pr-cluster-audit-6ac8",
+      "files": [
+        "scripts/check_duplicate_work_audit.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 202,
+      "title": "WIP duplicate-work retry",
+      "head": "cursor/duplicate-pr-cluster-audit-6ac8",
+      "files": [
+        "scripts/check_duplicate_work_audit.py",
+        "tests/test_duplicate_work_audit.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 301,
+      "title": "Fail-closed hot-path evidence inventory",
+      "head": "cursor/hot-path-a-6ac8",
+      "files": [
+        "scripts/check_hot_path_inventory.py",
+        "tests/test_hot_path_inventory.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 302,
+      "title": "Fail-closed hot-path evidence inventory",
+      "head": "cursor/hot-path-b-6ac8",
+      "files": [
+        "scripts/check_hot_path_inventory.py",
+        "tests/test_hot_path_inventory.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 401,
+      "title": "Architecture boundary gate",
+      "head": "cursor/arch-scripts-6ac8",
+      "files": [
+        "scripts/check_architecture_boundaries.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 402,
+      "title": "Backend architecture boundary scanner",
+      "head": "cursor/arch-backend-6ac8",
+      "files": [
+        "backend/scripts/check_architecture_boundaries.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 501,
+      "title": "Seed 05 first pass",
+      "head": "cursor/s009-first-6ac8",
+      "files": [
+        "scripts/check_duplicate_work_audit.py"
+      ],
+      "state": "closed"
+    },
+    {
+      "number": 502,
+      "title": "supersedes #501 Seed 05 second pass",
+      "head": "cursor/s009-second-6ac8",
+      "files": [
+        "scripts/check_duplicate_work_audit.py",
+        "tests/test_duplicate_work_audit.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 601,
+      "title": "Scan performance audit",
+      "head": "cursor/scan-a-6ac8",
+      "files": [
+        "scripts/check_scan_performance_inventory.py"
+      ],
+      "state": "merged"
+    },
+    {
+      "number": 602,
+      "title": "Scan performance audit",
+      "head": "cursor/scan-b-6ac8",
+      "files": [
+        "scripts/check_scan_performance_inventory.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 701,
+      "title": "Capability inventory",
+      "head": "cursor/capability-6ac8",
+      "files": [
+        "scripts/check_capability_inventory.py",
+        "tests/test_capability_inventory.py"
+      ],
+      "state": "open"
+    },
+    {
+      "number": 702,
+      "title": "Security priority inventory",
+      "head": "cursor/security-priority-6ac8",
+      "files": [
+        "scripts/check_capability_inventory.py",
+        "scripts/check_security_priority.py"
+      ],
+      "state": "open"
+    }
+  ]
+}

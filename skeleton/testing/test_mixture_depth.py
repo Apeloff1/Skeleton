@@ -73,6 +73,22 @@ def test_all_hard_tokens_reach_full_depth() -> None:
     assert metrics["estimated_block_savings"] == 0.0
 
 
+def test_selective_layer_freezes_exited_tokens_without_changing_active_queries() -> None:
+    model = _model(layers=2)
+    ids = _ids(model)
+    hidden = model._encode(ids)
+    layer = model.layers[0]
+    full, _ = layer.forward([list(row) for row in hidden], model.n_heads)
+    router = MixtureOfDepths(model, threshold=0.0)
+
+    selective = router._selective_layer(layer, hidden, active=(2, 3))
+
+    assert selective[0] == hidden[0]
+    assert selective[1] == hidden[1]
+    assert selective[2] == full[2]
+    assert selective[3] == full[3]
+
+
 def test_threshold_schedule_and_metrics_are_deterministic() -> None:
     model = _model(layers=3)
     ids = _ids(model)

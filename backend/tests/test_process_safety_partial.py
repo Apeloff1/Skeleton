@@ -21,6 +21,22 @@ def test_allows_partial_subprocess_with_literal_shell_false(tmp_path: Path) -> N
     assert findings == []
 
 
+def test_rejects_partial_bound_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import functools\nimport subprocess\nrunner = functools.partial(subprocess.run, 'python --version')\nrunner(check=True)\n",
+    )
+    assert any("partial command must be an argument vector" in finding for finding in findings)
+
+
+def test_rejects_partial_keyword_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import functools\nimport subprocess\nrunner = functools.partial(subprocess.run, args='python --version')\nrunner(check=True)\n",
+    )
+    assert any("partial args=" in finding for finding in findings)
+
+
 def test_rejects_partial_subprocess_with_shell_true(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,

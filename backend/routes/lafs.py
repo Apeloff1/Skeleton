@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 
 from gameforge.lafs import lafs, jeeves, librarian, HIERARCHY, TOTAL_LOG_TYPES
@@ -62,7 +63,7 @@ async def remember(req: RememberReq):
         sheet = lafs.add_sheet(req.domain, req.log_type, req.payload,
                                author=req.author, cross_refs=req.cross_refs, tags=req.tags)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+        raise internal_http_error("LAFS request failed", e) from None
     return {"ok": True, "sheet": sheet.brief()}
 
 
@@ -131,7 +132,7 @@ async def learn_online(req: LearnReq):
     try:
         summary = await _wiki_summary(req.topic)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"upstream_error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=502, detail="upstream_error") from None
     if not summary:
         raise HTTPException(status_code=404, detail="no_reliable_source_found")
 

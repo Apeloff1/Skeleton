@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+
 import pytest
 
 from core.auth_security import (
@@ -122,3 +125,85 @@ def test_security_summary_never_exposes_secret_or_seed_password():
     rendered = repr(summary)
     assert STRONG_SECRET not in rendered
     assert STRONG_PASSWORD not in rendered
+
+
+def test_active_auth_route_uses_shared_fail_closed_configuration_contract():
+    route_path = Path(__file__).parents[1] / "routes" / "gameforge_auth.py"
+    source = route_path.read_text(encoding="utf-8")
+
+    assert "from core.auth_security import" in source
+    assert "resolve_jwt_secret" in source
+    assert "resolve_seed_admin" in source
+    assert "resolve_session_api" in source
+    assert "auth_enforced" in source
+
+    # The active HTTP surface must never regress to the retired public defaults.
+    assert "dev-insecure-secret-change-me" not in source
+    assert "GameForge#Admin2026" not in source
+    assert 'SEED_ADMIN_EMAIL = "admin@gameforge.io"' not in source
+
+
+def test_active_auth_route_retires_persisted_legacy_bootstrap_state():
+    route_path = Path(__file__).parents[1] / "routes" / "gameforge_auth.py"
+    source = route_path.read_text(encoding="utf-8")
+
+    assert '_LEGACY_PUBLIC_SEED_EMAIL = "admin@gameforge.io"' in source
+    assert '"security_migration": "legacy_public_seed_disabled"' in source
+    assert "verify_password(" in source
+    assert "seed.password" in source
+    assert '"$setOnInsert"' in source
+    assert 'detail=f"Auth provider unreachable' not in source
+    assert 'detail="Auth provider unreachable"' in source
+
+
+def _decorated_route_roles(source: str) -> dict[str, str]:
+    """Extract role dependencies from router.get/post decorators without imports."""
+    roles: dict[str, str] = {}
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            if not isinstance(decorator.func, ast.Attribute):
+                continue
+            if decorator.func.attr not in {"get", "post"}:
+                continue
+            if not decorator.args or not isinstance(decorator.args[0], ast.Constant):
+                continue
+            route = decorator.args[0].value
+            if not isinstance(route, str):
+                continue
+            for child in ast.walk(decorator):
+                if not isinstance(child, ast.Call):
+                    continue
+                if not isinstance(child.func, ast.Name) or child.func.id != "require_role":
+                    continue
+                if not child.args or not isinstance(child.args[0], ast.Constant):
+                    continue
+                role = child.args[0].value
+                if isinstance(role, str):
+                    roles[route] = role
+    return roles
+
+
+def test_sensitive_telemetry_routes_use_shared_role_policy():
+    telemetry_path = Path(__file__).parents[1] / "routes" / "telemetry.py"
+    source = telemetry_path.read_text(encoding="utf-8")
+    roles = _decorated_route_roles(source)
+
+    expected = {
+        "/telemetry/event": "viewer",
+        "/telemetry/batch": "viewer",
+        "/telemetry/last-crash": "viewer",
+        "/telemetry/critical/recent": "admin",
+        "/telemetry/recent": "admin",
+        "/telemetry/sessions": "admin",
+        "/telemetry/summary": "admin",
+        "/security/audit": "admin",
+        "/security/audit-summary": "admin",
+        "/security/rate-limits": "admin",
+        "/security/health": "admin",
+    }
+    assert {route: roles.get(route) for route in expected} == expected

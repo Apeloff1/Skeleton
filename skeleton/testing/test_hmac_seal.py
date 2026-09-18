@@ -20,6 +20,13 @@ def test_mint_verify_roundtrip():
     assert verify_seal(token, secret=SECRET, now=1_700_000_000) == "alice"
 
 
+def test_mint_rejects_bool_and_float_ttl():
+    with pytest.raises(ValueError, match="ttl_secs must be an integer"):
+        mint_seal("alice", ttl_secs=True, secret=SECRET, now=1_700_000_000)
+    with pytest.raises(ValueError, match="ttl_secs must be an integer"):
+        mint_seal("alice", ttl_secs=60.5, secret=SECRET, now=1_700_000_000)
+
+
 def test_attester_with_dots():
     token = mint_seal("org.team.bot", ttl_secs=120, secret=SECRET, now=1_700_000_000)
     assert verify_seal(token, secret=SECRET, now=1_700_000_010) == "org.team.bot"

@@ -204,3 +204,17 @@ def test_actor_weight_below_charter_403(sealed_client, monkeypatch):
     detail = res.json().get("detail", res.json())
     assert detail.get("error") == "charter_denied"
     assert "below required" in detail.get("reason", "")
+
+
+def test_invalid_actor_weight_is_400_without_echo(sealed_client):
+    res = sealed_client.post(
+        "/api/v1/forge/blueprint",
+        json={"name": "x"},
+        headers={**_seal(), "x-gf-actor-weight": "nope<script>"},
+    )
+    assert res.status_code == 400
+    body = res.json()
+    detail = body.get("detail", body)
+    assert detail.get("error") == "invalid_actor_weight"
+    assert "nope" not in str(body)
+    assert "value" not in detail

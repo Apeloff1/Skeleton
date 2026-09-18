@@ -35,6 +35,8 @@ Tools are resolved through `ToolRegistry`. Every invocation gets one `StepRecord
 
 `RetryBudget.max_attempts` is the hard attempt ceiling. Exhaustion converts the tool step to `failed` and the run to `failed`; no running/retrying step is left behind.
 
+Sensitive tools also declare explicit `ToolCapability` requirements. A run receives a capability grant set; the default is empty. Capability decisions are recorded on the canonical `RunRecord` before handler invocation, and a denied capability fails the tool step without executing the handler.
+
 ## Cancellation
 
 The orchestrator uses the provider-neutral `CancellationToken` introduced by #116. Pre-cancelled runs terminate before a model/driver call. In-flight async driver/tool work races the cancellation token and transitions the active step/run to cancelled deterministically.
@@ -45,6 +47,18 @@ External `asyncio` task cancellation is not swallowed: active internal work is c
 
 `max_turns` is mandatory and positive. A driver that continues requesting tools beyond this bound terminates the run as failed with a turn-budget error. This prevents unbounded model/tool loops even when every individual operation succeeds.
 
+## Legacy coordinator adapter
+
+`skeleton.agents.coordination.Coordinator` remains a compatibility API for the older agent-pool surface. Agent selection and capacity accounting stay in `AgentPool`, but any task type with a registered local handler is adapted into the canonical lifecycle:
+
+1. the compatibility task is assigned to an available agent;
+2. a small `OrchestrationDriver` requests the registered handler as a canonical tool call;
+3. `CanonicalOrchestrator` owns the run/tool transitions and terminal state;
+4. the final `RunRecord` is projected back to legacy `TaskStatus`, `result`, and `error` fields;
+5. agent capacity is released after the canonical run reaches a terminal state.
+
+`Coordinator.get_run_record(task_id)` exposes the canonical record for migrated local tasks. Async callers use `await Coordinator.dispatch_async(...)`; the synchronous `dispatch(...)` wrapper deliberately refuses to nest an event loop and tells event-loop callers to use the async API. Tasks without a registered local handler preserve the historical externally-executed behavior and remain `RUNNING` after pool assignment.
+
 ## Migration rule
 
-New agent/orchestration paths should adapt to `OrchestrationDriver` and register tools through `ToolRegistry`. Existing coordinators should migrate state mutation and retry logic behind `CanonicalOrchestrator`; adding another independent run-status/retry loop is not an accepted migration path.
+New agent/orchestration paths should adapt to `OrchestrationDriver` and register tools through `ToolRegistry`. Compatibility layers may project canonical run state into legacy types, but they must not add another independent run-status, retry, or tool-exception lifecycle.

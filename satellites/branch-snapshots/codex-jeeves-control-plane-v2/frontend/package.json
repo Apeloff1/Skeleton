@@ -25,7 +25,7 @@
     "@react-navigation/native": "^7.1.6",
     "@react-navigation/native-stack": "^7.3.10",
     "@types/react": "~19.1.10",
-    "axios": "^1.13.5",
+    "axios": "^1.18.0",
     "d3-shape": "^3.2.0",
     "expo": "~54.0.35",
     "expo-asset": "~12.0.13",
@@ -73,7 +73,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^7.29.6",
     "@babel/plugin-transform-class-static-block": "^7.27.1",
     "eslint": "^9",
     "eslint-config-expo": "^57.0.2",

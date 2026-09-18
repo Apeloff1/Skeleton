@@ -9,6 +9,7 @@ verification report distinct from live chaos experiments.
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -39,21 +40,46 @@ class ScenarioResult:
 
 
 class FaultInjectionHarness:
-    """Structured resilience verification scenarios."""
+    """Structured resilience verification scenarios with bounded result history.
 
-    def __init__(self):
+    ``max_results`` bounds retained detailed results while lifetime run and
+    assertion counters remain exact. This keeps long-running reliability loops
+    from accumulating unbounded result objects without changing the historical
+    meaning of ``card()["runs"]`` or :meth:`verification_score`.
+    """
+
+    def __init__(self, max_results: int = 1000):
+        if isinstance(max_results, bool) or not isinstance(max_results, int):
+            raise TypeError("max_results must be an integer")
+        if max_results < 1:
+            raise ValueError("max_results must be at least 1")
         self._scenarios: Dict[str, Scenario] = {}
-        self._results: List[ScenarioResult] = []
+        self._results: deque[ScenarioResult] = deque(maxlen=max_results)
+        self._max_results = max_results
+        self._run_count = 0
+        self._assertion_count = 0
+        self._passed_assertion_count = 0
 
-    def scenario(self, name: str, fault: str, target: str,
-                 setup: Optional[Callable[[], Dict[str, Any]]] = None) -> Scenario:
-        s = Scenario(name=name, fault=fault, target=target, setup=setup)
-        self._scenarios[name] = s
-        return s
+    def scenario(
+        self,
+        name: str,
+        fault: str,
+        target: str,
+        setup: Optional[Callable[[], Dict[str, Any]]] = None,
+    ) -> Scenario:
+        scenario = Scenario(name=name, fault=fault, target=target, setup=setup)
+        self._scenarios[name] = scenario
+        return scenario
 
-    def assert_that(self, scenario: str, description: str,
-                    check: Callable[[Dict[str, Any]], bool]) -> None:
-        self._scenarios[scenario].assertions.append(Assertion(description=description, check=check))
+    def assert_that(
+        self,
+        scenario: str,
+        description: str,
+        check: Callable[[Dict[str, Any]], bool],
+    ) -> None:
+        self._scenarios[scenario].assertions.append(
+            Assertion(description=description, check=check)
+        )
 
     def run(self, name: str) -> ScenarioResult:
         scenario = self._scenarios[name]
@@ -74,42 +100,59 @@ class FaultInjectionHarness:
             except Exception as exc:  # noqa: BLE001
                 assertion.passed = False
                 assertion.detail = str(exc)
-            outcomes.append({
-                "description": assertion.description,
-                "passed": assertion.passed,
-                "detail": assertion.detail,
-            })
+            outcomes.append(
+                {
+                    "description": assertion.description,
+                    "passed": assertion.passed,
+                    "detail": assertion.detail,
+                }
+            )
+
         result = ScenarioResult(
             name=name,
-            passed=all(a["passed"] for a in outcomes) if outcomes else True,
+            passed=all(outcome["passed"] for outcome in outcomes) if outcomes else True,
             assertions=outcomes,
             duration_ms=(time.time_ns() - start) / 1e6,
         )
         self._results.append(result)
+        self._run_count += 1
+        self._assertion_count += len(outcomes)
+        self._passed_assertion_count += sum(1 for outcome in outcomes if outcome["passed"])
         return result
 
     def run_all(self) -> Dict[str, Any]:
         results = [self.run(name) for name in self._scenarios]
-        passed = sum(1 for r in results if r.passed)
+        passed = sum(1 for result in results if result.passed)
         return {
             "total": len(results),
             "passed": passed,
             "failed": len(results) - passed,
             "pass_rate": round(passed / len(results), 3) if results else 1.0,
-            "results": [{"name": r.name, "passed": r.passed, "ms": round(r.duration_ms, 2)} for r in results],
+            "results": [
+                {
+                    "name": result.name,
+                    "passed": result.passed,
+                    "ms": round(result.duration_ms, 2),
+                }
+                for result in results
+            ],
         }
 
     def verification_score(self) -> float:
-        all_assertions = [a for r in self._results for a in r.assertions]
-        if not all_assertions:
+        if not self._assertion_count:
             return 1.0
-        return sum(1 for a in all_assertions if a["passed"]) / len(all_assertions)
+        return self._passed_assertion_count / self._assertion_count
 
     def card(self) -> Dict[str, Any]:
         return {
             "kind": "fault-harness-card",
             "scenarios": len(self._scenarios),
-            "runs": len(self._results),
+            "runs": self._run_count,
+            "retained_runs": len(self._results),
+            "max_results": self._max_results,
             "verification_score": round(self.verification_score(), 3),
-            "recent": [{"name": r.name, "passed": r.passed} for r in self._results[-5:]],
+            "recent": [
+                {"name": result.name, "passed": result.passed}
+                for result in list(self._results)[-5:]
+            ],
         }

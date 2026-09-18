@@ -1,0 +1,139 @@
+name: PR Hygiene
+
+on:
+  pull_request:
+    # Classification is a pure function of the PR diff. Metadata-only edits,
+    # draft-state changes, and close events cannot change size/area/risk labels.
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: pr-hygiene-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Label mutation is restricted to same-repository pull requests. Fork pull
+# requests are intentionally skipped instead of granting a privileged trigger.
+permissions: {}
+
+jobs:
+  classify:
+    name: Classify pull request
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Apply size, area, dependency, and risk labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$RUNNER_TEMP/pr-files.txt"
+          pr_json=$(gh api "/repos/${REPO}/pulls/${PR}")
+          gh api --paginate "/repos/${REPO}/pulls/${PR}/files?per_page=100" --jq '.[].filename' > "$files"
+          additions=$(jq -r '.additions' <<<"$pr_json")
+          deletions=$(jq -r '.deletions' <<<"$pr_json")
+          changed=$((additions + deletions))
+
+          if (( changed <= 50 )); then size='size/xs';
+          elif (( changed <= 200 )); then size='size/s';
+          elif (( changed <= 500 )); then size='size/m';
+          elif (( changed <= 1000 )); then size='size/l';
+          else size='size/xl'; fi
+
+          desired=("$size")
+          grep -Eq '^backend/' "$files" && desired+=(area/backend) || true
+          grep -Eq '^frontend/' "$files" && desired+=(area/frontend) || true
+          grep -Eq '^skeleton/' "$files" && desired+=(area/core) || true
+          grep -Eq '(^|/)(tests?|testing|fixtures?)/|(^|/)test_[^/]+\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$' "$files" && desired+=(area/tests) || true
+          grep -Eq '^\.github/|^scripts/' "$files" && desired+=(area/automation) || true
+          grep -Eqi '(^|/)(docs?|documentation)/|(^|/)(README|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT)(\.|$)|\.md$' "$files" && desired+=(area/docs) || true
+          grep -Eqi '(^|/)(Dockerfile|docker-compose[^/]*\.ya?ml)$|(^|/)(infra|infrastructure|deploy|deployment)/' "$files" && desired+=(area/infrastructure) || true
+          grep -Eqi '(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.ya?ml|requirements[^/]*\.txt|requirements\.snapshot|pyproject\.toml|uv\.lock|poetry\.lock|Pipfile(\.lock)?|Dockerfile)$|^\.github/dependabot\.yml$' "$files" && desired+=(change/dependencies) || true
+          grep -Eqi '^\.github/workflows/|(^|/)(auth|security|crypto|migrations?|infra|infrastructure|deploy|deployment)(/|$)|(^|/)Dockerfile$' "$files" && desired+=(risk/high) || true
+
+          managed=(size/xs size/s size/m size/l size/xl area/backend area/frontend area/core area/tests area/automation area/docs area/infrastructure change/dependencies risk/high)
+
+          label_spec() {
+            case "$1" in
+              size/xs) printf '%s\t%s\n' c5def5 'Very small pull request (0-50 changed lines)' ;;
+              size/s) printf '%s\t%s\n' bfdadc 'Small pull request (51-200 changed lines)' ;;
+              size/m) printf '%s\t%s\n' fef2c0 'Medium pull request (201-500 changed lines)' ;;
+              size/l) printf '%s\t%s\n' f9d0c4 'Large pull request (501-1000 changed lines)' ;;
+              size/xl) printf '%s\t%s\n' d93f0b 'Extra-large pull request (more than 1000 changed lines)' ;;
+              area/backend) printf '%s\t%s\n' 1d76db 'Touches backend code' ;;
+              area/frontend) printf '%s\t%s\n' 5319e7 'Touches frontend code' ;;
+              area/core) printf '%s\t%s\n' 0e8a16 'Touches Skeleton core/runtime code' ;;
+              area/tests) printf '%s\t%s\n' 7057ff 'Touches tests or test fixtures' ;;
+              area/automation) printf '%s\t%s\n' 6f42c1 'Touches GitHub automation or repository tooling' ;;
+              area/docs) printf '%s\t%s\n' 0075ca 'Touches documentation' ;;
+              area/infrastructure) printf '%s\t%s\n' b60205 'Touches containers or infrastructure files' ;;
+              change/dependencies) printf '%s\t%s\n' 0366d6 'Changes dependency manifests or lockfiles' ;;
+              risk/high) printf '%s\t%s\n' b60205 'Touches security, workflow, migration, or deployment boundaries' ;;
+            esac
+          }
+
+          # Labels are metadata, not a merge-safety gate. Some GitHub App/token
+          # configurations report Issues: write yet still reject repository-label
+          # creation or PR label replacement with HTTP 403. Treat that as a
+          # degraded annotation path instead of failing the whole PR check.
+          existing=$(gh api --paginate "/repos/${REPO}/labels?per_page=100" --jq '.[].name')
+          create_failures=0
+          for label in "${desired[@]}"; do
+            if ! grep -Fxq "$label" <<<"$existing"; then
+              IFS=$'\t' read -r color description < <(label_spec "$label")
+              if gh label create "$label" --repo "$REPO" --color "$color" --description "$description" >/dev/null 2>&1; then
+                existing+=$'\n'"$label"
+              else
+                create_failures=$((create_failures + 1))
+                echo "::warning::PR hygiene could not create label '$label'; classification will continue without it."
+              fi
+            fi
+          done
+
+          available_desired=()
+          unavailable_desired=()
+          for label in "${desired[@]}"; do
+            if grep -Fxq "$label" <<<"$existing"; then
+              available_desired+=("$label")
+            else
+              unavailable_desired+=("$label")
+            fi
+          done
+
+          current=$(gh api "/repos/${REPO}/issues/${PR}/labels?per_page=100")
+          current_names=$(jq '[.[].name]' <<<"$current")
+          managed_json=$(printf '%s\n' "${managed[@]}" | jq -R . | jq -s .)
+          if ((${#available_desired[@]})); then
+            desired_json=$(printf '%s\n' "${available_desired[@]}" | jq -R . | jq -s 'unique')
+          else
+            desired_json='[]'
+          fi
+          payload=$(jq -n --argjson current "$current_names" --argjson managed "$managed_json" --argjson desired "$desired_json" '{labels: (($current - $managed + $desired) | unique)}')
+
+          label_write='applied'
+          if ! printf '%s' "$payload" | gh api --method PUT "/repos/${REPO}/issues/${PR}/labels" --input - >/dev/null 2>&1; then
+            label_write='permission-degraded'
+            echo '::warning::PR hygiene could not replace managed PR labels; merge-safety checks remain unaffected.'
+          fi
+
+          {
+            echo '## PR hygiene'
+            echo "- Changed lines: $changed (+$additions / -$deletions)"
+            echo "- Label write status: $label_write"
+            echo "- Label creation failures: $create_failures"
+            echo '- Desired managed labels:'
+            printf '%s\n' "${desired[@]}" | sort -u | sed 's/^/  - `/' | sed 's/$/`/'
+            if ((${#unavailable_desired[@]})); then
+              echo '- Unavailable labels skipped:'
+              printf '%s\n' "${unavailable_desired[@]}" | sort -u | sed 's/^/  - `/' | sed 's/$/`/'
+            fi
+            echo '- Manual labels are preserved whenever label mutation is available.'
+            echo '- Pull-request code was not checked out or executed.'
+            echo '- Label/API permission failures are annotations only and do not block branch flow.'
+          } >> "$GITHUB_STEP_SUMMARY"

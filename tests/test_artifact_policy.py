@@ -75,6 +75,25 @@ class ArtifactPolicyTests(unittest.TestCase):
         errors = self._validate("backend/data/build_artifacts/output.txt")
         self.assertTrue(any("generated/cache path" in error for error in errors))
 
+    def test_rejects_environment_state(self) -> None:
+        self._write("backend/.env.production", b"TOKEN=secret")
+        errors = self._validate("backend/.env.production")
+        self.assertTrue(any("environment state" in error for error in errors))
+
+    def test_allows_environment_templates(self) -> None:
+        self._write("backend/.env.example", b"TOKEN=replace-me")
+        self.assertEqual(self._validate("backend/.env.example"), [])
+
+    def test_rejects_machine_local_log(self) -> None:
+        self._write("debug/app.log", b"local output")
+        errors = self._validate("debug/app.log")
+        self.assertTrue(any("machine-local/generated state" in error for error in errors))
+
+    def test_rejects_virtualenv_content(self) -> None:
+        self._write(".venv/lib/site.py", b"generated")
+        errors = self._validate(".venv/lib/site.py")
+        self.assertTrue(any("generated/cache path" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -96,7 +96,6 @@ _ONCE_OVER_AGENTS = [
 
 async def _probe_agent(client, label: str, path: str, base: str) -> dict:
     """Probe one agent endpoint with up to 3 redundant attempts."""
-    last_err = None
     for attempt in range(1, 4):
         t0 = time.perf_counter()
         try:
@@ -108,12 +107,11 @@ async def _probe_agent(client, label: str, path: str, base: str) -> dict:
                 "agent": label, "path": path, "ok": ok, "status": r.status_code,
                 "latency_ms": dur, "attempts": attempt, "finding": finding,
             }
-        except Exception as e:  # network/timeout — retry (redundancy)
-            last_err = str(e)
+        except Exception:  # network/timeout — retry (redundancy)
             continue
     return {
         "agent": label, "path": path, "ok": False, "status": 0,
-        "latency_ms": None, "attempts": 3, "finding": f"unreachable: {last_err}",
+        "latency_ms": None, "attempts": 3, "finding": "unreachable",
     }
 
 

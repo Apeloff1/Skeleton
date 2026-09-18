@@ -36,7 +36,28 @@ _MAX_REQUEST_DEPTH = 8
 _MAX_REQUEST_NODES = 512
 _MAX_REQUEST_STRING_CHARS = 16_384
 _MAX_INPUT_CHARS = 32_768
+_MAX_PROVIDER_OUTPUT_CHARS = 131_072
+_MAX_IDENTIFIER_CHARS = 256
+_MAX_CODE_REVIEW_CHARS = 262_144
 _PROVIDER_ERROR_CONTENT = "[provider unavailable]"
+
+
+def _bounded_identifier(name: str, value: Any, *, maximum: int = _MAX_IDENTIFIER_CHARS) -> str:
+    """Validate and canonicalize public identity-like strings."""
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{name} must be non-empty")
+    if len(normalized) > maximum:
+        raise ValueError(f"{name} too large")
+    return normalized
+
+
+def _positive_limit(name: str, value: Any, *, maximum: int = 10_000) -> int:
+    if type(value) is not int or value <= 0 or value > maximum:
+        raise ValueError(f"{name} must be a positive integer <= {maximum}")
+    return value
 
 
 def _copy_bounded_json(value: Any, *, depth: int = 0, budget: Optional[List[int]] = None) -> Any:
@@ -132,6 +153,7 @@ class Session:
         return turn
 
     def context_window(self, max_turns: int = 10) -> List[str]:
+        max_turns = _positive_limit("max_turns", max_turns, maximum=1_000)
         return [t.content for t in self.turns[-max_turns:]]
 
     def to_dict(self) -> Dict[str, Any]:
@@ -165,6 +187,8 @@ class MemoryManager:
         self._stats["evicted"] += 1
 
     def create_session(self, user_id: str, mode: SessionMode = SessionMode.TUTORING) -> Session:
+        user_id = _bounded_identifier("user_id", user_id)
+        mode = _normalize_mode(mode)
         session = Session(session_id=uuid.uuid4().hex, user_id=user_id, mode=mode)
         self._sessions[session.session_id] = session
         self._user_sessions.setdefault(user_id, []).append(session.session_id)
@@ -179,6 +203,8 @@ class MemoryManager:
         return self._sessions.get(session_id)
 
     def get_user_history(self, user_id: str, limit: int = 10) -> List[Session]:
+        user_id = _bounded_identifier("user_id", user_id)
+        limit = _positive_limit("limit", limit, maximum=10_000)
         ids = self._user_sessions.get(user_id, [])[-limit:]
         return [self._sessions[sid] for sid in ids if sid in self._sessions]
 
@@ -316,11 +342,16 @@ class JeevesCore:
             content = self._provider.complete(legacy_prompt, context=prior_context)
         if not isinstance(content, str):
             raise TypeError("provider must return text")
+        if len(content) > _MAX_PROVIDER_OUTPUT_CHARS:
+            raise ValueError("provider response too large")
         return content
 
     @property
     def provider_name(self) -> str:
-        return getattr(self._provider, "name", "unknown")
+        name = getattr(self._provider, "name", None)
+        if not isinstance(name, str) or not name.strip() or len(name) > 128:
+            return "unknown"
+        return name
 
     def open_session(self, user_id: str, mode: Any = SessionMode.TUTORING) -> Session:
         normalized_mode = _normalize_mode(mode)
@@ -340,6 +371,7 @@ class JeevesCore:
         context: Optional[Dict[str, Any]] = None,
         allowed_tools: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
+        session_id = _bounded_identifier("session_id", session_id, maximum=128)
         session = self._memory.get_session(session_id)
         if not session:
             return {"error": "Session not found", "session_id": session_id}
@@ -468,9 +500,14 @@ class JeevesCore:
         return self.krem.due()
 
     def review_code(self, session_id: str, code: str) -> Dict[str, Any]:
+        session_id = _bounded_identifier("session_id", session_id, maximum=128)
         session = self._memory.get_session(session_id)
         if not session:
             return {"error": "Session not found"}
+        if not isinstance(code, str):
+            raise ValueError("code must be a string")
+        if len(code) > _MAX_CODE_REVIEW_CHARS:
+            raise ValueError("code too large")
         issues = []
         if "import *" in code:
             issues.append("Avoid wildcard imports")
@@ -481,12 +518,17 @@ class JeevesCore:
         return {"issues": issues, "issue_count": len(issues), "session_id": session_id}
 
     def bind_era(self, era: str) -> Dict[str, Any]:
+        era = _bounded_identifier("era", era, maximum=128)
         return {"era": era, "primary_dps": ["sword", "bow", "magic"], "status": "bound"}
 
     def advise(self, session_id: str, telemetry: Dict[str, Any]) -> Dict[str, Any]:
+        session_id = _bounded_identifier("session_id", session_id, maximum=128)
+        if type(telemetry) is not dict:
+            raise ValueError("telemetry must be an object")
+        copied = _copy_bounded_json(telemetry)
         return {
             "advice": "Monitor system health regularly",
-            "telemetry_summary": {"keys": list(telemetry.keys())},
+            "telemetry_summary": {"keys": list(copied.keys())},
             "session_id": session_id,
         }
 

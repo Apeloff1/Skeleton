@@ -14,7 +14,7 @@ Public surface:
 Tunable via env:
   RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP
   RATE_LIMIT_BURST        (int)   default 60         — initial bucket size
-  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost"
+  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost,testclient"
   RATE_LIMIT_MAX_BUCKETS  (int)   default 4096       — hard cap on tracked IPs
   RATE_LIMIT_BUCKET_TTL   (float) default 300        — idle seconds before expiry
   TRUSTED_PROXY_CIDRS     (csv)   default ""         — peers allowed to supply XFF
@@ -82,7 +82,7 @@ def _parse_trusted_proxy_networks(
 
 _RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600)
 _RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60)
-_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
+_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost,testclient")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 4096)
 _BUCKET_TTL = _positive_float_env("RATE_LIMIT_BUCKET_TTL", 300.0)
@@ -97,21 +97,13 @@ _MAX_XFF_CHARS = 2048
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
-_lat_lock: asyncio.Lock | None = None
 _counts: Dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
 
-def _get_lat_lock() -> asyncio.Lock:
-    global _lat_lock
-    if _lat_lock is None:
-        _lat_lock = asyncio.Lock()
-    return _lat_lock
-
-
-async def _push_latency(ms: float) -> None:
-    async with _get_lat_lock():
-        _lat_ring.append(ms)
+def _push_latency(ms: float) -> None:
+    """Record one sample without scheduling or lock contention."""
+    _lat_ring.append(ms)
 
 
 def _percentile(sorted_vals, pct: float) -> float:
@@ -161,11 +153,11 @@ def get_stats() -> dict:
 
 # ── Request identity ──────────────────────────────────────────────────
 def _request_id(request: Request) -> str:
-    """Return one bounded header-safe request ID or mint a full UUID4 hex ID."""
+    """Return one bounded header-safe request ID or mint a compact UUID4 token."""
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex
+    return uuid.uuid4().hex[:16]
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -194,63 +186,86 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 # ── Client identity / proxy trust ─────────────────────────────────────
-def _canonical_ip(value: str) -> str | None:
+def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     value = value.strip()
     if not value:
         return None
     try:
-        return str(ipaddress.ip_address(value))
+        return ipaddress.ip_address(value)
     except ValueError:
         return None
 
 
-def _is_trusted_proxy(value: str) -> bool:
-    canonical = _canonical_ip(value)
-    if canonical is None:
-        return False
-    address = ipaddress.ip_address(canonical)
+def _canonical_ip(value: str) -> str | None:
+    address = _parse_ip(value)
+    return str(address) if address is not None else None
+
+
+def _is_trusted_address(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
     return any(address in network for network in _TRUSTED_PROXY_NETWORKS)
 
 
-def _client_ip(request: Request) -> str:
-    """Resolve client identity without trusting attacker-controlled XFF.
+def _is_trusted_proxy(value: str) -> bool:
+    address = _parse_ip(value)
+    return address is not None and _is_trusted_address(address)
 
-    The direct peer is authoritative unless it is explicitly trusted. For a
-    trusted peer, one bounded well-formed XFF chain is walked right-to-left,
-    skipping trusted proxy hops and selecting the nearest untrusted address.
-    Ambiguous, malformed, oversized, or overlong forwarded headers fail closed
-    to the direct peer.
-    """
+
+def _resolve_client_ip(request: Request) -> str:
+    """Resolve client identity without trusting attacker-controlled XFF."""
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
-    canonical_peer = _canonical_ip(peer)
-    if peer == "-" or not _is_trusted_proxy(peer):
-        return canonical_peer or peer
+    if peer == "-":
+        return peer
+
+    peer_address = _parse_ip(peer)
+    canonical_peer = str(peer_address) if peer_address is not None else peer
+    if peer_address is None or not _is_trusted_address(peer_address):
+        return canonical_peer
 
     forwarded_headers = request.headers.getlist("x-forwarded-for")
     if len(forwarded_headers) != 1:
-        return canonical_peer or peer
+        return canonical_peer
     forwarded_value = forwarded_headers[0]
     if len(forwarded_value) > _MAX_XFF_CHARS:
-        return canonical_peer or peer
-    parts = [part.strip() for part in forwarded_value.split(",")]
-    if not parts or len(parts) > _MAX_XFF_HOPS or any(not part for part in parts):
-        return canonical_peer or peer
+        return canonical_peer
 
-    forwarded = [_canonical_ip(part) for part in parts]
-    if any(value is None for value in forwarded):
-        return canonical_peer or peer
+    parts = forwarded_value.split(",")
+    if not parts or len(parts) > _MAX_XFF_HOPS:
+        return canonical_peer
 
-    for value in reversed(forwarded):
-        assert value is not None
-        if not _is_trusted_proxy(value):
-            return value
-    return canonical_peer or peer
+    forwarded: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    for part in parts:
+        address = _parse_ip(part)
+        if address is None:
+            return canonical_peer
+        forwarded.append(address)
+
+    for address in reversed(forwarded):
+        if not _is_trusted_address(address):
+            return str(address)
+    return canonical_peer
+
+
+def _client_ip(request: Request) -> str:
+    """Resolve once per request and reuse across rate limiting and logging."""
+    cached = getattr(request.state, "_middleware_client_ip", None)
+    if cached is not None:
+        return cached
+    resolved = _resolve_client_ip(request)
+    request.state._middleware_client_ip = resolved
+    return resolved
 
 
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
     """Match a route root exactly or one of its descendants, never lookalikes."""
     return path == prefix or path.startswith(prefix + "/")
+
+
+def _is_api_path(path: str) -> bool:
+    """Publicly testable API-boundary predicate; reject lookalike prefixes."""
+    return _matches_path_prefix(path, "/api")
 
 
 # ── Access log ────────────────────────────────────────────────────────
@@ -289,7 +304,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         )
         _counts["requests"] += 1
         _counts[bucket] += 1
-        await _push_latency(duration)
+        _push_latency(duration)
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
@@ -315,8 +330,8 @@ class _Bucket:
         self.tokens = float(capacity)
         self.last = time.monotonic()
 
-    def take(self, n: int = 1) -> Tuple[bool, float]:
-        now = time.monotonic()
+    def take(self, n: int = 1, *, now: float | None = None) -> Tuple[bool, float]:
+        now = time.monotonic() if now is None else now
         elapsed = now - self.last
         if elapsed > 0:
             self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_per_sec)
@@ -428,11 +443,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         async with self._get_state_lock():
-            bucket, retry = self._bucket_for(ip)
+            now = time.monotonic()
+            bucket, retry = self._bucket_for(ip, now)
             if bucket is None:
                 ok = False
             else:
-                ok, retry = bucket.take(1)
+                ok, retry = bucket.take(1, now=now)
 
         if not ok:
             _counts["rate_limited"] += 1

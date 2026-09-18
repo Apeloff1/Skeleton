@@ -103,7 +103,7 @@ async def _flush_pending() -> int:
             await core_db[COLLECTION].bulk_write(pymongo_ops, ordered=False)
         return len(ops)
     except Exception as e:  # noqa: BLE001
-        print(f"[feature_flag_metrics] flush error: {type(e).__name__}: {e}", flush=True)
+        print(f"[feature_flag_metrics] flush error: {type(e).__name__}", flush=True)
         return 0
 
 
@@ -121,7 +121,7 @@ async def start_flusher() -> None:
             except asyncio.CancelledError:
                 break
             except Exception as e:  # noqa: BLE001
-                print(f"[feature_flag_metrics] flusher loop error: {type(e).__name__}: {e}", flush=True)
+                print(f"[feature_flag_metrics] flusher loop error: {type(e).__name__}", flush=True)
                 await asyncio.sleep(5)
 
     _flusher_task = asyncio.create_task(_loop())
@@ -137,5 +137,5 @@ async def stats() -> dict[str, Any]:
             "persisted_rows": int(total),
             "flusher_alive": bool(_flusher_task and not _flusher_task.done()),
         }
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "metrics_stats_failed"}

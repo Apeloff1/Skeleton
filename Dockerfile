@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE=python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6
+ARG PYTHON_IMAGE=python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
 FROM ${PYTHON_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,16 +8,37 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN groupadd --gid 10001 appuser \
-    && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
+# Refresh the pinned Alpine base to the currently fixed security packages.
+RUN apk upgrade --no-cache
+
+RUN addgroup -S -g 10001 appuser \
+    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
 
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
 
-RUN pip install --no-cache-dir .
+# The installer toolchain is build-time only. pip 26.2+ also carries vendored
+# packages plus an embedded CycloneDX SBOM under pip/_vendor; leaving that
+# tree in a production image makes those vendored copies part of the runtime
+# attack surface and causes image scanners to report them independently of
+# the application's installed packages. Install first, then remove the full
+# installer/toolchain surface from the final runtime.
+RUN pip install --no-cache-dir . \
+    && pip uninstall -y msgpack setuptools \
+    && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
+              /usr/local/lib/python3.14/site-packages/setuptools* \
+              /usr/local/lib/python3.14/site-packages/pkg_resources* \
+              /usr/local/lib/python3.14/site-packages/pip \
+              /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+              /usr/local/bin/pip*
 
 USER appuser
 
 EXPOSE 8001
+
+# Probe only the public liveness contract and use Python's standard library so
+# the runtime image does not gain curl/apt packages solely for health checks.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health/live', timeout=5).read()" || exit 1
 
 CMD ["uvicorn", "skeleton.api.server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8001"]

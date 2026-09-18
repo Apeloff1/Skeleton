@@ -10,6 +10,8 @@ paths by accident.
 from __future__ import annotations
 
 import ast
+from collections import Counter
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -31,6 +33,12 @@ UNSAFE_OBJECT_LOADERS = {
     "yaml.unsafe_load",
     "yaml.unsafe_load_all",
 }
+TRACKED_DESERIALIZER_CALLABLES = UNSAFE_OBJECT_LOADERS | {
+    "yaml.load",
+    "yaml.load_all",
+    "numpy.load",
+    "torch.load",
+}
 TRACKED_MODULES = {
     "pickle",
     "_pickle",
@@ -42,13 +50,44 @@ TRACKED_MODULES = {
     "numpy",
     "torch",
 }
+PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 
 
-def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+class DeserializationScanError(RuntimeError):
+    """Raised when the scanner cannot prove complete source discovery."""
+
+
+def python_files(root: Path | None = None) -> Iterable[Path]:
+    """Yield backend Python sources without following symlinks, failing on coverage loss."""
+    scan_root = ROOT if root is None else root
+    files: list[Path] = []
+    pending = [scan_root]
+
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise DeserializationScanError("source traversal failed") from exc
+
+        child_dirs: list[Path] = []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    if entry.name not in SKIP_DIRS:
+                        child_dirs.append(Path(entry.path))
+                    continue
+                if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    files.append(Path(entry.path))
+            except OSError as exc:
+                raise DeserializationScanError("source traversal failed") from exc
+
+        pending.extend(reversed(child_dirs))
+
+    yield from sorted(files)
 
 
 def display_path(path: Path) -> Path:
@@ -97,6 +136,132 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if replacement is None:
         return name
     return replacement + (f".{suffix}" if dot else "")
+
+
+def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
+    """Yield nodes owned by one lexical scope without entering nested scopes."""
+
+    def descend(node: ast.AST) -> Iterable[ast.AST]:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, PYTHON_SCOPES):
+                continue
+            yield child
+            yield from descend(child)
+
+    yield from descend(scope)
+
+
+def _parameter_names(scope: ast.AST) -> set[str]:
+    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        return set()
+    args = scope.args
+    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+    return names
+
+
+def _target_bindings(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
+    if isinstance(target, ast.Name):
+        return [(target.id, value)]
+    if (
+        isinstance(target, (ast.Tuple, ast.List))
+        and isinstance(value, (ast.Tuple, ast.List))
+        and len(target.elts) == len(value.elts)
+    ):
+        bindings: list[tuple[str, ast.AST]] = []
+        for child_target, child_value in zip(target.elts, value.elts):
+            bindings.extend(_target_bindings(child_target, child_value))
+        return bindings
+    return []
+
+
+def _assignment_bindings(node: ast.AST) -> list[tuple[str, ast.AST]]:
+    if isinstance(node, ast.Assign):
+        bindings: list[tuple[str, ast.AST]] = []
+        for target in node.targets:
+            bindings.extend(_target_bindings(target, node.value))
+        return bindings
+    if isinstance(node, ast.AnnAssign) and node.value is not None:
+        return _target_bindings(node.target, node.value)
+    if isinstance(node, ast.NamedExpr):
+        return _target_bindings(node.target, node.value)
+    return []
+
+
+def stable_module_aliases(
+    scope: ast.AST,
+    import_map: dict[str, str],
+) -> dict[str, str]:
+    """Resolve stable local aliases of tracked deserializer modules."""
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    candidates: list[tuple[str, ast.AST]] = []
+    for node in nodes:
+        for name, value in _assignment_bindings(node):
+            if not isinstance(value, (ast.Name, ast.Attribute)):
+                continue
+            if stores[name] == 1 and name not in parameters:
+                candidates.append((name, value))
+
+    resolved: dict[str, str] = {}
+    working = dict(import_map)
+    changed = True
+    while changed:
+        changed = False
+        for name, value in candidates:
+            if name in resolved:
+                continue
+            source = canonical_name(value, working)
+            if source is None or source.split(".", 1)[0] not in TRACKED_MODULES:
+                continue
+            resolved[name] = source
+            working[name] = source
+            changed = True
+    return resolved
+
+
+def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
+    """Resolve unambiguous local callable aliases to tracked deserializers.
+
+    Only names with exactly one store in the lexical scope are trusted. Parameters
+    and rebound names are intentionally discarded so ordinary application
+    callables cannot be mistaken for dangerous deserializers. Alias chains are
+    resolved to a fixed point, covering patterns such as ``decode = pickle.loads``
+    and ``restore = decode`` without broad data-flow analysis.
+    """
+
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    resolved: dict[str, str] = {}
+
+    changed = True
+    while changed:
+        changed = False
+        aliases = {**import_map, **resolved}
+        for node in nodes:
+            for name, value in _assignment_bindings(node):
+                source = canonical_name(value, aliases)
+                if source not in TRACKED_DESERIALIZER_CALLABLES:
+                    continue
+                if name in resolved or name in parameters or stores[name] != 1:
+                    continue
+                resolved[name] = source
+                changed = True
+
+    return resolved
 
 
 def keyword_value(node: ast.Call, name: str) -> ast.AST | None:
@@ -168,29 +333,44 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
-    aliases = import_aliases(tree)
+    import_map = import_aliases(tree)
     findings = star_import_violations(tree, label)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        violation = call_violation(node, aliases)
-        if violation:
-            findings.append(f"{label}:{node.lineno}: {violation}")
+    scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
+    for scope in scopes:
+        module_aliases = stable_module_aliases(scope, import_map)
+        base_aliases = {**import_map, **module_aliases}
+        aliases = {**base_aliases, **stable_deserializer_aliases(scope, base_aliases)}
+        for node in _scope_nodes(scope):
+            if not isinstance(node, ast.Call):
+                continue
+            violation = call_violation(node, aliases)
+            if violation:
+                findings.append(f"{label}:{node.lineno}: {violation}")
     return findings
 
 
 def main() -> int:
     findings: list[str] = []
-    for path in python_files():
+    try:
+        paths = list(python_files())
+    except DeserializationScanError as exc:
+        print("Unsafe deserialization patterns detected:", file=sys.stderr)
+        print(f"  - scanner coverage failure: {exc}", file=sys.stderr)
+        return 1
+
+    scanned = len(paths)
+    for path in paths:
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe deserialization patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
-    print("Deserialization safety gate passed: no unsafe object loaders found.")
+    print(f"Deserialization safety gate passed across {scanned} backend Python files: no unsafe object loaders found.")
     return 0
 
 

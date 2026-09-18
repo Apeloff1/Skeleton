@@ -4,6 +4,7 @@ Skeleton Kernel — Core primitives and foundational types
 Provides:
 - errors: SkeletonError, BlueprintError, MaterialisationError
 - events: DomainEvent, EventBus
+- causality: CausalGraph, CausalNode, CausalPath
 - ids: UserId, BlueprintId
 - entropy: EntropyPool
 - clocks: VectorClock
@@ -27,6 +28,8 @@ from skeleton.kernel.primitives import (
     UserId,
     VectorClock,
 )
+from skeleton.kernel.causality import CausalGraph, CausalGraphError, CausalNode, CausalPath
+from skeleton.kernel.work_queue import SubmitterCapError
 
 __all__ = [
     "SkeletonError",
@@ -34,6 +37,10 @@ __all__ = [
     "MaterialisationError",
     "DomainEvent",
     "EventBus",
+    "CausalGraph",
+    "CausalGraphError",
+    "CausalNode",
+    "CausalPath",
     "UserId",
     "BlueprintId",
     "EntropyPool",
@@ -41,4 +48,5 @@ __all__ = [
     "Invariant",
     "InvariantLattice",
     "CapabilityRegistry",
+    "SubmitterCapError",
 ]

@@ -5,17 +5,21 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-ARG UV_VERSION=0.12.4
-
-# Official Python multi-platform index pinned for reproducible rebuilds.
-# Refresh this digest deliberately alongside dependency/security review.
-# Stage 1: Builder with uv
-FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS builder
-ARG UV_VERSION
+# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# so compiled wheels and native extensions do not cross a glibc/musl boundary.
+FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc AS builder
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+# uv is a build-time tool only. Build dependencies are isolated to this stage.
+RUN apk add --no-cache --virtual .build-deps \
+      build-base \
+      cargo \
+      libffi-dev \
+      openssl-dev \
+      linux-headers \
+    && pip install --no-cache-dir uv==0.12.4
+
 COPY backend/pyproject.toml ./
 COPY backend/requirements.txt ./
 
@@ -24,19 +28,39 @@ ENV UV_COMPILE_BYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN uv pip install -r requirements.txt
+RUN uv pip install -r requirements.txt \
+    && uv pip install "msgpack>=1.2.1" "setuptools>=78.1.1"
 
 # Stage 2: Production
-FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS production
+FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc AS production
 
+# Apply the current Alpine security repository updates to the runtime layer.
+# The pinned base remains reproducible while util-linux and other OS packages
+# receive fixes released after the base-image snapshot.
+RUN apk upgrade --no-cache
+
+# pip is not required to serve the production application. pip 26.2+ carries
+# vendored packages and an embedded CycloneDX SBOM under pip/_vendor, so keep
+# that installer-only code out of the production runtime entirely. The
+# development stage below can restore pip from Python's bundled ensurepip when
+# developer-only tools are explicitly requested.
+RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
+           /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip*
+
+# Explicitly identify the application host as production so exec_guard can
+# never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
+# also fails closed unless deployment supplies an explicit origin allowlist.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    ENVIRONMENT=production \
+    CORS_ORIGINS=https://cors.invalid
 
 WORKDIR /app
 
-RUN groupadd --gid 10001 appuser \
-    && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
+RUN addgroup -S -g 10001 appuser \
+    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
 
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -58,8 +82,14 @@ CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
 # Stage 3: Development
 FROM production AS development
 
+# Preserve the historical local-development convenience while keeping the
+# production image fail-closed and permanently disabling host execution there.
+ENV ENVIRONMENT=development \
+    CORS_ORIGINS=*
+
 USER root
-RUN pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
+RUN python -m ensurepip --upgrade \
+    && python -m pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
 USER appuser
 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]

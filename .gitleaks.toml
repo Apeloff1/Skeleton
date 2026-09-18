@@ -5,3 +5,15 @@ title = "Skeleton secret scanning policy"
 # or allowlists here only when they are backed by tests and review evidence.
 [extend]
 useDefault = true
+
+# Catch provider-agnostic credentials that use a secret-bearing assignment name
+# but do not match a provider's branded token prefix. Restrict the candidate to
+# common opaque-token alphabets, require a meaningful minimum length, and then
+# require high Shannon entropy so documentation placeholders and ordinary words
+# do not become noisy findings.
+[[rules]]
+id = "skeleton-high-entropy-secret-assignment"
+description = "High-entropy value assigned to a secret-bearing identifier"
+regex = '''(?i)(?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|credential)\s*[:=]\s*["']?([A-Za-z0-9+/_=.\-]{28,})["']?'''
+secretGroup = 1
+entropy = 4.2

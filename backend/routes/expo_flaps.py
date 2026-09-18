@@ -45,8 +45,8 @@ def _read_events(limit: int) -> list[dict[str, Any]]:
         return rows
     except FileNotFoundError:
         return []
-    except Exception as e:  # noqa: BLE001
-        return [{"ts": time.time(), "kind": "error", "detail": f"{type(e).__name__}: {e}"}]
+    except Exception:  # noqa: BLE001
+        return [{"ts": time.time(), "kind": "error", "detail": "event_read_failed"}]
 
 
 @router.get("/expo-flaps")

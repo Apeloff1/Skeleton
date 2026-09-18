@@ -5,25 +5,38 @@ name: CI/CD
 on:
   push:
     branches: [main, develop]
-    paths-ignore:
-      - '.github/workflows/branch-clean.yml'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
 
-# GitHub can deliver workflow events out of commit order. Key concurrency by
-# SHA so a late parent event cannot cancel validation for the current head;
-# queue-drain removes stale queued work against the live branch tip.
+# Collapse superseded validation for the same PR or branch so rapid pushes do
+# not occupy runner capacity with stale commits. Workflow name keeps unrelated
+# pipelines isolated while PR number/ref scopes cancellation to one change set.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.11.16"
   NODE_VERSION: "24.20.0"
+  PYTHONPATH: "${{ github.workspace }}"
 permissions:
   contents: read
 jobs:
   backend-lint:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Lint"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -36,8 +49,6 @@ jobs:
         with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Repository toolchain contract
         run: python ../scripts/check_toolchain_contract.py
-      - name: Install pinned backend quality tools
-        run: uv tool install "ruff==0.9.10"
       - name: Backend correctness lint
         run: uvx --from "ruff==0.9.10" ruff check . --output-format=github
       - name: Backend syntax compilation
@@ -45,6 +56,7 @@ jobs:
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
   skeleton-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -96,6 +108,7 @@ jobs:
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
   school-jeeves-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Jeeves School Reasoning"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -112,6 +125,7 @@ jobs:
         env: {PYTHONPATH: "."}
         run: python -m pytest -q tests/test_jeeves_reasoning_stack.py
   cockpit-smoke:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -125,6 +139,7 @@ jobs:
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Test"
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -132,7 +147,8 @@ jobs:
     defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
-        image: mongo:7.0
+        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
+        image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
         ports: [27017:27017]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,6 +165,7 @@ jobs:
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   backend-import-smoke:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Import Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -169,6 +186,7 @@ jobs:
         run: |
           uv run python -c "import server; assert server.app is not None; print('server import: OK')"
   frontend:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Frontend"
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -181,7 +199,10 @@ jobs:
           node-version: "${{ env.NODE_VERSION }}"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
-      - run: yarn install --frozen-lockfile
+      - name: Install frontend dependencies without third-party lifecycle scripts
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Apply reviewed local node_modules patches
+        run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
       - run: yarn export:web
@@ -195,6 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
+      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -208,17 +230,24 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ env.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ./backend/Dockerfile
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./frontend
           target: production
           push: true
           tags: ${{ env.IMAGE }}/frontend:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend

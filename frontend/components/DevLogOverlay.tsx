@@ -35,10 +35,12 @@ export default function DevLogOverlay() {
   }, []);
 
   useEffect(() => {
-    // Auto-scroll to newest line.
+    // Avoid scheduling scroll timers while the lightweight pill/hidden state
+    // is active. Only the expanded log panel needs to follow incoming rows.
+    if (!expanded || hidden) return;
     const id = setTimeout(() => { try { scrollRef.current?.scrollToEnd({ animated: false }); } catch {} }, 30);
     return () => clearTimeout(id);
-  }, [steps]);
+  }, [steps, expanded, hidden]);
 
   if (hidden) {
     // Tiny restore dot in the corner so it's never permanently lost.

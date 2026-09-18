@@ -49,9 +49,9 @@ class EventBus:
                 if hasattr(res, "__await__"):
                     await res
                 delivered += 1
-            except Exception as e:  # noqa: BLE001 — isolate faulty subscribers
+            except Exception:  # noqa: BLE001 — isolate faulty subscribers
                 self.error_count += 1
-                errors.append(f"{type(e).__name__}: {e}")
+                errors.append("handler_failed")
 
         record = {"event_type": event_type, "delivered": delivered,
                   "errors": errors, "ts": time.time()}

@@ -47,7 +47,7 @@ def idempotent_insert(coll, key: str, doc: Dict[str, Any]) -> Dict[str, Any]:
         # DuplicateKeyError (E11000) → the write already happened.
         if "E11000" in str(e) or "duplicate key" in str(e).lower():
             return {"ok": True, "already": True, "key": key}
-        return {"ok": False, "already": False, "key": key, "error": str(e)}
+        return {"ok": False, "already": False, "key": key, "error": "persist_failed"}
 
 
 def optimistic_update(coll, filter: Dict[str, Any], updates: Dict[str, Any],
@@ -78,12 +78,12 @@ def optimistic_update(coll, filter: Dict[str, Any], updates: Dict[str, Any],
                     coll.update_one(filter, {"$set": {**updates, "_ver": 1, "_ver_at": time.time()}},
                                     upsert=True)
                     return {"ok": True, "version": 1, "conflict": False, "created": True}
-                except Exception as e:  # noqa: BLE001
-                    return {"ok": False, "version": expected_version, "conflict": False, "error": str(e)}
+                except Exception:  # noqa: BLE001
+                    return {"ok": False, "version": expected_version, "conflict": False, "error": "persist_failed"}
             return {"ok": False, "version": expected_version, "conflict": True}
         return {"ok": True, "version": expected_version + 1, "conflict": False}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "version": expected_version or 0, "conflict": False, "error": str(e)}
+    except Exception:
+        return {"ok": False, "version": expected_version or 0, "conflict": False, "error": "persist_failed"}
 
 
 __all__ = ["new_idempotency_key", "idempotent_insert", "optimistic_update"]

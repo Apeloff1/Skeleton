@@ -1,0 +1,132 @@
+name: Repository Hygiene Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/repository-hygiene-gate.yml'
+
+concurrency:
+  group: repository-hygiene-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    name: Changed-files hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MAX_FILE_BYTES: '10485760'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve changed-file diff base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            diff_base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          else
+            diff_base="$BASE_SHA"
+          fi
+          echo "DIFF_BASE=$diff_base" >> "$GITHUB_ENV"
+
+      - name: Reject whitespace errors and conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$DIFF_BASE" "$HEAD_SHA"
+
+      - name: Reject generated junk and accidental local state
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+
+          while IFS= read -r -d '' path; do
+            # Extensionless files created directly at repository root are a
+            # common scratch/debug artifact. Keep the intentional root files
+            # explicit so a stray `foo`, `tmp`, or similar file fails closed.
+            if [[ "$path" != */* && "$path" != *.* ]]; then
+              case "$path" in
+                Dockerfile|Makefile|LICENSE)
+                  ;;
+                *)
+                  echo "::error file=${path}::Unexpected extensionless file at repository root. Add an explicit allowlist entry only for intentional project files."
+                  failed=1
+                  ;;
+              esac
+            fi
+
+            case "$path" in
+              */.DS_Store|.DS_Store|*/Thumbs.db|Thumbs.db|*.log|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*|.mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*|node_modules/*|*/node_modules/*|.venv/*|*/.venv/*|coverage/*|*/coverage/*)
+                echo "::error file=${path}::Generated or machine-local file should not be committed."
+                failed=1
+                ;;
+              .env|*/.env|.env.local|*/.env.local|.env.*|*/.env.*)
+                case "$path" in
+                  *.env.example|*.env.sample|*.env.template|.env.example|.env.sample|.env.template)
+                    ;;
+                  *)
+                    echo "::error file=${path}::Environment state should not be committed; keep only documented example/template files."
+                    failed=1
+                    ;;
+                esac
+                ;;
+            esac
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
+
+          exit "$failed"
+
+      - name: Guard against accidental large files
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+
+          while IFS= read -r -d '' path; do
+            if ! git cat-file -e "${HEAD_SHA}:${path}" 2>/dev/null; then
+              continue
+            fi
+
+            size=$(git cat-file -s "${HEAD_SHA}:${path}")
+            if (( size <= MAX_FILE_BYTES )); then
+              continue
+            fi
+
+            prefix=$(git show "${HEAD_SHA}:${path}" 2>/dev/null | head -c 120 || true)
+            if grep -q '^version https://git-lfs.github.com/spec/v1' <<<"$prefix"; then
+              continue
+            fi
+
+            mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
+            echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
+            failed=1
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
+
+          exit "$failed"
+
+      - name: Summarize changed-file hygiene
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA" | wc -l | tr -d ' ')
+          {
+            echo '## Repository hygiene gate'
+            echo "- Changed files inspected: $changed"
+            echo '- Checks: whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
+            echo '- Large files represented by Git LFS pointers are allowed.'
+          } >> "$GITHUB_STEP_SUMMARY"

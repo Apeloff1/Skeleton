@@ -197,3 +197,115 @@ def test_allows_trusted_expression_in_run(tmp_path: Path) -> None:
         "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo '${{ github.repository }}'\n",
     )
     assert findings == []
+
+
+def test_composes_direct_dispatch_input_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo \"${{ inputs.payload }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_composes_multiline_dispatch_input_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: >\n          echo \"${{\n            github.event.inputs.payload\n          }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_composes_run_alias_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\nenv:\n  COMMAND: &command \"echo safe\"\njobs:\n  test:\n    steps:\n      - run: *command\n",
+    )
+    assert any("aliased run shell is forbidden" in finding for finding in findings)
+
+
+def test_allows_dispatch_input_through_environment_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - env:\n          PAYLOAD: ${{ inputs.payload }}\n        run: printf '%s\\n' \"$PAYLOAD\"\n",
+    )
+    assert findings == []
+
+
+def test_accepts_digest_pinned_job_and_service_containers(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    container:\n      image: python:3.14@sha256:{DOCKER_DIGEST}\n      options: --health-cmd 'python -V' --health-interval 10s\n    services:\n      cache:\n        image: redis:7@sha256:{DOCKER_DIGEST}\n        options: --health-cmd 'redis-cli ping'\n    steps:\n      - run: echo safe\n",
+    )
+    assert findings == []
+
+
+def test_rejects_mutable_job_container_image(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    container: python:3.14\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("container image must be pinned" in finding for finding in findings)
+
+
+def test_rejects_dynamic_job_container_image(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    container: ${{ matrix.image }}\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("dynamic container image references are forbidden" in finding for finding in findings)
+
+
+def test_rejects_mutable_service_container_image(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    services:\n      db:\n        image: postgres:17\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("service container image must be pinned" in finding for finding in findings)
+
+
+def test_rejects_privileged_job_container(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    container:\n      image: python@sha256:{DOCKER_DIGEST}\n      options: --privileged\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("forbidden privileged mode" in finding for finding in findings)
+
+
+def test_rejects_folded_host_network_option(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    container:\n      image: python@sha256:{DOCKER_DIGEST}\n      options: >-\n        --health-cmd 'python -V'\n        --network host\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("forbidden host network namespace" in finding for finding in findings)
+
+
+def test_rejects_service_capability_elevation(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    services:\n      db:\n        image: postgres@sha256:{DOCKER_DIGEST}\n        options: --cap-add SYS_ADMIN\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("forbidden Linux capability elevation" in finding for finding in findings)
+
+
+def test_rejects_docker_socket_mount(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    container:\n      image: python@sha256:{DOCKER_DIGEST}\n      options: -v /var/run/docker.sock:/var/run/docker.sock\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("forbidden Docker daemon socket mount" in finding for finding in findings)
+
+
+def test_rejects_flow_style_job_container_fail_closed(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    container: {{image: python@sha256:{DOCKER_DIGEST}}}\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("flow-style job container configuration is forbidden" in finding for finding in findings)
+
+
+def test_rejects_flow_style_services_fail_closed(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    services: {{db: {{image: postgres@sha256:{DOCKER_DIGEST}}}}}\n    steps:\n      - run: echo unsafe\n",
+    )
+    assert any("flow-style services configuration is forbidden" in finding for finding in findings)

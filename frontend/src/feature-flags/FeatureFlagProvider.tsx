@@ -1,19 +1,18 @@
 /**
- * src/feature-flags/FeatureFlagProvider.tsx — context + hooks (Feb 2026).
+ * Feature-flag context with local-first startup semantics.
  *
- * Boot-time prefetch + override merge:
- *
- *   final.resolved = (queryOverride ?? localOverride ?? server.resolved)
- *
- * Bundled fallback flags are used as the absolute floor so cold-boot
- * with no network still renders a sane UI. Impressions are recorded
- * on every useFeatureFlag() call and flushed every 30s to the server.
+ * Bundled flags and per-device/query overrides are always sufficient for first
+ * paint. Remote flags refresh in the background after cold-start work has had
+ * a chance to finish, sharing the same keyed cache/in-flight request as the
+ * boot phase-1 warmer.
  */
 import React from 'react';
 import { loadFlags, snapshot, invalidate, ResolvedFlag, FlagsSnapshot } from './flagsClient';
 import { BUNDLED_FALLBACK_FLAGS } from './fallback';
 import { getQueryOverrides, loadLocalOverrides, getLocalOverridesCached } from './overrides';
 import { recordImpression, start as startImpressions } from './impressions';
+
+const INITIAL_REMOTE_REFRESH_DELAY_MS = 1_500;
 
 interface FeatureFlagContextValue {
   flags: ResolvedFlag[];
@@ -28,7 +27,7 @@ interface FeatureFlagContextValue {
 
 const FeatureFlagContext = React.createContext<FeatureFlagContextValue>({
   flags: BUNDLED_FALLBACK_FLAGS,
-  byName: Object.fromEntries(BUNDLED_FALLBACK_FLAGS.map(f => [f.name, f])),
+  byName: Object.fromEntries(BUNDLED_FALLBACK_FLAGS.map(flag => [flag.name, flag])),
   environment: 'unknown',
   loading: true,
   error: null,
@@ -43,15 +42,14 @@ interface ProviderProps {
   children: React.ReactNode;
 }
 
-/** Merges server flags with local + query overrides. Pure. */
 function applyOverrides(serverFlags: ResolvedFlag[]): ResolvedFlag[] {
   const local = getLocalOverridesCached();
   const query = getQueryOverrides();
-  return serverFlags.map(f => {
-    let resolved = f.resolved;
-    if (Object.prototype.hasOwnProperty.call(local, f.name)) resolved = !!local[f.name];
-    if (Object.prototype.hasOwnProperty.call(query, f.name)) resolved = !!query[f.name];
-    return resolved === f.resolved ? f : { ...f, resolved };
+  return serverFlags.map(flag => {
+    let resolved = flag.resolved;
+    if (Object.prototype.hasOwnProperty.call(local, flag.name)) resolved = !!local[flag.name];
+    if (Object.prototype.hasOwnProperty.call(query, flag.name)) resolved = !!query[flag.name];
+    return resolved === flag.resolved ? flag : { ...flag, resolved };
   });
 }
 
@@ -60,29 +58,34 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
   initialFlags,
   children,
 }) => {
-  const cold = initialFlags || snapshot()?.flags || BUNDLED_FALLBACK_FLAGS;
-  const [userId, setUserId]   = React.useState<string | null>(initialUserId);
-  const [flags,  setFlags]    = React.useState<ResolvedFlag[]>(cold);
+  const initialSnapshot = React.useRef(snapshot(initialUserId)).current;
+  const cold = initialFlags || initialSnapshot?.flags || BUNDLED_FALLBACK_FLAGS;
+  const [userId, setUserId] = React.useState<string | null>(initialUserId);
+  const [flags, setFlags] = React.useState<ResolvedFlag[]>(cold);
   const [loading, setLoading] = React.useState<boolean>(cold === BUNDLED_FALLBACK_FLAGS);
-  const [error,  setError]    = React.useState<string | null>(null);
-  const [env,    setEnv]      = React.useState<string>('unknown');
+  const [error, setError] = React.useState<string | null>(null);
+  const [environment, setEnvironment] = React.useState<string>(initialSnapshot?.environment || 'unknown');
 
-  const ingest = React.useCallback((snap: FlagsSnapshot) => {
-    setFlags(applyOverrides(snap.flags));
-    setEnv(snap.environment);
-    if (!snap.ok && snap.flags.length === 0) setError('flags_fetch_failed');
+  const ingest = React.useCallback((next: FlagsSnapshot) => {
+    if (!next.ok) {
+      setError('flags_fetch_failed');
+      return;
+    }
+    setFlags(applyOverrides(next.flags));
+    setEnvironment(next.environment);
+    setError(null);
   }, []);
 
   const refresh = React.useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      // Make sure local overrides are loaded before we apply them.
       await loadLocalOverrides();
       invalidate();
-      const snap = await loadFlags(userId, { force: true });
-      ingest(snap);
-    } catch (e: any) {
-      setError(e?.message || 'flags_error');
+      const next = await loadFlags(userId, { force: true });
+      ingest(next);
+    } catch (caught: any) {
+      setError(caught?.message || 'flags_error');
     } finally {
       setLoading(false);
     }
@@ -91,42 +94,74 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
   React.useEffect(() => {
     startImpressions();
     let cancelled = false;
-    (async () => {
-      try {
-        await loadLocalOverrides();
-        const snap = await loadFlags(userId);
+    let remoteTimer: ReturnType<typeof setTimeout> | null = null;
+
+    setLoading(true);
+    setError(null);
+
+    void loadLocalOverrides()
+      .then(() => {
         if (cancelled) return;
-        ingest(snap);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'flags_error');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+        const warmed = snapshot(userId);
+        if (warmed?.ok) {
+          ingest(warmed);
+        } else {
+          // Never carry a previous user's rollout into a new user scope while
+          // the background refresh is pending. Bundled flags + local/query
+          // overrides are the safe cross-user floor.
+          setFlags(applyOverrides(BUNDLED_FALLBACK_FLAGS));
+          setEnvironment('unknown');
+        }
+        setLoading(false);
+      })
+      .catch((caught: any) => {
+        if (cancelled) return;
+        setError(caught?.message || 'flags_override_error');
+        setLoading(false);
+      });
+
+    remoteTimer = setTimeout(() => {
+      void loadFlags(userId)
+        .then(next => {
+          if (!cancelled) ingest(next);
+        })
+        .catch((caught: any) => {
+          if (!cancelled) setError(caught?.message || 'flags_error');
+        });
+    }, INITIAL_REMOTE_REFRESH_DELAY_MS);
+
+    return () => {
+      cancelled = true;
+      if (remoteTimer) clearTimeout(remoteTimer);
+    };
   }, [userId, ingest]);
 
   const byName = React.useMemo(() => {
-    const m: Record<string, ResolvedFlag> = {};
-    for (const f of flags) m[f.name] = f;
-    return m;
+    const map: Record<string, ResolvedFlag> = {};
+    for (const flag of flags) map[flag.name] = flag;
+    return map;
   }, [flags]);
 
   const value = React.useMemo<FeatureFlagContextValue>(() => ({
-    flags, byName, environment: env, loading, error, userId, refresh, setUserId,
-  }), [flags, byName, env, loading, error, userId, refresh]);
+    flags,
+    byName,
+    environment,
+    loading,
+    error,
+    userId,
+    refresh,
+    setUserId,
+  }), [flags, byName, environment, loading, error, userId, refresh]);
 
   return (
     <FeatureFlagContext.Provider value={value}>{children}</FeatureFlagContext.Provider>
   );
 };
 
-/** Returns `true`/`false` for a flag name (with optional fallback). */
 export function useFeatureFlag(name: string, fallback: boolean = false): boolean {
-  const ctx = React.useContext(FeatureFlagContext);
-  const f = ctx.byName[name];
-  const value = f ? f.resolved : fallback;
-  // Record impression (best-effort, fire-and-forget).
+  const context = React.useContext(FeatureFlagContext);
+  const flag = context.byName[name];
+  const value = flag ? flag.resolved : fallback;
   React.useEffect(() => { recordImpression(name, value); }, [name, value]);
   return value;
 }

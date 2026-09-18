@@ -10,6 +10,7 @@ command strings are rejected in favor of explicit argument vectors.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -27,11 +28,30 @@ UNSAFE_CALLS = {
 }
 
 
+def walk_python_files(root: Path, skip_dirs: set[str]) -> Iterable[Path]:
+    """Walk Python files without following symlinks and without hiding I/O errors."""
+    if root.is_symlink():
+        raise OSError("scan root must not be a symlink")
+
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        child_dirs: list[Path] = []
+        python_paths: list[Path] = []
+        with os.scandir(current) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                if entry.name in skip_dirs:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    child_dirs.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    python_paths.append(Path(entry.path))
+        yield from python_paths
+        stack.extend(reversed(child_dirs))
+
+
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from walk_python_files(ROOT, SKIP_DIRS)
 
 
 def display_path(path: Path) -> Path:
@@ -63,23 +83,103 @@ def literal_string(node: ast.AST) -> str | None:
     return None
 
 
-def obvious_command_string(node: ast.AST) -> bool:
-    """Return True when an argv expression is statically string-shaped.
+def obvious_command_string(
+    node: ast.AST,
+    string_aliases: frozenset[str] = frozenset(),
+) -> bool:
+    """Return True when an argv expression is provably string/bytes-shaped.
 
-    This intentionally handles only cases that are safe to classify without
-    data-flow guessing: string literals, f-strings, concatenations containing a
-    string-shaped operand, and common string-building methods. Unknown names
-    remain allowed so legitimate dynamically assembled argument vectors are not
-    falsely rejected by this lightweight gate.
+    The check stays deliberately high-confidence: it recognizes literals,
+    f-strings, string-producing operators/constructors, and string-preserving
+    methods only when their receiver is already provably string-shaped.
     """
-    if literal_string(node) is not None or isinstance(node, ast.JoinedStr):
+    if isinstance(node, ast.Name):
+        return node.id in string_aliases
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
         return True
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        return obvious_command_string(node.left) or obvious_command_string(node.right)
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr in {"format", "join"}:
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Add):
+            return obvious_command_string(node.left, string_aliases) or obvious_command_string(node.right, string_aliases)
+        if isinstance(node.op, ast.Mod):
+            return obvious_command_string(node.left, string_aliases)
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes", "repr", "ascii"}:
             return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "format",
+            "format_map",
+            "join",
+            "strip",
+            "lstrip",
+            "rstrip",
+            "replace",
+            "lower",
+            "upper",
+            "casefold",
+            "removeprefix",
+            "removesuffix",
+            "encode",
+            "decode",
+        }:
+            return obvious_command_string(node.func.value, string_aliases)
     return False
+
+
+def command_string_aliases(tree: ast.AST) -> frozenset[str]:
+    """Resolve unreassigned names that are provably string/bytes commands."""
+    writes: dict[str, int] = {}
+    candidates: list[tuple[str, ast.AST]] = []
+
+    def mark(name: str) -> None:
+        writes[name] = writes.get(name, 0) + 1
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            mark(node.id)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            mark(node.name)
+        elif isinstance(node, ast.Import):
+            for item in node.names:
+                mark(item.asname or item.name.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom):
+            for item in node.names:
+                if item.name != "*":
+                    mark(item.asname or item.name)
+        elif isinstance(node, ast.ExceptHandler) and isinstance(node.name, str):
+            mark(node.name)
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            args = node.args
+            for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+                mark(arg.arg)
+            if args.vararg is not None:
+                mark(args.vararg.arg)
+            if args.kwarg is not None:
+                mark(args.kwarg.arg)
+
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    candidates.append((target.id, node.value))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            candidates.append((node.target.id, node.value))
+        elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+            candidates.append((node.target.id, node.value))
+
+    resolved: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        frozen = frozenset(resolved)
+        for name, value in candidates:
+            if writes.get(name) != 1 or name in resolved:
+                continue
+            if obvious_command_string(value, frozen):
+                resolved.add(name)
+                changed = True
+    return frozenset(resolved)
 
 
 def command_argument(node: ast.Call) -> ast.AST | None:
@@ -217,10 +317,30 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve aliases assigned from tracked process callables or policy helpers."""
+    """Resolve aliases assigned from tracked process callables, modules, or helpers.
+
+    Module aliases are admitted only for a single unambiguous store and never when
+    the same name is a function/lambda parameter. This closes local module-alias
+    bypasses without treating later-reassigned locals as tracked modules.
+    """
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
+    store_counts: dict[str, int] = {}
+    parameter_names: set[str] = set()
+
     for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            store_counts[node.id] = store_counts.get(node.id, 0) + 1
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            args = node.args
+            parameter_names.update(
+                arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)
+            )
+            if args.vararg is not None:
+                parameter_names.add(args.vararg.arg)
+            if args.kwarg is not None:
+                parameter_names.add(args.kwarg.arg)
+
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 assignments.extend(destructured_assignments(target, node.value))
@@ -228,8 +348,10 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             assignments.append((node.target.id, node.value))
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             assignments.append((node.target.id, node.value))
+
     tracked_names = (
-        UNSAFE_CALLS.keys()
+        TRACKED_MODULES
+        | UNSAFE_CALLS.keys()
         | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
         | {f"{module}.__dict__" for module in TRACKED_MODULES}
         | ALIASABLE_HELPERS
@@ -239,9 +361,14 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
         changed = False
         for target, value in assignments:
             source = canonical_name(value, resolved)
-            if source in tracked_names and resolved.get(target) != source:
-                resolved[target] = source
-                changed = True
+            if source not in tracked_names or resolved.get(target) == source:
+                continue
+            if source in TRACKED_MODULES and (
+                store_counts.get(target, 0) != 1 or target in parameter_names
+            ):
+                continue
+            resolved[target] = source
+            changed = True
     return resolved
 
 
@@ -278,7 +405,11 @@ def dynamic_namespace_get_violation(node: ast.Call, aliases: dict[str, str]) -> 
     return f"dynamic namespace get() on {owner} is forbidden because process policy cannot be statically proven"
 
 
-def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[str]:
+def partial_policy_violations(
+    node: ast.Call,
+    aliases: dict[str, str],
+    string_aliases: frozenset[str] = frozenset(),
+) -> list[str]:
     """Validate process-sensitive arguments pre-bound through functools.partial."""
     if canonical_name(node.func, aliases) != "functools.partial" or not node.args:
         return []
@@ -286,7 +417,7 @@ def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[s
     if target not in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
         return []
     findings: list[str] = []
-    if len(node.args) > 1 and obvious_command_string(node.args[1]):
+    if len(node.args) > 1 and obvious_command_string(node.args[1], string_aliases):
         findings.append(
             f"{target} partial command must be an argument vector, not a string-shaped command"
         )
@@ -295,7 +426,7 @@ def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[s
             findings.append(f"{target} partial(..., **kwargs) is forbidden because shell policy cannot be statically proven")
         elif keyword.arg == "shell" and not literal_false(keyword.value):
             findings.append(f"{target} partial(..., shell=...) is forbidden unless shell=False is literal")
-        elif keyword.arg == "args" and obvious_command_string(keyword.value):
+        elif keyword.arg == "args" and obvious_command_string(keyword.value, string_aliases):
             findings.append(
                 f"{target} partial args= must be an argument vector, not a string-shaped command"
             )
@@ -307,9 +438,10 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
+    string_aliases = command_string_aliases(tree)
     findings = star_import_violations(tree, label)
     for node in ast.walk(tree):
         if isinstance(node, ast.Subscript):
@@ -327,7 +459,7 @@ def violations(path: Path) -> list[str]:
             if dynamic_check:
                 findings.append(f"{label}:{node.lineno}: {dynamic_check}")
 
-        for partial_violation in partial_policy_violations(node, aliases):
+        for partial_violation in partial_policy_violations(node, aliases, string_aliases):
             findings.append(f"{label}:{node.lineno}: {partial_violation}")
 
         name = canonical_name(node.func, aliases)
@@ -336,7 +468,7 @@ def violations(path: Path) -> list[str]:
             continue
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
             argv = command_argument(node)
-            if argv is not None and obvious_command_string(argv):
+            if argv is not None and obvious_command_string(argv, string_aliases):
                 findings.append(
                     f"{label}:{node.lineno}: {name} command must be an argument vector, not a string-shaped command"
                 )
@@ -351,17 +483,26 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
-    for path in python_files():
-        findings.extend(violations(path))
+    scanned = 0
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(f"Process safety scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
     print(
-        "Process safety gate passed: no unsafe shell execution, statically obvious string-shaped subprocess commands, "
-        "opaque subprocess kwargs, dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
+        f"Process safety gate passed across {scanned} backend Python files: no unsafe shell execution, "
+        "statically obvious string-shaped subprocess commands, opaque subprocess kwargs, dynamic process lookup, "
+        "process-sensitive star imports, unsafe process partials, unsafe process namespace get()/__getattribute__(), "
+        "os.system(), or os.popen() calls found."
     )
     return 0
 

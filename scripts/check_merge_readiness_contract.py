@@ -11,12 +11,44 @@ PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
 RUFF_VERSION = "0.9.10"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
-REQUIRED_NEEDS = ("quarantine_policy", "unit", "integration_smoke", "quality_security")
+REQUIRED_NEEDS = (
+    "quarantine_policy",
+    "unit",
+    "integration_smoke",
+    "quality_security",
+    "pr_automation",
+)
+PR_AUTOMATION_TESTS = (
+    "skeleton/testing/test_pr_automation.py",
+    "skeleton/testing/test_pr_automation_ruleset.py",
+    "skeleton/testing/test_pr_automation_sensitive_paths.py",
+    "skeleton/testing/test_pr_automation_workflow.py",
+    "skeleton/testing/test_pr_automation_branch_completions.py",
+)
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
+CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+READINESS_GUARD = (
+    "if: ${{ always() && (github.event_name != 'pull_request' || "
+    "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
+    "&& github.event.action != 'closed')) }}"
+)
+JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
+
+
+def job_block(text: str, job_name: str) -> str:
+    """Return one top-level workflow job block without leaking into later jobs."""
+    target = re.search(rf"^  {re.escape(job_name)}:\s*$", text, re.MULTILINE)
+    if target is None:
+        return ""
+
+    next_job = JOB_HEADER_RE.search(text, target.end())
+    end = next_job.start() if next_job is not None else len(text)
+    return text[target.start() : end]
 
 
 def main() -> int:
@@ -26,7 +58,27 @@ def main() -> int:
     except (OSError, UnicodeError) as exc:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
-    require("concurrency:" not in text, "merge-readiness must not cancel in-flight required gates", failures)
+    require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
+    require(
+        CONCURRENCY_GROUP in text,
+        "merge-readiness concurrency must deduplicate PRs while preserving each main head SHA",
+        failures,
+    )
+    require(
+        CANCEL_POLICY in text,
+        "only superseded pull-request merge-readiness runs may be cancelled",
+        failures,
+    )
+    require(
+        "cancel-in-progress: true" not in text,
+        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
+        failures,
+    )
+    require(
+        "github.event.pull_request.number || github.ref" not in text,
+        "branch-ref merge-readiness grouping can starve main verification during rapid merges",
+        failures,
+    )
     require(
         re.search(r'^\s*PYTHON_VERSION:\s*"3\.11\.16"\s*$', text, re.MULTILINE) is not None,
         f"Python must be pinned to {PYTHON_VERSION}",
@@ -38,8 +90,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 4,
-        "all four Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
+        "all five Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(
@@ -49,18 +101,46 @@ def main() -> int:
     )
     require(f'"ruff=={RUFF_VERSION}"' in text, f"Ruff must be pinned to {RUFF_VERSION}", failures)
     require("ruff==0.9.*" not in text, "wildcard Ruff execution is forbidden", failures)
-    require("--frozen-lockfile --non-interactive" in text, "frontend install must be frozen and non-interactive", failures)
+    require(
+        "--frozen-lockfile --non-interactive" in text,
+        "frontend install must be frozen and non-interactive",
+        failures,
+    )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
-    require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
+    require(
+        'ports:\n          - "27017:27017"' in text,
+        "Mongo service port must use explicit quoted list syntax",
+        failures,
+    )
 
-    readiness_start = text.find("  readiness:")
-    require(readiness_start >= 0, "readiness job missing", failures)
-    readiness = text[readiness_start:] if readiness_start >= 0 else ""
+    pr_automation = job_block(text, "pr_automation")
+    require(bool(pr_automation), "PR automation validation job missing", failures)
+    require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
+    require(
+        "python -m compileall -q skeleton/pr_automation" in pr_automation,
+        "PR automation package compilation gate missing",
+        failures,
+    )
+    require(
+        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in pr_automation,
+        "PR automation tests must disable ambient pytest plugins",
+        failures,
+    )
+    require("--noconftest" in pr_automation, "PR automation tests must avoid unrelated conftest state", failures)
+    for test_path in PR_AUTOMATION_TESTS:
+        require(test_path in pr_automation, f"PR automation gate missing {test_path}", failures)
+
+    readiness = job_block(text, "readiness")
+    require(bool(readiness), "readiness job missing", failures)
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
-    require("if: always()" in readiness, "Merge Readiness must always emit a result", failures)
+    require(
+        READINESS_GUARD in readiness,
+        "Merge Readiness must aggregate active validation runs while preserving draft/close cancellation barriers",
+        failures,
+    )
     require('result != "success"' in readiness, "Merge Readiness must fail on every non-success result", failures)
     for job in REQUIRED_NEEDS:
         require(
@@ -84,8 +164,9 @@ def main() -> int:
         return 1
 
     print(
-        "Merge-readiness contract passed: stable aggregate, exact toolchain, uncancelled required gates, "
-        "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
+        "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
+        "non-cancelling main verification, quarantine/security/secret gates, focused PR automation "
+        "contracts, and explicit fail-closed result aggregation are aligned."
     )
     return 0
 

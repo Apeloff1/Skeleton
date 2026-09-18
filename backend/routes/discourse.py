@@ -231,9 +231,9 @@ async def _run_bg(did: str, body: "DeliberateBody"):
         res["job_id"] = did
         res["status"] = "error" if res.get("error") else "done"
         await _db.discourse_jobs.update_one({"job_id": did}, {"$set": res}, upsert=True)
-    except Exception as e:
+    except Exception:
         await _db.discourse_jobs.update_one({"job_id": did},
-                                            {"$set": {"status": "error", "error": str(e)}}, upsert=True)
+                                            {"$set": {"status": "error", "error": "deliberation_failed"}}, upsert=True)
 
 
 @router.post("/deliberate/async")

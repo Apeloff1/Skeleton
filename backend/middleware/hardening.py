@@ -38,7 +38,7 @@ ADVANCED_ADMIN_TOKEN_ENV = "CODEDOCK_ADVANCED_ADMIN_TOKEN"
 ADVANCED_ADMIN_TOKEN_HEADER = "x-codedock-admin-token"
 MIN_ADVANCED_ADMIN_TOKEN_BYTES = 32
 
-# Per-path overrides (longest-prefix match). Paths NOT listed use the
+# Per-path overrides (longest route-boundary match). Paths NOT listed use the
 # middleware-level default_timeout_s. Tune for known slow endpoints.
 PATH_TIMEOUTS: dict[str, float] = {
     "/api/binary/build":      120.0,   # APK compile may take a while
@@ -55,17 +55,25 @@ PATH_TIMEOUTS: dict[str, float] = {
 }
 
 
+def _matches_route_boundary(path: str, prefix: str) -> bool:
+    """Match an exact route namespace or a descendant, never a look-alike prefix."""
+    normalized = prefix.rstrip("/")
+    if not normalized:
+        return path == "/"
+    return path == normalized or path.startswith(f"{normalized}/")
+
+
 def _resolve_timeout(path: str, default: float) -> float:
     best_key = ""
     for k in PATH_TIMEOUTS:
-        if path.startswith(k) and len(k) > len(best_key):
+        if _matches_route_boundary(path, k) and len(k) > len(best_key):
             best_key = k
     return PATH_TIMEOUTS.get(best_key, default)
 
 
 def _is_advanced_api_path(path: str) -> bool:
     """Match only the privileged route namespace, not look-alike prefixes."""
-    return path == ADVANCED_API_PREFIX or path.startswith(f"{ADVANCED_API_PREFIX}/")
+    return _matches_route_boundary(path, ADVANCED_API_PREFIX)
 
 
 def _advanced_api_auth_failure(request: Request) -> JSONResponse | None:
@@ -151,8 +159,8 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         self.default = float(default_timeout_s)
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Skip non-API paths (Metro / docs / etc.)
-        if not request.url.path.startswith("/api/"):
+        # Skip non-API paths (Metro / docs / etc.) while retaining exact /api.
+        if not _matches_route_boundary(request.url.path, "/api"):
             return await call_next(request)
 
         cors_failure = _cors_origin_failure(request)
@@ -217,7 +225,8 @@ def health_detailed():
             out["disk_pct"]   > 95.0 or
             out.get("cpu_percent", 0) > 95.0
         )
-    except Exception as e:
-        out["psutil_error"] = str(e)[:120]
+    except Exception as exc:
+        log.warning("health_metrics_unavailable error=%s", type(exc).__name__)
+        out["psutil_error"] = "health metrics unavailable"
         out["degraded"] = False
     return out
