@@ -1022,6 +1022,10 @@ class SemanticLensPlane:
         run_value = bounded_text(
             "independent_run", independent_run, maximum=512
         )
+        open_forecast = self.prediction_ledger.get(forecast_id)
+        if open_forecast is None:
+            raise AgentContractError("semantic forecast is not in the plane ledger")
+        open_fingerprint = open_forecast.fingerprint
         resolved = self.prediction_ledger.resolve(
             forecast_id,
             outcome=outcome,
@@ -1064,12 +1068,15 @@ class SemanticLensPlane:
                     if len(resolved.source_finding_ids) == 1
                     else None
                 ),
+                source_forecast_id=resolved.forecast_id,
+                source_forecast_fingerprint=open_fingerprint,
                 observation_ids=resolved.observation_ids,
                 evidence_ids=resolved.evidence_ids,
                 metadata={
                     "semantic_plane": True,
                     "forecast_id": resolved.forecast_id,
                     "forecast_fingerprint": resolved.fingerprint,
+                    "open_forecast_fingerprint": open_fingerprint,
                     "source_lens_keys": list(source_keys),
                     "interaction_calibration": len(source_keys) > 1,
                 },
