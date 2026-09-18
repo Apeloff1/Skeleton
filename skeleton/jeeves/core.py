@@ -696,6 +696,7 @@ class Jeeves:
         physics=None,
         audio=None,
         animation=None,
+        navigation=None,
     ):
         """Create an executable era project with all deterministic evidence planes."""
         project = self.game_projects.create(
@@ -706,6 +707,7 @@ class Jeeves:
             physics=physics,
             audio=audio,
             animation=animation,
+            navigation=navigation,
         )
         self._bus.emit(
             "jeeves.game_project.created",
@@ -717,13 +719,15 @@ class Jeeves:
                 "physics_bodies": len(project.physics.bodies),
                 "audio_sounds": len(project.audio.sounds),
                 "animation_clips": len(project.animation.clips),
+                "navigation_nodes": len(project.navigation.nodes),
+                "navigation_edges": len(project.navigation.edges),
                 "tree_digest": project.tree.digest,
             },
         )
         return project
 
     def evaluate_game_project(self, project):
-        """Evaluate all six deterministic project quality planes equally."""
+        """Evaluate all seven deterministic project quality planes equally."""
         report = self.game_projects.evaluate(
             project
         )
@@ -738,6 +742,7 @@ class Jeeves:
                 "physics_score": report.physics_score,
                 "audio_score": report.audio_score,
                 "animation_score": report.animation_score,
+                "navigation_score": report.navigation_score,
                 "passed": report.passed,
                 "failed": list(report.failed),
             },
