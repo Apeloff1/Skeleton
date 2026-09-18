@@ -174,6 +174,37 @@ def test_time_regression_fail_closed() -> None:
     assert caught.value.context["reason"] == "time_regression"
 
 
+def test_result_digest_binds_inputs_when_generated_spec_deduplicates_them() -> None:
+    baseline_ai = AIBehaviorSpec(
+        entity_type="guard",
+        behaviors=(),
+        aggression_level=0.5,
+        intelligence_level=0.5,
+    )
+    overlapping_ai = AIBehaviorSpec(
+        entity_type="guard",
+        # "patrol" is already supplied by the moderate-aggression default.
+        # The mechanics generator deduplicates it, so generated specs collide.
+        behaviors=("patrol",),
+        aggression_level=0.5,
+        intelligence_level=0.5,
+    )
+
+    baseline = _record(steps=(), ai_behavior=baseline_ai)
+    overlapping = _record(steps=(), ai_behavior=overlapping_ai)
+
+    assert baseline.spec_digest == overlapping.spec_digest
+    assert baseline.state_digest == overlapping.state_digest
+    assert baseline.step_digests == overlapping.step_digests
+    assert baseline.result_digest != overlapping.result_digest
+
+    tampered = baseline.to_canonical()
+    tampered["inputs"]["ai_behavior"]["behaviors"] = ["patrol"]
+    with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
+        _replay().replay(tampered)
+    assert caught.value.context["field"] == "result_digest"
+
+
 def test_replay_rejects_tampered_result_digest() -> None:
     recorded = _record()
     tampered = dict(recorded.to_canonical())
