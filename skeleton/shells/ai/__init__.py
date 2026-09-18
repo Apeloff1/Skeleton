@@ -1,5 +1,13 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.sealed_finalization import AISealedFinalizedExecution
+
+from skeleton.shells.ai.recovery_store import AIRecoveryCheckpointStore, RecoveryCheckpointCommit, RecoveryCheckpointConflict, RecoveryCheckpointHead, RecoveryCheckpointRecord, StoredRecoveryCheckpoint
+
+from skeleton.shells.ai.finalization_reconciler import AIExecutionFinalizationReconciler, FinalizationLayerReport, FinalizationReconcileAction, FinalizationReconcileReport
+
+from skeleton.shells.ai.finalization_state import AIExecutionFinalization, AIExecutionFinalizationStore, ExecutionFinalizationConflict, FinalizationPhase, FinalizationRecovery, StoredExecutionFinalization
+
 from skeleton.shells.ai.attempt_recovery import AIExecutionAttemptRecoveryInspector, AttemptRecoveryDisposition, AttemptRecoveryExpectation, AttemptRecoveryReport
 
 from skeleton.shells.ai.execution_attempt import AIExecutionAttempt, AIExecutionAttemptStore, AttemptTrackingExecutionBackend, ExecutionAttemptConflict, ExecutionAttemptRecovery, ExecutionAttemptSessionHead, ExecutionAttemptState, StoredExecutionAttempt
