@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from skeleton.jeeves.agent.associative_memory import AssociativeMemoryMesh
+from skeleton.jeeves.agent.relational_memory import RelationalMemoryIndex
 from skeleton.jeeves.agent.context_pipeline import LayeredContextResolver, ResolutionPolicy
 from skeleton.jeeves.agent.evidence import EvidenceLedger
 from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
@@ -46,17 +46,17 @@ def _goal() -> Goal:
 def _compiler(clock: TickClock):
     memory = MemoryManager(clock=clock)
     cards = MemoryGameIndex(policy=MemoryGamePolicy(minimum_score=0.0), clock=clock)
-    associations = AssociativeMemoryMesh(clock=clock)
+    relations = RelationalMemoryIndex(cards, clock=clock)
     resolver = LayeredContextResolver(
         cards=cards,
         memory=memory,
-        associations=associations,
+        relations=relations,
         policy=ResolutionPolicy(
             minimum_item_score=0.0,
             maximum_tier=1,
         ),
     )
-    return memory, cards, associations, resolver, ScientificContextCompiler(resolver)
+    return memory, cards, relations, resolver, ScientificContextCompiler(resolver)
 
 
 def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_workbench() -> None:
@@ -89,7 +89,7 @@ def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_wor
     payload = json.loads(workbench.content)
     assert payload["contract"]["interpretive_only"] is True
     assert payload["contract"]["semantic_readings_are_not_evidence"] is True
-    assert payload["contract"]["associations_change_priority_not_trust"] is True
+    assert payload["contract"]["relations_change_retrieval_priority_not_factual_trust"] is True
     assert any(row["family"] == "film" for row in payload["lenses"])
     assert prior.card_id in {
         source_id
@@ -183,7 +183,7 @@ def test_scientific_runtime_resolves_first_then_captures_current_goal() -> None:
     assert runtime.scientific_summary()["invariants"]["capture_after_initial_resolution"] is True
 
 
-def test_scientific_runtime_shares_one_memory_and_association_plane() -> None:
+def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     clock = TickClock()
     provider = DeterministicProvider(("unused",))
     runtime = ScientificJeevesRuntime(
@@ -196,4 +196,4 @@ def test_scientific_runtime_shares_one_memory_and_association_plane() -> None:
     assert runtime.scientific_context.resolver is runtime.context_resolver
     assert runtime.nuance_runtime.resolver is runtime.context_resolver
     assert runtime.context_resolver.cards is runtime.memory_cards
-    assert runtime.context_resolver.associations is runtime.associative_memory
+    assert runtime.context_resolver.relations is runtime.relational_memory
