@@ -347,12 +347,19 @@ def _convex_hull_intersection(
         interior = interior + vertex
     interior = interior / float(len(shape.vertices))
 
+    minimum = shape.vertices[0]
+    maximum = shape.vertices[0]
+    for vertex in shape.vertices[1:]:
+        minimum = minimum.min(vertex)
+        maximum = maximum.max(vertex)
+    hull_scale = max((maximum - minimum).to_tuple())
+
     enter = 0.0
     exit_distance = ray.max_distance
     enter_normal: Vec3 | None = None
-    tolerance = max(1.0e-10, ray.max_distance * 1.0e-12)
+    tolerance = max(1.0e-12, hull_scale * 1.0e-10)
 
-    for face_index, (i, j, k) in enumerate(shape.faces):
+    for i, j, k in shape.faces:
         a = shape.vertices[i]
         b = shape.vertices[j]
         d = shape.vertices[k]
@@ -632,13 +639,13 @@ def _sphere_cast_convex_hull(
     """Exact support-map sphere cast against a hull at its current transform."""
 
     query_sphere = RigidBody.kinematic(
-        "__query_sphere__",
+        "query:sphere",
         SphereShape(radius),
         position=ray.origin,
         linear_velocity=ray.direction * ray.max_distance,
     )
     target = RigidBody.static(
-        "__query_hull__",
+        "query:hull",
         shape,
         position=body.position,
         orientation=body.orientation,
