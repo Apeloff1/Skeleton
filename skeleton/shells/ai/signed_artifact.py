@@ -63,7 +63,7 @@ class ArtifactSigner:
         key_id: str,
         key: bytes,
         *,
-        clock: Callable[[], float] = time.monotonic,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         if not key_id or len(key_id) > 128:
             raise ValueError("invalid key_id")
