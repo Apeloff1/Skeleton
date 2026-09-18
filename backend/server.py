@@ -67,6 +67,7 @@ print(f"[BOOT] {_time.strftime('%H:%M:%S')} route imports done", flush=True)
 from middleware.security import (
     RateLimitMiddleware, AuditMiddleware, SizeLimitMiddleware,
 )
+from skeleton.api.request_bounds import HeaderBoundMiddleware
 
 
 # Import the 15-Year CS Bible Curriculum (for backward compatibility)
@@ -4900,6 +4901,11 @@ try:
     logger.info("[reliability] LoadShedding + DLQ + reliability endpoints installed")
 except Exception as e:
     logger.warning(f"[reliability] layer unavailable: {e}")
+
+# Final raw ASGI request-header boundary. Starlette wraps middleware in reverse
+# registration order, so this final registration is the outermost application
+# guard and rejects pathological header sets before downstream middleware.
+app.add_middleware(HeaderBoundMiddleware)
 
 # SOTA 2026 Feature Routes
 # v11.2 Masterclass & Asset Pipeline Routes
