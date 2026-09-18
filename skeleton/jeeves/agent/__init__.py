@@ -194,6 +194,11 @@ from .frontier_feedback import (
     FrontierFeedbackSample,
     FrontierReasoningFeedback,
 )
+from .frontier_probe_planning import (
+    FrontierProbePlan,
+    FrontierProbePlanner,
+    FrontierProbePolicy,
+)
 from .frontier_policy_tuning import (
     FrontierPolicyBounds,
     FrontierPolicyProposal,
