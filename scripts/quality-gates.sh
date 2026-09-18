@@ -81,6 +81,9 @@ python backend/scripts/check_deserialization_safety.py
 printf '\n== Backend dynamic import safety ==\n'
 python backend/scripts/check_dynamic_import_safety.py
 
+printf '\n== Repository dynamic import safety ==\n'
+python scripts/check_repository_dynamic_import_safety.py
+
 printf '\n== Backend tar archive extraction safety ==\n'
 python backend/scripts/check_archive_extraction_safety.py
 
@@ -135,6 +138,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_dynamic_import_safety.py \
   backend/tests/test_dynamic_import_exception_policy.py \
+  backend/tests/test_repository_dynamic_import_safety.py \
   backend/tests/test_scanner_nonempty_contract.py \
   backend/tests/test_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
