@@ -153,11 +153,11 @@ def get_stats() -> dict:
 
 # ── Request identity ──────────────────────────────────────────────────
 def _request_id(request: Request) -> str:
-    """Return one bounded header-safe request ID or mint a full UUID4 hex ID."""
+    """Return one bounded header-safe request ID or mint a compact UUID4 token."""
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex
+    return uuid.uuid4().hex[:16]
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -261,6 +261,11 @@ def _client_ip(request: Request) -> str:
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
     """Match a route root exactly or one of its descendants, never lookalikes."""
     return path == prefix or path.startswith(prefix + "/")
+
+
+def _is_api_path(path: str) -> bool:
+    """Publicly testable API-boundary predicate; reject lookalike prefixes."""
+    return _matches_path_prefix(path, "/api")
 
 
 # ── Access log ────────────────────────────────────────────────────────
