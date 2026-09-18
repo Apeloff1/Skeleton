@@ -1,5 +1,8 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.mcp_replay import MCPReplayGuard, MCPRequestAdmission, MCPRequestReplay
+from skeleton.shells.ai.model_admission import AIModelAdmission, ModelAdmissionReport, ModelAdmissionRequirement
+from skeleton.shells.ai.admitted_ensemble import AdmittedEnsembleAIPlanner, AdmittedEnsembleResult
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidence, AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
 from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval, QuorumApprovalError, QuorumApprovalPolicy, QuorumApprovalState, QuorumVote, QuorumVoteDecision, StoredQuorumApproval
 from skeleton.shells.ai.strict_recovery import StrictAIRecoveryManager, StrictRecoveryReport
