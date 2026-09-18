@@ -30,6 +30,8 @@ jobs:
       FAILED_RUN_RETENTION_DAYS: '21'
       MAX_CACHE_DELETES: '500'
       MAX_RUN_DELETES: '1000'
+      LIVE_RUN_STALE_MINUTES: '30'
+      MAX_LIVE_CANCELS: '100'
     steps:
       - name: Verify GitHub CLI
         shell: bash
@@ -37,6 +39,155 @@ jobs:
           set -euo pipefail
           gh --version
           gh auth status
+
+      - name: Cancel obsolete live PR runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${LIVE_RUN_STALE_MINUTES} minutes ago" +%s)
+          inventory="$RUNNER_TEMP/live-runs.tsv"
+          : > "$inventory"
+
+          fetch_live_status() {
+            local status_name="$1"
+            local attempt=1 delay=2 status tmp="$RUNNER_TEMP/live-${status_name}.candidate.tsv"
+            while true; do
+              : > "$tmp"
+              if gh api --paginate "/repos/${REPO}/actions/runs?status=${status_name}&per_page=100" \
+                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp"; then
+                cat "$tmp" >> "$inventory"
+                rm -f "$tmp"
+                return 0
+              else
+                status=$?
+              fi
+              if (( attempt >= 4 )); then
+                rm -f "$tmp"
+                echo "Failed to fetch ${status_name} live runs after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          for status_name in queued in_progress waiting pending requested; do
+            fetch_live_status "$status_name"
+          done
+          sort -t $'\t' -k1,1n -u -o "$inventory" "$inventory"
+
+          inspected=0
+          cancelled=0
+          moved=0
+          failed=0
+          kept_current=0
+          kept_security=0
+          kept_unlinked=0
+          kept_recent=0
+
+          while IFS=$'\t' read -r id name event head_sha head_branch created; do
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+            [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
+            inspected=$((inspected + 1))
+
+            created_epoch=$(date -u -d "$created" +%s)
+            if (( created_epoch >= cutoff )); then
+              kept_recent=$((kept_recent + 1))
+              continue
+            fi
+
+            case "$name" in
+              *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency*|*Repository\ Hygiene*|*Workflow\ Input\ Security*)
+                kept_security=$((kept_security + 1))
+                continue
+                ;;
+            esac
+
+            case "$event" in
+              pull_request|pull_request_target) ;;
+              *)
+                kept_unlinked=$((kept_unlinked + 1))
+                continue
+                ;;
+            esac
+
+            run_json="$RUNNER_TEMP/run-${id}.json"
+            if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$run_json"; then
+              failed=$((failed + 1))
+              continue
+            fi
+
+            mapfile -t pr_numbers < <(jq -r '.pull_requests[]?.number | select(type == "number" and . > 0)' "$run_json" | sort -n -u)
+            if (( ${#pr_numbers[@]} == 0 )); then
+              kept_unlinked=$((kept_unlinked + 1))
+              continue
+            fi
+
+            obsolete=true
+            for pr_number in "${pr_numbers[@]}"; do
+              pr_json="$RUNNER_TEMP/pr-${pr_number}.json"
+              if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$pr_json"; then
+                obsolete=false
+                break
+              fi
+
+              pr_state=$(jq -r '.state // empty' "$pr_json")
+              pr_head_sha=$(jq -r '.head.sha // empty' "$pr_json")
+              pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$pr_json")
+
+              if [[ "$pr_head_repo" != "$REPO" ]]; then
+                obsolete=false
+                break
+              fi
+              if [[ "$pr_state" == "open" && "$pr_head_sha" == "$head_sha" ]]; then
+                obsolete=false
+                kept_current=$((kept_current + 1))
+                break
+              fi
+              if [[ "$pr_state" != "open" && "$pr_state" != "closed" ]]; then
+                obsolete=false
+                break
+              fi
+            done
+
+            [[ "$obsolete" == "true" ]] || continue
+            if (( cancelled >= MAX_LIVE_CANCELS )); then
+              break
+            fi
+
+            if gh api --method POST "/repos/${REPO}/actions/runs/${id}/cancel" >/dev/null 2>&1; then
+              cancelled=$((cancelled + 1))
+              continue
+            fi
+
+            status_now=$(gh api "/repos/${REPO}/actions/runs/${id}" --jq '.status // empty' 2>/dev/null || true)
+            if [[ "$status_now" == "completed" ]]; then
+              moved=$((moved + 1))
+            else
+              failed=$((failed + 1))
+            fi
+          done < "$inventory"
+
+          {
+            echo '## Live Actions reaper'
+            echo "- Live runs inspected: $inspected"
+            echo "- Obsolete PR runs cancelled: $cancelled"
+            echo "- Runs that completed before cancellation: $moved"
+            echo "- Cancellation/API failures: $failed"
+            echo "- Current PR-head runs preserved: $kept_current"
+            echo "- Security/provenance/artifact/dependency runs preserved: $kept_security"
+            echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
+            echo "- Recent live runs preserved: $kept_recent"
+            echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
+            echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
+            echo '- Cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( failed > 0 )); then
+            echo "Live-run reaper encountered ${failed} fail-closed API/cancellation errors." >&2
+            exit 1
+          fi
 
       - name: Prune only cold Actions caches
         shell: bash
