@@ -325,6 +325,11 @@ class AIExecutionEvidenceFinalizer:
             anchor = self.audit_anchors.append(**anchor_args)
         if not self.audit_anchors.verify():
             raise RuntimeError("AI audit anchor chain failed verification after append")
+        audit_root = (
+            finalization.audit_root
+            if finalization is not None and finalization.audit_root
+            else self.audit_anchors.root_hash()
+        )
         if self.finalizations is not None and finalization is not None:
             finalization = self.finalizations.advance(
                 finalization,
@@ -333,11 +338,11 @@ class AIExecutionEvidenceFinalizer:
                 recovery_checkpoint_digest=recovery.digest,
                 audit_anchor_digest=anchor.anchor.digest,
                 audit_chain_node_hash=anchor.chain_node_hash,
+                audit_root=audit_root,
             ).finalization
 
         audit_witness = None
         if self.audit_witnesses is not None:
-            audit_root = self.audit_anchors.root_hash()
             audit_witness = self.audit_witnesses.publish_once(
                 audit_root,
                 runtime_trust_digest=runtime_trust_digest,
@@ -359,6 +364,7 @@ class AIExecutionEvidenceFinalizer:
                     recovery_checkpoint_digest=recovery.digest,
                     audit_anchor_digest=anchor.anchor.digest,
                     audit_chain_node_hash=anchor.chain_node_hash,
+                    audit_root=audit_root,
                     audit_witness_digest=audit_witness.witness.digest,
                     audit_witness_sequence=audit_witness.witness.sequence,
                 ).finalization
@@ -415,6 +421,7 @@ class AIExecutionEvidenceFinalizer:
                     recovery_checkpoint_digest=recovery.digest,
                     audit_anchor_digest=anchor.anchor.digest,
                     audit_chain_node_hash=anchor.chain_node_hash,
+                    audit_root=audit_root,
                     audit_witness_digest=(
                         ""
                         if audit_witness is None
@@ -438,6 +445,7 @@ class AIExecutionEvidenceFinalizer:
                 recovery_checkpoint_digest=recovery.digest,
                 audit_anchor_digest=anchor.anchor.digest,
                 audit_chain_node_hash=anchor.chain_node_hash,
+                audit_root=audit_root,
                 audit_witness_digest=(
                     ""
                     if audit_witness is None
