@@ -59,6 +59,8 @@ from .semantic_plane import (
     SemanticPlaneSnapshot,
 )
 from .semantic_topology_learning import (
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
     TopologyBridgePrediction,
     TopologyBridgeReport,
     TopologyBridgeTrial,
@@ -388,6 +390,21 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         """Import a resolved trial whose prediction is already in custody."""
 
         return self.semantic_plane.record_topology_bridge_trial(trial)
+
+    def export_semantic_topology_learning_state(
+        self,
+    ) -> SemanticTopologyLearningState:
+        """Export contract-bound semantic topology learning state."""
+
+        return self.semantic_plane.export_topology_learning_state()
+
+    def restore_semantic_topology_learning_state(
+        self,
+        state: SemanticTopologyLearningState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        """Restore semantic topology state after full contract validation."""
+
+        return self.semantic_plane.restore_topology_learning_state(state)
 
     def semantic_topology_learning_summary(self) -> Mapping[str, Any]:
         """Return bounded bridge-learning state without promoting it to evidence."""
