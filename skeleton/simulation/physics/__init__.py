@@ -22,6 +22,11 @@ from .character_rollback import (
     CharacterRollbackSession,
     CharacterStepReceipt,
 )
+from .character_motor import (
+    CharacterMotorResult,
+    CharacterMotorSettings,
+    KinematicCharacterMotor,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -163,6 +168,8 @@ __all__ = [
     "CharacterGroundState",
     "CharacterInputFrame",
     "CharacterMoveResult",
+    "CharacterMotorResult",
+    "CharacterMotorSettings",
     "CharacterRecoveryResult",
     "CharacterRollbackReceipt",
     "CharacterRollbackSession",
@@ -214,6 +221,7 @@ __all__ = [
     "IslandSolveReceipt",
     "JumpTuning",
     "KinematicCapsuleController",
+    "KinematicCharacterMotor",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
