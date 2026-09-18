@@ -16,7 +16,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .semantic_plane import SemanticLensPlane
-from .semantic_topology_learning import SemanticTopologyLearningLab
+from .semantic_topology_learning import (
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
+)
 from .types import AgentContractError, bounded_text, positive_int, stable_fingerprint
 
 
@@ -44,6 +48,90 @@ class SemanticLearningScope:
                 "workspace_id": self.workspace_id,
             }
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ScopedSemanticTopologyState:
+    schema_version: int
+    scope_fingerprint: str
+    semantic_plane_fingerprint: str
+    topology_state: SemanticTopologyLearningState
+
+    def __post_init__(self) -> None:
+        if self.schema_version != 1:
+            raise AgentContractError(
+                "unsupported scoped semantic topology state version"
+            )
+        for name in (
+            "scope_fingerprint",
+            "semantic_plane_fingerprint",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise AgentContractError(f"{name} is required")
+            object.__setattr__(self, name, value)
+        if not isinstance(
+            self.topology_state,
+            SemanticTopologyLearningState,
+        ):
+            raise TypeError(
+                "topology_state must be SemanticTopologyLearningState"
+            )
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "schema_version": self.schema_version,
+                "scope": self.scope_fingerprint,
+                "semantic_plane": self.semantic_plane_fingerprint,
+                "topology_state": self.topology_state.fingerprint,
+            }
+        )
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "scope_fingerprint": self.scope_fingerprint,
+            "semantic_plane_fingerprint": (
+                self.semantic_plane_fingerprint
+            ),
+            "topology_state": self.topology_state.as_json(),
+            "fingerprint": self.fingerprint,
+        }
+
+    @classmethod
+    def from_json(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "ScopedSemanticTopologyState":
+        if not isinstance(payload, Mapping):
+            raise TypeError(
+                "scoped semantic topology state payload must be a mapping"
+            )
+        raw_state = payload.get("topology_state")
+        if not isinstance(raw_state, Mapping):
+            raise AgentContractError(
+                "scoped semantic topology state is missing topology_state"
+            )
+        value = cls(
+            schema_version=int(payload.get("schema_version", 0)),
+            scope_fingerprint=str(
+                payload.get("scope_fingerprint", "")
+            ),
+            semantic_plane_fingerprint=str(
+                payload.get("semantic_plane_fingerprint", "")
+            ),
+            topology_state=SemanticTopologyLearningState.from_json(
+                raw_state
+            ),
+        )
+        supplied = payload.get("fingerprint")
+        if supplied is not None and str(supplied) != value.fingerprint:
+            raise AgentContractError(
+                "scoped semantic topology state fingerprint mismatch"
+            )
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,6 +319,47 @@ class ScopedSemanticPlanePool:
             fingerprint=fingerprint,
         )
 
+    def export_topology_state(
+        self,
+        tenant_id: str,
+        user_id: str,
+        workspace_id: str,
+    ) -> ScopedSemanticTopologyState:
+        scope = self.scope(tenant_id, user_id, workspace_id)
+        plane = self.get(tenant_id, user_id, workspace_id)
+        return ScopedSemanticTopologyState(
+            schema_version=1,
+            scope_fingerprint=scope.fingerprint,
+            semantic_plane_fingerprint=plane.fingerprint,
+            topology_state=plane.export_topology_learning_state(),
+        )
+
+    def restore_topology_state(
+        self,
+        tenant_id: str,
+        user_id: str,
+        workspace_id: str,
+        state: ScopedSemanticTopologyState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        scope = self.scope(tenant_id, user_id, workspace_id)
+        restored = (
+            state
+            if isinstance(state, ScopedSemanticTopologyState)
+            else ScopedSemanticTopologyState.from_json(state)
+        )
+        if restored.scope_fingerprint != scope.fingerprint:
+            raise AgentContractError(
+                "scoped semantic topology state belongs to another learning scope"
+            )
+        plane = self.get(tenant_id, user_id, workspace_id)
+        if restored.semantic_plane_fingerprint != plane.fingerprint:
+            raise AgentContractError(
+                "scoped semantic topology plane contract mismatch"
+            )
+        return plane.restore_topology_learning_state(
+            restored.topology_state
+        )
+
     def diagnostics(self) -> Mapping[str, Any]:
         snapshot = self.snapshot()
         return {
@@ -258,6 +387,7 @@ class ScopedSemanticPlanePool:
 
 __all__ = [
     "ScopedSemanticPlanePool",
+    "ScopedSemanticTopologyState",
     "SemanticLearningScope",
     "SemanticScopePoolSnapshot",
 ]
