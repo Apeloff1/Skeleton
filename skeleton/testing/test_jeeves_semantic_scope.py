@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.jeeves.agent.execution_audit import AuditEventKind
+from skeleton.jeeves.agent.execution_audit import (
+    AuditEventKind,
+    ExecutionAuditError,
+)
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import (
     DeterministicProvider,
@@ -10,6 +13,11 @@ from skeleton.jeeves.agent.provider import (
 )
 from skeleton.jeeves.agent.runtime import RunInputs
 from skeleton.jeeves.agent.semantic_frontier import LensInteractionKind
+from skeleton.jeeves.agent.semantic_lenses import (
+    LensFamily,
+    SemanticFinding,
+    SemanticObservation,
+)
 from skeleton.jeeves.agent.semantic_plane import SemanticLensPlane
 from skeleton.jeeves.agent.semantic_scope import ScopedSemanticPlanePool
 from skeleton.jeeves.agent.types import AgentContractError, Goal
@@ -209,6 +217,10 @@ def test_runtime_checkpoint_binds_semantic_scope_and_scoped_learning_root() -> N
         checkpoint.metadata["semantic_topology_learning_fingerprint"]
         == plane.topology_learning.fingerprint
     )
+    assert (
+        checkpoint.metadata["semantic_runtime_state_fingerprint"]
+        == plane.runtime_state_fingerprint
+    )
 
     ledger = runtime.runtime_guard.audit_store.get(state.run_id)
     assert ledger is not None
@@ -226,6 +238,55 @@ def test_runtime_checkpoint_binds_semantic_scope_and_scoped_learning_root() -> N
         binding.payload["semantic_topology_learning_fingerprint"]
         == plane.topology_learning.fingerprint
     )
+    assert (
+        binding.payload["semantic_runtime_state_fingerprint"]
+        == plane.runtime_state_fingerprint
+    )
+
+
+def test_same_scope_semantic_forecast_state_drift_blocks_resume() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-scope-semantic-state-drift")
+    state = runtime._new_state(inputs.run_id, inputs)
+    checkpoint = runtime.checkpointer.latest(state.run_id)
+    assert checkpoint is not None
+    plane = runtime.semantic_plane_for(inputs)
+
+    observations = (
+        SemanticObservation(
+            "scope-state-o1",
+            "The deployment shows concept drift under a changed regime.",
+            0,
+        ),
+    )
+    finding = SemanticFinding(
+        finding_id="scope-state-f1",
+        lens_key="concept_drift",
+        family=LensFamily.PREDICTIVE,
+        observation_ids=("scope-state-o1",),
+        interpretation="Concept drift is a bounded semantic hypothesis.",
+        prediction="A later sample should preserve or refute the drift signal.",
+        confidence=0.82,
+        ambiguity=0.12,
+        novelty=0.6,
+    )
+    semantic = plane.analyze(
+        observations,
+        findings=(finding,),
+        requested=("concept_drift",),
+    )
+    assert semantic.forecasts
+    assert (
+        plane.runtime_state_fingerprint
+        != checkpoint.metadata["semantic_runtime_state_fingerprint"]
+    )
+
+    with pytest.raises(
+        ExecutionAuditError,
+        match="semantic runtime state fingerprint changed",
+    ):
+        runtime._state_from_checkpoint(inputs, checkpoint)
 
 
 def test_other_scope_learning_does_not_invalidate_checkpoint_resume() -> None:
