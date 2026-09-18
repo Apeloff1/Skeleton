@@ -61,6 +61,7 @@ def advance_anchor(store, item):
         recovery_checkpoint_digest=fp("c"),
         audit_anchor_digest=fp("a"),
         audit_chain_node_hash=fp("n"),
+        audit_root=fp("r"),
     ).finalization
 
 
@@ -72,6 +73,7 @@ def advance_witness(store, item):
         recovery_checkpoint_digest=fp("c"),
         audit_anchor_digest=fp("a"),
         audit_chain_node_hash=fp("n"),
+        audit_root=fp("r"),
         audit_witness_digest=fp("w"),
         audit_witness_sequence=1,
     ).finalization
@@ -85,6 +87,7 @@ def advance_signed(store, item):
         recovery_checkpoint_digest=fp("c"),
         audit_anchor_digest=fp("a"),
         audit_chain_node_hash=fp("n"),
+        audit_root=fp("r"),
         audit_witness_digest=fp("w"),
         audit_witness_sequence=1,
         execution_evidence_digest=fp("e"),
@@ -100,6 +103,7 @@ def advance_complete(store, item):
         recovery_checkpoint_digest=fp("c"),
         audit_anchor_digest=fp("a"),
         audit_chain_node_hash=fp("n"),
+        audit_root=fp("r"),
         audit_witness_digest=(
             item.audit_witness_digest
         ),
@@ -209,6 +213,7 @@ def test_complete_can_skip_optional_witness_and_signed_bundle():
         recovery_checkpoint_digest=fp("c"),
         audit_anchor_digest=fp("a"),
         audit_chain_node_hash=fp("n"),
+        audit_root=fp("r"),
     ).finalization
     assert item.phase is FinalizationPhase.COMPLETE
     assert item.audit_witness_digest == ""
