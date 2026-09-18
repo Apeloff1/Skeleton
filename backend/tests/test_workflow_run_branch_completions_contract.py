@@ -104,11 +104,10 @@ def test_rejects_repair_intake_without_commit_oid_canonicalization() -> None:
 
 
 def test_rejects_idle_studio_without_same_repository_head() -> None:
-    source = _replace_once(
-        IDLE.read_text(encoding="utf-8"),
-        "github.event.workflow_run.head_repository.full_name == github.repository",
-        "true",
-    )
+    source = IDLE.read_text(encoding="utf-8")
+    guard = "github.event.workflow_run.head_repository.full_name == github.repository"
+    assert guard in source
+    source = source.replace(guard, "true")
     messages = "\n".join(violations_for_text(IDLE.name, source))
     assert "cross-repository workflow_run heads" in messages
 
