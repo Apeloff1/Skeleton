@@ -21,6 +21,7 @@ def inspect(
     release=False,
     preconditions=False,
     approval=False,
+    quorum=False,
 ):
     return AIExecutionAssuranceInspector(policy).inspect(
         band,
@@ -30,6 +31,7 @@ def inspect(
         release_verified=release,
         preconditions_verified=preconditions,
         human_approved=approval,
+        quorum_approved=quorum,
     )
 
 
@@ -67,6 +69,7 @@ def test_default_critical_is_denied_even_with_controls():
         release=True,
         preconditions=True,
         approval=True,
+        quorum=True,
     )
     assert not decision.allowed
     assert decision.required is AssuranceLevel.DENIED
@@ -102,6 +105,7 @@ def test_production_high_requires_all_controls():
         release=True,
         preconditions=True,
         approval=True,
+        quorum=True,
     )
     assert decision.allowed
     assert decision.sealed
@@ -109,6 +113,7 @@ def test_production_high_requires_all_controls():
     assert decision.release_verified
     assert decision.preconditions_verified
     assert decision.human_approved
+    assert decision.quorum_approved
 
 
 @pytest.mark.parametrize(
@@ -119,6 +124,7 @@ def test_production_high_requires_all_controls():
         ("release", "release"),
         ("preconditions", "preconditions"),
         ("approval", "approval"),
+        ("quorum", "quorum"),
     ],
 )
 def test_production_high_each_control_is_independently_required(
@@ -132,6 +138,7 @@ def test_production_high_each_control_is_independently_required(
         release=True,
         preconditions=True,
         approval=True,
+        quorum=True,
     )
     values[missing] = False
     decision = inspect(
@@ -221,6 +228,7 @@ def test_assurance_decision_to_dict_contains_evidence_flags():
     assert data["release_verified"] is True
     assert data["preconditions_verified"] is True
     assert data["human_approved"] is True
+    assert data["quorum_approved"] is True
 
 
 def test_assurance_require_raises_with_all_reasons():
@@ -235,6 +243,7 @@ def test_assurance_require_raises_with_all_reasons():
             release_verified=False,
             preconditions_verified=False,
             human_approved=False,
+            quorum_approved=False,
         )
     message = str(caught.value)
     assert "sealed" in message
@@ -242,6 +251,7 @@ def test_assurance_require_raises_with_all_reasons():
     assert "release" in message
     assert "preconditions" in message
     assert "approval" in message
+    assert "quorum" in message
 
 
 def test_assurance_require_returns_decision_when_allowed():
@@ -255,6 +265,7 @@ def test_assurance_require_returns_decision_when_allowed():
         release_verified=True,
         preconditions_verified=True,
         human_approved=True,
+        quorum_approved=True,
     )
     assert decision.allowed
 
