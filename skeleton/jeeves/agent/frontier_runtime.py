@@ -552,7 +552,15 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         if self.cortex is None:
             return result
         try:
-            report = self.cortex.observe_result(state.inputs, result)
+            verification_scores, action_risks = self._cortex_learning_signals(
+                state.run_id
+            )
+            report = self.cortex.observe_result(
+                state.inputs,
+                result,
+                verification_scores=verification_scores,
+                action_risks=action_risks,
+            )
             metadata = dict(result.metadata)
             metadata["cortex"] = {
                 "status": "observed",
@@ -564,6 +572,8 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "world_entropy_bits": report.world_entropy_bits,
                 "decision_count": len(report.decisions),
                 "learned_skill_ids": list(report.learned_skill_ids),
+                "verified_tool_signal_count": len(verification_scores),
+                "risk_bound_tool_signal_count": len(action_risks),
                 "anomalies": list(report.anomalies),
             }
             self.metrics.increment("agent.cortex.results_observed")
@@ -582,6 +592,56 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "message": str(exc)[:512],
             }
             return replace(result, metadata=metadata)
+
+    def _cortex_learning_signals(
+        self,
+        run_id: str,
+    ) -> tuple[dict[str, float], dict[str, RiskTier]]:
+        ledger = self.runtime_guard.audit_store.get(run_id)
+        if ledger is None:
+            return {}, {}
+
+        by_operation: dict[str, dict[str, Any]] = {}
+        for entry in ledger.entries():
+            if entry.operation_id is None:
+                continue
+            record = by_operation.setdefault(entry.operation_id, {})
+            if entry.kind is AuditEventKind.INTENT_BOUND:
+                call_id = entry.payload.get("call_id")
+                risk = entry.payload.get("risk")
+                if isinstance(call_id, str) and call_id:
+                    record["call_id"] = call_id
+                try:
+                    if risk is not None:
+                        record["risk"] = (
+                            risk
+                            if isinstance(risk, RiskTier)
+                            else RiskTier(str(risk))
+                        )
+                except ValueError:
+                    pass
+            elif entry.kind is AuditEventKind.EXECUTION_FINALIZED:
+                score = entry.payload.get("verification_score")
+                try:
+                    normalized = float(score)
+                except (TypeError, ValueError):
+                    continue
+                if 0.0 <= normalized <= 1.0:
+                    record["verification_score"] = normalized
+
+        verification_scores: dict[str, float] = {}
+        action_risks: dict[str, RiskTier] = {}
+        for record in by_operation.values():
+            call_id = record.get("call_id")
+            if not isinstance(call_id, str) or not call_id:
+                continue
+            score = record.get("verification_score")
+            if isinstance(score, float):
+                verification_scores[call_id] = score
+            risk = record.get("risk")
+            if isinstance(risk, RiskTier):
+                action_risks[call_id] = risk
+        return verification_scores, action_risks
 
     def _cortex_current_risk(self, state: _RunState) -> RiskTier:
         if state.plan is None:
