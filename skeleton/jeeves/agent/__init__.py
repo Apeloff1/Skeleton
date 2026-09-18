@@ -349,6 +349,10 @@ from .runtime import (
     RunCheckpoint,
     RunInputs,
 )
+from .scientific_runtime import (
+    ScientificAdaptiveJeevesRuntime,
+    ScientificJeevesRuntime,
+)
 from .runtime_abstraction import (
     ArgumentAbstractionPolicy,
     ArgumentAbstractor,
@@ -433,6 +437,7 @@ from .semantic_plane import (
     SemanticPlaneLearningUpdate,
     SemanticPlanePolicy,
     SemanticPlaneSnapshot,
+    SemanticTargetFusion,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,
