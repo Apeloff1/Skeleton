@@ -486,28 +486,67 @@ class SemanticTopologyLearningLab:
                 fingerprint=fingerprint,
             )
 
-        probabilities = [item.predicted_probability for item in rows]
-        outcomes = [item.outcome for item in rows]
+        primary = [item for item in rows if not item.negative_control]
+        controls = [item for item in rows if item.negative_control]
+        if not primary:
+            fingerprint = stable_fingerprint(
+                {
+                    "report": report_id,
+                    "candidate": candidate_fingerprint,
+                    "kind": kind_value.value,
+                    "trials": [item.fingerprint for item in rows],
+                    "status": TopologyBridgeStatus.CANDIDATE.value,
+                    "reasons": ("no_primary_trials",),
+                    "policy": self.policy.fingerprint,
+                }
+            )
+            return TopologyBridgeReport(
+                report_id=report_id,
+                candidate_id=candidate.candidate_id,
+                candidate_fingerprint=candidate_fingerprint,
+                left_key=candidate.left_key,
+                right_key=candidate.right_key,
+                kind=kind_value,
+                status=TopologyBridgeStatus.CANDIDATE,
+                trial_count=0,
+                independent_run_count=0,
+                domain_count=0,
+                negative_control_count=len(controls),
+                mean_probability=None,
+                empirical_rate=None,
+                wilson_95=None,
+                brier=None,
+                calibration_error=None,
+                negative_control_positive_rate=(
+                    None
+                    if not controls
+                    else sum(item.outcome for item in controls) / len(controls)
+                ),
+                reasons=("no_primary_trials",),
+                fingerprint=fingerprint,
+            )
+
+        probabilities = [item.predicted_probability for item in primary]
+        outcomes = [item.outcome for item in primary]
         positive_count = sum(outcomes)
         mean_probability = sum(probabilities) / len(probabilities)
-        empirical_rate = positive_count / len(rows)
-        interval = wilson_interval(positive_count, len(rows))
+        empirical_rate = positive_count / len(primary)
+        interval = wilson_interval(positive_count, len(primary))
         brier = brier_score(probabilities, outcomes)
         calibration_error = expected_calibration_error(
             probabilities,
             outcomes,
-            bins=min(10, len(rows)),
+            bins=min(10, len(primary)),
         )
-        runs = {item.independent_run for item in rows}
-        domains = {item.domain for item in rows}
-        controls = [item for item in rows if item.negative_control]
+        runs = {item.independent_run for item in primary}
+        domains = {item.domain for item in primary}
         control_rate = (
             None
             if not controls
             else sum(item.outcome for item in controls) / len(controls)
         )
         status, reasons = self._report_status(
-            trial_count=len(rows),
+            trial_count=len(primary),
             independent_runs=len(runs),
             domains=len(domains),
             negative_control_count=len(controls),
@@ -543,7 +582,7 @@ class SemanticTopologyLearningLab:
             right_key=candidate.right_key,
             kind=kind_value,
             status=status,
-            trial_count=len(rows),
+            trial_count=len(primary),
             independent_run_count=len(runs),
             domain_count=len(domains),
             negative_control_count=len(controls),
