@@ -457,8 +457,20 @@ def validate_manifest(
         )
     seen: dict[str, str] = {}
     validated: list[AssetRecord] = []
+    if data_by_id is not None:
+        if not isinstance(data_by_id, Mapping):
+            raise SerializationError("data_by_id must be a mapping")
+        expected_ids = {record.identity.asset_id for record in manifest.assets}
+        supplied_ids = set(data_by_id)
+        missing_data = sorted(expected_ids - supplied_ids)
+        extra_data = sorted(supplied_ids - expected_ids)
+        if missing_data or extra_data:
+            raise DigestDriftError(
+                "asset byte verification set does not match manifest identities",
+                context={"missing": missing_data, "extra": extra_data},
+            )
     for record in manifest.assets:
-        data = None if data_by_id is None else data_by_id.get(record.identity.asset_id)
+        data = None if data_by_id is None else data_by_id[record.identity.asset_id]
         checked = validate_record(record, data=data)
         asset_id = checked.identity.asset_id
         if asset_id in seen:
