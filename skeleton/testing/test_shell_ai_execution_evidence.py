@@ -38,6 +38,10 @@ def build(builder=None, **changes):
         model_attestation_digest=fp("m"),
         execution_seal_id="seal-1",
         quorum_approval_digest=fp("q"),
+        runtime_trust_digest=fp("t"),
+        authority_health_policy_digest=fp("h"),
+        audit_witness_digest=fp("w"),
+        audit_witness_sequence=1,
     )
     values.update(changes)
     return builder.build(**values)
@@ -88,6 +92,10 @@ def test_execution_evidence_optional_fields_can_be_empty():
         model_attestation_digest="",
         execution_seal_id="",
         quorum_approval_digest="",
+        runtime_trust_digest="",
+        authority_health_policy_digest="",
+        audit_witness_digest="",
+        audit_witness_sequence=None,
     )
     assert evidence.release_evidence_digest == ""
     assert evidence.execution_seal_id == ""
@@ -132,6 +140,9 @@ def test_execution_evidence_required_digest_validation(field):
         "sandbox_binding_digest",
         "model_attestation_digest",
         "quorum_approval_digest",
+        "runtime_trust_digest",
+        "authority_health_policy_digest",
+        "audit_witness_digest",
     ],
 )
 def test_execution_evidence_optional_digest_validation(field):
@@ -428,3 +439,103 @@ def test_execution_evidence_root_changes_per_append():
     second = target.root_hash()
     assert initial != first
     assert first != second
+
+
+def test_execution_evidence_digest_changes_with_runtime_trust():
+    first = build(runtime_trust_digest=fp("a"))
+    second = build(runtime_trust_digest=fp("b"))
+    assert first.digest != second.digest
+
+
+def test_execution_evidence_digest_changes_with_authority_health_policy():
+    first = build(authority_health_policy_digest=fp("a"))
+    second = build(authority_health_policy_digest=fp("b"))
+    assert first.digest != second.digest
+
+
+def test_execution_evidence_digest_changes_with_audit_witness():
+    first = build(
+        audit_witness_digest=fp("a"),
+        audit_witness_sequence=1,
+    )
+    second = build(
+        audit_witness_digest=fp("b"),
+        audit_witness_sequence=1,
+    )
+    assert first.digest != second.digest
+
+
+def test_execution_evidence_digest_changes_with_witness_sequence():
+    first = build(audit_witness_sequence=1)
+    second = build(audit_witness_sequence=2)
+    assert first.digest != second.digest
+
+
+@pytest.mark.parametrize(
+    "witness_digest,witness_sequence",
+    [
+        ("", 1),
+        (fp("w"), None),
+        ("", 0),
+        (fp("w"), 0),
+        (fp("w"), -1),
+        (fp("w"), True),
+    ],
+)
+def test_execution_evidence_witness_fields_must_be_paired(
+    witness_digest,
+    witness_sequence,
+):
+    with pytest.raises(ValueError, match="witness"):
+        build(
+            audit_witness_digest=witness_digest,
+            audit_witness_sequence=witness_sequence,
+        )
+
+
+def test_execution_evidence_witness_round_trip_through_store():
+    target = store()
+    evidence = build(
+        runtime_trust_digest=fp("t"),
+        authority_health_policy_digest=fp("h"),
+        audit_witness_digest=fp("w"),
+        audit_witness_sequence=7,
+    )
+    target.append(evidence)
+    loaded = target.snapshot()[0].evidence
+    assert loaded.runtime_trust_digest == fp("t")
+    assert loaded.authority_health_policy_digest == fp("h")
+    assert loaded.audit_witness_digest == fp("w")
+    assert loaded.audit_witness_sequence == 7
+    assert target.verify()
+
+
+def test_execution_evidence_tampered_witness_identity_breaks_outer_chain():
+    backend = InMemoryFencedStore()
+    target = store(backend=backend)
+    target.append(build())
+    node = target._chain.snapshot()[0]
+    record = backend.get(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+    )
+    payload = dict(node.payload)
+    raw = dict(payload["evidence"])
+    raw["audit_witness_digest"] = fp("x")
+    payload["evidence"] = raw
+    backend.compare_and_swap(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+        expected_revision=record.revision,
+        value=replace(node, payload=payload),
+    )
+    assert not target.verify()
+
+
+def test_execution_evidence_optional_trust_health_can_be_empty():
+    evidence = build(
+        runtime_trust_digest="",
+        authority_health_policy_digest="",
+    )
+    assert evidence.runtime_trust_digest == ""
+    assert evidence.authority_health_policy_digest == ""
