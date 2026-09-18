@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import copy
 import math
+
+import pytest
 
 from skeleton.jeeves.agent.epistemic_frontier import (
     EpistemicFrontierEngine,
@@ -25,7 +28,7 @@ from skeleton.jeeves.agent.research_synthesis import (
     HypothesisProposal,
     HypothesisSynthesisGate,
 )
-from skeleton.jeeves.agent.types import RiskTier
+from skeleton.jeeves.agent.types import AgentContractError, RiskTier
 
 
 def _hypothesis(
@@ -486,3 +489,130 @@ def test_strict_synthesis_builds_tournament_only_after_diverse_admission() -> No
     assert report.null_hypothesis_ids == ("h-null",)
     assert tournament.round().selected_probe_id in {"cheap-check", "expensive-check"}
     assert control.hypothesis_tournament(tournament.tournament_id) is tournament
+
+
+
+def test_tournament_checkpoint_replays_observations_instead_of_trusting_posterior() -> None:
+    tournament = HypothesisTournament(
+        (
+            _hypothesis("h-a", 0.5, cheap_yes=0.95, expensive_yes=0.4),
+            _hypothesis("h-b", 0.5, cheap_yes=0.05, expensive_yes=0.6),
+        ),
+        (
+            DiscriminatingProbe(
+                probe_id="cheap-check",
+                question="Cheap?",
+                outcome_support=("yes", "no"),
+            ),
+            DiscriminatingProbe(
+                probe_id="expensive-check",
+                question="Expensive?",
+                outcome_support=("yes", "no"),
+            ),
+        ),
+    )
+    tournament.observe("cheap-check", "yes", falsification_threshold=0.10)
+    state = tournament.dump_state()
+
+    restored = HypothesisTournament.from_state(state)
+
+    assert restored.tournament_id == tournament.tournament_id
+    assert restored.posterior == tournament.posterior
+    assert [item.fingerprint for item in restored.history()] == [
+        item.fingerprint for item in tournament.history()
+    ]
+
+    tampered = copy.deepcopy(state)
+    tampered["posterior"]["h-a"] = 0.5
+    tampered["posterior"]["h-b"] = 0.5
+    with pytest.raises(AgentContractError):
+        HypothesisTournament.from_state(tampered)
+
+
+def test_full_research_program_checkpoint_round_trips_and_rejects_tampering() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 6000.0)
+    control.map_epistemic_frontier(
+        (
+            KnowledgeObligation(
+                obligation_id="deploy-safety",
+                question="Is deployment safe?",
+                decision_impact=0.95,
+                confidence=0.55,
+                evidence_coverage=0.70,
+                model_disagreement=0.75,
+                evidence_refs=("ev-1",),
+            ),
+        )
+    )
+    item = control.research_agenda.claim_next()
+    assert item is not None
+    tournament = control.start_hypothesis_tournament(
+        (
+            _hypothesis("h-a", 0.5, cheap_yes=0.99, expensive_yes=0.5),
+            _hypothesis("h-b", 0.5, cheap_yes=0.01, expensive_yes=0.5),
+        ),
+        (
+            DiscriminatingProbe(
+                probe_id="cheap-check",
+                question="Observed?",
+                outcome_support=("yes", "no"),
+            ),
+            DiscriminatingProbe(
+                probe_id="expensive-check",
+                question="Secondary?",
+                outcome_support=("yes", "no"),
+            ),
+        ),
+        decision_impact=0.95,
+    )
+    control.observe_hypothesis_probe(
+        tournament.tournament_id,
+        "cheap-check",
+        "yes",
+        agenda_id=item.agenda_id,
+        evidence_refs=("ev-probe",),
+    )
+    control.certify_research_completion(_certifiable_summary())
+    control.precommit_research_forecast(
+        "deploy-safety",
+        {"safe": 0.8, "unsafe": 0.2},
+        forecast_id="program-forecast",
+    )
+    control.settle_research_forecast("program-forecast", "safe")
+
+    state = control.dump_research_state()
+    restored = FrontierCognitiveControlPlane(clock=lambda: 6000.0)
+    restored.restore_research_state(state)
+
+    assert restored.dump_research_state()["fingerprint"] == state["fingerprint"]
+    assert restored.research_agenda.snapshot().fingerprint == (
+        control.research_agenda.snapshot().fingerprint
+    )
+    assert restored.hypothesis_tournament(tournament.tournament_id).posterior == (
+        tournament.posterior
+    )
+    assert restored.epistemic_frontier.forecast("program-forecast").commitment == (
+        control.epistemic_frontier.forecast("program-forecast").commitment
+    )
+
+    tampered = copy.deepcopy(state)
+    tampered["fingerprint"] = "0" * 64
+    rejected = FrontierCognitiveControlPlane(clock=lambda: 6000.0)
+    with pytest.raises(AgentContractError):
+        rejected.restore_research_state(tampered)
+
+
+def test_forecast_commitment_tampering_is_rejected_during_program_restore() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 7000.0)
+    control.precommit_research_forecast(
+        "deploy-safety",
+        {"safe": 0.7, "unsafe": 0.3},
+        forecast_id="tamper-forecast",
+    )
+    state = control.dump_research_state()
+    tampered = copy.deepcopy(state)
+    tampered["forecasts"]["forecasts"][0]["distribution"]["safe"] = 0.1
+
+    restored = FrontierCognitiveControlPlane(clock=lambda: 7000.0)
+    with pytest.raises(AgentContractError):
+        restored.restore_research_state(tampered)
