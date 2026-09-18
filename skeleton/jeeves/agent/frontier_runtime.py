@@ -297,7 +297,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 )
 
         self.semantic_plane = semantic_plane or SemanticLensPlane()
-
         self.cortex_required = cortex_required
         self.cortex = cortex if cortex_enabled else None
         if cortex_enabled and self.cortex is None:
@@ -633,13 +632,14 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         if self.cortex is None:
             return result
         try:
-            verification_scores, action_risks = self._cortex_learning_signals(
+            verification_scores, action_costs, action_risks = self._cortex_learning_signals(
                 state.run_id
             )
             report = self.cortex.observe_result(
                 state.inputs,
                 result,
                 verification_scores=verification_scores,
+                action_costs=action_costs,
                 action_risks=action_risks,
             )
             metadata = dict(result.metadata)
@@ -654,6 +654,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "decision_count": len(report.decisions),
                 "learned_skill_ids": list(report.learned_skill_ids),
                 "verified_tool_signal_count": len(verification_scores),
+                "cost_bound_tool_signal_count": len(action_costs),
                 "risk_bound_tool_signal_count": len(action_risks),
                 "anomalies": list(report.anomalies),
             }
@@ -677,10 +678,10 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
     def _cortex_learning_signals(
         self,
         run_id: str,
-    ) -> tuple[dict[str, float], dict[str, RiskTier]]:
+    ) -> tuple[dict[str, float], dict[str, float], dict[str, RiskTier]]:
         ledger = self.runtime_guard.audit_store.get(run_id)
         if ledger is None:
-            return {}, {}
+            return {}, {}, {}
 
         by_operation: dict[str, dict[str, Any]] = {}
         for entry in ledger.entries():
@@ -710,19 +711,27 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 if 0.0 <= normalized <= 1.0:
                     record["verification_score"] = normalized
 
+        finalization_costs = {
+            item.operation_id: item.experience.cost
+            for item in self.runtime_guard.finalizations(run_id)
+        }
         verification_scores: dict[str, float] = {}
+        action_costs: dict[str, float] = {}
         action_risks: dict[str, RiskTier] = {}
-        for record in by_operation.values():
+        for operation_id, record in by_operation.items():
             call_id = record.get("call_id")
             if not isinstance(call_id, str) or not call_id:
                 continue
             score = record.get("verification_score")
             if isinstance(score, float):
                 verification_scores[call_id] = score
+            cost = finalization_costs.get(operation_id)
+            if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+                action_costs[call_id] = max(0.0, float(cost))
             risk = record.get("risk")
             if isinstance(risk, RiskTier):
                 action_risks[call_id] = risk
-        return verification_scores, action_risks
+        return verification_scores, action_costs, action_risks
 
     def _cortex_current_risk(self, state: _RunState) -> RiskTier:
         if state.plan is None:
