@@ -27,6 +27,10 @@ _SUPERSEDES_DIRECTIVE_RE = re.compile(
     r"^\s*(?:(?:[-*+]\s+)|(?:#{1,6}\s+))?supersedes\b", re.IGNORECASE
 )
 _PR_REF_RE = re.compile(r"#([1-9][0-9]*)\b")
+_SYNC_TITLE_PREFIX = "chore(sync): refresh "
+_PROTECTED_SYNC_BASES = frozenset(
+    {"main", "master", "develop", "development", "staging", "production", "prod", "gh-pages"}
+)
 
 
 @dataclass(frozen=True, slots=True)
