@@ -93,6 +93,7 @@ class AIShellOrchestrator:
         self.calibration = calibration or AICalibration()
         self.journal = journal or AIDecisionJournal(clock=clock)
         self.budget = budget or planner.budget
+        self.planner.budget = self.budget
         self._clock = clock
 
     def review(
