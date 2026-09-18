@@ -278,6 +278,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         """Bind a semantic snapshot as escalation-only advice for one run."""
 
         run_key = require_id("run_id", run_id)
+        self._adaptive_state(run_key)
         if not isinstance(snapshot, SemanticPlaneSnapshot):
             raise TypeError("snapshot must be SemanticPlaneSnapshot")
         if (
@@ -500,7 +501,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             clock=self._monotonic,
         )
         search = engine.search(task, allocation)
-        semantic_signals = self._semantic_frontier_signals(state)
+        semantic_signals = (
+            self._semantic_frontier_signals(state)
+            if self.adaptive_config.enable_frontier_reasoning
+            else ()
+        )
         decision = (
             self.frontier_reasoning.decide(
                 search,
@@ -949,6 +954,15 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             "context_head": repo.head(adaptive.context_branch),
             "experience_matches": adaptive.experience_matches,
             "frontier_decisions": list(adaptive.frontier_decision_fingerprints),
+            "semantic_frontier": [
+                {
+                    "signals": record.semantic_signal_count,
+                    "fusion": record.semantic_fusion_fingerprint,
+                }
+                for record in adaptive.searches
+                if record.semantic_signal_count
+                or record.semantic_fusion_fingerprint is not None
+            ],
             "frontier_feedback": feedback_report.fingerprint,
             "frontier_feedback_recommendation": feedback_recommendation.fingerprint,
         }
@@ -984,6 +998,25 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             "allocation_count": report.allocation_count,
             "specialist_searches": len(report.specialist_searches),
             "frontier_decisions": len(adaptive.frontier_decision_fingerprints),
+            "semantic_frontier": {
+                "searches_with_signals": sum(
+                    record.semantic_signal_count > 0
+                    for record in adaptive.searches
+                ),
+                "maximum_signal_count": max(
+                    (
+                        record.semantic_signal_count
+                        for record in adaptive.searches
+                    ),
+                    default=0,
+                ),
+                "fusion_fingerprints": [
+                    record.semantic_fusion_fingerprint
+                    for record in adaptive.searches
+                    if record.semantic_fusion_fingerprint is not None
+                ],
+                "authority": "escalation_only",
+            },
             "frontier_feedback": {
                 "fingerprint": feedback_report.fingerprint,
                 "count": feedback_report.count,
@@ -1002,6 +1035,11 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 "reasons": list(feedback_recommendation.reasons),
             },
         }
+        with self._adaptive_lock:
+            self._semantic_reasoning_snapshots.pop(
+                result.run_id,
+                None,
+            )
         return replace(result, metadata=json_safe(metadata))
 
     def _compute_signals(self, state: _RunState, *, purpose: str, step=None) -> ComputeSignals:
