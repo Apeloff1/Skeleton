@@ -400,7 +400,7 @@ class ContinuousCollisionDetector:
                     body_a,
                     body_b,
                     dt,
-                    max_iterations=64,
+                    max_iterations=128,
                     distance_iterations=64,
                     distance_tolerance=1.0e-6,
                     time_tolerance=1.0e-9,
