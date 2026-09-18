@@ -22,6 +22,9 @@ IDLE_WORKFLOW = "idle-studio.yml"
 QUEUE_DEFAULT_BRANCH_GUARD = (
     "github.event.workflow_run.head_branch == github.event.repository.default_branch"
 )
+QUEUE_DRAIN_JOB_IF_RE = re.compile(
+    r"(?m)^    if:\s*>-\s*$\n(?P<body>(?:      .*\n)+)"
+)
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
 OID_IDENTITY = "workflow_run head SHA must be a 40-character hex commit OID"
 IDENTITY_ADAPTERS = (
@@ -53,6 +56,14 @@ def _workflow_run_trigger_block(text: str) -> str:
     return tail if next_trigger is None else tail[: next_trigger.start()]
 
 
+def _queue_drain_job_guarded(text: str) -> bool:
+    """Require the trust guard in the executable job condition, not prose/code."""
+    match = QUEUE_DRAIN_JOB_IF_RE.search(text)
+    if match is None:
+        return False
+    return match.group("body").count(QUEUE_DEFAULT_BRANCH_GUARD) == 1
+
+
 def violations_for_text(path_name: str, text: str) -> list[str]:
     findings: list[str] = []
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
@@ -74,10 +85,7 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
-        # The guard is a single security boundary. Requiring exactly one
-        # occurrence prevents a stale/commented/duplicate copy elsewhere in
-        # the workflow from masking removal of the executable job condition.
-        and text.count(QUEUE_DEFAULT_BRANCH_GUARD) == 1
+        and _queue_drain_job_guarded(text)
     )
 
     if _is_named(path_name, QUEUE_DRAIN_WORKFLOW) and not queue_default_branch_only:
