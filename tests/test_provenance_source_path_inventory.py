@@ -16,7 +16,6 @@ SPEC.loader.exec_module(policy)
 
 LIVE_EXAMPLES = (
     ("skeleton/kernel/capabilities.py", "canonical"),
-    ("skeleton/build/incremental_graph.py", "canonical"),
     ("backend/server.py", "canonical"),
     ("frontend/package.json", "canonical"),
     ("core/activation_security.py", "canonical"),
@@ -74,7 +73,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("skeleton/vendor/third.py"), "vendor")
         self.assertEqual(policy.classify_path("backend/third_party/lib.py"), "vendor")
 
-    def test_live_skeleton_build_package_is_canonical_not_generated(self) -> None:
+    def test_skeleton_build_package_is_canonical_not_generated(self) -> None:
         self.assertEqual(
             policy.classify_path("skeleton/build/incremental_graph.py"),
             "canonical",
