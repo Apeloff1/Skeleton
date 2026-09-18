@@ -32,6 +32,7 @@ from .types import (
     AgentContractError,
     bounded_text,
     json_safe,
+    finite_number,
     positive_int,
     probability,
     stable_fingerprint,
@@ -59,6 +60,8 @@ class TopologyBridgeTrial:
     outcome: bool
     domain: str
     independent_run: str
+    predicted_at: float
+    observed_at: float
     negative_control: bool = False
     source_finding_ids: tuple[str, ...] = ()
     source_forecast_ids: tuple[str, ...] = ()
@@ -85,6 +88,16 @@ class TopologyBridgeTrial:
             raise AgentContractError("topology bridge trial requires distinct lenses")
         if not isinstance(self.kind, LensInteractionKind):
             object.__setattr__(self, "kind", LensInteractionKind(str(self.kind)))
+        predicted_at = finite_number("predicted_at", self.predicted_at)
+        observed_at = finite_number("observed_at", self.observed_at)
+        if predicted_at < 0 or observed_at < 0:
+            raise AgentContractError("topology bridge trial times must be non-negative")
+        if observed_at < predicted_at:
+            raise AgentContractError(
+                "topology bridge outcome cannot predate its prediction"
+            )
+        object.__setattr__(self, "predicted_at", predicted_at)
+        object.__setattr__(self, "observed_at", observed_at)
         object.__setattr__(
             self,
             "predicted_probability",
@@ -131,6 +144,8 @@ class TopologyBridgeTrial:
                 "outcome": self.outcome,
                 "domain": self.domain,
                 "run": self.independent_run,
+                "predicted_at": self.predicted_at,
+                "observed_at": self.observed_at,
                 "negative_control": self.negative_control,
                 "findings": self.source_finding_ids,
                 "forecasts": self.source_forecast_ids,
