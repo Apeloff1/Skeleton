@@ -26,7 +26,7 @@ class DistributedExecutionSealRegistry:
         backend: VersionedStateBackend,
         *,
         config: DistributedSealConfig | None = None,
-        clock: Callable[[], float] = time.monotonic,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self.authority = authority
         self.backend = backend
