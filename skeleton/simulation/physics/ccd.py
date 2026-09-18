@@ -1,8 +1,10 @@
 """Bounded continuous collision detection and deterministic TOI events.
 
-Continuous sphere motion supports:
-- sphere against static analytic sphere/box/plane geometry;
-- sphere against moving static/kinematic/dynamic spheres using relative motion;
+Continuous collision detection supports:
+- exact sphere sweeps against analytic static geometry;
+- relative-motion dynamic sphere pairs;
+- conservative-advancement finite convex pairs;
+- finite convex shapes against static infinite planes, including angular motion;
 - global earliest-event selection with stable pair ordering.
 
 The world consumes TOIEvent objects in bounded substeps so every body advances to
@@ -16,7 +18,7 @@ from dataclasses import dataclass
 from .body import BodyType, RigidBody
 from .convex import convex_time_of_impact
 from .errors import PhysicsValidationError
-from .math3d import EPSILON, Vec3
+from .math3d import EPSILON, Quat, Transform, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
 from .shapes import (
     BoxShape,
@@ -149,6 +151,124 @@ class ContinuousCollisionDetector:
             return False
         travel = body.linear_velocity.length() * dt
         return travel > body.shape.radius * self.motion_threshold
+
+    @staticmethod
+    def _predicted_transform(body: RigidBody, time: float) -> Transform:
+        position = body.position + body.linear_velocity * time
+        angular_speed = body.angular_velocity.length()
+        if time <= 0.0 or angular_speed <= 1.0e-12:
+            rotation = body.orientation
+        else:
+            axis = body.angular_velocity / angular_speed
+            delta = Quat.from_axis_angle(axis, angular_speed * time)
+            rotation = (delta * body.orientation).normalized()
+        return Transform(position, rotation)
+
+    @staticmethod
+    def _canonical_plane_event(
+        convex: RigidBody,
+        plane: RigidBody,
+        *,
+        time: float,
+        dt: float,
+        plane_normal: Vec3,
+    ) -> TOIEvent:
+        if plane.body_id < convex.body_id:
+            body_a = plane.body_id
+            body_b = convex.body_id
+            normal = plane_normal
+        else:
+            body_a = convex.body_id
+            body_b = plane.body_id
+            normal = -plane_normal
+        return TOIEvent(
+            body_a=body_a,
+            body_b=body_b,
+            fraction=min(1.0, max(0.0, time / dt)),
+            time=time,
+            normal=normal,
+        )
+
+    def _convex_plane_toi(
+        self,
+        convex: RigidBody,
+        plane: RigidBody,
+        dt: float,
+        *,
+        distance_tolerance: float = 1.0e-6,
+        time_tolerance: float = 1.0e-9,
+        max_iterations: int = 64,
+    ) -> TOIEvent | None:
+        if not self._eligible_continuous_body(convex, dt):
+            return None
+        if not isinstance(plane.shape, PlaneShape):
+            return None
+        if plane.body_type is not BodyType.STATIC:
+            return None
+        if isinstance(convex.shape, PlaneShape):
+            return None
+
+        sweep_radius = self._finite_sweep_radius(convex)
+        if sweep_radius is None:
+            return None
+
+        plane_normal, plane_offset = plane.shape.world_equation(plane.transform)
+        angular_bound = convex.angular_velocity.length() * sweep_radius
+        closing_linear = max(
+            0.0,
+            -convex.linear_velocity.dot(plane_normal),
+        )
+        closing_bound = closing_linear + angular_bound
+        time = 0.0
+        previous_separated_time = 0.0
+
+        def signed_distance(at_time: float) -> tuple[float, Vec3]:
+            transform = self._predicted_transform(convex, at_time)
+            deepest = convex.shape.support(-plane_normal, transform)
+            return plane_normal.dot(deepest) - plane_offset, deepest
+
+        def refine(low: float, high: float) -> float:
+            for _ in range(48):
+                if high - low <= time_tolerance:
+                    break
+                middle = (low + high) * 0.5
+                distance, _ = signed_distance(middle)
+                if distance <= distance_tolerance:
+                    high = middle
+                else:
+                    low = middle
+            return high
+
+        for _ in range(max_iterations):
+            distance, deepest = signed_distance(time)
+            if distance <= distance_tolerance:
+                if time <= EPSILON:
+                    point_velocity = convex.velocity_at_world_point(deepest)
+                    if point_velocity.dot(plane_normal) >= -EPSILON:
+                        return None
+                elif previous_separated_time < time:
+                    time = refine(previous_separated_time, time)
+                return self._canonical_plane_event(
+                    convex,
+                    plane,
+                    time=time,
+                    dt=dt,
+                    plane_normal=plane_normal,
+                )
+
+            if closing_bound <= EPSILON:
+                return None
+
+            advance = (distance - distance_tolerance) / closing_bound
+            previous_separated_time = time
+            time += max(advance, time_tolerance)
+            if time > dt + time_tolerance:
+                return None
+            time = min(time, dt)
+
+        raise PhysicsValidationError(
+            "convex-plane TOI iteration bound exceeded"
+        )
 
     @staticmethod
     def _sphere_sphere_toi(
@@ -424,6 +544,29 @@ class ContinuousCollisionDetector:
                     normal=hit.normal,
                 )
                 events[pair] = event
+
+        for convex in ordered:
+            if (
+                isinstance(convex.shape, (PlaneShape, SphereShape))
+                or not self._eligible_continuous_body(convex, dt)
+            ):
+                continue
+            for plane in ordered:
+                if (
+                    plane.body_id == convex.body_id
+                    or not isinstance(plane.shape, PlaneShape)
+                    or plane.body_type is not BodyType.STATIC
+                ):
+                    continue
+                pair = tuple(sorted((convex.body_id, plane.body_id)))
+                if pair in events:
+                    continue
+                checks += 1
+                if checks > self.max_checks:
+                    raise PhysicsValidationError("CCD check bound exceeded")
+                event = self._convex_plane_toi(convex, plane, dt)
+                if event is not None:
+                    events[(event.body_a, event.body_b)] = event
 
         if not events:
             return None
