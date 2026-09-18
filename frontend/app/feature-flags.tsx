@@ -71,7 +71,7 @@ export default function FeatureFlagsAdminScreen() {
     try {
       const r = await api.post(`/api/feature-flags/${encodeURIComponent(name)}`, body, { headers: adminHeaders() });
       if (!r.ok) {
-        toast.error(`Update failed: ${r.error || r.status}`);
+        toast.error('Could not update flag');
       } else {
         toast.success(`Updated ${name}`);
       }
@@ -88,7 +88,7 @@ export default function FeatureFlagsAdminScreen() {
         setBusy(f.name);
         try {
           const r = await api.del(`/api/feature-flags/${encodeURIComponent(f.name)}`, { headers: adminHeaders() });
-          if (!r.ok) toast.error(`Delete failed: ${r.error || r.status}`);
+          if (!r.ok) toast.error('Could not delete flag');
           else toast.success(`Deleted ${f.name}`);
         } finally { setBusy(null); await refresh(); }
       }},
@@ -199,7 +199,7 @@ export default function FeatureFlagsAdminScreen() {
         </View>
       ) : null}
 
-      {error ? <Text style={styles.err}>error: {error}</Text> : null}
+      {error ? <Text style={styles.err}>Could not refresh flags</Text> : null}
 
       <ScrollView
         style={styles.scroll}

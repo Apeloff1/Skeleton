@@ -15,6 +15,7 @@ import {
   ChatMessage 
 } from './CollaborationManager';
 import { toast } from '../../components/Toast';
+import { safeErrorMessage } from '../../utils/safeError';
 
 // ============================================================================
 // PROPS
@@ -106,8 +107,8 @@ export function CollaborationModal({
       
       // Send system message
       collaborationManager.sendMessage(`${userName} created the session`, 'system');
-    } catch (e: any) {
-      toast.error(`Failed to create session: ${e.message}`);
+    } catch (e: unknown) {
+      toast.error(`Could not create session (${safeErrorMessage(e)})`);
     } finally {
       setIsJoining(false);
     }
@@ -140,8 +141,8 @@ export function CollaborationModal({
       
       // Send system message
       collaborationManager.sendMessage(`${userName} joined the session`, 'system');
-    } catch (e: any) {
-      toast.error(`Failed to join session: ${e.message}`);
+    } catch (e: unknown) {
+      toast.error(`Could not join session (${safeErrorMessage(e)})`);
     } finally {
       setIsJoining(false);
     }

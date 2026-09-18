@@ -14,6 +14,7 @@ import theme from '../theme/tokens';
 import { Screen, AppHeader } from '../components/UI';
 import { toast } from '../components/Toast';
 import { actionSheet, promptSheet } from '../components/ActionSheet';
+import { safeErrorMessage } from '../utils/safeError';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -45,8 +46,8 @@ export default function ProfileScreen() {
           try {
             resetUser();
             toast.warn('Profile reset');
-          } catch (e: any) {
-            toast.error(`Reset failed: ${e?.message || 'unknown'}`);
+          } catch (e: unknown) {
+            toast.error(`Could not reset profile (${safeErrorMessage(e)})`);
           }
         }},
       ],
@@ -175,8 +176,8 @@ export default function ProfileScreen() {
                 } else {
                   await Share.share({ message: json, title: 'CodeDock user snapshot' });
                 }
-              } catch (e: any) {
-                toast.error(`Export failed: ${e.message || 'unknown'}`);
+              } catch (e: unknown) {
+                toast.error(`Could not export snapshot (${safeErrorMessage(e)})`);
               }
             }}
             activeOpacity={0.85}

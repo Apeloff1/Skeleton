@@ -27,6 +27,7 @@ import theme from '../theme/tokens';
 import { apiFetch } from '../utils/apiController';
 import { LinearGradient } from 'expo-linear-gradient';
 import { toast } from '../components/Toast';
+import { safeErrorMessage } from '../utils/safeError';
 
 const BACKEND =
   (typeof window !== 'undefined' ? window.location.origin : '') ||
@@ -110,8 +111,8 @@ export default function MyBuildsScreen() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       setBuilds(data.builds || []);
-    } catch (e: any) {
-      setError(String(e?.message || e).slice(0, 200));
+    } catch (e: unknown) {
+      setError(safeErrorMessage(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -172,8 +173,8 @@ export default function MyBuildsScreen() {
       const data = await r.json();
       const url = `${BACKEND}${data.download_url}`;
       try { await Linking.openURL(url); } catch {}
-    } catch (e: any) {
-      toast.error(`ZIP failed: ${String(e?.message || e)}`);
+    } catch (e: unknown) {
+      toast.error(`Could not create ZIP (${safeErrorMessage(e)})`);
     } finally {
       setZipBusy(null);
     }
@@ -351,7 +352,7 @@ export default function MyBuildsScreen() {
       ) : error ? (
         <View style={s.center}>
           <Ionicons name="cloud-offline-outline" size={36} color={theme.palette.danger[400]} />
-          <Text style={[s.muted, { color: theme.palette.danger[400] }]}>Couldn&apos;t load: {error}</Text>
+          <Text style={[s.muted, { color: theme.palette.danger[400] }]}>Could not load builds ({error})</Text>
           <Pressable onPress={onRefresh} style={s.retryBtn}>
             <Text style={s.retryText}>Retry</Text>
           </Pressable>

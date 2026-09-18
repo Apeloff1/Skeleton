@@ -13,6 +13,7 @@ import {
 import { Section, SliderRow, SwitchRow, ActionButton } from '../../features/Settings/components';
 import { actionSheet } from '../../components/ActionSheet';
 import { toast } from '../../components/Toast';
+import { safeErrorMessage } from '../../utils/safeError';
 
 // Smooth height transitions for open/close (Android needs explicit enable).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -97,8 +98,8 @@ export default function GalaxyStudioSettings() {
       const json = await res.json();
       toast.info(`Memory: ${json.summary.mem}\nMongo: ${json.summary.mongo}\nOrphan tasks: ${json.summary.orphan_tasks}`);
       await refreshAdmin();
-    } catch (e: any) {
-      toast.error(String(e?.message || e));
+    } catch (e: unknown) {
+      toast.error(`Could not clear zombies (${safeErrorMessage(e)})`);
     } finally { setAdminLoading(false); }
   }
 
@@ -108,8 +109,8 @@ export default function GalaxyStudioSettings() {
       const res = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || ''}/api/galaxy-studio/admin-status`);
       const json = await res.json();
       setAdminStatus(json);
-    } catch (e: any) {
-      toast.error(String(e?.message || e));
+    } catch (e: unknown) {
+      toast.error(`Could not refresh admin status (${safeErrorMessage(e)})`);
     } finally { setAdminLoading(false); }
   }
 

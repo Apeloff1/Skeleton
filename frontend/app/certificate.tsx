@@ -12,6 +12,7 @@ import { openModalFromRoute } from '../utils/openModalFromRoute';
 import theme from '../theme/tokens';
 import { Screen, AppHeader } from '../components/UI';
 import { toast } from '../components/Toast';
+import { safeErrorMessage } from '../utils/safeError';
 
 export default function CertificateScreen() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function CertificateScreen() {
         message,
         title: 'My Certificate',
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (Platform.OS === 'web') {
         // Web Share API often unavailable in iframes — fall back to clipboard.
         try {
@@ -47,7 +48,7 @@ export default function CertificateScreen() {
           toast.warn('Share unavailable — screenshot to save');
         }
       } else {
-        toast.error(`Share failed: ${e.message || 'unknown'}`);
+        toast.error(`Could not share certificate (${safeErrorMessage(e)})`);
       }
     }
   };
