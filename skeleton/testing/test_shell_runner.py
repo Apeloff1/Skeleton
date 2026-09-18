@@ -232,3 +232,44 @@ def test_rejects_in_place_executable_mutation_after_policy_construction(
         match="registered executable changed after policy construction",
     ):
         runner.run(ShellCommand("tool", cwd=tmp_path))
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True])
+def test_policy_rejects_nonfinite_or_boolean_timeout_bounds(
+    tmp_path: Path,
+    value,
+) -> None:
+    with pytest.raises(ShellPolicyError):
+        _policy(tmp_path, default_timeout=value)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, "2"])
+def test_command_rejects_nonfinite_non_numeric_or_boolean_timeout(
+    tmp_path: Path,
+    value,
+) -> None:
+    runner = ShellRunner(_policy(tmp_path))
+    with pytest.raises(ShellPolicyError, match="finite number"):
+        runner.run(ShellCommand("python", cwd=tmp_path, timeout=value))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_output_bytes", True),
+        ("max_output_bytes", 1.5),
+        ("max_input_bytes", True),
+        ("max_input_bytes", -1),
+        ("max_env_bytes", 2.5),
+        ("max_args", True),
+        ("max_args", 0),
+        ("max_arg_bytes", 0.5),
+    ],
+)
+def test_policy_rejects_malformed_integer_bounds(
+    tmp_path: Path,
+    field: str,
+    value,
+) -> None:
+    with pytest.raises(ShellPolicyError, match="invalid integer bound"):
+        _policy(tmp_path, **{field: value})
