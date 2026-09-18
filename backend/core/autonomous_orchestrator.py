@@ -133,10 +133,18 @@ def _ready(node: dict, by_id: dict) -> bool:
 
 
 def _dependency_index(nodes: list[dict]) -> tuple[dict[str, dict], dict[str, list[str]]]:
-    """Build direct lookup plus reverse dependency edges in linear time."""
-    by_id = {node["id"]: node for node in nodes}
-    dependents: dict[str, list[str]] = {node_id: [] for node_id in by_id}
-    for node in nodes:
+    """Build direct lookup plus reverse dependency edges without rescanning DAGs."""
+    by_id: dict[str, dict] = {}
+    for index in range(len(nodes)):
+        node = nodes[index]
+        by_id[node["id"]] = node
+
+    dependents: dict[str, list[str]] = {
+        node_id: []
+        for node_id in by_id
+    }
+    for index in range(len(nodes)):
+        node = nodes[index]
         for dep_id in node.get("depends_on", []):
             if dep_id in dependents:
                 dependents[dep_id].append(node["id"])
@@ -281,11 +289,11 @@ def replan_from(plan_id: str, node_id: str) -> dict:
             to_reset.add(child_id)
             queue.append(child_id)
 
-    for n in plan["nodes"]:
-        if n["id"] in to_reset:
-            n["status"] = "planned"
-            n["result"] = None
-            n["produced_gid"] = None
+    for reset_id in to_reset:
+        node = by_id[reset_id]
+        node["status"] = "planned"
+        node["result"] = None
+        node["produced_gid"] = None
     plan["version"] += 1
     plan["status"] = "planned"
     _save_plan(plan)
