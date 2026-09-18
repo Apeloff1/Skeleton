@@ -552,6 +552,13 @@ from .research_synthesis import (
     SynthesisReport,
     SynthesisSeverity,
 )
+from .unknown_unknowns import (
+    SurpriseObservation,
+    SurpriseScoutPolicy,
+    SurpriseScoutSnapshot,
+    UnknownUnknownCandidate,
+    UnknownUnknownScout,
+)
 from .world_model import (
     BeliefConflict,
     BeliefEdge,
