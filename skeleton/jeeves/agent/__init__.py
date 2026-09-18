@@ -396,6 +396,13 @@ from .frontier_runtime import (
     FrontierJeevesAgentRuntime,
     HardenedJeevesAgentRuntime,
 )
+from .adaptive_runtime import (
+    AdaptiveConfig,
+    AdaptiveJeevesRuntime,
+    AdaptiveRunReport,
+    FrontierAdaptiveJeevesRuntime,
+    SpecialistSearchRecord,
+)
 from .semantic_extreme_lenses import (
     LensMaturity,
     RareLensDefinition,
