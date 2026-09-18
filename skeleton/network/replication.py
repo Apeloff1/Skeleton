@@ -1410,6 +1410,17 @@ def _ack_from_payload(payload: Mapping[str, Any]) -> Ack:
             "missing_sequences must fall strictly after applied and at or before received",
             context={"last_applied": last_applied, "last_received": last_received},
         )
+    if last_received > last_applied and (
+        not missing or missing[0] != last_applied + 1
+    ):
+        raise SequenceError(
+            "missing_sequences must begin with the next unapplied sequence",
+            context={
+                "last_applied": last_applied,
+                "last_received": last_received,
+                "first_missing": missing[0] if missing else None,
+            },
+        )
     return Ack(
         peer_id=_bounded_token("peer_id", data["peer_id"], maximum=MAX_PEER_ID_CHARS),
         last_applied_sequence=last_applied,
