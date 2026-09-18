@@ -71,9 +71,13 @@ class AIExecutionEvidenceFinalizer:
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
             raise RuntimeError("AI execution evidence may only finalize a completed attempt")
-        if execution.review.planning.response.proposal is not session.proposal:
-            # Identity is deliberately strict here. A finalizer should receive
-            # the exact proposal object held by the session that executed it.
+        reviewed_proposal = execution.review.planning.response.proposal
+        if session.proposal is None:
+            raise RuntimeError("AI session has no proposal to finalize")
+        if (
+            reviewed_proposal.proposal_id != session.proposal.proposal_id
+            or reviewed_proposal.fingerprint != session.proposal.fingerprint
+        ):
             raise RuntimeError("execution bundle does not belong to session proposal")
         if execution.provenance.intent_fingerprint != session.intent.fingerprint:
             raise RuntimeError("execution provenance intent does not match session")
