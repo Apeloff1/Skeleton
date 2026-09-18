@@ -625,6 +625,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             self._stage_run_summary(repo, adaptive.context_branch, inputs, result, trajectory, credit, council)
         except Exception:
             self.metrics.increment("agent.adaptive.summary_failures")
+        feedback_report = self.frontier_feedback.report()
+        feedback_recommendation = self.frontier_feedback.recommendation()
         report_payload = {
             "run": result.run_id,
             "success": result.success,
@@ -636,6 +638,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             "searches": [record.trace_fingerprint for record in adaptive.searches],
             "context_head": repo.head(adaptive.context_branch),
             "experience_matches": adaptive.experience_matches,
+            "frontier_decisions": list(adaptive.frontier_decision_fingerprints),
+            "frontier_feedback": feedback_report.fingerprint,
+            "frontier_feedback_recommendation": feedback_recommendation.fingerprint,
         }
         report = AdaptiveRunReport(
             run_id=result.run_id,
@@ -668,6 +673,24 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             "context_head": report.context_head,
             "allocation_count": report.allocation_count,
             "specialist_searches": len(report.specialist_searches),
+            "frontier_decisions": len(adaptive.frontier_decision_fingerprints),
+            "frontier_feedback": {
+                "fingerprint": feedback_report.fingerprint,
+                "count": feedback_report.count,
+                "commit_success_rate": feedback_report.commit_success_rate,
+                "direct_success_rate": feedback_report.direct_success_rate,
+                "escalated_success_rate": feedback_report.escalated_success_rate,
+                "observed_escalation_delta": feedback_report.observed_escalation_delta,
+                "brier_score": feedback_report.brier_score,
+                "calibration_gap": feedback_report.calibration_gap,
+            },
+            "frontier_feedback_recommendation": {
+                "fingerprint": feedback_recommendation.fingerprint,
+                "minimum_quality_delta": feedback_recommendation.minimum_quality_delta,
+                "minimum_choice_probability_delta": feedback_recommendation.minimum_choice_probability_delta,
+                "maximum_entropy_delta": feedback_recommendation.maximum_entropy_delta,
+                "reasons": list(feedback_recommendation.reasons),
+            },
         }
         return replace(result, metadata=json_safe(metadata))
 
