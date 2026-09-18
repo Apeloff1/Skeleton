@@ -27,6 +27,8 @@ class TestCortexLive(unittest.TestCase):
         live.get_live()
         status = live.status()
         self.assertTrue(status["live"])
+        self.assertIn("persistence_configured", status)
+        self.assertIn("last_load", status)
 
 
 class TestServerStateWiring(unittest.TestCase):

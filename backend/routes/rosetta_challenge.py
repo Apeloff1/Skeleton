@@ -139,8 +139,8 @@ async def submit_challenge(
             return {"error": f"Language '{target_language}' not executable"}
     except subprocess.TimeoutExpired:
         return {"compiled": False, "output": "", "error": "Timeout (10s)", "score": 0}
-    except Exception as e:
-        return {"compiled": False, "output": "", "error": str(e), "score": 0}
+    except Exception:
+        return {"compiled": False, "output": "", "error": "compile_failed", "score": 0}
 
     compiled = result.returncode == 0
     has_output = bool(result.stdout.strip())

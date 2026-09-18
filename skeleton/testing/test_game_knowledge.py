@@ -134,3 +134,5 @@ def test_gameforge_builds_era_grounding_from_acquired_knowledge() -> None:
         "Hunt Showdown",
         "Lethal Company",
     }
+    assert context["speculative_rag"]["pipeline"] == "game_logic"
+    assert context["speculative_rag"]["queries"]

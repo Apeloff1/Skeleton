@@ -102,9 +102,9 @@ class AgentRuntime:
             try:
                 self.state = AgentState.WORKING
                 await self._execute_work(work)
-            except Exception as e:
+            except Exception:
                 work.status = "error"
-                work.error = str(e)
+                work.error = "work_failed"
                 work.completed_at = datetime.utcnow().isoformat()
                 self.state = AgentState.ERROR
                 self.history.append(work)

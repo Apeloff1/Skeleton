@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -541,4 +542,4 @@ Generate JSON with:
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI bot persona generation failed: {str(e)}")
+        raise internal_http_error("AI bot persona generation failed", e) from None

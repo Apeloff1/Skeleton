@@ -40,8 +40,8 @@ async def flair_stats():
             "per_mood":     await _axis("mood"),
             "per_era":      await _axis("era"),
         }
-    except Exception as e:
-        return {"total_flair": 0, "error": str(e)[:200]}
+    except Exception:
+        return {"total_flair": 0, "error": "flair_unavailable"}
 
 
 @router.get("/flair/random")
@@ -67,8 +67,8 @@ async def flair_random(
         pipeline.append({"$project": {"_id": 0}})
         docs = await _cdb.unique_flair.aggregate(pipeline).to_list(n)
         return {"count": len(docs), "filters": match, "flair": docs}
-    except Exception as e:
-        return {"count": 0, "error": str(e)[:200], "flair": []}
+    except Exception:
+        return {"count": 0, "error": "flair_query_failed", "flair": []}
 
 
 @router.post("/flair/seed")
@@ -84,5 +84,5 @@ async def trigger_flair_seed():
             "target_flair": TOTAL_FLAIR,
             "message": "50,000 unique flair entries seeding in background.",
         }
-    except Exception as e:
-        return {"status": "error", "error": str(e)[:200]}
+    except Exception:
+        return {"status": "error", "error": "flair_seed_failed"}

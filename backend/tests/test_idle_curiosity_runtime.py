@@ -59,7 +59,10 @@ def test_failed_research_is_counted_without_killing_runtime(tmp_path):
     snap = runtime.snapshot()
     assert snap["failed_cycles"] == 1
     assert snap["total_cycles"] == 1
-    assert "RuntimeError" in snap["last_error"]
+    assert snap["last_error"] == "curiosity_cycle_failed"
+    assert result["error"] == "curiosity_cycle_failed"
+    assert "research provider unavailable" not in str(result)
+    assert "research provider unavailable" not in str(snap)
 
 
 def test_background_thread_stops_cleanly(tmp_path):

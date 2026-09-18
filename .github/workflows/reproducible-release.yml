@@ -67,8 +67,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r source-a/requirements-build.txt
 
       - name: Run release provenance regression tests
+        env:
+          PYTHONPATH: source-a
         run: |
-          python -m pip install --disable-pip-version-check "pytest==8.4.2"
+          python -m pip install --disable-pip-version-check \
+            "pytest==8.4.2" \
+            "pydantic==2.13.5" \
+            "pydantic-settings==2.15.0"
           python -m pytest -q source-a/scripts/testing/test_release_provenance.py
 
       - name: Build release A

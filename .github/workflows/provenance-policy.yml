@@ -3,7 +3,7 @@ name: Provenance Policy
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   validate:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Provenance Manifest
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -35,10 +35,12 @@ jobs:
           python -m compileall -q
           scripts/check_provenance_manifest.py
           scripts/check_provenance_source_inventory.py
+          scripts/check_source_path_inventory.py
           scripts/check_provenance_completeness.py
           scripts/run_provenance_evidence.py
           tests/test_provenance_manifest.py
           tests/test_provenance_source_inventory.py
+          tests/test_provenance_source_path_inventory.py
           tests/test_provenance_completeness.py
           tests/test_provenance_evidence_runner.py
           tests/test_frontier_memory_adapters.py
@@ -46,6 +48,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_provenance_*.py' -q
       - name: Validate source repository inventory
         run: python scripts/check_provenance_source_inventory.py
+      - name: Classify tracked source paths
+        run: python scripts/check_source_path_inventory.py
       - name: Validate consolidation inventory and canonical promotions
         run: python scripts/check_provenance_manifest.py
       - name: Validate source-to-component completeness

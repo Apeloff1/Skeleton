@@ -252,8 +252,8 @@ class AppWideZaibatsuSecurity:
         if can_access_fn:
             try:
                 allowed = bool(can_access_fn(reader_unit, owner_unit, surface))
-            except Exception as e:
-                self._emit("isolation_error", "medium", "deny", error=str(e))
+            except Exception:
+                self._emit("isolation_error", "medium", "deny", error="isolation_error")
                 return {"ok": False, "blocked": True, "reason": "isolation_error"}
         if not allowed:
             ev = self._emit(

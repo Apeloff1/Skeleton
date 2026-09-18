@@ -137,8 +137,8 @@ Predict:
             },
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"predictions": [], "error": str(e)}
+    except Exception:
+        return {"predictions": [], "error": "prediction_failed"}
 
 @router.post("/refactor")
 async def auto_refactor(request: RefactorRequest):
@@ -186,8 +186,8 @@ Preserve behavior: {request.preserve_behavior}"""
             "preserve_behavior": request.preserve_behavior,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"refactored_code": request.code, "error": str(e)}
+    except Exception:
+        return {"refactored_code": request.code, "error": "refactor_failed"}
 
 @router.post("/multi-model")
 async def multi_model_orchestration(request: MultiModelRequest):
@@ -252,8 +252,8 @@ async def multi_model_orchestration(request: MultiModelRequest):
             "final_output": final_output,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"result": None, "error": str(e)}
+    except Exception:
+        return {"result": None, "error": "orchestration_failed"}
 
 @router.post("/code-intel")
 async def advanced_code_intelligence(request: CodeIntelRequest):
@@ -295,8 +295,8 @@ Provide detailed analysis for each type."""
             "analysis": response.content if hasattr(response, 'content') else str(response),
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"analysis": {}, "error": str(e)}
+    except Exception:
+        return {"analysis": {}, "error": "code_intel_failed"}
 
 @router.post("/autocomplete")
 async def smart_autocomplete(request: AutoCompleteRequest):
@@ -344,8 +344,8 @@ Provide smart completions."""
             "cursor": {"line": request.cursor_line, "column": request.cursor_column},
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"completions": [], "error": str(e)}
+    except Exception:
+        return {"completions": [], "error": "autocomplete_failed"}
 
 @router.post("/explain-like-expert")
 async def explain_like_expert(code: str, language: str = "python", expertise_level: str = "senior"):
@@ -387,5 +387,5 @@ Provide:
             "expertise_level": expertise_level,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        return {"explanation": "", "error": str(e)}
+    except Exception:
+        return {"explanation": "", "error": "explain_failed"}

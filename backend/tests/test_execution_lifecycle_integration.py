@@ -134,6 +134,8 @@ def test_executor_failure_is_audited_and_intent_remains_retryable(tmp_path):
     assert report["remaining"] == 1
     assert len(report["failed"]) == 1
     assert report["failed"][0]["operation_id"] == admitted.id
+    assert report["failed"][0]["error"] == "dispatch_failed"
+    assert "boom" not in str(report)
 
     lifecycle = plane.operation_lifecycle(admitted.id)
     assert lifecycle["state"] == "pending_bound"

@@ -15,6 +15,7 @@ an additional prefix so the public paths stay identical:
 
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 
 # Sub-router — NO prefix so the parent's "/api/galaxy-studio" prefix applies.
 router = APIRouter(tags=["galaxy-studio"])
@@ -28,7 +29,7 @@ async def get_capabilities_catalog():
         from routes import galaxy_studio_capabilities as _caps
         return _caps.get_capability_catalog()
     except Exception as e:
-        raise HTTPException(500, f"capability catalog unavailable: {e}")
+        raise internal_http_error("capability catalog unavailable", e) from None
 
 
 @router.get("/pipeline/catalog")
@@ -38,7 +39,7 @@ async def get_pipeline_catalog_route():
         from routes import galaxy_studio_gamedev_pipeline as _gdp
         return _gdp.get_pipeline_catalog()
     except Exception as e:
-        raise HTTPException(500, f"pipeline catalog unavailable: {e}")
+        raise internal_http_error("pipeline catalog unavailable", e) from None
 
 
 @router.get("/datasets/catalog")
@@ -48,7 +49,7 @@ async def get_datasets_catalog_route():
         from routes import galaxy_studio_datasets as _ds
         return _ds.get_dataset_catalog()
     except Exception as e:
-        raise HTTPException(500, f"dataset catalog unavailable: {e}")
+        raise internal_http_error("dataset catalog unavailable", e) from None
 
 
 __all__ = [

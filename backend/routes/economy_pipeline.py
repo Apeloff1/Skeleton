@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -453,7 +454,7 @@ async def ai_design_economy(request: AIEconomyDesignRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI economy design failed: {str(e)}")
+        raise internal_http_error("AI economy design failed", e) from None
 
 
 @router.post("/ai/monetization/strategy")
@@ -486,4 +487,4 @@ async def ai_design_monetization(request: AIMonetizationRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI monetization design failed: {str(e)}")
+        raise internal_http_error("AI monetization design failed", e) from None

@@ -50,6 +50,7 @@ class NpcSpec:
     quality: dict[str, Any] = field(default_factory=dict)
     quality_stats: dict[str, Any] = field(default_factory=dict)
     repair: dict[str, Any] = field(default_factory=dict)
+    speculative_rag: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +68,7 @@ class NpcSpec:
             "quality": dict(self.quality),
             "quality_stats": dict(self.quality_stats),
             "repair": dict(self.repair),
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
@@ -121,10 +123,11 @@ def _build_behaviour(archetype: str) -> list[BehaviourState]:
 
 
 class NpcPipeline:
-    def __init__(self, bus: EventBus | None = None, generator: GeneratorFn | None = None, *, root=None) -> None:
+    def __init__(self, bus: EventBus | None = None, generator: GeneratorFn | None = None, *, root=None, genesis=None) -> None:
         self._bus = bus or EventBus()
         self._generator = generator or _default_generator
         self._root = root
+        self._genesis = genesis
 
     def run(self, description: str, *, name: str | None = None,
             dialogue_beats: int = 3, params: dict[str, Any] | None = None,
@@ -132,12 +135,19 @@ class NpcPipeline:
         from skeleton.intelligence.npc_verifier import NpcVerifier
         from skeleton.intelligence.pipeline_repair import attempt_npc_repair
         from skeleton.organism.quality_state import append_quality
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
 
         if not description or not description.strip():
             raise ValidationError("NPC description must be non-empty")
         if not 1 <= dialogue_beats <= 12:
             raise ValidationError("dialogue_beats must be in [1, 12]",
                                   context={"dialogue_beats": dialogue_beats})
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "npc",
+            {"description": description},
+            limit=3,
+        )
         run_id = str(PipelineRunId.new())
         start = self._bus.emit("pipeline.npc.started",
                                {"run_id": run_id, "description": description[:120]})
@@ -198,5 +208,6 @@ class NpcPipeline:
         ))
         self._bus.emit("pipeline.npc.completed",
                        {"run_id": run_id, "name": spec.name, "archetype": spec.archetype},
-                       correlation_id=start.correlation_id, causation_id=start.event_id)
+                       correlation_id=start.correlation_id)
+        spec.speculative_rag = prefetch
         return spec

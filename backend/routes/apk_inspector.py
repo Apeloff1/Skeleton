@@ -121,8 +121,8 @@ async def install_toolchain_status():
             size = fh.tell()
             fh.seek(max(0, size - 4096))
             tail = fh.read().decode("utf-8", errors="replace")
-    except Exception as e:
-        tail = f"(log read error: {type(e).__name__})"
+    except Exception:
+        tail = "(log_read_failed)"
     return {
         "running":   not binary_builder._have_full_apk_toolchain() and "=== DONE ===" not in tail,
         "complete":  binary_builder._have_full_apk_toolchain(),
@@ -302,8 +302,8 @@ def _inspect_apk(apk_path: Path) -> dict:
 
             # META-INF signing presence
             out["has_v1_signature"] = any(n.startswith("META-INF/") and (n.endswith(".SF") or n.endswith(".RSA")) for n in names)
-    except Exception as e:
-        out["zip_error"] = f"{type(e).__name__}: {e}"
+    except Exception:
+        out["zip_error"] = "apk_inspect_failed"
 
     return out
 
@@ -338,8 +338,8 @@ def _apksigner_verify(apk_path: Path) -> dict:
             "stdout": r.stdout[-800:],
             "stderr": r.stderr[-400:],
         }
-    except Exception as e:
-        return {"available": True, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"available": True, "error": "apk_verify_failed"}
     finally:
         if temp_path:
             try:

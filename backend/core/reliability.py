@@ -238,7 +238,7 @@ def dlq_push(task_label: str, error: Exception | str, payload: Any = None):
         _DLQ.append({
             "ts": datetime.utcnow().isoformat(),
             "task": task_label,
-            "error": str(error)[:500],
+            "error": "task_failed",
             "error_type": type(error).__name__ if isinstance(error, BaseException) else "str",
             "payload_keys": list(payload.keys())[:20] if isinstance(payload, dict) else None,
         })

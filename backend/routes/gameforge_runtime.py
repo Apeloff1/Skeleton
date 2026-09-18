@@ -42,8 +42,8 @@ async def _omega_emit(agent_id: str, content: str, topic: str = "general"):
         if agent_id == "jeeves":
             return await omega_fabric.jeeves_emit(content, topic)
         return await omega_fabric.agent_emit(agent_id, content, topic)
-    except Exception as e:  # noqa: BLE001
-        return {"accepted": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        return {"accepted": False, "error": "omega_emit_failed"}
 
 
 

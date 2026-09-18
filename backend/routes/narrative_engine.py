@@ -12,6 +12,7 @@ Capabilities:
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
@@ -281,7 +282,7 @@ async def generate_story(request: StoryGenerationRequest):
         return story
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Narrative request failed", e) from None
 
 @router.post("/generate-character")
 async def generate_character(request: CharacterRequest):

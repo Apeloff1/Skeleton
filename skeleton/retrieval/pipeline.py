@@ -17,6 +17,7 @@ composition inside ``search()``.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Tuple
 
@@ -24,6 +25,28 @@ from skeleton.retrieval.fusion import ScoredResult
 from skeleton.retrieval.highlight import Highlighter
 from skeleton.retrieval.query import PrefetchedQuery, QueryPlan, QueryPlanner
 from skeleton.retrieval.query_language import QueryParser, QueryTerm
+
+
+def _planner_execute_kwargs(
+    execute: Callable[..., Any],
+    *,
+    top_k: Optional[int],
+    plan: QueryPlan,
+    prefetched: Optional[PrefetchedQuery],
+) -> dict[str, Any]:
+    """Forward prefetch kwargs only when the planner accepts them."""
+
+    params = inspect.signature(execute).parameters
+    if any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in params.values()):
+        return {"top_k": top_k, "plan": plan, "prefetched": prefetched}
+    kwargs: dict[str, Any] = {}
+    if "top_k" in params:
+        kwargs["top_k"] = top_k
+    if "plan" in params:
+        kwargs["plan"] = plan
+    if "prefetched" in params:
+        kwargs["prefetched"] = prefetched
+    return kwargs
 
 
 @dataclass(frozen=True)
@@ -112,9 +135,12 @@ class SearchPipeline:
         results = tuple(
             self._planner.execute(
                 query,
-                top_k=top_k,
-                plan=plan,
-                prefetched=prefetched,
+                **_planner_execute_kwargs(
+                    self._planner.execute,
+                    top_k=top_k,
+                    plan=plan,
+                    prefetched=prefetched,
+                ),
             )
         )
         results = self._apply_stages(query, results, top_k=top_k)

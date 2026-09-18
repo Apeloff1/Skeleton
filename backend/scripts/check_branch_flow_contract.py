@@ -21,6 +21,8 @@ def violations_for_text(text: str) -> list[str]:
 
     if re.search(r"(?m)^\s{2}pull_request(?:_target)?\s*:", text):
         findings.append("write-capable branch-flow must never run on pull-request events")
+    if re.search(r"(?m)^\s{2}push\s*:", text):
+        findings.append("branch-flow must not run on every main push")
     if not re.search(r"(?m)^permissions:\s*\{\}\s*(?:#.*)?$", text):
         findings.append("branch-flow must fail closed at workflow scope with permissions: {}")
     if not re.search(r"(?m)^\s{2}cancel-in-progress:\s*false\s*$", text):
@@ -76,6 +78,15 @@ def violations_for_text(text: str) -> list[str]:
         findings.append("terminal branch-flow API/permission failures must fail the run")
     if "max_updates = 4" not in text:
         findings.append("branch-flow must retain a bounded per-pass mutation cap")
+
+    for marker in (
+        "MAX_QUEUED_ACTIONS_RUNS: '40'",
+        "/actions/runs?status=queued&per_page=1",
+        "if: steps.pressure.outputs.proceed == 'true'",
+        "Branch refresh mutations: skipped",
+    ):
+        if marker not in text:
+            findings.append(f"branch-flow queue-pressure contract missing {marker}")
 
     return findings
 
