@@ -325,3 +325,103 @@ def test_semantic_plane_without_findings_abstains_instead_of_inventing_signal() 
     assert "no_signals" in snapshot.fusion.abstention_reasons
     assert snapshot.factual_assertion_authorized is False
     assert snapshot.causal_assertion_authorized is False
+
+
+def test_semantic_plane_resolution_feeds_scientific_calibration_ledger() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=32,
+            max_per_family=5,
+            minimum_rare_when_supported=2,
+        )
+    )
+    finding = _finding(
+        "learning-concept-drift",
+        "concept_drift",
+        LensFamily.PREDICTIVE,
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        findings=(finding,),
+        requested=("concept_drift",),
+    )
+    forecast = next(
+        item
+        for item in snapshot.forecasts
+        if item.source_finding_ids == ("learning-concept-drift",)
+    )
+
+    update = plane.resolve_forecast(
+        forecast.forecast_id,
+        outcome=True,
+        domain="runtime-regression",
+        independent_run="run-001",
+    )
+
+    assert update.calibrated_keys == ("concept_drift",)
+    assert len(update.trial_ids) == 1
+    assert len(update.reports) == 1
+    report = update.reports[0]
+    assert report.lens_key == "concept_drift"
+    assert report.trial_count == 1
+    assert report.independent_runs == 1
+    assert len(update.fingerprint) == 64
+
+    # The same ScientificLensLab is used by governance on the next plane pass,
+    # closing the outcome -> calibration -> routing loop.
+    next_selection = plane.select(
+        _observations(),
+        requested=("concept_drift",),
+    )
+    governed = plane.governance.assess(
+        next_selection,
+        observations=_observations(),
+    )
+    decision = governed.decision_for("concept_drift")
+    assert decision is not None
+    assert decision.scientific_status == report.status
+    assert 0.0 <= decision.predictive_weight <= 1.0
+
+
+def test_interaction_forecast_calibrates_composite_not_constituent_lenses_twice() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=36,
+            max_per_family=6,
+            minimum_rare_when_supported=2,
+        )
+    )
+    findings = (
+        _finding("interaction-causal", "backdoor_confounding", LensFamily.CAUSAL),
+        _finding("interaction-shift", "covariate_shift", LensFamily.PREDICTIVE),
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        findings=findings,
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+    interaction_forecast = next(
+        item
+        for item in snapshot.forecasts
+        if item.source_interaction_ids
+        and set(item.source_lens_keys)
+        == {"backdoor_confounding", "covariate_shift"}
+    )
+
+    update = plane.resolve_forecast(
+        interaction_forecast.forecast_id,
+        outcome=False,
+        domain="integration",
+        independent_run="interaction-run-001",
+    )
+
+    assert update.calibrated_keys == (
+        "interaction:backdoor_confounding+covariate_shift",
+    )
+    assert plane.governance.registry.lab.trials("backdoor_confounding") == ()
+    assert plane.governance.registry.lab.trials("covariate_shift") == ()
+    assert len(
+        plane.governance.registry.lab.trials(
+            "interaction:backdoor_confounding+covariate_shift"
+        )
+    ) == 1
