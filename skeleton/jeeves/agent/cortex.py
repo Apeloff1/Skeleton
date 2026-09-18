@@ -65,6 +65,7 @@ from .world_model import (
     Hypothesis,
     Proposition,
     WorldModel,
+    WorldModelError,
 )
 
 
@@ -102,6 +103,13 @@ class CortexConfig:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise AgentContractError(f"{name} must be positive integer")
+        for name in (
+            "learn_from_failed_runs",
+            "learn_read_only_actions",
+            "preserve_run_worlds",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise AgentContractError(f"{name} must be boolean")
         stale = float(self.stale_evidence_seconds)
         if stale <= 0:
             raise AgentContractError("stale_evidence_seconds must be positive")
@@ -211,6 +219,9 @@ class JeevesCortex:
         )
         self._runs: dict[str, RunCognitiveState] = {}
         self._checkpoint_cache: dict[str, deque[RunCheckpoint]] = {}
+        self._checkpoint_assessments: dict[
+            str, dict[str, CortexCheckpointAssessment]
+        ] = {}
         self._result_reports: dict[str, CortexRunReport] = {}
         self._lock = threading.RLock()
 
@@ -235,6 +246,15 @@ class JeevesCortex:
         with self._lock:
             prior = self._runs.get(resolved)
             if prior is not None:
+                if prior.scope != scope:
+                    raise CortexError("existing cortex run scope does not match inputs")
+                if prior.metadata.get("goal_id") != inputs.goal.goal_id:
+                    raise CortexError("existing cortex run goal does not match inputs")
+                if evidence_ledger is not None:
+                    try:
+                        prior.world.bind_evidence_ledger(evidence_ledger)
+                    except WorldModelError as exc:
+                        raise CortexError(str(exc)) from exc
                 return prior
             world = self.world_model.graph(scope, evidence_ledger=evidence_ledger)
             state = RunCognitiveState(
@@ -281,6 +301,12 @@ class JeevesCortex:
         state = self.state(checkpoint.run_id) or self.begin(inputs, run_id=checkpoint.run_id)
         if checkpoint.goal_id != inputs.goal.goal_id:
             raise CortexError("checkpoint goal does not match cortex run goal")
+        with self._lock:
+            cached = self._checkpoint_assessments.get(
+                checkpoint.run_id, {}
+            ).get(checkpoint.fingerprint)
+        if cached is not None:
+            return cached
         self._cache_checkpoint(checkpoint)
         self._ingest_checkpoint_evidence(state, checkpoint)
         self._ingest_plan_structure(state, checkpoint.plan)
@@ -358,8 +384,11 @@ class JeevesCortex:
         )
         with self._lock:
             self._runs[state.run_id] = updated_state
-        probes = updated_state.world.ranked_probes(limit=self.config.max_probe_count, minimum_entropy_bits=0.05)
-        return CortexCheckpointAssessment(
+        probes = updated_state.world.ranked_probes(
+            limit=self.config.max_probe_count,
+            minimum_entropy_bits=0.05,
+        )
+        assessment = CortexCheckpointAssessment(
             run_id=state.run_id,
             checkpoint_sequence=checkpoint.sequence,
             decision=decision,
@@ -370,6 +399,11 @@ class JeevesCortex:
             recommended_skill_id=recommended_skill_id,
             notes=tuple(notes),
         )
+        with self._lock:
+            self._checkpoint_assessments.setdefault(
+                state.run_id, {}
+            )[checkpoint.fingerprint] = assessment
+        return assessment
 
     def observe_result(
         self,
@@ -378,6 +412,7 @@ class JeevesCortex:
         *,
         verification_scores: Mapping[str, float] | None = None,
         action_costs: Mapping[str, float] | None = None,
+        action_risks: Mapping[str, RiskTier | str] | None = None,
     ) -> CortexRunReport:
         if not isinstance(result, AgentResult):
             raise TypeError("result must be AgentResult")
@@ -388,10 +423,19 @@ class JeevesCortex:
             result,
             verification_scores=verification_scores or {},
             action_costs=action_costs or {},
+            action_risks=action_risks or {},
         )
         self._link_action_outcome_beliefs(state, result)
-        top_hypotheses = state.world.hypotheses(refresh=True)[:5]
-        unresolved = state.world.ranked_probes(limit=self.config.max_probe_count, minimum_entropy_bits=0.10)
+        visible_hypotheses = tuple(
+            hypothesis
+            for hypothesis in state.world.hypotheses(refresh=True)
+            if hypothesis.posterior >= self.config.minimum_hypothesis_probability
+        )
+        top_hypotheses = visible_hypotheses[:5]
+        unresolved = state.world.ranked_probes(
+            limit=self.config.max_probe_count,
+            minimum_entropy_bits=0.10,
+        )
         anomalies = self._result_anomalies(state, result)
         decisions = self.meta.history(run_id=result.run_id)
         world_fingerprint = state.world.snapshot(persist=False).fingerprint
@@ -411,7 +455,7 @@ class JeevesCortex:
             result_reason=result.reason.value,
             world_fingerprint=world_fingerprint,
             belief_count=len(state.world.beliefs()),
-            hypothesis_count=len(state.world.hypotheses(refresh=False)),
+            hypothesis_count=len(visible_hypotheses),
             world_entropy_bits=state.world.world_entropy_bits(),
             decisions=decisions,
             top_hypotheses=top_hypotheses,
@@ -426,6 +470,9 @@ class JeevesCortex:
             if not self.config.preserve_run_worlds:
                 self._runs.pop(result.run_id, None)
                 self._checkpoint_cache.pop(result.run_id, None)
+                self._checkpoint_assessments.pop(result.run_id, None)
+        if not self.config.preserve_run_worlds:
+            self.world_model.discard(state.scope)
         return report
 
     def report(self, run_id: str) -> CortexRunReport | None:
@@ -645,6 +692,7 @@ class JeevesCortex:
         *,
         verification_scores: Mapping[str, float],
         action_costs: Mapping[str, float],
+        action_risks: Mapping[str, RiskTier | str],
     ) -> set[str]:
         learned: set[str] = set()
         if not result.success and not self.config.learn_from_failed_runs:
@@ -656,8 +704,18 @@ class JeevesCortex:
             feature_buckets={"goal": result.goal_id[:32]},
         )
         for observation in result.observations:
-            score = probability("verification_score", verification_scores.get(observation.call_id, 1.0 if observation.ok and result.success else 0.5))
+            score = probability(
+                "verification_score",
+                verification_scores.get(
+                    observation.call_id,
+                    1.0 if observation.ok and result.success else 0.5,
+                ),
+            )
             verified = score >= 0.6 and observation.ok
+            raw_risk = action_risks.get(observation.call_id, RiskTier.READ_ONLY)
+            risk = raw_risk if isinstance(raw_risk, RiskTier) else RiskTier(str(raw_risk))
+            if risk is RiskTier.READ_ONLY and not self.config.learn_read_only_actions:
+                continue
             profile = self.skills.record_tool_observation(
                 run_id=result.run_id,
                 tool_name=observation.tool_name,
@@ -667,6 +725,7 @@ class JeevesCortex:
                 verification_score=score,
                 cost=max(0.0, float(action_costs.get(observation.call_id, 0.0))),
                 failure_mode=observation.error,
+                risk=risk,
             )
             learned.add(profile.spec.skill_id)
         return learned
