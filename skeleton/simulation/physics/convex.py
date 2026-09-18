@@ -15,13 +15,20 @@ from dataclasses import dataclass
 
 from .body import RigidBody
 from .errors import ConvexQueryError, PhysicsValidationError
-from .math3d import EPSILON, Vec3
-from .shapes import PlaneShape
+from .math3d import EPSILON, Mat3, Quat, Transform, Vec3
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    CylinderShape,
+    PlaneShape,
+    SphereShape,
+)
 
 MAX_GJK_ITERATIONS = 128
 MAX_EPA_ITERATIONS = 128
 MAX_EPA_VERTICES = 256
 MAX_EPA_FACES = 512
+MAX_CONVEX_TOI_ITERATIONS = 128
 _GJK_DIRECTION_EPSILON_SQ = 1.0e-24
 _DUPLICATE_SUPPORT_EPSILON_SQ = 1.0e-20
 
@@ -101,6 +108,94 @@ class EPAPenetration:
 
 
 @dataclass(frozen=True, slots=True)
+class ConvexDistanceResult:
+    intersects: bool
+    distance: float
+    normal: Vec3
+    point_a: Vec3
+    point_b: Vec3
+    iterations: int
+    simplex_size: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.intersects, bool):
+            raise PhysicsValidationError("convex distance intersects must be boolean")
+        if (
+            isinstance(self.distance, bool)
+            or not isinstance(self.distance, (int, float))
+            or not math.isfinite(float(self.distance))
+            or float(self.distance) < 0.0
+        ):
+            raise PhysicsValidationError(
+                "convex distance must be finite and non-negative"
+            )
+        object.__setattr__(self, "distance", float(self.distance))
+        object.__setattr__(self, "normal", self.normal.normalized())
+        if not isinstance(self.point_a, Vec3) or not isinstance(self.point_b, Vec3):
+            raise PhysicsValidationError("convex distance witnesses must be Vec3")
+        if (
+            isinstance(self.iterations, bool)
+            or not isinstance(self.iterations, int)
+            or self.iterations < 0
+        ):
+            raise PhysicsValidationError(
+                "convex distance iterations must be non-negative integer"
+            )
+        if (
+            isinstance(self.simplex_size, bool)
+            or not isinstance(self.simplex_size, int)
+            or not 1 <= self.simplex_size <= 4
+        ):
+            raise PhysicsValidationError(
+                "convex distance simplex_size outside [1, 4]"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ConvexTOIResult:
+    body_a: str
+    body_b: str
+    fraction: float
+    time: float
+    normal: Vec3
+    point_a: Vec3
+    point_b: Vec3
+    iterations: int
+    initial_overlap: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.body_a or not self.body_b or self.body_a == self.body_b:
+            raise PhysicsValidationError("convex TOI requires distinct body ids")
+        if not math.isfinite(self.fraction) or not 0.0 <= self.fraction <= 1.0:
+            raise PhysicsValidationError("convex TOI fraction must be in [0, 1]")
+        if not math.isfinite(self.time) or self.time < 0.0:
+            raise PhysicsValidationError("convex TOI time must be non-negative")
+        object.__setattr__(self, "normal", self.normal.normalized())
+        if not isinstance(self.point_a, Vec3) or not isinstance(self.point_b, Vec3):
+            raise PhysicsValidationError("convex TOI witnesses must be Vec3")
+        if (
+            isinstance(self.iterations, bool)
+            or not isinstance(self.iterations, int)
+            or self.iterations < 0
+        ):
+            raise PhysicsValidationError(
+                "convex TOI iterations must be non-negative integer"
+            )
+        if not isinstance(self.initial_overlap, bool):
+            raise PhysicsValidationError(
+                "convex TOI initial_overlap must be boolean"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class _ClosestSimplex:
+    vertices: tuple[SupportVertex, ...]
+    weights: tuple[float, ...]
+    point: Vec3
+    contains_origin: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class _EPAFace:
     a: int
     b: int
@@ -148,6 +243,598 @@ def support_vertex(
         point_a=point_a,
         point_b=point_b,
     )
+
+
+def _support_vertex_transforms(
+    a: RigidBody,
+    b: RigidBody,
+    direction: Vec3,
+    transform_a: Transform,
+    transform_b: Transform,
+) -> SupportVertex:
+    _validate_pair(a, b)
+    if not isinstance(transform_a, Transform) or not isinstance(transform_b, Transform):
+        raise PhysicsValidationError("convex support transforms must be Transform")
+    direction = _safe_direction(direction)
+    point_a = a.shape.support(direction, transform_a)
+    point_b = b.shape.support(-direction, transform_b)
+    return SupportVertex(
+        point=point_a - point_b,
+        point_a=point_a,
+        point_b=point_b,
+    )
+
+
+def _weighted_point(
+    vertices: tuple[SupportVertex, ...],
+    weights: tuple[float, ...],
+    *,
+    witness: str,
+) -> Vec3:
+    result = Vec3.zero()
+    for vertex, weight in zip(vertices, weights):
+        source = vertex.point_a if witness == "a" else vertex.point_b
+        result = result + source * weight
+    return result
+
+
+def _reduce_closest(
+    vertices: tuple[SupportVertex, ...],
+    weights: tuple[float, ...],
+    point: Vec3,
+    *,
+    contains_origin: bool = False,
+) -> _ClosestSimplex:
+    pairs = [
+        (vertex, max(0.0, weight))
+        for vertex, weight in zip(vertices, weights)
+        if weight > 1.0e-12
+    ]
+    if not pairs:
+        index = min(
+            range(len(vertices)),
+            key=lambda item: (
+                vertices[item].point.length_squared(),
+                item,
+            ),
+        )
+        return _ClosestSimplex(
+            (vertices[index],),
+            (1.0,),
+            vertices[index].point,
+            contains_origin=False,
+        )
+    total = sum(weight for _, weight in pairs)
+    reduced_vertices = tuple(vertex for vertex, _ in pairs)
+    reduced_weights = tuple(weight / total for _, weight in pairs)
+    reduced_point = Vec3.zero()
+    for vertex, weight in zip(reduced_vertices, reduced_weights):
+        reduced_point = reduced_point + vertex.point * weight
+    return _ClosestSimplex(
+        reduced_vertices,
+        reduced_weights,
+        Vec3.zero() if contains_origin else reduced_point,
+        contains_origin=contains_origin,
+    )
+
+
+def _closest_segment_origin(
+    first: SupportVertex,
+    second: SupportVertex,
+) -> _ClosestSimplex:
+    a = first.point
+    b = second.point
+    direction = b - a
+    denominator = direction.length_squared()
+    if denominator <= _GJK_DIRECTION_EPSILON_SQ:
+        chosen = min(
+            (first, second),
+            key=lambda row: row.point.length_squared(),
+        )
+        return _ClosestSimplex((chosen,), (1.0,), chosen.point)
+    t = min(1.0, max(0.0, -a.dot(direction) / denominator))
+    point = a + direction * t
+    return _reduce_closest(
+        (first, second),
+        (1.0 - t, t),
+        point,
+    )
+
+
+def _closest_triangle_origin(
+    first: SupportVertex,
+    second: SupportVertex,
+    third: SupportVertex,
+) -> _ClosestSimplex:
+    a = first.point
+    b = second.point
+    c = third.point
+    ab = b - a
+    ac = c - a
+    ap = -a
+    d1 = ab.dot(ap)
+    d2 = ac.dot(ap)
+    if d1 <= 0.0 and d2 <= 0.0:
+        return _ClosestSimplex((first,), (1.0,), a)
+
+    bp = -b
+    d3 = ab.dot(bp)
+    d4 = ac.dot(bp)
+    if d3 >= 0.0 and d4 <= d3:
+        return _ClosestSimplex((second,), (1.0,), b)
+
+    vc = d1 * d4 - d3 * d2
+    if vc <= 0.0 and d1 >= 0.0 and d3 <= 0.0:
+        denominator = d1 - d3
+        if abs(denominator) <= _GJK_DIRECTION_EPSILON_SQ:
+            return _closest_segment_origin(first, second)
+        v = d1 / denominator
+        return _reduce_closest(
+            (first, second),
+            (1.0 - v, v),
+            a + ab * v,
+        )
+
+    cp = -c
+    d5 = ab.dot(cp)
+    d6 = ac.dot(cp)
+    if d6 >= 0.0 and d5 <= d6:
+        return _ClosestSimplex((third,), (1.0,), c)
+
+    vb = d5 * d2 - d1 * d6
+    if vb <= 0.0 and d2 >= 0.0 and d6 <= 0.0:
+        denominator = d2 - d6
+        if abs(denominator) <= _GJK_DIRECTION_EPSILON_SQ:
+            return _closest_segment_origin(first, third)
+        w = d2 / denominator
+        return _reduce_closest(
+            (first, third),
+            (1.0 - w, w),
+            a + ac * w,
+        )
+
+    va = d3 * d6 - d5 * d4
+    edge_bc_a = d4 - d3
+    edge_bc_b = d5 - d6
+    if va <= 0.0 and edge_bc_a >= 0.0 and edge_bc_b >= 0.0:
+        denominator = edge_bc_a + edge_bc_b
+        if abs(denominator) <= _GJK_DIRECTION_EPSILON_SQ:
+            return _closest_segment_origin(second, third)
+        w = edge_bc_a / denominator
+        return _reduce_closest(
+            (second, third),
+            (1.0 - w, w),
+            b + (c - b) * w,
+        )
+
+    denominator = va + vb + vc
+    if abs(denominator) <= _GJK_DIRECTION_EPSILON_SQ:
+        candidates = (
+            _closest_segment_origin(first, second),
+            _closest_segment_origin(first, third),
+            _closest_segment_origin(second, third),
+        )
+        return min(
+            candidates,
+            key=lambda row: row.point.length_squared(),
+        )
+    inverse = 1.0 / denominator
+    v = vb * inverse
+    w = vc * inverse
+    u = 1.0 - v - w
+    return _reduce_closest(
+        (first, second, third),
+        (u, v, w),
+        a * u + b * v + c * w,
+    )
+
+
+def _closest_tetrahedron_origin(
+    vertices: tuple[SupportVertex, SupportVertex, SupportVertex, SupportVertex],
+) -> _ClosestSimplex:
+    a, b, c, d = (row.point for row in vertices)
+    matrix = Mat3.from_columns(b - a, c - a, d - a)
+
+    if matrix.is_invertible():
+        coordinates = matrix.inverse().mul_vec(-a)
+        weights = (
+            1.0 - coordinates.x - coordinates.y - coordinates.z,
+            coordinates.x,
+            coordinates.y,
+            coordinates.z,
+        )
+        if min(weights) >= -1.0e-10 and max(weights) <= 1.0 + 1.0e-10:
+            clamped = tuple(max(0.0, value) for value in weights)
+            total = sum(clamped)
+            normalized = tuple(value / total for value in clamped)
+            return _reduce_closest(
+                vertices,
+                normalized,
+                Vec3.zero(),
+                contains_origin=True,
+            )
+
+    face_indices = (
+        (0, 1, 2),
+        (0, 1, 3),
+        (0, 2, 3),
+        (1, 2, 3),
+    )
+    candidates = tuple(
+        _closest_triangle_origin(
+            vertices[i],
+            vertices[j],
+            vertices[k],
+        )
+        for i, j, k in face_indices
+    )
+    return min(
+        enumerate(candidates),
+        key=lambda row: (
+            row[1].point.length_squared(),
+            row[0],
+        ),
+    )[1]
+
+
+def _closest_simplex_origin(
+    simplex: tuple[SupportVertex, ...],
+) -> _ClosestSimplex:
+    if len(simplex) == 1:
+        return _ClosestSimplex(simplex, (1.0,), simplex[0].point)
+    if len(simplex) == 2:
+        return _closest_segment_origin(simplex[0], simplex[1])
+    if len(simplex) == 3:
+        return _closest_triangle_origin(simplex[0], simplex[1], simplex[2])
+    if len(simplex) == 4:
+        return _closest_tetrahedron_origin(
+            (simplex[0], simplex[1], simplex[2], simplex[3])
+        )
+    raise ConvexQueryError("convex distance simplex outside tetrahedron bound")
+
+
+def _distance_result_from_closest(
+    closest: _ClosestSimplex,
+    *,
+    iterations: int,
+    transform_a: Transform,
+    transform_b: Transform,
+    tolerance: float,
+) -> ConvexDistanceResult:
+    point_a = _weighted_point(
+        closest.vertices,
+        closest.weights,
+        witness="a",
+    )
+    point_b = _weighted_point(
+        closest.vertices,
+        closest.weights,
+        witness="b",
+    )
+    witness_delta = point_b - point_a
+    witness_distance = witness_delta.length()
+    intersects = closest.contains_origin or witness_distance <= tolerance
+    if witness_distance > tolerance:
+        normal = witness_delta / witness_distance
+        distance = witness_distance
+    else:
+        center_delta = transform_b.position - transform_a.position
+        normal = center_delta.normalized_or_zero()
+        if normal.length_squared() <= _GJK_DIRECTION_EPSILON_SQ:
+            normal = Vec3.axis(0)
+        distance = 0.0
+    return ConvexDistanceResult(
+        intersects=intersects,
+        distance=distance,
+        normal=normal,
+        point_a=point_a,
+        point_b=point_b,
+        iterations=iterations,
+        simplex_size=len(closest.vertices),
+    )
+
+
+def _convex_distance_transforms(
+    a: RigidBody,
+    b: RigidBody,
+    transform_a: Transform,
+    transform_b: Transform,
+    *,
+    max_iterations: int,
+    tolerance: float,
+) -> ConvexDistanceResult:
+    direction = transform_b.position - transform_a.position
+    if direction.length_squared() <= _GJK_DIRECTION_EPSILON_SQ:
+        direction = Vec3.axis(0)
+
+    first = _support_vertex_transforms(
+        a,
+        b,
+        direction,
+        transform_a,
+        transform_b,
+    )
+    closest = _closest_simplex_origin((first,))
+
+    for iteration in range(1, max_iterations + 1):
+        distance_sq = closest.point.length_squared()
+        if closest.contains_origin or distance_sq <= tolerance * tolerance:
+            return _distance_result_from_closest(
+                closest,
+                iterations=iteration - 1,
+                transform_a=transform_a,
+                transform_b=transform_b,
+                tolerance=tolerance,
+            )
+
+        direction = -closest.point
+        candidate = _support_vertex_transforms(
+            a,
+            b,
+            direction,
+            transform_a,
+            transform_b,
+        )
+        distance = math.sqrt(distance_sq)
+        improvement = candidate.point.dot(direction) + distance_sq
+        if improvement <= tolerance * max(1.0, distance):
+            return _distance_result_from_closest(
+                closest,
+                iterations=iteration,
+                transform_a=transform_a,
+                transform_b=transform_b,
+                tolerance=tolerance,
+            )
+
+        if any(
+            (candidate.point - vertex.point).length_squared()
+            <= _DUPLICATE_SUPPORT_EPSILON_SQ
+            for vertex in closest.vertices
+        ):
+            return _distance_result_from_closest(
+                closest,
+                iterations=iteration,
+                transform_a=transform_a,
+                transform_b=transform_b,
+                tolerance=tolerance,
+            )
+
+        trial = closest.vertices + (candidate,)
+        if len(trial) > 4:
+            raise ConvexQueryError(
+                "convex distance simplex exceeded tetrahedron bound"
+            )
+        closest = _closest_simplex_origin(trial)
+
+    raise ConvexQueryError("convex distance iteration bound exceeded")
+
+
+def convex_distance(
+    a: RigidBody,
+    b: RigidBody,
+    *,
+    max_iterations: int = 64,
+    tolerance: float = 1.0e-9,
+) -> ConvexDistanceResult:
+    _validate_pair(a, b)
+    if (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or not 1 <= max_iterations <= MAX_GJK_ITERATIONS
+    ):
+        raise PhysicsValidationError(
+            "convex distance max_iterations outside supported range"
+        )
+    if (
+        isinstance(tolerance, bool)
+        or not isinstance(tolerance, (int, float))
+        or not math.isfinite(float(tolerance))
+        or float(tolerance) <= 0.0
+    ):
+        raise PhysicsValidationError(
+            "convex distance tolerance must be positive"
+        )
+    return _convex_distance_transforms(
+        a,
+        b,
+        a.transform,
+        b.transform,
+        max_iterations=max_iterations,
+        tolerance=float(tolerance),
+    )
+
+
+def _predicted_transform(body: RigidBody, time: float) -> Transform:
+    position = body.position + body.linear_velocity * time
+    angular_speed = body.angular_velocity.length()
+    if angular_speed <= 1.0e-12 or time <= 0.0:
+        rotation = body.orientation
+    else:
+        axis = body.angular_velocity / angular_speed
+        delta = Quat.from_axis_angle(axis, angular_speed * time)
+        rotation = (delta * body.orientation).normalized()
+    return Transform(position=position, rotation=rotation)
+
+
+def _shape_sweep_radius(body: RigidBody) -> float:
+    shape = body.shape
+    if isinstance(shape, SphereShape):
+        return shape.radius
+    if isinstance(shape, BoxShape):
+        return shape.half_extents.length()
+    if isinstance(shape, CapsuleShape):
+        return shape.half_height + shape.radius
+    if isinstance(shape, CylinderShape):
+        return math.hypot(shape.radius, shape.half_height)
+    raise PhysicsValidationError(
+        "convex TOI requires finite supported shape"
+    )
+
+
+def _distance_at_time(
+    a: RigidBody,
+    b: RigidBody,
+    time: float,
+    *,
+    max_iterations: int,
+    tolerance: float,
+) -> ConvexDistanceResult:
+    return _convex_distance_transforms(
+        a,
+        b,
+        _predicted_transform(a, time),
+        _predicted_transform(b, time),
+        max_iterations=max_iterations,
+        tolerance=tolerance,
+    )
+
+
+def _refine_convex_toi(
+    a: RigidBody,
+    b: RigidBody,
+    low: float,
+    high: float,
+    *,
+    distance_tolerance: float,
+    time_tolerance: float,
+    distance_iterations: int,
+) -> tuple[float, ConvexDistanceResult]:
+    result = _distance_at_time(
+        a,
+        b,
+        high,
+        max_iterations=distance_iterations,
+        tolerance=distance_tolerance * 0.1,
+    )
+    for _ in range(48):
+        if high - low <= time_tolerance:
+            break
+        middle = (low + high) * 0.5
+        candidate = _distance_at_time(
+            a,
+            b,
+            middle,
+            max_iterations=distance_iterations,
+            tolerance=distance_tolerance * 0.1,
+        )
+        if candidate.intersects or candidate.distance <= distance_tolerance:
+            high = middle
+            result = candidate
+        else:
+            low = middle
+    return high, result
+
+
+def convex_time_of_impact(
+    a: RigidBody,
+    b: RigidBody,
+    dt: float,
+    *,
+    max_iterations: int = 32,
+    distance_iterations: int = 64,
+    distance_tolerance: float = 1.0e-6,
+    time_tolerance: float = 1.0e-9,
+) -> ConvexTOIResult | None:
+    _validate_pair(a, b)
+    if isinstance(dt, bool) or not isinstance(dt, (int, float)):
+        raise PhysicsValidationError("convex TOI dt must be numeric")
+    dt = float(dt)
+    if not math.isfinite(dt) or dt <= 0.0:
+        raise PhysicsValidationError("convex TOI dt must be positive")
+    if (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or not 1 <= max_iterations <= MAX_CONVEX_TOI_ITERATIONS
+    ):
+        raise PhysicsValidationError(
+            "convex TOI max_iterations outside supported range"
+        )
+    if (
+        isinstance(distance_iterations, bool)
+        or not isinstance(distance_iterations, int)
+        or not 1 <= distance_iterations <= MAX_GJK_ITERATIONS
+    ):
+        raise PhysicsValidationError(
+            "convex TOI distance_iterations outside supported range"
+        )
+    for name, value in (
+        ("distance_tolerance", distance_tolerance),
+        ("time_tolerance", time_tolerance),
+    ):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) <= 0.0
+        ):
+            raise PhysicsValidationError(f"{name} must be positive")
+    distance_tolerance = float(distance_tolerance)
+    time_tolerance = float(time_tolerance)
+
+    radius_a = _shape_sweep_radius(a)
+    radius_b = _shape_sweep_radius(b)
+    relative_velocity = b.linear_velocity - a.linear_velocity
+    angular_bound = (
+        a.angular_velocity.length() * radius_a
+        + b.angular_velocity.length() * radius_b
+    )
+
+    time = 0.0
+    previous_separated_time = 0.0
+
+    for iteration in range(1, max_iterations + 1):
+        result = _distance_at_time(
+            a,
+            b,
+            time,
+            max_iterations=distance_iterations,
+            tolerance=distance_tolerance * 0.1,
+        )
+
+        if result.intersects or result.distance <= distance_tolerance:
+            if time > 0.0:
+                time, result = _refine_convex_toi(
+                    a,
+                    b,
+                    previous_separated_time,
+                    time,
+                    distance_tolerance=distance_tolerance,
+                    time_tolerance=time_tolerance,
+                    distance_iterations=distance_iterations,
+                )
+            return ConvexTOIResult(
+                body_a=a.body_id,
+                body_b=b.body_id,
+                fraction=min(1.0, max(0.0, time / dt)),
+                time=time,
+                normal=result.normal,
+                point_a=result.point_a,
+                point_b=result.point_b,
+                iterations=iteration,
+                initial_overlap=time <= time_tolerance,
+            )
+
+        closing_linear = max(
+            0.0,
+            -relative_velocity.dot(result.normal),
+        )
+        closing_bound = closing_linear + angular_bound
+        if closing_bound <= EPSILON:
+            return None
+
+        advance = (
+            result.distance - distance_tolerance
+        ) / closing_bound
+        if advance <= 0.0:
+            advance = time_tolerance
+
+        previous_separated_time = time
+        next_time = time + max(advance, time_tolerance)
+        if next_time > dt + time_tolerance:
+            return None
+        time = min(dt, next_time)
+
+    raise ConvexQueryError("convex TOI iteration bound exceeded")
 
 
 def _triple_product(a: Vec3, b: Vec3, c: Vec3) -> Vec3:
