@@ -595,10 +595,7 @@ class _ReplicationCore:
             return result
         if packet.kind == "delta":
             _validate_delta_payload_shape(packet.payload)
-            result = self._ingest_delta(packet, predictions)
-            if result.outcome is not DeliveryOutcome.REJECTED_GAP:
-                self._last_received = max(self._last_received, packet.sequence)
-            return result
+            return self._ingest_delta(packet, predictions)
         raise SerializationError("unknown packet kind", context={"kind": packet.kind})
 
     def append_produced(
@@ -743,6 +740,7 @@ class _ReplicationCore:
                 "delta exceeds the bounded reorder window",
             )
         self._buffer[packet.sequence] = packet
+        self._last_received = max(self._last_received, packet.sequence)
         return self._result(
             DeliveryOutcome.BUFFERED,
             packet.sequence,
