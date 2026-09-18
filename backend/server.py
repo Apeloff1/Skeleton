@@ -1925,8 +1925,8 @@ class CodeAnalyzer:
                 
         except SyntaxError as e:
             analysis.issues.append({"type": "syntax_error", "line": e.lineno, "message": str(e.msg)})
-        except Exception as e:
-            analysis.issues.append({"type": "analysis_error", "message": str(e)})
+        except Exception:
+            analysis.issues.append({"type": "analysis_error", "message": "analysis_failed"})
         return analysis
 
 class ExecutionContext:

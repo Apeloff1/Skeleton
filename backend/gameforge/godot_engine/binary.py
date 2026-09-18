@@ -211,5 +211,5 @@ def binary_status() -> dict:
     try:
         b = get_binary()
         return {**b.info(), "available": True}
-    except FileNotFoundError as e:
-        return {"available": False, "error": str(e)}
+    except FileNotFoundError:
+        return {"available": False, "error": "godot_binary_unavailable"}

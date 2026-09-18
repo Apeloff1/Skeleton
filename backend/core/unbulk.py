@@ -194,8 +194,8 @@ def module_inventory(top: int = 25) -> dict:
 def _safe(fn):
     try:
         return fn()
-    except Exception as e:  # never let one source break the whole report
-        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+    except Exception:  # never let one source break the whole report
+        return {"error": "source_unavailable"}
 
 
 def savings() -> dict:

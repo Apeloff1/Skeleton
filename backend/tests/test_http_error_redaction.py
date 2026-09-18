@@ -115,6 +115,21 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "core" / "narrative_vault.py",
     REPO_ROOT / "backend" / "core" / "provenance_ledger.py",
     REPO_ROOT / "backend" / "core" / "autonomous_orchestrator.py",
+    REPO_ROOT / "backend" / "core" / "runtime_health.py",
+    REPO_ROOT / "backend" / "core" / "control_plane.py",
+    REPO_ROOT / "backend" / "core" / "feature_flags_audit.py",
+    REPO_ROOT / "backend" / "core" / "feature_flags_metrics.py",
+    REPO_ROOT / "backend" / "core" / "unbulk.py",
+    REPO_ROOT / "backend" / "core" / "mongo_guard.py",
+    REPO_ROOT / "backend" / "core" / "churn_2_service.py",
+    REPO_ROOT / "backend" / "core" / "scheduler.py",
+    REPO_ROOT / "backend" / "gameforge" / "rooms" / "room_api_gateway.py",
+    REPO_ROOT / "backend" / "gameforge" / "knowledge" / "free_apis.py",
+    REPO_ROOT / "backend" / "gameforge" / "omega" / "integration.py",
+    REPO_ROOT / "backend" / "gameforge" / "jeeves" / "jeeves_self_training.py",
+    REPO_ROOT / "backend" / "gameforge" / "api" / "control.py",
+    REPO_ROOT / "backend" / "gameforge" / "api" / "scim.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "binary.py",
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 SERVER = REPO_ROOT / "backend" / "server.py"
@@ -224,6 +239,8 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "type(e).__name__}: {e}" not in source
     assert 'f"stripe error:' not in source
     assert "all models failed:" not in source
+    assert "persist_failed: {e}" not in source
+    assert "probe_crashed:" not in source
 
 
 
@@ -295,3 +312,4 @@ def test_server_health_envelopes_do_not_stringify_exceptions() -> None:
     assert '"error": str(e)[:200]' not in source
     assert "index_audit_failed" in source
     assert "probe_failed" in source
+    assert "analysis_failed" in source
