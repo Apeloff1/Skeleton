@@ -190,6 +190,30 @@ def test_non_string_artifact_and_evidence_ids_fail_closed() -> None:
         build_evidence(**valid_kwargs(test_evidence=[bad_test]))
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "reason"),
+    [
+        ("schema_version", 2, "incompatible release evidence schema"),
+        ("source_date_epoch", -1, "source_date_epoch must be a non-negative integer"),
+        ("source_date_epoch", True, "source_date_epoch must be a non-negative integer"),
+    ],
+)
+def test_typed_release_evidence_root_metadata_fails_closed(
+    field: str,
+    value: object,
+    reason: str,
+) -> None:
+    evidence = valid_evidence()
+    object.__setattr__(evidence, field, value)
+    result = evaluate_release_ready(
+        evidence,
+        expected_commit=COMMIT,
+        observed_artifacts=valid_observed(),
+    )
+    assert result.release_ready is False
+    assert any(reason in item for item in result.reasons)
+
+
 def test_schema_version_is_stable_and_canonical() -> None:
     evidence = valid_evidence()
     payload = json.loads(serialize_evidence(evidence))
