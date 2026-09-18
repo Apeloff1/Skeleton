@@ -20,6 +20,7 @@ from skeleton.game.mechanics import (
     AIBehaviorSpec,
     CombatSystemSpec,
     EconomySystemSpec,
+    GameMechanicsError,
     GameMechanicsGenerator,
     ProgressionSystemSpec,
 )
@@ -34,6 +35,8 @@ MAX_SEED: Final = 2_147_483_647
 MAX_TICK: Final = 1_000_000
 MAX_TOKEN_CHARS: Final = 64
 MAX_PAYLOAD_KEYS: Final = 8
+MAX_CANONICAL_DEPTH: Final = 16
+MAX_CANONICAL_ITEMS: Final = 256
 MAX_DAMAGE: Final = 10_000
 MAX_XP: Final = 1_000_000
 MAX_DELTA: Final = 1_000_000
@@ -201,8 +204,32 @@ class MechanicsReplay:
             inputs=dict(recorded.inputs),
             steps=recorded.steps,
         )
-        comparison = self.compare(recorded, fresh)
-        comparison.reject_if_divergent()
+        digest_checks = (
+            ("spec_digest", recorded.spec_digest, fresh.spec_digest),
+            ("state_digest", recorded.state_digest, fresh.state_digest),
+            ("result_digest", recorded.result_digest, fresh.result_digest),
+        )
+        for field, expected, actual in digest_checks:
+            if expected != actual:
+                raise GameReplayError(
+                    "divergent mechanics execution",
+                    context={
+                        "reason": "divergence",
+                        "field": field,
+                        "expected": expected,
+                        "actual": actual,
+                    },
+                )
+        if recorded.step_digests != fresh.step_digests:
+            raise GameReplayError(
+                "divergent mechanics execution",
+                context={
+                    "reason": "divergence",
+                    "field": "step_digests",
+                    "expected": list(recorded.step_digests),
+                    "actual": list(fresh.step_digests),
+                },
+            )
         return fresh
 
     def compare(
@@ -223,6 +250,12 @@ class MechanicsReplay:
             ),
             ("seed", str(left.seed), str(right.seed), "seed divergence"),
             ("tick", str(left.tick), str(right.tick), "time divergence"),
+            (
+                "inputs",
+                canonical_dumps(left.inputs),
+                canonical_dumps(right.inputs),
+                "input divergence",
+            ),
             ("spec_digest", left.spec_digest, right.spec_digest, "spec digest divergence"),
             ("state_digest", left.state_digest, right.state_digest, "state digest divergence"),
             (
@@ -283,11 +316,24 @@ def parse_trace(value: ReplayTrace | Mapping[str, Any] | str | bytes) -> ReplayT
     if isinstance(value, ReplayTrace):
         payload = value.to_canonical()
     elif isinstance(value, (bytes, bytearray)):
-        payload = _loads_object(bytes(value).decode("utf-8"))
+        try:
+            decoded = bytes(value).decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise GameReplayError(
+                "malformed replay trace",
+                context={"reason": "malformed_trace", "error": "utf8"},
+            ) from exc
+        payload = _loads_object(decoded)
     elif isinstance(value, str):
         payload = _loads_object(value)
     elif isinstance(value, Mapping):
         payload = dict(value)
+        encoded = canonical_dumps(payload).encode("utf-8")
+        if len(encoded) > MAX_TRACE_BYTES:
+            raise GameReplayError(
+                "replay trace exceeds size bound",
+                context={"reason": "malformed_trace", "max_bytes": MAX_TRACE_BYTES},
+            )
     else:
         raise GameReplayError(
             "malformed replay trace",
@@ -297,13 +343,20 @@ def parse_trace(value: ReplayTrace | Mapping[str, Any] | str | bytes) -> ReplayT
 
 
 def _loads_object(raw: str) -> dict[str, Any]:
-    if len(raw.encode("utf-8")) > MAX_TRACE_BYTES:
+    try:
+        encoded = raw.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise GameReplayError(
+            "malformed replay trace",
+            context={"reason": "malformed_trace", "error": "utf8"},
+        ) from exc
+    if len(encoded) > MAX_TRACE_BYTES:
         raise GameReplayError(
             "replay trace exceeds size bound",
             context={"reason": "malformed_trace", "max_bytes": MAX_TRACE_BYTES},
         )
     try:
-        loaded = json.loads(raw)
+        loaded = json.loads(raw, object_pairs_hook=_json_object_no_duplicates)
     except json.JSONDecodeError as exc:
         raise GameReplayError(
             "malformed replay trace",
@@ -830,7 +883,7 @@ def _ensure_combatant(state: dict[str, Any], name: str) -> None:
 
 
 def _parse_steps(steps: Any) -> tuple[ReplayStep, ...]:
-    if not isinstance(steps, Sequence) or isinstance(steps, (str, bytes)):
+    if not isinstance(steps, (list, tuple)):
         raise GameReplayError(
             "replay steps must be a list",
             context={"reason": "malformed_trace", "field": "steps"},
@@ -984,6 +1037,12 @@ def _combat_spec(value: CombatSystemSpec | Mapping[str, Any] | None) -> CombatSy
             "combat input is malformed",
             context={"reason": "malformed_trace", "field": "combat"},
         )
+    _expect_spec_keys(
+        value,
+        field="combat",
+        required=("style",),
+        optional=("include_magic", "include_status_effects", "party_based", "enemy_ai_complexity"),
+    )
     try:
         return CombatSystemSpec(
             style=value["style"],
@@ -994,7 +1053,7 @@ def _combat_spec(value: CombatSystemSpec | Mapping[str, Any] | None) -> CombatSy
             party_based=_require_bool("party_based", value.get("party_based", False)),
             enemy_ai_complexity=value.get("enemy_ai_complexity", "moderate"),
         )
-    except KeyError as exc:
+    except (GameMechanicsError, KeyError, TypeError, ValueError) as exc:
         raise GameReplayError(
             "combat input is malformed",
             context={"reason": "malformed_trace", "field": "combat"},
@@ -1013,6 +1072,12 @@ def _progression_spec(
             "progression input is malformed",
             context={"reason": "malformed_trace", "field": "progression"},
         )
+    _expect_spec_keys(
+        value,
+        field="progression",
+        required=("style",),
+        optional=("max_level", "include_prestige", "skill_tree_branches"),
+    )
     try:
         return ProgressionSystemSpec(
             style=value["style"],
@@ -1022,7 +1087,7 @@ def _progression_spec(
             ),
             skill_tree_branches=value.get("skill_tree_branches", 3),
         )
-    except KeyError as exc:
+    except (GameMechanicsError, KeyError, TypeError, ValueError) as exc:
         raise GameReplayError(
             "progression input is malformed",
             context={"reason": "malformed_trace", "field": "progression"},
@@ -1039,9 +1104,19 @@ def _economy_spec(value: EconomySystemSpec | Mapping[str, Any] | None) -> Econom
             "economy input is malformed",
             context={"reason": "malformed_trace", "field": "economy"},
         )
+    _expect_spec_keys(
+        value,
+        field="economy",
+        required=(),
+        optional=("currencies", "include_trading", "include_crafting", "inflation_model"),
+    )
     currencies = value.get("currencies", ("gold",))
-    if isinstance(currencies, list):
-        currencies = tuple(currencies)
+    if not isinstance(currencies, (list, tuple)):
+        raise GameReplayError(
+            "economy input is malformed",
+            context={"reason": "malformed_trace", "field": "currencies"},
+        )
+    currencies = tuple(currencies)
     try:
         return EconomySystemSpec(
             currencies=currencies,
@@ -1051,7 +1126,7 @@ def _economy_spec(value: EconomySystemSpec | Mapping[str, Any] | None) -> Econom
             ),
             inflation_model=_require_bool("inflation_model", value.get("inflation_model", False)),
         )
-    except KeyError as exc:
+    except (GameMechanicsError, KeyError, TypeError, ValueError) as exc:
         raise GameReplayError(
             "economy input is malformed",
             context={"reason": "malformed_trace", "field": "economy"},
@@ -1068,9 +1143,19 @@ def _ai_spec(value: AIBehaviorSpec | Mapping[str, Any] | None) -> AIBehaviorSpec
             "AI behavior input is malformed",
             context={"reason": "malformed_trace", "field": "ai_behavior"},
         )
+    _expect_spec_keys(
+        value,
+        field="ai_behavior",
+        required=("entity_type",),
+        optional=("behaviors", "aggression_level", "intelligence_level"),
+    )
     behaviors = value.get("behaviors", ())
-    if isinstance(behaviors, list):
-        behaviors = tuple(behaviors)
+    if not isinstance(behaviors, (list, tuple)):
+        raise GameReplayError(
+            "AI behavior input is malformed",
+            context={"reason": "malformed_trace", "field": "behaviors"},
+        )
+    behaviors = tuple(behaviors)
     try:
         return AIBehaviorSpec(
             entity_type=value["entity_type"],
@@ -1078,7 +1163,7 @@ def _ai_spec(value: AIBehaviorSpec | Mapping[str, Any] | None) -> AIBehaviorSpec
             aggression_level=value.get("aggression_level", 0.5),
             intelligence_level=value.get("intelligence_level", 0.5),
         )
-    except KeyError as exc:
+    except (GameMechanicsError, KeyError, TypeError, ValueError) as exc:
         raise GameReplayError(
             "AI behavior input is malformed",
             context={"reason": "malformed_trace", "field": "ai_behavior"},
@@ -1107,8 +1192,20 @@ def _canonical_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     return canonical
 
 
-def _canonical_json_value(value: Any) -> Any:
-    if value is None or isinstance(value, str):
+def _canonical_json_value(value: Any, *, depth: int = 0) -> Any:
+    if depth > MAX_CANONICAL_DEPTH:
+        raise GameReplayError(
+            "replay payload is not canonical JSON",
+            context={"reason": "non_canonical_json", "error": "nesting"},
+        )
+    if value is None:
+        return value
+    if isinstance(value, str):
+        if len(value) > MAX_TRACE_BYTES:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "string_bound"},
+            )
         return value
     if isinstance(value, bool):
         return value
@@ -1122,27 +1219,60 @@ def _canonical_json_value(value: Any) -> Any:
             )
         return value
     if isinstance(value, Mapping):
-        return {str(key): _canonical_json_value(item) for key, item in value.items()}
+        if len(value) > MAX_CANONICAL_ITEMS:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "object_bound"},
+            )
+        canonical: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise GameReplayError(
+                    "replay payload is not canonical JSON",
+                    context={"reason": "non_canonical_json", "error": "non_string_key"},
+                )
+            if key in canonical:
+                raise GameReplayError(
+                    "replay payload is not canonical JSON",
+                    context={"reason": "non_canonical_json", "error": "duplicate_key"},
+                )
+            canonical[key] = _canonical_json_value(item, depth=depth + 1)
+        return canonical
     if isinstance(value, (list, tuple)):
-        return [_canonical_json_value(item) for item in value]
+        if len(value) > MAX_CANONICAL_ITEMS:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "list_bound"},
+            )
+        return [_canonical_json_value(item, depth=depth + 1) for item in value]
     raise GameReplayError(
         "replay payload is not canonical JSON",
         context={"reason": "non_canonical_json", "type": type(value).__name__},
     )
 
 
-def _redact_generated(value: Any) -> Any:
+def _redact_generated(value: Any, *, depth: int = 0) -> Any:
+    if depth > MAX_CANONICAL_DEPTH:
+        raise GameReplayError(
+            "generated mechanics are not canonical JSON",
+            context={"reason": "non_canonical_json", "error": "nesting"},
+        )
     if isinstance(value, Mapping):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             if key == "id" and isinstance(item, str) and _UUID_RE.fullmatch(item):
                 continue
-            redacted[str(key)] = _redact_generated(item)
+            if not isinstance(key, str):
+                raise GameReplayError(
+                    "generated mechanics are not canonical JSON",
+                    context={"reason": "non_canonical_json", "error": "non_string_key"},
+                )
+            redacted[key] = _redact_generated(item, depth=depth + 1)
         return redacted
     if isinstance(value, list):
-        return [_redact_generated(item) for item in value]
+        return [_redact_generated(item, depth=depth + 1) for item in value]
     if isinstance(value, tuple):
-        return [_redact_generated(item) for item in value]
+        return [_redact_generated(item, depth=depth + 1) for item in value]
     if isinstance(value, float) and not math.isfinite(value):
         raise GameReplayError(
             "generated mechanics are not canonical JSON",
@@ -1192,6 +1322,40 @@ def _ratio_to_mille(value: Any) -> int:
             context={"reason": "malformed_spec"},
         )
     return round(number * 1000)
+
+
+def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise GameReplayError(
+                "malformed replay trace",
+                context={"reason": "malformed_trace", "error": "duplicate_key", "key": key},
+            )
+        result[key] = value
+    return result
+
+
+def _expect_spec_keys(
+    value: Mapping[str, Any],
+    *,
+    field: str,
+    required: tuple[str, ...],
+    optional: tuple[str, ...],
+) -> None:
+    allowed = set(required) | set(optional)
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise GameReplayError(
+            f"{field} input is malformed",
+            context={"reason": "malformed_trace", "field": field, "unknown_keys": unknown},
+        )
+    missing = [key for key in required if key not in value]
+    if missing:
+        raise GameReplayError(
+            f"{field} input is malformed",
+            context={"reason": "malformed_trace", "field": field, "missing_keys": missing},
+        )
 
 
 def _expect_payload_keys(
@@ -1249,6 +1413,11 @@ def _require_token(name: str, value: Any) -> str:
             f"{name} must be a non-empty string",
             context={"reason": "malformed_trace", "field": name},
         )
+    if any(ord(char) < 32 for char in value):
+        raise GameReplayError(
+            f"{name} contains control characters",
+            context={"reason": "malformed_trace", "field": name},
+        )
     if len(value) > MAX_TOKEN_CHARS:
         raise GameReplayError(
             f"{name} is too long",
@@ -1271,5 +1440,10 @@ def _parse_digest_list(value: Any) -> tuple[str, ...]:
         raise GameReplayError(
             "step_digests must be a list",
             context={"reason": "malformed_trace", "field": "step_digests"},
+        )
+    if len(value) > MAX_STEPS:
+        raise GameReplayError(
+            "step_digests exceeds replay step bound",
+            context={"reason": "malformed_trace", "maximum": MAX_STEPS},
         )
     return tuple(_require_digest("step_digest", item) for item in value)
