@@ -114,6 +114,7 @@ class IndexCard:
     source_fingerprint: str
     created_at: float
     updated_at: float
+    source_provider: str = ""
     salience: float = 0.5
     trust: float = 0.5
     confidence: float = 0.5
@@ -141,6 +142,11 @@ class IndexCard:
         if not isinstance(self.source_tier, SourceTier):
             object.__setattr__(self, "source_tier", SourceTier(str(self.source_tier)))
         object.__setattr__(self, "source_ref", bounded_text("source_ref", self.source_ref, maximum=2048))
+        object.__setattr__(
+            self,
+            "source_provider",
+            bounded_text("source_provider", self.source_provider, maximum=512, allow_empty=True),
+        )
         source_fingerprint = str(self.source_fingerprint).strip().lower()
         if not source_fingerprint:
             raise AgentContractError("source_fingerprint cannot be empty")
@@ -192,6 +198,7 @@ class IndexCard:
                 "preview": self.preview,
                 "source_tier": self.source_tier.value,
                 "source_ref": self.source_ref,
+                "source_provider": self.source_provider,
                 "source_fingerprint": self.source_fingerprint,
                 "tags": self.tags,
                 "lens_ids": self.lens_ids,
@@ -383,6 +390,7 @@ class MemoryGameIndex:
         source_ref: str,
         source_fingerprint: str,
         cue: str,
+        source_provider: str = "",
         preview: str,
         kind: CardKind = CardKind.SOURCE_CUE,
         salience: float = 0.5,
@@ -401,6 +409,7 @@ class MemoryGameIndex:
             "namespace": namespace_key,
             "source_tier": source_tier.value if isinstance(source_tier, SourceTier) else str(source_tier),
             "source_ref": source_ref,
+            "source_provider": source_provider,
             "source_fingerprint": source_fingerprint,
             "cue": cue,
             "kind": kind.value if isinstance(kind, CardKind) else str(kind),
@@ -415,6 +424,7 @@ class MemoryGameIndex:
             source_ref=source_ref,
             source_fingerprint=source_fingerprint,
             created_at=now,
+            source_provider=source_provider,
             updated_at=now,
             salience=salience,
             trust=trust,
