@@ -17,6 +17,10 @@ from skeleton.jeeves.agent.research_agenda import (
     AgendaStatus,
     ResearchAgenda,
 )
+from skeleton.jeeves.agent.research_assurance import (
+    ResearchEvidenceSummary,
+    ResearchResolution,
+)
 from skeleton.jeeves.agent.types import RiskTier
 
 
@@ -43,6 +47,24 @@ def _hypothesis(
         ),
     )
 
+
+
+def _certifiable_summary() -> ResearchEvidenceSummary:
+    return ResearchEvidenceSummary(
+        obligation_id="deploy-safety",
+        decision_impact=0.95,
+        evidence_coverage=0.95,
+        freshness=0.95,
+        contradiction_strength=0.05,
+        independent_source_count=3,
+        leading_hypothesis_id="h-a",
+        leading_posterior=0.96,
+        effective_hypotheses=1.10,
+        unresolved_assumptions=(),
+        predictive_brier_scores=(0.08, 0.10, 0.09),
+        predictive_surprise_bits=(0.20, 0.30, 0.25),
+        evidence_refs=("ev-1", "ev-2", "ev-probe"),
+    )
 
 def test_tournament_prefers_safe_discriminating_probe_over_expensive_low_value_probe() -> None:
     tournament = HypothesisTournament(
@@ -271,6 +293,14 @@ def test_control_plane_feeds_tournament_learning_back_into_research_agenda() -> 
     assert update.surprise_bits >= 0.0
     assert attempt is not None
     assert attempt.information_gain_bits == update.information_gain_bits
+    assert control.research_agenda.item(agenda_item.agenda_id).status is AgendaStatus.QUEUED
+
+    certificate = control.certify_research_completion(
+        _certifiable_summary(),
+        resolution_note="Coverage, predictive record, and independent evidence passed.",
+    )
+    assert certificate.resolution is ResearchResolution.RESOLVED
+    assert certificate.accepted is True
     assert control.research_agenda.item(agenda_item.agenda_id).status is AgendaStatus.RESOLVED
 
 
@@ -295,6 +325,9 @@ def test_surprising_precommitted_forecast_reopens_resolved_research() -> None:
         information_gain_bits=0.5,
         successful=True,
     )
+    assert control.research_agenda.item(item.agenda_id).status is AgendaStatus.QUEUED
+    certificate = control.certify_research_completion(_certifiable_summary())
+    assert certificate.accepted is True
     assert control.research_agenda.item(item.agenda_id).status is AgendaStatus.RESOLVED
 
     control.precommit_research_forecast(
@@ -309,3 +342,50 @@ def test_surprising_precommitted_forecast_reopens_resolved_research() -> None:
 
     assert settlement.surprise_bits > 6.0
     assert control.research_agenda.item(item.agenda_id).status is AgendaStatus.QUEUED
+
+
+
+def test_completion_gate_refuses_high_confidence_without_evidence_independence() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 3000.0)
+    summary = ResearchEvidenceSummary(
+        obligation_id="deploy-safety",
+        decision_impact=0.95,
+        evidence_coverage=0.99,
+        freshness=0.99,
+        contradiction_strength=0.01,
+        independent_source_count=1,
+        leading_hypothesis_id="h-a",
+        leading_posterior=0.99,
+        effective_hypotheses=1.01,
+        predictive_brier_scores=(0.01, 0.01, 0.01),
+        predictive_surprise_bits=(0.01, 0.01, 0.01),
+    )
+
+    certificate = control.certify_research_completion(summary)
+
+    assert certificate.accepted is False
+    assert certificate.resolution is ResearchResolution.CONTINUE
+    assert any(item.code == "source-independence" for item in certificate.errors)
+
+
+def test_completion_gate_only_provisional_without_prediction_history() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 4000.0)
+    summary = ResearchEvidenceSummary(
+        obligation_id="low-impact-question",
+        decision_impact=0.50,
+        evidence_coverage=0.90,
+        freshness=0.90,
+        contradiction_strength=0.05,
+        independent_source_count=2,
+        leading_hypothesis_id="h-a",
+        leading_posterior=0.90,
+        effective_hypotheses=1.10,
+        predictive_brier_scores=(),
+        predictive_surprise_bits=(),
+    )
+
+    certificate = control.certify_research_completion(summary)
+
+    assert certificate.accepted is False
+    assert certificate.provisional is True
+    assert certificate.resolution is ResearchResolution.PROVISIONAL
