@@ -21,7 +21,6 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-
 TASK_KEY = "reserve-S039-creator-benchmark-fixtures"
 CONFLICT_DOMAIN = "eval.fixtures.creator_intent"
 SCHEMA = "eval.fixtures.creator_intent.v1"
