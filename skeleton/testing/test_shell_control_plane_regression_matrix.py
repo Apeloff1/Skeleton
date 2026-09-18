@@ -525,3 +525,18 @@ def test_service_state_stopped_has_no_outgoing_transition():
     state.transition(ShellServicePhase.STOPPED)
     with pytest.raises(RuntimeError):
         state.transition(ShellServicePhase.STARTING)
+
+
+def test_incident_new_record_is_open_and_unacknowledged():
+    registry = IncidentRegistry()
+    incident = registry.open(IncidentSeverity.WARNING, "fresh")
+    assert incident.state is IncidentState.OPEN
+    assert incident.acknowledged_by == ""
+    assert incident.closed_at is None
+
+
+def test_namespace_default_enabled_state_allows_normal_checks():
+    namespace = ShellNamespace("default")
+    assert namespace.enabled
+    assert namespace.allows_principal("principal")
+    assert namespace.allows_command("python")
