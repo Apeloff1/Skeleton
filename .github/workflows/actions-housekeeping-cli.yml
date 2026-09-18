@@ -10,10 +10,10 @@ on:
       - '.github/workflows/actions-housekeeping-cli.yml'
 
 concurrency:
-  # queue-drain.yml and the owner-side drainer explicitly preserve this
-  # recovery lane. Keep an active cleanup alive; newer triggers coalesce
-  # instead of repeatedly preempting the run that is reclaiming capacity.
-  group: actions-housekeeping-cli-${{ github.repository }}
+  # v2 intentionally escapes any pre-existing queued v1 housekeeping run so
+  # stale-run recovery can acquire an independent lane. Future v2 triggers
+  # remain non-preemptive and coalesce normally.
+  group: actions-housekeeping-cli-v2-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -21,8 +21,9 @@ permissions: {}
 jobs:
   cleanup:
     name: Prune cold Actions state
-    # Housekeeping is a recovery path and must not depend on the scarcer ARM lane it may be cleaning up.
-    runs-on: ubuntu-latest
+    # Housekeeping uses an independent ARM recovery lane so provider-stuck
+    # x64 queue entries cannot prevent the cleanup that retires them.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     permissions:
       actions: write
