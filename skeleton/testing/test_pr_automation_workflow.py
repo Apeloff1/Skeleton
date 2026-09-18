@@ -71,6 +71,7 @@ def test_workflow_defaults_are_fail_closed_and_bounded():
     assert "PR_AUTOMATION_ALLOW_FORK_MERGE: ${{ vars.PR_AUTOMATION_ALLOW_FORK_MERGE || 'false' }}" in text
     assert "PR_AUTOMATION_MERGE_WHEN_READY: ${{ vars.PR_AUTOMATION_MERGE_WHEN_READY || 'false' }}" in text
     assert 'PR_AUTOMATION_MAX_MUTATIONS: "1"' in text
+    assert 'PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"' in text
 
 
 def test_workflow_elevates_only_the_evaluate_job_for_status_and_merge_control():
