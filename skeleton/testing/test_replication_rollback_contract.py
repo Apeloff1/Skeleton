@@ -547,6 +547,32 @@ def test_ack_cannot_claim_future_authority_progress() -> None:
         authority.record_ack(packet)
 
 
+def test_ack_for_evicted_frame_is_unverifiable_and_rejected() -> None:
+    authority = Authority(history_limit=3)
+    first = authority.snapshot(0, {})
+    authority.mutate(1, (Patch.set("hero", {"x": 1}),))
+    authority.mutate(2, (Patch.set("hero", {"x": 2}),))
+    authority.mutate(3, (Patch.set("hero", {"x": 3}),))
+
+    assert authority._core._frame(first.sequence) is None  # type: ignore[attr-defined]
+    forged = replication_mod._wrap_packet(  # type: ignore[attr-defined]
+        "ack",
+        first.sequence,
+        {
+            "peer_id": "client-old",
+            "last_applied_sequence": first.sequence,
+            "last_applied_digest": "0" * 64,
+            "last_received_sequence": first.sequence,
+            "tick": 0,
+            "missing_sequences": [],
+        },
+    )
+
+    with pytest.raises(HistoryExhaustedError, match="outside retained authority history"):
+        authority.record_ack(forged)
+    assert authority.last_ack("client-old") is None
+
+
 def test_ack_cannot_regress_or_lie_about_retained_frame() -> None:
     authority = Authority()
     first = authority.snapshot(0, {})
