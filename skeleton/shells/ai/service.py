@@ -298,6 +298,11 @@ class AIShellService:
             quorum_digest=quorum_digest,
             execution_backend_id=active_backend.backend_id,
             sandbox_binding_digest=sandbox_binding_digest,
+            runtime_trust_digest=(
+                ""
+                if self._runtime_trust_report is None
+                else self._runtime_trust_report.epoch_digest
+            ),
         )
         return binding.digest
 
