@@ -33,6 +33,7 @@ from .errors import (
 from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
 from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .math3d import EPSILON, AABB, Quat, Vec3
+from .mesh import TriangleMeshShape
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import (
     BoxShape,
@@ -496,6 +497,13 @@ class PhysicsWorld:
                     vertex.to_tuple() for vertex in shape.vertices
                 ),
                 "faces": shape.faces,
+            }
+        if isinstance(shape, TriangleMeshShape):
+            return {
+                "kind": shape.kind.value,
+                "vertex_count": len(shape.vertices),
+                "triangle_count": len(shape.triangles),
+                "geometry_fingerprint": shape.geometry_fingerprint,
             }
         raise PhysicsValidationError("unknown shape implementation")
 
