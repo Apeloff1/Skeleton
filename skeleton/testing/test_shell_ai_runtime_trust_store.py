@@ -697,3 +697,70 @@ def test_runtime_trust_store_to_dict_shapes_are_json_ready():
     report = target.verify("production").to_dict()
     assert report["ok"] is True
     assert report["revision"] == 1
+
+
+def test_runtime_trust_concurrent_initializer_reuses_immutable_history_winner():
+    now = [1.0]
+    backend = InMemoryFencedStore()
+    target = RuntimeTrustPinStore(
+        backend,
+        ArtifactSigner(
+            "trust-key",
+            b"k" * 32,
+            clock=lambda: now[0],
+        ),
+        namespace="trust-pin",
+        clock=lambda: now[0],
+    )
+    first = target.pin("production", epoch())
+
+    # Model an initializer that persisted immutable revision history but lost
+    # its head CAS before another process retried startup.
+    head = backend.get(
+        target.namespace,
+        target._head_key("production"),
+    )
+    assert head is not None
+    backend.delete(
+        target.namespace,
+        target._head_key("production"),
+        expected_revision=head.revision,
+    )
+
+    now[0] = 2.0
+    recovered = target.pin("production", epoch())
+
+    # The retrier must reuse the signed immutable history winner rather than
+    # creating a second revision-1 identity with a different timestamp.
+    assert recovered.pin.digest == first.pin.digest
+    assert recovered.signature.signature == first.signature.signature
+    current = target.current("production")
+    assert current is not None
+    assert current[1].pin.digest == first.pin.digest
+    assert target.verify("production").ok
+
+
+def test_runtime_trust_same_revision_different_epoch_is_not_converged():
+    backend = InMemoryFencedStore()
+    target = store(backend)
+    first = target.pin("production", epoch())
+    head = backend.get(
+        target.namespace,
+        target._head_key("production"),
+    )
+    assert head is not None
+    backend.delete(
+        target.namespace,
+        target._head_key("production"),
+        expected_revision=head.revision,
+    )
+
+    # Immutable revision 1 still binds the old authority. A new epoch may not
+    # claim that revision just because the mutable head is absent.
+    with pytest.raises(RuntimeTrustPinConflict, match="different pin"):
+        target.pin(
+            "production",
+            epoch(code_revision="code-2"),
+        )
+
+    assert target.history_item("production", 1).pin.digest == first.pin.digest
