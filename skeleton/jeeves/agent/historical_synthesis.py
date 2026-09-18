@@ -570,6 +570,7 @@ class HistoricalContextAdapter:
     """Expose the historical corpus as canonical CHRONICLE context."""
 
     source_tier = SourceTier.CHRONICLE
+    source_provider = "scientific-lineage"
 
     def __init__(self, frontier: ChronologicalScientificFrontier, *, knowledge_year: int = 2026) -> None:
         self.frontier = frontier
@@ -620,6 +621,7 @@ class HistoricalContextAdapter:
             confidence=max(0.05, min(1.0, evidence_strength)),
             salience=0.75,
             token_estimate=max(1, len(text) // 4),
+            source_provider=self.source_provider,
             tags=tuple(family.value for family in method.families) + ("scientific-lineage",),
             metadata={
                 "introduced_year": method.introduced_year,
@@ -703,6 +705,7 @@ class HistoricalContextAdapter:
                 source_tier=self.source_tier,
                 source_ref=record.source_ref,
                 source_fingerprint=record.source_fingerprint,
+                source_provider=record.source_provider,
                 cue=f"{method.name} {' '.join(f.value for f in method.families)} {method.thesis}",
                 preview=record.content[:8192],
                 kind=CardKind.FACT_CUE,
