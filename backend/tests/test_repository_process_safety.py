@@ -108,3 +108,98 @@ def test_metacharacters_are_literal_runtime_arguments() -> None:
         text=True,
     )
     assert result.stdout.strip() == payload
+
+
+
+def test_rejects_str_constructor_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncommand = ['python', '--version']\n"
+        "subprocess.run(str(command), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_literal_strip_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(' python --version '.strip(), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_repr_and_ascii_string_commands(tmp_path: Path) -> None:
+    for builder in ("repr", "ascii"):
+        findings = _scan(
+            tmp_path,
+            "import subprocess\ncommand = ['python', '--version']\n"
+            f"subprocess.run({builder}(command), shell=False)\n",
+        )
+        assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_assigned_string_command_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\nsubprocess.run(cmd, shell=False)\n",
+    )
+    assert any("argument vector" in finding for finding in findings)
+
+
+def test_reassigned_command_alias_remains_dynamic(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\ncmd = build_command()\nsubprocess.run(cmd)\n",
+    )
+    assert not any("argument vector" in finding for finding in findings)
+
+
+def test_unknown_strip_receiver_is_not_classified_as_string(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(builder.strip(), shell=False)\n",
+    )
+    assert findings == []
+
+
+
+def test_rejects_stable_subprocess_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "proc = subprocess\n"
+        "proc.run('python --version', shell=False)\n",
+    )
+    assert any("subprocess.run" in finding and "argument vector" in finding for finding in findings)
+
+
+def test_rejects_stable_os_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import os\n"
+        "process_os = os\n"
+        "process_os.system('echo unsafe')\n",
+    )
+    assert any("os.system() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_stable_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "first = subprocess\n"
+        "second = first\n"
+        "second.run('python --version', shell=False)\n",
+    )
+    assert any("subprocess.run" in finding and "argument vector" in finding for finding in findings)
+
+
+def test_reassigned_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "proc = subprocess\n"
+        "proc = custom_runner\n"
+        "proc.run('python --version', shell=False)\n",
+    )
+    assert findings == []
