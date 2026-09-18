@@ -24,7 +24,7 @@ on:
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - ".emergent/cron/**"
       - "backend/**"
