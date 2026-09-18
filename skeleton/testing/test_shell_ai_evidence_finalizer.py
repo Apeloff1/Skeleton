@@ -639,3 +639,149 @@ def test_finalizer_witness_survives_fresh_reader():
         release_evidence_digest=fp("l"),
     )
     assert current.witness.digest == result.audit_witness.witness.digest
+
+
+def test_finalizer_binds_execution_attempt_across_all_evidence_layers():
+    session, proposal = completed_session()
+    backend = InMemoryFencedStore()
+    journal = AIDecisionJournal(clock=lambda: 10.0)
+    receipts = ReceiptChain()
+    session_store = SessionEvidenceStore(
+        backend,
+        namespace="session-evidence-attempt",
+    )
+    audit_store = AIAuditAnchorStore(
+        backend,
+        ArtifactSigner("audit", b"k" * 32, clock=lambda: 10.0),
+        namespace="audit-attempt",
+        clock=lambda: 10.0,
+    )
+    execution_store = AIExecutionEvidenceStore(
+        backend,
+        ArtifactSigner("execution", b"x" * 32, clock=lambda: 11.0),
+        namespace="execution-attempt",
+    )
+    finalizer = AIExecutionEvidenceFinalizer(
+        journal=journal,
+        receipt_chain=receipts,
+        session_evidence=session_store,
+        audit_anchors=audit_store,
+        execution_evidence=execution_store,
+        execution_evidence_builder=AIExecutionEvidenceBuilder(
+            clock=lambda: 12.0,
+        ),
+    )
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    result = finalizer.finalize(
+        session,
+        execution_bundle(session, proposal, receipts),
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+        execution_seal_id="seal-attempt",
+        execution_attempt_authority_digest=fp("a"),
+    )
+
+    recovery = result.recovery_checkpoint
+    assert recovery.execution_attempt_id == "seal-attempt"
+    assert recovery.execution_attempt_authority_digest == fp("a")
+    anchor = result.audit_anchor.anchor
+    assert anchor.execution_attempt_id == "seal-attempt"
+    assert anchor.execution_attempt_authority_digest == fp("a")
+    signed = result.execution_evidence
+    assert signed is not None
+    assert signed.evidence.execution_attempt_id == "seal-attempt"
+    assert signed.evidence.execution_attempt_authority_digest == fp("a")
+    assert audit_store.verify()
+    assert execution_store.verify()
+
+
+def test_finalizer_rejects_attempt_authority_without_execution_seal():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    with pytest.raises(RuntimeError, match="execution seal"):
+        finalizer.finalize(
+            session,
+            execution_bundle(session, proposal, receipts),
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            execution_attempt_authority_digest=fp("a"),
+        )
+
+
+def test_finalizer_rejects_malformed_attempt_authority_digest():
+    session, proposal = completed_session()
+    journal, receipts, _, _, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    with pytest.raises(ValueError, match="execution_attempt_authority_digest"):
+        finalizer.finalize(
+            session,
+            execution_bundle(session, proposal, receipts),
+            policy_fingerprint=fp("p"),
+            tool_catalog_digest=fp("t"),
+            effect_digest=fp("e"),
+            execution_seal_id="seal-attempt",
+            execution_attempt_authority_digest="bad",
+        )
+
+
+def test_finalizer_attempt_binding_changes_recovery_digest():
+    session, proposal = completed_session()
+    first_journal, first_receipts, _, _, first_finalizer = environment()
+    first_journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    first = first_finalizer.finalize(
+        session,
+        execution_bundle(session, proposal, first_receipts),
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        execution_seal_id="seal-a",
+        execution_attempt_authority_digest=fp("a"),
+    )
+
+    second_session, second_proposal = completed_session()
+    second_journal, second_receipts, _, _, second_finalizer = environment()
+    second_journal.append(
+        "done",
+        session_id=second_session.session_id,
+        intent_id=second_session.intent.intent_id,
+        proposal_id=second_proposal.proposal_id,
+    )
+    second = second_finalizer.finalize(
+        second_session,
+        execution_bundle(
+            second_session,
+            second_proposal,
+            second_receipts,
+        ),
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        execution_seal_id="seal-b",
+        execution_attempt_authority_digest=fp("b"),
+    )
+    assert first.recovery_checkpoint.digest != second.recovery_checkpoint.digest
+    assert first.audit_anchor.anchor.digest != second.audit_anchor.anchor.digest
