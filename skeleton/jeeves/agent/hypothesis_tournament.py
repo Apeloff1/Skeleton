@@ -287,6 +287,7 @@ class TournamentUpdate:
     winner_id: str
     winner_probability: float
     falsified_ids: tuple[str, ...]
+    falsification_threshold: float
     fingerprint: str
 
 
@@ -543,6 +544,7 @@ class HypothesisTournament:
             winner_id=winner_id,
             winner_probability=posterior[winner_id],
             falsified_ids=falsified,
+            falsification_threshold=threshold,
             fingerprint=stable_fingerprint(payload),
         )
         self._history.append(update)
@@ -550,6 +552,137 @@ class HypothesisTournament:
 
     def history(self) -> tuple[TournamentUpdate, ...]:
         return tuple(self._history)
+
+    def dump_state(self) -> dict[str, Any]:
+        """Serialize initial contracts plus observations for deterministic replay."""
+
+        return {
+            "version": 1,
+            "decision_impact": self.decision_impact,
+            "policy": {
+                name: getattr(self.policy, name)
+                for name in self.policy.__dataclass_fields__
+            },
+            "hypotheses": [
+                {
+                    "hypothesis_id": item.hypothesis_id,
+                    "statement": item.statement,
+                    "prior_weight": item.prior_weight,
+                    "predictions": [
+                        {
+                            "probe_id": prediction.probe_id,
+                            "distribution": dict(prediction.distribution),
+                            "rationale": prediction.rationale,
+                        }
+                        for prediction in item.predictions
+                    ],
+                    "assumptions": list(item.assumptions),
+                    "evidence_refs": list(item.evidence_refs),
+                    "provenance": list(item.provenance),
+                    "metadata": dict(item.metadata),
+                }
+                for item in self._hypotheses
+            ],
+            "probes": [
+                {
+                    "probe_id": item.probe_id,
+                    "question": item.question,
+                    "outcome_support": list(item.outcome_support),
+                    "expected_cost": item.expected_cost,
+                    "risk": item.risk.value,
+                    "reversible": item.reversible,
+                    "evidence_only": item.evidence_only,
+                    "metadata": dict(item.metadata),
+                }
+                for item in self._probes
+            ],
+            "observations": [
+                {
+                    "probe_id": item.probe_id,
+                    "observed_outcome": item.observed_outcome,
+                    "falsification_threshold": item.falsification_threshold,
+                    "expected_update_fingerprint": item.fingerprint,
+                }
+                for item in self._history
+            ],
+            "posterior": dict(self._posterior),
+            "tournament_id": self.tournament_id,
+        }
+
+    @classmethod
+    def from_state(cls, state: Mapping[str, Any]) -> "HypothesisTournament":
+        """Rebuild a tournament by replaying observations and verify fingerprints."""
+
+        payload = json_safe(dict(state))
+        if payload.get("version") != 1:
+            raise AgentContractError("unsupported tournament state version")
+        hypotheses = tuple(
+            CompetingHypothesis(
+                hypothesis_id=value["hypothesis_id"],
+                statement=value["statement"],
+                prior_weight=value["prior_weight"],
+                predictions=tuple(
+                    HypothesisPrediction(
+                        probe_id=prediction["probe_id"],
+                        distribution=dict(prediction["distribution"]),
+                        rationale=prediction.get("rationale", ""),
+                    )
+                    for prediction in value["predictions"]
+                ),
+                assumptions=tuple(value.get("assumptions", ())),
+                evidence_refs=tuple(value.get("evidence_refs", ())),
+                provenance=tuple(value.get("provenance", ())),
+                metadata=dict(value.get("metadata", {})),
+            )
+            for value in payload.get("hypotheses", ())
+        )
+        probes = tuple(
+            DiscriminatingProbe(
+                probe_id=value["probe_id"],
+                question=value["question"],
+                outcome_support=tuple(value["outcome_support"]),
+                expected_cost=value.get("expected_cost", 0.1),
+                risk=RiskTier(value.get("risk", RiskTier.READ_ONLY.value)),
+                reversible=bool(value.get("reversible", True)),
+                evidence_only=bool(value.get("evidence_only", True)),
+                metadata=dict(value.get("metadata", {})),
+            )
+            for value in payload.get("probes", ())
+        )
+        tournament = cls(
+            hypotheses,
+            probes,
+            policy=TournamentPolicy(**dict(payload.get("policy", {}))),
+            decision_impact=payload.get("decision_impact", 1.0),
+        )
+        expected_id = payload.get("tournament_id")
+        if expected_id is not None and tournament.tournament_id != expected_id:
+            raise AgentContractError("tournament identity mismatch during replay")
+        for observation in payload.get("observations", ()):
+            update = tournament.observe(
+                observation["probe_id"],
+                observation["observed_outcome"],
+                falsification_threshold=observation.get(
+                    "falsification_threshold",
+                    0.02,
+                ),
+            )
+            expected = observation.get("expected_update_fingerprint")
+            if expected is not None and update.fingerprint != expected:
+                raise AgentContractError(
+                    "tournament update fingerprint mismatch during replay"
+                )
+        expected_posterior = payload.get("posterior")
+        if expected_posterior is not None:
+            normalized = _normalize(
+                dict(expected_posterior),
+                name="stored_posterior",
+            )
+            if stable_fingerprint(normalized) != stable_fingerprint(tournament.posterior):
+                raise AgentContractError(
+                    "tournament posterior mismatch after deterministic replay"
+                )
+        return tournament
 
     def _probe(self, probe_id: str) -> DiscriminatingProbe:
         for probe in self._probes:
