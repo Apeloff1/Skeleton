@@ -14,6 +14,9 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Sequence
 
+from .context_fabric import CognitiveContextFabric
+from .context_mesh import ContextRepositoryMesh
+from .context_repository import ContextRepository
 from .cognition import (
     ContextCompiler,
     ContextSection,
@@ -23,6 +26,11 @@ from .cognition import (
     PromptCompiler,
     RunScratchpad,
 )
+from .historical_synthesis import (
+    ChronologicalScientificFrontier,
+    HistoricalContextAdapter,
+    foundational_seed_methods,
+)
 from .evidence import (
     EvidenceArtifact,
     EvidenceLedger,
@@ -31,7 +39,9 @@ from .evidence import (
     GroundingReport,
     LearningEvidenceBridge,
 )
-from .memory import MemoryError, MemoryManager, MemoryNamespace
+from .memory import MemoryError, MemoryManager, MemoryNamespace, MemoryRecord
+from .memory_game_index import CardKind, SourceTier
+from .predictive_memory import PredictiveMemoryEngine
 from .planning import (
     ModelPlanParser,
     PLAN_SCHEMA,
@@ -378,6 +388,13 @@ class JeevesAgentRuntime:
         grounding_policy: GroundingPolicy | None = None,
         verification_policy: VerificationPolicy | None = None,
         context_compiler: ContextCompiler | None = None,
+        context_fabric: CognitiveContextFabric | None = None,
+        context_mesh: ContextRepositoryMesh | None = None,
+        context_repositories: Sequence[ContextRepository] = (),
+        predictive_memory: PredictiveMemoryEngine | None = None,
+        historical_frontier: ChronologicalScientificFrontier | None = None,
+        historical_knowledge_year: int = 2026,
+        enable_historical_context: bool = True,
         prompt_compiler: PromptCompiler | None = None,
         config: AgentConfig | None = None,
         metrics: MetricsRegistry | None = None,
@@ -405,6 +422,39 @@ class JeevesAgentRuntime:
         self.grounding_policy = grounding_policy or GroundingPolicy()
         self.verification_policy = verification_policy or VerificationPolicy()
         self.context = context_compiler or ContextCompiler()
+        self.context_fabric = context_fabric or CognitiveContextFabric()
+        if context_mesh is not None and context_mesh.fabric is not self.context_fabric:
+            raise AgentContractError("context_mesh must be bound to the runtime context_fabric")
+        self.context_mesh = context_mesh or ContextRepositoryMesh(self.context_fabric)
+        for repository in tuple(context_repositories):
+            if not isinstance(repository, ContextRepository):
+                raise TypeError("context_repositories must contain ContextRepository values")
+            self.context_mesh.attach(repository)
+        if predictive_memory is not None and predictive_memory.index is not self.context_fabric.index:
+            raise AgentContractError("predictive_memory must use the runtime context_fabric index")
+        self.predictive_memory = predictive_memory or PredictiveMemoryEngine(self.context_fabric.index)
+
+        if isinstance(historical_knowledge_year, bool) or not isinstance(historical_knowledge_year, int):
+            raise AgentContractError("historical_knowledge_year must be an integer")
+        if historical_knowledge_year < 0 or historical_knowledge_year > 3000:
+            raise AgentContractError("historical_knowledge_year is outside supported bounds")
+        self.enable_historical_context = bool(enable_historical_context)
+        if historical_frontier is None:
+            historical_frontier = ChronologicalScientificFrontier()
+            for historical_method in foundational_seed_methods():
+                historical_frontier.register_method(historical_method)
+        elif not isinstance(historical_frontier, ChronologicalScientificFrontier):
+            raise TypeError("historical_frontier must be ChronologicalScientificFrontier")
+        self.historical_frontier = historical_frontier
+        self.historical_context = HistoricalContextAdapter(
+            self.historical_frontier,
+            knowledge_year=historical_knowledge_year,
+        )
+        self._historical_indexed_namespaces: set[str] = set()
+        self._historical_index_lock = threading.RLock()
+        if self.enable_historical_context:
+            self.context_fabric.register(self.historical_context)
+
         self.prompts = prompt_compiler or PromptCompiler()
         self.config = config or AgentConfig()
         self.metrics = metrics or MetricsRegistry()
@@ -420,6 +470,7 @@ class JeevesAgentRuntime:
         """Start and synchronously complete one bounded agent run."""
         if not isinstance(inputs, RunInputs):
             raise TypeError("inputs must be RunInputs")
+        self._ensure_historical_context(inputs.namespace.key)
         run_id = inputs.run_id or stable_id(
             "run",
             {
@@ -437,6 +488,7 @@ class JeevesAgentRuntime:
 
     def resume(self, inputs: RunInputs, run_id: str) -> AgentResult:
         """Resume from the latest retained checkpoint without repeating succeeded steps."""
+        self._ensure_historical_context(inputs.namespace.key)
         run_id = require_id("run_id", run_id)
         checkpoint = self.checkpointer.latest(run_id)
         if checkpoint is None:
@@ -447,6 +499,38 @@ class JeevesAgentRuntime:
             raise RuntimeErrorBase("cannot resume a terminal run")
         state = self._state_from_checkpoint(inputs, checkpoint)
         return self._drive(state)
+
+    def _ensure_historical_context(self, namespace_key: str) -> None:
+        """Index public scientific lineage once per runtime namespace.
+
+        The cards are fast retrieval pointers only. Canonical content continues
+        to come from HistoricalContextAdapter through the CHRONICLE tier.
+        """
+        if not self.enable_historical_context:
+            return
+        key = str(namespace_key)
+        with self._historical_index_lock:
+            if key in self._historical_indexed_namespaces:
+                return
+            self.historical_context.index_cards(self.context_fabric.index, key)
+            self._historical_indexed_namespaces.add(key)
+
+    def attach_context_repository(
+        self,
+        repository: ContextRepository,
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Attach one namespace-owned durable context repository.
+
+        The repository is multiplexed by namespace across storage tiers, so
+        journals/logs/diaries/annals/chronicles/DB/cache/file records can be
+        canonically rehydrated without cross-tenant adapter replacement.
+        """
+        self.context_mesh.attach(repository, replace=replace)
+
+    def detach_context_repository(self, namespace_key: str) -> bool:
+        return self.context_mesh.detach(namespace_key)
 
     def cancel(self, run_id: str) -> None:
         run_id = require_id("run_id", run_id)
@@ -624,6 +708,7 @@ class JeevesAgentRuntime:
                 evidence=state.ledger,
                 observations=state.observations,
                 scratchpad=state.scratch,
+                context_fabric=self.context_fabric,
             )
             response = self._model_call(
                 state,
@@ -690,6 +775,7 @@ class JeevesAgentRuntime:
             current_step=step,
             observations=state.observations,
             scratchpad=state.scratch,
+            context_fabric=self.context_fabric,
         )
         response = self._model_call(
             state,
@@ -859,6 +945,7 @@ class JeevesAgentRuntime:
             current_step=step,
             observations=(observation,),
             scratchpad=state.scratch,
+            context_fabric=self.context_fabric,
         )
         response = self._model_call(
             state,
@@ -945,6 +1032,7 @@ class JeevesAgentRuntime:
             observations=state.observations,
             scratchpad=state.scratch,
             extra_sections=(extra,),
+            context_fabric=self.context_fabric,
         )
         response = self._model_call(
             state,
@@ -992,6 +1080,7 @@ class JeevesAgentRuntime:
                 observations=state.observations,
                 scratchpad=state.scratch,
                 extra_sections=extras,
+                context_fabric=self.context_fabric,
             )
             response = self._model_call(
                 state,
@@ -1371,9 +1460,9 @@ class JeevesAgentRuntime:
         trust: float,
         salience: float,
         evidence: Sequence[EvidenceRef] = (),
-    ) -> None:
+    ) -> MemoryRecord | None:
         try:
-            self.memory.remember(
+            record = self.memory.remember(
                 namespace,
                 content,
                 kind=kind,
@@ -1385,9 +1474,44 @@ class JeevesAgentRuntime:
                 ttl_seconds=self.config.working_memory_ttl_seconds,
                 metadata={"automatic": True, "promoted": False},
             )
+            # Every durable memory write receives a compact cue card immediately.
+            # The card is only an index: canonical rehydration comes back through
+            # MemoryManagerAdapter before model context is compiled.
+            card_kind = (
+                CardKind.INTERACTION
+                if source in {"run-goal", "user-input", "user-interaction"}
+                else CardKind.EPISODE_CUE
+                if kind is MemoryKind.EPISODIC
+                else CardKind.FACT_CUE
+            )
+            card = self.context_fabric.index.index_source(
+                namespace_key=namespace.key,
+                source_tier=SourceTier.MEMORY_STORE,
+                source_ref=record.memory_id,
+                source_fingerprint=record.fingerprint,
+                cue=content[:2048],
+                preview=content[:8192],
+                kind=card_kind,
+                salience=record.salience,
+                trust=record.trust,
+                confidence=record.trust,
+                tags=tuple(record.tags) + ("fast-index", source),
+                metadata={
+                    "canonical_source_required": True,
+                    "memory_kind": record.kind.value,
+                    "memory_source": record.source,
+                },
+            )
+            stream_kind = "dialogue" if card_kind is CardKind.INTERACTION else "runtime"
+            self.predictive_memory.observe(
+                card.card_id,
+                stream_id=f"{namespace.key}:{stream_kind}",
+            )
+            return record
         except Exception:
             # Runtime completion must not depend on optional memory persistence.
             self.metrics.increment("agent.memory.write_failures")
+            return None
 
     @staticmethod
     def _dedupe_refs(refs: Sequence[EvidenceRef]) -> tuple[EvidenceRef, ...]:
