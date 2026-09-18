@@ -154,14 +154,17 @@ class SemanticLensTopology:
                 seen.add(identity)
                 left = self._specs[rule.left_key]
                 right = self._specs[rule.right_key]
+                edge_payload: dict[str, object] = {
+                    "rule": rule.key,
+                    "kind": rule.kind.value,
+                    "symmetric": rule.symmetric,
+                    "source": source,
+                }
+                if source == "learned" and rule.metadata:
+                    edge_payload["rule_metadata"] = dict(rule.metadata)
                 edge_id = stable_id(
                     "semantic-topology-edge",
-                    {
-                        "rule": rule.key,
-                        "kind": rule.kind.value,
-                        "symmetric": rule.symmetric,
-                        "source": source,
-                    },
+                    edge_payload,
                     length=28,
                 )
                 edges.append(
