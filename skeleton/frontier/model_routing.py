@@ -170,6 +170,23 @@ def _estimate_cost(
     ) / 1_000_000.0
 
 
+def _planned_output_tokens(
+    metadata: ProviderMetadata,
+    request: ModelRouteRequest,
+    *,
+    remaining_output: int | None = None,
+) -> int:
+    """Use one output-token estimate for planning and execution."""
+    planned = (
+        request.max_output_tokens
+        if request.max_output_tokens is not None
+        else metadata.max_output_tokens
+    )
+    if remaining_output is not None:
+        planned = min(planned, remaining_output)
+    return planned
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderMetadata:
     """Capability catalog entry for one interchangeable runtime endpoint."""
@@ -750,7 +767,11 @@ class ModelRouter:
                 _estimate_cost(
                     item,
                     input_tokens=request.estimated_input_tokens,
-                    output_tokens=request.max_output_tokens or 0,
+                    output_tokens=_planned_output_tokens(
+                        item,
+                        request,
+                        remaining_output=request.budget.max_output_tokens,
+                    ),
                 ),
                 item.timeout_seconds,
                 item.provider_id,
@@ -772,7 +793,17 @@ class ModelRouter:
         attempts: list[AttemptRecord] = []
         selected_id: str | None = None
         response: ChatResponse | None = None
-        status = "no_capable_provider" if not plan.provider_ids else "provider_failed"
+        budget_rejected = any(
+            any("route budget" in reason or "output token budget" in reason for reason in reasons)
+            for reasons in plan.rejected.values()
+        )
+        status = (
+            "budget_exhausted"
+            if not plan.provider_ids and budget_rejected
+            else "no_capable_provider"
+            if not plan.provider_ids
+            else "provider_failed"
+        )
 
         for provider_id in plan.provider_ids:
             remaining_time = deadline - loop.time()
@@ -790,12 +821,14 @@ class ModelRouter:
                 if request.budget.max_output_tokens is None
                 else max(0, request.budget.max_output_tokens - spent_output)
             )
-            planned_output = request.max_output_tokens or metadata.max_output_tokens
-            if remaining_output is not None:
-                if remaining_output <= 0:
-                    status = "budget_exhausted"
-                    break
-                planned_output = min(planned_output, remaining_output)
+            if remaining_output is not None and remaining_output <= 0:
+                status = "budget_exhausted"
+                break
+            planned_output = _planned_output_tokens(
+                metadata,
+                request,
+                remaining_output=remaining_output,
+            )
             estimated = _estimate_cost(
                 metadata,
                 input_tokens=request.estimated_input_tokens,
@@ -803,7 +836,7 @@ class ModelRouter:
             )
             if remaining_cost is not None and estimated > remaining_cost:
                 status = "budget_exhausted"
-                break
+                continue
 
             started = loop.time()
             try:
@@ -932,9 +965,12 @@ class ModelRouter:
         missing = required - metadata.capabilities
         if missing:
             reasons.append("missing capabilities: " + ",".join(sorted(missing)))
-        total_tokens = request.estimated_input_tokens + (
-            request.max_output_tokens or 0
+        planned_output = _planned_output_tokens(
+            metadata,
+            request,
+            remaining_output=request.budget.max_output_tokens,
         )
+        total_tokens = request.estimated_input_tokens + planned_output
         if total_tokens > metadata.max_input_tokens:
             reasons.append(
                 f"context {total_tokens} exceeds {metadata.max_input_tokens}"
@@ -944,6 +980,15 @@ class ModelRouter:
             and request.max_output_tokens > metadata.max_output_tokens
         ):
             reasons.append("output tokens exceed provider maximum")
+        if request.budget.max_output_tokens is not None and request.budget.max_output_tokens <= 0:
+            reasons.append("output token budget exhausted")
+        estimated = _estimate_cost(
+            metadata,
+            input_tokens=request.estimated_input_tokens,
+            output_tokens=planned_output,
+        )
+        if request.budget.max_cost is not None and estimated > request.budget.max_cost:
+            reasons.append("estimated cost exceeds route budget")
         return reasons
 
     def _result(
