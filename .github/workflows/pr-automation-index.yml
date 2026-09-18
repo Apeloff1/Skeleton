@@ -12,12 +12,11 @@ on:
     # Evaluate terminal workflow state only. Requested/in-progress transitions
     # multiplied Actions load without adding merge-readiness information.
     types: [completed]
-    # GitHub delivers workflow_run events only for listed heads. Match every
-    # completing branch, including slashed feature refs, so PR CI completions
-    # are not dropped just because they did not run on the default branch.
-    branches:
-      - "*"
-      - "**"
+    # Main completions already fan out through the watched workflows.
+    # Keep PR/feature heads event-driven and reconcile default-branch state on
+    # the existing schedule/manual paths instead of multiplying privileged runs.
+    branches-ignore:
+      - main
   schedule:
     - cron: "17,47 * * * *"
   workflow_dispatch:
