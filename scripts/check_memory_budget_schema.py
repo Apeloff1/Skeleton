@@ -21,7 +21,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S057-memory-budget-review"
+TASK_ID = "reserve-S057-memory-budget-review"
 CONFLICT_DOMAIN = "rag.spec.bounded_retrieval"
 _FINDING_PREFIX = "memory-budget"
 

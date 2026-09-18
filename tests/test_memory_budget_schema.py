@@ -10,7 +10,7 @@ from scripts.check_memory_budget_schema import (
     DOCUMENT_FIELDS,
     FALLBACK_POLICIES,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     TRUNCATION_POLICIES,
     main,
     validate_memory_budget,
@@ -55,7 +55,7 @@ def _doc(**overrides):
 
 def test_schema_contract_is_budgets_not_retrieval_surfaces() -> None:
     assert SCHEMA_VERSION == 1
-    assert TASK_KEY == "reserve-S057-memory-budget-review"
+    assert TASK_ID == "reserve-S057-memory-budget-review"
     assert CONFLICT_DOMAIN == "rag.spec.bounded_retrieval"
     assert DOCUMENT_FIELDS == {
         "schema_version",
