@@ -26,6 +26,7 @@ class ExecutionSeal:
     expires_at: float
     nonce: str
     signature: str
+    assurance_digest: str = ""
 
     def __post_init__(self) -> None:
         if not self.seal_id or len(self.seal_id) > 128:
@@ -36,6 +37,8 @@ class ExecutionSeal:
             raise ValueError("preconditions_digest must be SHA-256 hex")
         if self.release_evidence_digest and len(self.release_evidence_digest) != 64:
             raise ValueError("release_evidence_digest must be SHA-256 hex")
+        if self.assurance_digest and len(self.assurance_digest) != 64:
+            raise ValueError("assurance_digest must be SHA-256 hex")
         if self.expires_at <= self.issued_at:
             raise ValueError("execution seal expiry must follow issue time")
         if len(self.signature) != 64:
@@ -50,6 +53,7 @@ class ExecutionSeal:
             "preconditions_digest": self.preconditions_digest,
             "approval_id": self.approval_id,
             "release_evidence_digest": self.release_evidence_digest,
+            "assurance_digest": self.assurance_digest,
             "issued_at": self.issued_at,
             "expires_at": self.expires_at,
             "nonce": self.nonce,
@@ -108,6 +112,7 @@ class ExecutionSealAuthority:
         preconditions_digest: str = "",
         approval_id: str = "",
         release_evidence_digest: str = "",
+        assurance_digest: str = "",
         ttl_seconds: float = 60.0,
     ) -> ExecutionSeal:
         if ttl_seconds <= 0:
@@ -126,6 +131,7 @@ class ExecutionSealAuthority:
             "preconditions_digest": preconditions_digest,
             "approval_id": approval_id,
             "release_evidence_digest": release_evidence_digest,
+            "assurance_digest": assurance_digest,
             "issued_at": now,
             "expires_at": now + ttl_seconds,
             "nonce": nonce,
@@ -142,6 +148,7 @@ class ExecutionSealAuthority:
             now + ttl_seconds,
             nonce,
             self._signature(unsigned),
+            assurance_digest,
         )
 
     def verify(
@@ -154,6 +161,7 @@ class ExecutionSealAuthority:
         preconditions_digest: str = "",
         approval_id: str = "",
         release_evidence_digest: str = "",
+        assurance_digest: str = "",
     ) -> None:
         now = self._clock()
         if seal.issued_at > now + self.max_clock_skew_seconds:
@@ -174,6 +182,8 @@ class ExecutionSealAuthority:
             raise ExecutionSealError("execution seal approval mismatch")
         if seal.release_evidence_digest != release_evidence_digest:
             raise ExecutionSealError("execution seal release evidence mismatch")
+        if seal.assurance_digest != assurance_digest:
+            raise ExecutionSealError("execution seal assurance evidence mismatch")
         expected = self._signature(seal.unsigned_dict())
         if not hmac.compare_digest(expected, seal.signature):
             raise ExecutionSealError("execution seal signature mismatch")
