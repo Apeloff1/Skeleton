@@ -882,7 +882,8 @@ class ModelRouter:
                 request.budget.max_output_tokens is not None
                 and spent_output > request.budget.max_output_tokens
             )
-            if cost_exhausted or output_exhausted:
+            provider_output_exhausted = response.usage.output_tokens > planned_output
+            if cost_exhausted or output_exhausted or provider_output_exhausted:
                 attempts.append(
                     AttemptRecord(
                         provider_id=metadata.provider_id,
