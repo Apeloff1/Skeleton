@@ -16,6 +16,7 @@ SPEC.loader.exec_module(policy)
 
 LIVE_EXAMPLES = (
     ("skeleton/kernel/capabilities.py", "canonical"),
+    ("skeleton/build/incremental_graph.py", "canonical"),
     ("backend/server.py", "canonical"),
     ("frontend/package.json", "canonical"),
     ("core/activation_security.py", "canonical"),
@@ -72,6 +73,15 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("frontend/node_modules/react/index.js"), "vendor")
         self.assertEqual(policy.classify_path("skeleton/vendor/third.py"), "vendor")
         self.assertEqual(policy.classify_path("backend/third_party/lib.py"), "vendor")
+
+    def test_live_skeleton_build_package_is_canonical_not_generated(self) -> None:
+        self.assertEqual(
+            policy.classify_path("skeleton/build/incremental_graph.py"),
+            "canonical",
+        )
+        self.assertEqual(policy.classify_path("build/lib/generated.py"), "generated")
+        self.assertEqual(policy.classify_path("frontend/build/bundle.js"), "generated")
+        self.assertEqual(policy.classify_path("backend/build/cache.bin"), "generated")
 
     def test_generated_wins_over_binary_and_canonical(self) -> None:
         self.assertEqual(
