@@ -234,6 +234,13 @@ class AIShellService:
             review,
             execution_backend=execution_backend,
             sealed=True,
+            preconditions_verified=(
+                precondition_report is not None and precondition_report.ok
+            ),
+            human_approved=(
+                review.critique.policy.requires_approval
+                and approval is not None
+            ),
         )
         use = seal_registry.consume(
             seal,
@@ -251,6 +258,13 @@ class AIShellService:
             approval=approval,
             execution_backend=execution_backend,
             sealed=True,
+            preconditions_verified=(
+                precondition_report is not None and precondition_report.ok
+            ),
+            human_approved=(
+                review.critique.policy.requires_approval
+                and approval is not None
+            ),
         )
         return result, precondition_report, use
 
@@ -260,6 +274,8 @@ class AIShellService:
         *,
         execution_backend: AIPlanExecutionBackend | None,
         sealed: bool,
+        preconditions_verified: bool = False,
+        human_approved: bool = False,
     ) -> None:
         if self.assurance is None:
             return
@@ -272,6 +288,12 @@ class AIShellService:
                 VerifiedSandboxExecutionBackend,
             ),
             backend_id=active_backend.backend_id,
+            release_verified=(
+                self._release_report is not None
+                and self._release_report.allowed
+            ),
+            preconditions_verified=preconditions_verified,
+            human_approved=human_approved,
         )
 
     def execute(
@@ -290,6 +312,11 @@ class AIShellService:
             approval=approval,
             execution_backend=execution_backend,
             sealed=False,
+            preconditions_verified=False,
+            human_approved=(
+                review.critique.policy.requires_approval
+                and approval is not None
+            ),
         )
 
     def _execute_reviewed(
@@ -301,6 +328,8 @@ class AIShellService:
         approval=None,
         execution_backend: AIPlanExecutionBackend | None = None,
         sealed: bool,
+        preconditions_verified: bool = False,
+        human_approved: bool = False,
     ) -> AIExecutionBundle:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
@@ -309,6 +338,8 @@ class AIShellService:
             review,
             execution_backend=execution_backend,
             sealed=sealed,
+            preconditions_verified=preconditions_verified,
+            human_approved=human_approved,
         )
         proposal = review.planning.response.proposal
         pin = self._pins.get(session.session_id)
