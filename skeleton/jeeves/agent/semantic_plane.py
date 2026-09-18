@@ -1021,6 +1021,9 @@ class SemanticLensPlane:
             "restricted_report_ids": snapshot.restricted_report_ids,
             "rejected_report_ids": snapshot.rejected_report_ids,
             "candidate_report_ids": snapshot.candidate_report_ids,
+            "ambiguous_active_candidate_ids": (
+                snapshot.ambiguous_active_candidate_ids
+            ),
             "learned_rule_keys": snapshot.learned_rule_keys,
             "snapshot_fingerprint": snapshot.fingerprint,
             "contract_fingerprint": (
