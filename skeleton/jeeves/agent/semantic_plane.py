@@ -52,7 +52,6 @@ from .semantic_prediction import (
     SemanticPredictionLedger,
     SemanticPredictiveModel,
 )
-from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph, TangentNode
 from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph
 from .types import (
     AgentContractError,
@@ -83,45 +82,6 @@ _FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
     LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
 }
 
-_AXIS_TAG: dict[str, ExplorationAxis] = {
-    "causal": ExplorationAxis.CAUSAL,
-    "probability": ExplorationAxis.PROBABILISTIC,
-    "probabilistic": ExplorationAxis.PROBABILISTIC,
-    "predictive": ExplorationAxis.PROBABILISTIC,
-    "temporal": ExplorationAxis.TEMPORAL,
-    "semantic": ExplorationAxis.SEMANTIC,
-    "cinematic": ExplorationAxis.CINEMATIC,
-    "literary": ExplorationAxis.LITERARY,
-    "ludic": ExplorationAxis.LUDIC,
-    "social": ExplorationAxis.SOCIAL,
-    "adversarial": ExplorationAxis.ADVERSARIAL,
-    "system": ExplorationAxis.SYSTEM,
-    "memory": ExplorationAxis.MEMORY,
-    "computational": ExplorationAxis.SYSTEM,
-    "metacognitive": ExplorationAxis.ADVERSARIAL,
-    "information": ExplorationAxis.SEMANTIC,
-}
-
-
-
-_FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
-    LensFamily.FILM: ExplorationAxis.CINEMATIC,
-    LensFamily.LITERATURE: ExplorationAxis.LITERARY,
-    LensFamily.GAME: ExplorationAxis.LUDIC,
-    LensFamily.NARRATIVE: ExplorationAxis.SEMANTIC,
-    LensFamily.SEMIOTIC: ExplorationAxis.SEMANTIC,
-    LensFamily.COGNITIVE: ExplorationAxis.MEMORY,
-    LensFamily.RHETORIC: ExplorationAxis.SEMANTIC,
-    LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
-    LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
-    LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
-    LensFamily.CAUSAL: ExplorationAxis.CAUSAL,
-    LensFamily.INFORMATION: ExplorationAxis.SEMANTIC,
-    LensFamily.COMPUTATIONAL: ExplorationAxis.SYSTEM,
-    LensFamily.METACOGNITIVE: ExplorationAxis.ADVERSARIAL,
-    LensFamily.PROBABILITY: ExplorationAxis.PROBABILISTIC,
-    LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
-}
 
 
 @dataclass(frozen=True, slots=True)
