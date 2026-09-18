@@ -7,6 +7,7 @@ import uuid
 
 from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
+from skeleton.shells.ai.assurance_binding import AssuranceBinding
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
@@ -204,6 +205,40 @@ class AIShellService:
         )
         return current.digest
 
+    def _assurance_digest(
+        self,
+        review: AIReviewBundle,
+        *,
+        execution_backend: AIPlanExecutionBackend | None,
+        preconditions_digest: str,
+        approval_id: str,
+        quorum_digest: str,
+    ) -> str:
+        if self.assurance is None:
+            return quorum_digest
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        active_backend = execution_backend or self.orchestrator.execution_backend
+        sandbox_binding = getattr(active_backend, "binding", None)
+        sandbox_binding_digest = (
+            ""
+            if sandbox_binding is None
+            else getattr(sandbox_binding, "digest", "")
+        )
+        binding = AssuranceBinding(
+            1,
+            review.critique.risk.band,
+            self.assurance.policy.digest,
+            review.compiled.plan.fingerprint,
+            release_evidence_digest=self._release_digest(),
+            preconditions_digest=preconditions_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+            execution_backend_id=active_backend.backend_id,
+            sandbox_binding_digest=sandbox_binding_digest,
+        )
+        return binding.digest
+
     def seal_review(
         self,
         session: AIShellSession,
@@ -214,6 +249,7 @@ class AIShellService:
         preconditions: Preconditions | None = None,
         approval=None,
         quorum_approval: QuorumApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
         ttl_seconds: float = 60.0,
     ) -> ExecutionSeal:
         """Issue short-lived signed authority for one exact reviewed plan.
@@ -257,14 +293,22 @@ class AIShellService:
             principal=principal,
             quorum_approval=quorum_approval,
         )
+        preconditions_digest = "" if preconditions is None else preconditions.digest
+        assurance_digest = self._assurance_digest(
+            review,
+            execution_backend=execution_backend,
+            preconditions_digest=preconditions_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+        )
         return authority.issue(
             principal=principal,
             session_id=session.session_id,
             plan_pin=pin,
-            preconditions_digest="" if preconditions is None else preconditions.digest,
+            preconditions_digest=preconditions_digest,
             approval_id=approval_id,
             release_evidence_digest=self._release_digest(),
-            assurance_digest=quorum_digest,
+            assurance_digest=assurance_digest,
             ttl_seconds=ttl_seconds,
         )
 
@@ -322,6 +366,13 @@ class AIShellService:
             principal=context.principal,
             quorum_approval=quorum_approval,
         )
+        assurance_digest = self._assurance_digest(
+            review,
+            execution_backend=execution_backend,
+            preconditions_digest=precondition_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+        )
         self._require_assurance(
             review,
             execution_backend=execution_backend,
@@ -340,7 +391,7 @@ class AIShellService:
             preconditions_digest=precondition_digest,
             approval_id=approval_id,
             release_evidence_digest=self._release_digest(),
-            assurance_digest=quorum_digest,
+            assurance_digest=assurance_digest,
         )
         if quorum_approval is not None:
             if self.approval_quorum is None:
