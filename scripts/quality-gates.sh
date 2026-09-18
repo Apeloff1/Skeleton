@@ -150,6 +150,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_dynamic_import_safety.py \
   backend/tests/test_scanner_nonempty_contract.py \
   backend/tests/test_archive_extraction_safety.py \
+  backend/tests/test_unbulk_decompression_security.py \
   backend/tests/test_repository_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
   backend/tests/test_live_scraper_network_security.py \
