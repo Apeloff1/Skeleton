@@ -82,7 +82,7 @@ class ConsensusPolicy:
     maximum_member_weight: float = 0.85
     minimum_agreement: float = 0.58
     minimum_plurality_margin: float = 0.10
-    maximum_cluster_entropy: float = 0.76
+    maximum_cluster_entropy: float = 0.94
 
     def __post_init__(self) -> None:
         object.__setattr__(
