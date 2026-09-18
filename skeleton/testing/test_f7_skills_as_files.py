@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from skeleton.context import skills_files as skills_files_module
 from skeleton.context.skills_files import (
     ContextCard,
     SkillBank,
@@ -219,3 +220,41 @@ def test_missing_skill_file_raises(tmp_path: Path):
     bank = _bank(tmp_path)
     with pytest.raises(SkillsFilesError, match="missing"):
         bank.load_skill("nope")
+
+
+
+def test_atomic_write_does_not_follow_predictable_legacy_temp_symlink(tmp_path: Path):
+    bank = _bank(tmp_path)
+    target = bank.skill_path("safe")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("sentinel", encoding="utf-8")
+    legacy_tmp = target.with_suffix(target.suffix + ".tmp")
+    try:
+        legacy_tmp.symlink_to(victim)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    bank.upsert_skill(SkillSpec(skill_id="safe", instructions="bounded"))
+
+    assert victim.read_text(encoding="utf-8") == "sentinel"
+    assert legacy_tmp.is_symlink()
+    assert bank.load_skill("safe").instructions == "bounded"
+
+
+def test_atomic_write_cleans_unique_temp_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    bank = _bank(tmp_path)
+    target = bank.skill_path("safe")
+
+    def fail_replace(_source, _target):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(skills_files_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        bank.upsert_skill(SkillSpec(skill_id="safe", instructions="bounded"))
+
+    assert not target.exists()
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
