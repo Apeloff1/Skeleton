@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from skeleton.automation.free_model import redact_secrets
@@ -40,3 +42,14 @@ def test_generated_python_validation_is_non_executing_and_rejects_syntax():
         validate_generated_files({
             "files": [{"path": "skeleton/bad.py", "content": "def broken(:\n"}]
         })
+
+
+def test_repo_bots_workflow_keeps_matrix_context_at_step_scope():
+    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "repo-bots.yml"
+    source = workflow.read_text(encoding="utf-8")
+    matrix_guard = (
+        "if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' "
+        "|| github.event.inputs.bot == matrix.bot"
+    )
+    assert f"\n    {matrix_guard}\n" not in source
+    assert source.count(f"\n        {matrix_guard}\n") == 3

@@ -53,3 +53,64 @@ def test_queue_drain_recovery_does_not_require_upstream_success() -> None:
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
     assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
     assert "Any trusted terminal main Merge Readiness completion may wake recovery." in workflow
+
+
+def test_queue_drain_reclaims_obsolete_same_repository_pr_runs() -> None:
+    workflow = _workflow_text()
+
+    assert "def list_open_pr_heads():" in workflow
+    assert "same-repository open PR has incomplete head identity" in workflow
+    assert "def stale_pr_run(run, open_pr_heads):" in workflow
+    assert "run.get('event') != 'pull_request'" in workflow
+    assert "run_repo != repo or not branch or branch == 'main' or not sha" in workflow
+    assert "sha not in open_pr_heads.get(branch, set())" in workflow
+    assert "obsolete_pr_queued" in workflow
+    assert "obsolete_pr_active" in workflow
+
+    queued_guard = workflow.index("if stale_pr_run(run, open_pr_heads):")
+    queued_control_plane = workflow.index("if is_control_plane(run):", queued_guard)
+    assert queued_guard < queued_control_plane
+
+    active_loop = workflow.index("for run in active:")
+    active_guard = workflow.index("if stale_pr_run(run, open_pr_heads):", active_loop)
+    active_control_plane = workflow.index("if is_control_plane(run):", active_guard)
+    assert active_guard < active_control_plane
+
+
+def test_queue_drain_reclaims_deleted_main_workflow_runs_only() -> None:
+    workflow = _workflow_text()
+
+    assert "def current_workflow_paths(head_sha):" in workflow
+    assert "/contents/.github/workflows?{query}" in workflow
+    assert "current workflow file inventory is empty" in workflow
+    assert "def orphaned_main_workflow_run(run, current_paths):" in workflow
+    assert "(run.get('head_branch') or '') == 'main'" in workflow
+    assert "workflow_path.startswith('.github/workflows/')" in workflow
+    assert "workflow_path not in current_paths" in workflow
+    assert "orphaned_main_queued" in workflow
+    assert "orphaned_main_active" in workflow
+
+    # The helper is deliberately main-only: a PR may validly introduce a new
+    # workflow file that does not exist on the current default branch.
+    helper = workflow[
+        workflow.index("def orphaned_main_workflow_run"):
+        workflow.index("def list_open_pr_heads")
+    ]
+    assert "pull_request" not in helper
+    assert "head_branch" in helper
+
+
+def test_queue_drain_force_cancels_provider_stuck_obsolete_runs() -> None:
+    workflow = _workflow_text()
+
+    assert "def post_with_retry(path):" in workflow
+    assert "def run_completed(run_id):" in workflow
+    assert "def cancel(run_id):" in workflow
+    assert "/actions/runs/{run_id}/force-cancel" in workflow
+    assert "status in {409, 422} and run_completed(run_id)" in workflow
+    assert "status in {409, 422} or status in retryable" in workflow
+    assert "forced in {409, 422} and run_completed(run_id)" in workflow
+
+    normal = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/cancel'")
+    force = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/force-cancel'")
+    assert normal < force
