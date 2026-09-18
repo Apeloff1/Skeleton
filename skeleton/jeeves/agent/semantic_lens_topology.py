@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from .semantic_depth_interactions import depth_interaction_rules
 from .semantic_frontier import (
