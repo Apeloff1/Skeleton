@@ -10,6 +10,7 @@ from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.assurance_binding import AssuranceBinding
 from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttempt,
     AIExecutionAttemptStore,
@@ -30,6 +31,7 @@ from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
 from skeleton.shells.ai.runtime_trust import AIRuntimeTrustGuard, RuntimeTrustReport
 from skeleton.shells.ai.sandbox_backend import VerifiedSandboxExecutionBackend
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
+from skeleton.shells.ai.sealed_finalization import AISealedFinalizedExecution
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
 from skeleton.shells.ai.startup_release import AIStartupReleaseGuard, RuntimeReleaseExpectation, StartupReleaseReport
@@ -696,6 +698,130 @@ class AIShellService:
         finally:
             if execution_fence is not None and self.execution_fences is not None:
                 self.execution_fences.release(execution_fence)
+
+    def execute_sealed_and_finalize(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        seal: ExecutionSeal,
+        seal_registry: ExecutionSealRegistry,
+        finalizer: AIExecutionEvidenceFinalizer,
+        preconditions: Preconditions | None = None,
+        precondition_checker: PreconditionChecker | None = None,
+        approval=None,
+        quorum_approval: QuorumApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
+        model_attestation_digest: str = "",
+    ) -> AISealedFinalizedExecution:
+        """Execute one sealed plan and commit its recovery/audit evidence.
+
+        Process execution and evidence finalization are intentionally distinct
+        durability domains.  If the child process reaches a terminal state but
+        evidence finalization fails, this method degrades the long-lived
+        service so no new work is admitted until recovery completes.
+        """
+
+        if not isinstance(finalizer, AIExecutionEvidenceFinalizer):
+            raise TypeError("finalizer must be AIExecutionEvidenceFinalizer")
+        execution, precondition_report, seal_use = self.execute_sealed(
+            session,
+            review,
+            context=context,
+            seal=seal,
+            seal_registry=seal_registry,
+            preconditions=preconditions,
+            precondition_checker=precondition_checker,
+            approval=approval,
+            quorum_approval=quorum_approval,
+            execution_backend=execution_backend,
+            execution_fence=execution_fence,
+        )
+
+        execution_attempt = None
+        if self.execution_attempts is not None:
+            stored_attempt = self.execution_attempts.current(seal.seal_id)
+            if stored_attempt is None:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution is missing durable attempt "
+                            "evidence"
+                        ),
+                    )
+                raise RuntimeError(
+                    "terminal execution attempt evidence is missing"
+                )
+            execution_attempt = stored_attempt.attempt
+            if not execution_attempt.terminal:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution attempt is not terminal "
+                            "in durable ledger"
+                        ),
+                    )
+                raise RuntimeError(
+                    "execution attempt did not reach terminal ledger state"
+                )
+
+        active_backend = (
+            execution_backend or self.orchestrator.execution_backend
+        )
+        sandbox_binding = getattr(active_backend, "binding", None)
+        sandbox_binding_digest = (
+            ""
+            if sandbox_binding is None
+            else getattr(sandbox_binding, "digest", "")
+        )
+        quorum_approval_digest = (
+            ""
+            if quorum_approval is None
+            else quorum_approval.digest
+        )
+
+        try:
+            finalized = finalizer.finalize(
+                session,
+                execution,
+                policy_fingerprint=(
+                    self.governance.current_policy().fingerprint
+                ),
+                tool_catalog_digest=self.orchestrator.planner.catalog.digest,
+                effect_digest=self.orchestrator.compiler.effects.digest,
+                release_evidence_digest=self._release_digest(),
+                sandbox_binding_digest=sandbox_binding_digest,
+                model_attestation_digest=model_attestation_digest,
+                execution_seal_id=seal.seal_id,
+                quorum_approval_digest=quorum_approval_digest,
+                runtime_trust_digest=self._runtime_trust_digest(),
+                authority_health_policy_digest=(
+                    self._authority_health_policy_digest()
+                ),
+                execution_attempt=execution_attempt,
+            )
+        except BaseException as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "terminal execution evidence finalization failed: "
+                        f"{type(exc).__name__}"
+                    ),
+                )
+            raise
+
+        return AISealedFinalizedExecution(
+            execution,
+            precondition_report,
+            seal_use,
+            finalized,
+            execution_attempt,
+        )
 
     def _require_assurance(
         self,
