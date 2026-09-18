@@ -199,6 +199,16 @@ class TopologyBridgePrediction:
         return tuple(sorted((self.left_key, self.right_key)))
 
     @property
+    def slot_key(self) -> tuple[str, str, str, str, bool]:
+        return (
+            self.candidate_id,
+            self.kind.value,
+            self.domain,
+            self.independent_run,
+            self.negative_control,
+        )
+
+    @property
     def fingerprint(self) -> str:
         return stable_fingerprint(
             {
@@ -819,6 +829,10 @@ class SemanticTopologyLearningLab:
         )
         self._candidates = {item.candidate_id: item for item in candidates}
         self._predictions: dict[str, TopologyBridgePrediction] = {}
+        self._prediction_slots: dict[
+            tuple[str, str, str, str, bool],
+            str,
+        ] = {}
         self._trials: dict[str, TopologyBridgeTrial] = {}
         self._resolved_predictions: dict[str, str] = {}
         self._lock = threading.RLock()
@@ -886,7 +900,23 @@ class SemanticTopologyLearningLab:
                         + prediction.prediction_id
                     )
                 return existing
+
+            slot_prediction_id = self._prediction_slots.get(
+                prediction.slot_key
+            )
+            if slot_prediction_id is not None:
+                prior = self._predictions[slot_prediction_id]
+                if prior.fingerprint == prediction.fingerprint:
+                    return prior
+                raise AgentContractError(
+                    "topology bridge experiment slot already has a "
+                    "different predeclared prediction"
+                )
+
             self._predictions[prediction.prediction_id] = prediction
+            self._prediction_slots[prediction.slot_key] = (
+                prediction.prediction_id
+            )
         return prediction
 
     def prediction(
@@ -2058,13 +2088,24 @@ class SemanticTopologyLearningLab:
             )
 
         staged_predictions: dict[str, TopologyBridgePrediction] = {}
+        staged_slots: dict[
+            tuple[str, str, str, str, bool],
+            str,
+        ] = {}
         for prediction in restored.predictions:
             self._validate_prediction_candidate(prediction)
             if prediction.prediction_id in staged_predictions:
                 raise AgentContractError(
                     "duplicate topology bridge prediction during restore"
                 )
+            prior_slot = staged_slots.get(prediction.slot_key)
+            if prior_slot is not None:
+                raise AgentContractError(
+                    "topology learning state contains competing predictions "
+                    "for one experiment slot"
+                )
             staged_predictions[prediction.prediction_id] = prediction
+            staged_slots[prediction.slot_key] = prediction.prediction_id
 
         staged_trials: dict[str, TopologyBridgeTrial] = {}
         staged_resolved: dict[str, str] = {}
@@ -2102,6 +2143,7 @@ class SemanticTopologyLearningLab:
 
         with self._lock:
             self._predictions = staged_predictions
+            self._prediction_slots = staged_slots
             self._trials = staged_trials
             self._resolved_predictions = staged_resolved
             reports = self.reports()
