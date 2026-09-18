@@ -27,6 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
+from .cognition import ContextCompiler, ContextPacket, ContextSection, RunScratchpad
 from .context_pipeline import ContextResolution, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
@@ -37,7 +38,19 @@ from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
 from .semantic_tangent_bridge import SemanticRestartPacket, SemanticTangentBridge
 from .tangent_graph import TangentNode
-from .types import AgentContractError, bounded_text, json_safe, positive_int, stable_fingerprint, stable_id
+from .types import (
+    AgentContractError,
+    Goal,
+    Plan,
+    PlanStep,
+    ToolObservation,
+    bounded_text,
+    canonical_json,
+    json_safe,
+    positive_int,
+    stable_fingerprint,
+    stable_id,
+)
 from .uncertainty_frontier import FrontierLens, FrontierLensContract, FrontierLensRegistry
 
 
@@ -599,5 +612,286 @@ class ScientificNuanceRuntime:
                 "updates": [(key, value.fingerprint) for key, value in sorted(self._updates.items())],
                 "prediction_ledger": self.prediction_ledger.fingerprint,
                 "tangent_graph": self.tangent_bridge.graph.fingerprint,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificContextCompilerPolicy:
+    """Prompt-facing bounds for the current relational nuance workbench."""
+
+    maximum_nuance_chars: int = 20_000
+    maximum_lens_questions: int = 3
+    context_priority: int = 68
+
+    def __post_init__(self) -> None:
+        for name in (
+            "maximum_nuance_chars",
+            "maximum_lens_questions",
+            "context_priority",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                positive_int(name, getattr(self, name), maximum=1_000_000),
+            )
+
+
+class ScientificContextCompiler:
+    """Compile current relational nuance state into the normal runtime context."""
+
+    def __init__(
+        self,
+        resolver: LayeredContextResolver,
+        *,
+        nuance: ScientificNuanceRuntime | None = None,
+        base_compiler: ContextCompiler | None = None,
+        policy: ScientificContextCompilerPolicy | None = None,
+    ) -> None:
+        if not isinstance(resolver, LayeredContextResolver):
+            raise TypeError("resolver must be LayeredContextResolver")
+        self.resolver = resolver
+        self.nuance = nuance or ScientificNuanceRuntime(resolver)
+        if self.nuance.resolver is not resolver:
+            raise NuanceRuntimeError(
+                "nuance runtime and scientific compiler must share one resolver"
+            )
+        self.base = base_compiler or ContextCompiler()
+        self.policy = policy or ScientificContextCompilerPolicy()
+
+    @staticmethod
+    def _query(
+        task_instruction: str,
+        goal: Goal,
+        current_step: PlanStep | None,
+    ) -> str:
+        parts = [goal.objective, task_instruction]
+        if current_step is not None:
+            parts.extend(
+                (
+                    current_step.title,
+                    current_step.description,
+                    current_step.expected_outcome,
+                )
+            )
+        return " ".join(part for part in parts if part)
+
+    @staticmethod
+    def _context_tags(
+        goal: Goal,
+        plan: Plan | None,
+        current_step: PlanStep | None,
+    ) -> tuple[str, ...]:
+        tags = {"scientific-context", "jeeves"}
+        if current_step is not None:
+            tags.update(("current-step", current_step.risk.value))
+            if current_step.tool:
+                tags.add(f"tool:{current_step.tool}")
+        if plan is not None:
+            tags.add(f"plan-version:{plan.version}")
+        for key in ("domain", "task", "mode"):
+            value = goal.metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                tags.add(value.strip().casefold()[:128])
+        return tuple(sorted(tags))
+
+    def _workbench_section(self, frame: NuanceFrame) -> ContextSection:
+        lenses = [
+            {
+                "key": spec.key,
+                "family": spec.family.value,
+                "role": spec.role.value,
+                "activation": round(
+                    float(frame.lens_selection.activation_scores.get(spec.key, 0.0)),
+                    8,
+                ),
+                "rare": spec.rare,
+                "questions": list(spec.asks[: self.policy.maximum_lens_questions]),
+                "predicts": spec.predicts,
+                "failure_mode": spec.failure_mode,
+            }
+            for spec in frame.lens_selection.lenses
+        ]
+        uncertainty = [
+            {
+                "lens": item.lens.value,
+                "priority": round(item.priority, 8),
+                "reason": item.reason,
+                "quantity": item.contract.quantity.value,
+                "lineage_year": item.contract.lineage_year,
+                "use_when": item.contract.use_when,
+                "invalid_when": item.contract.invalid_when,
+                "assumptions": list(item.contract.assumptions),
+                "implementation": item.contract.implementation.value,
+            }
+            for item in frame.uncertainty_recommendations
+        ]
+        relation = frame.relation_sequence
+        payload: dict[str, Any] = {
+            "contract": {
+                "interpretive_only": True,
+                "semantic_readings_are_not_evidence": True,
+                "relations_change_retrieval_priority_not_factual_trust": True,
+                "relational_transitions_are_scored_before_learning": True,
+                "uncertainty_lenses_require_their_stated_assumptions": True,
+                "predictions_must_be_falsifiable_and_scored_later": True,
+            },
+            "frame_id": frame.frame_id,
+            "frame_fingerprint": frame.fingerprint,
+            "context_fingerprint": frame.context.fingerprint,
+            "lenses": lenses,
+            "uncertainty": uncertainty,
+            "relation_sequence": None
+            if relation is None
+            else {
+                "created_relation_ids": list(relation.created_relation_ids),
+                "event_boundary_ids": list(relation.event_boundary_ids),
+                "prediction_count": len(relation.transition_predictions),
+                "fingerprint": relation.fingerprint,
+            },
+        }
+        encoded = canonical_json(payload)
+        if len(encoded) > self.policy.maximum_nuance_chars:
+            payload["lenses"] = [
+                {
+                    "key": row["key"],
+                    "family": row["family"],
+                    "role": row["role"],
+                    "activation": row["activation"],
+                    "rare": row["rare"],
+                }
+                for row in lenses
+            ]
+            payload["uncertainty"] = [
+                {
+                    "lens": row["lens"],
+                    "priority": row["priority"],
+                    "quantity": row["quantity"],
+                    "lineage_year": row["lineage_year"],
+                }
+                for row in uncertainty
+            ]
+            payload["truncated_detail"] = True
+            encoded = canonical_json(payload)
+        if len(encoded) > self.policy.maximum_nuance_chars:
+            encoded = canonical_json(
+                {
+                    "contract": payload["contract"],
+                    "frame_id": frame.frame_id,
+                    "frame_fingerprint": frame.fingerprint,
+                    "context_fingerprint": frame.context.fingerprint,
+                    "lens_keys": [item.key for item in frame.lens_selection.lenses],
+                    "uncertainty_lenses": [
+                        item.lens.value
+                        for item in frame.uncertainty_recommendations
+                    ],
+                    "truncated_detail": True,
+                }
+            )
+        return ContextSection(
+            name="scientific_nuance_workbench",
+            content=encoded,
+            priority=self.policy.context_priority,
+            required=False,
+            source_ids=(frame.fingerprint,),
+        )
+
+    def compile(
+        self,
+        *,
+        system_instruction: str,
+        task_instruction: str,
+        goal: Goal,
+        namespace: MemoryNamespace,
+        memory: Any,
+        evidence: Any,
+        plan: Plan | None = None,
+        current_step: PlanStep | None = None,
+        observations: Sequence[ToolObservation] = (),
+        scratchpad: RunScratchpad | None = None,
+        extra_sections: Sequence[ContextSection] = (),
+    ) -> ContextPacket:
+        if memory is not self.resolver.memory:
+            raise NuanceRuntimeError(
+                "scientific context compiler must share the runtime MemoryManager"
+            )
+        frame = self.nuance.prepare(
+            namespace,
+            self._query(task_instruction, goal, current_step),
+            context_tags=self._context_tags(goal, plan, current_step),
+            capture_interaction=False,
+        )
+        layered = frame.context.sections(
+            maximum_chars=self.resolver.policy.max_total_chars
+        )
+        return self.base.compile(
+            system_instruction=system_instruction,
+            task_instruction=task_instruction,
+            goal=goal,
+            namespace=namespace,
+            memory=memory,
+            evidence=evidence,
+            plan=plan,
+            current_step=current_step,
+            observations=observations,
+            scratchpad=scratchpad,
+            extra_sections=(
+                tuple(layered)
+                + (self._workbench_section(frame),)
+                + tuple(extra_sections)
+            ),
+        )
+
+    def capture_user_interaction(
+        self,
+        namespace: MemoryNamespace,
+        content: str,
+        *,
+        context_tags: Sequence[str] = (),
+        provenance: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> InteractionCard:
+        frame = self.nuance.prepare(
+            namespace,
+            content,
+            context_tags=context_tags,
+            capture_interaction=True,
+            interaction_provenance=provenance,
+            interaction_metadata={
+                "captured_by_scientific_context_compiler": True,
+                **dict(metadata or {}),
+            },
+        )
+        if not frame.captured_card_id:
+            raise NuanceRuntimeError("scientific interaction capture produced no card")
+        card = self.resolver.cards.store.get(frame.captured_card_id)
+        if card is None:
+            raise NuanceRuntimeError("captured scientific interaction card is missing")
+        return card
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "resolver_policy": {
+                    "card_limit": self.resolver.policy.card_limit,
+                    "relation_seed_limit": self.resolver.policy.relation_seed_limit,
+                    "relation_limit_per_seed": self.resolver.policy.relation_limit_per_seed,
+                    "memory_limit": self.resolver.policy.memory_limit,
+                    "repository_limit": self.resolver.policy.repository_limit,
+                    "maximum_tier": int(self.resolver.policy.maximum_tier),
+                    "max_total_chars": self.resolver.policy.max_total_chars,
+                },
+                "nuance": self.nuance.fingerprint,
+                "base_budget": {
+                    "total_chars": self.base.budget.total_chars,
+                    "memory_chars": self.base.budget.memory_chars,
+                    "evidence_chars": self.base.budget.evidence_chars,
+                },
+                "policy": {
+                    "maximum_nuance_chars": self.policy.maximum_nuance_chars,
+                    "maximum_lens_questions": self.policy.maximum_lens_questions,
+                    "context_priority": self.policy.context_priority,
+                },
             }
         )
