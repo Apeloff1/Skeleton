@@ -340,6 +340,7 @@ class SemanticPlaneSnapshot:
         ...,
     ]
     topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
+    runtime_state_fingerprint: str
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
@@ -705,6 +706,9 @@ class SemanticLensPlane:
                     ),
                     "semantic_topology_learning_fingerprint": (
                         snapshot.topology_learning.fingerprint
+                    ),
+                    "semantic_runtime_state_fingerprint": (
+                        snapshot.runtime_state_fingerprint
                     ),
                     "inference_authority": "escalation_only",
                     "may_increase_evidence_quality": False,
@@ -1355,6 +1359,7 @@ class SemanticLensPlane:
             ),
             topology_bridge_candidates=topology_bridge_candidates,
         )
+        runtime_state_fingerprint = self.runtime_state_fingerprint
         fingerprint = stable_fingerprint(
             {
                 "observations": [item.fingerprint for item in observations],
@@ -1387,6 +1392,7 @@ class SemanticLensPlane:
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
+                "runtime_state_fingerprint": runtime_state_fingerprint,
                 "coverage": coverage.fingerprint,
                 "decision_feature_authorized": decision_feature_authorized,
                 "factual": False,
@@ -1410,7 +1416,11 @@ class SemanticLensPlane:
             topology_learning=topology_learning,
             learned_topology_rules=learned_topology_rules,
             learned_companion_keys=learned_companion_keys,
+            learned_companion_activations=(
+                learned_companion_activations
+            ),
             topology_bridge_candidates=topology_bridge_candidates,
+            runtime_state_fingerprint=runtime_state_fingerprint,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
