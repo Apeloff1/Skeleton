@@ -20,3 +20,16 @@ def test_pr_hygiene_uses_minimum_token_scope() -> None:
     # content as part of classification.
     assert "github.event.pull_request.head.repo.full_name == github.repository" in text
     assert "actions/checkout" not in text
+
+def test_pr_hygiene_runs_only_when_diff_identity_can_change() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "types: [opened, reopened, synchronize]" in text
+    for metadata_only in (
+        "edited",
+        "ready_for_review",
+        "converted_to_draft",
+        "closed",
+    ):
+        assert metadata_only not in text
+

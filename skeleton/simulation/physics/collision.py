@@ -20,6 +20,7 @@ from .math3d import EPSILON, AABB, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     ShapeKind,
@@ -930,7 +931,10 @@ def _plane_support_convex(
 ) -> ContactManifold | None:
     plane_shape = plane.shape
     assert isinstance(plane_shape, PlaneShape)
-    assert isinstance(convex.shape, (CapsuleShape, CylinderShape))
+    assert isinstance(
+        convex.shape,
+        (CapsuleShape, CylinderShape, ConvexHullShape),
+    )
 
     normal, offset = plane_shape.world_equation(plane.transform)
     deepest = convex.shape.support(-normal, convex.transform)
@@ -1019,10 +1023,14 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
     if kind_a is ShapeKind.PLANE and kind_b is ShapeKind.PLANE:
         return None
 
-    round_convex = {ShapeKind.CAPSULE, ShapeKind.CYLINDER}
-    if kind_a is ShapeKind.PLANE and kind_b in round_convex:
+    support_convex = {
+        ShapeKind.CAPSULE,
+        ShapeKind.CYLINDER,
+        ShapeKind.CONVEX_HULL,
+    }
+    if kind_a is ShapeKind.PLANE and kind_b in support_convex:
         return _plane_support_convex(a, b)
-    if kind_b is ShapeKind.PLANE and kind_a in round_convex:
+    if kind_b is ShapeKind.PLANE and kind_a in support_convex:
         result = _plane_support_convex(b, a)
         return None if result is None else result.flipped()
 
@@ -1031,11 +1039,12 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
         ShapeKind.BOX,
         ShapeKind.CAPSULE,
         ShapeKind.CYLINDER,
+        ShapeKind.CONVEX_HULL,
     }
     if (
         kind_a in finite_convex
         and kind_b in finite_convex
-        and (kind_a in round_convex or kind_b in round_convex)
+        and (kind_a in support_convex or kind_b in support_convex)
     ):
         return _convex_convex(a, b)
 

@@ -528,3 +528,32 @@ def test_separating_translation_can_dominate_angular_sweep_bound() -> None:
     )
 
     assert hit is None
+
+
+
+def test_convex_toi_fallback_scan_recovers_after_advancement_budget() -> None:
+    moving = _dynamic(
+        "moving",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-3.0, 0.0, 0.0),
+    )
+    target = _static(
+        "target",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3.zero(),
+    )
+    moving.linear_velocity = Vec3(10.0, 0.0, 0.0)
+
+    hit = convex_time_of_impact(
+        moving,
+        target,
+        0.5,
+        max_iterations=1,
+        distance_tolerance=1.0e-7,
+        time_tolerance=1.0e-9,
+    )
+
+    assert hit is not None
+    assert hit.time == pytest.approx(0.2, abs=2.0e-6)
+    assert hit.normal.x > 0.999999
+    assert hit.iterations > 1
