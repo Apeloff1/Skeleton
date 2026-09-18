@@ -71,7 +71,11 @@ class WebhookDispatcher:
             signed_body = dict(body)
             signed_body["sig"] = self._sign(body, sub.secret)
             try:
-                self._sender(sub.endpoint, signed_body)
+                safe_endpoint, _ = validate_public_https_url(
+                    sub.endpoint,
+                    purpose="webhook endpoint",
+                )
+                self._sender(safe_endpoint, signed_body)
                 self._deliveries += 1
                 fired += 1
             except Exception:
