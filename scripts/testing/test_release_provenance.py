@@ -145,6 +145,7 @@ def test_emit_provenance_is_deterministic_and_hashes_release_inputs(
         "release-sbom.cdx.json",
         "skeleton-16.0.0-py3-none-any.whl",
     ]
+    assert payload["inputs"][0]["name"] == "requirements-build.txt"
     assert payload["inputs"][0]["sha256"] == release_provenance._sha256(build_lock)
     assert payload["sbom_refs"][0]["name"] == "release-sbom.cdx.json"
 
