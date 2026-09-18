@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping, Sequence
 
-TASK_KEY = "reserve-S020-security-priority"
+TASK_ID = "reserve-S020-security-priority"
 CONFLICT_DOMAIN = "security.readonly.regression_priority"
 INVENTORY_VERSION = 1
 FINDING_PREFIX = "S020-SEC-PRI"
@@ -189,7 +189,7 @@ class _FileFacts:
 class InventoryReport:
     """Deterministic ranked backlog. Unknown items fail closed."""
 
-    task_key: str = TASK_KEY
+    task_key: str = TASK_ID
     conflict_domain: str = CONFLICT_DOMAIN
     inventory_version: int = INVENTORY_VERSION
     finding_prefix: str = FINDING_PREFIX
@@ -916,7 +916,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_report(report))
     else:
         print(
-            f"{FINDING_PREFIX}\t{TASK_KEY}\t{CONFLICT_DOMAIN}\t"
+            f"{FINDING_PREFIX}\t{TASK_ID}\t{CONFLICT_DOMAIN}\t"
             f"severity_policy={SEVERITY_POLICY}"
         )
         for item in report.items:

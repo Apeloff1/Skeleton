@@ -151,7 +151,7 @@ class SecurityPriorityInventoryTests(unittest.TestCase):
         return matches[0]
 
     def test_task_identity_and_finding_prefix_are_unique(self) -> None:
-        self.assertEqual(inventory.TASK_KEY, "reserve-S020-security-priority")
+        self.assertEqual(inventory.TASK_ID, "reserve-S020-security-priority")
         self.assertEqual(inventory.CONFLICT_DOMAIN, "security.readonly.regression_priority")
         self.assertEqual(inventory.FINDING_PREFIX, "S020-SEC-PRI")
         self.assertEqual(inventory.SEVERITY_POLICY, "unscored")
