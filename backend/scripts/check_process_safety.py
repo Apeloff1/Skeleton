@@ -100,7 +100,7 @@ def obvious_command_string(node: ast.AST) -> bool:
         if isinstance(node.op, ast.Mod):
             return obvious_command_string(node.left)
     if isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes"}:
+        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes", "repr", "ascii"}:
             return True
         if isinstance(node.func, ast.Attribute) and node.func.attr in {
             "format",
