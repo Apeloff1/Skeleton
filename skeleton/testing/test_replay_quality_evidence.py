@@ -274,6 +274,31 @@ def test_digest_valid_evidence_rejects_schema_and_pass_flag_contradictions() -> 
     assert "unsupported schema" in rejected_schema.reasons[0]
 
 
+def test_digest_valid_evidence_rejects_invalid_field_schema() -> None:
+    clean = run_harness(_manifest(max_runs=1)).to_mapping()
+
+    mutations = (
+        ("negative runs", {"runs": -1}),
+        ("runs beyond max", {"runs": 2}),
+        ("unknown source", {"source": "invented.core"}),
+        ("unknown kind", {"kind": "maybe"}),
+        ("malformed trace digest", {"trace_digests": ["z" * 64]}),
+        ("wrong reasons type", {"reasons": "looks-like-a-list"}),
+    )
+    for label, changes in mutations:
+        payload = dict(clean)
+        payload.update(changes)
+        payload["evidence_digest"] = evidence_digest_for(payload)
+        rejected = verify_evidence(payload)
+        assert rejected.verdict is Verdict.CORRUPT, label
+        assert rejected.passed is False, label
+
+    noncanonical = dict(clean)
+    noncanonical["divergence"] = {"opaque": object()}
+    with pytest.raises(QualityEvidenceError, match="canonically serializable"):
+        evidence_digest_for(noncanonical)
+
+
 def test_timeout_does_not_pass() -> None:
     report = run_harness(
         _manifest(max_runs=2, time_budget_ms=100.0),
