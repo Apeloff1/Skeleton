@@ -68,6 +68,16 @@ SERVER_ERROR_FILES = [
     REPO_ROOT / "backend" / "routes" / "nexus.py",
     REPO_ROOT / "backend" / "routes" / "galaxy_studio.py",
 ]
+
+PUBLIC_EXCEPTION_BOUNDARY_FILES = [
+    REPO_ROOT / "backend" / "routes" / "deployment_checkpoint_trust.py",
+    REPO_ROOT / "backend" / "routes" / "construct_forge.py",
+]
+CONSOLE_EXCEPTION_FILES = [
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_capabilities.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_datasets.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_gamedev_pipeline.py",
+]
 JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "asset_genesis.py",
     REPO_ROOT / "backend" / "routes" / "galaxy_studio_files.py",
@@ -87,6 +97,7 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "game_shared.py",
     REPO_ROOT / "backend" / "routes" / "game_factory.py",
     REPO_ROOT / "backend" / "routes" / "code_playground.py",
+    REPO_ROOT / "backend" / "routes" / "compiler.py",
     REPO_ROOT / "backend" / "routes" / "camera_director.py",
     REPO_ROOT / "backend" / "routes" / "curriculum.py",
     REPO_ROOT / "backend" / "routes" / "agent_knowledge.py",
@@ -207,6 +218,19 @@ def _broad_failure_http_leaks(path: Path) -> list[int]:
     return leaks
 
 
+def _caught_exception_http_leaks(path: Path) -> list[int]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    leaks: list[int] = []
+    for handler in (node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)):
+        if not handler.name:
+            continue
+        for statement in handler.body:
+            for call in _http_exception_calls(statement):
+                if _references_name(call, handler.name):
+                    leaks.append(call.lineno)
+    return leaks
+
+
 def _http_status_code(call: ast.Call) -> int | None:
     for keyword in call.keywords:
         if keyword.arg == "status_code" and isinstance(keyword.value, ast.Constant):
@@ -246,6 +270,30 @@ def test_mixed_routes_do_not_leak_server_errors(path: Path) -> None:
     assert leaks == [], f"{path.name} exposes caught exception data in 5xx responses at lines {leaks}"
     source = path.read_text(encoding="utf-8")
     assert "internal_http_error(" in source or "public_http_error(" in source
+
+
+@pytest.mark.parametrize("path", PUBLIC_EXCEPTION_BOUNDARY_FILES, ids=lambda path: path.name)
+def test_targeted_routes_do_not_expose_caught_exception_text(path: Path) -> None:
+    leaks = _caught_exception_http_leaks(path)
+    assert leaks == [], f"{path.name} exposes caught exception data at lines {leaks}"
+
+
+@pytest.mark.parametrize("path", CONSOLE_EXCEPTION_FILES, ids=lambda path: path.name)
+def test_generator_console_failures_log_type_only(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+    assert "failed: {e}" not in source
+    assert "type(e).__name__" in source
+
+
+def test_exception_exposure_batch_uses_stable_public_codes() -> None:
+    compiler = (REPO_ROOT / "backend" / "routes" / "compiler.py").read_text(encoding="utf-8")
+    construct = (REPO_ROOT / "backend" / "routes" / "construct_forge.py").read_text(encoding="utf-8")
+    checkpoint = (REPO_ROOT / "backend" / "routes" / "deployment_checkpoint_trust.py").read_text(encoding="utf-8")
+    assert '"error": "syntax_error"' in compiler
+    assert "construct_conflict" in construct
+    assert "deployment_checkpoint_pin_rejected" in checkpoint
+    assert "deployment_checkpoint_trust_conflict" in checkpoint
+    assert "detail=str(exc)" not in checkpoint
 
 
 @pytest.mark.parametrize("path", JSON_ENVELOPE_FILES, ids=lambda path: path.name)

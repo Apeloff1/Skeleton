@@ -15,7 +15,7 @@ import os
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from core.http_errors import internal_http_error
+from core.http_errors import internal_http_error, public_http_error
 
 from core.deployment_checkpoint_pin_diagnostics import diagnose_deployment_checkpoint_pins
 from core.deployment_checkpoint_pin_ledger import (
@@ -100,9 +100,9 @@ async def ingest_checkpoint_witness_receipt(
             "requirement_satisfied": runtime.requirement_satisfied(),
         }
     except DeploymentCheckpointPinRejected as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
+        raise public_http_error(403, "deployment_checkpoint_pin_rejected", exc) from None
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
 
 
 @router.get("/status")
@@ -147,7 +147,7 @@ async def checkpoint_witness_bundle(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
         raise internal_http_error("deployment_checkpoint_trust_failed", exc) from None
 
@@ -170,9 +170,9 @@ async def checkpoint_witness_trust_advance(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
 
 
 @router.get("/continuity")
@@ -195,9 +195,9 @@ async def checkpoint_witness_continuity(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
 
 
 @router.get("/verification-package")
@@ -253,6 +253,6 @@ async def checkpoint_witness_verification_package(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise public_http_error(409, "deployment_checkpoint_trust_conflict", exc) from None

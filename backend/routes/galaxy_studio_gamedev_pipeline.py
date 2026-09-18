@@ -333,5 +333,5 @@ def generate_gamedev_pipeline(build: dict, title: str, genre: str) -> Dict[str, 
             build["pipeline_stage_count"] = len(PIPELINE_STAGES)
             build["pipeline_files"] = len(files)
     except Exception as e:
-        print(f"[GALAXY gamedev-pipeline] generation failed: {e}")
+        print(f"[GALAXY gamedev-pipeline] generation failed ({type(e).__name__})")
     return files
