@@ -55,6 +55,7 @@ class ExecutionSealRegistry:
         plan_pin,
         preconditions_digest: str = "",
         approval_id: str = "",
+        release_evidence_digest: str = "",
     ) -> SealUse:
         self.authority.verify(
             seal,
@@ -63,6 +64,7 @@ class ExecutionSealRegistry:
             plan_pin=plan_pin,
             preconditions_digest=preconditions_digest,
             approval_id=approval_id,
+            release_evidence_digest=release_evidence_digest,
         )
         with self._lock:
             if seal.seal_id in self._used:
