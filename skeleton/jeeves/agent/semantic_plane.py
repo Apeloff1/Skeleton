@@ -286,9 +286,17 @@ class SemanticLensPlane:
         if any(not isinstance(item, SemanticFinding) for item in findings):
             raise TypeError("findings must contain SemanticFinding values")
 
-        observation_map = {item.observation_id: item for item in observations}
-        observation_ids = set(observation_map)
+        observation_ids = {item.observation_id for item in observations}
+        observation_evidence = {
+            item.observation_id: set(item.evidence_ids)
+            for item in observations
+        }
         selected = {spec.key for spec in selection.lenses}
+        counts: dict[str, int] = {}
+        for finding in findings:
+            counts[finding.finding_id] = counts.get(finding.finding_id, 0) + 1
+        duplicate_ids = {key for key, count in counts.items() if count > 1}
+
         accepted: list[SemanticFinding] = []
         rejected: list[FindingRejection] = []
         unknown: set[str] = set()
@@ -297,15 +305,11 @@ class SemanticLensPlane:
         orphan: set[str] = set()
         unknown_observation_reference: set[str] = set()
         evidence_mismatch: set[str] = set()
-        duplicate_ids: set[str] = set()
-        seen_finding_ids: set[str] = set()
 
         for finding in findings:
             reasons: list[str] = []
-            if finding.finding_id in seen_finding_ids:
-                duplicate_ids.add(finding.finding_id)
+            if finding.finding_id in duplicate_ids:
                 reasons.append("duplicate_finding_id")
-            seen_finding_ids.add(finding.finding_id)
 
             try:
                 spec = self.registry.get(finding.lens_key)
@@ -323,6 +327,12 @@ class SemanticLensPlane:
                 reasons.append("lens_not_selected_for_current_observations")
 
             finding_observations = set(finding.observation_ids)
+            unknown_refs = finding_observations - observation_ids
+            if unknown_refs:
+                unknown_observation_reference.add(finding.finding_id)
+                if self.policy.require_observation_subset:
+                    reasons.append("unknown_observation_reference")
+
             if (
                 self.policy.require_observation_overlap
                 and finding_observations
@@ -331,32 +341,23 @@ class SemanticLensPlane:
                 orphan.add(finding.finding_id)
                 reasons.append("no_overlap_with_current_observations")
 
-            if (
-                self.policy.require_observation_subset
-                and not finding_observations.issubset(observation_ids)
-            ):
-                unknown_observation_reference.add(finding.finding_id)
-                reasons.append("unknown_observation_reference")
+            if self.policy.require_evidence_provenance and finding.evidence_ids:
+                referenced_evidence: set[str] = set()
+                for observation_id in finding_observations & observation_ids:
+                    referenced_evidence.update(
+                        observation_evidence.get(observation_id, set())
+                    )
+                if not set(finding.evidence_ids).issubset(referenced_evidence):
+                    evidence_mismatch.add(finding.finding_id)
+                    reasons.append("evidence_not_provenanced_by_observations")
 
-            referenced_evidence = {
-                evidence_id
-                for observation_id in finding_observations
-                if observation_id in observation_map
-                for evidence_id in observation_map[observation_id].evidence_ids
-            }
-            if (
-                self.policy.require_evidence_provenance
-                and not set(finding.evidence_ids).issubset(referenced_evidence)
-            ):
-                evidence_mismatch.add(finding.finding_id)
-                reasons.append("evidence_not_backed_by_referenced_observations")
-
+            reasons = list(dict.fromkeys(reasons))
             if reasons:
                 rejected.append(
                     FindingRejection(
                         finding_id=finding.finding_id,
                         lens_key=finding.lens_key,
-                        reasons=tuple(dict.fromkeys(reasons)),
+                        reasons=tuple(reasons),
                     )
                 )
             else:
@@ -373,9 +374,11 @@ class SemanticLensPlane:
                 "family_mismatch": sorted(family_mismatch),
                 "unselected": sorted(unselected),
                 "orphan": sorted(orphan),
-                "unknown_observation_reference": sorted(unknown_observation_reference),
+                "unknown_observation_reference": sorted(
+                    unknown_observation_reference
+                ),
                 "evidence_mismatch": sorted(evidence_mismatch),
-                "duplicate_ids": sorted(duplicate_ids),
+                "duplicate_finding_ids": sorted(duplicate_ids),
             }
         )
         return SemanticFindingAudit(
@@ -385,7 +388,9 @@ class SemanticLensPlane:
             family_mismatch_ids=tuple(sorted(family_mismatch)),
             unselected_ids=tuple(sorted(unselected)),
             orphan_observation_ids=tuple(sorted(orphan)),
-            unknown_observation_reference_ids=tuple(sorted(unknown_observation_reference)),
+            unknown_observation_reference_ids=tuple(
+                sorted(unknown_observation_reference)
+            ),
             evidence_mismatch_ids=tuple(sorted(evidence_mismatch)),
             duplicate_finding_ids=tuple(sorted(duplicate_ids)),
             fingerprint=fingerprint,
