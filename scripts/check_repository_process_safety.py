@@ -57,41 +57,12 @@ def display_path(path: Path) -> Path:
         return path
 
 
-def _definitely_string_command(node: ast.AST) -> bool:
+def _definitely_string_command(
+    node: ast.AST,
+    string_aliases: frozenset[str] = frozenset(),
+) -> bool:
     """Return True only when the AST proves a subprocess command is string/bytes-like."""
-    if isinstance(node, ast.Constant):
-        return isinstance(node.value, (str, bytes))
-    if isinstance(node, ast.JoinedStr):
-        return True
-    if isinstance(node, ast.BinOp):
-        if isinstance(node.op, ast.Add):
-            # If either operand is definitely string-like, successful + evaluation
-            # yields a string/bytes command (otherwise Python raises before spawn).
-            return _definitely_string_command(node.left) or _definitely_string_command(node.right)
-        if isinstance(node.op, ast.Mod):
-            # Percent-formatting a string-shaped left operand yields text.
-            return _definitely_string_command(node.left)
-    if isinstance(node, ast.Call):
-        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes", "repr", "ascii"}:
-            return True
-        if isinstance(node.func, ast.Attribute) and node.func.attr in {
-            "format",
-            "format_map",
-            "join",
-            "strip",
-            "lstrip",
-            "rstrip",
-            "replace",
-            "lower",
-            "upper",
-            "casefold",
-            "removeprefix",
-            "removesuffix",
-            "encode",
-            "decode",
-        }:
-            return _definitely_string_command(node.func.value)
-    return False
+    return bool(BACKEND_GATE.obvious_command_string(node, string_aliases))
 
 
 def _command_argument(node: ast.Call) -> ast.AST | None:
@@ -117,6 +88,7 @@ def argv_violations(path: Path) -> list[str]:
         return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
+    string_aliases = BACKEND_GATE.command_string_aliases(tree)
     findings: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -125,7 +97,7 @@ def argv_violations(path: Path) -> list[str]:
         if name not in SUBPROCESS_CALLS:
             continue
         command = _command_argument(node)
-        if command is not None and _definitely_string_command(command):
+        if command is not None and _definitely_string_command(command, string_aliases):
             findings.append(
                 f"{label}:{node.lineno}: {name} command must be an argument vector, not a string"
             )
