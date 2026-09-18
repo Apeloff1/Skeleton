@@ -45,6 +45,8 @@ class LensOutcomeTrial:
     proposition: str
     negative_control: bool = False
     source_finding_id: str | None = None
+    source_forecast_id: str | None = None
+    source_forecast_fingerprint: str | None = None
     observation_ids: tuple[str, ...] = ()
     evidence_ids: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -67,7 +69,32 @@ class LensOutcomeTrial:
         object.__setattr__(self, "independent_run", run)
         object.__setattr__(self, "proposition", bounded_text("trial proposition", self.proposition, maximum=8192))
         if self.source_finding_id is not None:
-            object.__setattr__(self, "source_finding_id", str(self.source_finding_id).strip())
+            object.__setattr__(
+                self,
+                "source_finding_id",
+                str(self.source_finding_id).strip(),
+            )
+        if (self.source_forecast_id is None) != (
+            self.source_forecast_fingerprint is None
+        ):
+            raise AgentContractError(
+                "source forecast id and fingerprint must be supplied together"
+            )
+        if self.source_forecast_id is not None:
+            forecast_id = str(self.source_forecast_id).strip()
+            forecast_fingerprint = str(
+                self.source_forecast_fingerprint
+            ).strip()
+            if not forecast_id or not forecast_fingerprint:
+                raise AgentContractError(
+                    "source forecast id/fingerprint cannot be empty"
+                )
+            object.__setattr__(self, "source_forecast_id", forecast_id)
+            object.__setattr__(
+                self,
+                "source_forecast_fingerprint",
+                forecast_fingerprint,
+            )
         object.__setattr__(self, "observation_ids", tuple(sorted({str(x) for x in self.observation_ids if str(x)})))
         object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
@@ -84,6 +111,8 @@ class LensOutcomeTrial:
                 "proposition": self.proposition,
                 "negative_control": self.negative_control,
                 "finding": self.source_finding_id,
+                "forecast": self.source_forecast_id,
+                "forecast_fingerprint": self.source_forecast_fingerprint,
                 "observations": self.observation_ids,
                 "evidence": self.evidence_ids,
             }
@@ -261,6 +290,8 @@ class ScientificLensLab:
         domain: str,
         independent_run: str,
         negative_control: bool = False,
+        source_forecast_id: str | None = None,
+        source_forecast_fingerprint: str | None = None,
     ) -> LensOutcomeTrial:
         if not isinstance(finding, SemanticFinding):
             raise TypeError("finding must be SemanticFinding")
@@ -273,6 +304,8 @@ class ScientificLensLab:
                 "domain": domain,
                 "run": independent_run,
                 "control": negative_control,
+                "forecast": source_forecast_id,
+                "forecast_fingerprint": source_forecast_fingerprint,
             },
             length=32,
         )
@@ -286,6 +319,8 @@ class ScientificLensLab:
             proposition=finding.prediction or finding.interpretation,
             negative_control=negative_control,
             source_finding_id=finding.finding_id,
+            source_forecast_id=source_forecast_id,
+            source_forecast_fingerprint=source_forecast_fingerprint,
             observation_ids=finding.observation_ids,
             evidence_ids=finding.evidence_ids,
             metadata={
