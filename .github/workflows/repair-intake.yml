@@ -19,11 +19,10 @@ permissions:
   actions: read
 
 concurrency:
-  # Superseded failures for the same PR/workflow should not queue behind one
-  # another. Use every associated PR number as the stable case-safe identity;
-  # non-PR workflow runs fall back to the exact head SHA so unrelated refs
-  # cannot cancel one another through GitHub's case-insensitive groups.
-  group: repair-intake-${{ github.event.workflow_run.workflow_id }}-${{ join(github.event.workflow_run.pull_requests.*.number, '-') || github.event.workflow_run.head_sha }}
+  # Superseded failures for the exact triggering workflow generation may
+  # coalesce. Both fields are immutable GitHub workflow_run metadata, avoiding
+  # opaque PR-list joins and branch-name/case collisions.
+  group: repair-intake-${{ github.event.workflow_run.workflow_id }}-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
