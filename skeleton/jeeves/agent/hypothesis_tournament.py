@@ -281,6 +281,8 @@ class TournamentUpdate:
     prior: Mapping[str, float]
     posterior: Mapping[str, float]
     likelihoods: Mapping[str, float]
+    predictive_probability: float
+    surprise_bits: float
     information_gain_bits: float
     winner_id: str
     winner_probability: float
@@ -502,6 +504,8 @@ class HypothesisTournament:
             likelihood = max(self.policy.likelihood_floor, likelihood)
             likelihoods[hid] = likelihood
             weighted[hid] = prior[hid] * likelihood
+        predictive_probability = sum(weighted.values())
+        surprise_bits = -math.log2(max(_EPS, predictive_probability))
         posterior = _normalize(weighted, name="posterior")
         self._posterior = posterior
         posterior_entropy = _entropy_bits(posterior)
@@ -521,6 +525,8 @@ class HypothesisTournament:
             "prior": prior,
             "posterior": posterior,
             "likelihoods": likelihoods,
+            "predictive_probability": predictive_probability,
+            "surprise_bits": surprise_bits,
             "information_gain": information_gain,
             "falsified": falsified,
         }
@@ -531,6 +537,8 @@ class HypothesisTournament:
             prior=prior,
             posterior=posterior,
             likelihoods=likelihoods,
+            predictive_probability=predictive_probability,
+            surprise_bits=surprise_bits,
             information_gain_bits=information_gain,
             winner_id=winner_id,
             winner_probability=posterior[winner_id],
