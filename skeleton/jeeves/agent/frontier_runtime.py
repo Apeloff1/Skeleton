@@ -29,9 +29,11 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from dataclasses import replace
 from typing import Any, Callable, Mapping
 
 from .audit_assurance import FrontierExecutionReplayVerifier
+from .cortex import JeevesCortex
 from .execution_audit import (
     AuditEventKind,
     AuditSeverity,
@@ -51,7 +53,7 @@ from .runtime_guard import (
     RuntimeGuardSignals,
 )
 from .strict_runtime import StrictJeevesAgentRuntime
-from .types import AgentResult, RiskTier, TerminationReason, stable_fingerprint
+from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
 
 
 class ScopedGeneralizingRuntimeEpistemicGuard(GeneralizingRuntimeEpistemicGuard):
@@ -226,15 +228,35 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         RiskTier.EXTERNAL.value,
         RiskTier.HIGH_IMPACT.value,
     }
+    _CORTEX_ASSESSMENT_KEY = "cortex:assessment"
+    _CORTEX_ERROR_KEY = "cortex:error"
+    _RISK_ORDER = {
+        RiskTier.READ_ONLY: 0,
+        RiskTier.REVERSIBLE: 1,
+        RiskTier.MUTATING: 2,
+        RiskTier.EXTERNAL: 3,
+        RiskTier.HIGH_IMPACT: 4,
+    }
 
     def __init__(
         self,
         *,
         argument_abstractor: ArgumentAbstractor | None = None,
         runtime_guard: RuntimeEpistemicGuard | None = None,
+        cortex: JeevesCortex | None = None,
+        cortex_enabled: bool = True,
+        cortex_required: bool = False,
         wall_clock: Callable[[], float] = time.time,
         **kwargs: Any,
     ) -> None:
+        if not isinstance(cortex_enabled, bool):
+            raise TypeError("cortex_enabled must be boolean")
+        if not isinstance(cortex_required, bool):
+            raise TypeError("cortex_required must be boolean")
+        if cortex is not None and not isinstance(cortex, JeevesCortex):
+            raise TypeError("cortex must be JeevesCortex or None")
+        if not cortex_enabled and cortex is not None:
+            raise ValueError("cortex cannot be supplied when cortex_enabled is false")
         # A caller supplying a complete guard owns its exact semantics. For the
         # default construction path, let Strict build validated components and
         # then re-compose those same objects under the scoped generalizing guard
@@ -264,6 +286,16 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 raise ValueError(
                     "argument_abstractor cannot be combined with an explicit runtime_guard"
                 )
+
+        self.cortex_required = cortex_required
+        self.cortex = cortex if cortex_enabled else None
+        if cortex_enabled and self.cortex is None:
+            self.cortex = JeevesCortex(
+                clock=wall_clock,
+                monotonic=self._monotonic,
+            )
+        self._cortex_lock = threading.RLock()
+        self._cortex_assessments: dict[str, Mapping[str, Any]] = {}
 
     def _state_from_checkpoint(
         self,
@@ -296,6 +328,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             state.last_error = (
                 "recovery quarantine: ambiguous side effect(s) require external reconciliation"
             )
+        self._restore_cortex_advisory(state, checkpoint)
         return state
 
     def _drive(self, state: _RunState) -> AgentResult:
@@ -306,7 +339,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "run.recovery_quarantined",
                 dict(quarantine),
             )
-            return self._finish_failure(
+            result = self._finish_failure(
                 state,
                 TerminationReason.CONFIRMATION_REQUIRED,
                 "A prior consequential tool call may already have taken effect; autonomous replanning is blocked until external state is reconciled.",
@@ -315,7 +348,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                     "required_action": "reconcile_external_state_before_new_execution",
                 },
             )
-        return super()._drive(state)
+        else:
+            result = super()._drive(state)
+        return self._observe_cortex_result(state, result)
 
     def _checkpoint(self, state: _RunState) -> RunCheckpoint:
         """Persist after reciprocally binding checkpoint, audit, and model roots."""
@@ -402,7 +437,180 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         self.checkpointer.save(checkpoint)
         self.metrics.increment("agent.checkpoints.saved")
         self.metrics.increment("agent.checkpoints.audit_bound")
+        self._observe_cortex_checkpoint(state, checkpoint)
         return checkpoint
+
+    def _restore_cortex_advisory(
+        self,
+        state: _RunState,
+        checkpoint: RunCheckpoint,
+    ) -> None:
+        if self.cortex is None:
+            return
+        with self._cortex_lock:
+            cached = self._cortex_assessments.get(state.run_id)
+        if cached is not None and cached.get("checkpoint_sequence") == checkpoint.sequence:
+            state.scratch.set(
+                self._CORTEX_ASSESSMENT_KEY,
+                cached,
+                importance=0.95,
+            )
+            state.scratch.delete(self._CORTEX_ERROR_KEY)
+            return
+        self._observe_cortex_checkpoint(state, checkpoint)
+
+    def _observe_cortex_checkpoint(
+        self,
+        state: _RunState,
+        checkpoint: RunCheckpoint,
+    ) -> Mapping[str, Any] | None:
+        if self.cortex is None:
+            return None
+        try:
+            self.cortex.begin(
+                state.inputs,
+                run_id=state.run_id,
+                evidence_ledger=state.ledger,
+            )
+            assessment = self.cortex.observe_checkpoint(
+                state.inputs,
+                checkpoint,
+                current_risk=self._cortex_current_risk(state),
+            )
+            payload = {
+                "schema_version": 1,
+                "authority": "advisory_only",
+                "checkpoint_sequence": checkpoint.sequence,
+                "checkpoint_fingerprint": checkpoint.fingerprint,
+                "decision_id": assessment.decision.decision_id,
+                "mode": assessment.decision.mode.value,
+                "score": assessment.decision.score,
+                "directive": assessment.decision.directive,
+                "hard_stop": assessment.decision.hard_stop,
+                "requires_confirmation": assessment.decision.requires_confirmation,
+                "reasons": [reason.value for reason in assessment.decision.reasons],
+                "recommended_skill_id": assessment.recommended_skill_id,
+                "world_fingerprint": assessment.world_fingerprint,
+                "probes": [
+                    {
+                        "probe_id": probe.probe_id,
+                        "proposition_id": probe.proposition_id,
+                        "expected_information_gain_bits": probe.expected_information_gain_bits,
+                        "priority": probe.priority,
+                    }
+                    for probe in assessment.probes[:4]
+                ],
+                "notes": list(assessment.notes[:8]),
+            }
+            with self._cortex_lock:
+                self._cortex_assessments[state.run_id] = payload
+            state.scratch.set(
+                self._CORTEX_ASSESSMENT_KEY,
+                payload,
+                importance=0.95,
+            )
+            state.scratch.delete(self._CORTEX_ERROR_KEY)
+            state.trace.emit(
+                "cortex.checkpoint_assessed",
+                {
+                    "checkpoint_sequence": checkpoint.sequence,
+                    "decision_id": assessment.decision.decision_id,
+                    "mode": assessment.decision.mode.value,
+                    "score": assessment.decision.score,
+                    "hard_stop": assessment.decision.hard_stop,
+                    "recommended_skill_id": assessment.recommended_skill_id,
+                    "probe_count": len(assessment.probes),
+                    "authority": "advisory_only",
+                },
+            )
+            self.metrics.increment("agent.cortex.checkpoints_assessed")
+            return payload
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.checkpoint_errors")
+            error = {
+                "stage": "checkpoint",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+                "checkpoint_sequence": checkpoint.sequence,
+                "authority": "advisory_only",
+            }
+            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
+            state.trace.emit("cortex.error", error)
+            if self.cortex_required:
+                raise
+            return None
+
+    def _observe_cortex_result(
+        self,
+        state: _RunState,
+        result: AgentResult,
+    ) -> AgentResult:
+        if self.cortex is None:
+            return result
+        try:
+            report = self.cortex.observe_result(state.inputs, result)
+            metadata = dict(result.metadata)
+            metadata["cortex"] = {
+                "status": "observed",
+                "authority": "advisory_only",
+                "report_fingerprint": report.report_fingerprint,
+                "world_fingerprint": report.world_fingerprint,
+                "belief_count": report.belief_count,
+                "hypothesis_count": report.hypothesis_count,
+                "world_entropy_bits": report.world_entropy_bits,
+                "decision_count": len(report.decisions),
+                "learned_skill_ids": list(report.learned_skill_ids),
+                "anomalies": list(report.anomalies),
+            }
+            self.metrics.increment("agent.cortex.results_observed")
+            return replace(result, metadata=metadata)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.result_errors")
+            if self.cortex_required:
+                raise
+            metadata = dict(result.metadata)
+            metadata["cortex"] = {
+                "status": "degraded",
+                "authority": "advisory_only",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+            }
+            return replace(result, metadata=metadata)
+
+    def _cortex_current_risk(self, state: _RunState) -> RiskTier:
+        if state.plan is None:
+            return RiskTier.READ_ONLY
+        running = [
+            step for step in state.plan.steps
+            if step.status is StepStatus.RUNNING
+        ]
+        candidates = running or list(state.plan.ready_steps())
+        if not candidates:
+            return RiskTier.READ_ONLY
+        return max(
+            (step.risk for step in candidates),
+            key=lambda risk: self._RISK_ORDER[risk],
+        )
+
+    def cortex_summary(self) -> Mapping[str, Any]:
+        if self.cortex is None:
+            return {
+                "enabled": False,
+                "required": self.cortex_required,
+            }
+        summary = dict(self.cortex.global_summary())
+        summary.update(
+            {
+                "enabled": True,
+                "required": self.cortex_required,
+                "authority": "advisory_only",
+            }
+        )
+        return summary
 
     @staticmethod
     def _verify_resume_identity(inputs: RunInputs, checkpoint: RunCheckpoint) -> None:
