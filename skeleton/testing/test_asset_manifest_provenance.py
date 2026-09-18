@@ -175,6 +175,77 @@ def test_non_canonical_values_fail_closed():
         canonical_dumps({1: "x"})
 
 
+def test_direct_record_construction_cannot_bypass_content_schema_validation():
+    data = _bytes("direct")
+    valid, _ = _record("direct", data=data)
+
+    with pytest.raises(AssetManifestError, match="size_bytes"):
+        validate_manifest(
+            AssetManifest(
+                schema_version=SCHEMA_VERSION,
+                assets=(
+                    AssetRecord(
+                        identity=valid.identity,
+                        content=manifest_mod.ContentDescriptor(
+                            sha256=valid.content.sha256,
+                            size_bytes=-1,
+                            media_type=valid.content.media_type,
+                            canonical_identity=valid.content.canonical_identity,
+                        ),
+                        source=valid.source,
+                        license=valid.license,
+                        lineage=valid.lineage,
+                        targets=valid.targets,
+                        release_marked=False,
+                        fingerprint=valid.fingerprint,
+                    ),
+                ),
+            )
+        )
+
+    with pytest.raises(SerializationError, match="media_type"):
+        validate_manifest(
+            AssetManifest(
+                schema_version=SCHEMA_VERSION,
+                assets=(
+                    AssetRecord(
+                        identity=valid.identity,
+                        content=manifest_mod.ContentDescriptor(
+                            sha256=valid.content.sha256,
+                            size_bytes=valid.content.size_bytes,
+                            media_type="x" * (manifest_mod.MAX_STRING_CHARS + 1),
+                            canonical_identity=valid.content.canonical_identity,
+                        ),
+                        source=valid.source,
+                        license=valid.license,
+                        lineage=valid.lineage,
+                        targets=valid.targets,
+                        release_marked=False,
+                        fingerprint=valid.fingerprint,
+                    ),
+                ),
+            )
+        )
+
+    malformed_release_flag = AssetRecord(
+        identity=valid.identity,
+        content=valid.content,
+        source=valid.source,
+        license=valid.license,
+        lineage=valid.lineage,
+        targets=valid.targets,
+        release_marked="false",  # type: ignore[arg-type]
+        fingerprint=valid.fingerprint,
+    )
+    with pytest.raises(SerializationError, match="release_marked"):
+        validate_manifest(
+            AssetManifest(
+                schema_version=SCHEMA_VERSION,
+                assets=(malformed_release_flag,),
+            )
+        )
+
+
 def test_digest_drift_fails_closed_on_bytes_and_declared_identity():
     record, data = _record("drift")
     verify_content(record, data)
