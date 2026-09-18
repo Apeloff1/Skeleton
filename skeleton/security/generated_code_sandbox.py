@@ -240,7 +240,7 @@ class GeneratedCodeSandbox:
     def granted_capabilities(self) -> frozenset[SandboxCapability]:
         granted: set[SandboxCapability] = set()
         for capability, kernel_caps in _CAPABILITY_MAP.items():
-            if any(self._kernel.can(self._holder, item) for item in kernel_caps):
+            if all(self._kernel.can(self._holder, item) for item in kernel_caps):
                 granted.add(capability)
         return frozenset(granted)
 
@@ -310,6 +310,17 @@ class GeneratedCodeSandbox:
         if operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}:
             if not self._path_allowed(operation.target):
                 return SandboxDecision(False, "path escapes sandbox workspace", operation)
+            required_kernel_cap = (
+                Capability.FS_READ
+                if operation.kind is OperationKind.FS_READ
+                else Capability.FS_WRITE
+            )
+            if not self._kernel.can(self._holder, required_kernel_cap):
+                return SandboxDecision(
+                    False,
+                    f"missing capability {required_kernel_cap.value}",
+                    operation,
+                )
             if _looks_like_secret_path(operation.target) and not self._has_capability(
                 SandboxCapability.SECRETS
             ):
