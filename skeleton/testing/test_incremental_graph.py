@@ -534,3 +534,78 @@ def test_module_does_not_import_scanner_or_execute_builds() -> None:
     assert graph_mod.__name__ == "skeleton.build.incremental_graph"
     assert "subprocess" not in graph_mod.__dict__
     assert "socket" not in graph_mod.__dict__
+
+
+def test_specs_and_dependencies_are_consumed_with_hard_bounds() -> None:
+    def specs():
+        index = 0
+        while True:
+            yield {"id": f"n{index}"}
+            index += 1
+
+    with pytest.raises(IncrementalGraphError, match="specs count exceeds"):
+        build_incremental_graph(specs(), max_nodes=3)
+
+    def dependencies():
+        index = 0
+        while True:
+            yield f"d{index}"
+            index += 1
+
+    with pytest.raises(IncrementalGraphError, match="dependencies count exceeds"):
+        build_incremental_graph([{"id": "root", "dependencies": dependencies()}], max_edges=3)
+
+
+def test_deep_acyclic_graph_does_not_depend_on_python_recursion_limit() -> None:
+    count = 1200
+    specs = [{"id": "n0000"}]
+    specs.extend(
+        {"id": f"n{index:04d}", "dependencies": [f"n{index - 1:04d}"]}
+        for index in range(1, count)
+    )
+    graph = build_incremental_graph(
+        specs,
+        max_nodes=count,
+        max_edges=count,
+        max_visits=10_000,
+    )
+    assert len(graph.topological_order) == count
+    assert graph.topological_order[0] == "n0000"
+    assert graph.topological_order[-1] == f"n{count - 1:04d}"
+
+
+def test_topological_ready_set_is_globally_lexicographic() -> None:
+    graph = build_incremental_graph(
+        [
+            {"id": "a"},
+            {"id": "b"},
+            {"id": "z", "dependencies": ["a"]},
+            {"id": "aa", "dependencies": ["b"]},
+        ]
+    )
+    assert graph.topological_order == ("a", "b", "aa", "z")
+
+
+def test_node_id_alias_is_not_ambiguous() -> None:
+    with pytest.raises(IncrementalGraphError, match="both id and node_id"):
+        build_incremental_graph([{"id": "a", "node_id": "b"}])
+
+
+def test_repo_index_file_count_respects_graph_bound_before_conversion() -> None:
+    snapshot = _valid_repo_index()
+    with pytest.raises(IncrementalGraphError, match="file count exceeds"):
+        build_incremental_graph(repo_index=snapshot, max_nodes=2)
+
+
+def test_repo_index_object_requires_complete_contract() -> None:
+    with pytest.raises(IncrementalGraphError, match="missing required fields"):
+        build_incremental_graph(repo_index=SimpleNamespace(files=()))
+
+
+def test_repo_index_tracked_file_requires_complete_contract() -> None:
+    snapshot = _valid_repo_index()
+    files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
+    files[1].pop("working_mode")
+    bad = {**snapshot, "files": files}
+    with pytest.raises(IncrementalGraphError, match="missing required keys"):
+        build_incremental_graph(repo_index=bad)
