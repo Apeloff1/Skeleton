@@ -67,6 +67,8 @@ Key references:
 - `docs/SHELL_AI_EVALS.md`
 - `docs/SHELL_AI_MCP_2026.md`
 - `docs/SHELL_AI_HIGH_ASSURANCE_RUNBOOK.md`
+- `docs/SHELL_AI_RUNTIME_TRUST_EPOCHS.md`
+- `docs/SHELL_AI_DISTRIBUTED_AUTHORITY_OPERATIONS.md`
 
 The canonical quality gate runs every `skeleton/testing/test_shell_*.py` regression, so AI-shell security and execution tests are mandatory rather than optional.
 
