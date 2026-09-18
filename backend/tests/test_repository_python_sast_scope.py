@@ -71,6 +71,29 @@ def test_repository_python_sast_required_root_cannot_be_symlink(
         list(python_files())
 
 
+def test_repository_python_sast_keeps_live_skeleton_build_package(tmp_path: Path) -> None:
+    namespace = _scanner_namespace()
+    python_files = namespace["python_files"]
+    skeleton = tmp_path / "skeleton"
+    scripts = tmp_path / "scripts"
+    live_build = skeleton / "build"
+    generated_build = scripts / "build"
+    live_build.mkdir(parents=True)
+    generated_build.mkdir(parents=True)
+    (live_build / "incremental_graph.py").write_text("value = 1\n", encoding="utf-8")
+    (generated_build / "generated.py").write_text("value = 1\n", encoding="utf-8")
+    (scripts / "tool.py").write_text("value = 1\n", encoding="utf-8")
+
+    python_files.__globals__["REPO_ROOT"] = tmp_path
+    python_files.__globals__["SCAN_ROOTS"] = (skeleton, scripts)
+
+    scanned = {path.relative_to(tmp_path).as_posix() for path in python_files()}
+
+    assert "skeleton/build/incremental_graph.py" in scanned
+    assert "scripts/tool.py" in scanned
+    assert "scripts/build/generated.py" not in scanned
+
+
 def test_repository_python_sast_main_redacts_traversal_error_details(capsys) -> None:
     namespace = _scanner_namespace()
     main = namespace["main"]
