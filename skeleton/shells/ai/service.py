@@ -230,6 +230,11 @@ class AIShellService:
             precondition_report = precondition_checker.require(preconditions)
             precondition_digest = preconditions.digest
         approval_id = "" if approval is None else approval.approval_id
+        self._require_assurance(
+            review,
+            execution_backend=execution_backend,
+            sealed=True,
+        )
         use = seal_registry.consume(
             seal,
             principal=context.principal,
