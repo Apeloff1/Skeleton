@@ -76,6 +76,22 @@ def test_rejects_walrus_alias_of_requests_get_verify_false(tmp_path: Path) -> No
     assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
 
 
+def test_rejects_chained_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "runner = eval\nexecute = runner\nexecute(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_chained_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nfetch = requests.get\ncall = fetch\ncall(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
 def test_allows_reassigned_sensitive_alias_to_avoid_unsafe_inference(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
