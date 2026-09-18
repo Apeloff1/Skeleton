@@ -854,6 +854,61 @@ class PhysicsWorld:
             body_b.position = body_b.position - event.normal * (slop * weight_b)
             body_b.wake()
 
+    def _project_toi_residual_closing_velocity(
+        self,
+        manifold: ContactManifold,
+    ) -> None:
+        """Remove only residual inward normal velocity after the interim TOI solve.
+
+        Curved support-map contacts can move the active witness point as the
+        solver applies angular impulse.  In rare capsule/cylinder cases the
+        ordinary bounded solver therefore leaves a microscopic inward velocity
+        at the resolved witness.  The next conservative-advancement query sees
+        that as another immediate impact and can chatter until the world-level
+        CCD substep guard fires.
+
+        This projection is deliberately one-sided: it never changes a
+        separating contact and never adds restitution.  Effective mass includes
+        both translational and angular response at each bounded manifold point,
+        so the correction is the minimum normal impulse needed to reach zero
+        residual closing speed.
+        """
+        body_a = self._bodies[manifold.body_a]
+        body_b = self._bodies[manifold.body_b]
+        normal = manifold.normal
+
+        for point in manifold.points:
+            velocity_a = body_a.velocity_at_world_point(point.position)
+            velocity_b = body_b.velocity_at_world_point(point.position)
+            normal_speed = (velocity_b - velocity_a).dot(normal)
+            if normal_speed >= -EPSILON:
+                continue
+
+            arm_a = point.position - body_a.position
+            arm_b = point.position - body_b.position
+            effective_inverse_mass = body_a.inverse_mass + body_b.inverse_mass
+
+            if body_a.dynamic_body:
+                angular_a = body_a.world_inverse_inertia().mul_vec(
+                    arm_a.cross(normal)
+                ).cross(arm_a)
+                effective_inverse_mass += normal.dot(angular_a)
+            if body_b.dynamic_body:
+                angular_b = body_b.world_inverse_inertia().mul_vec(
+                    arm_b.cross(normal)
+                ).cross(arm_b)
+                effective_inverse_mass += normal.dot(angular_b)
+
+            if effective_inverse_mass <= EPSILON:
+                continue
+
+            impulse_magnitude = -normal_speed / effective_inverse_mass
+            if not math.isfinite(impulse_magnitude) or impulse_magnitude <= 0.0:
+                continue
+            impulse = normal * impulse_magnitude
+            body_a.apply_impulse(-impulse, point=point.position)
+            body_b.apply_impulse(impulse, point=point.position)
+
     def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
         self._bias_toi_pair_into_contact(event)
         manifold = detect_collision(
@@ -885,6 +940,7 @@ class PhysicsWorld:
             cache=None,
             tick=tick,
         )
+        self._project_toi_residual_closing_velocity(impact_manifold)
 
     def _integrate_velocity_phase(
         self,
