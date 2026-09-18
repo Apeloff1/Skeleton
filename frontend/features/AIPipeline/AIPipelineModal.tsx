@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
+import { safeErrorMessage } from '../../utils/safeError';
 const API_URL = API_BASE;
 
 interface AIPipelineModalProps {
@@ -93,8 +94,9 @@ export const AIPipelineModal: React.FC<AIPipelineModalProps> = ({
       } else {
         setGeneratedCode('// No code generated. Try rephrasing your description.');
       }
-    } catch (error: any) {
-      toast.error(`Failed to generate code: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Failed to generate code', safeErrorMessage(error));
+      toast.error('Failed to generate code');
     } finally {
       setIsLoading(false);
     }
@@ -128,8 +130,9 @@ export const AIPipelineModal: React.FC<AIPipelineModalProps> = ({
       } else {
         setAnalysisResult('Analysis complete. No specific findings.');
       }
-    } catch (error: any) {
-      toast.error(`Failed to analyze code: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Failed to analyze code', safeErrorMessage(error));
+      toast.error('Failed to analyze code');
     } finally {
       setIsLoading(false);
     }
@@ -148,8 +151,9 @@ export const AIPipelineModal: React.FC<AIPipelineModalProps> = ({
       
       setProviders(providersData.providers || []);
       setPipelineInfo(infoData);
-    } catch (error: any) {
-      toast.error(`Failed to load providers: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Failed to load providers', safeErrorMessage(error));
+      toast.error('Failed to load providers');
     } finally {
       setIsLoading(false);
     }

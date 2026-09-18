@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
+import { safeErrorMessage } from '../../utils/safeError';
 const API_URL = API_BASE;
 
 interface AdvancedFeaturesModalProps {
@@ -78,8 +79,9 @@ export const AdvancedFeaturesModal: React.FC<AdvancedFeaturesModalProps> = ({
         setCurrentCommit(data.commit_id);
         loadHistory();
       }
-    } catch (error: any) {
-      toast.error(`Commit failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Commit failed', safeErrorMessage(error));
+      toast.error('Commit failed');
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +123,9 @@ export const AdvancedFeaturesModal: React.FC<AdvancedFeaturesModalProps> = ({
 
       const data = await response.json();
       setBenchmarkResult(data);
-    } catch (error: any) {
-      toast.error(`Benchmark failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Benchmark failed', safeErrorMessage(error));
+      toast.error('Benchmark failed');
     } finally {
       setIsLoading(false);
     }
@@ -149,8 +152,9 @@ export const AdvancedFeaturesModal: React.FC<AdvancedFeaturesModalProps> = ({
 
       const data = await response.json();
       setVerifyResult(data);
-    } catch (error: any) {
-      toast.error(`Verification failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Verification failed', safeErrorMessage(error));
+      toast.error('Verification failed');
     } finally {
       setIsLoading(false);
     }

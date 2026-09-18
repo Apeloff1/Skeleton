@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
+import { safeErrorMessage } from '../../utils/safeError';
 const API_URL = API_BASE;
 
 interface ImagineModalProps {
@@ -96,8 +97,9 @@ export const ImagineModal: React.FC<ImagineModalProps> = ({
       if (data.status === 'success' && data.images?.[0]?.data && onImageGenerated) {
         onImageGenerated(data.images[0].data);
       }
-    } catch (error: any) {
-      toast.error(`Image generation failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Image generation failed', safeErrorMessage(error));
+      toast.error('Image generation failed');
     } finally {
       setIsLoading(false);
     }
@@ -128,8 +130,9 @@ export const ImagineModal: React.FC<ImagineModalProps> = ({
         setPrompt(data.enhanced_prompt);
         toast.info('Your prompt has been enhanced by AI');
       }
-    } catch (error: any) {
-      toast.error(`Enhancement failed: ${error.message}`);
+    } catch (error: unknown) {
+      console.error('Enhancement failed', safeErrorMessage(error));
+      toast.error('Enhancement failed');
     } finally {
       setIsLoading(false);
     }
