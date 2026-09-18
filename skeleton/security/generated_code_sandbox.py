@@ -100,8 +100,26 @@ _PROC_CALLS = frozenset({
     "os.spawnlp", "os.spawnlpe", "os.posix_spawn", "os.fork", "os.forkpty",
     "subprocess.run", "subprocess.Popen", "subprocess.call",
     "subprocess.check_call", "subprocess.check_output",
+    "multiprocessing.Process", "multiprocessing.Pool",
+    "pty.spawn", "ctypes.CDLL", "ctypes.PyDLL",
 })
 _EVAL_CALLS = frozenset({"eval", "exec", "compile", "__import__", "builtins.eval", "builtins.exec"})
+_TRACKED_CALLABLES = frozenset().union(
+    _FS_CALLS,
+    _NET_CALLS,
+    _PROC_CALLS,
+    _EVAL_CALLS,
+    {
+        "getattr",
+        "builtins.getattr",
+        "importlib.import_module",
+        "os.getenv",
+        "os.environ.get",
+        "os.environ.__getitem__",
+        "sandbox.grant",
+        "GeneratedCodeSandbox.grant",
+    },
+)
 
 
 class SandboxCapability(str, Enum):
@@ -240,7 +258,7 @@ class GeneratedCodeSandbox:
     def granted_capabilities(self) -> frozenset[SandboxCapability]:
         granted: set[SandboxCapability] = set()
         for capability, kernel_caps in _CAPABILITY_MAP.items():
-            if any(self._kernel.can(self._holder, item) for item in kernel_caps):
+            if all(self._kernel.can(self._holder, item) for item in kernel_caps):
                 granted.add(capability)
         return frozenset(granted)
 
@@ -308,11 +326,27 @@ class GeneratedCodeSandbox:
                 operation,
             )
         if operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}:
-            if not self._path_allowed(operation.target):
+            if operation.target == "<dynamic>":
+                return SandboxDecision(False, "dynamic filesystem target cannot be proven contained", operation)
+            try:
+                resolved_path = self._contained_path(operation.target)
+            except SandboxPolicyError:
                 return SandboxDecision(False, "path escapes sandbox workspace", operation)
-            if _looks_like_secret_path(operation.target) and not self._has_capability(
-                SandboxCapability.SECRETS
-            ):
+            required_kernel_cap = (
+                Capability.FS_READ
+                if operation.kind is OperationKind.FS_READ
+                else Capability.FS_WRITE
+            )
+            if not self._kernel.can(self._holder, required_kernel_cap):
+                return SandboxDecision(
+                    False,
+                    f"missing capability {required_kernel_cap.value}",
+                    operation,
+                )
+            if (
+                _looks_like_secret_path(operation.target)
+                or _looks_like_secret_path(str(resolved_path))
+            ) and not self._has_capability(SandboxCapability.SECRETS):
                 return SandboxDecision(
                     False,
                     "secret-bearing path requires secrets capability",
@@ -411,16 +445,9 @@ class GeneratedCodeSandbox:
         return True
 
     def _contained_path(self, target: str) -> Path:
-        if (
-            not isinstance(target, str)
-            or not target
-            or target == "<dynamic>"
-            or "\x00" in target
-        ):
+        if not isinstance(target, str) or not target or "\x00" in target:
             raise SandboxPolicyError("filesystem target is invalid", context={"target": repr(target)})
         decoded = unquote(target)
-        if "\x00" in decoded:
-            raise SandboxPolicyError("filesystem target is invalid", context={"target": repr(target)})
         candidate = Path(decoded)
         if candidate.is_absolute():
             resolved = candidate
@@ -456,8 +483,7 @@ class GeneratedCodeSandbox:
             return False
         if not self._process_allowlist:
             return False
-        executable = Path(target).name
-        return target in self._process_allowlist or executable in self._process_allowlist
+        return target in self._process_allowlist
 
 
 def _bounded_payload(payload: object) -> str:
@@ -498,18 +524,29 @@ def _inspect_python(source: str) -> list[Operation]:
         ) from exc
     operations: list[Operation] = []
     aliases: dict[str, str] = {}
-    for node in ast.walk(tree):
+    nodes = list(ast.walk(tree))
+
+    # Resolve imports before inspecting calls so source ordering cannot hide a
+    # sensitive callable behind an alias used earlier in the AST traversal.
+    for node in nodes:
         if isinstance(node, ast.Import):
             for item in node.names:
                 aliases[item.asname or item.name.split(".", 1)[0]] = item.name
                 operations.extend(_import_operations(item.name))
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            aliases[module.split(".", 1)[0]] = module
+            if module:
+                aliases[module.split(".", 1)[0]] = module
             operations.extend(_import_operations(module))
             for item in node.names:
-                operations.extend(_import_operations(f"{module}.{item.name}" if module else item.name))
-        elif isinstance(node, ast.Call):
+                full_name = f"{module}.{item.name}" if module else item.name
+                aliases[item.asname or item.name] = full_name
+                operations.extend(_import_operations(full_name))
+
+    aliases.update(_stable_callable_aliases(nodes, aliases))
+
+    for node in nodes:
+        if isinstance(node, ast.Call):
             operations.extend(_call_operations(node, aliases))
         elif isinstance(node, ast.Attribute):
             name = _dotted_name(node, aliases)
@@ -523,6 +560,46 @@ def _inspect_python(source: str) -> list[Operation]:
                     )
                 )
     return operations
+
+
+def _stable_callable_aliases(
+    nodes: Iterable[ast.AST],
+    import_aliases: Mapping[str, str],
+) -> dict[str, str]:
+    """Conservatively resolve local aliases to sensitive callables, including chains."""
+    node_list = list(nodes)
+    resolved: dict[str, str] = {}
+
+    changed = True
+    while changed:
+        changed = False
+        aliases = {**import_aliases, **resolved}
+        for node in node_list:
+            value: ast.AST | None = None
+            names: list[str] = []
+            if isinstance(node, ast.Assign):
+                value = node.value
+                names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                value = node.value
+                names = [node.target.id]
+            elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+                value = node.value
+                names = [node.target.id]
+            if value is None or not names:
+                continue
+            source = _dotted_name(value, aliases)
+            if source not in _TRACKED_CALLABLES:
+                continue
+            for name in names:
+                # Generated code is adversarial: once a local name is observed
+                # aliasing a sensitive callable, later reassignment must not be
+                # allowed to erase that provenance and create a bypass.
+                if name in resolved:
+                    continue
+                resolved[name] = source
+                changed = True
+    return resolved
 
 
 def _inspect_tool_json(text: str) -> list[Operation]:
@@ -748,11 +825,12 @@ def _is_blocked_host(host: str) -> bool:
         address = ipaddress.ip_address(host)
     except ValueError:
         return host.startswith("169.254.")
-    return bool(
-        address.is_loopback
-        or address.is_private
-        or address.is_link_local
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
+    return not bool(
+        address.is_global
+        and not address.is_multicast
+        and not address.is_unspecified
+        and not address.is_loopback
+        and not address.is_link_local
+        and not address.is_reserved
+        and not getattr(address, "is_site_local", False)
     )
