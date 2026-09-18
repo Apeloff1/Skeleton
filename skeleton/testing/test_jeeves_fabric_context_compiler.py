@@ -213,6 +213,9 @@ def test_base_context_compiler_restores_explicit_fabric_contract() -> None:
     assert record.memory_id in canonical_section.content
     assert any(row["content"] == record.content for row in canonical_rows)
     assert semantic["interpretive_only"] is True
+    assert all(row["scientific_grade"] for row in semantic["lenses"])
+    assert all("permissions" in row for row in semantic["lenses"])
+    assert all(row["evidence_ceiling"] for row in semantic["lenses"])
     assert all(row["factual_assertion_authorized"] is False for row in semantic["lenses"])
     assert all(row["causal_assertion_authorized"] is False for row in semantic["lenses"])
     assert "not factual evidence" in semantic["instruction"]
