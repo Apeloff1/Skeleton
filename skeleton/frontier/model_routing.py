@@ -124,14 +124,12 @@ def _normalize_capabilities(
             value = capability.value
         elif isinstance(capability, str):
             value = capability.strip().lower()
+            if value != capability:
+                raise ValueError(f"{field_name} entries must be normalized")
         else:
             raise TypeError(f"{field_name} entries must be strings")
         if not value:
             raise ValueError(f"{field_name} entries must not be empty")
-        if value != str(capability).strip().lower() and not isinstance(
-            capability, ModelCapability
-        ):
-            raise ValueError(f"{field_name} entries must be normalized")
         normalized.add(value)
     if not normalized and not allow_empty:
         raise ValueError(f"{field_name} must not be empty")
@@ -932,12 +930,10 @@ class ModelRouter:
         missing = required - metadata.capabilities
         if missing:
             reasons.append("missing capabilities: " + ",".join(sorted(missing)))
-        total_tokens = request.estimated_input_tokens + (
-            request.max_output_tokens or 0
-        )
-        if total_tokens > metadata.max_input_tokens:
+        if request.estimated_input_tokens > metadata.max_input_tokens:
             reasons.append(
-                f"context {total_tokens} exceeds {metadata.max_input_tokens}"
+                "input tokens "
+                f"{request.estimated_input_tokens} exceeds {metadata.max_input_tokens}"
             )
         if (
             request.max_output_tokens is not None
