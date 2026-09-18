@@ -449,6 +449,8 @@ class MemoryGameIndex:
         source_ref: str,
         source_fingerprint: str,
         sequence: int,
+        source_tier: SourceTier = SourceTier.MEMORY_STORE,
+        source_provider: str = "",
         role: str = "user",
         salience: float = 0.70,
         trust: float = 1.0,
@@ -461,9 +463,10 @@ class MemoryGameIndex:
         role = str(role).casefold().strip() or "user"
         return self.index_source(
             namespace_key=namespace_key,
-            source_tier=SourceTier.USER_INTERACTION,
+            source_tier=source_tier,
             source_ref=source_ref,
             source_fingerprint=source_fingerprint,
+            source_provider=source_provider,
             cue=text,
             preview=text[:8192],
             kind=CardKind.INTERACTION,
