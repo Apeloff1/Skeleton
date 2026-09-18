@@ -139,6 +139,54 @@ class ContinuousCollisionDetector:
             motion += body.angular_velocity.length() * radius * dt
         return motion > radius * self.motion_threshold
 
+    @staticmethod
+    def _continuous_finite_body(body: RigidBody) -> bool:
+        return (
+            body.continuous
+            and body.body_type is BodyType.DYNAMIC
+            and body.awake
+            and isinstance(
+                body.shape,
+                (SphereShape, BoxShape, CapsuleShape, CylinderShape),
+            )
+        )
+
+    def _pair_requires_general_ccd(
+        self,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        dt: float,
+    ) -> bool:
+        continuous = tuple(
+            body
+            for body in (body_a, body_b)
+            if self._continuous_finite_body(body)
+        )
+        if not continuous:
+            return False
+
+        relative_travel = (
+            body_b.linear_velocity - body_a.linear_velocity
+        ).length() * dt
+
+        angular_travel = 0.0
+        for body in (body_a, body_b):
+            radius = self._finite_sweep_radius(body)
+            if radius is not None:
+                angular_travel += (
+                    body.angular_velocity.length() * radius * dt
+                )
+
+        threshold_radius = min(
+            radius
+            for body in continuous
+            if (radius := self._finite_sweep_radius(body)) is not None
+        )
+        return (
+            relative_travel + angular_travel
+            > threshold_radius * self.motion_threshold
+        )
+
     def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
         if (
             not body.continuous
@@ -381,9 +429,10 @@ class ContinuousCollisionDetector:
                 pair = (body_a.body_id, body_b.body_id)
                 if pair in events:
                     continue
-                if not (
-                    self._eligible_continuous_body(body_a, dt)
-                    or self._eligible_continuous_body(body_b, dt)
+                if not self._pair_requires_general_ccd(
+                    body_a,
+                    body_b,
+                    dt,
                 ):
                     continue
                 if not isinstance(body_a.shape, finite_shapes) or not isinstance(
@@ -426,9 +475,7 @@ class ContinuousCollisionDetector:
                 events[pair] = event
 
         for convex in ordered:
-            if not self._eligible_continuous_body(convex, dt):
-                continue
-            if isinstance(convex.shape, PlaneShape):
+            if not self._continuous_finite_body(convex):
                 continue
 
             for plane in ordered:
@@ -443,6 +490,12 @@ class ContinuousCollisionDetector:
                 if pair in events:
                     # Exact sphere/static-plane sweeps and any earlier
                     # canonical event remain authoritative.
+                    continue
+                if not self._pair_requires_general_ccd(
+                    convex,
+                    plane,
+                    dt,
+                ):
                     continue
 
                 checks += 1
