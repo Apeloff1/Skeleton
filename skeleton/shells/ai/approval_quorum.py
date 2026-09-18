@@ -35,7 +35,6 @@ class QuorumApprovalPolicy:
     forbid_principal_self_approval: bool = True
     allowed_roles: frozenset[str] = frozenset()
     max_ttl_seconds: float = 900.0
-    reject_is_terminal: bool = True
 
     def __post_init__(self) -> None:
         if self.required_votes < 2:
@@ -297,6 +296,10 @@ class AIApprovalQuorumStore:
                 if prior.role != role:
                     raise QuorumApprovalError(
                         "approver already voted with a different role"
+                    )
+                if prior.decision is not decision:
+                    raise QuorumApprovalError(
+                        "approver may not change quorum vote decision"
                     )
                 return StoredQuorumApproval(record.revision, current)
             if len(current.votes) >= self.policy.max_votes:
