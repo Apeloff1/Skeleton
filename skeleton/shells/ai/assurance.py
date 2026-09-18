@@ -24,6 +24,7 @@ class AIExecutionAssurancePolicy:
     require_release_bands: frozenset[RiskBand] = frozenset()
     require_preconditions_bands: frozenset[RiskBand] = frozenset()
     require_human_approval_bands: frozenset[RiskBand] = frozenset()
+    require_quorum_bands: frozenset[RiskBand] = frozenset()
 
     def __post_init__(self) -> None:
         for name in ("low", "medium", "high", "critical"):
@@ -36,6 +37,7 @@ class AIExecutionAssurancePolicy:
             "require_release_bands",
             "require_preconditions_bands",
             "require_human_approval_bands",
+            "require_quorum_bands",
         ):
             object.__setattr__(
                 self,
@@ -52,6 +54,7 @@ class AIExecutionAssurancePolicy:
             ),
             require_preconditions_bands=frozenset({RiskBand.HIGH}),
             require_human_approval_bands=frozenset({RiskBand.HIGH}),
+            require_quorum_bands=frozenset({RiskBand.HIGH}),
         )
 
     def for_band(self, band: RiskBand) -> AssuranceLevel:
@@ -72,6 +75,7 @@ class AssuranceDecision:
     release_verified: bool
     preconditions_verified: bool
     human_approved: bool
+    quorum_approved: bool
     reasons: tuple[str, ...]
 
     def to_dict(self) -> dict[str, object]:
@@ -83,6 +87,7 @@ class AssuranceDecision:
             "release_verified": self.release_verified,
             "preconditions_verified": self.preconditions_verified,
             "human_approved": self.human_approved,
+            "quorum_approved": self.quorum_approved,
             "reasons": list(self.reasons),
         }
 
@@ -104,6 +109,7 @@ class AIExecutionAssuranceInspector:
         release_verified: bool = False,
         preconditions_verified: bool = False,
         human_approved: bool = False,
+        quorum_approved: bool = False,
     ) -> AssuranceDecision:
         band = RiskBand(band)
         required = self.policy.for_band(band)
@@ -134,6 +140,11 @@ class AIExecutionAssuranceInspector:
             and not human_approved
         ):
             reasons.append("risk band requires human approval")
+        if (
+            band in self.policy.require_quorum_bands
+            and not quorum_approved
+        ):
+            reasons.append("risk band requires dual-control quorum approval")
 
         return AssuranceDecision(
             not reasons,
@@ -143,6 +154,7 @@ class AIExecutionAssuranceInspector:
             bool(release_verified),
             bool(preconditions_verified),
             bool(human_approved),
+            bool(quorum_approved),
             tuple(reasons),
         )
 
@@ -156,6 +168,7 @@ class AIExecutionAssuranceInspector:
         release_verified: bool = False,
         preconditions_verified: bool = False,
         human_approved: bool = False,
+        quorum_approved: bool = False,
     ) -> AssuranceDecision:
         decision = self.inspect(
             band,
@@ -165,6 +178,7 @@ class AIExecutionAssuranceInspector:
             release_verified=release_verified,
             preconditions_verified=preconditions_verified,
             human_approved=human_approved,
+            quorum_approved=quorum_approved,
         )
         if not decision.allowed:
             raise RuntimeError("; ".join(decision.reasons))
