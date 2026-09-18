@@ -19,9 +19,9 @@ permissions:
   actions: read
 
 concurrency:
-  # Superseded observations for the same immutable workflow/head identity
-  # coalesce without evaluating opaque list-join expressions in concurrency.
-  group: repair-intake-${{ github.event.workflow_run.workflow_id }}-${{ github.event.workflow_run.head_sha }}
+  # Superseded observations for the same trusted workflow-run branch coalesce
+  # without evaluating opaque list-join expressions in concurrency.
+  group: repair-intake-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
