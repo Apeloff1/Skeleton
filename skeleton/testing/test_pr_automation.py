@@ -9,6 +9,7 @@ from skeleton.pr_automation.core import CIState, Decision, Mode, PRSnapshot, Pol
 from skeleton.pr_automation.index import EventIndex
 from skeleton.pr_automation.runner import (
     GATE_CONTEXT,
+    GitHubError,
     aggregate_ci,
     count_approvals,
     count_changes_requested,
@@ -491,7 +492,7 @@ def test_queued_actions_count_fails_closed_on_invalid_total(value):
             assert "/actions/runs?status=queued&per_page=1" in path
             return {"total_count": value}
 
-    with pytest.raises(Exception, match="invalid queued Actions count"):
+    with pytest.raises(GitHubError, match="invalid queued Actions count"):
         queued_actions_count(InvalidQueueClient(), "Apeloff1/Skeleton")
 
 
