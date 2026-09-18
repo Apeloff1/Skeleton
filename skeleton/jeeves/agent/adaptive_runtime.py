@@ -249,6 +249,80 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         result = super().resume(inputs, run_id)
         return self._post_run(inputs, result)
 
+    def run_with_semantics(
+        self,
+        inputs: RunInputs,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        semantic_sequence: int = 0,
+    ) -> AgentResult:
+        """Start a run with a semantic advisory bound before planning."""
+
+        if not isinstance(inputs, RunInputs):
+            raise TypeError("inputs must be RunInputs")
+        run_id = inputs.run_id or stable_id(
+            "run",
+            {
+                "goal": inputs.goal.goal_id,
+                "tenant": inputs.tenant_id,
+                "user": inputs.user_id,
+                "session": inputs.session_id,
+                "at": self._wall_clock(),
+            },
+        )
+        if self.checkpointer.latest(run_id) is not None:
+            raise RuntimeErrorBase(f"run already exists: {run_id}")
+        state = self._new_state(run_id, inputs)
+        self.analyze_semantics_for_run(
+            run_id,
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=semantic_sequence,
+        )
+        result = self._drive(state)
+        return self._post_run(inputs, result)
+
+    def resume_with_semantics(
+        self,
+        inputs: RunInputs,
+        run_id: str,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        semantic_sequence: int = 0,
+    ) -> AgentResult:
+        """Resume a checkpoint and bind a fresh semantic advisory revision."""
+
+        run_key = require_id("run_id", run_id)
+        checkpoint = self.checkpointer.latest(run_key)
+        if checkpoint is None:
+            raise RuntimeErrorBase(f"no checkpoint for run: {run_key}")
+        if checkpoint.goal_id != inputs.goal.goal_id:
+            raise RuntimeErrorBase("resume goal does not match checkpoint")
+        if checkpoint.phase in {
+            AgentPhase.COMPLETED,
+            AgentPhase.CANCELLED,
+        }:
+            raise RuntimeErrorBase("cannot resume a terminal run")
+        state = self._state_from_checkpoint(inputs, checkpoint)
+        self.analyze_semantics_for_run(
+            run_key,
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=semantic_sequence,
+        )
+        result = self._drive(state)
+        return self._post_run(inputs, result)
+
     def _new_state(self, run_id: str, inputs: RunInputs) -> _RunState:
         state = super()._new_state(run_id, inputs)
         repo = self._context_repo(inputs)
@@ -1042,6 +1116,57 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             )
         return replace(result, metadata=json_safe(metadata))
 
+    def _semantic_compute_pressure(
+        self,
+        state: _RunState,
+    ) -> tuple[float, float, float, int]:
+        """Return escalation-only pressure derived from current semantic signals."""
+
+        signals = self._semantic_frontier_signals(state)
+        if not signals:
+            return 0.0, 0.0, 0.0, 0
+        try:
+            fusion = self.frontier_reasoning.lens_fusion.fuse(signals)
+        except Exception as exc:
+            self.metrics.increment(
+                "agent.frontier.semantic_compute_pressure_failures"
+            )
+            state.trace.emit(
+                "frontier.semantic_compute_pressure_failed",
+                {
+                    "run_id": state.run_id,
+                    "error": f"{type(exc).__name__}: {str(exc)[:512]}",
+                },
+            )
+            return 0.0, 0.0, 0.0, 0
+
+        sensitivity = max(
+            0.0,
+            min(
+                1.0,
+                fusion.sensitivity_high - fusion.sensitivity_low,
+            ),
+        )
+        conflict = max(0.0, min(1.0, fusion.conflict_strength))
+        uncertainty_pressure = max(
+            conflict,
+            sensitivity,
+            0.75 if fusion.abstain else 0.0,
+        )
+        information_pressure = max(
+            sensitivity,
+            min(
+                1.0,
+                0.70 * conflict + (0.20 if fusion.abstain else 0.0),
+            ),
+        )
+        return (
+            uncertainty_pressure,
+            conflict,
+            information_pressure,
+            len(signals),
+        )
+
     def _compute_signals(self, state: _RunState, *, purpose: str, step=None) -> ComputeSignals:
         plan = state.plan
         plan_size = len(plan.steps) if plan is not None else 1
@@ -1065,7 +1190,41 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         novelty, matches = self._experience_novelty(state)
         adaptive = self._adaptive_state(state.run_id)
         adaptive.experience_matches = max(adaptive.experience_matches, matches)
-        expected_information_gain = min(1.0, uncertainty * (0.65 if not artifacts else 0.35) + contradiction * 0.35)
+        expected_information_gain = min(
+            1.0,
+            uncertainty * (0.65 if not artifacts else 0.35)
+            + contradiction * 0.35,
+        )
+        (
+            semantic_uncertainty,
+            semantic_contradiction,
+            semantic_information_gain,
+            semantic_signal_count,
+        ) = self._semantic_compute_pressure(state)
+        uncertainty = max(uncertainty, semantic_uncertainty)
+        contradiction = max(
+            contradiction,
+            semantic_contradiction,
+        )
+        expected_information_gain = max(
+            expected_information_gain,
+            semantic_information_gain,
+        )
+        if semantic_signal_count:
+            state.trace.emit(
+                "frontier.semantic_compute_pressure",
+                {
+                    "run_id": state.run_id,
+                    "purpose": purpose,
+                    "signal_count": semantic_signal_count,
+                    "uncertainty_pressure": semantic_uncertainty,
+                    "contradiction_pressure": semantic_contradiction,
+                    "information_gain_pressure": (
+                        semantic_information_gain
+                    ),
+                    "authority": "escalation_only",
+                },
+            )
         risk = step.risk if step is not None else self._current_risk(plan)
         scratch_entries = len(state.scratch.entries())
         context_saturation = min(1.0, scratch_entries / 64.0 + state.usage.total_tokens / max(1, state.inputs.budget.max_tokens) * 0.35)
