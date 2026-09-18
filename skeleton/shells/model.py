@@ -10,6 +10,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 import hashlib
 import json
+import math
 import re
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
@@ -174,6 +175,7 @@ class ResourceRequest:
         if self.timeout_seconds is not None and (
             isinstance(self.timeout_seconds, bool)
             or not isinstance(self.timeout_seconds, (int, float))
+            or not math.isfinite(float(self.timeout_seconds))
             or self.timeout_seconds <= 0
         ):
             raise ShellModelError("timeout_seconds must be a positive number")
@@ -336,8 +338,13 @@ class ExecutionTiming:
 
     def __post_init__(self) -> None:
         for value in (self.queued_seconds, self.runtime_seconds, self.total_seconds):
-            if value < 0:
-                raise ShellModelError("timing values may not be negative")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or value < 0
+            ):
+                raise ShellModelError("timing values must be finite non-negative numbers")
 
     def to_dict(self) -> dict[str, float]:
         return {
