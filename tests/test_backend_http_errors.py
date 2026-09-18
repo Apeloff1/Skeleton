@@ -165,6 +165,8 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "gameforge" / "personal" / "synergy" / "reliability.py",
     REPO_ROOT / "backend" / "core" / "product_control_plane.py",
     REPO_ROOT / "backend" / "gameforge" / "bootstrap" / "begin_cns_activation.py",
+    REPO_ROOT / "backend" / "core" / "security_v2.py",
+    REPO_ROOT / "backend" / "core" / "swarm_planner.py",
 ]
 SERVER = REPO_ROOT / "backend" / "server.py"
 
@@ -293,6 +295,10 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert 'f"ZIP extract failed: {pe}"' not in source
     assert "vault injection soft-failed:" not in source
     assert 'f"room_engine: {e}"' not in source
+    assert "strict validation failed:" not in source
+    assert "dependency graph invalid:" not in source
+    assert "disk headroom check failed:" not in source
+    assert "projects dir not writable:" not in source
 
 
 

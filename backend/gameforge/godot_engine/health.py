@@ -78,8 +78,8 @@ async def deep_health(probe_timeout: int = 45) -> HealthReport:
         if usage.free < LOW_DISK_BYTES:
             report.problems.append("low disk headroom (<500 MiB free)")
     except OSError as exc:
-        logger.warning("Unable to inspect disk headroom for %s: %s", _BACKEND_DIR, exc)
-        report.problems.append(f"disk headroom check failed: {type(exc).__name__}")
+        logger.warning("Unable to inspect disk headroom for %s: %s", _BACKEND_DIR, type(exc).__name__)
+        report.problems.append("disk_headroom_check_failed")
         report.ok = False
 
     try:
@@ -88,8 +88,9 @@ async def deep_health(probe_timeout: int = 45) -> HealthReport:
             pass
         report.projects_dir_writable = True
     except OSError as e:
+        logger.warning("Unable to write to projects dir %s: %s", PROJECTS_DIR, type(e).__name__)
         report.projects_dir_writable = False
-        report.problems.append(f"projects dir not writable: {type(e).__name__}")
+        report.problems.append("projects_dir_not_writable")
 
     if report.problems:
         report.ok = False

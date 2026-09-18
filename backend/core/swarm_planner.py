@@ -294,9 +294,9 @@ def verify_plan(plan: dict) -> dict:
     acyclic = True
     try:
         topo_waves(phase_nodes, deps)
-    except ValueError as ex:
+    except ValueError:
         acyclic = False
-        problems.append(f"dependency graph invalid: {ex}")
+        problems.append("dependency_graph_invalid")
 
     # 2) reachability — every node reachable from the director
     reachable: set[str] = set()

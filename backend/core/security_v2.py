@@ -181,8 +181,8 @@ def strict_validator(model_cls):
                     body_dict = body.model_dump(exclude_unset=False)
                     model_cls.model_validate(body_dict, strict=True)
                 except Exception as e:
-                    from fastapi import HTTPException
-                    raise HTTPException(status_code=422, detail=f"strict validation failed: {e}")
+                    from core.http_errors import public_http_error
+                    raise public_http_error(422, "strict_validation_failed", e) from None
             return await fn(*args, **kwargs)
         return wrapper
     return dec
