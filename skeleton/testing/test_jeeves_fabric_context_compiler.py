@@ -10,6 +10,7 @@ from skeleton.jeeves.agent.context_fabric import (
     CognitiveContextFabric,
     ContextFabricPolicy,
     DeepContextRecord,
+    MemoryManagerAdapter,
 )
 from skeleton.jeeves.agent.evidence import EvidenceLedger
 from skeleton.jeeves.agent.fabric_cognition import (
@@ -20,7 +21,12 @@ from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game_index import SourceTier
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import JeevesAgentRuntime
-from skeleton.jeeves.agent.types import Goal, MemoryKind, stable_fingerprint
+from skeleton.jeeves.agent.types import (
+    AgentContractError,
+    Goal,
+    MemoryKind,
+    stable_fingerprint,
+)
 
 
 class TickClock:
@@ -326,3 +332,174 @@ def test_fabric_index_recall_is_not_accidentally_filtered_by_runtime_tags() -> N
     assert payload["fast_recall_fingerprint"]
     assert compiler.last_fabric_snapshot()["ok"] is True
     assert calls["search"] >= first_searches
+
+
+def test_deep_context_record_rejects_invalid_token_estimates() -> None:
+    for value in (0, -1, True):
+        with pytest.raises(AgentContractError, match="token_estimate"):
+            DeepContextRecord(
+                source_tier=SourceTier.EXTERNAL,
+                source_ref="invalid-token-record",
+                source_provider="provider-a",
+                source_fingerprint=stable_fingerprint(("invalid", value)),
+                content="invalid token estimate",
+                canonical=True,
+                trust=0.8,
+                confidence=0.8,
+                salience=0.8,
+                token_estimate=value,
+            )
+
+
+def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> None:
+    left = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="shared-ref",
+        source_provider="provider-a",
+        source_fingerprint=stable_fingerprint("provider-a-content"),
+        content="Provider A canonical content.",
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=8,
+    )
+    right = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="shared-ref",
+        source_provider="provider-b",
+        source_fingerprint=stable_fingerprint("provider-b-content"),
+        content="Provider B canonical content.",
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=8,
+    )
+
+    packed = CognitiveContextFabric._dedupe((left, right))
+
+    assert len(packed) == 2
+    assert {record.source_provider for record in packed} == {"provider-a", "provider-b"}
+
+
+def test_memory_adapter_fetch_order_is_deterministic_and_respects_token_budget() -> None:
+    clock = TickClock()
+    namespace = _namespace()
+    memory = MemoryManager(clock=clock)
+    first = memory.remember(
+        namespace,
+        "first memory",
+        trust=0.9,
+        salience=0.8,
+        source="fixture",
+    )
+    second = memory.remember(
+        namespace,
+        "second memory",
+        trust=0.9,
+        salience=0.8,
+        source="fixture",
+    )
+    adapter = MemoryManagerAdapter(memory, namespace)
+
+    ordered = adapter.fetch_refs(
+        namespace.key,
+        (second.memory_id, first.memory_id),
+        max_records=2,
+        max_tokens=100,
+    )
+    bounded = adapter.fetch_refs(
+        namespace.key,
+        (second.memory_id, first.memory_id),
+        max_records=2,
+        max_tokens=1,
+    )
+
+    assert [record.source_ref for record in ordered] == [
+        second.memory_id,
+        first.memory_id,
+    ]
+    assert bounded == ()
+
+
+def test_callable_adapter_enforces_budget_even_when_callback_ignores_it() -> None:
+    oversized = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="oversized",
+        source_provider="provider-a",
+        source_fingerprint=stable_fingerprint("oversized"),
+        content="oversized",
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=100,
+    )
+    small = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="small",
+        source_provider="provider-a",
+        source_fingerprint=stable_fingerprint("small"),
+        content="small",
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=5,
+    )
+    adapter = CallableContextAdapter(
+        SourceTier.EXTERNAL,
+        fetcher=lambda ns, refs, max_records, max_tokens: (oversized, small),
+        searcher=lambda ns, query, max_records, max_tokens: (oversized, small),
+        source_provider="provider-a",
+    )
+
+    values = adapter.search(
+        _namespace().key,
+        "alpha",
+        max_records=2,
+        max_tokens=10,
+    )
+
+    assert values == (small,)
+
+
+def test_outer_fabric_rejects_oversized_record_from_noncompliant_adapter() -> None:
+    oversized = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="oversized-outer",
+        source_provider="bad-provider",
+        source_fingerprint=stable_fingerprint("oversized-outer"),
+        content="oversized outer record",
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=100,
+    )
+
+    class NoncompliantAdapter:
+        source_tier = SourceTier.EXTERNAL
+        source_provider = "bad-provider"
+
+        def fetch_refs(self, namespace_key, source_refs, *, max_records, max_tokens):
+            return (oversized,)
+
+        def search(self, namespace_key, query, *, max_records, max_tokens):
+            return (oversized,)
+
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=4,
+            maximum_tokens=10,
+            minimum_deep_trust=0.0,
+            minimum_fast_hits_before_skip_deep=1,
+        )
+    )
+    fabric.register(NoncompliantAdapter())
+
+    result = fabric.retrieve(_namespace().key, "oversized outer")
+
+    assert result.records == ()
+    assert result.token_estimate == 0
