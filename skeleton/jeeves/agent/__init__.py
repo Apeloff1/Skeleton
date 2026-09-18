@@ -4,7 +4,8 @@ Public imports are explicit enough for application code to assemble the runtime
 without reaching through implementation paths. The package surface exposes the
 bounded runtime plus scientific layers for cue-first associative context, typed
 probability and uncertainty, semantic nuance with empirical validation,
-perpendicular tangent continuity, and factorized causal control.
+perpendicular tangent continuity, factorized causal control, and guarded
+execution with tamper-evident replay.
 """
 
 from .action_model import (
@@ -125,6 +126,21 @@ from .evaluation import (
     EvalResult,
     EvaluationSuite,
     RunEvaluator,
+)
+from .execution_audit import (
+    AuditEventKind,
+    AuditSeverity,
+    ExecutionAuditCheckpoint,
+    ExecutionAuditEntry,
+    ExecutionAuditError,
+    ExecutionAuditLedger,
+    ExecutionReplayVerifier,
+    GENESIS_HASH,
+    InMemoryExecutionAuditStore,
+    OperationReplay,
+    ReplayIssue,
+    ReplayIssueKind,
+    ReplayReport,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
 from .interpretive_science import (
@@ -247,9 +263,31 @@ from .provider import (
 from .runtime import (
     AgentConfig,
     InMemoryCheckpointer,
-    JeevesAgentRuntime,
+    JeevesAgentRuntime as LegacyJeevesAgentRuntime,
     RunCheckpoint,
     RunInputs,
+)
+from .runtime_abstraction import (
+    ArgumentAbstractionPolicy,
+    ArgumentAbstractor,
+    GeneralizingRuntimeEpistemicGuard,
+)
+from .runtime_guard import (
+    GuardAdmissionMode,
+    GuardFinalization,
+    GuardedToolExecution,
+    RiskGuardProfile,
+    RuntimeEpistemicGuard,
+    RuntimeGuardDenied,
+    RuntimeGuardError,
+    RuntimeGuardPolicy,
+    RuntimeGuardRequest,
+    RuntimeGuardSignals,
+)
+from .strict_runtime import StrictJeevesAgentRuntime
+from .frontier_runtime import (
+    FrontierJeevesAgentRuntime,
+    HardenedJeevesAgentRuntime,
 )
 from .semantic_frontier import (
     FrontierLensRouter,
@@ -389,5 +427,10 @@ from .world_model import (
     proposition_from_artifact,
     reliability_to_likelihood_ratio,
 )
+
+# New application code gets the guarded/generalizing runtime by default. The
+# pre-enforcement runtime remains explicitly available for compatibility and
+# controlled regression comparisons only.
+JeevesAgentRuntime = FrontierJeevesAgentRuntime
 
 __all__ = [name for name in globals() if not name.startswith("_")]
