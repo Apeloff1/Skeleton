@@ -355,20 +355,38 @@ class CognitiveContextFabric:
         self.lens_router = lens_router or SemanticLensRouter()
         self.lens_science = lens_science or LensScienceRegistry()
         self.policy = policy or ContextFabricPolicy()
-        self._adapters: dict[SourceTier, ContextStoreAdapter] = {}
+        self._adapters: dict[SourceTier, list[ContextStoreAdapter]] = {}
         self._lock = threading.RLock()
 
     def register(self, adapter: ContextStoreAdapter) -> None:
+        """Register an adapter without evicting other providers for the tier."""
         tier = adapter.source_tier
         if not isinstance(tier, SourceTier):
             tier = SourceTier(str(tier))
         with self._lock:
-            self._adapters[tier] = adapter
+            bucket = self._adapters.setdefault(tier, [])
+            if all(existing is not adapter for existing in bucket):
+                bucket.append(adapter)
 
-    def unregister(self, source_tier: SourceTier) -> bool:
+    def unregister(
+        self,
+        source_tier: SourceTier,
+        adapter: ContextStoreAdapter | None = None,
+    ) -> bool:
         tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
         with self._lock:
-            return self._adapters.pop(tier, None) is not None
+            if adapter is None:
+                return self._adapters.pop(tier, None) is not None
+            bucket = self._adapters.get(tier)
+            if not bucket:
+                return False
+            remaining = [value for value in bucket if value is not adapter]
+            changed = len(remaining) != len(bucket)
+            if remaining:
+                self._adapters[tier] = remaining
+            else:
+                self._adapters.pop(tier, None)
+            return changed
 
     def retrieve(
         self,
@@ -399,22 +417,21 @@ class CognitiveContextFabric:
         lens_governance = self.lens_science.assess_bundle(lens_bundle)
 
         with self._lock:
-            adapters = dict(self._adapters)
-        # Per-call adapters let the runtime expose namespace-scoped stores
-        # (notably MemoryManager) without mutating the shared adapter registry.
-        # This is important for concurrent tenants: a run must never replace
-        # another run's namespace adapter merely because both use MEMORY_STORE.
+            adapters = {tier: list(values) for tier, values in self._adapters.items()}
+        # Per-call adapters are additive.  A namespace-scoped memory adapter,
+        # historical chronicle, durable user chronicle, cache and DB may all
+        # legitimately share a tier without replacing one another.
         for adapter in tuple(call_adapters):
             tier = adapter.source_tier
             if not isinstance(tier, SourceTier):
                 tier = SourceTier(str(tier))
-            adapters[tier] = adapter
+            adapters.setdefault(tier, []).append(adapter)
         requested = {
             tier if isinstance(tier, SourceTier) else SourceTier(str(tier))
             for tier in requested_tiers
         }
         if requested:
-            adapters = {tier: adapter for tier, adapter in adapters.items() if tier in requested}
+            adapters = {tier: values for tier, values in adapters.items() if tier in requested}
 
         records: list[DeepContextRecord] = []
         stale: set[str] = set()
@@ -431,26 +448,29 @@ class CognitiveContextFabric:
 
         if self.policy.always_rehydrate_index_hits:
             for tier, refs in refs_by_tier.items():
-                adapter = adapters.get(tier)
-                if adapter is None:
+                tier_adapters = adapters.get(tier, ())
+                if not tier_adapters:
                     continue
-                fetched = adapter.fetch_refs(
-                    namespace_key,
-                    tuple(dict.fromkeys(refs)),
-                    max_records=self.policy.deep_limit,
-                    max_tokens=max(1, budget_remaining),
-                )
-                for record in fetched:
-                    if record.trust < self.policy.minimum_deep_trust:
-                        continue
-                    if records and record.token_estimate > budget_remaining:
-                        continue
-                    records.append(record)
-                    budget_remaining = max(0, budget_remaining - record.token_estimate)
-                    resolved_refs.add(record.source_ref)
-                    for card in card_by_source.get((record.source_tier, record.source_ref), ()):
-                        if card.source_fingerprint != record.source_fingerprint:
-                            stale.add(card.card_id)
+                for adapter in tier_adapters:
+                    if budget_remaining <= 0:
+                        break
+                    fetched = adapter.fetch_refs(
+                        namespace_key,
+                        tuple(dict.fromkeys(refs)),
+                        max_records=self.policy.deep_limit,
+                        max_tokens=max(1, budget_remaining),
+                    )
+                    for record in fetched:
+                        if record.trust < self.policy.minimum_deep_trust:
+                            continue
+                        if records and record.token_estimate > budget_remaining:
+                            continue
+                        records.append(record)
+                        budget_remaining = max(0, budget_remaining - record.token_estimate)
+                        resolved_refs.add(record.source_ref)
+                        for card in card_by_source.get((record.source_tier, record.source_ref), ()):
+                            if card.source_fingerprint != record.source_fingerprint:
+                                stale.add(card.card_id)
 
         fast_is_weak = (
             fast.fallback_to_deep_context
@@ -461,8 +481,15 @@ class CognitiveContextFabric:
             or (fast.conflict_detected and self.policy.broad_search_on_conflict)
         )
         if broad and budget_remaining > 0:
-            per_adapter_records = max(1, self.policy.deep_limit // max(1, len(adapters)))
-            for tier, adapter in sorted(adapters.items(), key=lambda item: item[0].value):
+            adapter_count = sum(len(values) for values in adapters.values())
+            per_adapter_records = max(1, self.policy.deep_limit // max(1, adapter_count))
+            ordered_adapters = [
+                (tier, adapter)
+                for tier, values in adapters.items()
+                for adapter in values
+            ]
+            ordered_adapters.sort(key=lambda item: (item[0].value, type(item[1]).__name__))
+            for tier, adapter in ordered_adapters:
                 if budget_remaining <= 0:
                     break
                 found = adapter.search(
@@ -489,7 +516,7 @@ class CognitiveContextFabric:
                 {
                     hit.card.source_ref
                     for hit in fast.all_hits
-                    if hit.card.source_ref not in resolved_refs and hit.card.source_tier in adapters
+                    if hit.card.source_ref not in resolved_refs and bool(adapters.get(hit.card.source_tier))
                 }
             )
         )
