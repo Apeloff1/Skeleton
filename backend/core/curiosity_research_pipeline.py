@@ -173,15 +173,49 @@ class EnsembleCuriosityResearcher:
             return None
         excerpt = str(raw.get("excerpt") or "")[:6000]
         quality = max(0.0, min(1.0, float(raw.get("quality", raw.get("confidence", 0.0)) or 0.0)))
+        locator = str(raw.get("locator") or "")[:2000]
+        supports_claims = _texts(raw.get("supports_claims"))
+        contradicts_claims = _texts(raw.get("contradicts_claims"))
+        provenance_verified = bool(
+            raw.get(
+                "provenance_verified",
+                raw.get("verified_locator", False),
+            )
+        )
+        claim_bindings = _bindings(
+            raw.get("claim_bindings"),
+            excerpt=excerpt,
+        )
+        # Compatibility bridge for older source-search adapters. A verified
+        # locator plus an exact named supporting claim is treated as an
+        # inspectable measurement binding. Unverified legacy labels remain
+        # non-authoritative, and contradictions still require an explicit
+        # evidence span showing opposition.
+        if (
+            not claim_bindings
+            and provenance_verified
+            and locator.strip()
+            and supports_claims
+        ):
+            claim_bindings = tuple(
+                SourceClaimBinding(
+                    claim=claim,
+                    supports=True,
+                    binding_method="measurement_record",
+                    evidence_span=claim,
+                    mapping_rationale="verified legacy locator exact-claim compatibility",
+                )
+                for claim in supports_claims
+            )
         return ResearchSource(
-            source=source[:1000], locator=str(raw.get("locator") or "")[:2000], excerpt=excerpt,
+            source=source[:1000], locator=locator, excerpt=excerpt,
             quality=quality, kind=str(raw.get("kind") or "unsourced"),
             independence_group=str(raw.get("independence_group") or source)[:500],
-            claim_bindings=_bindings(raw.get("claim_bindings"), excerpt=excerpt),
-            supports_claims=_texts(raw.get("supports_claims")), contradicts_claims=_texts(raw.get("contradicts_claims")),
+            claim_bindings=claim_bindings,
+            supports_claims=supports_claims, contradicts_claims=contradicts_claims,
             observed_at=str(raw.get("observed_at") or "")[:100], reproducible=bool(raw.get("reproducible", False)),
             peer_reviewed=bool(raw.get("peer_reviewed", False)), primary=bool(raw.get("primary", False)),
-            provenance_verified=bool(raw.get("provenance_verified", raw.get("verified_locator", False))),
+            provenance_verified=provenance_verified,
             preregistered=bool(raw.get("preregistered", False)), data_available=bool(raw.get("data_available", False)),
             code_available=bool(raw.get("code_available", False)), sample_size=_positive_int(raw.get("sample_size")),
             uncertainty_reported=bool(raw.get("uncertainty_reported", False)),
