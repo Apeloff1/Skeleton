@@ -74,6 +74,7 @@ from .semantic_research_bridge import (
 )
 from .semantic_scope import (
     ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
     SemanticLearningScope,
 )
 from .strict_runtime import StrictJeevesAgentRuntime
@@ -489,19 +490,24 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
     def export_scoped_semantic_topology_learning_state(
         self,
         inputs: RunInputs,
-    ) -> SemanticTopologyLearningState:
-        return self.semantic_plane_for(
-            inputs
-        ).export_topology_learning_state()
+    ) -> ScopedSemanticTopologyState:
+        return self.semantic_scope_pool.export_topology_state(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+        )
 
     def restore_scoped_semantic_topology_learning_state(
         self,
         inputs: RunInputs,
-        state: SemanticTopologyLearningState | Mapping[str, Any],
+        state: ScopedSemanticTopologyState | Mapping[str, Any],
     ) -> SemanticTopologyLearningSnapshot:
-        return self.semantic_plane_for(
-            inputs
-        ).restore_topology_learning_state(state)
+        return self.semantic_scope_pool.restore_topology_state(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+            state,
+        )
 
     def semantic_scope_diagnostics(self) -> Mapping[str, Any]:
         return {
