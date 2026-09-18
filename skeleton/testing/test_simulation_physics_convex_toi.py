@@ -475,9 +475,14 @@ def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
 
     receipt = world.step()[0]
 
-    assert receipt.ccd_clamps >= 1
-    assert moving.position.x < target.position.x
-    assert moving.linear_velocity.x < 9.0
+    state = (
+        f"ccd_clamps={receipt.ccd_clamps} "
+        f"moving_x={moving.position.x:.12g} target_x={target.position.x:.12g} "
+        f"moving_vx={moving.linear_velocity.x:.12g}"
+    )
+    assert receipt.ccd_clamps >= 1, state
+    assert moving.position.x < target.position.x, state
+    assert moving.linear_velocity.x < 9.0, state
 
 
 def test_general_convex_toi_tie_break_is_canonical() -> None:
