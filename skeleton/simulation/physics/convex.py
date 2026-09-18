@@ -1546,23 +1546,38 @@ def epa_penetration(
                 iterations=iteration,
             )
 
-        boundary: list[tuple[int, int]] = []
+        # The visible patch horizon is topological: an undirected edge
+        # belongs to the boundary exactly once, regardless of the local winding
+        # of adjacent faces.  Cancelling only reverse-oriented tuples lets
+        # same-winding numerical faces duplicate horizon edges and can grow an
+        # otherwise manifold EPA polytope until the face bound is exhausted.
+        edge_counts: dict[tuple[int, int], int] = {}
         for visible_face in visible:
-            for edge in (
+            for first, second in (
                 (visible_face.a, visible_face.b),
                 (visible_face.b, visible_face.c),
                 (visible_face.c, visible_face.a),
             ):
-                reverse = (edge[1], edge[0])
-                if reverse in boundary:
-                    boundary.remove(reverse)
-                else:
-                    boundary.append(edge)
+                edge = (min(first, second), max(first, second))
+                edge_counts[edge] = edge_counts.get(edge, 0) + 1
+
+        if any(count > 2 for count in edge_counts.values()):
+            raise ConvexQueryError("EPA visible horizon is non-manifold")
+
+        boundary = sorted(
+            edge
+            for edge, count in edge_counts.items()
+            if count == 1
+        )
 
         visible_set = set(visible)
         faces = [face_row for face_row in faces if face_row not in visible_set]
+        face_keys = {
+            tuple(sorted(face_row.indices))
+            for face_row in faces
+        }
 
-        for edge in sorted(boundary):
+        for edge in boundary:
             new_face = _make_epa_face(
                 vertices,
                 edge[0],
@@ -1570,7 +1585,10 @@ def epa_penetration(
                 new_index,
             )
             if new_face is not None:
-                faces.append(new_face)
+                face_key = tuple(sorted(new_face.indices))
+                if face_key not in face_keys:
+                    faces.append(new_face)
+                    face_keys.add(face_key)
             if len(faces) > MAX_EPA_FACES:
                 raise ConvexQueryError("EPA face bound exceeded")
 
