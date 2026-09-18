@@ -298,6 +298,8 @@ def recovery_environment(phase="review", *, session_evidence_digest=""):
         ).digest,
         release_evidence_digest=fp("l"),
         sandbox_binding_digest=fp("s"),
+        runtime_trust_digest=fp("u"),
+        authority_health_policy_digest=fp("h"),
     )
     return backend, journal, receipts, evidence_store, recovery
 
@@ -309,6 +311,8 @@ def inspect(manager, recovery, journal, receipts, evidence_store, **changes):
         current_effect_digest=fp("e"),
         current_release_evidence_digest=fp("l"),
         current_sandbox_binding_digest=fp("s"),
+        current_runtime_trust_digest=fp("u"),
+        current_authority_health_policy_digest=fp("h"),
     )
     values.update(changes)
     return manager.inspect(
@@ -527,3 +531,141 @@ def test_recovery_checkpoint_digest_changes_with_session_journal():
         session_journal_digest=fp("b"),
     )
     assert first.digest != second.digest
+
+
+def test_strict_recovery_runtime_trust_drift_requires_replan():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        current_runtime_trust_digest=fp("x"),
+    )
+    assert result.action is RecoveryAction.REQUIRE_REPLAN
+    assert not result.runtime_trust_matches
+    assert result.authority_health_policy_matches
+    assert any("runtime trust" in reason for reason in result.reasons)
+
+
+def test_strict_recovery_authority_health_policy_drift_requires_replan():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        current_authority_health_policy_digest=fp("x"),
+    )
+    assert result.action is RecoveryAction.REQUIRE_REPLAN
+    assert result.runtime_trust_matches
+    assert not result.authority_health_policy_matches
+    assert any("authority health" in reason for reason in result.reasons)
+
+
+def test_strict_recovery_matching_trust_and_health_preserve_resume():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+    )
+    assert result.action is RecoveryAction.RESUME_REVIEW
+    assert result.runtime_trust_matches
+    assert result.authority_health_policy_matches
+
+
+def test_recovery_checkpoint_digest_changes_with_runtime_trust():
+    base = checkpoint()
+    first = AIRecoveryCheckpoint.wrap(
+        base,
+        runtime_trust_digest=fp("a"),
+    )
+    second = AIRecoveryCheckpoint.wrap(
+        base,
+        runtime_trust_digest=fp("b"),
+    )
+    assert first.digest != second.digest
+
+
+def test_recovery_checkpoint_digest_changes_with_authority_health_policy():
+    base = checkpoint()
+    first = AIRecoveryCheckpoint.wrap(
+        base,
+        authority_health_policy_digest=fp("a"),
+    )
+    second = AIRecoveryCheckpoint.wrap(
+        base,
+        authority_health_policy_digest=fp("b"),
+    )
+    assert first.digest != second.digest
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "runtime_trust_digest",
+        "authority_health_policy_digest",
+    ],
+)
+def test_recovery_checkpoint_rejects_invalid_new_digest(field):
+    with pytest.raises(ValueError):
+        AIRecoveryCheckpoint.wrap(
+            checkpoint(),
+            **{field: "bad"},
+        )
+
+
+def test_strict_recovery_integrity_failure_dominates_trust_drift():
+    _, journal, receipts, store, recovery = recovery_environment("review")
+
+    class CorruptJournal:
+        def verify(self):
+            return False
+
+        def root_hash(self):
+            return journal.root_hash()
+
+        def snapshot(self):
+            return journal.snapshot()
+
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        CorruptJournal(),
+        receipts,
+        store,
+        current_runtime_trust_digest=fp("x"),
+    )
+    assert result.action is RecoveryAction.MANUAL_REVIEW
+    assert not result.runtime_trust_matches
+    assert any("integrity" in reason for reason in result.reasons)
+
+
+def test_strict_recovery_execution_evidence_drift_keeps_verification_precedence():
+    evidence = SessionExecutionEvidence.from_report(
+        "session",
+        report(),
+    )
+    _, journal, receipts, store, recovery = recovery_environment(
+        "executing",
+        session_evidence_digest=evidence.digest,
+    )
+    # No evidence is stored, and trust also drifted. The interrupted execution
+    # must still be verified rather than blindly replanned because side effects
+    # may already have occurred.
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        current_runtime_trust_digest=fp("x"),
+    )
+    assert result.action is RecoveryAction.REQUIRE_VERIFICATION
+    assert not result.session_evidence_matches
+    assert not result.runtime_trust_matches
