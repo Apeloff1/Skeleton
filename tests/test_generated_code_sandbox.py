@@ -420,6 +420,17 @@ def test_nested_tool_policy_keys_cannot_bypass_self_grant_detection(
     assert box.granted_capabilities() == frozenset()
 
 
+def test_tool_json_duplicate_keys_fail_closed_before_semantic_dispatch(
+    tmp_path: Path,
+) -> None:
+    box = _sandbox(tmp_path)
+    payload = '{"name":"fetch","name":"noop","arguments":{"value":"ok"}}'
+    decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
+    assert decision.allowed is False
+    assert "duplicate JSON keys" in decision.reason
+    assert box.granted_capabilities() == frozenset()
+
+
 def test_tool_json_structure_bound_fails_closed(tmp_path: Path) -> None:
     box = _sandbox(tmp_path)
     payload = json.dumps(
