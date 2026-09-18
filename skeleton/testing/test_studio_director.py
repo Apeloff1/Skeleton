@@ -346,18 +346,19 @@ def test_researcher_cannot_author_a_patch_during_squad_execution(tmp_path, monke
         seed="research-patch",
         repo_state_path=None,
     ) == 0
-    events = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
-    assert events[-1]["event"] == "run_finished"
-    assert "task_failed_closed" in [row["event"] for row in events]
     records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
-    assert [record["event"] for record in records] == ["run_started", "plan_created", "patch_accepted", "run_finished"]
-    accepted = records[2]
-    assert accepted["researcher"]
-    assert accepted["builder"]
-    assert accepted["reviewer"]
-    assert accepted["verifier"]
-    assert len({accepted["researcher"], accepted["builder"], accepted["reviewer"], accepted["verifier"]}) == 4
-    assert accepted["required_checks"] == ["credential-free autonomous studio smoke"]
+    assert [record["event"] for record in records] == [
+        "run_started",
+        "plan_created",
+        "task_failed_closed",
+        "run_finished",
+    ]
+    failure = records[2]
+    assert failure["task"] == "Smoke change"
+    assert "researcher must remain evidence-only" in failure["error"]
+    assert records[-1]["accepted_tasks"] == 0
+    assert records[-1]["emitted_patch_chars"] == 0
+    assert patch_path.read_text(encoding="utf-8") == ""
 
 
 def test_verifier_can_reject_reviewed_patch_before_it_reaches_ci(tmp_path, monkeypatch) -> None:
