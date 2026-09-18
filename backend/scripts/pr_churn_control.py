@@ -1,8 +1,10 @@
-"""Bounded, fail-closed cleanup for explicitly superseded pull requests.
+"""Bounded, fail-closed cleanup for trusted pull-request churn.
 
-The controller never infers supersedence from titles, changed files, or timing alone.
-A newer trusted same-repository PR must explicitly declare that it supersedes an
-older PR before that older PR can be retired.
+Ordinary PR retirement still requires explicit supersedence from a newer trusted
+same-repository PR. The only additional retirement class is the exact automated
+reverse-sync template that uses the default branch as head to refresh a
+non-protected feature branch; this class is matched by full identity, title, and
+body contract rather than by loose heuristics.
 """
 
 from __future__ import annotations
