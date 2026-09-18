@@ -17,7 +17,8 @@ AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
 )
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
-QUEUE_DEFAULT_BRANCH_TRIGGER_RE = re.compile(
+BRANCH_CLEAN_WORKFLOW = "branch-clean.yml"
+DEFAULT_BRANCH_TRIGGER_RE = re.compile(
     r"(?m)^  workflow_run:\s*(?:#.*)?$\n"
     r"(?:    [^\n]*\n)*?"
     r"    branches:\s*\[main\]\s*$"
@@ -63,28 +64,39 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
-    queue_default_branch_only = (
-        _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
-        and QUEUE_DEFAULT_BRANCH_TRIGGER_RE.search(text) is not None
+    guarded_default_branch_only = (
+        (
+            _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
+            or _is_named(path_name, BRANCH_CLEAN_WORKFLOW)
+        )
+        and DEFAULT_BRANCH_TRIGGER_RE.search(text) is not None
         and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
         in text
+        and (
+            not _is_named(path_name, BRANCH_CLEAN_WORKFLOW)
+            or "github.event.workflow_run.head_repository.full_name == github.repository"
+            in text
+        )
     )
-    if _is_named(path_name, QUEUE_DRAIN_WORKFLOW) and not queue_default_branch_only:
+    if (
+        (_is_named(path_name, QUEUE_DRAIN_WORKFLOW) or _is_named(path_name, BRANCH_CLEAN_WORKFLOW))
+        and not guarded_default_branch_only
+    ):
         findings.append(
             f"{path_name}: workflow_run consumers must match every completing head "
-            'with branches: ["*", "**"]; Queue Drain may wake only from guarded '
-            "default-branch completions"
+            'with branches: ["*", "**"]; Queue Drain and Branch Clean may wake only '
+            "from guarded default-branch completions"
         )
 
     if (
         not has_all_branch_globs
         and not automation_main_only_exclusion
-        and not queue_default_branch_only
+        and not guarded_default_branch_only
     ):
         findings.append(
             f"{path_name}: workflow_run consumers must match every completing head "
             'with branches: ["*", "**"]; PR Automation may exclude only main, '
-            "and Queue Drain may wake only from guarded default-branch completions"
+            "and Queue Drain/Branch Clean may wake only from guarded default-branch completions"
         )
     if "pull_requests[0]" in text:
         findings.append(
