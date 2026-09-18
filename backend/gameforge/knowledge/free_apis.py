@@ -5,9 +5,10 @@ plus an async fetcher. Results can be folded back into Jeeves' trainable brain.
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Optional
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 # key -> {name, category, url (may contain {q}/{lat}/{lon}/{from}/{to}), note}
 FREE_APIS: dict[str, dict] = {
@@ -61,6 +62,7 @@ FREE_APIS: dict[str, dict] = {
 
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; GameForge-CNS/1.0; +https://gameforge.local)",
             "Accept": "application/json, text/plain, */*"}
+_MAX_RESPONSE_BYTES = 512 * 1024
 
 
 def catalog() -> dict:
@@ -75,12 +77,17 @@ def _build_url(api: dict, params: dict) -> str:
     placeholders = re.findall(r"\{(\w+)\}", url)
     for ph in placeholders:
         val = params.get(ph, params.get("q", ""))
-        url = url.replace("{" + ph + "}", str(val).strip().replace(" ", "%20"))
-    # append any extra params not used as placeholders
-    extra = {k: v for k, v in params.items() if k not in placeholders and k != "q"}
+        encoded = quote(str(val).strip(), safe="")
+        url = url.replace("{" + ph + "}", encoded)
+    # Extra caller-provided values must remain query data, never URL syntax.
+    extra = {
+        str(k): str(v)
+        for k, v in params.items()
+        if k not in placeholders and k != "q"
+    }
     if extra:
         sep = "&" if "?" in url else "?"
-        url += sep + "&".join(f"{k}={v}" for k, v in extra.items())
+        url += sep + urlencode(extra)
     return url
 
 
@@ -96,6 +103,25 @@ def _validate_catalog_url(api: dict, url: str) -> None:
         raise ValueError("API URL credentials are not allowed")
 
 
+async def _read_bounded_body(response) -> bytes:
+    """Read a streamed response without allowing unbounded buffering."""
+    declared = response.headers.get("content-length")
+    if declared is not None:
+        try:
+            declared_size = int(declared)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid response content length") from exc
+        if declared_size < 0 or declared_size > _MAX_RESPONSE_BYTES:
+            raise ValueError("response body exceeds size limit")
+
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        if len(body) + len(chunk) > _MAX_RESPONSE_BYTES:
+            raise ValueError("response body exceeds size limit")
+        body.extend(chunk)
+    return bytes(body)
+
+
 async def fetch(api_key: str, params: dict) -> dict:
     api = FREE_APIS.get(api_key)
     if not api:
@@ -105,14 +131,17 @@ async def fetch(api_key: str, params: dict) -> dict:
         _validate_catalog_url(api, url)
         import httpx
         async with httpx.AsyncClient(timeout=10, follow_redirects=False, headers=_HEADERS) as c:
-            r = await c.get(url)
-        ct = r.headers.get("content-type", "")
+            async with c.stream("GET", url) as r:
+                raw = await _read_bounded_body(r)
+                ct = r.headers.get("content-type", "")
+                status = r.status_code
+                success = r.is_success
         body: Any
         if "json" in ct:
-            body = r.json()
+            body = json.loads(raw)
         else:
-            body = r.text[:4000]
-        return {"ok": r.is_success, "api": api_key, "name": api["name"], "status": r.status_code, "url": url, "data": body}
+            body = raw.decode("utf-8", errors="replace")[:4000]
+        return {"ok": success, "api": api_key, "name": api["name"], "status": status, "url": url, "data": body}
     except Exception:  # noqa: BLE001
         return {"ok": False, "api": api_key, "error": "api_fetch_failed", "url": url}
 
