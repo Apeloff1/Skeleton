@@ -9,6 +9,13 @@ on:
 
 permissions: {}
 
+# Repository-global concurrency keys must be explicit even for one-shot
+# tombstone workflows. Keep this lane distinct from both current Merge
+# Readiness and the legacy SHA-scoped job-level groups below.
+concurrency:
+  group: merge-readiness-legacy-concurrency-drain-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tombstone:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}

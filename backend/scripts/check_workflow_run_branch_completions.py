@@ -111,7 +111,13 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             )
 
     if _is_named(path_name, IDLE_WORKFLOW):
-        if "github.event.workflow_run.head_repository.full_name == github.repository" not in text:
+        same_repo_guard = (
+            "github.event.workflow_run.head_repository.full_name == github.repository"
+        )
+        # Both pressure and studio are workflow_run consumers. Requiring the
+        # guard only once lets one job silently lose the trust boundary while
+        # another occurrence masks the regression.
+        if text.count(same_repo_guard) < 2:
             findings.append(
                 f"{path_name}: branch completions must reject cross-repository workflow_run heads"
             )
