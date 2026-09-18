@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from skeleton.jeeves.agent.adaptive_runtime import AdaptiveConfig, AdaptiveJeevesRuntime
 from skeleton.jeeves.agent.adversarial_verification import CouncilVerdict, Verdict
 from skeleton.jeeves.agent.deliberation import (
     CandidateProposal,
@@ -642,3 +645,39 @@ def test_matched_eval_feedback_allows_measured_improvement() -> None:
     assert report.pass_gains >= 1
     assert report.mean_score_delta > 0.05
     assert gate.passed is True
+
+
+
+def test_adaptive_specialist_generation_uses_virtual_model_call_dispatch() -> None:
+    runtime = object.__new__(AdaptiveJeevesRuntime)
+    runtime.adaptive_config = AdaptiveConfig(maximum_specialist_width=2)
+    calls: list[dict[str, object]] = []
+
+    def fake_model_call(state, **kwargs):
+        calls.append({"state": state, **kwargs})
+        return SimpleNamespace(
+            content=(
+                '{"candidates":[{"summary":"bounded candidate",'
+                '"proposed_action":"continue safely",'
+                '"predicted_outcome":"bounded progress",'
+                '"confidence":0.8,"evidence_ids":[],'
+                '"assumptions":[],"risks":[],'
+                '"expected_cost":0.0,"expected_latency_ms":1.0}]}'
+            ),
+            provider="dispatch-test",
+            model="spy-model",
+            request_id="request:dispatch",
+        )
+
+    runtime._model_call = fake_model_call
+    state = SimpleNamespace(ledger=SimpleNamespace(get=lambda _evidence_id: None))
+    generator = runtime._provider_specialist_generator(state)
+
+    candidates = generator("bounded task", None, SpecialistRole.SOLVER, 1)
+
+    assert len(calls) == 1
+    assert calls[0]["state"] is state
+    assert calls[0]["metadata"]["purpose"] == "deliberation:solver"
+    assert len(candidates) == 1
+    assert candidates[0].metadata["provider"] == "dispatch-test"
+    assert candidates[0].metadata["model"] == "spy-model"
