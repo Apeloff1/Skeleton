@@ -139,6 +139,34 @@ jobs:
                       break
               return out
 
+          def current_workflow_paths(head_sha):
+              query = urllib.parse.urlencode({'ref': head_sha})
+              status, payload = request(
+                  f'/repos/{repo}/contents/.github/workflows?{query}'
+              )
+              if status != 200 or not isinstance(payload, list):
+                  raise SystemExit(
+                      f'failed to list current workflow files: HTTP {status}'
+                  )
+              paths = {
+                  item.get('path')
+                  for item in payload
+                  if isinstance(item, dict)
+                  and item.get('type') == 'file'
+                  and str(item.get('path') or '').startswith('.github/workflows/')
+              }
+              if not paths:
+                  raise SystemExit('current workflow file inventory is empty')
+              return paths
+
+          def orphaned_main_workflow_run(run, current_paths):
+              workflow_path = run.get('path') or ''
+              return (
+                  (run.get('head_branch') or '') == 'main'
+                  and workflow_path.startswith('.github/workflows/')
+                  and workflow_path not in current_paths
+              )
+
           def list_open_pr_heads():
               heads = {}
               for page in range(1, 11):
@@ -209,6 +237,8 @@ jobs:
               'stale_dynamic_active': 0,
               'obsolete_pr_queued': 0,
               'obsolete_pr_active': 0,
+              'orphaned_main_queued': 0,
+              'orphaned_main_active': 0,
               'last_validation_preserved': 0,
               'accepted': 0,
               'moved': 0,
@@ -225,6 +255,7 @@ jobs:
               head = main_sha()
               latest_main = head
               head_runs = list_runs(head_sha=head)
+              current_paths = current_workflow_paths(head)
               replacement_keys = {
                   workflow_event_key(run)
                   for run in head_runs
@@ -258,6 +289,11 @@ jobs:
                       selected.append(run)
                       totals['obsolete_pr_queued'] += 1
                       local['obsolete_pr_queued'] += 1
+                      continue
+                  if orphaned_main_workflow_run(run, current_paths):
+                      selected.append(run)
+                      totals['orphaned_main_queued'] += 1
+                      local['orphaned_main_queued'] += 1
                       continue
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
@@ -308,6 +344,11 @@ jobs:
                       totals['obsolete_pr_active'] += 1
                       local['obsolete_pr_active'] += 1
                       continue
+                  if orphaned_main_workflow_run(run, current_paths):
+                      selected.append(run)
+                      totals['orphaned_main_active'] += 1
+                      local['orphaned_main_active'] += 1
+                      continue
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
                       local['control_plane_preserved'] += 1
@@ -355,6 +396,8 @@ jobs:
                   f'obsolete_main={local["obsolete_main"]} '
                   f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
                   f'obsolete_pr_active={local["obsolete_pr_active"]} '
+                  f'orphaned_main_queued={local["orphaned_main_queued"]} '
+                  f'orphaned_main_active={local["orphaned_main_active"]} '
                   f'duplicates={local["duplicates"]} '
                   f'last_validation_preserved={local["last_validation_preserved"]} '
                   f'accepted={accepted} moved={moved} deferred={deferred} '
@@ -383,6 +426,12 @@ jobs:
                   )
                   handle.write(
                       f'- Obsolete active PR selections: {totals["obsolete_pr_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Orphaned main queued selections: {totals["orphaned_main_queued"]}\n'
+                  )
+                  handle.write(
+                      f'- Orphaned main active selections: {totals["orphaned_main_active"]}\n'
                   )
                   handle.write(
                       f'- Duplicate selections: {totals["duplicates"]}\n'
