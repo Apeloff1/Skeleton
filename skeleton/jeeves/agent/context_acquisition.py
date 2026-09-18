@@ -21,8 +21,15 @@ from .associative_memory import (
     MemoryAssociation,
     SequencePrediction,
 )
-from .context_pipeline import ContextResolution, LayeredContextResolver
-from .memory import MemoryNamespace
+from .context_pipeline import (
+    ContextResolution,
+    ContextSourceAdapter,
+    LayeredContextCompiler,
+    LayeredContextResolver,
+    ResolutionPolicy,
+)
+from .context_repository import ContextRepository
+from .memory import MemoryManager, MemoryNamespace
 from .memory_game import CardHit, InteractionCard
 from .semantic_lenses import JuxtapositionAnalyzer, SemanticObservation
 from .types import AgentContractError, json_safe, positive_int, probability, stable_fingerprint, stable_id
@@ -88,6 +95,32 @@ class RecallTrace:
     resolution: ContextResolution | None
     used_deep_context: bool
     fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class CueFirstContextSystem:
+    """Correctly shared L0/deep-context wiring for production callers."""
+
+    cards: AssociativeMemoryGameIndex
+    resolver: LayeredContextResolver
+    compiler: LayeredContextCompiler
+    acquisition: "InteractionAcquisitionEngine"
+
+    def __post_init__(self) -> None:
+        if self.resolver.cards is not self.cards:
+            raise AgentContractError("cue-first resolver must use the associative card index")
+        if self.compiler.resolver is not self.resolver:
+            raise AgentContractError("cue-first compiler must use the shared resolver")
+        if self.acquisition.cards is not self.cards or self.acquisition.resolver is not self.resolver:
+            raise AgentContractError("cue-first acquisition must share cards and resolver")
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint({
+            "cards": self.cards.associative_fingerprint,
+            "resolver_policy": self.resolver.policy.__class__.__name__,
+            "acquisition": self.acquisition.fingerprint,
+        })
 
 
 class InteractionAcquisitionEngine:
@@ -294,3 +327,36 @@ class InteractionAcquisitionEngine:
         with self._lock:
             recent = {key: tuple(value) for key, value in sorted(self._recent.items())}
         return stable_fingerprint({"cards": self.cards.associative_fingerprint, "recent": recent})
+
+def build_cue_first_context_system(
+    *,
+    memory: MemoryManager,
+    cards: AssociativeMemoryGameIndex | None = None,
+    repository: ContextRepository | None = None,
+    adapters: Sequence[ContextSourceAdapter] = (),
+    resolution_policy: ResolutionPolicy | None = None,
+    acquisition_policy: InteractionAcquisitionPolicy | None = None,
+) -> CueFirstContextSystem:
+    """Build the canonical context path with one shared associative L0 index.
+
+    Retrieval order is inherited from LayeredContextResolver: associative cards
+    first, then scoped memory, versioned repository, caches/databases, narrative
+    stores, annals/chronicles/archives, and finally optional external adapters.
+    """
+    if not isinstance(memory, MemoryManager):
+        raise TypeError("memory must be MemoryManager")
+    index = cards or AssociativeMemoryGameIndex()
+    resolver = LayeredContextResolver(
+        cards=index,
+        memory=memory,
+        repository=repository,
+        adapters=adapters,
+        policy=resolution_policy,
+    )
+    compiler = LayeredContextCompiler(resolver)
+    acquisition = InteractionAcquisitionEngine(
+        index,
+        resolver=resolver,
+        policy=acquisition_policy,
+    )
+    return CueFirstContextSystem(index, resolver, compiler, acquisition)
