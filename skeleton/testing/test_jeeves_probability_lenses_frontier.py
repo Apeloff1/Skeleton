@@ -1,8 +1,11 @@
 import math
 
+import pytest
+
 from skeleton.jeeves.agent.probability_lenses import (
     ProbabilityLens,
     ProbabilityWorkbench,
+    categorical_entropy,
     aleatoric_epistemic_assessment,
     conformal_coverage_assessment,
     expected_information_gain,
@@ -12,6 +15,7 @@ from skeleton.jeeves.agent.probability_lenses import (
     robust_bayes_envelope,
     surprisal_probability,
 )
+from skeleton.jeeves.agent.types import AgentContractError
 
 
 def test_probability_taxonomy_expands_without_erasing_original_lenses():
@@ -85,3 +89,28 @@ def test_aleatoric_epistemic_split_and_surprisal_are_explicit():
     assert math.isclose(split.estimate, 0.6, rel_tol=1e-12)
     surprise = surprisal_probability(0.125)
     assert surprise.metadata["surprisal"] == 3.0
+
+
+def test_memory_game_probability_rejects_impossible_singleton_state():
+    with pytest.raises(Exception, match="known_singletons exceeds"):
+        memory_pair_next_flip_probability(
+            total_pairs=4,
+            removed_pairs=3,
+            known_singletons=3,
+        )
+
+
+def test_information_gain_requires_one_shared_state_space():
+    with pytest.raises(Exception, match="same state space"):
+        expected_information_gain(
+            (0.5, 0.5),
+            ((1.0, (0.2, 0.3, 0.5)),),
+        )
+
+
+@pytest.mark.parametrize("bad_base", [math.inf, math.nan])
+def test_entropy_and_surprisal_reject_nonfinite_bases(bad_base):
+    with pytest.raises(AgentContractError, match="must be finite"):
+        categorical_entropy((0.5, 0.5), base=bad_base)
+    with pytest.raises(AgentContractError, match="must be finite"):
+        surprisal_probability(0.5, base=bad_base)
