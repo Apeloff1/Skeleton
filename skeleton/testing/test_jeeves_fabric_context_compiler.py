@@ -490,6 +490,54 @@ def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> Non
     assert {record.source_provider for record in packed} == {"provider-a", "provider-b"}
 
 
+def test_memory_adapter_parent_scope_cannot_read_session_private_records() -> None:
+    clock = TickClock()
+    child = _namespace()
+    parent = child.parent()
+    memory = MemoryManager(clock=clock)
+    private = memory.remember(
+        child,
+        "shared alpha private session detail",
+        trust=0.9,
+        salience=0.8,
+        source="private-fixture",
+    )
+    durable = memory.remember(
+        parent,
+        "shared alpha durable workspace detail",
+        trust=0.9,
+        salience=0.8,
+        source="parent-fixture",
+    )
+    adapter = MemoryManagerAdapter(memory, child)
+
+    parent_search = adapter.search(
+        parent.key,
+        "shared alpha detail",
+        max_records=8,
+        max_tokens=1_000,
+    )
+    parent_fetch = adapter.fetch_refs(
+        parent.key,
+        (private.memory_id, durable.memory_id),
+        max_records=8,
+        max_tokens=1_000,
+    )
+    child_fetch = adapter.fetch_refs(
+        child.key,
+        (private.memory_id, durable.memory_id),
+        max_records=8,
+        max_tokens=1_000,
+    )
+
+    assert {record.source_ref for record in parent_search} == {durable.memory_id}
+    assert {record.source_ref for record in parent_fetch} == {durable.memory_id}
+    assert {record.source_ref for record in child_fetch} == {
+        private.memory_id,
+        durable.memory_id,
+    }
+
+
 def test_memory_adapter_fetch_order_is_deterministic_and_respects_token_budget() -> None:
     clock = TickClock()
     namespace = _namespace()
