@@ -1038,9 +1038,20 @@ class Authority:
                 context={"peer_id": ack.peer_id},
             )
         frame = self._core._frame(ack.last_applied_sequence)
-        if frame is not None and (
-            ack.last_applied_digest != frame.digest or ack.tick != frame.tick
-        ):
+        if frame is None:
+            # An acknowledgement is evidence about one exact authority frame.
+            # Once that frame has fallen out of retained history its digest and
+            # tick can no longer be authenticated, so accepting the claim would
+            # turn an unverifiable peer assertion into trusted evidence.
+            raise HistoryExhaustedError(
+                "acknowledgement sequence is outside retained authority history",
+                context={
+                    "peer_id": ack.peer_id,
+                    "sequence": ack.last_applied_sequence,
+                    "retained": self._core._retained_sequences(),
+                },
+            )
+        if ack.last_applied_digest != frame.digest or ack.tick != frame.tick:
             raise ReplicationError(
                 "acknowledgement does not match retained authority frame",
                 context={"peer_id": ack.peer_id, "sequence": ack.last_applied_sequence},
