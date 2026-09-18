@@ -1667,6 +1667,20 @@ class SemanticLensPlane:
         )
 
     @property
+    def runtime_state_fingerprint(self) -> str:
+        """Fingerprint mutable semantic state that can affect run behavior."""
+
+        return stable_fingerprint(
+            {
+                "contract": self.fingerprint,
+                "governance": self.governance.registry.fingerprint,
+                "prediction_ledger": self.prediction_ledger.fingerprint,
+                "tangent_graph": self.tangent_graph.fingerprint,
+                "topology_learning": self.topology_learning.fingerprint,
+            }
+        )
+
+    @property
     def fingerprint(self) -> str:
         # Runtime/checkpoint identity binds the semantic contract, not mutable
         # calibration outcomes. Scientific trial ledgers may legitimately grow
