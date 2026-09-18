@@ -558,6 +558,66 @@ class ResearchAgenda:
             fingerprint=stable_fingerprint(payload),
         )
 
+    def apply_completion_certificate(
+        self,
+        agenda_id: str,
+        *,
+        certificate_id: str,
+        accepted: bool,
+        resolution_note: str = "",
+    ) -> AgendaItem:
+        """Resolve an agenda item only from an explicit accepted certificate."""
+
+        agenda_id = require_id("agenda_id", agenda_id)
+        certificate_id = require_id("certificate_id", certificate_id)
+        if not isinstance(accepted, bool):
+            raise AgentContractError("accepted must be boolean")
+        try:
+            item = self._items[agenda_id]
+        except KeyError as exc:
+            raise AgentContractError("unknown agenda_id") from exc
+        now = finite_number("now", self._clock())
+        status = AgendaStatus.RESOLVED if accepted else AgendaStatus.QUEUED
+        updated = replace(
+            item,
+            status=status,
+            updated_at=now,
+            defer_until=None,
+            resolution_note=(
+                bounded_text(
+                    "resolution_note",
+                    resolution_note,
+                    maximum=4096,
+                    allow_empty=True,
+                )
+                if accepted
+                else ""
+            ),
+            metadata={
+                **dict(item.metadata),
+                "completion_certificate_id": certificate_id,
+                "completion_accepted": accepted,
+            },
+        )
+        self._items[agenda_id] = updated
+        return updated
+
+    def items_for_obligation(
+        self,
+        obligation_id: str,
+    ) -> tuple[AgendaItem, ...]:
+        obligation_id = require_id("obligation_id", obligation_id)
+        return tuple(
+            sorted(
+                (
+                    item
+                    for item in self._items.values()
+                    if item.obligation_id == obligation_id
+                ),
+                key=lambda item: item.agenda_id,
+            )
+        )
+
     def reopen_on_surprise(
         self,
         obligation_id: str,
