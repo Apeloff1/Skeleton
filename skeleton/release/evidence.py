@@ -390,6 +390,24 @@ def evaluate_release_ready(
         document = parse_evidence(evidence)
 
     reasons: list[str] = []
+    if (
+        isinstance(document.schema_version, bool)
+        or not isinstance(document.schema_version, int)
+        or document.schema_version != SCHEMA_VERSION
+    ):
+        reasons.append(
+            f"incompatible release evidence schema: {document.schema_version!r}"
+        )
+    if (
+        isinstance(document.source_date_epoch, bool)
+        or not isinstance(document.source_date_epoch, int)
+        or document.source_date_epoch < 0
+    ):
+        reasons.append("source_date_epoch must be a non-negative integer")
+    if not isinstance(document.source_commit, str) or not _COMMIT_RE.fullmatch(
+        document.source_commit
+    ):
+        reasons.append("source commit must be a lowercase Git object ID")
     payload = document.to_payload()
     reasons.extend(_reasons_unreproducible_time(payload, document.source_date_epoch))
     reasons.extend(_reasons_inlined_content(payload))
@@ -440,13 +458,16 @@ def evaluate_release_ready(
     if not document.artifacts:
         reasons.append("missing required artifacts")
     seen_ids: set[str] = set()
-    asset_ids = _asset_ids(document.asset_provenance)
+    asset_digests = _asset_digests(document.asset_provenance)
     for artifact in document.artifacts:
-        if artifact.artifact_id in seen_ids:
+        if not isinstance(artifact.artifact_id, str):
+            reasons.append("artifact id must be a string")
+        elif artifact.artifact_id in seen_ids:
             reasons.append(f"duplicate artifact id: {artifact.artifact_id}")
         elif not _TOKEN_RE.fullmatch(artifact.artifact_id):
             reasons.append(f"artifact id is not a canonical token: {artifact.artifact_id}")
-        seen_ids.add(artifact.artifact_id)
+        if isinstance(artifact.artifact_id, str):
+            seen_ids.add(artifact.artifact_id)
         reasons.extend(
             _reasons_file_ref("artifact", artifact.name, artifact.sha256, artifact.size)
         )
@@ -454,10 +475,16 @@ def evaluate_release_ready(
             _reasons_locator("artifact", artifact.locator, artifact.size, artifact.name)
         )
         reasons.extend(_reasons_upload(artifact))
-        if artifact.asset_id and artifact.asset_id not in asset_ids:
-            reasons.append(
-                f"artifact {artifact.artifact_id} references missing asset provenance {artifact.asset_id}"
-            )
+        if artifact.asset_id:
+            asset_digest = asset_digests.get(artifact.asset_id)
+            if asset_digest is None:
+                reasons.append(
+                    f"artifact {artifact.artifact_id} references missing asset provenance {artifact.asset_id}"
+                )
+            elif artifact.sha256 != asset_digest:
+                reasons.append(
+                    f"artifact {artifact.artifact_id} digest does not match asset provenance {artifact.asset_id}"
+                )
 
     reasons.extend(_consume_asset_provenance(document.asset_provenance, expected_commit=expected))
 
@@ -692,8 +719,9 @@ def _reasons_locator(label: str, locator: ArtifactLocator, size: int, name: str)
 
 def _reasons_file_ref(label: str, name: str, digest: str, size: int) -> list[str]:
     reasons: list[str] = []
-    if not isinstance(name, str) or not name.strip() or name != name.strip():
-        reasons.append(f"{label} name must be a non-empty canonical path")
+    name_error = _canonical_name_error(name)
+    if name_error is not None:
+        reasons.append(f"{label} name {name_error}")
     if not isinstance(digest, str) or not _SHA256_RE.fullmatch(digest):
         reasons.append(f"{label} digest must be a lowercase SHA-256")
     if isinstance(size, bool) or not isinstance(size, int) or size < 0:
@@ -710,17 +738,24 @@ def _reasons_test_records(
     reasons: list[str] = []
     seen: set[str] = set()
     for item in records:
-        if item.evidence_id in seen:
-            reasons.append(f"duplicate {label} id: {item.evidence_id}")
-        seen.add(item.evidence_id)
-        if not _TOKEN_RE.fullmatch(item.evidence_id):
-            reasons.append(f"{label} id is not a canonical token: {item.evidence_id}")
-        if not item.name.strip():
-            reasons.append(f"{label} {item.evidence_id} is missing a name")
-        if not _SHA256_RE.fullmatch(item.sha256):
-            reasons.append(f"{label} {item.evidence_id} digest must be a lowercase SHA-256")
-        if require_pass and item.result not in _PASS_RESULTS:
-            reasons.append(f"{label} {item.evidence_id} result is not passing")
+        evidence_id = item.evidence_id
+        if not isinstance(evidence_id, str):
+            reasons.append(f"{label} id must be a string")
+        else:
+            if evidence_id in seen:
+                reasons.append(f"duplicate {label} id: {evidence_id}")
+            seen.add(evidence_id)
+            if not _TOKEN_RE.fullmatch(evidence_id):
+                reasons.append(f"{label} id is not a canonical token: {evidence_id}")
+        name_error = _canonical_name_error(item.name)
+        if name_error is not None:
+            reasons.append(f"{label} {evidence_id} name {name_error}")
+        if not isinstance(item.sha256, str) or not _SHA256_RE.fullmatch(item.sha256):
+            reasons.append(f"{label} {evidence_id} digest must be a lowercase SHA-256")
+        if not isinstance(item.result, str) or (
+            require_pass and item.result not in _PASS_RESULTS
+        ):
+            reasons.append(f"{label} {evidence_id} result is not passing")
     return reasons
 
 
@@ -851,16 +886,18 @@ def _asset_manifest_validator():
     return _validate
 
 
-def _asset_ids(records: Sequence[Mapping[str, Any]]) -> set[str]:
-    ids: set[str] = set()
+def _asset_digests(records: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    digests: dict[str, str] = {}
     for record in records:
         if not isinstance(record, Mapping):
             continue
         identity = record.get("identity") if isinstance(record.get("identity"), Mapping) else record
+        content = record.get("content") if isinstance(record.get("content"), Mapping) else record
         asset_id = identity.get("asset_id") if isinstance(identity, Mapping) else None
-        if isinstance(asset_id, str):
-            ids.add(asset_id)
-    return ids
+        digest = content.get("sha256") if isinstance(content, Mapping) else None
+        if isinstance(asset_id, str) and isinstance(digest, str):
+            digests[asset_id] = digest
+    return digests
 
 
 def _sorted_asset_records(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -955,9 +992,25 @@ def _require_digest(value: Any) -> str:
     return value
 
 
+def _canonical_name_error(value: Any) -> str | None:
+    if not isinstance(value, str) or not value or value != value.strip():
+        return "must be a non-empty canonical path"
+    if value.startswith("/") or "\\" in value:
+        return "must be a repository-relative POSIX path"
+    if any(ord(char) < 32 for char in value):
+        return "must not contain control characters"
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return "must not contain empty, dot, or parent path segments"
+    if re.fullmatch(r"[A-Za-z]:", parts[0]):
+        return "must not contain a Windows drive prefix"
+    return None
+
+
 def _require_name(value: Any) -> str:
-    if not isinstance(value, str) or not value.strip() or value != value.strip():
-        raise EvidenceSchemaError("name must be a non-empty canonical path")
+    error = _canonical_name_error(value)
+    if error is not None:
+        raise EvidenceSchemaError(f"name {error}")
     return value
 
 
@@ -1026,14 +1079,20 @@ def _coerce_artifact(value: Mapping[str, Any] | ArtifactRecord) -> ArtifactRecor
             "artifact record is not canonical",
             context={"missing": missing, "extra": sorted(extra)},
         )
+    artifact_id = value["artifact_id"]
+    if not isinstance(artifact_id, str) or not artifact_id:
+        raise EvidenceSchemaError("artifact_id must be a non-empty string")
+    asset_id = value.get("asset_id") or ""
+    if not isinstance(asset_id, str):
+        raise EvidenceSchemaError("asset_id must be a string")
     return ArtifactRecord(
-        artifact_id=str(value["artifact_id"]),
+        artifact_id=artifact_id,
         name=_require_name(value["name"]),
         sha256=_require_digest(value["sha256"]),
         size=_require_size(value["size"]),
         locator=_coerce_locator(value["locator"]),
         upload=_coerce_upload(value["upload"]),
-        asset_id=str(value.get("asset_id") or ""),
+        asset_id=asset_id,
     )
 
 
@@ -1073,8 +1132,11 @@ def _coerce_test(value: Mapping[str, Any] | TestEvidence) -> TestEvidence:
     result = value["result"]
     if not isinstance(result, str) or not result.strip():
         raise EvidenceSchemaError("test evidence result must be a non-empty string")
+    evidence_id = value["evidence_id"]
+    if not isinstance(evidence_id, str) or not evidence_id:
+        raise EvidenceSchemaError("test evidence id must be a non-empty string")
     return TestEvidence(
-        evidence_id=str(value["evidence_id"]),
+        evidence_id=evidence_id,
         name=_require_name(value["name"]),
         sha256=_require_digest(value["sha256"]),
         result=result.strip(),
