@@ -163,24 +163,39 @@ def _parameter_names(scope: ast.AST) -> set[str]:
     return names
 
 
-def _assigned_names(node: ast.AST) -> list[str]:
-    if isinstance(node, ast.Assign):
-        return [target.id for target in node.targets if isinstance(target, ast.Name)]
-    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-        return [node.target.id]
+def _target_bindings(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
+    if isinstance(target, ast.Name):
+        return [(target.id, value)]
+    if (
+        isinstance(target, (ast.Tuple, ast.List))
+        and isinstance(value, (ast.Tuple, ast.List))
+        and len(target.elts) == len(value.elts)
+    ):
+        bindings: list[tuple[str, ast.AST]] = []
+        for child_target, child_value in zip(target.elts, value.elts):
+            bindings.extend(_target_bindings(child_target, child_value))
+        return bindings
     return []
 
 
-def _assignment_value(node: ast.AST) -> ast.AST | None:
+def _assignment_bindings(node: ast.AST) -> list[tuple[str, ast.AST]]:
     if isinstance(node, ast.Assign):
-        return node.value
-    if isinstance(node, ast.AnnAssign):
-        return node.value
-    return None
+        bindings: list[tuple[str, ast.AST]] = []
+        for target in node.targets:
+            bindings.extend(_target_bindings(target, node.value))
+        return bindings
+    if isinstance(node, ast.AnnAssign) and node.value is not None:
+        return _target_bindings(node.target, node.value)
+    if isinstance(node, ast.NamedExpr):
+        return _target_bindings(node.target, node.value)
+    return []
 
 
-def stable_module_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
-    """Resolve stable local aliases of tracked deserialization modules."""
+def stable_module_aliases(
+    scope: ast.AST,
+    import_map: dict[str, str],
+) -> dict[str, str]:
+    """Resolve stable local aliases of tracked deserializer modules."""
     nodes = list(_scope_nodes(scope))
     stores = Counter(
         node.id
@@ -188,28 +203,29 @@ def stable_module_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[st
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
     )
     parameters = _parameter_names(scope)
-    assignments: list[tuple[str, ast.AST]] = []
+    candidates: list[tuple[str, ast.AST]] = []
     for node in nodes:
-        value = _assignment_value(node)
-        if not isinstance(value, (ast.Name, ast.Attribute)):
-            continue
-        assignments.extend((name, value) for name in _assigned_names(node))
+        for name, value in _assignment_bindings(node):
+            if not isinstance(value, (ast.Name, ast.Attribute)):
+                continue
+            if stores[name] == 1 and name not in parameters:
+                candidates.append((name, value))
 
-    resolved = dict(import_map)
-    inferred: dict[str, str] = {}
+    resolved: dict[str, str] = {}
+    working = dict(import_map)
     changed = True
     while changed:
         changed = False
-        for name, value in assignments:
-            if stores[name] != 1 or name in parameters:
+        for name, value in candidates:
+            if name in resolved:
                 continue
-            source = canonical_name(value, resolved)
-            if source not in TRACKED_MODULES or resolved.get(name) == source:
+            source = canonical_name(value, working)
+            if source is None or source.split(".", 1)[0] not in TRACKED_MODULES:
                 continue
             resolved[name] = source
-            inferred[name] = source
+            working[name] = source
             changed = True
-    return inferred
+    return resolved
 
 
 def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
@@ -236,13 +252,10 @@ def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> d
         changed = False
         aliases = {**import_map, **resolved}
         for node in nodes:
-            value = _assignment_value(node)
-            if value is None:
-                continue
-            source = canonical_name(value, aliases)
-            if source not in TRACKED_DESERIALIZER_CALLABLES:
-                continue
-            for name in _assigned_names(node):
+            for name, value in _assignment_bindings(node):
+                source = canonical_name(value, aliases)
+                if source not in TRACKED_DESERIALIZER_CALLABLES:
+                    continue
                 if name in resolved or name in parameters or stores[name] != 1:
                     continue
                 resolved[name] = source
@@ -326,7 +339,8 @@ def violations(path: Path) -> list[str]:
     findings = star_import_violations(tree, label)
     scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
     for scope in scopes:
-        base_aliases = {**import_map, **stable_module_aliases(scope, import_map)}
+        module_aliases = stable_module_aliases(scope, import_map)
+        base_aliases = {**import_map, **module_aliases}
         aliases = {**base_aliases, **stable_deserializer_aliases(scope, base_aliases)}
         for node in _scope_nodes(scope):
             if not isinstance(node, ast.Call):
