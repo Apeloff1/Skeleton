@@ -642,6 +642,6 @@ async def snowball_phases(pid: str, era: str = "modern", genre: str = "",
         out["title"] = g.get("title", "")
         out["genre"] = use_genre
         return out
-    except Exception as e:  # never break the snowball landing
-        return {"error": "phase_build_failed", "detail": str(e)[:200]}
+    except Exception:  # never break the snowball landing
+        return {"error": "phase_build_failed"}
 

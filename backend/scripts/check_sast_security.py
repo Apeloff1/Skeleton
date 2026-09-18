@@ -29,7 +29,7 @@ SKIP_DIRS = {
     ".expo",
     "coverage",
 }
-TRACKED_MODULES = {"requests", "httpx", "ssl", "tempfile", "jwt"}
+TRACKED_MODULES = {"requests", "httpx", "ssl", "tempfile", "jwt", "builtins"}
 REQUESTS_SESSION_CALLS = {
     f"requests.Session.{method}"
     for method in ("get", "post", "put", "patch", "delete", "head", "options", "request")
@@ -52,6 +52,19 @@ NETWORK_CALLS = {
     "httpx.head",
     "httpx.options",
     "httpx.request",
+}
+SENSITIVE_CALLABLES = {
+    "eval",
+    "exec",
+    "builtins.eval",
+    "builtins.exec",
+    "tempfile.mktemp",
+    "ssl._create_unverified_context",
+    "httpx.Client",
+    "httpx.AsyncClient",
+    "jwt.decode",
+    "jwt.api_jwt.decode_complete",
+    *NETWORK_CALLS,
 }
 PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}
@@ -213,6 +226,8 @@ def _assigned_names(node: ast.AST) -> list[str]:
         return [target.id for target in node.targets if isinstance(target, ast.Name)]
     if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
         return [node.target.id]
+    if isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
+        return [node.target.id]
     return []
 
 
@@ -221,7 +236,96 @@ def _assignment_value(node: ast.AST) -> ast.AST | None:
         return node.value
     if isinstance(node, ast.AnnAssign):
         return node.value
+    if isinstance(node, ast.NamedExpr):
+        return node.value
     return None
+
+
+def _sensitive_callable_bindings(
+    scope: ast.AST,
+    aliases: dict[str, str],
+) -> dict[str, str]:
+    """Resolve unambiguous local aliases of callables already covered by policy.
+
+    Only single-assignment names are tracked. Reassigned names and parameters
+    are intentionally excluded. Resolution is iterative so aliases of proven
+    sensitive aliases remain sensitive without guessing about dynamic state.
+    """
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    candidates: list[tuple[str, ast.AST]] = []
+
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, (ast.Name, ast.Attribute)):
+            continue
+        for name in _assigned_names(node):
+            if stores[name] == 1 and name not in parameters:
+                candidates.append((name, value))
+
+    resolved: dict[str, str] = {}
+    working = dict(aliases)
+    changed = True
+    while changed:
+        changed = False
+        for name, value in candidates:
+            if name in resolved:
+                continue
+            target = canonical_name(value, working)
+            if target not in SENSITIVE_CALLABLES:
+                continue
+            resolved[name] = target
+            working[name] = target
+            changed = True
+    return resolved
+
+
+def _tracked_module_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Resolve stable local aliases of security-sensitive modules.
+
+    A name must have exactly one store in its lexical scope and must not be a
+    parameter. Resolution is iterative so stable alias chains remain visible,
+    while reassigned locals are deliberately ignored.
+    """
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    assignments: list[tuple[str, ast.AST]] = []
+
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, (ast.Name, ast.Attribute)):
+            continue
+        for name in _assigned_names(node):
+            assignments.append((name, value))
+
+    resolved = dict(aliases)
+    changed = True
+    while changed:
+        changed = False
+        for name, value in assignments:
+            if stores[name] != 1 or name in parameters:
+                continue
+            target = canonical_name(value, resolved)
+            if target not in TRACKED_MODULES or resolved.get(name) == target:
+                continue
+            resolved[name] = target
+            changed = True
+
+    return {
+        name: target
+        for name, target in resolved.items()
+        if name not in aliases and target in TRACKED_MODULES
+    }
 
 
 def _requests_session_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
@@ -283,8 +387,9 @@ def _dict_disables_signature_verification(node: ast.AST | None) -> bool:
 def call_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
     name = canonical_name(node.func, aliases)
 
-    if name in {"eval", "exec"}:
-        return f"{name}() is forbidden in backend production code"
+    if name in {"eval", "exec", "builtins.eval", "builtins.exec"}:
+        builtin = name.rsplit(".", 1)[-1]
+        return f"{builtin}() is forbidden in backend production code"
 
     if name == "tempfile.mktemp":
         return "tempfile.mktemp() is race-prone; use NamedTemporaryFile or mkstemp"
@@ -317,7 +422,9 @@ def violations(path: Path) -> list[str]:
     findings: list[str] = []
     scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
     for scope in scopes:
-        aliases = {**import_map, **_requests_session_bindings(scope, import_map)}
+        aliases = {**import_map, **_tracked_module_bindings(scope, import_map)}
+        aliases.update(_requests_session_bindings(scope, aliases))
+        aliases.update(_sensitive_callable_bindings(scope, aliases))
         for node in _scope_nodes(scope):
             if not isinstance(node, ast.Call):
                 continue

@@ -194,9 +194,21 @@ class ProductControlPlane:
         evidence = derive_lifecycle(operation_id, pending_operations=pending, receipts=receipts, audit_entries=audit)
         p = next((x for x in pending if x["operation_id"] == operation_id), None); r = next((x for x in receipts if x["operation_id"] == operation_id), None)
         binding = self.executors.resolve(p["capability_id"], p["action"]) if p else None
-        return {**asdict(evidence), "pending_operation": p,
-                "executor": ({"name": binding.name, "version": binding.version, "effect_class": binding.effect_class, "replay_safe": binding.replay_safe} if binding else None),
-                "receipt": r}
+        projection = asdict(evidence)
+        projection["pending_present"] = evidence.pending
+        projection["pending_operation"] = p
+        projection["executor"] = (
+            {
+                "name": binding.name,
+                "version": binding.version,
+                "effect_class": binding.effect_class,
+                "replay_safe": binding.replay_safe,
+            }
+            if binding
+            else None
+        )
+        projection["receipt"] = r
+        return projection
 
     def execution_ledger(self) -> list[dict[str, Any]]:
         return [asdict(x) for x in derive_ledger(pending_operations=self.pending(), receipts=self.receipt_history(limit=500), audit_entries=self.audit_history(limit=500))]
@@ -218,8 +230,8 @@ class ProductControlPlane:
             binding = active.resolve(op.capability_id, op.action)
             if binding is None: report["unbound"].append(op.outbox_seq); continue
             try: result = await self.operations.execute_one(op.outbox_seq, binding.executor)
-            except OperationExecutionError as exc:
-                report["failed"].append({"outbox_seq": op.outbox_seq, "operation_id": op.id, "executor": binding.name, "error": str(exc)}); continue
+            except OperationExecutionError:
+                report["failed"].append({"outbox_seq": op.outbox_seq, "operation_id": op.id, "executor": binding.name, "error": "dispatch_failed"}); continue
             report["confirmed" if result.confirmed else "deferred"].append(op.outbox_seq)
         report["remaining"] = self.operations.outbox.pending_count; return report
 

@@ -113,8 +113,8 @@ async def fetch(api_key: str, params: dict) -> dict:
         else:
             body = r.text[:4000]
         return {"ok": r.is_success, "api": api_key, "name": api["name"], "status": r.status_code, "url": url, "data": body}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "api": api_key, "error": f"{type(e).__name__}: {e}"[:160], "url": url}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "api": api_key, "error": "api_fetch_failed", "url": url}
 
 
 # ── heuristic API picker for on-demand knowledge acquisition ──────────────────

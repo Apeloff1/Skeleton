@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 _NORMAL_SHIFT_MINUTES = 8 * 60
+_SQUAD_ROLE_FIELDS = (
+    ("researcher", "researcher"),
+    ("builder", "builder"),
+    ("reviewer", "reviewer"),
+    ("verifier", "verifier"),
+)
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -110,7 +116,7 @@ def idle_snapshot(package_path: Path, audit_path: Path) -> dict[str, Any]:
                 continue
             task = entry.get("task", {})
             task_id = str(task.get("key", "")) if isinstance(task, Mapping) else ""
-            for field, role in (("builder", "builder"), ("reviewer", "reviewer")):
+            for field, role in _SQUAD_ROLE_FIELDS:
                 raw = entry.get(field, {})
                 if not isinstance(raw, Mapping):
                     continue
@@ -149,7 +155,7 @@ def night_snapshot(audit_path: Path) -> dict[str, Any]:
         if row.get("event") != "patch_accepted":
             continue
         task_id = str(row.get("task", "")).strip()
-        for field, role in (("builder", "builder"), ("reviewer", "reviewer")):
+        for field, role in _SQUAD_ROLE_FIELDS:
             worker_id = str(row.get(field, "")).strip()
             if not worker_id:
                 continue

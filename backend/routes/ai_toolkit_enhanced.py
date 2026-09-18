@@ -159,8 +159,8 @@ async def call_ai(prompt: str, system_prompt: str = None) -> str:
         
         response = await chat.send_async([UserMessage(content=full_prompt)])
         return response.text
-    except Exception as e:
-        return f"AI Error: {str(e)}"
+    except Exception:
+        return "llm_request_failed"
 
 
 def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:

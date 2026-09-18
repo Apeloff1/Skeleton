@@ -10,11 +10,15 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+import logging
 import threading
 import time
 from typing import Any
 
 from core.curiosity_engine import CuriosityEngine, Researcher
+
+logger = logging.getLogger("IdleCuriosity")
+_CYCLE_FAILED = "curiosity_cycle_failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,15 +120,16 @@ class IdleCuriosityRuntime:
         try:
             result = asyncio.run(self.engine.run_once(self.researcher, minimum_score=self.minimum_score))
         except Exception as exc:
+            logger.warning("curiosity cycle failed: %s", type(exc).__name__)
             with self._lock:
                 self._failed_cycles += 1
                 self._total_cycles += 1
                 self._cycles_this_window += 1
                 self._last_cycle_monotonic = time.monotonic()
                 self._last_cycle_at = datetime.now(UTC).isoformat()
-                self._last_error = f"{type(exc).__name__}: {exc}"[:2000]
+                self._last_error = _CYCLE_FAILED
                 self._last_result = None
-            return {"status": "error", "error": self._last_error}
+            return {"status": "error", "error": _CYCLE_FAILED}
         with self._lock:
             self._total_cycles += 1
             self._cycles_this_window += 1

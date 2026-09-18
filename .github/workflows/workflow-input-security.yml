@@ -9,16 +9,20 @@ on:
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
+      - 'backend/scripts/check_workflow_trigger_fanout.py'
       - 'backend/scripts/check_workflow_concurrency.py'
       - 'backend/scripts/check_repo_attention_contract.py'
       - 'backend/scripts/check_branch_flow_contract.py'
+      - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
+      - 'backend/tests/test_workflow_trigger_fanout_gate.py'
       - 'backend/tests/test_workflow_concurrency_gate.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
+      - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
       - 'core/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
@@ -31,16 +35,20 @@ on:
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
+      - 'backend/scripts/check_workflow_trigger_fanout.py'
       - 'backend/scripts/check_workflow_concurrency.py'
       - 'backend/scripts/check_repo_attention_contract.py'
       - 'backend/scripts/check_branch_flow_contract.py'
+      - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
+      - 'backend/tests/test_workflow_trigger_fanout_gate.py'
       - 'backend/tests/test_workflow_concurrency_gate.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
+      - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
       - 'core/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
@@ -80,9 +88,11 @@ jobs:
           tests/test_workflow_event_shell_security.py
           tests/test_workflow_action_allowlist.py
           tests/test_workflow_permissions_gate.py
+          tests/test_workflow_trigger_fanout_gate.py
           tests/test_workflow_concurrency_gate.py
           tests/test_repo_attention_contract.py
           tests/test_branch_flow_contract.py
+          tests/test_workflow_run_branch_completions_contract.py
           tests/test_bot_activation_security.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
@@ -90,11 +100,15 @@ jobs:
         run: python backend/scripts/check_workflow_action_allowlist.py
       - name: Enforce least-privilege workflow token permissions
         run: python backend/scripts/check_workflow_permissions.py
+      - name: Enforce workflow trigger-fanout audit
+        run: python backend/scripts/check_workflow_trigger_fanout.py
       - name: Enforce workflow concurrency-key collision audit
         run: python backend/scripts/check_workflow_concurrency.py
       - name: Enforce Repository Attention contract
         run: python backend/scripts/check_repo_attention_contract.py
       - name: Enforce branch-flow mutation contract
         run: python backend/scripts/check_branch_flow_contract.py
+      - name: Enforce workflow_run branch-completion contract
+        run: python backend/scripts/check_workflow_run_branch_completions.py
       - name: Enforce bot activation security baseline
         run: python -m core.activation_security

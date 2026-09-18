@@ -113,7 +113,8 @@ class CoherenceEngine:
                 self.on_pain(self._pain)
 
         except Exception as e:
-            errors.append(str(e))
+            logger.warning("transcript trigger failed: %s", type(e).__name__)
+            errors.append("trigger_failed")
             return self._emit(TriggerId.T_TRANSCRIPT_SEGMENT, False, actions, data, errors)
 
         return self._emit(TriggerId.T_TRANSCRIPT_SEGMENT, True, actions, data, errors)
@@ -138,7 +139,8 @@ class CoherenceEngine:
                 ["neuro.daily_control_plane", "predictive.forecast", "plasticity.intervene"]
             )
         except Exception as e:
-            return self._emit(TriggerId.T_DAY_START, False, actions, data, [str(e)])
+            logger.warning("day_start trigger failed: %s", type(e).__name__)
+            return self._emit(TriggerId.T_DAY_START, False, actions, data, ["trigger_failed"])
         return self._emit(TriggerId.T_DAY_START, True, actions, data)
 
     def on_sleep(self, sleep_hours: float) -> CoherenceEvent:

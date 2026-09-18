@@ -2,16 +2,11 @@ name: Shift Supervisor Control
 
 on:
   schedule:
-    # Run five minutes before Idle Studio (:07/:22/:37/:52) so consumers see
-    # a completed canonical refresh rather than racing the plan producer.
+    # Bounded canonical refresh cadence. Queue pressure is checked before any
+    # checkout, model call, or plan mutation.
     - cron: '2,32 * * * *'
     - cron: '17,47 * * * *'
   workflow_dispatch:
-  # GitHub can delay or omit scheduled events under heavy Actions pressure.
-  # Main-push fallback is gated below and only refreshes when the canonical
-  # plan is missing or already at the consumer freshness boundary.
-  push:
-    branches: [main]
 
 concurrency:
   group: shift-supervisor-control
@@ -34,10 +29,40 @@ jobs:
       REPO: ${{ github.repository }}
       PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
       PLAN_FRESHNESS_SECONDS: '1200'
+      MAX_QUEUED_ACTIONS_RUNS: '40'
       SHIFT_ACCOUNTING_TIMEZONE: Europe/Oslo
 
     steps:
+      - name: Gate Actions queue pressure
+        id: pressure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          queued_count=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count')
+          threshold="$MAX_QUEUED_ACTIONS_RUNS"
+          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+            echo '::error::Shift Supervisor queue guard received invalid queue evidence.'
+            exit 1
+          fi
+          if (( queued_count >= threshold )); then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## Shift Supervisor queue guard'
+              echo
+              echo 'Status: **safe no-op due to Actions queue pressure**.'
+              echo
+              echo "- Queued Actions runs: $queued_count"
+              echo "- Backpressure threshold: $threshold"
+              echo '- Canonical-plan mutation: skipped'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Gate main-push fallback on stale or missing canonical plan
+        if: steps.pressure.outputs.proceed == 'true'
         id: fallback
         env:
           GH_TOKEN: ${{ github.token }}

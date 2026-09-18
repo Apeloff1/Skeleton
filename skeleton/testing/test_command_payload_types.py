@@ -222,3 +222,206 @@ def test_http_ingest_and_include_files_reject_coerced_types() -> None:
     with pytest.raises(HTTPException):
         asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
 
+
+def test_require_mapping_rejects_string_and_array_stand_ins() -> None:
+    from skeleton.application.command_contracts import require_mapping
+
+    assert require_mapping({}, "metadata_filter", None, optional=True) is None
+    assert require_mapping({"answers": {"era": "now"}}, "answers", {}, optional=False) == {"era": "now"}
+    for value in ("{}", [], ("a",), 1, True):
+        with pytest.raises(CommandError) as exc_info:
+            require_mapping({"answers": value}, "answers", {}, optional=False)
+        assert exc_info.value.code == "invalid_argument"
+
+
+def test_require_list_rejects_string_iterables_and_bool_ints() -> None:
+    from skeleton.application.command_contracts import require_list
+
+    assert require_list({}, "deps", [], optional=False) == []
+    assert require_list({"deps": ["a", "b"]}, "deps", [], optional=False, item_type=str) == ["a", "b"]
+    with pytest.raises(CommandError):
+        require_list({"deps": "ab"}, "deps", [], optional=False)
+    with pytest.raises(CommandError):
+        require_list({"xs": [True]}, "xs", [], optional=False, item_type=int)
+
+
+def test_memory_and_run_commands_reject_coerced_objects() -> None:
+    service = build_runtime_command_service(_State())
+    ok = service.execute("memory", {"query": "hello", "metadata_filter": {"plane": "facts"}})
+    assert ok.ok is True
+
+    for payload in (
+        {"query": "hello", "metadata_filter": ["facts"]},
+        {"query": "hello", "metadata_filter": "facts"},
+        {"query": 12},
+    ):
+        result = service.execute("memory", payload)
+        assert result.ok is False
+        assert result.to_payload()["error"]["code"] == "invalid_argument"
+
+    answers = service.execute("run", {"answers": {"seed": 1}})
+    assert answers.ok is True
+    for payload in ({"answers": []}, {"answers": "nope"}):
+        result = service.execute("run", payload)
+        assert result.ok is False
+
+
+def test_http_jeeves_session_and_hot_strings_fail_closed() -> None:
+    from skeleton.jeeves.core import SessionMode
+    from skeleton.api import routes
+
+    class _Session:
+        session_id = "s-1"
+        mode = SessionMode.TUTORING
+
+    class _Jeeves:
+        def open_session(self, user_id, mode=None):
+            self.user_id = user_id
+            self.mode = mode
+            return _Session()
+
+    class _HttpState:
+        jeeves = _Jeeves()
+        intelligence = type("I", (), {"reason": staticmethod(lambda query, context=None: {"query": query, "context": context})})()
+        resilience = type(
+            "R",
+            (),
+            {
+                "process_input": staticmethod(
+                    lambda raw_input, user_id: (
+                        raw_input,
+                        type("Rep", (), {"level": type("L", (), {"name": "LOW"})(), "confidence": 1.0, "action_taken": "allow"})(),
+                    )
+                )
+            },
+        )()
+
+    created = asyncio.run(routes.jeeves_session({"user_id": "api-user"}, _HttpState()))
+    assert created["mode"] == "tutoring"
+    with pytest.raises(HTTPException) as bad_mode:
+        asyncio.run(routes.jeeves_session({"mode": "chat"}, _HttpState()))
+    assert bad_mode.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.jeeves_session({"mode": True}, _HttpState()))
+
+    reasoned = asyncio.run(routes.intelligence_reason({"query": "why", "context": {"k": 1}}, _HttpState()))
+    assert reasoned["query"] == "why"
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.intelligence_reason({"query": 1}, _HttpState()))
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.intelligence_reason({"query": "why", "context": ["no"]}, _HttpState()))
+
+    sanitised = asyncio.run(routes.resilience_sanitise({"input": "hello"}, _HttpState()))
+    assert sanitised["sanitized"] == "hello"
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.resilience_sanitise({"input": 9}, _HttpState()))
+
+
+def test_sidecar_intake_rejects_non_object_answers() -> None:
+    from skeleton.api import gameforge_routes
+
+    class _State:
+        genesis = None
+
+    body = asyncio.run(gameforge_routes.gameforge_intake({"answers": {"era": "now"}}, _State()))
+    assert body["status"] == "processed"
+    with pytest.raises(HTTPException) as coerced:
+        asyncio.run(gameforge_routes.gameforge_intake({"answers": "nope"}, _State()))
+    assert coerced.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(gameforge_routes.gameforge_intake({"answers": ["era"]}, _State()))
+
+
+def test_http_game_logic_curve_allow_list_fail_closed() -> None:
+    from skeleton.api import routes
+
+    class _Spec:
+        def to_dict(self):
+            return {"curve": "linear"}
+
+    class _Pipeline:
+        def run(self, *args, **kwargs):
+            self.kwargs = kwargs
+            return _Spec()
+
+    class _HttpState:
+        game_logic_pipeline = _Pipeline()
+        genesis = None
+
+    body = asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": "linear"}, _HttpState()))
+    assert body["status"] == "generated"
+    with pytest.raises(HTTPException) as unknown:
+        asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": "bezier"}, _HttpState()))
+    assert unknown.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": True}, _HttpState()))
+
+
+def test_http_forge_component_and_wire_items_fail_closed() -> None:
+    from skeleton.api import routes
+
+    class _Blueprint:
+        blueprint_id = "bp-1"
+
+        def connect(self, src, dst):
+            self.src = src
+            self.dst = dst
+
+        def validate(self):
+            return []
+
+    class _Forge:
+        def new_blueprint(self, name):
+            self.name = name
+            self.bp = _Blueprint()
+            return self.bp
+
+        def instantiate(self, bp, kind, instance_id, config=None):
+            self.kind = kind
+            self.instance_id = instance_id
+            self.config = config
+
+    class _HttpState:
+        forge = _Forge()
+
+    body = asyncio.run(
+        routes.forge_blueprint(
+            {
+                "name": "room",
+                "components": [{"kind": "room", "instance_id": "r1", "config": {"hp": 1}}],
+                "wires": [{"from": ["r1", "out"], "to": ["r2", "in"]}],
+            },
+            _HttpState(),
+        )
+    )
+    assert body["status"] == "created"
+    with pytest.raises(HTTPException) as bad_comp:
+        asyncio.run(routes.forge_blueprint({"components": ["room"]}, _HttpState()))
+    assert bad_comp.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.forge_blueprint({"components": [{"kind": 1, "instance_id": "r1"}]}, _HttpState()))
+    with pytest.raises(HTTPException):
+        asyncio.run(
+            routes.forge_blueprint(
+                {"components": [{"kind": "room", "instance_id": "r1", "config": []}]},
+                _HttpState(),
+            )
+        )
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.forge_blueprint({"wires": [{"from": "ab", "to": ["x", "y"]}]}, _HttpState()))
+
+
+def test_require_charter_rejects_bool_default_weight_and_non_integer_header() -> None:
+    from fastapi import HTTPException
+
+    from skeleton.api.charter_gate import require_charter
+
+    with pytest.raises(TypeError, match="integer"):
+        require_charter("forge", "blueprint", default_weight=True)
+    gate = require_charter("forge", "blueprint")
+    with pytest.raises(HTTPException) as bad:
+        gate(attester="bot", x_gf_actor_weight="1.5")
+    assert bad.value.status_code == 400
+    assert bad.value.detail == {"error": "invalid_actor_weight"}
+    assert "1.5" not in str(bad.value.detail)
+

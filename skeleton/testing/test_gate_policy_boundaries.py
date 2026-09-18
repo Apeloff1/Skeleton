@@ -235,3 +235,15 @@ def test_non_positive_body_limit_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="positive"):
         BodyBoundMiddleware(app, max_body_bytes=0)
+
+
+def test_bool_and_float_body_limit_fails_closed() -> None:
+    async def app(_scope, _receive, _send) -> None:
+        raise AssertionError("app must not run")
+
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=True)
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=False)
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=1.5)

@@ -230,8 +230,8 @@ async def build_godot(b: BuildBody):
                                  capture_output=True, text=True, timeout=90)
             engine_log = ((run.stdout or "") + (run.stderr or ""))[-400:]
             engine_validated = "GameForge Godot build" in (run.stdout or "") or run.returncode == 0
-        except Exception as e:  # noqa: BLE001
-            engine_log = f"engine run error: {e}"
+        except Exception:  # noqa: BLE001
+            engine_log = "engine_run_failed"
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for name in ("project.godot", "main.gd", "main.tscn", "gamefiles.json"):
