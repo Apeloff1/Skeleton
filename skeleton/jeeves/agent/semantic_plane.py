@@ -40,10 +40,12 @@ from .semantic_governance_bridge import (
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
+    ReadingStatus,
     SemanticFinding,
     SemanticLensSpec,
     SemanticObservation,
     SemanticRole,
+    TangentSeed,
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .semantic_plane_interactions import plane_interaction_rules
@@ -68,8 +70,13 @@ class SemanticPlanePolicy:
     max_per_family: int = 6
     minimum_rare_when_supported: int = 4
     max_perpendicular_axes: int = 16
+    frontier_limit: int = 20
+    frontier_max_per_axis: int = 3
+    frontier_max_per_family: int = 3
     require_selected_findings: bool = True
     require_observation_overlap: bool = True
+    require_observation_subset: bool = True
+    require_evidence_provenance: bool = True
     include_interaction_forecasts: bool = True
     base_rate: float = 0.5
 
@@ -79,6 +86,9 @@ class SemanticPlanePolicy:
             "max_per_family",
             "minimum_rare_when_supported",
             "max_perpendicular_axes",
+            "frontier_limit",
+            "frontier_max_per_axis",
+            "frontier_max_per_family",
         ):
             object.__setattr__(
                 self,
@@ -103,6 +113,9 @@ class SemanticFindingAudit:
     family_mismatch_ids: tuple[str, ...]
     unselected_ids: tuple[str, ...]
     orphan_observation_ids: tuple[str, ...]
+    unknown_observation_reference_ids: tuple[str, ...]
+    evidence_mismatch_ids: tuple[str, ...]
+    duplicate_finding_ids: tuple[str, ...]
     fingerprint: str
 
 
@@ -125,6 +138,8 @@ class SemanticPlaneCoverage:
     perpendicular_candidates: int
     forecast_count: int
     fused_effective_lens_count: float
+    tangent_count: int
+    frontier_tangent_count: int
     fingerprint: str
 
 
@@ -149,6 +164,9 @@ class SemanticPlaneSnapshot:
     forecasts: tuple[SemanticForecast, ...]
     fusion: LensFusionResult
     coverage: SemanticPlaneCoverage
+    tangent_ids: tuple[str, ...]
+    frontier: FrontierSelection
+    decision_feature_authorized: bool
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
     fingerprint: str
@@ -169,6 +187,7 @@ class SemanticLensPlane:
         predictive: SemanticPredictiveModel | None = None,
         prediction_ledger: SemanticPredictionLedger | None = None,
         fusion: LensFusionEngine | None = None,
+        tangent_graph: TangentGraph | None = None,
         policy: SemanticPlanePolicy | None = None,
     ) -> None:
         self.registry = registry or MaximalSemanticRegistry()
@@ -180,6 +199,7 @@ class SemanticLensPlane:
         self.predictive = predictive or SemanticPredictiveModel()
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.fusion = fusion or LensFusionEngine()
+        self.tangent_graph = tangent_graph or TangentGraph()
         self.policy = policy or SemanticPlanePolicy()
 
     def select(
