@@ -49,10 +49,18 @@ class AIShellService:
         orchestrator: AIShellOrchestrator,
         diagnostics: AIShellDiagnostics,
         governance: AIShellGovernance,
+        *,
+        release_guard: AIStartupReleaseGuard | None = None,
+        release_expectation: RuntimeReleaseExpectation | None = None,
     ) -> None:
+        if (release_guard is None) != (release_expectation is None):
+            raise ValueError("release_guard and release_expectation must be configured together")
         self.orchestrator = orchestrator
         self.diagnostics = diagnostics
         self.governance = governance
+        self.release_guard = release_guard
+        self.release_expectation = release_expectation
+        self._release_report: StartupReleaseReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
         self.stale_guard = AIPlanStaleGuard()
@@ -72,6 +80,14 @@ class AIShellService:
         if not shell_ready:
             self.state.transition(AIServicePhase.DEGRADED, reason="shell service is not ready")
             return report
+        if self.release_guard is not None and self.release_expectation is not None:
+            self._release_report = self.release_guard.inspect(self.release_expectation)
+            if not self._release_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI release/channel verification failed",
+                )
+                return report
         self.state.transition(AIServicePhase.READY)
         return report
 
