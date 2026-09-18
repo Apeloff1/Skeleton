@@ -131,6 +131,25 @@ def _router_with(*pairs: tuple[dict, FakeAdapter]) -> ModelRouter:
     return router
 
 
+@pytest.mark.parametrize(
+    ("input_tokens", "output_tokens", "error"),
+    [
+        (-1, 0, ValueError),
+        (0, -1, ValueError),
+        (True, 0, TypeError),
+        (0, False, TypeError),
+        (1.5, 0, TypeError),
+    ],
+)
+def test_token_usage_rejects_malformed_counts(
+    input_tokens,
+    output_tokens,
+    error,
+) -> None:
+    with pytest.raises(error):
+        TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens)
+
+
 @pytest.mark.parametrize("max_attempts", [True, 1.5, "2"])
 def test_retry_policy_rejects_non_integer_attempt_counts(max_attempts) -> None:
     with pytest.raises(TypeError, match="max_attempts"):
@@ -320,6 +339,26 @@ def test_actual_usage_over_budget_is_not_reported_as_success() -> None:
     assert result.response is None
     assert result.attempts[0].outcome == "budget_exhausted"
     assert greedy.calls
+
+
+def test_provider_cannot_exceed_requested_output_ceiling_without_route_budget() -> None:
+    greedy = FakeAdapter(
+        "greedy-request",
+        usage=TokenUsage(input_tokens=1, output_tokens=11),
+    )
+    router = _router_with((_metadata("greedy-request"), greedy))
+    result = asyncio.run(
+        router.invoke(
+            _request(
+                budget=RouteBudget(max_cost=1.0, max_provider_attempts=1),
+                estimated_input_tokens=1,
+                max_output_tokens=10,
+            )
+        )
+    )
+    assert result.status == "budget_exhausted"
+    assert result.response is None
+    assert result.attempts[0].outcome == "budget_exhausted"
 
 
 def test_actual_output_usage_over_token_budget_is_not_reported_as_success() -> None:
