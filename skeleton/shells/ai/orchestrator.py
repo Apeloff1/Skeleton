@@ -18,6 +18,7 @@ from skeleton.shells.ai.observation import ObservationBuilder
 from skeleton.shells.ai.planner import AIPlanner, PlanningResult
 from skeleton.shells.ai.provenance import AIDecisionProvenance
 from skeleton.shells.ai.schema import schema_digest
+from skeleton.shells.ai.session_evidence import SessionEvidenceStore, SessionExecutionEvidence
 from skeleton.shells.ai.session import AISessionPhase, AIShellSession
 from skeleton.shells.ai.tool_guard import AIToolGuardRegistry
 from skeleton.shells.ai.types import AIIntent
@@ -81,6 +82,7 @@ class AIShellOrchestrator:
         journal: AIDecisionJournal | None = None,
         budget: AIBudget | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
+        session_evidence: SessionEvidenceStore | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.planner = planner
@@ -88,6 +90,7 @@ class AIShellOrchestrator:
         self.compiler = compiler
         self.shell_service = shell_service
         self.execution_backend = execution_backend or ShellServiceExecutionBackend(shell_service)
+        self.session_evidence = session_evidence
         self.approvals = approvals or AIApprovalRegistry(clock=clock)
         self.guards = guards or AIToolGuardRegistry()
         self.verifier = verifier or PlanVerifier()
@@ -195,6 +198,7 @@ class AIShellOrchestrator:
         context: ExecutionContext,
         approval: AIPlanApproval | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
+        release_evidence_digest: str = "",
     ) -> AIExecutionBundle:
         if session.phase is not AISessionPhase.REVIEW:
             raise RuntimeError("AI session is not ready for execution decision")
@@ -233,6 +237,15 @@ class AIShellOrchestrator:
             self.budget.verification_round()
             verification = self.verifier.verify(session.intent, report)
 
+            session_evidence_digest = ""
+            if self.session_evidence is not None:
+                evidence = SessionExecutionEvidence.from_report(
+                    session.session_id,
+                    report,
+                )
+                self.session_evidence.put(evidence)
+                session_evidence_digest = evidence.digest
+
             for action, step in zip(proposal.actions, report.steps):
                 if step.dispatch is not None:
                     observation = self.observations.dispatch(step.dispatch)
@@ -257,6 +270,12 @@ class AIShellOrchestrator:
                 verified=verification.verified,
                 latency_ms=duration_ms,
             )
+            sandbox_binding = getattr(active_backend, "binding", None)
+            sandbox_binding_digest = (
+                ""
+                if sandbox_binding is None
+                else getattr(sandbox_binding, "digest", "")
+            )
             provenance = AIDecisionProvenance(
                 intent_fingerprint=session.intent.fingerprint,
                 proposal_fingerprint=proposal.fingerprint,
@@ -268,6 +287,10 @@ class AIShellOrchestrator:
                 risk_score=review.critique.risk.score,
                 approval_id=approval_id,
                 receipt_root=active_backend.receipt_root(),
+                execution_backend_id=active_backend.backend_id,
+                session_evidence_digest=session_evidence_digest,
+                sandbox_binding_digest=sandbox_binding_digest,
+                release_evidence_digest=release_evidence_digest,
             )
             self.journal.append(
                 "ai.plan.completed",
@@ -281,6 +304,9 @@ class AIShellOrchestrator:
                     "duration_ms": duration_ms,
                     "provenance_digest": provenance.digest,
                     "execution_backend": active_backend.backend_id,
+                    "session_evidence_digest": session_evidence_digest,
+                    "sandbox_binding_digest": sandbox_binding_digest,
+                    "release_evidence_digest": release_evidence_digest,
                 },
             )
             if success:
