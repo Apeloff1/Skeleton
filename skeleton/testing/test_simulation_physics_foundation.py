@@ -534,9 +534,11 @@ def test_live_external_force_prevents_sleep_before_accumulator_clear() -> None:
 
 def test_failed_solver_rolls_back_entire_tick_atomically() -> None:
     world = _zero_gravity_world()
+    world.add_body(RigidBody.static("ground", PlaneShape()))
     body = RigidBody.dynamic(
         "body",
         SphereShape(1.0),
+        position=Vec3(0.0, 0.75, 0.0),
         linear_damping=0.0,
         angular_damping=0.0,
     )

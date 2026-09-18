@@ -7,20 +7,38 @@ from dataclasses import dataclass
 from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
-from .ccd import CCDHit, ContinuousCollisionDetector
-from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
-from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .ccd import ContinuousCollisionDetector, TOIEvent
+from .collision import (
+    ContactManifold,
+    SweepAndPruneBroadPhase,
+    detect_collision,
+    generate_manifolds,
+)
+from .constraints import (
+    ConstraintSolver,
+    ConstraintStats,
+    JointConstraint,
+    is_joint_constraint,
+)
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
     DuplicateBodyError,
     DuplicateJointError,
     JointNotFoundError,
+    PhysicsSnapshotError,
     PhysicsValidationError,
 )
-from .math3d import AABB, Quat, Vec3
+from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
+from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
+from .snapshots import (
+    PhysicsBodyState,
+    PhysicsSnapshot,
+    build_snapshot,
+    verify_snapshot,
+)
 from .solver import SequentialImpulseSolver, SolverStats
 
 MAX_WORLD_BODIES = 100_000
@@ -81,6 +99,8 @@ class PhysicsSettings:
     ccd_enabled: bool = True
     ccd_motion_threshold: float = 0.5
     ccd_contact_slop: float = 1.0e-7
+    ccd_max_substeps: int = 8
+    ccd_min_advance_fraction: float = 1.0e-6
     max_ccd_checks: int = 65_536
     constraint_velocity_iterations: int = 8
     constraint_position_iterations: int = 4
@@ -109,6 +129,20 @@ class PhysicsSettings:
         ):
             raise PhysicsValidationError("ccd_contact_slop must be finite and non-negative")
         object.__setattr__(self, "ccd_contact_slop", float(self.ccd_contact_slop))
+        if (
+            isinstance(self.ccd_min_advance_fraction, bool)
+            or not isinstance(self.ccd_min_advance_fraction, (int, float))
+            or not math.isfinite(float(self.ccd_min_advance_fraction))
+            or not 0.0 < float(self.ccd_min_advance_fraction) <= 0.1
+        ):
+            raise PhysicsValidationError(
+                "ccd_min_advance_fraction must be in (0, 0.1]"
+            )
+        object.__setattr__(
+            self,
+            "ccd_min_advance_fraction",
+            float(self.ccd_min_advance_fraction),
+        )
         for name in ("sleep_linear_speed", "sleep_angular_speed"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -132,6 +166,11 @@ class PhysicsSettings:
             maximum=10_000,
         )
         _bounded_int(self.max_ccd_checks, name="max_ccd_checks", maximum=1_000_000)
+        _bounded_int(
+            self.ccd_max_substeps,
+            name="ccd_max_substeps",
+            maximum=128,
+        )
         for name in (
             "velocity_iterations",
             "position_iterations",
@@ -144,7 +183,7 @@ class PhysicsSettings:
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v2",
+                "domain": "skeleton.simulation.physics.settings.v3",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
@@ -160,6 +199,8 @@ class PhysicsSettings:
                 "ccd_enabled": self.ccd_enabled,
                 "ccd_motion_threshold": self.ccd_motion_threshold,
                 "ccd_contact_slop": self.ccd_contact_slop,
+                "ccd_max_substeps": self.ccd_max_substeps,
+                "ccd_min_advance_fraction": self.ccd_min_advance_fraction,
                 "max_ccd_checks": self.max_ccd_checks,
                 "constraint_velocity_iterations": self.constraint_velocity_iterations,
                 "constraint_position_iterations": self.constraint_position_iterations,
@@ -181,6 +222,7 @@ class PhysicsStepReceipt:
     sleeping_bodies: int
     solver: SolverStats
     constraints: ConstraintStats
+    islands: IslandGraphStats
 
     @property
     def changed(self) -> bool:
@@ -193,7 +235,7 @@ class PhysicsWorld:
             raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
-        self._joints: dict[str, DistanceJoint] = {}
+        self._joints: dict[str, JointConstraint] = {}
         self._tick = 0
         self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
         self._solver = SequentialImpulseSolver(
@@ -261,18 +303,18 @@ class PhysicsWorld:
     def joint_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._joints))
 
-    def joints(self) -> tuple[DistanceJoint, ...]:
+    def joints(self) -> tuple[JointConstraint, ...]:
         return tuple(self._joints[joint_id] for joint_id in self.joint_ids())
 
-    def get_joint(self, joint_id: str) -> DistanceJoint:
+    def get_joint(self, joint_id: str) -> JointConstraint:
         try:
             return self._joints[joint_id]
         except KeyError as exc:
             raise JointNotFoundError(joint_id) from exc
 
-    def add_joint(self, joint: DistanceJoint) -> DistanceJoint:
-        if not isinstance(joint, DistanceJoint):
-            raise PhysicsValidationError("joint must be DistanceJoint")
+    def add_joint(self, joint: JointConstraint) -> JointConstraint:
+        if not is_joint_constraint(joint):
+            raise PhysicsValidationError("unsupported joint constraint")
         if joint.joint_id in self._joints:
             raise DuplicateJointError(joint.joint_id)
         if len(self._joints) >= self.settings.max_joints:
@@ -284,7 +326,7 @@ class PhysicsWorld:
         self._joints[joint.joint_id] = joint
         return joint
 
-    def remove_joint(self, joint_id: str) -> DistanceJoint:
+    def remove_joint(self, joint_id: str) -> JointConstraint:
         try:
             return self._joints.pop(joint_id)
         except KeyError as exc:
@@ -392,6 +434,28 @@ class PhysicsWorld:
             },
         }
 
+    def _body_configuration_record(self, body: RigidBody) -> dict[str, object]:
+        return {
+            "body_id": body.body_id,
+            "type": body.body_type.value,
+            "shape_config": self._shape_record(body),
+            "mass": body.mass if math.isfinite(body.mass) else None,
+            "inverse_mass": body.inverse_mass,
+            "material": {
+                "friction": body.material.friction,
+                "restitution": body.material.restitution,
+                "rolling_friction": body.material.rolling_friction,
+                "friction_rule": body.material.friction_rule.value,
+                "restitution_rule": body.material.restitution_rule.value,
+            },
+            "local_inertia": body.local_inertia.to_tuple(),
+            "local_inverse_inertia": body.local_inverse_inertia.to_tuple(),
+            "linear_damping": body.linear_damping,
+            "angular_damping": body.angular_damping,
+            "gravity_scale": body.gravity_scale,
+            "continuous": body.continuous,
+        }
+
     def _body_record(self, body: RigidBody) -> dict[str, object]:
         return {
             **body.state_record(),
@@ -410,10 +474,24 @@ class PhysicsWorld:
         }
 
     @property
+    def configuration_digest(self) -> str:
+        return digest(
+            {
+                "domain": "skeleton.simulation.physics.configuration.v1",
+                "settings": self.settings.fingerprint,
+                "bodies": [
+                    self._body_configuration_record(body)
+                    for body in self.bodies()
+                ],
+                "joints": [joint.state_record() for joint in self.joints()],
+            }
+        )
+
+    @property
     def state_digest(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.world_state.v2",
+                "domain": "skeleton.simulation.physics.world_state.v3",
                 "settings": self.settings.fingerprint,
                 "tick": self._tick,
                 "bodies": [self._body_record(body) for body in self.bodies()],
@@ -425,6 +503,69 @@ class PhysicsWorld:
                 ],
             }
         )
+
+    def capture_snapshot(self) -> PhysicsSnapshot:
+        body_states = tuple(
+            PhysicsBodyState(
+                body_id=body.body_id,
+                position=body.position,
+                orientation=body.orientation,
+                linear_velocity=body.linear_velocity,
+                angular_velocity=body.angular_velocity,
+                force=body.force,
+                torque=body.torque,
+                awake=body.awake,
+                sleep_time=body.sleep_time,
+            )
+            for body in self.bodies()
+        )
+        return build_snapshot(
+            tick=self._tick,
+            configuration_digest=self.configuration_digest,
+            body_states=body_states,
+            contact_cache=self._contact_cache.snapshot(),
+            manifolds=self._last_manifolds,
+            state_digest=self.state_digest,
+        )
+
+    def _apply_snapshot_state(self, snapshot: PhysicsSnapshot) -> None:
+        for state in snapshot.body_states:
+            body = self._bodies[state.body_id]
+            body.position = state.position
+            body.orientation = state.orientation
+            body.linear_velocity = state.linear_velocity
+            body.angular_velocity = state.angular_velocity
+            body.force = state.force
+            body.torque = state.torque
+            body.awake = state.awake
+            body.sleep_time = state.sleep_time
+        self._contact_cache.restore(snapshot.contact_cache)
+        self._last_manifolds = snapshot.manifolds
+        self._tick = snapshot.tick
+
+    def restore_snapshot(self, snapshot: PhysicsSnapshot) -> None:
+        if not isinstance(snapshot, PhysicsSnapshot):
+            raise PhysicsSnapshotError("restore requires PhysicsSnapshot")
+        verify_snapshot(snapshot)
+        if snapshot.configuration_digest != self.configuration_digest:
+            raise PhysicsSnapshotError("physics snapshot configuration mismatch")
+        expected_ids = self.body_ids()
+        snapshot_ids = tuple(row.body_id for row in snapshot.body_states)
+        if snapshot_ids != expected_ids:
+            raise PhysicsSnapshotError("physics snapshot body set mismatch")
+
+        previous = self.capture_snapshot()
+        try:
+            self._apply_snapshot_state(snapshot)
+            if self.state_digest != snapshot.state_digest:
+                raise PhysicsSnapshotError("physics snapshot state digest mismatch")
+        except Exception:
+            self._apply_snapshot_state(previous)
+            if self.state_digest != previous.state_digest:
+                raise PhysicsSnapshotError(
+                    "physics snapshot restore rollback failed"
+                )
+            raise
 
     def _capture_step_checkpoint(self) -> _StepCheckpoint:
         states = tuple(
@@ -470,39 +611,131 @@ class PhysicsWorld:
         if self.state_digest != checkpoint.state_digest:
             raise PhysicsValidationError("physics step checkpoint failed exact restoration")
 
-    def _integrate_velocity_phase(self, dt: float) -> tuple[CCDHit, ...]:
-        bodies = self.bodies()
-        hits: list[CCDHit] = []
-        for body in bodies:
-            hit = None
-            if self.settings.ccd_enabled:
-                hit = self._ccd.sweep(body, bodies, dt)
-            if hit is None:
-                body.integrate_velocity(dt)
-                continue
-            body.position = hit.center - hit.normal * self.settings.ccd_contact_slop
-            body.integrate_orientation(dt)
-            hits.append(hit)
-        return tuple(hits)
+    def _advance_all_bodies(self, dt: float) -> None:
+        if dt <= 0.0:
+            return
+        for body in self.bodies():
+            body.integrate_velocity(dt)
 
-    def _update_sleep(self, dt: float) -> None:
+    def _bias_toi_pair_into_contact(self, event: TOIEvent) -> None:
+        slop = self.settings.ccd_contact_slop
+        if slop <= 0.0:
+            return
+        body_a = self._bodies[event.body_a]
+        body_b = self._bodies[event.body_b]
+        inverse_mass_sum = body_a.inverse_mass + body_b.inverse_mass
+        if inverse_mass_sum <= 0.0:
+            return
+        if body_a.inverse_mass > 0.0:
+            weight_a = body_a.inverse_mass / inverse_mass_sum
+            # TOI is ideally exactly touching. Bias a microscopic amount into
+            # contact so narrow phase has a resolvable manifold despite roundoff.
+            body_a.position = body_a.position + event.normal * (slop * weight_a)
+            body_a.wake()
+        if body_b.inverse_mass > 0.0:
+            weight_b = body_b.inverse_mass / inverse_mass_sum
+            body_b.position = body_b.position - event.normal * (slop * weight_b)
+            body_b.wake()
+
+    def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
+        self._bias_toi_pair_into_contact(event)
+        manifold = detect_collision(
+            self._bodies[event.body_a],
+            self._bodies[event.body_b],
+        )
+        if manifold is None:
+            raise PhysicsValidationError(
+                "CCD TOI failed to produce a resolvable contact manifold"
+            )
+        # Do not persist interim impulses into the frame cache. The final
+        # discrete solve owns next-frame warm-start state; caching here would
+        # re-apply the same impact impulse later in this tick.
+        self._solver.solve(
+            self._bodies,
+            (manifold,),
+            cache=None,
+            tick=tick,
+        )
+
+    def _integrate_velocity_phase(
+        self,
+        dt: float,
+        *,
+        tick: int,
+    ) -> tuple[TOIEvent, ...]:
+        if not self.settings.ccd_enabled:
+            self._advance_all_bodies(dt)
+            return ()
+
+        remaining = dt
+        events: list[TOIEvent] = []
+        minimum_advance = dt * self.settings.ccd_min_advance_fraction
+
+        for _ in range(self.settings.ccd_max_substeps):
+            if remaining <= EPSILON:
+                remaining = 0.0
+                break
+
+            event = self._ccd.earliest_event(self.bodies(), remaining)
+            if event is None:
+                self._advance_all_bodies(remaining)
+                remaining = 0.0
+                break
+
+            advance = event.time
+            if advance > 0.0:
+                self._advance_all_bodies(advance)
+                remaining = max(0.0, remaining - advance)
+
+            self._resolve_toi_event(event, tick=tick)
+            events.append(event)
+
+            if remaining <= EPSILON:
+                remaining = 0.0
+                break
+
+            if advance <= minimum_advance:
+                escape = min(remaining, minimum_advance)
+                self._advance_all_bodies(escape)
+                remaining = max(0.0, remaining - escape)
+
+        if remaining > EPSILON:
+            pending = self._ccd.earliest_event(self.bodies(), remaining)
+            if pending is not None:
+                raise PhysicsValidationError("CCD substep bound exceeded")
+            self._advance_all_bodies(remaining)
+
+        return tuple(events)
+
+    def _update_sleep(self, graph: IslandGraph, dt: float) -> None:
         linear_limit_sq = self.settings.sleep_linear_speed**2
         angular_limit_sq = self.settings.sleep_angular_speed**2
-        for body in self.bodies():
-            if body.body_type is not BodyType.DYNAMIC or not body.awake:
-                continue
-            quiet = (
-                body.linear_velocity.length_squared() <= linear_limit_sq
-                and body.angular_velocity.length_squared() <= angular_limit_sq
-                and body.force.length_squared() == 0.0
-                and body.torque.length_squared() == 0.0
+
+        for island in graph.islands:
+            dynamic = tuple(self._bodies[body_id] for body_id in island.dynamic_bodies)
+            active = any(
+                body.linear_velocity.length_squared() > linear_limit_sq
+                or body.angular_velocity.length_squared() > angular_limit_sq
+                or body.force.length_squared() > 0.0
+                or body.torque.length_squared() > 0.0
+                for body in dynamic
             )
-            if quiet:
-                body.sleep_time += dt
-                if body.sleep_time >= self.settings.sleep_after_seconds:
+
+            if active:
+                for body in dynamic:
+                    body.sleep_time = 0.0
+                continue
+
+            all_ready = True
+            for body in dynamic:
+                if body.awake:
+                    body.sleep_time += dt
+                if body.sleep_time < self.settings.sleep_after_seconds:
+                    all_ready = False
+
+            if all_ready:
+                for body in dynamic:
                     body.sleep()
-            else:
-                body.sleep_time = 0.0
 
     def _step_once(self) -> PhysicsStepReceipt:
         checkpoint = self._capture_step_checkpoint()
@@ -511,25 +744,38 @@ class PhysicsWorld:
         next_tick = self._tick + 1
 
         try:
+            previous_graph = build_islands(
+                self._bodies,
+                self._last_manifolds,
+                self.joints(),
+            )
+            previous_graph.propagate_awake(self._bodies)
+
             for body in self.bodies():
                 body.integrate_forces(dt, self.settings.gravity)
-            ccd_hits = self._integrate_velocity_phase(dt)
+            ccd_hits = self._integrate_velocity_phase(dt, tick=next_tick)
 
             pairs = self._broad_phase.compute_pairs(self.bodies())
             manifolds = generate_manifolds(self._bodies, pairs)
-            solver_stats = self._solver.solve(
+            graph = build_islands(
                 self._bodies,
                 manifolds,
+                self.joints(),
+            )
+            graph.propagate_awake(self._bodies)
+            island_solve = solve_islands(
+                self._bodies,
+                graph,
+                contact_solver=self._solver,
+                constraint_solver=self._constraint_solver,
                 cache=self._contact_cache,
                 tick=next_tick,
-            )
-            constraint_stats = self._constraint_solver.solve(
-                self._bodies,
-                self.joints(),
                 dt=dt,
             )
+            solver_stats = island_solve.solver
+            constraint_stats = island_solve.constraints
 
-            self._update_sleep(dt)
+            self._update_sleep(graph, dt)
             for body in self.bodies():
                 body.clear_accumulators()
 
@@ -559,6 +805,7 @@ class PhysicsWorld:
             sleeping_bodies=sleeping,
             solver=solver_stats,
             constraints=constraint_stats,
+            islands=graph.stats,
         )
 
     def step(self, steps: int = 1) -> tuple[PhysicsStepReceipt, ...]:

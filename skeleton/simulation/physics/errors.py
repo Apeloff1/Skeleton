@@ -40,3 +40,15 @@ class DuplicateJointError(PhysicsError):
 
 class JointNotFoundError(PhysicsError, KeyError):
     """Raised when a requested joint does not exist."""
+
+
+class PhysicsSnapshotError(PhysicsError):
+    """Raised when a physics snapshot is invalid or incompatible."""
+
+
+class PhysicsReplayError(PhysicsError):
+    """Raised when physics replay evidence is malformed."""
+
+
+class PhysicsReplayDivergenceError(PhysicsReplayError):
+    """Raised when deterministic physics replay diverges from recorded evidence."""

@@ -1,7 +1,7 @@
 """Deterministic engine-neutral 3D physics foundation."""
 
 from .body import BodyType, RigidBody
-from .ccd import CCDHit, ContinuousCollisionDetector
+from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -20,7 +20,20 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
-from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .constraints import (
+    ConstraintSolver,
+    ConstraintStats,
+    DistanceJoint,
+    DistanceLimitJoint,
+    FixedJoint,
+    HingeJoint,
+    JointConstraint,
+    JointKind,
+    PointJoint,
+    SliderJoint,
+    SpringJoint,
+    is_joint_constraint,
+)
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
@@ -29,6 +42,9 @@ from .errors import (
     DuplicateJointError,
     JointNotFoundError,
     PhysicsError,
+    PhysicsReplayDivergenceError,
+    PhysicsReplayError,
+    PhysicsSnapshotError,
     PhysicsValidationError,
     SolverError,
     UnsupportedCollisionError,
@@ -39,24 +55,67 @@ from .gameplay import (
     JumpTuning,
     ProjectileSolution,
 )
+from .islands import (
+    IslandGraph,
+    IslandGraphStats,
+    IslandSolveReceipt,
+    PhysicsIsland,
+    build_islands,
+    solve_islands,
+)
 from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_materials
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
 from .shapes import BoxShape, CollisionShape, MassProperties, PlaneShape, ShapeKind, SphereShape
+from .snapshots import (
+    PhysicsBodyState,
+    PhysicsSnapshot,
+    build_snapshot,
+    verify_snapshot,
+)
 from .solver import SequentialImpulseSolver, SolverStats
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
+from .commands import (
+    PhysicsCommand,
+    PhysicsCommandFrame,
+    PhysicsCommandKind,
+    PhysicsCommandTape,
+    apply_physics_commands,
+    step_physics_with_commands,
+)
+from .rollback import (
+    CommandCorrectionReceipt,
+    PhysicsCommandRollbackSession,
+    PhysicsRollbackSession,
+    RollbackReceipt,
+)
+from .replay import (
+    PhysicsCommandReplayFrame,
+    PhysicsCommandReplayRecorder,
+    PhysicsCommandReplayTape,
+    PhysicsReplayFrame,
+    PhysicsReplayRecorder,
+    PhysicsReplayTape,
+    PhysicsReplayVerification,
+    replay_physics,
+    replay_physics_commands,
+)
 
 __all__ = [
     "AABB",
     "BodyNotFoundError",
     "CCDHit",
+    "CommandCorrectionReceipt",
     "ConstraintSolver",
     "ConstraintStats",
     "ContactCache",
     "ContactCacheEntry",
     "ContinuousCollisionDetector",
     "DistanceJoint",
+    "DistanceLimitJoint",
     "DuplicateJointError",
+    "JointConstraint",
+    "JointKind",
     "JointNotFoundError",
     "BodyType",
     "BoxShape",
@@ -68,12 +127,36 @@ __all__ = [
     "ContactPoint",
     "DegenerateGeometryError",
     "DuplicateBodyError",
+    "FixedJoint",
     "GamePhysicsProfile",
     "GameplayScale",
+    "HingeJoint",
+    "IslandGraph",
+    "IslandGraphStats",
+    "IslandSolveReceipt",
     "JumpTuning",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
+    "PhysicsIsland",
+    "PhysicsBodyState",
+    "PhysicsCommand",
+    "PhysicsCommandFrame",
+    "PhysicsCommandKind",
+    "PhysicsCommandReplayFrame",
+    "PhysicsCommandReplayRecorder",
+    "PhysicsCommandReplayTape",
+    "PhysicsCommandRollbackSession",
+    "PhysicsCommandTape",
+    "PhysicsReplayDivergenceError",
+    "PhysicsReplayError",
+    "PhysicsReplayFrame",
+    "PhysicsReplayRecorder",
+    "PhysicsReplayTape",
+    "PhysicsReplayVerification",
+    "PhysicsRollbackSession",
+    "PhysicsSnapshot",
+    "PhysicsSnapshotError",
     "PhysicsError",
     "PhysicsMaterial",
     "PhysicsSettings",
@@ -81,30 +164,44 @@ __all__ = [
     "PhysicsValidationError",
     "PhysicsWorld",
     "PlaneShape",
+    "PointJoint",
     "ProjectileSolution",
     "Quat",
     "Ray",
     "RayHit",
     "RigidBody",
+    "RollbackReceipt",
     "SequentialImpulseSolver",
     "ShapeKind",
+    "SliderJoint",
     "SolverError",
     "SolverStats",
     "SphereShape",
+    "SpringJoint",
     "SweepAndPruneBroadPhase",
+    "TOIEvent",
     "Transform",
     "UnsupportedCollisionError",
     "Vec3",
     "aggregate_physics",
+    "apply_physics_commands",
     "angular_momentum",
+    "build_islands",
+    "build_snapshot",
     "combine_materials",
     "detect_collision",
     "generate_manifolds",
     "gravitational_potential_energy",
     "impulse_from_force",
+    "is_joint_constraint",
     "kinetic_energy",
     "linear_momentum",
     "raycast_body",
+    "replay_physics",
+    "replay_physics_commands",
+    "solve_islands",
     "sphere_cast_body",
+    "step_physics_with_commands",
+    "verify_snapshot",
     "world_inertia",
 ]
