@@ -19,7 +19,7 @@ This registry is consumed by agents.py (each agent step can declare a list
 of tool calls to run before producing its output).
 """
 from __future__ import annotations
-import os, asyncio, json, subprocess, tempfile
+import os, asyncio, json, subprocess, tempfile, sys
 from typing import Any, Callable, Coroutine
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -102,8 +102,12 @@ async def _tool_compile_code(params: dict) -> dict:
 
 
 async def _tool_run_code(params: dict) -> dict:
-    """Reuse the playground's run pipeline via local Python eval for python only;
-    other langs go through the existing route."""
+    """Execute Python out-of-process behind the repository execution gate.
+
+    The tool registry must never evaluate agent-supplied code in the API
+    process. Python execution therefore uses a fresh isolated interpreter,
+    a private temporary working directory, and a bounded timeout.
+    """
     if not code_execution_enabled():
         return {
             "ok": False,
@@ -116,14 +120,60 @@ async def _tool_run_code(params: dict) -> dict:
     lang = params.get("language", "python")
     if lang != "python":
         return {"ok": False, "error": f"inline run only supports python; for {lang} call /api/playground/run"}
-    import io, contextlib, builtins
-    buf_out, buf_err = io.StringIO(), io.StringIO()
+    if not isinstance(code, str) or not code.strip():
+        return {"ok": False, "error": "empty code", "exit_code": 1}
+
     try:
-        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            builtins.exec(builtins.compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
-        return {"ok": True, "stdout": buf_out.getvalue()[-4000:], "stderr": buf_err.getvalue()[-4000:], "exit_code": 0}
-    except Exception:
-        return {"ok": False, "stdout": buf_out.getvalue()[-4000:], "stderr": (buf_err.getvalue() or "execution_failed")[-4000:], "exit_code": 1}
+        timeout_seconds = int(params.get("timeout_seconds", 10))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "invalid timeout_seconds", "exit_code": 1}
+    if not 1 <= timeout_seconds <= 30:
+        return {"ok": False, "error": "timeout_seconds must be between 1 and 30", "exit_code": 1}
+
+    input_data = params.get("input_data")
+    if input_data is not None and not isinstance(input_data, str):
+        return {"ok": False, "error": "input_data must be a string", "exit_code": 1}
+    if isinstance(input_data, str) and len(input_data) > 100_000:
+        return {"ok": False, "error": "input_data too large", "exit_code": 1}
+
+    with tempfile.TemporaryDirectory(prefix="tool-run-") as td:
+        source = os.path.join(td, "main.py")
+        with open(source, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(code)
+
+        process = None
+        try:
+            process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-I",
+                "-S",
+                "-u",
+                source,
+                cwd=td,
+                stdin=asyncio.subprocess.PIPE if input_data is not None else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input=input_data.encode("utf-8") if input_data is not None else None),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            if process is not None:
+                process.kill()
+                await process.communicate()
+            return {"ok": False, "error": "execution timed out", "stdout": "", "stderr": "", "exit_code": 124}
+        except OSError:
+            return {"ok": False, "error": "execution unavailable", "stdout": "", "stderr": "", "exit_code": 1}
+
+    stdout_text = stdout.decode("utf-8", errors="replace")[-4000:]
+    stderr_text = stderr.decode("utf-8", errors="replace")[-4000:]
+    return {
+        "ok": process.returncode == 0,
+        "stdout": stdout_text,
+        "stderr": stderr_text,
+        "exit_code": process.returncode,
+    }
 
 
 async def _tool_package_build(params: dict) -> dict:
