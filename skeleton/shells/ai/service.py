@@ -401,6 +401,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_authority_health()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -603,6 +604,16 @@ class AIShellService:
                 approval=approval,
                 execution_backend=execution_backend,
                 release_evidence_digest=self._release_digest(),
+                runtime_trust_digest=(
+                    ""
+                    if self._runtime_trust_report is None
+                    else self._runtime_trust_report.epoch_digest
+                ),
+                authority_health_policy_digest=(
+                    ""
+                    if self._authority_health_report is None
+                    else self._authority_health_report.policy_digest
+                ),
             )
         finally:
             if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
