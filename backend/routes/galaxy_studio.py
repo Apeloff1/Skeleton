@@ -1286,8 +1286,8 @@ Before any narrative payload is written to disk, the Playwright sub-swarm must:
             ])
             out["docs/STYLE_MANIFEST.md"] = "\n".join(sm_lines) + "\n"
 
-    except Exception as _e:
-        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection soft-failed: {_e})\n"
+    except Exception:
+        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection unavailable)\n"
     return out
 
 
@@ -1451,9 +1451,9 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
             }
         except Exception:
             pass
-    except Exception as _e:
+    except Exception:
         out["docs/GAME_KNOWLEDGE_VAULT.md"] = (
-            f"# {title} — Game Knowledge Vault\n\n(vault injection soft-failed: {_e})\n"
+            f"# {title} — Game Knowledge Vault\n\n(vault injection unavailable)\n"
         )
     return out
 
@@ -5119,7 +5119,8 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
         subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d)) and d not in {".", ".."}]
         actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
     except Exception as pe:
-        return {"build_id": build_id, "status": "package_error", "message": f"ZIP extract failed: {pe}"}
+        print(f"[GALAXY] ZIP extract failed: {type(pe).__name__}", flush=True)
+        return {"build_id": build_id, "status": "package_error", "message": "zip_extract_failed"}
 
     env = _os.environ.copy()
     env["EXPO_TOKEN"] = token
