@@ -170,6 +170,10 @@ from .execution_audit import (
     ReplayReport,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .frontier_adjudication import (
+    CandidateAdjudication,
+    HostCandidateAdjudicator,
+)
 from .frontier_consensus import (
     ConsensusCluster,
     ConsensusMember,
