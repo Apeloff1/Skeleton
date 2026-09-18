@@ -470,12 +470,12 @@ class LensFusionEngine:
             sum(w * (p - mean) ** 2 for w, p in zip(signal_weights, probs)) / norm
         )
         positive_mass = sum(
-            item.effective_weight
+            contrib.effective_weight
             for item, contrib in zip(ordered, contributions)
             if item.probability > 0.5 and contrib.effective_weight > 0
         )
         negative_mass = sum(
-            item.effective_weight
+            contrib.effective_weight
             for item, contrib in zip(ordered, contributions)
             if item.probability < 0.5 and contrib.effective_weight > 0
         )
