@@ -476,15 +476,22 @@ def validate_record(record: AssetRecord, *, data: bytes | None = None) -> AssetR
     _require_kind(identity.kind)
     _bounded_token("asset_id", identity.asset_id)
     _bounded_string("logical_name", identity.logical_name, allow_empty=True)
+
+    content = record.content
+    digest = _require_digest(content.sha256)
+    _require_int("size_bytes", content.size_bytes, minimum=0)
+    _bounded_string("media_type", content.media_type, allow_empty=True)
     expected_identity = canonical_content_identity(
         kind=identity.kind,
-        content_sha256=record.content.sha256,
+        content_sha256=digest,
     )
-    if record.content.canonical_identity != expected_identity:
+    if content.canonical_identity != expected_identity:
         raise DigestDriftError(
             "canonical content identity does not match kind and digest",
             context={"asset_id": identity.asset_id},
         )
+    if not isinstance(record.release_marked, bool):
+        raise SerializationError("release_marked must be a boolean")
     if data is not None:
         verify_content(record, data)
     _validate_source(record.source)
