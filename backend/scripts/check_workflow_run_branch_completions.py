@@ -19,6 +19,9 @@ DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
+QUEUE_DEFAULT_BRANCH_GUARD = (
+    "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+)
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
 OID_IDENTITY = "workflow_run head SHA must be a 40-character hex commit OID"
 IDENTITY_ADAPTERS = (
@@ -71,8 +74,10 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
-        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
-        in text
+        # The guard is a single security boundary. Requiring exactly one
+        # occurrence prevents a stale/commented/duplicate copy elsewhere in
+        # the workflow from masking removal of the executable job condition.
+        and text.count(QUEUE_DEFAULT_BRANCH_GUARD) == 1
     )
 
     if _is_named(path_name, QUEUE_DRAIN_WORKFLOW) and not queue_default_branch_only:
