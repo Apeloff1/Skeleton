@@ -29,6 +29,7 @@ MAX_EPA_ITERATIONS = 128
 MAX_EPA_VERTICES = 256
 MAX_EPA_FACES = 512
 MAX_CONVEX_TOI_ITERATIONS = 128
+MAX_CONVEX_TOI_FALLBACK_SAMPLES = 256
 _GJK_DIRECTION_EPSILON_SQ = 1.0e-24
 _DUPLICATE_SUPPORT_EPSILON_SQ = 1.0e-20
 
@@ -725,6 +726,57 @@ def _refine_convex_toi(
     return high, result
 
 
+def _fallback_convex_toi_scan(
+    a: RigidBody,
+    b: RigidBody,
+    start_time: float,
+    dt: float,
+    *,
+    distance_tolerance: float,
+    time_tolerance: float,
+    distance_iterations: int,
+) -> tuple[float, ConvexDistanceResult, int] | None:
+    """Deterministically bracket contact after advancement stalls.
+
+    Conservative advancement normally converges much faster than this path.
+    The fallback exists for pathological witness-normal changes near curved
+    features.  It never invents a collision: a scan sample must actually
+    intersect or lie within the configured distance tolerance before binary
+    refinement is allowed to return a TOI.
+    """
+
+    if start_time >= dt - time_tolerance:
+        return None
+
+    low = start_time
+    span = dt - start_time
+    for sample_index in range(1, MAX_CONVEX_TOI_FALLBACK_SAMPLES + 1):
+        high = start_time + span * (
+            sample_index / MAX_CONVEX_TOI_FALLBACK_SAMPLES
+        )
+        candidate = _distance_at_time(
+            a,
+            b,
+            high,
+            max_iterations=distance_iterations,
+            tolerance=distance_tolerance * 0.1,
+        )
+        if candidate.intersects or candidate.distance <= distance_tolerance:
+            refined_time, refined = _refine_convex_toi(
+                a,
+                b,
+                low,
+                high,
+                distance_tolerance=distance_tolerance,
+                time_tolerance=time_tolerance,
+                distance_iterations=distance_iterations,
+            )
+            return refined_time, refined, sample_index
+        low = high
+
+    return None
+
+
 def convex_time_of_impact(
     a: RigidBody,
     b: RigidBody,
@@ -838,7 +890,30 @@ def convex_time_of_impact(
             return None
         time = min(dt, next_time)
 
-    raise ConvexQueryError("convex TOI iteration bound exceeded")
+    fallback = _fallback_convex_toi_scan(
+        a,
+        b,
+        time,
+        dt,
+        distance_tolerance=distance_tolerance,
+        time_tolerance=time_tolerance,
+        distance_iterations=distance_iterations,
+    )
+    if fallback is None:
+        return None
+
+    fallback_time, result, scan_samples = fallback
+    return ConvexTOIResult(
+        body_a=a.body_id,
+        body_b=b.body_id,
+        fraction=min(1.0, max(0.0, fallback_time / dt)),
+        time=fallback_time,
+        normal=result.normal,
+        point_a=result.point_a,
+        point_b=result.point_b,
+        iterations=max_iterations + scan_samples,
+        initial_overlap=fallback_time <= time_tolerance,
+    )
 
 
 def _validate_convex_plane_pair(
