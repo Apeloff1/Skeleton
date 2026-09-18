@@ -51,6 +51,30 @@ class Gh:
             args.extend(["--label", label])
         self.run(args)
 
+    def find_issue(self, title: str) -> Mapping[str, Any] | None:
+        data = self.json([
+            "issue", "list", "--repo", self.repo, "--state", "all",
+            "--search", f"{title} in:title", "--limit", "100",
+            "--json", "number,title,state",
+        ])
+        if not isinstance(data, list):
+            return None
+        exact = [
+            item
+            for item in data
+            if isinstance(item, Mapping)
+            and str(item.get("title", "")) == title
+            and isinstance(item.get("number"), int)
+        ]
+        return max(exact, key=lambda item: int(item["number"])) if exact else None
+
+    def close_issue(self, number: int) -> None:
+        self.run([
+            "api", "--method", "PATCH",
+            f"repos/{self.repo}/issues/{number}",
+            "-f", "state=closed",
+        ])
+
 
 def labels_for(text: str) -> tuple[str, ...]:
     value = text.lower()
@@ -112,13 +136,19 @@ def nightly_report(gh: Gh, results: Sequence[BotResult]) -> BotResult:
         "", "Safety: labels/issues only; no PR code execution, source mutation, security-gate weakening, or arbitrary merges.",
     ]
     title = "bot: night shift report"
-    existing = [x for x in issues if str(x.get("title", "")) == title]
+    existing = gh.find_issue(title)
     body = "\n".join(lines)
-    if existing and isinstance(existing[0].get("number"), int):
-        gh.comment(existing[0]["number"], body)
-        return BotResult("nightly-report", 1, ("updated the existing report issue",))
+    if existing is not None:
+        number = int(existing["number"])
+        gh.comment(number, body)
+        gh.close_issue(number)
+        return BotResult("nightly-report", 1, ("updated the closed report ledger",))
     gh.create_issue(title, body, ())
-    return BotResult("nightly-report", 1, ("created the report issue",))
+    created = gh.find_issue(title)
+    if created is None:
+        raise RuntimeError("night shift report issue was created but could not be resolved")
+    gh.close_issue(int(created["number"]))
+    return BotResult("nightly-report", 1, ("created and closed the report ledger",))
 
 
 def main() -> int:
