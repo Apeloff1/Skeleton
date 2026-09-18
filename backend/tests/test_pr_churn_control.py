@@ -139,10 +139,17 @@ def test_exact_reverse_sync_automation_is_retirable() -> None:
         _sync_pr(405, head_repo="fork/repo"),
         _sync_pr(406, base_repo="other/repo"),
         _sync_pr(407, base="release/2026.09"),
-        _sync_pr(408, labels=("keep-open",)),
-        _sync_pr(409, draft=True),
+        _sync_pr(408, base="keep/long-lived"),
+        _sync_pr(409, base="backup/snapshot"),
+        _sync_pr(410, base="archive/old"),
+        _sync_pr(411, labels=("keep-open",)),
+        _sync_pr(412, draft=True),
+        {
+            **_sync_pr(413),
+            "number": 0,
+        },
         _pr(
-            410,
+            414,
             title="chore(sync): refresh feature/stale from main",
             body=(
                 "Automated stale-branch refresh. Merge current `main` into this "
@@ -161,6 +168,21 @@ def test_reverse_sync_retirement_is_fail_closed(pr: dict[str, object]) -> None:
         trusted_author=AUTHOR,
     )
     assert allowed is False
+
+
+def test_reverse_sync_requires_complete_same_repository_identity() -> None:
+    missing_base_repo = _sync_pr(415)
+    missing_base_repo["base"] = {"ref": "feature/stale"}
+
+    allowed, reason = eligible_reverse_sync(
+        missing_base_repo,
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+    )
+
+    assert allowed is False
+    assert reason == "sync PR base is not same-repository"
 
 
 def test_reverse_sync_plan_is_oldest_first_and_bounded() -> None:
