@@ -75,3 +75,26 @@ def test_queue_drain_reclaims_obsolete_same_repository_pr_runs() -> None:
     active_guard = workflow.index("if stale_pr_run(run, open_pr_heads):", active_loop)
     active_control_plane = workflow.index("if is_control_plane(run):", active_guard)
     assert active_guard < active_control_plane
+
+
+def test_queue_drain_reclaims_deleted_main_workflow_runs_only() -> None:
+    workflow = _workflow_text()
+
+    assert "def current_workflow_paths(head_sha):" in workflow
+    assert "/contents/.github/workflows?{query}" in workflow
+    assert "current workflow file inventory is empty" in workflow
+    assert "def orphaned_main_workflow_run(run, current_paths):" in workflow
+    assert "(run.get('head_branch') or '') == 'main'" in workflow
+    assert "workflow_path.startswith('.github/workflows/')" in workflow
+    assert "workflow_path not in current_paths" in workflow
+    assert "orphaned_main_queued" in workflow
+    assert "orphaned_main_active" in workflow
+
+    # The helper is deliberately main-only: a PR may validly introduce a new
+    # workflow file that does not exist on the current default branch.
+    helper = workflow[
+        workflow.index("def orphaned_main_workflow_run"):
+        workflow.index("def list_open_pr_heads")
+    ]
+    assert "pull_request" not in helper
+    assert "head_branch" in helper
