@@ -58,6 +58,7 @@ def _project_id(value: str | None) -> str | None:
     if (
         not normalized
         or len(normalized) > _MAX_PROJECT_ID_LENGTH
+        or "://" in normalized
         or not _PROJECT_ID_PATTERN.fullmatch(normalized)
     ):
         raise ValueError("project_id must be a bounded canonical identifier")
