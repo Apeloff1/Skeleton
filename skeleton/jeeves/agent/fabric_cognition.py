@@ -219,15 +219,16 @@ class FabricContextCompiler(ContextCompiler):
 
         encoded = canonical_json(payload)
         if len(encoded) > self.fabric_policy.maximum_section_chars:
+            included_source_ids = []
             payload = {
                 "contract": payload["contract"],
                 "fabric_fingerprint": result.fingerprint,
                 "broad_search_used": result.broad_search_used,
-                "stale_card_ids": list(result.stale_card_ids[:16]),
-                "unresolved_source_refs": list(result.unresolved_source_refs[:16]),
                 "records": [],
             }
             encoded = canonical_json(payload)
+        if len(encoded) > self.fabric_policy.maximum_section_chars:
+            return None
 
         if not (
             payload.get("records")
