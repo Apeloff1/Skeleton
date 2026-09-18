@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping, Sequence, Tuple
 
@@ -65,7 +66,6 @@ class DivisionByZeroSemantics(str, Enum):
     TRAP = "trap"
     POISON = "poison"
     UNDEFINED = "undefined"
-    IEEE = "ieee"
 
 
 class FloatMode(str, Enum):
@@ -109,6 +109,8 @@ def _bounded_text(name: str, value: object, *, allow_empty: bool = False, maximu
 def _mapping(name: str, value: object) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise SemanticContractError(f"{name} must be a mapping")
+    if any(not isinstance(key, str) for key in value):
+        raise SemanticContractError(f"{name} keys must be strings")
     return value
 
 
@@ -300,7 +302,7 @@ class SemanticContractCodec:
                 mode=FloatMode(str(item.get("mode", FloatMode.STRICT_IEEE.value))),
                 rounding=RoundingMode(str(item.get("rounding", RoundingMode.NEAREST_EVEN.value))),
                 nan=NaNSemantics(str(item.get("nan", NaNSemantics.PRESERVE.value))),
-                preserve_signed_zero=bool(item.get("preserve_signed_zero", True)),
+                preserve_signed_zero=item.get("preserve_signed_zero", True),
             )
 
         nondeterminism = None
@@ -323,7 +325,7 @@ class SemanticContractCodec:
             integer=integer,
             floating=floating,
             nondeterminism=nondeterminism,
-            schema_version=int(data.get("schema_version", 1)),
+            schema_version=data.get("schema_version", 1),
         )
 
 
@@ -423,9 +425,8 @@ class ModuleSemanticAuditor:
     def _is_integer_instruction(instruction: Instruction) -> bool:
         names = [result.value_type.name.casefold() for result in instruction.results]
         return any(
-            name == "int"
-            or name == "integer"
-            or name.startswith(("i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128"))
+            name in {"int", "integer"}
+            or re.fullmatch(r"[iu][1-9][0-9]*", name) is not None
             for name in names
         )
 
@@ -434,7 +435,7 @@ class ModuleSemanticAuditor:
         names = [result.value_type.name.casefold() for result in instruction.results]
         return any(
             name in {"float", "double", "half", "bfloat"}
-            or name.startswith(("f16", "f32", "f64", "f80", "f128", "bf16"))
+            or re.fullmatch(r"(?:f|bf)[1-9][0-9]*", name) is not None
             for name in names
         )
 
