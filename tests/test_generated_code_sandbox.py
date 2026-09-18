@@ -338,6 +338,27 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
     assert box.granted_capabilities() == frozenset()
 
 
+def test_secret_symlink_cannot_bypass_secrets_capability(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENAI_API_KEY=REDACTED_SECRET_PLACEHOLDER\n", encoding="utf-8")
+    alias = tmp_path / "notes.txt"
+    alias.symlink_to(env_file)
+
+    box = GeneratedCodeSandbox(
+        tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+    with pytest.raises(SandboxPolicyError, match="secret-bearing path"):
+        box.attempt(
+            Operation(
+                OperationKind.FS_READ,
+                str(alias),
+                SandboxCapability.FILESYSTEM,
+            )
+        )
+
+
 def test_secret_path_requires_secrets_even_inside_workspace(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=REDACTED_SECRET_PLACEHOLDER\n", encoding="utf-8")
