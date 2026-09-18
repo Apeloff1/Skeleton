@@ -1,7 +1,7 @@
 """Composite game-project quality and evolution for Jeeves.
 
-Runtime, compiled assets, deterministic scripts, physics, audio, and animation
-are separate evidence planes. Promotion is Pareto-safe: a candidate must not
+Runtime, compiled assets, deterministic scripts, physics, audio, animation,
+and navigation are separate evidence planes. Promotion is Pareto-safe: a candidate must not
 regress any plane and must strictly improve at least one. This prevents a fix
 in one subsystem from smuggling degradation through another.
 """
@@ -34,6 +34,14 @@ from .game_engine_assets import (
     attach_asset_build,
     canonical_asset_patches,
     canonical_asset_sources,
+)
+from .game_engine_navigation import (
+    NavigationAdversary,
+    NavigationQualityReport,
+    NavigationSource,
+    attach_navigation_build,
+    canonical_navigation_patches,
+    canonical_navigation_source,
 )
 from .game_engine_physics import (
     PhysicsAdversary,
@@ -74,6 +82,8 @@ class GameProjectSandbox:
     physics: PhysicsSceneSource
     audio: AudioSceneSource
     animation: AnimationSceneSource
+    navigation: NavigationSource
+    navigation: NavigationSource
 
     @property
     def era(self) -> EngineEra:
@@ -107,6 +117,7 @@ class GameProjectSandbox:
             self.physics,
             self.audio,
             self.animation,
+            self.navigation,
         )
 
 
@@ -119,6 +130,7 @@ class ProjectQualityReport:
     physics: PhysicsQualityReport
     audio: AudioQualityReport
     animation: AnimationQualityReport
+    navigation: NavigationQualityReport
 
     @property
     def passed(self) -> bool:
@@ -129,11 +141,12 @@ class ProjectQualityReport:
             and self.physics.passed
             and self.audio.passed
             and self.animation.passed
+            and self.navigation.passed
         )
 
     @property
     def score(self) -> float:
-        # Give all six project planes equal authority regardless of how many
+        # Give all seven project planes equal authority regardless of how many
         # individual probes each underlying plane exposes.
         return (
             float(self.runtime.score)
@@ -142,7 +155,8 @@ class ProjectQualityReport:
             + self.physics.score
             + self.audio.score
             + self.animation.score
-        ) / 6.0
+            + self.navigation.score
+        ) / 7.0
 
     @property
     def failed(self) -> tuple[str, ...]:
@@ -177,6 +191,11 @@ class ProjectQualityReport:
                 for name
                 in self.animation.failed
             )
+            + tuple(
+                "navigation:" + name
+                for name
+                in self.navigation.failed
+            )
         )
 
     @property
@@ -205,6 +224,10 @@ class ProjectQualityReport:
     def animation_score(self) -> float:
         return self.animation.score
 
+    @property
+    def navigation_score(self) -> float:
+        return self.navigation.score
+
 
 class ExecutableGameProjectLab:
     """Build and evaluate complete era projects, not isolated subsystems."""
@@ -217,6 +240,7 @@ class ExecutableGameProjectLab:
         physics_adversary: PhysicsAdversary | None = None,
         audio_adversary: AudioAdversary | None = None,
         animation_adversary: AnimationAdversary | None = None,
+        navigation_adversary: NavigationAdversary | None = None,
     ) -> None:
         self.engine_lab = (
             engine_lab
@@ -242,6 +266,10 @@ class ExecutableGameProjectLab:
             animation_adversary
             or AnimationAdversary()
         )
+        self.navigation_adversary = (
+            navigation_adversary
+            or NavigationAdversary()
+        )
 
     def create(
         self,
@@ -253,6 +281,7 @@ class ExecutableGameProjectLab:
         physics: PhysicsSceneSource | None = None,
         audio: AudioSceneSource | None = None,
         animation: AnimationSceneSource | None = None,
+        navigation: NavigationSource | None = None,
     ) -> GameProjectSandbox:
         engine = self.engine_lab.create(
             era,
@@ -309,9 +338,20 @@ class ExecutableGameProjectLab:
                 engine.era
             )
         )
-        compiled = attach_animation_build(
+        compiled_animation = attach_animation_build(
             compiled_audio,
             animation_source,
+        )
+        navigation_source = (
+            navigation
+            if navigation is not None
+            else canonical_navigation_source(
+                engine.era
+            )
+        )
+        compiled = attach_navigation_build(
+            compiled_animation,
+            navigation_source,
         )
         return GameProjectSandbox(
             compiled,
@@ -320,6 +360,7 @@ class ExecutableGameProjectLab:
             physics_source,
             audio_source,
             animation_source,
+            navigation_source,
         )
 
     def evaluate(
@@ -361,6 +402,12 @@ class ExecutableGameProjectLab:
                 project.animation,
             )
         )
+        navigation = (
+            self.navigation_adversary.evaluate(
+                project.engine,
+                project.navigation,
+            )
+        )
         return ProjectQualityReport(
             project.era,
             runtime,
@@ -369,6 +416,7 @@ class ExecutableGameProjectLab:
             physics,
             audio,
             animation,
+            navigation,
         )
 
     def canonical_repair(
@@ -412,6 +460,12 @@ class ExecutableGameProjectLab:
                 project.animation,
             )
         )
+        navigation_patches = (
+            canonical_navigation_patches(
+                project.engine,
+                project.navigation,
+            )
+        )
         paths = [
             patch.path
             for patch
@@ -422,6 +476,7 @@ class ExecutableGameProjectLab:
                 + physics_patches
                 + audio_patches
                 + animation_patches
+                + navigation_patches
             )
         ]
         if len(paths) != len(
@@ -437,6 +492,7 @@ class ExecutableGameProjectLab:
             + physics_patches
             + audio_patches
             + animation_patches
+            + navigation_patches
         )
 
 
@@ -500,6 +556,16 @@ def _nonregressing_improvement(
             before.animation.failed
         )
     )
+    navigation_nonregressing = (
+        after.navigation_score
+        >= before.navigation_score
+        and len(
+            after.navigation.failed
+        )
+        <= len(
+            before.navigation.failed
+        )
+    )
     strict = (
         runtime_strictly_improves(
             before.runtime,
@@ -515,6 +581,8 @@ def _nonregressing_improvement(
         > before.audio_score
         or after.animation_score
         > before.animation_score
+        or after.navigation_score
+        > before.navigation_score
         or len(after.failed)
         < len(before.failed)
     )
@@ -525,6 +593,7 @@ def _nonregressing_improvement(
         and physics_nonregressing
         and audio_nonregressing
         and animation_nonregressing
+        and navigation_nonregressing
         and strict
     )
 
@@ -547,6 +616,8 @@ def _meets_target(
         >= target
         and report.animation_score
         >= target
+        and report.navigation_score
+        >= target
     )
 
 
@@ -568,6 +639,8 @@ class ProjectEvolutionRound:
     selected_audio_score: float
     before_animation_score: float
     selected_animation_score: float
+    before_navigation_score: float
+    selected_navigation_score: float
     accepted: bool
     failures: tuple[str, ...]
 
@@ -595,6 +668,7 @@ class ProjectEvolutionSession:
             project.physics,
             project.audio,
             project.animation,
+            project.navigation,
         )
 
     @property
@@ -608,6 +682,7 @@ class ProjectEvolutionSession:
             self.physics,
             self.audio,
             self.animation,
+            self.navigation,
         )
 
     @property
@@ -670,6 +745,13 @@ class ProjectEvolutionSession:
             raise GameEngineLabError(
                 "project animation recipe cannot change inside a quality lineage"
             )
+        if (
+            project.navigation
+            != self.navigation
+        ):
+            raise GameEngineLabError(
+                "project navigation recipe cannot change inside a quality lineage"
+            )
         return ProjectEvolutionSession(
             self.engine_session.checkpoint(
                 project.engine
@@ -679,6 +761,7 @@ class ProjectEvolutionSession:
             self.physics,
             self.audio,
             self.animation,
+            self.navigation,
         )
 
     def restore(
@@ -694,6 +777,7 @@ class ProjectEvolutionSession:
             self.physics,
             self.audio,
             self.animation,
+            self.navigation,
         )
 
 
@@ -846,6 +930,8 @@ class AdversarialGameProjectEvolution:
                     before.audio_score,
                     before.animation_score,
                     before.animation_score,
+                    before.navigation_score,
+                    before.navigation_score,
                     False,
                     before.failed,
                 ),
@@ -888,6 +974,8 @@ class AdversarialGameProjectEvolution:
                 selected_report.audio_score,
                 before.animation_score,
                 selected_report.animation_score,
+                before.navigation_score,
+                selected_report.navigation_score,
                 True,
                 selected_report.failed,
             ),
@@ -1007,6 +1095,7 @@ def build_executable_game_project(
     physics: PhysicsSceneSource | None = None,
     audio: AudioSceneSource | None = None,
     animation: AnimationSceneSource | None = None,
+    navigation: NavigationSource | None = None,
 ) -> GameProjectSandbox:
     return ExecutableGameProjectLab().create(
         era,
@@ -1016,4 +1105,5 @@ def build_executable_game_project(
         physics=physics,
         audio=audio,
         animation=animation,
+        navigation=navigation,
     )
