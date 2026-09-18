@@ -48,6 +48,13 @@ def python_files() -> Iterable[Path]:
             yield path
 
 
+def _root_label(root: Path) -> Path:
+    try:
+        return root.relative_to(REPO_ROOT)
+    except ValueError:
+        return root
+
+
 def _load_violation_engine() -> Callable[[Path], list[str]]:
     if not BASE_SCANNER.is_file():
         raise RuntimeError(f"canonical SAST scanner missing: {BASE_SCANNER}")
@@ -86,7 +93,7 @@ def main() -> int:
     for root, count in root_counts.items():
         if count == 0:
             findings.append(
-                f"scanner coverage failure: no Python files scanned under {root.relative_to(REPO_ROOT)}"
+                f"scanner coverage failure: no Python files scanned under {_root_label(root)}"
             )
 
     if findings:
@@ -98,7 +105,7 @@ def main() -> int:
     print(
         f"Repository Python SAST gate passed ({len(files)} core/tooling Python files; "
         + ", ".join(
-            f"{root.relative_to(REPO_ROOT)}={count}"
+            f"{_root_label(root)}={count}"
             for root, count in root_counts.items()
         )
         + ")."
