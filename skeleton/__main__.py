@@ -28,6 +28,12 @@ Commands:
                 Use `capabilities --cortex-audit` for unmounted cortex register_routes
                 Use `capabilities --mounted-audit` for create_app swarm/cockpit mounts
                 Use `capabilities --main-cli-audit` for python -m skeleton help vs dispatch
+                Use `capabilities --app-audit` for create_app inline GET / and /cortex/status
+                Use `capabilities --charter-audit` for require_charter domain/action pairs
+                Use `capabilities --contract-audit` for CommandSpec vs runtime register
+                Use `capabilities --live-hmac-audit` for HMAC prefixes vs live handlers
+                Use `capabilities --nested-audit` for nested include_router mounts
+                Use `capabilities --env-audit` for SKELETON_OWN / HMAC env flags
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -64,6 +70,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         cortex_route_audit_snapshot,
         mounted_route_audit_snapshot,
         main_cli_audit_snapshot,
+        app_route_audit_snapshot,
+        charter_audit_snapshot,
+        contract_audit_snapshot,
+        live_hmac_audit_snapshot,
+        nested_router_audit_snapshot,
+        env_flag_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -81,6 +93,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "cortex_audit": {"--cortex-audit", "cortex-audit", "--cortex_audit", "cortex_audit"},
         "mounted_audit": {"--mounted-audit", "mounted-audit", "--mounted_audit", "mounted_audit"},
         "main_cli_audit": {"--main-cli-audit", "main-cli-audit", "--main_cli_audit", "main_cli_audit"},
+        "app_audit": {"--app-audit", "app-audit", "--app_audit", "app_audit"},
+        "charter_audit": {"--charter-audit", "charter-audit", "--charter_audit", "charter_audit"},
+        "contract_audit": {"--contract-audit", "contract-audit", "--contract_audit", "contract_audit"},
+        "live_hmac_audit": {"--live-hmac-audit", "live-hmac-audit", "--live_hmac_audit", "live_hmac_audit"},
+        "nested_audit": {"--nested-audit", "nested-audit", "--nested_audit", "nested_audit"},
+        "env_audit": {"--env-audit", "env-audit", "--env_audit", "env_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -92,7 +110,19 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "main_cli_audit":
+    if view == "env_audit":
+        payload = env_flag_audit_snapshot()
+    elif view == "nested_audit":
+        payload = nested_router_audit_snapshot()
+    elif view == "live_hmac_audit":
+        payload = live_hmac_audit_snapshot()
+    elif view == "contract_audit":
+        payload = contract_audit_snapshot()
+    elif view == "charter_audit":
+        payload = charter_audit_snapshot()
+    elif view == "app_audit":
+        payload = app_route_audit_snapshot()
+    elif view == "main_cli_audit":
         payload = main_cli_audit_snapshot()
     elif view == "mounted_audit":
         payload = mounted_route_audit_snapshot()

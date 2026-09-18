@@ -36,7 +36,8 @@ F-13 economic/cascade reconciliation, F-14 speculative RAG, F-15
 organism/social/galaxy plane audit, F-16 capability discovery, F-17 genesis/export structural audits, F-18
 pipeline speculative RAG, F-19 main-router API route audit, F-20..F-21 payload/HMAC
 audits, F-22..F-27 text/CLI/template/sidecar audits, and F-28..F-35 mapping/list
-plus domain/cortex/mounted/main-CLI audits are
+plus domain/cortex/mounted/main-CLI audits, and F-36..F-43 sidecar intake /
+curve allow-list / live-surface audits are
 **landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
@@ -65,6 +66,7 @@ plus domain/cortex/mounted/main-CLI audits are
 | F-21 HMAC open-prefix audit | #1019 | DEFAULT_OPEN_PREFIXES vs API_ROUTES; probe-only open surface |
 | F-22..F-27 Float/text + CLI/template/sidecar | #1019 | require_float/require_text; developer CLI, templates, GameForge/command sidecars |
 | F-28..F-35 Mapping/list + domain/cortex/mounted/main-CLI | #1019 | require_mapping/require_list; SessionMode; gate domains; unmounted cortex; create_app mounts; main CLI |
+| F-36..F-43 Sidecar intake, curves, live-surface audits | #1019 | sidecar answers mapping; curve allow-list; create_app inline; charter pairs; contracts; live HMAC; nested include; env flags |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -106,5 +108,6 @@ organism/social/galaxy plane audit, F-16 capability discovery, F-17
 genesis/export structural audits, F-18 pipeline speculative RAG, F-19
 main-router API route audit, F-20..F-27 payload types and CLI/HMAC/sidecar
 audits, and F-28..F-35 mapping/list plus domain/cortex/mounted/main-CLI audits
-are landed in code. The former CI-1..CI-3
+are landed in code, as are F-36..F-43 sidecar intake, curve allow-lists, and
+live-surface audits. The former CI-1..CI-3
 blockers are resolved on main; the remaining structural queue is F-11.

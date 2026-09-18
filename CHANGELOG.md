@@ -4,6 +4,26 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-36..F-43 sidecar intake, curves, and live-surface audits
+
+- Sidecar GameForge intake `answers` uses `require_mapping`; the whole request
+  body is no longer treated as answers. HTTP pipeline `curve` is allow-listed
+  to `linear|quadratic|exponential`.
+- Additive `app_route_audit` reports create_app inline `GET /` and
+  `GET /cortex/status`, both missing from `API_ROUTES`.
+- Additive `charter_audit` locks the six main-router `require_charter` pairs
+  (`swarm.submit` plus five forge actions). Sidecar GameForge stays unchartered.
+- Additive `contract_audit` locks CommandSpec names against runtime
+  `service.register` with zero drift.
+- Additive `live_hmac_audit` compares default HMAC prefixes to the live handler
+  union. Only `/health/live` and `/health/ready` are open; `/` and `/cortex/status`
+  stay sealed under default prefixes.
+- Additive `nested_router_audit` reports GameForge's nested command-router include.
+- Additive `env_flag_audit` lists `SKELETON_PUBLIC_DEV_SURFACES`, `GF_SEAL_SECRET`,
+  `GF_SEAL_KEYRING`, and `SKELETON_OWN` without importing those modules.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
 ## 2026-09-18 — F-28..F-35 mapping/list payloads and domain/cortex/mounted/main-CLI audits
 
 - Shared `require_mapping` / `require_list` reject strings, tuples-as-objects,

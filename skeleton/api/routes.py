@@ -454,6 +454,132 @@ async def application_main_cli_audit() -> Dict[str, Any]:
     return main_cli_audit_snapshot()
 
 
+@router.get("/application/app/audit/{method}/{path:path}")
+async def application_app_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one create_app inline-handler audit row by method and path."""
+    from skeleton.application import get_app_route_audit_row
+
+    try:
+        return get_app_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/app/audit")
+async def application_app_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --app-audit``."""
+    from skeleton.application import app_route_audit_snapshot
+
+    return app_route_audit_snapshot()
+
+
+@router.get("/application/charter/audit/{method}/{path:path}")
+async def application_charter_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one charter-binding audit row by method and path."""
+    from skeleton.application import get_charter_audit_row
+
+    try:
+        return get_charter_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/charter/audit")
+async def application_charter_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --charter-audit``."""
+    from skeleton.application import charter_audit_snapshot
+
+    return charter_audit_snapshot()
+
+
+@router.get("/application/contracts/audit/{command_id}")
+async def application_contract_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one command-contract audit row by command name."""
+    from skeleton.application import get_contract_audit_row
+
+    try:
+        return get_contract_audit_row(command_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/contracts/audit")
+async def application_contract_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --contract-audit``."""
+    from skeleton.application import contract_audit_snapshot
+
+    return contract_audit_snapshot()
+
+
+@router.get("/application/hmac/live-audit/{method}/{path:path}")
+async def application_live_hmac_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one live-HMAC audit row by method and path."""
+    from skeleton.application import get_live_hmac_audit_row
+
+    try:
+        return get_live_hmac_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/hmac/live-audit")
+async def application_live_hmac_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --live-hmac-audit``."""
+    from skeleton.application import live_hmac_audit_snapshot
+
+    return live_hmac_audit_snapshot()
+
+
+@router.get("/application/nested/audit/{include_id:path}")
+async def application_nested_router_audit_row(include_id: str) -> Dict[str, Any]:
+    """Return one nested-include audit row by host module."""
+    from skeleton.application import get_nested_router_audit_row
+
+    try:
+        return get_nested_router_audit_row(include_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/nested/audit")
+async def application_nested_router_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --nested-audit``."""
+    from skeleton.application import nested_router_audit_snapshot
+
+    return nested_router_audit_snapshot()
+
+
+@router.get("/application/env/audit/{flag_id}")
+async def application_env_flag_audit_row(flag_id: str) -> Dict[str, Any]:
+    """Return one environment-flag audit row by variable name."""
+    from skeleton.application import get_env_flag_audit_row
+
+    try:
+        return get_env_flag_audit_row(flag_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/env/audit")
+async def application_env_flag_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --env-audit``."""
+    from skeleton.application import env_flag_audit_snapshot
+
+    return env_flag_audit_snapshot()
+
+
 @router.get("/application/planes/audit/{plane_id}")
 async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
     """Return one F-15 plane audit row by stable ID."""
@@ -713,12 +839,14 @@ async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    from skeleton.application.command_contracts import PROGRESSION_CURVES
+
     description = _text_field(request, "description", "")
     spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
         description,
         title=_text_field(request, "title", "untitled"),
         max_level=_int_field(request, "max_level", 50, minimum=1),
-        curve=_text_field(request, "curve", "quadratic"),
+        curve=_text_field(request, "curve", "quadratic", allowed=PROGRESSION_CURVES),
         currency=_text_field(request, "currency", "gold"),
     )
     return {

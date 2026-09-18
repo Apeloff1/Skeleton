@@ -62,6 +62,12 @@ _CAPABILITY_VIEW_FLAGS = (
     "cortex_audit",
     "mounted_audit",
     "main_cli_audit",
+    "app_audit",
+    "charter_audit",
+    "contract_audit",
+    "live_hmac_audit",
+    "nested_audit",
+    "env_audit",
 )
 
 
@@ -97,6 +103,30 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["env_audit"]:
+            from .env_flag_audit import env_flag_audit_snapshot, get_env_flag_audit_row
+
+            return _lookup_row(payload, "flag_id", get_env_flag_audit_row, env_flag_audit_snapshot)
+        if flags["nested_audit"]:
+            from .nested_router_audit import get_nested_router_audit_row, nested_router_audit_snapshot
+
+            return _lookup_row(payload, "include_id", get_nested_router_audit_row, nested_router_audit_snapshot)
+        if flags["live_hmac_audit"]:
+            from .live_hmac_audit import get_live_hmac_audit_row, live_hmac_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_live_hmac_audit_row, live_hmac_audit_snapshot)
+        if flags["contract_audit"]:
+            from .contract_audit import contract_audit_snapshot, get_contract_audit_row
+
+            return _lookup_row(payload, "command_id", get_contract_audit_row, contract_audit_snapshot)
+        if flags["charter_audit"]:
+            from .charter_audit import charter_audit_snapshot, get_charter_audit_row
+
+            return _lookup_row(payload, "route_id", get_charter_audit_row, charter_audit_snapshot)
+        if flags["app_audit"]:
+            from .app_route_audit import app_route_audit_snapshot, get_app_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_app_route_audit_row, app_route_audit_snapshot)
         if flags["main_cli_audit"]:
             from .main_cli_audit import get_main_cli_audit_row, main_cli_audit_snapshot
 

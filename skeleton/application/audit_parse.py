@@ -876,3 +876,406 @@ def main_cli_help_commands() -> list[str]:
         if token and token[0].isalpha():
             names.append(token)
     return names
+
+
+def assigned_str_constant(tree: ast.AST | None, name: str) -> str | None:
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        value: ast.AST | None = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            value = node.value
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    value = node.value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            return value.value
+    return None
+
+
+def create_app_inline_handlers() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.api.server")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "create_app":
+            continue
+        for child in node.body:
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in child.decorator_list:
+                parsed = _decorator_route(decorator, owner_names=("app",))
+                if parsed is None:
+                    continue
+                method, path = parsed
+                full_path = path if path.startswith("/") else f"/{path}"
+                full_path = full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
+                key = (method, full_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append(
+                    {
+                        "method": method,
+                        "path": full_path,
+                        "handler": child.name,
+                        "module": "skeleton.api.server",
+                        "source": "create_app",
+                        "charter_gated": _depends_named(child, "require_charter"),
+                        "seal_gated": _depends_named(child, "require_seal"),
+                    }
+                )
+        break
+    return rows
+
+
+def _require_charter_pair(node: ast.AST) -> tuple[str, str] | None:
+    call = node
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "Depends"
+        and node.args
+    ):
+        call = node.args[0]
+    if not isinstance(call, ast.Call):
+        return None
+    func = call.func
+    is_charter = (isinstance(func, ast.Name) and func.id == "require_charter") or (
+        isinstance(func, ast.Attribute) and func.attr == "require_charter"
+    )
+    if not is_charter or len(call.args) < 2:
+        return None
+    domain_node, action_node = call.args[0], call.args[1]
+    if not isinstance(domain_node, ast.Constant) or not isinstance(domain_node.value, str):
+        return None
+    if not isinstance(action_node, ast.Constant) or not isinstance(action_node.value, str):
+        return None
+    return domain_node.value, action_node.value
+
+
+def _function_charter_pair(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, str] | None:
+    defaults = list(fn.args.defaults) + [item for item in fn.args.kw_defaults if item is not None]
+    for default in defaults:
+        pair = _require_charter_pair(default)
+        if pair is not None:
+            return pair
+    return None
+
+
+def _charter_rows_from_tree(
+    tree: ast.AST,
+    *,
+    module: str,
+    source: str,
+    owner_names: tuple[str, ...] = ("router",),
+    mount_prefix: str = "/api/v1",
+    join_router_prefix: bool = False,
+    nested: bool = False,
+) -> list[dict[str, object]]:
+    if not isinstance(tree, ast.Module):
+        return []
+    router_prefix = api_router_prefix(module) if join_router_prefix else ""
+    functions: list[ast.AST] = []
+    if nested:
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                functions.extend(
+                    child
+                    for child in node.body
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                )
+    else:
+        functions = [
+            node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in functions:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        pair = _function_charter_pair(node)
+        if pair is None:
+            continue
+        domain, action = pair
+        for decorator in node.decorator_list:
+            parsed = _decorator_route(decorator, owner_names=owner_names)
+            if parsed is None:
+                continue
+            method, path = parsed
+            full_path = (
+                _normalize_handler_path(path)
+                if path.startswith(_API_PREFIX)
+                else join_url_paths(mount_prefix, router_prefix, path)
+            )
+            full_path = full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
+            key = (method, full_path)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "method": method,
+                    "path": full_path,
+                    "handler": node.name,
+                    "module": module,
+                    "source": source,
+                    "domain": domain,
+                    "action": action,
+                    "key": f"{method} {full_path}",
+                }
+            )
+    return rows
+
+
+def charter_route_bindings() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    main_tree = parse_module_tree("skeleton.api.routes")
+    if main_tree is not None:
+        for row in _charter_rows_from_tree(
+            main_tree,
+            module="skeleton.api.routes",
+            source="main",
+        ):
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    for module, source in (
+        ("skeleton.api.gameforge_routes", "gameforge"),
+        ("skeleton.api.command_routes", "command"),
+    ):
+        tree = parse_module_tree(module)
+        if tree is None:
+            continue
+        for row in _charter_rows_from_tree(tree, module=module, source=source):
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    for mount in create_app_included_routers():
+        module = str(mount["module"] or "")
+        if not module or module in _SKIP_MOUNTED_MODULES:
+            continue
+        tree = parse_module_tree(module)
+        if tree is None:
+            continue
+        for row in _charter_rows_from_tree(
+            tree,
+            module=module,
+            source=module.rsplit(".", 1)[-1],
+            mount_prefix=str(mount["prefix"] or ""),
+            join_router_prefix=True,
+        ):
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    return rows
+
+
+def command_contract_specs() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.application.command_contracts")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, object]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Name) or func.id != "CommandSpec":
+            continue
+        if not node.args or not isinstance(node.args[0], ast.Constant) or not isinstance(node.args[0].value, str):
+            continue
+        auth_required = False
+        mutating = False
+        for keyword in node.keywords:
+            if keyword.arg == "auth_required" and isinstance(keyword.value, ast.Constant):
+                auth_required = keyword.value.value is True
+            if keyword.arg == "mutating" and isinstance(keyword.value, ast.Constant):
+                mutating = keyword.value.value is True
+        rows.append(
+            {
+                "command": node.args[0].value,
+                "auth_required": auth_required,
+                "mutating": mutating,
+            }
+        )
+    return rows
+
+
+def runtime_registered_commands() -> list[str]:
+    tree = parse_module_tree("skeleton.application.runtime_commands")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "build_runtime_command_service":
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call) or not child.args:
+                continue
+            func = child.func
+            if not isinstance(func, ast.Attribute) or func.attr != "register":
+                continue
+            arg = child.args[0]
+            if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+                continue
+            if arg.value in seen:
+                continue
+            seen.add(arg.value)
+            names.append(arg.value)
+        break
+    return names
+
+
+def live_handler_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    sources = (
+        (("main", row) for row in main_router_handlers()),
+        (("sidecar", row) for row in sidecar_router_handlers()),
+        (("mounted", row) for row in mounted_router_handlers()),
+        (("cortex", row) for row in cortex_route_handlers()),
+        (("create_app", row) for row in create_app_inline_handlers()),
+    )
+    for group in sources:
+        for source, row in group:
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "method": row["method"],
+                    "path": row["path"],
+                    "handler": row.get("handler", ""),
+                    "source": row.get("source", source),
+                    "surface": source,
+                }
+            )
+    return rows
+
+
+def module_nested_includes(module: str) -> list[dict[str, object]]:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    aliases: dict[str, str] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        for alias in node.names:
+            aliases[alias.asname or alias.name] = node.module
+    rows: list[dict[str, object]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Attribute) or call.func.attr != "include_router" or not call.args:
+            continue
+        router_arg = call.args[0]
+        if not isinstance(router_arg, ast.Name):
+            continue
+        prefix = ""
+        for keyword in call.keywords:
+            if (
+                keyword.arg == "prefix"
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ):
+                prefix = keyword.value.value
+        rows.append(
+            {
+                "host_module": module,
+                "included_name": router_arg.id,
+                "included_module": aliases.get(router_arg.id, ""),
+                "prefix": prefix,
+            }
+        )
+    return rows
+
+
+def nested_router_includes() -> list[dict[str, object]]:
+    modules = [str(row["module"]) for row in create_app_included_routers() if row.get("module")]
+    modules.append("skeleton.api.command_routes")
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for module in dict.fromkeys(modules):
+        for row in module_nested_includes(module):
+            key = (str(row["host_module"]), str(row["included_module"] or row["included_name"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    return rows
+
+
+def _is_environ_get(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute) or node.func.attr != "get":
+        return False
+    receiver = node.func.value
+    if isinstance(receiver, ast.Attribute) and receiver.attr == "environ":
+        return True
+    return isinstance(receiver, ast.Name) and receiver.id == "environ"
+
+
+def environ_flag_names(module: str) -> list[str]:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    aliases: dict[str, str] = {}
+    for node in tree.body:
+        target: str | None = None
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            target = node.targets[0].id
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target = node.target.id
+            value = node.value
+        if target and isinstance(value, ast.Constant) and isinstance(value.value, str):
+            aliases[target] = value.value
+    names: list[str] = []
+    seen: set[str] = set()
+    for node in ast.walk(tree):
+        if not _is_environ_get(node) or not isinstance(node, ast.Call) or not node.args:
+            continue
+        arg = node.args[0]
+        key: str | None = None
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            key = arg.value
+        elif isinstance(arg, ast.Name) and arg.id in aliases:
+            key = aliases[arg.id]
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        names.append(key)
+    return names
+
+
+AUDITED_ENV_MODULES = (
+    "skeleton.api.server",
+    "skeleton.api.hmac_seal",
+    "skeleton.cortex.live",
+)
+
+
+def audited_environ_flags() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for module in AUDITED_ENV_MODULES:
+        for name in environ_flag_names(module):
+            if name in seen:
+                continue
+            seen.add(name)
+            rows.append({"name": name, "module": module})
+    return rows

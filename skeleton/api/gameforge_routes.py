@@ -29,10 +29,15 @@ def _state():
 @router.post("/gameforge/intake")
 async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     """Process questionnaire answers into a structured intake result."""
+    from skeleton.application.command_contracts import CommandError, require_mapping
     from skeleton.pipelines import GameForge
 
+    try:
+        answers = require_mapping(request, "answers", {}, optional=False) or {}
+    except CommandError as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+
     forge = GameForge(genesis=state.genesis, bus=state.genesis.bus if state.genesis else None)
-    answers = request.get("answers", request)
     result = forge.intake(answers)
     return {"intake": result, "status": "processed"}
 

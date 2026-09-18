@@ -317,3 +317,43 @@ def test_http_jeeves_session_and_hot_strings_fail_closed() -> None:
         asyncio.run(routes.resilience_sanitise({"input": 9}, _HttpState()))
 
 
+def test_sidecar_intake_rejects_non_object_answers() -> None:
+    from skeleton.api import gameforge_routes
+
+    class _State:
+        genesis = None
+
+    body = asyncio.run(gameforge_routes.gameforge_intake({"answers": {"era": "now"}}, _State()))
+    assert body["status"] == "processed"
+    with pytest.raises(HTTPException) as coerced:
+        asyncio.run(gameforge_routes.gameforge_intake({"answers": "nope"}, _State()))
+    assert coerced.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(gameforge_routes.gameforge_intake({"answers": ["era"]}, _State()))
+
+
+def test_http_game_logic_curve_allow_list_fail_closed() -> None:
+    from skeleton.api import routes
+
+    class _Spec:
+        def to_dict(self):
+            return {"curve": "linear"}
+
+    class _Pipeline:
+        def run(self, *args, **kwargs):
+            self.kwargs = kwargs
+            return _Spec()
+
+    class _HttpState:
+        game_logic_pipeline = _Pipeline()
+        genesis = None
+
+    body = asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": "linear"}, _HttpState()))
+    assert body["status"] == "generated"
+    with pytest.raises(HTTPException) as unknown:
+        asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": "bezier"}, _HttpState()))
+    assert unknown.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": True}, _HttpState()))
+
+

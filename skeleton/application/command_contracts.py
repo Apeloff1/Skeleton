@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
 CONTRACT_VERSION = "1.0"
 MATERIALISE_TARGETS = ("json", "yaml", "godot")
+PROGRESSION_CURVES = ("linear", "quadratic", "exponential")
 
 
 def require_bool(payload: Mapping[str, Any], key: str, default: bool = False) -> bool:
