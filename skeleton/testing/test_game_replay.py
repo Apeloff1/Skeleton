@@ -154,7 +154,11 @@ def test_step_payload_and_order_divergence_are_detected() -> None:
             *_steps()[1:],
         )
     )
-    reordered = _record(steps=(_steps()[1], _steps()[0], *_steps()[2:]))
+    # Combat and XP share at_tick=1, so swapping them is a legal reorder.
+    original = _steps()
+    reordered = _record(
+        steps=(original[0], original[2], original[1], *original[3:])
+    )
 
     payload_report = _replay().compare(baseline, payload_changed)
     order_report = _replay().compare(baseline, reordered)
@@ -162,6 +166,12 @@ def test_step_payload_and_order_divergence_are_detected() -> None:
     assert order_report.identical is False
     assert "state_digest" in {item.field for item in payload_report.mismatches}
     assert "steps" in {item.field for item in order_report.mismatches}
+
+
+def test_time_regression_fail_closed() -> None:
+    with pytest.raises(GameReplayError, match="replay time went backwards") as caught:
+        _record(steps=(_steps()[1], _steps()[0]))
+    assert caught.value.context["reason"] == "time_regression"
 
 
 def test_replay_rejects_tampered_result_digest() -> None:
@@ -252,11 +262,12 @@ def test_explicit_clock_and_seed_never_read_process_globals(monkeypatch: pytest.
     monkeypatch.setattr(random, "randint", boom)
     monkeypatch.setattr(random, "randrange", boom)
 
-    recorded = _record(seed=7, tick=3)
+    recorded = _record(seed=7, tick=0)
     replayed = _replay().replay(recorded)
     assert recorded.result_digest == replayed.result_digest
-    assert recorded.tick == 3
+    assert recorded.tick == 0
     assert recorded.seed == 7
+    assert [step.at_tick for step in recorded.steps] == [0, 1, 1, 2, 2, 4]
 
 
 def test_canonical_serialization_is_key_order_invariant() -> None:
