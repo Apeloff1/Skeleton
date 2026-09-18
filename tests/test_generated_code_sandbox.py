@@ -172,6 +172,32 @@ def test_generated_code_has_no_authority_beyond_explicit_grants(tmp_path: Path) 
         )
 
 
+def test_dynamic_filesystem_target_fails_closed_even_with_filesystem_grant(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+
+    decision = box.admit(
+        "path = input()\nwith open(path, 'r') as handle:\n    data = handle.read()\n",
+        kind=PayloadKind.PYTHON,
+    )
+    assert decision.allowed is False
+    assert "path escapes sandbox workspace" in decision.reason
+
+    with pytest.raises(SandboxPolicyError, match="path escapes"):
+        box.attempt(
+            Operation(
+                OperationKind.FS_READ,
+                "<dynamic>",
+                SandboxCapability.FILESYSTEM,
+            )
+        )
+
+
 def test_filesystem_network_process_attempts_outside_grant_fail_closed(tmp_path: Path) -> None:
     box = GeneratedCodeSandbox(
         workspace_root=tmp_path,
