@@ -29,7 +29,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from .audit_assurance import FrontierExecutionReplayVerifier
 from .execution_audit import (
@@ -50,6 +50,8 @@ from .runtime_guard import (
     RuntimeGuardRequest,
     RuntimeGuardSignals,
 )
+from .semantic_lenses import SemanticFinding, SemanticObservation
+from .semantic_plane import SemanticLensPlane, SemanticPlaneSnapshot
 from .strict_runtime import StrictJeevesAgentRuntime
 from .types import AgentResult, RiskTier, TerminationReason, stable_fingerprint
 
@@ -232,6 +234,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         *,
         argument_abstractor: ArgumentAbstractor | None = None,
         runtime_guard: RuntimeEpistemicGuard | None = None,
+        semantic_plane: SemanticLensPlane | None = None,
         wall_clock: Callable[[], float] = time.time,
         **kwargs: Any,
     ) -> None:
@@ -264,6 +267,24 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 raise ValueError(
                     "argument_abstractor cannot be combined with an explicit runtime_guard"
                 )
+
+        self.semantic_plane = semantic_plane or SemanticLensPlane()
+
+    def analyze_semantics(
+        self,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+    ) -> SemanticPlaneSnapshot:
+        """Run the governed semantic plane without bypassing runtime evidence rules."""
+        return self.semantic_plane.analyze(
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+        )
 
     def _state_from_checkpoint(
         self,
@@ -349,6 +370,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "execution_audit_checkpoint": audit.checkpoint_fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
+            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
         }
         if lineage is not None:
             metadata.update(
@@ -385,6 +407,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "runtime_guard_policy": self.runtime_guard.policy.fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
+            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
         }
         if lineage is not None:
             binding_payload.update(
@@ -440,6 +463,15 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         current_world = self.runtime_guard.world.snapshot(persist=False).fingerprint
         if expected_world != current_world:
             raise ExecutionAuditError("world model fingerprint changed on resume")
+
+        expected_semantic_plane = checkpoint.metadata.get("semantic_plane_fingerprint")
+        if (
+            expected_semantic_plane is not None
+            and expected_semantic_plane != self.semantic_plane.fingerprint
+        ):
+            raise ExecutionAuditError(
+                "semantic plane contract fingerprint changed on resume"
+            )
 
         if isinstance(self.runtime_guard, ScopedGeneralizingRuntimeEpistemicGuard):
             try:
@@ -519,6 +551,15 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 continue
             if payload.get("world_model_fingerprint") != checkpoint.metadata.get(
                 "world_model_fingerprint"
+            ):
+                continue
+            checkpoint_semantic_plane = checkpoint.metadata.get(
+                "semantic_plane_fingerprint"
+            )
+            if (
+                checkpoint_semantic_plane is not None
+                and payload.get("semantic_plane_fingerprint")
+                != checkpoint_semantic_plane
             ):
                 continue
             checkpoint_lineage = checkpoint.metadata.get(
