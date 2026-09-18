@@ -45,6 +45,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_constraints",
     "skeleton.testing.test_simulation_physics_convex",
     "skeleton.testing.test_simulation_physics_convex_collision",
+    "skeleton.testing.test_simulation_physics_convex_hull_queries",
     "skeleton.testing.test_simulation_physics_convex_hulls_modern",
     "skeleton.testing.test_simulation_physics_convex_queries",
     "skeleton.testing.test_simulation_physics_convex_toi",
