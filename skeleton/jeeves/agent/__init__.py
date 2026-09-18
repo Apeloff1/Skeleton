@@ -379,6 +379,14 @@ from .semantic_extreme_lenses import (
     rare_semantic_specs,
     register_rare_lenses,
 )
+from .semantic_research_lenses import (
+    CATALOG_VERSION as RESEARCH_LENS_CATALOG_VERSION,
+    register_research_lenses,
+    research_catalog_fingerprint,
+    research_definitions_by_family,
+    research_semantic_definitions,
+    research_semantic_specs,
+)
 
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
