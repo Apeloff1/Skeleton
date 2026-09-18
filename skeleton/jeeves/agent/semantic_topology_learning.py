@@ -600,21 +600,32 @@ class TopologyBridgePolicy:
     minimum_trials: int = 8
     minimum_independent_runs: int = 4
     minimum_domains: int = 2
+    minimum_trials_per_domain: int = 2
     minimum_negative_controls: int = 2
+    minimum_control_domains: int = 2
+    minimum_controls_per_domain: int = 1
     maximum_brier: float = 0.24
     maximum_ece: float = 0.20
     minimum_empirical_rate: float = 0.55
     maximum_negative_control_positive_rate: float = 0.30
+    maximum_domain_brier: float = 0.32
+    minimum_domain_empirical_rate: float = 0.45
+    maximum_domain_control_positive_rate: float = 0.50
     reject_brier: float = 0.40
     reject_ece: float = 0.40
     reject_empirical_rate: float = 0.30
+    reject_domain_brier: float = 0.60
+    reject_domain_empirical_rate: float = 0.20
 
     def __post_init__(self) -> None:
         for name in (
             "minimum_trials",
             "minimum_independent_runs",
             "minimum_domains",
+            "minimum_trials_per_domain",
             "minimum_negative_controls",
+            "minimum_control_domains",
+            "minimum_controls_per_domain",
         ):
             object.__setattr__(
                 self,
@@ -626,9 +637,14 @@ class TopologyBridgePolicy:
             "maximum_ece",
             "minimum_empirical_rate",
             "maximum_negative_control_positive_rate",
+            "maximum_domain_brier",
+            "minimum_domain_empirical_rate",
+            "maximum_domain_control_positive_rate",
             "reject_brier",
             "reject_ece",
             "reject_empirical_rate",
+            "reject_domain_brier",
+            "reject_domain_empirical_rate",
         ):
             object.__setattr__(
                 self,
@@ -643,6 +659,18 @@ class TopologyBridgePolicy:
             raise AgentContractError(
                 "reject_empirical_rate must be <= minimum_empirical_rate"
             )
+        if self.reject_domain_brier < self.maximum_domain_brier:
+            raise AgentContractError(
+                "reject_domain_brier must be >= maximum_domain_brier"
+            )
+        if (
+            self.reject_domain_empirical_rate
+            > self.minimum_domain_empirical_rate
+        ):
+            raise AgentContractError(
+                "reject_domain_empirical_rate must be <= "
+                "minimum_domain_empirical_rate"
+            )
 
     @property
     def fingerprint(self) -> str:
@@ -651,18 +679,53 @@ class TopologyBridgePolicy:
                 "minimum_trials": self.minimum_trials,
                 "minimum_independent_runs": self.minimum_independent_runs,
                 "minimum_domains": self.minimum_domains,
+                "minimum_trials_per_domain": self.minimum_trials_per_domain,
                 "minimum_negative_controls": self.minimum_negative_controls,
+                "minimum_control_domains": self.minimum_control_domains,
+                "minimum_controls_per_domain": (
+                    self.minimum_controls_per_domain
+                ),
                 "maximum_brier": self.maximum_brier,
                 "maximum_ece": self.maximum_ece,
                 "minimum_empirical_rate": self.minimum_empirical_rate,
                 "maximum_negative_control_positive_rate": (
                     self.maximum_negative_control_positive_rate
                 ),
+                "maximum_domain_brier": self.maximum_domain_brier,
+                "minimum_domain_empirical_rate": (
+                    self.minimum_domain_empirical_rate
+                ),
+                "maximum_domain_control_positive_rate": (
+                    self.maximum_domain_control_positive_rate
+                ),
                 "reject_brier": self.reject_brier,
                 "reject_ece": self.reject_ece,
                 "reject_empirical_rate": self.reject_empirical_rate,
+                "reject_domain_brier": self.reject_domain_brier,
+                "reject_domain_empirical_rate": (
+                    self.reject_domain_empirical_rate
+                ),
             }
         )
+
+
+@dataclass(frozen=True, slots=True)
+class TopologyBridgeDomainReport:
+    domain: str
+    trial_count: int
+    independent_run_count: int
+    negative_control_count: int
+    qualified_domain_count: int
+    qualified_control_domain_count: int
+    mean_probability: float | None
+    empirical_rate: float | None
+    wilson_95: tuple[float, float] | None
+    brier: float | None
+    calibration_error: float | None
+    negative_control_positive_rate: float | None
+    qualified_primary: bool
+    qualified_control: bool
+    fingerprint: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -684,6 +747,10 @@ class TopologyBridgeReport:
     brier: float | None
     calibration_error: float | None
     negative_control_positive_rate: float | None
+    worst_domain_brier: float | None
+    minimum_domain_empirical_rate: float | None
+    worst_domain_control_positive_rate: float | None
+    domain_reports: tuple[TopologyBridgeDomainReport, ...]
     reasons: tuple[str, ...]
     fingerprint: str
 
