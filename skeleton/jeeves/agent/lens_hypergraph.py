@@ -204,7 +204,6 @@ class SemanticLensHypergraph:
         self,
         items: Sequence[SemanticFinding],
         calibration_weights: Mapping[str, float],
-        total_family_count: int,
     ) -> LensHyperedge | None:
         observation_sets = [set(item.observation_ids) for item in items]
         overlap = self._jaccard(observation_sets)
@@ -331,11 +330,10 @@ class SemanticLensHypergraph:
             key=lambda item: (item.confidence * (1.0 - 0.5 * item.ambiguity), item.novelty, item.finding_id),
             reverse=True,
         )[: self.policy.max_findings]
-        family_count = max(1, len(LensFamily))
         edges: list[LensHyperedge] = []
         for order in range(2, min(self.policy.max_order, len(ranked)) + 1):
             for combo in itertools.combinations(ranked, order):
-                edge = self._edge(combo, calibration_weights, family_count)
+                edge = self._edge(combo, calibration_weights)
                 if edge is not None:
                     edges.append(edge)
                 if len(edges) >= self.policy.max_edges:
