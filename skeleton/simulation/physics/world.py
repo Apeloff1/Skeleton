@@ -8,6 +8,18 @@ from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
 from .ccd import ContinuousCollisionDetector, TOIEvent
+from .character import (
+    CharacterGroundState,
+    CharacterMoveResult,
+    CharacterRecoveryResult,
+    CharacterResizeResult,
+    CharacterRuntimeResult,
+    KinematicCapsuleController,
+)
+from .character_motor import (
+    CharacterMotorResult,
+    KinematicCharacterMotor,
+)
 from .collision import (
     ContactManifold,
     SweepAndPruneBroadPhase,
@@ -34,7 +46,14 @@ from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
 from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
-from .shapes import BoxShape, CapsuleShape, CylinderShape, PlaneShape, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    ConvexHullShape,
+    CylinderShape,
+    PlaneShape,
+    SphereShape,
+)
 from .snapshots import (
     PhysicsBodyState,
     PhysicsSnapshot,
@@ -433,6 +452,144 @@ class PhysicsWorld:
         ]
         return sort_hits(hits)
 
+    def move_character(
+        self,
+        controller: KinematicCapsuleController,
+        displacement: Vec3,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterMoveResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.move(
+            displacement,
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+        )
+
+    def probe_character_ground(
+        self,
+        controller: KinematicCapsuleController,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+        distance: float | None = None,
+    ) -> CharacterGroundState:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.ground_probe(
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+            distance=distance,
+        )
+
+    def recover_character_overlaps(
+        self,
+        controller: KinematicCapsuleController,
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterRecoveryResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        return controller.recover_overlaps(
+            self.bodies(),
+            ignore=ignore,
+        )
+
+    def resize_character(
+        self,
+        controller: KinematicCapsuleController,
+        new_half_height: float,
+        *,
+        ignore: tuple[str, ...] = (),
+        preserve_foot: bool = True,
+    ) -> CharacterResizeResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        return controller.resize(
+            new_half_height,
+            self.bodies(),
+            ignore=ignore,
+            preserve_foot=preserve_foot,
+        )
+
+    def step_character_runtime(
+        self,
+        controller: KinematicCapsuleController,
+        requested_velocity: Vec3,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+        recover_overlaps: bool = True,
+        carry_support: bool = True,
+    ) -> CharacterRuntimeResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.runtime_step(
+            requested_velocity,
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+            recover_overlaps=recover_overlaps,
+            carry_support=carry_support,
+        )
+
+    def step_character_motor(
+        self,
+        controller: KinematicCapsuleController,
+        motor: KinematicCharacterMotor,
+        desired_velocity: Vec3,
+        *,
+        jump: bool = False,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterMotorResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        if not isinstance(motor, KinematicCharacterMotor):
+            raise PhysicsValidationError(
+                "motor must be KinematicCharacterMotor"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character motor dt",
+        )
+        return motor.step(
+            controller,
+            desired_velocity,
+            self.bodies(),
+            dt=step_dt,
+            jump=jump,
+            ignore=ignore,
+        )
+
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
         shape = body.shape
         if isinstance(shape, SphereShape):
@@ -456,6 +613,15 @@ class PhysicsWorld:
                 "kind": shape.kind.value,
                 "radius": shape.radius,
                 "half_height": shape.half_height,
+            }
+        if isinstance(shape, ConvexHullShape):
+            return {
+                "kind": shape.kind.value,
+                "vertices": tuple(
+                    vertex.to_tuple()
+                    for vertex in shape.vertices
+                ),
+                "faces": shape.faces,
             }
         raise PhysicsValidationError("unknown shape implementation")
 
