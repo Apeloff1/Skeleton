@@ -319,16 +319,22 @@ jobs:
 
           if [[ -s "$RUNNER_TEMP/night-worker-status.json" ]]; then
             worker_title='[Shift Supervisor] Night Worker Status'
-            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            worker_number=$(gh issue list --repo "$REPO" --state all --search "$worker_title in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
             if [[ -n "${worker_number:-}" ]]; then
               gh issue edit "$worker_number" --repo "$REPO" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
             else
-              gh issue create --repo "$REPO" --title "$worker_title" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
+              worker_url=$(gh issue create --repo "$REPO" --title "$worker_title" --body-file "$RUNNER_TEMP/night-worker-status.json")
+              worker_number="${worker_url##*/}"
             fi
+            if [[ ! "$worker_number" =~ ^[0-9]+$ ]]; then
+              echo 'Autonomous Studio could not resolve a valid worker-status issue number.' >&2
+              exit 1
+            fi
+            gh api --method PATCH "repos/${REPO}/issues/${worker_number}" -f state=closed >/dev/null
           fi
 
           title='bot: autonomous studio ledger'
-          number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          number=$(gh issue list --repo "$REPO" --state all --search "$title in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
             issue_url=$(gh issue create --repo "$REPO" --title "$title" --body 'Durable append-only human-readable ledger for Autonomous Studio runs. Every scheduled run comments here, including rejected/no-op runs. Source-of-truth machine events also live in the PR audit JSONL when a patch is published.')
             number="${issue_url##*/}"
@@ -357,7 +363,12 @@ jobs:
               echo '</details>'
             fi
           } > "$RUNNER_TEMP/ledger-comment.md"
+          if [[ ! "$number" =~ ^[0-9]+$ ]]; then
+            echo 'Autonomous Studio could not resolve a valid ledger issue number.' >&2
+            exit 1
+          fi
           gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
+          gh api --method PATCH "repos/${REPO}/issues/${number}" -f state=closed >/dev/null
 
       - name: Prepare validated branch payload
         if: steps.proposal.outputs.has_patch == 'true'
