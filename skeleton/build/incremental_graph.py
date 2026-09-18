@@ -680,7 +680,7 @@ def _repo_index_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
     return digest.hexdigest()
 
 
-def _validated_repo_index(raw: Any) -> tuple[dict[str, Any], ...]:
+def _validated_repo_index(raw: Any, *, max_nodes: int) -> tuple[dict[str, Any], ...]:
     payload = _coerce_repo_index(raw)
     schema = payload.get("schema")
     if isinstance(schema, bool) or schema != GRAPH_SCHEMA:
@@ -711,6 +711,11 @@ def _validated_repo_index(raw: Any) -> tuple[dict[str, Any], ...]:
     files = payload.get("files")
     if not isinstance(files, Sequence) or isinstance(files, (str, bytes, bytearray)):
         raise IncrementalGraphError("repo index files must be a sequence")
+    if len(files) > max_nodes:
+        raise IncrementalGraphError(
+            "repo index file count exceeds configured node limit",
+            context={"files": len(files), "max_nodes": max_nodes},
+        )
 
     normalized = tuple(
         _coerce_tracked_file(item, object_format=object_format)
@@ -756,9 +761,9 @@ def _validated_repo_index(raw: Any) -> tuple[dict[str, Any], ...]:
     return normalized
 
 
-def _source_specs_from_repo_index(raw: Any) -> list[NodeSpec]:
+def _source_specs_from_repo_index(raw: Any, *, max_nodes: int) -> list[NodeSpec]:
     specs: list[NodeSpec] = []
-    for item in _validated_repo_index(raw):
+    for item in _validated_repo_index(raw, max_nodes=max_nodes):
         spec = _source_spec_from_tracked_file(item)
         if spec is not None:
             specs.append(spec)
