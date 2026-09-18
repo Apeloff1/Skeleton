@@ -1800,3 +1800,50 @@ def test_boundary_ledger_failure_blocks_delegate_before_child(tmp_path):
     current = attempts.current(seal.seal_id)
     assert current is not None
     assert current.attempt.state is ExecutionAttemptState.AUTHORIZED
+
+
+def test_assurance_rejection_releases_submitted_execution_fence(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        high_contract(),
+        auto_band=RiskBand.HIGH,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(
+        intent(),
+        session_id="fenced-assurance-reject",
+    )
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+
+    with pytest.raises(RuntimeError, match="sandbox"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext(
+                "assurance-reject",
+                principal="alice",
+            ),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=fence,
+        )
+
+    assert not registry.used(seal.seal_id)
+    assert fences.backend.leases() == ()
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
