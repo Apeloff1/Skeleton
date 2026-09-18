@@ -255,20 +255,16 @@ class CharacterRollbackSession:
 
         before = self.controller.capture_state()
         previous_tick = self.tick
-        appended = False
+        states_before = dict(self._states)
+        commands_before = dict(self._commands)
         try:
-            appended = self._append_command(frame)
+            self._append_command(frame)
             return self._execute_frame(frame, bodies)
         except Exception:
             self.controller.restore_state(before)
             self.tick = previous_tick
-            self._states = {
-                tick: state
-                for tick, state in self._states.items()
-                if tick <= previous_tick
-            }
-            if appended:
-                self._commands.pop(frame.tick, None)
+            self._states = states_before
+            self._commands = commands_before
             raise
 
     def rollback_to(self, tick: int) -> CharacterRollbackReceipt:
@@ -326,18 +322,27 @@ class CharacterRollbackSession:
                 "bodies_at_tick must be callable"
             )
 
-        receipts: list[CharacterStepReceipt] = []
-        while self.tick < tick:
-            next_tick = self.tick + 1
-            try:
-                frame = self._commands[next_tick]
-            except KeyError as exc:
-                raise PhysicsReplayError(
-                    "character input frame not retained for resimulation"
-                ) from exc
-            bodies = bodies_at_tick(next_tick)
-            receipts.append(self._execute_frame(frame, bodies))
-        return tuple(receipts)
+        before_state = self.controller.capture_state()
+        before_tick = self.tick
+        states_before = dict(self._states)
+        try:
+            receipts: list[CharacterStepReceipt] = []
+            while self.tick < tick:
+                next_tick = self.tick + 1
+                try:
+                    frame = self._commands[next_tick]
+                except KeyError as exc:
+                    raise PhysicsReplayError(
+                        "character input frame not retained for resimulation"
+                    ) from exc
+                bodies = bodies_at_tick(next_tick)
+                receipts.append(self._execute_frame(frame, bodies))
+            return tuple(receipts)
+        except Exception:
+            self.controller.restore_state(before_state)
+            self.tick = before_tick
+            self._states = states_before
+            raise
 
     def correct_and_resimulate(
         self,
