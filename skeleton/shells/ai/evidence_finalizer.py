@@ -10,6 +10,10 @@ from skeleton.shells.ai.audit_witness import (
     SignedAIAuditWitness,
 )
 from skeleton.shells.ai.checkpoint import AISessionCheckpoint
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttempt,
+    ExecutionAttemptState,
+)
 from skeleton.shells.ai.orchestrator import AIExecutionBundle
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
@@ -153,6 +157,77 @@ class AIExecutionEvidenceFinalizer:
         execution_attempt_id = (
             execution_seal_id if execution_attempt_authority_digest else ""
         )
+        execution_attempt_id = ""
+        execution_attempt_authority_digest = ""
+        execution_attempt_state = ""
+        if execution_attempt is not None:
+            if execution_attempt.session_id != session.session_id:
+                raise RuntimeError(
+                    "execution attempt session differs from finalized session"
+                )
+            if execution_attempt.plan_fingerprint != execution.report.fingerprint:
+                raise RuntimeError(
+                    "execution attempt plan differs from finalized execution"
+                )
+            if execution_seal_id and (
+                execution_attempt.execution_seal_id != execution_seal_id
+            ):
+                raise RuntimeError(
+                    "execution attempt seal differs from finalizer seal"
+                )
+            if (
+                execution_attempt.execution_backend_id
+                and execution_attempt.execution_backend_id
+                != execution.provenance.execution_backend_id
+            ):
+                raise RuntimeError(
+                    "execution attempt backend differs from execution provenance"
+                )
+            if runtime_trust_digest and (
+                execution_attempt.runtime_trust_digest
+                != runtime_trust_digest
+            ):
+                raise RuntimeError(
+                    "execution attempt runtime trust differs from finalizer"
+                )
+            if release_evidence_digest and (
+                execution_attempt.release_evidence_digest
+                != release_evidence_digest
+            ):
+                raise RuntimeError(
+                    "execution attempt release evidence differs from finalizer"
+                )
+            if session.phase.value == "complete":
+                if execution_attempt.state is not ExecutionAttemptState.SUCCEEDED:
+                    raise RuntimeError(
+                        "completed session requires successful execution attempt"
+                    )
+                if (
+                    execution_attempt.terminal_evidence_digest
+                    != execution.provenance.digest
+                ):
+                    raise RuntimeError(
+                        "execution attempt terminal evidence differs from provenance"
+                    )
+            elif session.phase.value == "failed":
+                if execution_attempt.state is not ExecutionAttemptState.FAILED:
+                    raise RuntimeError(
+                        "failed session requires failed execution attempt"
+                    )
+                if (
+                    execution_attempt.terminal_evidence_digest
+                    and execution_attempt.terminal_evidence_digest
+                    != execution.provenance.digest
+                ):
+                    raise RuntimeError(
+                        "execution attempt terminal evidence differs from provenance"
+                    )
+            execution_attempt_id = execution_attempt.attempt_id
+            execution_attempt_authority_digest = (
+                execution_attempt.authority_digest
+            )
+            execution_attempt_state = execution_attempt.state.value
+
         if not self.journal.verify():
             raise RuntimeError("AI decision journal failed integrity verification")
         if not self.receipt_chain.verify():
@@ -264,6 +339,11 @@ class AIExecutionEvidenceFinalizer:
                     if audit_witness is None
                     else audit_witness.witness.sequence
                 ),
+                execution_attempt_id=execution_attempt_id,
+                execution_attempt_authority_digest=(
+                    execution_attempt_authority_digest
+                ),
+                execution_attempt_state=execution_attempt_state,
             )
             signed_execution_evidence = self.execution_evidence.append(
                 final_bundle
