@@ -31,7 +31,26 @@ from .mechanics import (
     ProgressionSystemSpec,
 )
 
+from .replay import (
+    REPLAY_SCHEMA,
+    REPLAY_SCHEMA_VERSION,
+    GameReplayError,
+    MechanicsReplay,
+    ReplayComparison,
+    ReplayMismatch,
+    ReplayStep,
+    ReplayTrace,
+)
+
 __all__ = [
+    "ReplayTrace",
+    "ReplayStep",
+    "ReplayMismatch",
+    "ReplayComparison",
+    "MechanicsReplay",
+    "GameReplayError",
+    "REPLAY_SCHEMA_VERSION",
+    "REPLAY_SCHEMA",
     "AIBehaviorSpec",
     "BoundMechanic",
     "CANONICAL_KIND_ORDER",
