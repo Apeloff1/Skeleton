@@ -130,6 +130,16 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "gameforge" / "api" / "control.py",
     REPO_ROOT / "backend" / "gameforge" / "api" / "scim.py",
     REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "binary.py",
+    REPO_ROOT / "backend" / "core" / "boot_stages.py",
+    REPO_ROOT / "backend" / "core" / "routes_registry.py",
+    REPO_ROOT / "backend" / "core" / "truth_watch.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "health.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "backup.py",
+    REPO_ROOT / "backend" / "gameforge" / "exocortex" / "neuro_layers.py",
+    REPO_ROOT / "backend" / "gameforge" / "prood" / "saga_orchestrator.py",
+    REPO_ROOT / "backend" / "gameforge" / "prood" / "event_bus.py",
+    REPO_ROOT / "backend" / "gameforge" / "persistence" / "chronoback.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_build.py",
 ]
 SERVER = REPO_ROOT / "backend" / "server.py"
 
@@ -229,6 +239,9 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "all models failed:" not in source
     assert "persist_failed: {e}" not in source
     assert "probe_crashed:" not in source
+    assert "engine run error:" not in source
+    assert "manifest_corrupt:" not in source
+    assert "type(exc).__name__}: {exc}" not in source
 
 
 
