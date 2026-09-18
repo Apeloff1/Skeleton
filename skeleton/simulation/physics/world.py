@@ -617,7 +617,7 @@ class PhysicsWorld:
         for body in self.bodies():
             body.integrate_velocity(dt)
 
-    def _nudge_toi_pair(self, event: TOIEvent) -> None:
+    def _bias_toi_pair_into_contact(self, event: TOIEvent) -> None:
         slop = self.settings.ccd_contact_slop
         if slop <= 0.0:
             return
@@ -628,15 +628,17 @@ class PhysicsWorld:
             return
         if body_a.inverse_mass > 0.0:
             weight_a = body_a.inverse_mass / inverse_mass_sum
-            body_a.position = body_a.position - event.normal * (slop * weight_a)
+            # TOI is ideally exactly touching. Bias a microscopic amount into
+            # contact so narrow phase has a resolvable manifold despite roundoff.
+            body_a.position = body_a.position + event.normal * (slop * weight_a)
             body_a.wake()
         if body_b.inverse_mass > 0.0:
             weight_b = body_b.inverse_mass / inverse_mass_sum
-            body_b.position = body_b.position + event.normal * (slop * weight_b)
+            body_b.position = body_b.position - event.normal * (slop * weight_b)
             body_b.wake()
 
     def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
-        self._nudge_toi_pair(event)
+        self._bias_toi_pair_into_contact(event)
         manifold = detect_collision(
             self._bodies[event.body_a],
             self._bodies[event.body_b],
