@@ -117,6 +117,20 @@ class SemanticObservation:
         object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "observation_id": self.observation_id,
+                "content": self.content,
+                "position": self.position,
+                "source": self.source,
+                "tags": self.tags,
+                "evidence_ids": self.evidence_ids,
+                "metadata": self.metadata,
+            }
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class TangentSeed:
