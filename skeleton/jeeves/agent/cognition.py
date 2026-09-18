@@ -311,6 +311,20 @@ class ContextCompiler:
             if rendered and rendered != "[]":
                 sections.append(ContextSection("scratch", rendered, priority=40))
 
+        sections.extend(
+            self._extension_sections(
+                query=query,
+                goal=goal,
+                namespace=namespace,
+                memory=memory,
+                evidence=evidence,
+                plan=plan,
+                current_step=current_step,
+                observations=observations,
+                scratchpad=scratchpad,
+                memory_ids=tuple(memory_ids),
+            )
+        )
         sections.extend(extra_sections)
         retained, dropped = self._pack(sections, system_chars=len(system), task_chars=len(task_instruction))
         user = self._render_user(task_instruction, retained)
@@ -325,6 +339,30 @@ class ContextCompiler:
             evidence_ids=tuple(evidence_ids),
             total_chars=total_chars,
         )
+
+    def _extension_sections(
+        self,
+        *,
+        query: str,
+        goal: Goal,
+        namespace: MemoryNamespace,
+        memory: MemoryManager,
+        evidence: EvidenceLedger,
+        plan: Plan | None,
+        current_step: PlanStep | None,
+        observations: Sequence[ToolObservation],
+        scratchpad: RunScratchpad | None,
+        memory_ids: tuple[str, ...],
+    ) -> tuple[ContextSection, ...]:
+        """Extension seam for bounded context sidecars.
+
+        Subclasses may add provenance-visible sections, but the base compiler
+        remains authoritative for goal, plan, evidence, observations, memory,
+        and scratch. Extension sections are always optional and are packed
+        through the same global context budget.
+        """
+
+        return ()
 
     def _pack(
         self,
