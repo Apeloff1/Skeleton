@@ -4,6 +4,9 @@ on:
   workflow_run:
     workflows: ['Shift Supervisor Control']
     types: [completed]
+    branches:
+      - "*"
+      - "**"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -22,7 +25,9 @@ jobs:
   studio:
     if: >-
       github.repository == 'Apeloff1/Skeleton' &&
-      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.head_repository.full_name == github.repository)
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -90,31 +95,68 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .idle-studio-tmp
-          gh api "/repos/$REPO/actions/runs?per_page=50" --jq '.workflow_runs' > .idle-studio-tmp/runs.json
-          gh api "/repos/$REPO/issues?state=open&per_page=50&sort=updated&direction=desc" > .idle-studio-tmp/issues.json
-          gh api "/repos/$REPO/pulls?state=open&per_page=50&sort=updated&direction=desc" > .idle-studio-tmp/pulls.json
           base_sha=$(git rev-parse HEAD)
           BASE_SHA="$base_sha" CURRENT_RUN_ID="$GITHUB_RUN_ID" python - <<'PY'
           import json
           import os
+          import re
+          import subprocess
           from pathlib import Path
 
-          root = Path('.idle-studio-tmp')
-          issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
+          REPO = os.environ["REPO"]
+          PAGE_SIZE = 50
+          MAX_PAGES = 10
+          COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
+          root = Path(".idle-studio-tmp")
+          base_sha = os.environ["BASE_SHA"].casefold()
+          if COMMIT_OID_RE.fullmatch(base_sha) is None:
+              raise SystemExit("idle-studio base SHA must be a 40-character hex commit OID")
+
+          def gh_json(path: str):
+              result = subprocess.run(
+                  ["gh", "api", path],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              return json.loads(result.stdout)
+
+          def list_pages(path: str, *, key: str | None = None) -> list:
+              items: list = []
+              separator = "&" if "?" in path else "?"
+              for page in range(1, MAX_PAGES + 1):
+                  payload = gh_json(f"{path}{separator}per_page={PAGE_SIZE}&page={page}")
+                  if key is None:
+                      batch = payload
+                  else:
+                      if not isinstance(payload, dict):
+                          raise SystemExit(f"malformed {path} payload")
+                      batch = payload.get(key) or []
+                  if not isinstance(batch, list):
+                      raise SystemExit(f"malformed {path} list")
+                  items.extend(item for item in batch if isinstance(item, dict))
+                  if len(batch) < PAGE_SIZE:
+                      return items
+              raise SystemExit(f"{path} exceeded bounded identity scan")
+
           issues = [
-              item for item in issues
-              if not str(item.get('title', '')).strip().lower().startswith('bot:')
+              item for item in list_pages(
+                  f"/repos/{REPO}/issues?state=open&sort=updated&direction=desc"
+              )
+              if not str(item.get("title", "")).strip().lower().startswith("bot:")
           ]
           state = {
-              'runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
-              'issues': issues,
-              'pulls': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
-              'base_sha': os.environ['BASE_SHA'],
-              'current_run_id': os.environ['CURRENT_RUN_ID'],
+              "runs": list_pages(f"/repos/{REPO}/actions/runs", key="workflow_runs"),
+              "issues": issues,
+              "pulls": list_pages(
+                  f"/repos/{REPO}/pulls?state=open&sort=updated&direction=desc"
+              ),
+              "base_sha": base_sha,
+              "current_run_id": os.environ["CURRENT_RUN_ID"],
           }
-          (root / 'repo-state.json').write_text(
+          (root / "repo-state.json").write_text(
               json.dumps(state, sort_keys=True, indent=2),
-              encoding='utf-8',
+              encoding="utf-8",
           )
           PY
 

@@ -4,6 +4,9 @@ on:
   workflow_run:
     workflows: ["PR Lifecycle Signal"]
     types: [requested]
+    branches:
+      - "*"
+      - "**"
   schedule:
     - cron: '*/10 * * * *'
   push:
@@ -16,8 +19,9 @@ on:
 
 # Privilege separation: pull-request code only emits a read-only lifecycle
 # signal. Privileged cleanup is loaded from the default branch. The event-driven
-# path drains one PR immediately; trusted main/scheduled runs reconcile backlog
-# whose original lifecycle signal was missed.
+# path drains every trusted PR associated with the completing head immediately;
+# trusted main/scheduled runs reconcile backlog whose original lifecycle signal
+# was missed.
 permissions: {}
 
 concurrency:
@@ -44,7 +48,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
-      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+      WORKFLOW_RUN_PR_HINTS: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
       EVENT_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
       EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch }}
       EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
