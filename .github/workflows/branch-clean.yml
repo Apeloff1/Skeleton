@@ -73,17 +73,26 @@ jobs:
           delete_batch_size=32
 
           declare -A open_pr_heads=()
+          declare -A open_pr_bases=()
           declare -A merged_pr_head_tips=()
 
-          load_open_pr_heads() {
+          load_open_pr_refs() {
             local branch
             open_pr_heads=()
+            open_pr_bases=()
             while IFS= read -r branch; do
               [[ -n "$branch" ]] || continue
               open_pr_heads["$branch"]=1
             done < <(
               gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
                 --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
+            )
+            while IFS= read -r branch; do
+              [[ -n "$branch" && "$branch" != main ]] || continue
+              open_pr_bases["$branch"]=1
+            done < <(
+              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref'
             )
           }
 
@@ -114,10 +123,12 @@ jobs:
             unique_count=0
             protected_count=0
             open_pr_count=0
+            open_pr_base_count=0
             late_open_pr_count=0
+            late_open_pr_base_count=0
             : > ../preserved-branches.txt
 
-            load_open_pr_heads
+            load_open_pr_refs
             load_merged_pr_head_tips
 
             while read -r tip branch; do
@@ -134,10 +145,16 @@ jobs:
                   ;;
               esac
 
-              # Never mutate a branch that currently backs an open same-repo PR.
+              # Never mutate a branch that currently backs or bases an open
+              # same-repository PR. Stacked PRs rely on non-main base refs.
               if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
                 open_pr_count=$((open_pr_count + 1))
                 printf '%s %s open-pr-head\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+              if [[ -n "${open_pr_bases[$branch]+x}" ]]; then
+                open_pr_base_count=$((open_pr_base_count + 1))
+                printf '%s %s open-pr-base\n' "$branch" "$tip" >> ../preserved-branches.txt
                 continue
               fi
 
@@ -197,7 +214,7 @@ jobs:
             fi
 
             # A PR opened during classification wins over cleanup.
-            load_open_pr_heads
+            load_open_pr_refs
             safe_delete_branches=()
             safe_delete_tips=()
             for ((i=0; i<${#delete_branches[@]}; i++)); do
@@ -206,6 +223,11 @@ jobs:
               if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
                 late_open_pr_count=$((late_open_pr_count + 1))
                 printf '%s %s open-pr-head-late\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+              if [[ -n "${open_pr_bases[$branch]+x}" ]]; then
+                late_open_pr_base_count=$((late_open_pr_base_count + 1))
+                printf '%s %s open-pr-base-late\n' "$branch" "$tip" >> ../preserved-branches.txt
                 continue
               fi
               safe_delete_branches+=("$branch")
@@ -256,13 +278,15 @@ jobs:
               echo "- Tree-identical divergent refs eligible: $identical_tree_count"
               echo "- Unique/diverged refs preserved: $unique_count"
               echo "- Long-lived/release/backup refs preserved: $protected_count"
-              echo "- Open-PR refs preserved during classification: $open_pr_count"
-              echo "- Newly opened PR refs preserved before deletion: $late_open_pr_count"
+              echo "- Open-PR head refs preserved during classification: $open_pr_count"
+              echo "- Open-PR base refs preserved during classification: $open_pr_base_count"
+              echo "- Newly opened PR head refs preserved before deletion: $late_open_pr_count"
+              echo "- Newly opened PR base refs preserved before deletion: $late_open_pr_base_count"
               echo "- Branch refs deleted: $deleted"
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
               echo '- A non-protected branch is eligible only when its tip is main/an ancestor of main, exactly matches a merged same-repository PR head, or has a tree identical to current main.'
-              echo '- Open PR heads are never cleanup candidates.'
+              echo '- Open PR heads and non-main open PR base branches are never cleanup candidates.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
                 echo
