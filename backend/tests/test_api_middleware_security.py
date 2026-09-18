@@ -98,6 +98,21 @@ def test_api_route_boundary_rejects_lookalike_prefixes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_default_starlette_testclient_peer_does_not_consume_rate_limit_state() -> None:
+    limiter = RateLimiterMiddleware(_App(), per_minute=1, burst=1)
+    request = _request("testclient")
+    sentinel = object()
+
+    async def call_next(_request: Request):
+        return sentinel
+
+    for _ in range(8):
+        assert await limiter.dispatch(request, call_next) is sentinel
+
+    assert limiter._buckets == {}
+
+
+@pytest.mark.asyncio
 async def test_rate_limiter_prunes_expired_state_and_stays_bounded() -> None:
     limiter = RateLimiterMiddleware(
         _App(), per_minute=60, burst=1, max_buckets=3, bucket_ttl=300
