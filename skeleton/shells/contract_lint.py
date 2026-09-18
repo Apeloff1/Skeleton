@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from skeleton.shells.capabilities import ShellCapability
 from skeleton.shells.commands import CommandCatalog, CommandDefinition
 
 
@@ -62,7 +63,10 @@ class CommandContractLinter:
         findings: list[ContractFinding] = []
         name = definition.name
 
-        if definition.allow_stdin and not definition.required_capabilities:
+        if (
+            definition.allow_stdin
+            and definition.required_capabilities == frozenset({ShellCapability.EXECUTE})
+        ):
             findings.append(
                 ContractFinding(
                     ContractSeverity.WARNING,
@@ -72,7 +76,10 @@ class CommandContractLinter:
                 )
             )
 
-        if definition.allow_nonzero_success and not definition.required_capabilities:
+        if (
+            definition.allow_nonzero_success
+            and definition.required_capabilities == frozenset({ShellCapability.EXECUTE})
+        ):
             findings.append(
                 ContractFinding(
                     ContractSeverity.WARNING,
