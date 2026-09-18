@@ -11,6 +11,7 @@ from skeleton.shells.ai.budget import AIBudget
 from skeleton.shells.ai.calibration import AICalibration
 from skeleton.shells.ai.compiler import AIPlanCompiler, CompiledAIPlan
 from skeleton.shells.ai.critic import AIPlanCritic, CritiqueReport
+from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend, ShellServiceExecutionBackend
 from skeleton.shells.ai.journal import AIDecisionJournal
 from skeleton.shells.ai.memory import AIOutcomeMemory
 from skeleton.shells.ai.observation import ObservationBuilder
@@ -79,12 +80,14 @@ class AIShellOrchestrator:
         calibration: AICalibration | None = None,
         journal: AIDecisionJournal | None = None,
         budget: AIBudget | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.planner = planner
         self.critic = critic
         self.compiler = compiler
         self.shell_service = shell_service
+        self.execution_backend = execution_backend or ShellServiceExecutionBackend(shell_service)
         self.approvals = approvals or AIApprovalRegistry(clock=clock)
         self.guards = guards or AIToolGuardRegistry()
         self.verifier = verifier or PlanVerifier()
@@ -191,6 +194,7 @@ class AIShellOrchestrator:
         *,
         context: ExecutionContext,
         approval: AIPlanApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
     ) -> AIExecutionBundle:
         if session.phase is not AISessionPhase.REVIEW:
             raise RuntimeError("AI session is not ready for execution decision")
@@ -218,8 +222,9 @@ class AIShellOrchestrator:
 
         session.transition(AISessionPhase.EXECUTING)
         started = self._clock()
+        active_backend = execution_backend or self.execution_backend
         try:
-            report = self.shell_service.execute_plan(
+            report = active_backend.execute_plan(
                 review.compiled.plan,
                 context=context,
             )
@@ -262,7 +267,7 @@ class AIShellOrchestrator:
                 model_id=model_key,
                 risk_score=review.critique.risk.score,
                 approval_id=approval_id,
-                receipt_root=self.shell_service.receipts.root_hash(),
+                receipt_root=active_backend.receipt_root(),
             )
             self.journal.append(
                 "ai.plan.completed",
@@ -275,6 +280,7 @@ class AIShellOrchestrator:
                     "verified": verification.verified,
                     "duration_ms": duration_ms,
                     "provenance_digest": provenance.digest,
+                    "execution_backend": active_backend.backend_id,
                 },
             )
             if success:
