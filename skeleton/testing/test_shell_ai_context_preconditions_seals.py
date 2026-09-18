@@ -383,3 +383,50 @@ def test_execution_seal_rejects_issue_time_too_far_in_future():
             session_id="s",
             plan_pin=pin(),
         )
+
+
+def test_execution_seal_binds_release_evidence_digest():
+    authority = ExecutionSealAuthority(b"k" * 32)
+    seal = authority.issue(
+        principal="alice",
+        session_id="s",
+        plan_pin=pin(),
+        release_evidence_digest=fp("7"),
+    )
+    authority.verify(
+        seal,
+        principal="alice",
+        session_id="s",
+        plan_pin=pin(),
+        release_evidence_digest=fp("7"),
+    )
+    with pytest.raises(ExecutionSealError, match="release evidence"):
+        authority.verify(
+            seal,
+            principal="alice",
+            session_id="s",
+            plan_pin=pin(),
+            release_evidence_digest=fp("8"),
+        )
+
+
+def test_execution_seal_release_binding_is_signed():
+    authority = ExecutionSealAuthority(b"k" * 32)
+    seal = authority.issue(
+        principal="alice",
+        session_id="s",
+        plan_pin=pin(),
+        release_evidence_digest=fp("7"),
+    )
+    tampered = replace(
+        seal,
+        release_evidence_digest=fp("8"),
+    )
+    with pytest.raises(ExecutionSealError, match="release evidence|signature"):
+        authority.verify(
+            tampered,
+            principal="alice",
+            session_id="s",
+            plan_pin=pin(),
+            release_evidence_digest=fp("7"),
+        )
