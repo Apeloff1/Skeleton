@@ -118,12 +118,12 @@ class Patch:
         return cls(_bounded_token("entity_id", entity_id), PatchOp.DELETE, ())
 
     def to_payload(self) -> dict[str, Any]:
-        payload = {
-            "entity_id": self.entity_id,
+        fields = _validated_patch_fields(self)
+        return {
+            "entity_id": _bounded_token("entity_id", self.entity_id),
             "op": self.op.value,
-            "fields": {key: value for key, value in self.fields},
+            "fields": fields,
         }
-        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +251,9 @@ def frame_digest(
     tick: int,
     entities: Mapping[str, Any],
 ) -> str:
+    schema_version = _require_int("schema_version", schema_version, minimum=1)
+    sequence = _require_int("sequence", sequence, minimum=0)
+    tick = _require_int("tick", tick, minimum=0)
     return _sha256(
         canonical_dumps(
             {
@@ -272,7 +275,10 @@ def decode_packet(raw: bytes) -> Packet:
             context={"max_bytes": MAX_PACKET_BYTES, "actual": len(raw)},
         )
     try:
-        data = json.loads(bytes(raw).decode("utf-8"))
+        data = json.loads(
+            bytes(raw).decode("utf-8"),
+            object_pairs_hook=_json_object_no_duplicates,
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SerializationError("malformed packet") from exc
     if not isinstance(data, dict):
@@ -565,7 +571,6 @@ class _ReplicationCore:
                 "packet checksum mismatch",
                 context={"sequence": packet.sequence, "kind": packet.kind},
             )
-        self._last_received = max(self._last_received, packet.sequence)
         if packet.kind == "ack":
             raise ReplicationError("replicas do not ingest acknowledgement packets as state")
         if packet.sequence in {frame.sequence for frame in self._history}:
@@ -585,9 +590,15 @@ class _ReplicationCore:
                 "sequence is behind the confirmed head",
             )
         if packet.kind == "snapshot":
-            return self._ingest_snapshot(packet, predictions)
+            result = self._ingest_snapshot(packet, predictions)
+            self._last_received = max(self._last_received, packet.sequence)
+            return result
         if packet.kind == "delta":
-            return self._ingest_delta(packet, predictions)
+            _validate_delta_payload_shape(packet.payload)
+            result = self._ingest_delta(packet, predictions)
+            if result.outcome is not DeliveryOutcome.REJECTED_GAP:
+                self._last_received = max(self._last_received, packet.sequence)
+            return result
         raise SerializationError("unknown packet kind", context={"kind": packet.kind})
 
     def append_produced(
@@ -640,7 +651,9 @@ class _ReplicationCore:
             entities=entities,
         )
         expected_state = state_digest(entities)
-        if payload["digest"] != expected_digest or payload["state_digest"] != expected_state:
+        supplied_digest = _require_digest(payload["digest"])
+        supplied_state = _require_digest(payload["state_digest"])
+        if supplied_digest != expected_digest or supplied_state != expected_state:
             raise ReplicationError(
                 "snapshot digest mismatch",
                 context={"sequence": packet.sequence},
@@ -753,7 +766,8 @@ class _ReplicationCore:
                 "delta base sequence does not match confirmed head",
                 context={"expected": self._sequence, "base_sequence": base_sequence},
             )
-        if payload["base_digest"] != self.digest:
+        base_digest = _require_digest(payload["base_digest"])
+        if base_digest != self.digest:
             raise ReplicationError(
                 "delta base digest does not match confirmed head",
                 context={"sequence": packet.sequence},
@@ -768,12 +782,14 @@ class _ReplicationCore:
             entities=entities,
         )
         expected_state = state_digest(entities)
-        if payload["resulting_digest"] != expected_digest:
+        resulting_digest = _require_digest(payload["resulting_digest"])
+        resulting_state_digest = _require_digest(payload["resulting_state_digest"])
+        if resulting_digest != expected_digest:
             raise ReplicationError(
                 "delta resulting digest mismatch",
                 context={"sequence": next_sequence},
             )
-        if payload["resulting_state_digest"] != expected_state:
+        if resulting_state_digest != expected_state:
             raise ReplicationError(
                 "delta resulting state digest mismatch",
                 context={"sequence": next_sequence},
@@ -1158,8 +1174,9 @@ def apply_patches(entities: Mapping[str, Any], patches: Sequence[Patch]) -> dict
         if not isinstance(patch, Patch):
             raise SerializationError("patches must be Patch values")
         entity_id = _bounded_token("entity_id", patch.entity_id)
+        fields = _validated_patch_fields(patch)
         if patch.op is PatchOp.DELETE:
-            if patch.fields:
+            if fields:
                 raise ReplicationError("delete patches must not carry fields")
             if entity_id not in working:
                 raise ReplicationError(
@@ -1168,7 +1185,6 @@ def apply_patches(entities: Mapping[str, Any], patches: Sequence[Patch]) -> dict
                 )
             del working[entity_id]
             continue
-        fields = {key: _canonicalize(value) for key, value in patch.fields}
         if not fields and patch.op is PatchOp.SET:
             raise ReplicationError("set patches must include fields")
         if len(fields) > MAX_FIELDS:
@@ -1222,6 +1238,58 @@ def _reconcile_predictions(
         rolled_back=divergent,
         resimulated_ticks=remaining,
     )
+
+
+def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise SerializationError(
+                "JSON object contains duplicate keys",
+                context={"key": key},
+            )
+        result[key] = value
+    return result
+
+
+def _validate_delta_payload_shape(payload: Mapping[str, Any]) -> None:
+    if not isinstance(payload, Mapping):
+        raise SerializationError("delta payload must be an object")
+    _require_exact_keys(payload, _DELTA_KEYS, "delta")
+    _require_int("base_sequence", payload["base_sequence"], minimum=0)
+    _require_digest(payload["base_digest"])
+    _require_int("tick", payload["tick"], minimum=0)
+    _decode_patches(payload["patches"])
+    _require_digest(payload["resulting_digest"])
+    _require_digest(payload["resulting_state_digest"])
+
+
+def _validated_patch_fields(patch: Patch) -> dict[str, Any]:
+    if not isinstance(patch.op, PatchOp):
+        raise SerializationError(
+            "patch op must be a PatchOp",
+            context={"op": repr(patch.op)},
+        )
+    if not isinstance(patch.fields, tuple):
+        raise SerializationError("patch fields must be a tuple")
+    if len(patch.fields) > MAX_FIELDS:
+        raise ReplicationError(
+            "patch fields exceed field bound",
+            context={"max_fields": MAX_FIELDS},
+        )
+    fields: dict[str, Any] = {}
+    for entry in patch.fields:
+        if not isinstance(entry, tuple) or len(entry) != 2:
+            raise SerializationError("patch field entry must be a (name, value) pair")
+        key, value = entry
+        token = _bounded_token("field", key)
+        if token in fields:
+            raise SerializationError(
+                "patch contains duplicate field names",
+                context={"field": token},
+            )
+        fields[token] = _canonicalize(value)
+    return fields
 
 
 def _wrap_packet(kind: str, sequence: int, payload: Mapping[str, Any]) -> Packet:
