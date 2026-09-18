@@ -72,7 +72,14 @@ def test_mesh_rejects_degenerate_duplicate_and_out_of_range_triangles() -> None:
         Vec3.axis(2),
         Vec3(1.0, 0.0, 1.0),
     )
+    degenerate_vertices = (
+        Vec3.zero(),
+        Vec3.axis(0),
+        Vec3(2.0, 0.0, 0.0),
+    )
     with pytest.raises(PhysicsValidationError, match="degenerate"):
+        TriangleMeshShape(degenerate_vertices, ((0, 1, 2),))
+    with pytest.raises(PhysicsValidationError, match="distinct"):
         TriangleMeshShape(vertices, ((0, 1, 1),))
     with pytest.raises(PhysicsValidationError, match="duplicate"):
         TriangleMeshShape(vertices, ((0, 1, 2), (2, 1, 0)))
