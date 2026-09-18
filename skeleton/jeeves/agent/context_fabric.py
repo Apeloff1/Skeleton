@@ -236,6 +236,15 @@ class MemoryManagerAdapter:
         self.namespace = namespace
         self.source_provider = f"memory-store:{namespace.key}"
 
+    def supports_source_provider(self, source_provider: str) -> bool:
+        provider = str(source_provider).strip()
+        if not provider:
+            return True
+        return provider in {
+            f"memory-store:{self.namespace.key}",
+            f"memory-store:{self.namespace.parent().key}",
+        }
+
     def fetch_refs(
         self,
         namespace_key: str,
@@ -415,6 +424,20 @@ class CognitiveContextFabric:
             if all(existing is not adapter for existing in bucket):
                 bucket.append(adapter)
 
+    @staticmethod
+    def _adapter_supports_provider(
+        adapter: ContextStoreAdapter,
+        source_provider: str,
+    ) -> bool:
+        provider = str(source_provider).strip()
+        if not provider:
+            return True
+        checker = getattr(adapter, "supports_source_provider", None)
+        if callable(checker):
+            return bool(checker(provider))
+        adapter_provider = str(getattr(adapter, "source_provider", "")).strip()
+        return bool(adapter_provider) and adapter_provider == provider
+
     def unregister(
         self,
         source_tier: SourceTier,
@@ -510,7 +533,10 @@ class CognitiveContextFabric:
                             for hit in fast.all_hits
                             for card in (hit.card,)
                             if card.source_tier is tier
-                            and (not card.source_provider or card.source_provider == adapter_provider)
+                            and self._adapter_supports_provider(
+                                adapter,
+                                card.source_provider,
+                            )
                         )
                     )
                     if not eligible_refs:
