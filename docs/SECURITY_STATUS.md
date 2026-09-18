@@ -36,9 +36,10 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | Tar archive extraction safety | `backend/scripts/check_archive_extraction_safety.py` | `backend/tests/test_archive_extraction_safety.py`; Backend Quality and Merge Readiness invoke the gate | Canonical | The scanner enforces the Python `data` filter for backend tar extraction; other archive formats and decompression-bomb/resource limits remain tracked in #540. |
 | JavaScript child-process alias safety | `backend/scripts/check_js_process_alias_safety.py` | `backend/tests/test_js_process_alias_safety.py` | Canonical | Frontend/browser-specific sink coverage still needs periodic review. |
 | API payload/rate-limit/error-redaction contracts | canonical runtime tests in `tests/` | `tests/test_api_gateway_payload_reliability.py`, `tests/test_api_gateway_rate_limit_reliability.py`, `tests/test_api_gateway_error_redaction.py` | Canonical | Header limits, CORS/auth boundaries, content-type validation, and SSRF-specific coverage remain tracked in #540. |
+| Outbound callback/catalog destination boundary | `skeleton/security/outbound_url.py`; webhook subscription guards; fixed-host GameForge free-API catalog with encoded parameters and bounded streamed responses | `tests/test_webhook_destination_security.py`; `backend/tests/test_free_api_network_security.py`; both are invoked by `scripts/quality-gates.sh` | Canonical | The shared URL guard covers deterministic scheme/host/literal-address policy. A real network sender must additionally validate resolved addresses at connect time to close DNS-rebinding TOCTOU risk. |
 | Tool/sandbox capability boundary | provider/runtime and architecture boundary gates plus consolidated sandbox contracts | canonical architecture/provider tests and closed capability-sandbox work under parent #80 | Canonical / implemented | #540 still tracks adversarial proof that untrusted model/tool input cannot widen grants. |
 | Adversarial release boundary | `skeleton/cortex/adversarial.py`; `skeleton/cortex/tri_adversarial.py` | `tests/test_adversarial_engine.py`, `tests/test_tri_adversarial_engine.py`, candidate-isolation and mutation/repair-boundary regressions | Canonical | Lane candidates and metadata are deep-isolated and judge mutation is fail-closed outside the explicit bounded repair path; new judge interfaces must preserve this invariant. |
-| Application-container privilege boundary | root/backend/frontend production Dockerfiles; `docker-compose.yml` | `skeleton/testing/test_deployment_security_defaults.py` verifies non-secret deployment defaults, immutable stateful refs, `no-new-privileges`, capability drops, and canonical liveness probes | Implemented | Read-only root filesystems and writable-mount minimization remain compatibility work; third-party database/vector images require their own capability review. |
+| Application-container privilege boundary | root/backend/frontend production Dockerfiles; `docker-compose.yml` | `skeleton/testing/test_deployment_security_defaults.py` verifies non-secret deployment defaults, immutable stateful refs, `no-new-privileges`, capability drops, read-only application roots, bounded `/tmp` tmpfs, and canonical liveness probes | Implemented | Third-party database/vector images and their required writable state still require separate capability/minimization review. |
 
 ## Secrets, malware, and telemetry controls
 
@@ -93,7 +94,7 @@ Issue #540 remains open for the following high-value work:
 - fail-closed scanner self-failure regressions across the security suite;
 - realistic secret-fixture/high-entropy false-negative audit;
 - dependency/container vulnerability and controlled digest-refresh verification;
-- read-only-filesystem/writable-mount minimization and runtime-secret hardening;
+- runtime-secret hardening plus writable-state minimization for third-party stateful services;
 - release provenance/attestation refusal behavior;
 - adversarial malformed-input, traversal, archive-bomb/zip-slip, SSRF, command-injection, unsafe-serialization, and leakage tests.
 
