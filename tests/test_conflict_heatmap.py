@@ -9,7 +9,7 @@ from scripts.check_conflict_heatmap import (
     DOCUMENT_FIELDS,
     SCHEMA_VERSION,
     SURFACE_FIELDS,
-    TASK_KEY,
+    TASK_ID,
     canonical_write_path,
     classify_heatmap,
     classify_surface,
@@ -44,7 +44,7 @@ def _doc(**overrides):
 def test_closed_class_set_and_seed_identity() -> None:
     assert CLASSES == ("busy", "idle", "unknown")
     assert len(CLASSES) == len(set(CLASSES))
-    assert TASK_KEY == "reserve-S495-conflict-heatmap"
+    assert TASK_ID == "reserve-S495-conflict-heatmap"
     assert CONFLICT_DOMAIN == "ops.readonly.conflict_heatmap"
     assert DOCUMENT_FIELDS == {"schema_version", "as_of", "busy_window_seconds", "surfaces"}
     assert SURFACE_FIELDS == {"path", "pr", "updated"}

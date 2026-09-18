@@ -31,7 +31,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S495-conflict-heatmap"
+TASK_ID = "reserve-S495-conflict-heatmap"
 CONFLICT_DOMAIN = "ops.readonly.conflict_heatmap"
 CLASSES: tuple[str, ...] = ("busy", "idle", "unknown")
 CLASS_SET = frozenset(CLASSES)
