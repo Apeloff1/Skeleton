@@ -22,6 +22,10 @@ from skeleton.shells.ai.execution_attempt import (
 )
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceStore
 from skeleton.shells.ai.execution_seal import ExecutionSealAuthority
+from skeleton.shells.ai.finalization_reconciler import (
+    AIExecutionFinalizationReconciler,
+    FinalizationReconcileAction,
+)
 from skeleton.shells.ai.finalization_state import (
     AIExecutionFinalizationStore,
     FinalizationPhase,
@@ -706,3 +710,306 @@ def test_finalization_id_is_stable_for_returned_terminal_execution(tmp_path):
         execution_attempt_id=seal.seal_id,
     )
     assert result.finalized.finalization.finalization_id == expected
+
+def test_service_finalization_persists_recovery_checkpoint(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    finalized = result.finalized
+    assert finalized.recovery_commit is not None
+    assert finalized.finalization.require_recovery_checkpoint
+    stored = env.recovery_checkpoints.require(
+        finalized.finalization.finalization_id,
+        checkpoint_digest=finalized.recovery_checkpoint.digest,
+    )
+    assert (
+        stored.record.checkpoint.digest
+        == finalized.recovery_checkpoint.digest
+    )
+    assert stored.record.session_id == session.session_id
+
+
+def test_recovery_checkpoint_survives_fresh_store_reader(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    fresh = AIRecoveryCheckpointStore(
+        env.backend,
+        namespace="recovery-checkpoints",
+        clock=lambda: 20.0,
+    )
+    loaded = fresh.require(
+        result.finalized.finalization.finalization_id,
+        checkpoint_digest=(
+            result.finalized.recovery_checkpoint.digest
+        ),
+    )
+    assert loaded.record.session_id == session.session_id
+    assert (
+        loaded.record.checkpoint.execution_attempt_id
+        == seal.seal_id
+    )
+    assert fresh.verify_session_head(session.session_id)
+
+
+def test_fresh_reconciler_verifies_service_finalization(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    reconciler = AIExecutionFinalizationReconciler(
+        finalizations=env.finalizations,
+        session_evidence=env.session_evidence,
+        audit_anchors=env.anchors,
+        recovery_checkpoints=AIRecoveryCheckpointStore(
+            env.backend,
+            namespace="recovery-checkpoints",
+        ),
+        audit_witnesses=env.witnesses,
+        execution_evidence=env.execution_evidence,
+    )
+    report = reconciler.inspect(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.action is FinalizationReconcileAction.COMPLETE
+    assert report.ok
+    assert report.session_evidence.verified
+    assert report.recovery_checkpoint.verified
+    assert report.audit_anchor.verified
+    assert report.audit_witness.verified
+    assert report.execution_evidence.verified
+
+
+def test_serialized_finalized_result_includes_recovery_commit(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    data = result.to_dict()
+    commit = data["finalized"]["recovery_commit"]
+    assert commit is not None
+    assert (
+        commit["record"]["checkpoint_digest"]
+        == result.finalized.recovery_checkpoint.digest
+    )
+    assert commit["head"]["session_id"] == session.session_id
+
+
+def test_failed_execution_persists_failed_recovery_checkpoint(tmp_path):
+    env = EvidenceEnvironment(
+        tmp_path,
+        script="import sys; sys.exit(4)",
+    )
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    assert not result.execution.ok
+    assert result.finalized.recovery_commit is not None
+    stored = env.recovery_checkpoints.current_session(
+        session.session_id
+    )
+    assert stored is not None
+    assert stored.record.checkpoint.session.phase == "failed"
+    assert (
+        stored.record.checkpoint.execution_attempt_id
+        == seal.seal_id
+    )
+
+
+def test_partial_finalization_failure_keeps_durable_checkpoint(tmp_path):
+    env = EvidenceEnvironment(
+        tmp_path,
+        anchor_class=BrokenAnchorStore,
+    )
+    session, review, _, registry, seal = env.reviewed()
+
+    with pytest.raises(RuntimeError, match="audit anchor chain"):
+        env.service.execute_sealed_and_finalize(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            finalizer=env.finalizer,
+        )
+
+    current = env.recovery_checkpoints.current_session(
+        session.session_id
+    )
+    assert current is not None
+    assert current.record.checkpoint.session.phase == "complete"
+    assert current.record.checkpoint.execution_attempt_id == seal.seal_id
+
+    anchors = env.anchors.snapshot()
+    assert len(anchors) == 1
+    finalization_id = anchors[0].anchor.finalization_id
+    finalization = env.finalizations.current(
+        finalization_id
+    ).finalization
+    assert finalization.phase is FinalizationPhase.CHECKPOINTED
+    assert (
+        finalization.recovery_checkpoint_digest
+        == current.record.checkpoint.digest
+    )
+
+
+def test_recovery_head_matches_completed_finalization(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    head_revision, head = env.recovery_checkpoints.head(
+        session.session_id
+    )
+    assert head_revision >= 1
+    assert (
+        head.finalization_id
+        == result.finalized.finalization.finalization_id
+    )
+    assert (
+        head.checkpoint_digest
+        == result.finalized.recovery_checkpoint.digest
+    )
+    assert (
+        head.transition_count
+        == result.finalized.checkpoint.transition_count
+    )
+
+
+def test_independent_sessions_keep_independent_recovery_heads(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    first_session, first_review, _, first_registry, first_seal = (
+        env.reviewed("first-session")
+    )
+    first = env.service.execute_sealed_and_finalize(
+        first_session,
+        first_review,
+        context=ExecutionContext("first", principal="alice"),
+        seal=first_seal,
+        seal_registry=first_registry,
+        finalizer=env.finalizer,
+    )
+
+    second_session, second_review, _, second_registry, second_seal = (
+        env.reviewed("second-session")
+    )
+    second = env.service.execute_sealed_and_finalize(
+        second_session,
+        second_review,
+        context=ExecutionContext("second", principal="alice"),
+        seal=second_seal,
+        seal_registry=second_registry,
+        finalizer=env.finalizer,
+    )
+
+    first_current = env.recovery_checkpoints.current_session(
+        first_session.session_id
+    )
+    second_current = env.recovery_checkpoints.current_session(
+        second_session.session_id
+    )
+    assert first_current is not None
+    assert second_current is not None
+    assert (
+        first_current.record.checkpoint.digest
+        == first.finalized.recovery_checkpoint.digest
+    )
+    assert (
+        second_current.record.checkpoint.digest
+        == second.finalized.recovery_checkpoint.digest
+    )
+    assert (
+        first_current.record.checkpoint.digest
+        != second_current.record.checkpoint.digest
+    )
+
+
+def test_service_finalization_required_layers_are_explicit(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    finalization = result.finalized.finalization
+    assert finalization.require_recovery_checkpoint
+    assert finalization.require_witness
+    assert finalization.require_signed_evidence
+    assert finalization.phase is FinalizationPhase.COMPLETE
+
+
+def test_recovery_commit_binds_same_finalization_identity(tmp_path):
+    env = EvidenceEnvironment(tmp_path)
+    session, review, _, registry, seal = env.reviewed()
+    result = env.service.execute_sealed_and_finalize(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        finalizer=env.finalizer,
+    )
+
+    finalized = result.finalized
+    assert (
+        finalized.recovery_commit.stored.record.finalization_id
+        == finalized.finalization.finalization_id
+    )
+    assert (
+        finalized.recovery_commit.head.finalization_id
+        == finalized.finalization.finalization_id
+    )
+    assert (
+        finalized.recovery_commit.stored.record.checkpoint.digest
+        == finalized.recovery_checkpoint.digest
+    )
+
