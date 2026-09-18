@@ -310,6 +310,8 @@ class GeneratedCodeSandbox:
                 operation,
             )
         if operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}:
+            if operation.target == "<dynamic>":
+                return SandboxDecision(False, "dynamic filesystem target cannot be proven contained", operation)
             try:
                 resolved_path = self._contained_path(operation.target)
             except SandboxPolicyError:
