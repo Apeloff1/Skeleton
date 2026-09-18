@@ -114,3 +114,28 @@ def test_queue_drain_force_cancels_provider_stuck_obsolete_runs() -> None:
     normal = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/cancel'")
     force = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/force-cancel'")
     assert normal < force
+
+
+def test_queue_drain_reclaims_stale_dynamic_codeql_pr_runs() -> None:
+    workflow = _workflow_text()
+
+    assert "numbered_heads = {}" in workflow
+    assert "numbered_heads[number] = sha" in workflow
+    assert "return heads, numbered_heads" in workflow
+    assert "def stale_dynamic_pr_run(run, open_pr_numbered_heads):" in workflow
+    assert "run.get('event') != 'dynamic'" in workflow
+    assert "dynamic/github-code-scanning/codeql" in workflow
+    assert "prefix = 'refs/pull/'" in workflow
+    assert "suffix = '/head'" in workflow
+    assert "number_text.isdigit()" in workflow
+    assert "sha != open_pr_numbered_heads.get(int(number_text), '')" in workflow
+    assert "obsolete_dynamic_pr_queued" in workflow
+    assert "obsolete_dynamic_pr_active" in workflow
+
+    helper = workflow[
+        workflow.index("def stale_dynamic_pr_run"):
+        workflow.index("def path(run):")
+    ]
+    assert "run_repo != repo" in helper
+    assert "refs/pull/" in helper
+    assert "dynamic/github-code-scanning/codeql" in helper
