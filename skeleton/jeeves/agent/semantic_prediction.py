@@ -288,7 +288,14 @@ class SemanticPredictiveModel:
             falsifiers.append(f"Counter-reading better predicts the same observation: {finding.counterreading}")
         forecast_id = stable_id(
             "semantic-forecast",
-            {"finding": finding.fingerprint, "prediction": finding.prediction, "horizon": horizon},
+            {
+                "finding": finding.fingerprint,
+                "prediction": finding.prediction,
+                "horizon": horizon,
+                "confidence": finding.confidence,
+                "ambiguity": finding.ambiguity,
+                "status": finding.status.value,
+            },
             length=28,
         )
         return SemanticForecast(
@@ -318,7 +325,13 @@ class SemanticPredictiveModel:
         proposition = interaction.rule.predictive_effect
         forecast_id = stable_id(
             "semantic-forecast",
-            {"interaction": interaction.fingerprint, "prediction": proposition, "horizon": horizon},
+            {
+                "interaction": interaction.fingerprint,
+                "prediction": proposition,
+                "horizon": horizon,
+                "confidence": interaction.confidence,
+                "ambiguity": interaction.ambiguity,
+            },
             length=28,
         )
         return SemanticForecast(
