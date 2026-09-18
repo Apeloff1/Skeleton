@@ -351,10 +351,10 @@ async def run_scrapers_once(db) -> dict[str, Any]:
                     {"_id": job["_id"]},
                     {"$set": {
                         "last_run_at":     datetime.now(timezone.utc).isoformat(),
-                        "last_run_status": f"error:{type(exc).__name__[:60]}",
+                        "last_run_status": "error",
                     }},
                 )
-                summary["errors"].append({"name": name, "error": type(exc).__name__})
+                summary["errors"].append({"name": name, "error": "job_failed"})
                 log.warning("[scraper] %s failed: %s", name, type(exc).__name__)
     return summary
 

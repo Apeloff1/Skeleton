@@ -824,7 +824,8 @@ def build_apk(build: dict) -> dict:
             file_count, total_bytes, sig_info, verified = _build_real_apk(build, out_path)
             is_real = bool(verified)
         except Exception as e:
-            sig_info = f"toolchain error: {e}"
+            print(f"[binary_builder] toolchain error: {type(e).__name__}")
+            sig_info = "toolchain_error"
             is_real = False
             file_count = 0
             total_bytes = 0
@@ -904,7 +905,8 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
     errors = []
     for r in results:
         if isinstance(r, Exception):
-            errors.append(f"{type(r).__name__}: {r}")
+            print(f"[binary_builder] package failed: {type(r).__name__}")
+            errors.append("package_failed")
         else:
             artifacts.append(r)
     return {"artifacts": artifacts, "errors": errors}
