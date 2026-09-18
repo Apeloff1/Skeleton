@@ -138,6 +138,14 @@ def violations_for_text(text: str) -> list[str]:
         findings.append("PR label mutation must be restricted to same-repository heads")
     if "issues: write" not in clear_pr:
         findings.append("PR clear job needs only issues: write for label mutation")
+    for label in ("needs-attention", "stale-draft"):
+        marker = f"contains(github.event.pull_request.labels.*.name, '{label}')"
+        if marker not in clear_pr:
+            findings.append(f"PR clear job must skip runner allocation without managed label: {label}")
+
+    clear_issue = _block(text, "clear-issue-attention", 2)
+    if "contains(github.event.issue.labels.*.name, 'needs-attention')" not in clear_issue:
+        findings.append("issue clear job must skip runner allocation without needs-attention")
 
     clear_comment = _block(text, "clear-comment-attention", 2)
     if "github.event.sender.type != 'Bot'" not in clear_comment:
@@ -147,6 +155,10 @@ def violations_for_text(text: str) -> list[str]:
             findings.append(f"comment-driven clearing must retain trusted association: {association}")
     if "github.event.issue.pull_request != null" not in clear_comment:
         findings.append("stale-draft comment clearing must be conditioned on an actual pull request")
+    for label in ("needs-attention", "stale-draft"):
+        marker = f"contains(github.event.issue.labels.*.name, '{label}')"
+        if marker not in clear_comment:
+            findings.append(f"comment clear job must skip runner allocation without managed label: {label}")
 
     clear_review = _block(text, "clear-review-attention", 2)
     if "github.event.pull_request.head.repo.full_name == github.repository" not in clear_review:
@@ -158,6 +170,10 @@ def violations_for_text(text: str) -> list[str]:
             findings.append(
                 f"review and review-comment clearing must both retain trusted association: {association}"
             )
+    for label in ("needs-attention", "stale-draft"):
+        marker = f"contains(github.event.pull_request.labels.*.name, '{label}')"
+        if marker not in clear_review:
+            findings.append(f"review clear job must skip runner allocation without managed label: {label}")
 
     sweep = _block(text, "sweep", 2)
     required_sweep_markers = {
