@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
+from .convex import convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
@@ -109,6 +110,34 @@ class ContinuousCollisionDetector:
             raise PhysicsValidationError("CCD max_checks outside supported range")
         self.motion_threshold = float(motion_threshold)
         self.max_checks = max_checks
+
+    @staticmethod
+    def _finite_sweep_radius(body: RigidBody) -> float | None:
+        shape = body.shape
+        if isinstance(shape, SphereShape):
+            return shape.radius
+        if isinstance(shape, BoxShape):
+            return shape.half_extents.length()
+        if isinstance(shape, CapsuleShape):
+            return shape.half_height + shape.radius
+        if isinstance(shape, CylinderShape):
+            return math.hypot(shape.radius, shape.half_height)
+        return None
+
+    def _eligible_continuous_body(self, body: RigidBody, dt: float) -> bool:
+        if (
+            not body.continuous
+            or body.body_type is not BodyType.DYNAMIC
+            or not body.awake
+        ):
+            return False
+        radius = self._finite_sweep_radius(body)
+        if radius is None:
+            return False
+        motion = body.linear_velocity.length() * dt
+        if not isinstance(body.shape, SphereShape):
+            motion += body.angular_velocity.length() * radius * dt
+        return motion > radius * self.motion_threshold
 
     def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
         if (
@@ -340,6 +369,61 @@ class ContinuousCollisionDetector:
                     existing.body_b,
                 ):
                     events[(event.body_a, event.body_b)] = event
+
+        finite_shapes = (
+            SphereShape,
+            BoxShape,
+            CapsuleShape,
+            CylinderShape,
+        )
+        for index, body_a in enumerate(ordered):
+            for body_b in ordered[index + 1 :]:
+                pair = (body_a.body_id, body_b.body_id)
+                if pair in events:
+                    continue
+                if not (
+                    self._eligible_continuous_body(body_a, dt)
+                    or self._eligible_continuous_body(body_b, dt)
+                ):
+                    continue
+                if not isinstance(body_a.shape, finite_shapes) or not isinstance(
+                    body_b.shape,
+                    finite_shapes,
+                ):
+                    continue
+
+                checks += 1
+                if checks > self.max_checks:
+                    raise PhysicsValidationError("CCD check bound exceeded")
+
+                hit = convex_time_of_impact(
+                    body_a,
+                    body_b,
+                    dt,
+                    max_iterations=64,
+                    distance_iterations=64,
+                    distance_tolerance=1.0e-6,
+                    time_tolerance=1.0e-9,
+                )
+                if hit is None:
+                    continue
+
+                if hit.time <= EPSILON:
+                    relative_velocity = (
+                        body_b.velocity_at_world_point(hit.point_b)
+                        - body_a.velocity_at_world_point(hit.point_a)
+                    )
+                    if relative_velocity.dot(hit.normal) >= -EPSILON:
+                        continue
+
+                event = TOIEvent(
+                    body_a=body_a.body_id,
+                    body_b=body_b.body_id,
+                    fraction=hit.fraction,
+                    time=hit.time,
+                    normal=hit.normal,
+                )
+                events[pair] = event
 
         if not events:
             return None
