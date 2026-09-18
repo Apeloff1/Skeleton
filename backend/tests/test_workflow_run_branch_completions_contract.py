@@ -20,6 +20,20 @@ AUTOMATION = WORKFLOWS / "pr-automation-index.yml"
 DRAIN = WORKFLOWS / "pr-obsolete-run-drain.yml"
 IDLE = WORKFLOWS / "idle-studio.yml"
 QUEUE_DRAIN = WORKFLOWS / "queue-drain.yml"
+BRANCH_CLEAN_SOURCE = (
+    'name: Prune redundant branches safely\n'
+    'on:\n'
+    '  workflow_run:\n'
+    '    workflows: ["Actions Housekeeping CLI"]\n'
+    '    types: [completed]\n'
+    '    branches: [main]\n'
+    'jobs:\n'
+    '  prune:\n'
+    '    if: >-\n'
+    "      github.event_name != 'workflow_run' ||\n"
+    '      (github.event.workflow_run.head_repository.full_name == github.repository &&\n'
+    '       github.event.workflow_run.head_branch == github.event.repository.default_branch)\n'
+)
 
 
 def _replace_once(source: str, old: str, new: str) -> str:
@@ -82,6 +96,42 @@ def test_rejects_queue_drain_broader_or_unguarded_branch_filter() -> None:
     )
     messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
     assert "every completing head" in messages
+
+
+def test_branch_clean_may_wake_only_from_same_repo_default_branch() -> None:
+    messages = "\n".join(
+        violations_for_text("branch-clean.yml", BRANCH_CLEAN_SOURCE)
+    )
+    assert "every completing head" not in messages
+
+
+def test_rejects_branch_clean_broader_or_unguarded_filter() -> None:
+    source = _replace_once(
+        BRANCH_CLEAN_SOURCE,
+        "    branches: [main]\n",
+        "    branches: [release/**]\n",
+    )
+    assert "every completing head" in "\n".join(
+        violations_for_text("branch-clean.yml", source)
+    )
+
+    source = _replace_once(
+        BRANCH_CLEAN_SOURCE,
+        "github.event.workflow_run.head_repository.full_name == github.repository",
+        "true",
+    )
+    assert "every completing head" in "\n".join(
+        violations_for_text("branch-clean.yml", source)
+    )
+
+    source = _replace_once(
+        BRANCH_CLEAN_SOURCE,
+        "github.event.workflow_run.head_branch == github.event.repository.default_branch",
+        "true",
+    )
+    assert "every completing head" in "\n".join(
+        violations_for_text("branch-clean.yml", source)
+    )
 
 
 def test_rejects_automation_identity_from_first_pull_request_only() -> None:
