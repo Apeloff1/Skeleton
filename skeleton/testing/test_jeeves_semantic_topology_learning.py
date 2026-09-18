@@ -861,6 +861,48 @@ def test_supplemental_rule_cannot_override_static_interaction_contract() -> None
         engine.compose((), supplemental_rules=(static,))
 
 
+def test_learned_bridge_overlays_effective_topology_without_mutating_static_graph() -> None:
+    _, topology, candidate, lab = _system()
+    static = topology.snapshot
+    _promote(lab, candidate)
+    learned = lab.learned_rules()
+    assert len(learned) == 1
+
+    effective = topology.snapshot_with_rules((learned[0].rule,))
+
+    assert topology.snapshot.fingerprint == static.fingerprint
+    assert len(effective.edges) == len(static.edges) + 1
+    learned_edge = next(
+        edge
+        for edge in effective.edges
+        if edge.key
+        == tuple(sorted((candidate.left_key, candidate.right_key)))
+    )
+    assert learned_edge.source == "learned"
+    assert effective.candidate_bridge_count == static.candidate_bridge_count - 1
+    assert candidate.right_key in topology.neighbors_with_rules(
+        candidate.left_key,
+        (learned[0].rule,),
+    )
+    assert topology.shortest_path_with_rules(
+        candidate.left_key,
+        candidate.right_key,
+        supplemental_rules=(learned[0].rule,),
+    ) == (candidate.left_key, candidate.right_key)
+
+
+def test_topology_overlay_rejects_collision_with_static_edge() -> None:
+    registry = MaximalSemanticRegistry()
+    topology = SemanticLensTopology(registry)
+    static_rule = default_interaction_rules()[0]
+
+    with pytest.raises(
+        AgentContractError,
+        match="collides with static edge",
+    ):
+        topology.snapshot_with_rules((static_rule,))
+
+
 def test_semantic_plane_activates_bridge_only_after_empirical_promotion() -> None:
     registry, topology, candidate, lab = _system()
     plane = SemanticLensPlane(
