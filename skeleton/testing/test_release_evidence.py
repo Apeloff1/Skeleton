@@ -286,7 +286,7 @@ def test_missing_eval_evidence_blocks_release_ready() -> None:
         observed_artifacts=valid_observed(),
     )
     assert result.release_ready is False
-    assert any("missing required eval evidence" in reason for reason in result.reasons)
+    assert "missing required eval evidence" in result.reasons
 
 
 def test_tampered_digest_fails_closed() -> None:
@@ -603,7 +603,7 @@ def test_from_v1_provenance_keeps_schema_version_1_callers() -> None:
         observed_artifacts={"skeleton-16.0.0-py3-none-any.whl": WHEEL},
     )
     assert tests_only_result.release_ready is False
-    assert any("missing required eval evidence" in reason for reason in tests_only_result.reasons)
+    assert "missing required eval evidence" in tests_only_result.reasons
 
     evidence = from_v1_provenance(
         v1,
