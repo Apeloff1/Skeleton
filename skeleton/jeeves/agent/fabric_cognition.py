@@ -136,11 +136,10 @@ class FabricContextCompiler(ContextCompiler):
             )
         except (KeyboardInterrupt, SystemExit):
             raise
-        except Exception as exc:
+        except Exception:
             with self._fabric_state_lock:
-                self._last_result = None
-                self._last_error = f"{type(exc).__name__}: {str(exc)[:1024]}"
-            if self.fabric_policy.fail_closed:
+                fabric_error = self._last_error
+            if fabric_error is None or self.fabric_policy.fail_closed:
                 raise
             return super().compile(
                 system_instruction=system_instruction,
