@@ -5,6 +5,7 @@ import gzip
 import importlib.util
 import io
 import json
+import sys
 import tarfile
 from pathlib import Path
 
@@ -221,6 +222,24 @@ def test_schema_version_1_callers_are_unchanged(tmp_path: Path) -> None:
     assert payload["schema_version"] == 1
     assert "schema_id" not in payload
     assert payload["source"]["commit"] == COMMIT
+
+
+def test_evidence_loader_does_not_require_preexisting_pythonpath() -> None:
+    """Reproducible Release pytest runs from the parent of the checkout."""
+
+    root = str(REPO_ROOT.resolve())
+    original = list(sys.path)
+    sys.path[:] = [
+        entry
+        for entry in sys.path
+        if entry not in {"", ".", root}
+        and Path(entry).resolve() != REPO_ROOT.resolve()
+    ]
+    try:
+        module = release_provenance._load_release_evidence()
+        assert module.SCHEMA_ID == "skeleton.release.evidence"
+    finally:
+        sys.path[:] = original
 
 
 def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) -> None:

@@ -268,8 +268,16 @@ def compare_provenance(args: argparse.Namespace) -> int:
 
 
 def _load_release_evidence():
-    """Import the canonical evidence gate without coupling v1 emit to it."""
+    """Import the canonical evidence gate without coupling v1 emit to it.
 
+    Reproducible Release runs pytest from the parent of the checkout without
+    setting PYTHONPATH, so locate the package from this script's repository
+    root instead of assuming ``skeleton`` is already importable.
+    """
+
+    root = str(Path(__file__).resolve().parents[1])
+    if root not in sys.path:
+        sys.path.insert(0, root)
     try:
         from skeleton.release import evidence as release_evidence
     except ImportError as exc:  # pragma: no cover - package layout is required for evidence
