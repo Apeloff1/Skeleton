@@ -314,7 +314,7 @@ class RuntimeTrustPinStore:
     def _persist_revision(
         self,
         item: SignedRuntimeTrustPin,
-    ) -> None:
+    ) -> SignedRuntimeTrustPin:
         key = self._history_key(
             item.pin.scope,
             item.pin.revision,
@@ -325,15 +325,28 @@ class RuntimeTrustPinStore:
                 key,
                 item.to_dict(),
             )
+            return item
         except DistributedStateConflict:
             existing = self.history_item(
                 item.pin.scope,
                 item.pin.revision,
             )
-            if existing.pin.digest != item.pin.digest:
+            same_authority = (
+                existing.pin.scope == item.pin.scope
+                and existing.pin.revision == item.pin.revision
+                and existing.pin.epoch_digest == item.pin.epoch_digest
+                and existing.pin.previous_pin_digest
+                == item.pin.previous_pin_digest
+                and existing.pin.change_id == item.pin.change_id
+            )
+            if not same_authority:
                 raise RuntimeTrustPinConflict(
                     "runtime trust revision already contains different pin"
                 )
+            # Concurrent starters/rollovers may sign at different wall-clock
+            # instants. The immutable history winner is canonical; all losing
+            # writers must reuse it rather than manufacturing parallel history.
+            return existing
 
     def pin(
         self,
@@ -366,7 +379,7 @@ class RuntimeTrustPinStore:
                 self._clock(),
             )
             item = self._sign(pin)
-            self._persist_revision(item)
+            item = self._persist_revision(item)
             try:
                 self.backend.put_if_absent(
                     self.namespace,
@@ -450,7 +463,7 @@ class RuntimeTrustPinStore:
                 self._clock(),
             )
             item = self._sign(next_pin)
-            self._persist_revision(item)
+            item = self._persist_revision(item)
             try:
                 self.backend.compare_and_swap(
                     self.namespace,
