@@ -47,13 +47,23 @@ def _probe_writable_dir(path: Path) -> None:
     try:
         fd, raw_probe = tempfile.mkstemp(prefix=".w_probe.", dir=path)
         probe = Path(raw_probe)
-        os.write(fd, b"ok")
-        os.fsync(fd)
+        handle = os.fdopen(fd, "wb")
+        fd = -1
+        with handle:
+            handle.write(b"ok")
+            handle.flush()
+            os.fsync(handle.fileno())
     finally:
         if fd >= 0:
-            os.close(fd)
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         if probe is not None:
-            probe.unlink(missing_ok=True)
+            try:
+                probe.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
@@ -156,12 +166,19 @@ def _atomic_write_text(path: Path, content: str) -> None:
     )
     tmp = Path(raw_tmp)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+        handle = os.fdopen(fd, "w", encoding="utf-8", newline="\n")
+        fd = -1
+        with handle:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(tmp, path)
     except BaseException:
+        if fd >= 0:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         try:
             tmp.unlink(missing_ok=True)
         finally:
