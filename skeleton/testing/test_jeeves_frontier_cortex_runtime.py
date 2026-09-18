@@ -308,7 +308,8 @@ def test_checkpoint_binds_semantic_topology_learning_root() -> None:
     checkpoint = runtime.checkpointer.latest(state.run_id)
     assert checkpoint is not None
 
-    expected = runtime.semantic_plane.topology_learning.fingerprint
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    expected = scoped_plane.topology_learning.fingerprint
     assert (
         checkpoint.metadata["semantic_topology_learning_fingerprint"]
         == expected
@@ -336,11 +337,13 @@ def test_resume_rejects_semantic_topology_learning_drift() -> None:
     checkpoint = runtime.checkpointer.latest(state.run_id)
     assert checkpoint is not None
 
-    candidate = runtime.semantic_plane.topology.bridge_candidates(
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    candidate = scoped_plane.topology.bridge_candidates(
         limit=1,
         minimum_score=0.0,
     )[0]
-    runtime.declare_semantic_topology_candidate_prediction(
+    runtime.declare_scoped_semantic_topology_candidate_prediction(
+        inputs,
         candidate.candidate_id,
         kind=LensInteractionKind.REINFORCES,
         predicted_probability=0.7,
