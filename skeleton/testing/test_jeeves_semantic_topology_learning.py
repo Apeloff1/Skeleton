@@ -218,6 +218,65 @@ def test_negative_control_failure_blocks_promotion() -> None:
     assert lab.learned_rules() == ()
 
 
+def test_competing_active_relation_kinds_fail_closed() -> None:
+    _, _, candidate, lab = _system()
+    _promote(
+        lab,
+        candidate,
+        kind=LensInteractionKind.REINFORCES,
+    )
+    for index, domain, run in (
+        (201, "film", "conflict-a"),
+        (202, "film", "conflict-b"),
+        (203, "game", "conflict-c"),
+        (204, "game", "conflict-d"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                kind=LensInteractionKind.CONFLICTS,
+                domain=domain,
+                run=run,
+            )
+        )
+    for index, domain, run in (
+        (301, "film", "conflict-control-a"),
+        (302, "game", "conflict-control-b"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                kind=LensInteractionKind.CONFLICTS,
+                probability=0.05,
+                outcome=False,
+                domain=domain,
+                run=run,
+                negative_control=True,
+            )
+        )
+
+    reinforces = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+    conflicts = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.CONFLICTS,
+    )
+    snapshot = lab.snapshot()
+
+    assert reinforces.status is TopologyBridgeStatus.ACTIVE
+    assert conflicts.status is TopologyBridgeStatus.ACTIVE
+    assert lab.learned_rules() == ()
+    assert snapshot.ambiguous_active_candidate_ids == (
+        candidate.candidate_id,
+    )
+
+
 def test_controls_do_not_pollute_primary_bridge_calibration() -> None:
     _, _, candidate, lab = _system()
     _promote(lab, candidate)
