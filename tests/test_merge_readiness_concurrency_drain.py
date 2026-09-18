@@ -11,7 +11,8 @@ def test_legacy_merge_readiness_tombstones_are_bounded_and_read_only() -> None:
     assert "permissions: {}" in workflow
     assert "group: merge-readiness-${{ matrix.sha }}" in workflow
     assert "cancel-in-progress: true" in workflow
-    assert "runs-on: ubuntu-latest" in workflow\n    assert "runs-on: ubuntu-24.04-arm" not in workflow
+    assert "runs-on: ubuntu-latest" in workflow
+    assert "runs-on: ubuntu-24.04-arm" not in workflow
     assert "timeout-minutes: 2" in workflow
     assert "workflow_dispatch:" in workflow
     assert "paths:" in workflow
