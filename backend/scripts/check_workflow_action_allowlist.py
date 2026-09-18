@@ -41,6 +41,7 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
         "docker/build-push-action",
         "docker/login-action",
         "docker/setup-buildx-action",
+        "docker/setup-qemu-action",
         "gacts/gitleaks",
         "gitleaks/gitleaks-action",
     }

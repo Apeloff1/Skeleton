@@ -5,7 +5,9 @@ on:
   workflow_run:
     workflows: ["Actions Housekeeping CLI"]
     types: [completed]
-    branches: [main]
+    branches:
+      - "*"
+      - "**"
   schedule:
     # Avoid push-storm starvation: one durable cleanup sweep every five minutes.
     - cron: '3-58/5 * * * *'

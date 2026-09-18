@@ -123,7 +123,7 @@ def test_branch_cleanup_trigger_is_bounded() -> None:
 
     assert 'workflows: ["Actions Housekeeping CLI"]' in text
     assert "types: [completed]" in text
-    assert "branches: [main]" in text
+    assert 'branches:\n      - "*"\n      - "**"' in text
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in text
     assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in text
     assert "- cron: '3-58/5 * * * *'" in text

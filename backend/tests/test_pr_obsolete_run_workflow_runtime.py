@@ -9,6 +9,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "backend" / "scripts" / "pr_obsolete_run_from_workflow_run.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-obsolete-run-drain.yml"
+SIGNAL_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-lifecycle-signal.yml"
 
 
 def test_workflow_run_adapter_is_directly_executable_from_repo_root() -> None:
@@ -53,3 +54,11 @@ def test_privileged_drainer_starts_when_lifecycle_signal_is_requested() -> None:
     assert text.count("python backend/scripts/pr_obsolete_run_sweep.py") == 1
     assert text.count("python backend/scripts/pr_obsolete_run_from_workflow_run.py") == 1
     assert "WORKFLOW_RUN_PR_HINTS" in text
+
+
+def test_lifecycle_signal_wakes_immediate_drain_only_on_close() -> None:
+    text = SIGNAL_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "types: [closed]" in text
+    assert "synchronize" not in text
+    assert "Superseded synchronize heads are already reclaimed by queue-drain" in text
