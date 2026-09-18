@@ -23,6 +23,8 @@ class AIDecisionProvenance:
     session_evidence_digest: str = ""
     sandbox_binding_digest: str = ""
     release_evidence_digest: str = ""
+    runtime_trust_digest: str = ""
+    authority_health_policy_digest: str = ""
 
     def __post_init__(self) -> None:
         for name in (
@@ -48,6 +50,8 @@ class AIDecisionProvenance:
             "session_evidence_digest",
             "sandbox_binding_digest",
             "release_evidence_digest",
+            "runtime_trust_digest",
+            "authority_health_policy_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -74,6 +78,12 @@ class AIDecisionProvenance:
             data["sandbox_binding_digest"] = self.sandbox_binding_digest
         if self.release_evidence_digest:
             data["release_evidence_digest"] = self.release_evidence_digest
+        if self.runtime_trust_digest:
+            data["runtime_trust_digest"] = self.runtime_trust_digest
+        if self.authority_health_policy_digest:
+            data["authority_health_policy_digest"] = (
+                self.authority_health_policy_digest
+            )
         return data
 
     @property
