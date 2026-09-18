@@ -40,6 +40,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_ccd_advanced",
     "skeleton.testing.test_simulation_physics_character",
     "skeleton.testing.test_simulation_physics_character_runtime",
+    "skeleton.testing.test_simulation_physics_character_rollback",
     "skeleton.testing.test_simulation_physics_character_state",
     "skeleton.testing.test_simulation_physics_constraints",
     "skeleton.testing.test_simulation_physics_convex",
