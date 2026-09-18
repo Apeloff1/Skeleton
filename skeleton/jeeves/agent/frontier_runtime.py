@@ -480,6 +480,21 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
 
         return self.semantic_plane.record_topology_bridge_trial(trial)
 
+    def semantic_topology_learning_diagnostics(
+        self,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        """Return bounded semantic topology-learning diagnostics."""
+
+        return self.semantic_plane.topology_learning_diagnostics(
+            candidate_id=candidate_id,
+            kind=kind,
+            limit=limit,
+        )
+
     def semantic_topology_research_obligations(
         self,
         *,
