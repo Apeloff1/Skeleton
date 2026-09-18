@@ -13,6 +13,11 @@ from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttemptStore,
+    ExecutionAttemptRecovery,
+    ExecutionAttemptState,
+)
 from skeleton.shells.ai.execution_seal import ExecutionSealAuthority, ExecutionSealError
 from skeleton.shells.ai.execution_fence import (
     AIExecutionFenceError,
@@ -54,6 +59,7 @@ def build_service(
     runtime_trust=None,
     authority_health=None,
     execution_fences=None,
+    execution_attempts=None,
     worker_id="",
 ):
     command_catalog = CommandCatalog(
@@ -135,6 +141,7 @@ def build_service(
         runtime_trust=runtime_trust,
         authority_health=authority_health,
         execution_fences=execution_fences,
+        execution_attempts=execution_attempts,
         worker_id=worker_id,
     )
     service.start()
@@ -1333,3 +1340,460 @@ def test_execution_fence_is_bound_into_assurance_seal(tmp_path):
     assert first.assurance_digest
     assert len(first.assurance_digest) == 64
     assert fences.release(fence)
+
+
+def _attempt_store(backend=None, *, max_retries=8):
+    return AIExecutionAttemptStore(
+        backend or InMemoryFencedStore(),
+        max_retries=max_retries,
+    )
+
+
+def test_execution_attempt_ledger_requires_worker_identity(tmp_path):
+    attempts = _attempt_store()
+    base, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+    )
+    with pytest.raises(ValueError, match="worker_id"):
+        AIShellService(
+            base.orchestrator,
+            base.diagnostics,
+            base.governance,
+            assurance=AIExecutionAssuranceInspector(),
+            execution_attempts=attempts,
+        )
+
+
+def test_configured_attempt_ledger_blocks_direct_execute(tmp_path):
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-direct")
+    review, _ = service.review(session)
+    with pytest.raises(RuntimeError, match="attempt ledger requires execute_sealed"):
+        service.execute(
+            session,
+            review,
+            context=ExecutionContext("direct", principal="alice"),
+        )
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_attempt_ledger_records_successful_real_child(tmp_path):
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-success")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("attempt", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+    )
+    assert result.ok
+    stored = attempts.current(seal.seal_id)
+    assert stored is not None
+    assert stored.attempt.state is ExecutionAttemptState.SUCCEEDED
+    assert stored.attempt.terminal_evidence_digest == result.provenance.digest
+    assert (
+        stored.attempt.recovery
+        is ExecutionAttemptRecovery.TERMINAL_SUCCESS
+    )
+    assert stored.attempt.execution_backend_id == "shell-service-host"
+    assert registry.used(seal.seal_id)
+    assert len(service.orchestrator.shell_service.receipts.snapshot()) == 1
+
+
+def test_attempt_ledger_binds_runtime_trust_and_release_identity(tmp_path):
+    trust = _ToggleRuntimeTrust()
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        runtime_trust=trust,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-trust")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("attempt", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+    )
+    stored = attempts.current(seal.seal_id)
+    assert stored.attempt.runtime_trust_digest == "t" * 64
+    assert stored.attempt.release_evidence_digest == ""
+    assert result.provenance.runtime_trust_digest == "t" * 64
+
+
+def test_attempt_ledger_binds_execution_fence_token(tmp_path):
+    backend = InMemoryFencedStore()
+    fences = _fence_manager(backend=backend)
+    attempts = _attempt_store(backend)
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-fence")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("attempt", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        execution_fence=fence,
+    )
+    assert result.ok
+    stored = attempts.current(seal.seal_id)
+    assert stored.attempt.execution_fence_digest
+    assert stored.attempt.fencing_token == fence.lease.fencing_token
+    assert stored.attempt.state is ExecutionAttemptState.SUCCEEDED
+    assert fences.backend.leases() == ()
+
+
+def test_attempt_ledger_backend_crash_records_failed_terminal(tmp_path):
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-crash")
+    review, _ = service.review(session)
+
+    class CrashingBackend:
+        backend_id = "crash-backend"
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute_plan(self, plan, *, context):
+            self.calls += 1
+            raise RuntimeError("synthetic child boundary crash")
+
+        def receipt_root(self):
+            return "c" * 64
+
+    backend = CrashingBackend()
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=backend,
+    )
+    with pytest.raises(RuntimeError, match="synthetic child boundary crash"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("attempt", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_backend=backend,
+        )
+    assert backend.calls == 1
+    stored = attempts.current(seal.seal_id)
+    assert stored.attempt.state is ExecutionAttemptState.FAILED
+    assert stored.attempt.error_type == "RuntimeError"
+    assert stored.attempt.terminal_evidence_digest == ""
+    assert registry.used(seal.seal_id)
+
+
+def test_invalid_seal_creates_no_execution_attempt(tmp_path):
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-invalid-seal")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    with pytest.raises(Exception):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("attempt", principal="bob"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert attempts.current(seal.seal_id) is None
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_assurance_denial_creates_no_execution_attempt(tmp_path):
+    attempts = _attempt_store()
+    service, _ = build_service(
+        tmp_path,
+        high_contract(),
+        auto_band=RiskBand.HIGH,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-assurance")
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    with pytest.raises(RuntimeError, match="verified sandbox"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("attempt", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert attempts.current(seal.seal_id) is None
+    assert not registry.used(seal.seal_id)
+
+
+def test_attempt_ledger_preserves_verified_sandbox_provenance(tmp_path):
+    attempts = _attempt_store()
+    service, effects = build_service(
+        tmp_path,
+        high_contract(),
+        auto_band=RiskBand.HIGH,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    intent_value = intent()
+    session = service.new_session(
+        intent_value,
+        session_id="attempt-sandbox",
+    )
+    review, _ = service.review(session)
+    backend, fake = verified_backend(review, intent_value, effects)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=backend,
+    )
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("attempt", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        execution_backend=backend,
+    )
+    assert result.ok
+    assert len(fake.calls) == 1
+    assert result.provenance.execution_backend_id == "sandbox:fake"
+    assert result.provenance.sandbox_binding_digest == backend.binding.digest
+    stored = attempts.current(seal.seal_id)
+    assert stored.attempt.state is ExecutionAttemptState.SUCCEEDED
+    assert stored.attempt.execution_backend_id == "sandbox:fake"
+
+
+class _ReserveOutageBackend:
+    def get(self, namespace, key):
+        return None
+
+    def put_if_absent(self, namespace, key, value):
+        raise OSError("attempt store unavailable")
+
+    def compare_and_swap(self, namespace, key, *, expected_revision, value):
+        raise OSError("attempt store unavailable")
+
+    def delete(self, namespace, key, *, expected_revision):
+        raise OSError("attempt store unavailable")
+
+
+def test_attempt_store_outage_after_seal_consumption_never_spawns_child(tmp_path):
+    attempts = _attempt_store(_ReserveOutageBackend())
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-outage")
+    review, _ = service.review(session)
+
+    class NeverBackend:
+        backend_id = "never"
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute_plan(self, plan, *, context):
+            self.calls += 1
+            raise AssertionError("child must not spawn")
+
+        def receipt_root(self):
+            return "n" * 64
+
+    backend = NeverBackend()
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=backend,
+    )
+    with pytest.raises(OSError, match="unavailable"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("attempt", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_backend=backend,
+        )
+    assert registry.used(seal.seal_id)
+    assert backend.calls == 0
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+class _BoundaryConflictBackend:
+    def __init__(self):
+        self.store = InMemoryFencedStore()
+
+    def get(self, namespace, key):
+        return self.store.get(namespace, key)
+
+    def put_if_absent(self, namespace, key, value):
+        return self.store.put_if_absent(namespace, key, value)
+
+    def compare_and_swap(self, namespace, key, *, expected_revision, value):
+        raise DistributedStateConflict("boundary CAS unavailable")
+
+    def delete(self, namespace, key, *, expected_revision):
+        return self.store.delete(
+            namespace,
+            key,
+            expected_revision=expected_revision,
+        )
+
+
+def test_boundary_ledger_failure_blocks_delegate_before_child(tmp_path):
+    attempts = _attempt_store(
+        _BoundaryConflictBackend(),
+        max_retries=1,
+    )
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_attempts=attempts,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="attempt-boundary-cas")
+    review, _ = service.review(session)
+
+    class NeverBackend:
+        backend_id = "never-boundary"
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute_plan(self, plan, *, context):
+            self.calls += 1
+            raise AssertionError("child must not spawn")
+
+        def receipt_root(self):
+            return "n" * 64
+
+    backend = NeverBackend()
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=backend,
+    )
+    with pytest.raises(RuntimeError, match="ledger terminal write failed"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("attempt", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_backend=backend,
+        )
+    assert backend.calls == 0
+    assert registry.used(seal.seal_id)
+    current = attempts.current(seal.seal_id)
+    assert current is not None
+    assert current.attempt.state is ExecutionAttemptState.AUTHORIZED
