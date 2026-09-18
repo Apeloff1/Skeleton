@@ -437,6 +437,49 @@ def test_source_fingerprint_case_normalization_does_not_create_false_staleness()
     assert any(item.source_fingerprint == record.source_fingerprint for item in result.records)
 
 
+def test_deep_context_record_rejects_understated_content_size() -> None:
+    with pytest.raises(
+        AgentContractError,
+        match="understates context content size",
+    ):
+        _external_record(
+            content="x" * 4_000,
+            source_ref="dishonest-size",
+            token_estimate=1,
+        )
+
+
+def test_context_contract_booleans_are_strict() -> None:
+    with pytest.raises(AgentContractError, match="canonical must be boolean"):
+        DeepContextRecord(
+            source_tier=SourceTier.EXTERNAL,
+            source_ref="bad-canonical",
+            source_provider="provider-a",
+            source_fingerprint=stable_fingerprint("bad-canonical"),
+            content="bounded",
+            canonical="false",
+            trust=0.8,
+            confidence=0.8,
+            salience=0.8,
+            token_estimate=2,
+        )
+
+    with pytest.raises(
+        AgentContractError,
+        match="broad_search_on_conflict must be boolean",
+    ):
+        ContextFabricPolicy(broad_search_on_conflict="false")
+
+
+def test_callable_context_adapter_rejects_non_callable_hooks() -> None:
+    with pytest.raises(TypeError, match="must be callable"):
+        CallableContextAdapter(
+            SourceTier.EXTERNAL,
+            fetcher=None,
+            searcher=lambda ns, query, max_records, max_tokens: (),
+        )
+
+
 def test_deep_context_record_rejects_invalid_token_estimates() -> None:
     for value in (0, -1, True):
         with pytest.raises(AgentContractError, match="token_estimate"):
@@ -751,7 +794,7 @@ def test_canonical_and_semantic_sections_are_valid_json_within_memory_budget() -
         content="x" * 8_000,
         source_ref="large-source",
         provider="provider-a",
-        token_estimate=100,
+        token_estimate=2_000,
     )
     compiler = FabricContextCompiler(
         fabric=_external_fabric(record),
