@@ -483,6 +483,16 @@ from .semantic_lens_topology import (
     SemanticTopologySnapshot,
 )
 
+from .semantic_topology_learning import (
+    LearnedTopologyRule,
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    TopologyBridgePolicy,
+    TopologyBridgeReport,
+    TopologyBridgeStatus,
+    TopologyBridgeTrial,
+)
+
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
     FrontierLensRouter,
