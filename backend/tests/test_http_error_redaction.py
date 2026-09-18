@@ -159,6 +159,10 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "core" / "observability.py",
     REPO_ROOT / "backend" / "services" / "jeeves_consultant.py",
     REPO_ROOT / "backend" / "gameforge" / "runtime" / "agent_runtime.py",
+    REPO_ROOT / "backend" / "gameforge" / "exocortex" / "quality.py",
+    REPO_ROOT / "backend" / "gameforge" / "personal" / "synergy" / "coherence.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "zaibatsu_security.py",
+    REPO_ROOT / "backend" / "gameforge" / "personal" / "synergy" / "reliability.py",
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 SERVER = REPO_ROOT / "backend" / "server.py"
@@ -290,6 +294,11 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "work.error = str(e)" not in source
     assert "last_error = str(e)" not in source
     assert "worker-fallback:" not in source
+    assert "gaps=[str(e)]" not in source
+    assert "errors.append(str(e))" not in source
+    assert "data, [str(e)]" not in source
+    assert 'error=str(e)' not in source
+    assert "TriggerError(TriggerErrorCode.UNKNOWN, msg" not in source
 
 
 
@@ -362,3 +371,7 @@ def test_server_health_envelopes_do_not_stringify_exceptions() -> None:
     assert "index_audit_failed" in source
     assert "probe_failed" in source
     assert "analysis_failed" in source
+    assert "boot_task_failed" in source
+    assert "execution_failed" in source
+    assert 'entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"' not in source
+    assert "result.error = str(e)" not in source

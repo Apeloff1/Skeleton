@@ -2016,9 +2016,9 @@ class PythonExecutor(CodeExecutor):
             finally:
                 os.unlink(temp_file)
                 
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         
         ctx.end()
         result.metrics.execution_time_ms = ctx.elapsed_ms
@@ -2119,9 +2119,9 @@ class CppExecutor(CodeExecutor):
         except asyncio.TimeoutError:
             result.status = ExecutionStatus.TIMEOUT
             result.error = f"Timeout after {ctx.request.timeout_seconds}s"
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         finally:
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
@@ -2181,9 +2181,9 @@ class CExecutor(CppExecutor):
             result.output = stdout.decode()
             result.status = ExecutionStatus.SUCCESS if run_process.returncode == 0 else ExecutionStatus.ERROR
             
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         finally:
             if temp_dir: shutil.rmtree(temp_dir, ignore_errors=True)
         
@@ -2389,7 +2389,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 entry["status"] = "failed"
                 entry["completed_at"] = time.time()
-                entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+                entry["error"] = "boot_task_failed"
                 logger.warning(f"[stagger] {label} failed: {e}")
         task = asyncio.create_task(_runner(), name=f"kick:{label}")
         _BOOT_TASKS.append(task)
