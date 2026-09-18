@@ -253,6 +253,8 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             raise TypeError("cortex_enabled must be boolean")
         if not isinstance(cortex_required, bool):
             raise TypeError("cortex_required must be boolean")
+        if cortex_required and not cortex_enabled:
+            raise ValueError("cortex_required cannot be true when cortex is disabled")
         if cortex is not None and not isinstance(cortex, JeevesCortex):
             raise TypeError("cortex must be JeevesCortex or None")
         if not cortex_enabled and cortex is not None:
