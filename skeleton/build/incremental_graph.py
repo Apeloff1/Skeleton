@@ -502,21 +502,22 @@ def _coerce_repo_index(raw: Any) -> Mapping[str, Any]:
     elif isinstance(raw, Mapping):
         payload = dict(raw)
     else:
-        files = getattr(raw, "files", None)
-        if files is None:
+        required = (
+            "schema",
+            "head",
+            "object_format",
+            "source_digest",
+            "tracked_files",
+            "tracked_bytes",
+            "files",
+        )
+        missing = [name for name in required if not hasattr(raw, name)]
+        if missing:
             raise IncrementalGraphError(
-                "repo index must be a mapping, snapshot, or object with files",
-                context={"type": type(raw).__name__},
+                "repo index object is missing required fields",
+                context={"fields": missing, "type": type(raw).__name__},
             )
-        payload = {
-            "schema": getattr(raw, "schema", GRAPH_SCHEMA),
-            "head": getattr(raw, "head", None),
-            "object_format": getattr(raw, "object_format", None),
-            "source_digest": getattr(raw, "source_digest", None),
-            "tracked_files": getattr(raw, "tracked_files", None),
-            "tracked_bytes": getattr(raw, "tracked_bytes", None),
-            "files": files,
-        }
+        payload = {name: getattr(raw, name) for name in required}
     if not isinstance(payload, Mapping):
         raise IncrementalGraphError("repo index payload must be a mapping")
     _unknown_keys(payload, _REPO_INDEX_KEYS, field="repo_index")
@@ -586,8 +587,14 @@ def _coerce_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
             context={"type": type(raw).__name__},
         )
     _unknown_keys(payload, _TRACKED_FILE_KEYS, field="tracked_file")
+    missing = sorted(_TRACKED_FILE_KEYS.difference(payload))
+    if missing:
+        raise IncrementalGraphError(
+            "tracked file is missing required keys",
+            context={"keys": missing},
+        )
 
-    path = _require_repo_path(payload.get("path"))
+    path = _require_repo_path(payload["path"])
     mode = _require_git_mode(payload.get("mode"), field="tracked file mode")
     index_blob = _require_object_id(
         payload.get("index_blob"),
