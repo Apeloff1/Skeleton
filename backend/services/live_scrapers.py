@@ -64,6 +64,16 @@ def _literal_ip(host: str):
     return ip_address(packed)
 
 
+def _is_public_unicast(address) -> bool:
+    """Return True only for globally routable unicast addresses."""
+    return bool(
+        address.is_global
+        and not address.is_multicast
+        and not address.is_unspecified
+        and not address.is_reserved
+    )
+
+
 async def _host_resolves_public(host: str) -> bool:
     """Fail closed unless every current DNS answer is a globally routable IP.
 
@@ -74,7 +84,7 @@ async def _host_resolves_public(host: str) -> bool:
     """
     literal = _literal_ip(host)
     if literal is not None:
-        return literal.is_global
+        return _is_public_unicast(literal)
 
     try:
         answers = await asyncio.to_thread(
@@ -96,7 +106,7 @@ async def _host_resolves_public(host: str) -> bool:
             resolved = ip_address(raw.split("%", 1)[0])
         except (IndexError, TypeError, ValueError):
             return False
-        if not resolved.is_global:
+        if not _is_public_unicast(resolved):
             return False
         seen.add(str(resolved))
     return bool(seen)
@@ -129,8 +139,8 @@ def _validated_scrape_url(url: str) -> tuple[str, str]:
     if normalized_host in _BLOCKED_SCRAPE_HOSTS or normalized_host.endswith(".localhost"):
         raise ValueError("scrape URL targets a blocked local endpoint")
     literal = _literal_ip(normalized_host)
-    if literal is not None and not literal.is_global:
-        raise ValueError("scrape URL targets a non-public IP address")
+    if literal is not None and not _is_public_unicast(literal):
+        raise ValueError("scrape URL targets a non-public unicast IP address")
     return value, normalized_host
 
 
