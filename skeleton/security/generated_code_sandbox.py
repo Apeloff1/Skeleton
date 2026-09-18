@@ -308,7 +308,9 @@ class GeneratedCodeSandbox:
                 operation,
             )
         if operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}:
-            if not self._path_allowed(operation.target):
+            try:
+                resolved_path = self._contained_path(operation.target)
+            except SandboxPolicyError:
                 return SandboxDecision(False, "path escapes sandbox workspace", operation)
             required_kernel_cap = (
                 Capability.FS_READ
@@ -321,9 +323,10 @@ class GeneratedCodeSandbox:
                     f"missing capability {required_kernel_cap.value}",
                     operation,
                 )
-            if _looks_like_secret_path(operation.target) and not self._has_capability(
-                SandboxCapability.SECRETS
-            ):
+            if (
+                _looks_like_secret_path(operation.target)
+                or _looks_like_secret_path(str(resolved_path))
+            ) and not self._has_capability(SandboxCapability.SECRETS):
                 return SandboxDecision(
                     False,
                     "secret-bearing path requires secrets capability",
