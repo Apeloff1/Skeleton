@@ -34,6 +34,7 @@ class ShapeKind(str, Enum):
     PLANE = "plane"
     CAPSULE = "capsule"
     CYLINDER = "cylinder"
+    CONVEX_HULL = "convex_hull"
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,6 +291,293 @@ class CylinderShape:
             mass,
             Vec3.zero(),
             Mat3.diagonal(Vec3(transverse, axial, transverse)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ConvexHullShape:
+    """Closed oriented convex triangle mesh with canonical support topology.
+
+    Vertex order is canonicalized lexically and triangle indices are remapped so
+    equivalent input permutations produce identical shape state.  The mesh must
+    be closed, consistently oriented, non-degenerate, and convex.
+    """
+
+    vertices: tuple[Vec3, ...]
+    triangles: tuple[tuple[int, int, int], ...]
+
+    def __post_init__(self) -> None:
+        try:
+            source_vertices = tuple(self.vertices)
+            source_triangles = tuple(tuple(row) for row in self.triangles)
+        except TypeError as exc:
+            raise PhysicsValidationError(
+                "convex hull vertices and triangles must be iterable"
+            ) from exc
+
+        if len(source_vertices) < 4:
+            raise PhysicsValidationError(
+                "convex hull requires at least four vertices"
+            )
+        if not all(isinstance(vertex, Vec3) for vertex in source_vertices):
+            raise PhysicsValidationError(
+                "convex hull vertices must be Vec3"
+            )
+        if len({vertex.to_tuple() for vertex in source_vertices}) != len(
+            source_vertices
+        ):
+            raise PhysicsValidationError(
+                "convex hull vertices must be unique"
+            )
+        if len(source_triangles) < 4:
+            raise PhysicsValidationError(
+                "convex hull requires at least four triangles"
+            )
+
+        order = sorted(
+            range(len(source_vertices)),
+            key=lambda index: (
+                source_vertices[index].to_tuple(),
+                index,
+            ),
+        )
+        remap = {
+            old_index: new_index
+            for new_index, old_index in enumerate(order)
+        }
+        vertices = tuple(source_vertices[index] for index in order)
+
+        remapped: list[tuple[int, int, int]] = []
+        for triangle in source_triangles:
+            if len(triangle) != 3:
+                raise PhysicsValidationError(
+                    "convex hull triangle must contain three indices"
+                )
+            if any(
+                isinstance(index, bool) or not isinstance(index, int)
+                for index in triangle
+            ):
+                raise PhysicsValidationError(
+                    "convex hull triangle indices must be integers"
+                )
+            if any(index < 0 or index >= len(source_vertices) for index in triangle):
+                raise PhysicsValidationError(
+                    "convex hull triangle index outside vertex range"
+                )
+            mapped = tuple(remap[index] for index in triangle)
+            if len(set(mapped)) != 3:
+                raise PhysicsValidationError(
+                    "convex hull triangle indices must be distinct"
+                )
+            a, b, d = (vertices[index] for index in mapped)
+            if (b - a).cross(d - a).length_squared() <= 1.0e-24:
+                raise PhysicsValidationError(
+                    "convex hull contains degenerate triangle"
+                )
+            minimum_position = min(range(3), key=lambda i: mapped[i])
+            canonical = (
+                mapped[minimum_position],
+                mapped[(minimum_position + 1) % 3],
+                mapped[(minimum_position + 2) % 3],
+            )
+            remapped.append(canonical)
+
+        if len(set(remapped)) != len(remapped):
+            raise PhysicsValidationError(
+                "convex hull triangles must be unique"
+            )
+        triangles = tuple(sorted(remapped))
+
+        def validate_edges(rows: tuple[tuple[int, int, int], ...]) -> None:
+            undirected: dict[tuple[int, int], int] = {}
+            directed: dict[tuple[int, int], int] = {}
+            for i, j, k in rows:
+                for start, end in ((i, j), (j, k), (k, i)):
+                    edge = tuple(sorted((start, end)))
+                    undirected[edge] = undirected.get(edge, 0) + 1
+                    directed[(start, end)] = directed.get((start, end), 0) + 1
+            if any(count != 2 for count in undirected.values()):
+                raise PhysicsValidationError(
+                    "convex hull triangle mesh must be closed"
+                )
+            for first, second in undirected:
+                if (
+                    directed.get((first, second), 0) != 1
+                    or directed.get((second, first), 0) != 1
+                ):
+                    raise PhysicsValidationError(
+                        "convex hull triangle winding must be consistent"
+                    )
+
+        validate_edges(triangles)
+
+        signed_volume = 0.0
+        for i, j, k in triangles:
+            a, b, d = vertices[i], vertices[j], vertices[k]
+            signed_volume += a.dot(b.cross(d)) / 6.0
+        if abs(signed_volume) <= 1.0e-15:
+            raise PhysicsValidationError(
+                "convex hull enclosed volume must be non-zero"
+            )
+        if signed_volume < 0.0:
+            flipped: list[tuple[int, int, int]] = []
+            for i, j, k in triangles:
+                row = (i, k, j)
+                minimum_position = min(range(3), key=lambda p: row[p])
+                flipped.append(
+                    (
+                        row[minimum_position],
+                        row[(minimum_position + 1) % 3],
+                        row[(minimum_position + 2) % 3],
+                    )
+                )
+            triangles = tuple(sorted(flipped))
+            validate_edges(triangles)
+
+        for i, j, k in triangles:
+            a, b, d = vertices[i], vertices[j], vertices[k]
+            normal = (b - a).cross(d - a)
+            tolerance = 1.0e-9 * max(1.0, normal.length())
+            if any(
+                normal.dot(vertex - a) > tolerance
+                for vertex in vertices
+            ):
+                raise PhysicsValidationError(
+                    "convex hull mesh is not convex or winding is inconsistent"
+                )
+
+        object.__setattr__(self, "vertices", vertices)
+        object.__setattr__(self, "triangles", triangles)
+
+    @property
+    def kind(self) -> ShapeKind:
+        return ShapeKind.CONVEX_HULL
+
+    def bounding_radius(self) -> float:
+        return max(vertex.length() for vertex in self.vertices)
+
+    def aabb(self, transform: Transform) -> AABB:
+        transformed = tuple(
+            transform.transform_point(vertex)
+            for vertex in self.vertices
+        )
+        minimum = transformed[0]
+        maximum = transformed[0]
+        for point in transformed[1:]:
+            minimum = minimum.min(point)
+            maximum = maximum.max(point)
+        return AABB(minimum, maximum)
+
+    def support(self, direction: Vec3, transform: Transform) -> Vec3:
+        local_direction = transform.inverse_transform_vector(direction)
+        if local_direction.length_squared() <= 1.0e-24:
+            raise PhysicsValidationError(
+                "convex hull support direction must be non-zero"
+            )
+        index = max(
+            range(len(self.vertices)),
+            key=lambda item: (
+                self.vertices[item].dot(local_direction),
+                -item,
+            ),
+        )
+        return transform.transform_point(self.vertices[index])
+
+    @staticmethod
+    def _second_moment_component(
+        a: Vec3,
+        b: Vec3,
+        c: Vec3,
+        volume: float,
+        first_axis: int,
+        second_axis: int,
+    ) -> float:
+        points = (a.to_tuple(), b.to_tuple(), c.to_tuple())
+        diagonal = sum(
+            point[first_axis] * point[second_axis]
+            for point in points
+        ) * (volume / 10.0)
+        cross = 0.0
+        for left in range(3):
+            for right in range(left + 1, 3):
+                cross += (
+                    points[left][first_axis] * points[right][second_axis]
+                    + points[right][first_axis] * points[left][second_axis]
+                )
+        return diagonal + cross * (volume / 20.0)
+
+    def mass_properties(self, density: float) -> MassProperties:
+        density = _positive(density, name="density")
+        volume = 0.0
+        first_moment = Vec3.zero()
+        second = [[0.0, 0.0, 0.0] for _ in range(3)]
+
+        for i, j, k in self.triangles:
+            a, b, c = self.vertices[i], self.vertices[j], self.vertices[k]
+            tetra_volume = a.dot(b.cross(c)) / 6.0
+            volume += tetra_volume
+            first_moment = (
+                first_moment
+                + (a + b + c) * (tetra_volume / 4.0)
+            )
+            for row in range(3):
+                for column in range(3):
+                    second[row][column] += self._second_moment_component(
+                        a,
+                        b,
+                        c,
+                        tetra_volume,
+                        row,
+                        column,
+                    )
+
+        if volume <= 1.0e-15:
+            raise PhysicsValidationError(
+                "convex hull mass volume must be positive"
+            )
+
+        center = first_moment / volume
+        centroid_tolerance = 1.0e-12 * max(
+            1.0,
+            self.bounding_radius(),
+        )
+        center = Vec3(
+            0.0 if abs(center.x) <= centroid_tolerance else center.x,
+            0.0 if abs(center.y) <= centroid_tolerance else center.y,
+            0.0 if abs(center.z) <= centroid_tolerance else center.z,
+        )
+        mass = density * volume
+        trace = second[0][0] + second[1][1] + second[2][2]
+        inertia_origin = Mat3(
+            density * (trace - second[0][0]),
+            -density * second[0][1],
+            -density * second[0][2],
+            -density * second[1][0],
+            density * (trace - second[1][1]),
+            -density * second[1][2],
+            -density * second[2][0],
+            -density * second[2][1],
+            density * (trace - second[2][2]),
+        )
+
+        cx, cy, cz = center.to_tuple()
+        shift = Mat3(
+            mass * (cy * cy + cz * cz),
+            -mass * cx * cy,
+            -mass * cx * cz,
+            -mass * cy * cx,
+            mass * (cx * cx + cz * cz),
+            -mass * cy * cz,
+            -mass * cz * cx,
+            -mass * cz * cy,
+            mass * (cx * cx + cy * cy),
+        )
+        inertia = inertia_origin + (shift * -1.0)
+
+        return MassProperties(
+            mass,
+            center,
+            inertia,
         )
 
 

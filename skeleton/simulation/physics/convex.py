@@ -19,6 +19,7 @@ from .math3d import EPSILON, Mat3, Quat, Transform, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
@@ -666,6 +667,8 @@ def _shape_sweep_radius(body: RigidBody) -> float:
         return shape.half_height + shape.radius
     if isinstance(shape, CylinderShape):
         return math.hypot(shape.radius, shape.half_height)
+    if isinstance(shape, ConvexHullShape):
+        return shape.bounding_radius()
     raise PhysicsValidationError(
         "convex TOI requires finite supported shape"
     )

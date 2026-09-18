@@ -23,6 +23,7 @@ from .queries import Ray, RayHit, sphere_cast_body
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
@@ -124,6 +125,8 @@ class ContinuousCollisionDetector:
             return shape.half_height + shape.radius
         if isinstance(shape, CylinderShape):
             return math.hypot(shape.radius, shape.half_height)
+        if isinstance(shape, ConvexHullShape):
+            return shape.bounding_radius()
         return None
 
     def _eligible_continuous_body(self, body: RigidBody, dt: float) -> bool:
@@ -498,6 +501,7 @@ class ContinuousCollisionDetector:
             SphereShape,
             BoxShape,
             CapsuleShape,
+            ConvexHullShape,
             CylinderShape,
         )
         for index, body_a in enumerate(ordered):

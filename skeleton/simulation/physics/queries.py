@@ -5,11 +5,13 @@ import math
 from dataclasses import dataclass
 
 from .body import RigidBody
+from .convex import convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
@@ -329,6 +331,74 @@ def _cylinder_intersection(
     )
 
 
+def _hull_intersection(
+    ray: Ray,
+    body: RigidBody,
+    shape: ConvexHullShape,
+) -> RayHit | None:
+    local_origin = body.transform.inverse_transform_point(ray.origin)
+    local_direction = body.transform.inverse_transform_vector(
+        ray.direction
+    ).normalized()
+
+    inside = True
+    for i, j, k in shape.triangles:
+        a, b, c = shape.vertices[i], shape.vertices[j], shape.vertices[k]
+        normal = (b - a).cross(c - a).normalized()
+        if normal.dot(local_origin - a) > EPSILON:
+            inside = False
+            break
+    if inside:
+        return RayHit(
+            body.body_id,
+            0.0,
+            ray.origin,
+            -ray.direction,
+        )
+
+    candidates: list[tuple[float, int, Vec3]] = []
+    for triangle_index, (i, j, k) in enumerate(shape.triangles):
+        a, b, c = shape.vertices[i], shape.vertices[j], shape.vertices[k]
+        edge_ab = b - a
+        edge_ac = c - a
+        pvec = local_direction.cross(edge_ac)
+        determinant = edge_ab.dot(pvec)
+        if abs(determinant) <= EPSILON:
+            continue
+        inverse = 1.0 / determinant
+        tvec = local_origin - a
+        u = tvec.dot(pvec) * inverse
+        if u < -EPSILON or u > 1.0 + EPSILON:
+            continue
+        qvec = tvec.cross(edge_ab)
+        v = local_direction.dot(qvec) * inverse
+        if v < -EPSILON or u + v > 1.0 + EPSILON:
+            continue
+        distance = edge_ac.dot(qvec) * inverse
+        if distance < 0.0 or distance > ray.max_distance:
+            continue
+        local_normal = edge_ab.cross(edge_ac).normalized()
+        if local_normal.dot(local_direction) > 0.0:
+            local_normal = -local_normal
+        candidates.append(
+            (distance, triangle_index, local_normal)
+        )
+
+    if not candidates:
+        return None
+    distance, _, local_normal = min(
+        candidates,
+        key=lambda row: (row[0], row[1]),
+    )
+    normal = body.transform.transform_vector(local_normal).normalized()
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        normal,
+    )
+
+
 def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
     shape = body.shape
     if isinstance(shape, SphereShape):
@@ -341,6 +411,8 @@ def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
         return _capsule_intersection(ray, body, shape)
     if isinstance(shape, CylinderShape):
         return _cylinder_intersection(ray, body, shape)
+    if isinstance(shape, ConvexHullShape):
+        return _hull_intersection(ray, body, shape)
     raise PhysicsValidationError("unsupported raycast shape")
 
 
@@ -550,6 +622,49 @@ def _sphere_cast_cylinder(
     return make_hit(high)
 
 
+def _sphere_cast_hull(
+    ray: Ray,
+    radius: float,
+    body: RigidBody,
+    shape: ConvexHullShape,
+) -> RayHit | None:
+    query_id = "physics.query.sphere"
+    if body.body_id == query_id:
+        query_id = "physics.query.sphere.alt"
+
+    moving = RigidBody.kinematic(
+        query_id,
+        SphereShape(radius),
+        position=ray.origin,
+        linear_velocity=ray.direction * ray.max_distance,
+    )
+    target = RigidBody.static(
+        body.body_id,
+        shape,
+        position=body.position,
+        orientation=body.orientation,
+        material=body.material,
+    )
+    hit = convex_time_of_impact(
+        moving,
+        target,
+        1.0,
+        max_iterations=64,
+        distance_iterations=64,
+        distance_tolerance=1.0e-7,
+        time_tolerance=1.0e-10,
+    )
+    if hit is None:
+        return None
+    distance = ray.max_distance * hit.fraction
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        -hit.normal,
+    )
+
+
 def sphere_cast_body(
     ray: Ray,
     radius: float,
@@ -580,6 +695,8 @@ def sphere_cast_body(
         return _capsule_intersection(ray, body, expanded)
     if isinstance(shape, CylinderShape):
         return _sphere_cast_cylinder(ray, radius, body, shape)
+    if isinstance(shape, ConvexHullShape):
+        return _sphere_cast_hull(ray, radius, body, shape)
     if isinstance(shape, PlaneShape):
         normal, offset = shape.world_equation(body.transform)
         signed_origin = normal.dot(ray.origin) - offset
