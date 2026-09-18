@@ -573,9 +573,7 @@ def test_late_command_correction_matches_fresh_corrected_simulation() -> None:
     assert fresh_session.commands.tape_digest == session.commands.tape_digest
 
 
-def test_failed_late_input_correction_restores_world_commands_and_history(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_failed_late_input_correction_restores_world_commands_and_history() -> None:
     world = _world()
     session = PhysicsCommandRollbackSession(world, history_capacity=64)
     session.step((_impulse_command(0, 1.0),))
@@ -596,13 +594,15 @@ def test_failed_late_input_correction_restores_world_commands_and_history(
             raise RuntimeError("synthetic correction failure")
         return original_step(self, steps)
 
-    monkeypatch.setattr(PhysicsWorld, "step", fail_step)
-
-    with pytest.raises(RuntimeError, match="synthetic correction failure"):
-        session.correct_and_resimulate(
-            1,
-            (_impulse_command(0, 9.0),),
-        )
+    PhysicsWorld.step = fail_step
+    try:
+        with pytest.raises(RuntimeError, match="synthetic correction failure"):
+            session.correct_and_resimulate(
+                1,
+                (_impulse_command(0, 9.0),),
+            )
+    finally:
+        PhysicsWorld.step = original_step
 
     assert world.tick == before_tick
     assert world.state_digest == before_digest
