@@ -53,6 +53,18 @@ class ProbabilityLens(str, Enum):
     POSSIBILITY_NECESSITY = "possibility_necessity"
     GAME_CHANCE = "game_chance"
     MEMORY_RETRIEVAL = "memory_retrieval"
+    SURPRISAL = "surprisal"
+    HIDDEN_STATE = "hidden_state"
+    COPULA_DEPENDENCE = "copula_dependence"
+    ROBUST_BAYES = "robust_bayes"
+    EXTREME_VALUE = "extreme_value"
+    EXCHANGEABILITY = "exchangeability"
+    ALEATORIC_EPISTEMIC = "aleatoric_epistemic"
+    HIERARCHICAL_BAYES = "hierarchical_bayes"
+    CONFORMAL_COVERAGE = "conformal_coverage"
+    RISK_SENSITIVE = "risk_sensitive"
+    INFORMATION_GAIN = "information_gain"
+    ENSEMBLE_MODEL = "ensemble_model"
 
 
 class AssessmentShape(str, Enum):
@@ -713,6 +725,333 @@ def expected_calibration_error(
         error += len(bucket) / total * abs(mean_p - mean_y)
     return error
 
+
+def hypergeometric_probability(
+    population: int,
+    success_states: int,
+    draws: int,
+    successes_drawn: int,
+    *,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    """Exact probability for uniform sampling without replacement."""
+    population = _count("population", population)
+    success_states = _count("success_states", success_states)
+    draws = _count("draws", draws)
+    successes_drawn = _count("successes_drawn", successes_drawn)
+    if population <= 0 or success_states > population or draws > population:
+        raise ProbabilityError("invalid hypergeometric population/draw counts")
+    if successes_drawn > success_states or successes_drawn > draws:
+        value = 0.0
+    elif draws - successes_drawn > population - success_states:
+        value = 0.0
+    else:
+        value = (
+            math.comb(success_states, successes_drawn)
+            * math.comb(population - success_states, draws - successes_drawn)
+            / math.comb(population, draws)
+        )
+    return ProbabilityAssessment(
+        ProbabilityLens.GAME_CHANCE,
+        AssessmentShape.POINT,
+        estimate=value,
+        lower=value,
+        upper=value,
+        provenance=tuple(provenance),
+        metadata={
+            "game": "sampling_without_replacement",
+            "population": population,
+            "success_states": success_states,
+            "draws": draws,
+            "successes_drawn": successes_drawn,
+            "exact": True,
+        },
+    )
+
+def memory_pair_next_flip_probability(
+    total_pairs: int,
+    removed_pairs: int,
+    known_singletons: int,
+    *,
+    targeting_known_singleton: bool = False,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    """Exact chance for the next unknown flip in a pair-matching memory game."""
+    total_pairs = _count("total_pairs", total_pairs)
+    removed_pairs = _count("removed_pairs", removed_pairs)
+    known_singletons = _count("known_singletons", known_singletons)
+    if total_pairs <= 0 or removed_pairs > total_pairs:
+        raise ProbabilityError("invalid memory-game pair counts")
+    remaining_cards = 2 * (total_pairs - removed_pairs)
+    if known_singletons > remaining_cards:
+        raise ProbabilityError("known_singletons exceeds remaining face-down cards")
+    face_down_unknown = remaining_cards - known_singletons
+    if face_down_unknown == 0:
+        value = 0.0
+    elif targeting_known_singleton:
+        value = 1.0 / face_down_unknown
+    else:
+        value = min(1.0, known_singletons / face_down_unknown)
+    return ProbabilityAssessment(
+        ProbabilityLens.GAME_CHANCE,
+        AssessmentShape.POINT,
+        estimate=value,
+        lower=value,
+        upper=value,
+        provenance=tuple(provenance),
+        metadata={
+            "game": "memory_pair_matching",
+            "total_pairs": total_pairs,
+            "removed_pairs": removed_pairs,
+            "known_singletons": known_singletons,
+            "face_down_unknown": max(0, face_down_unknown),
+            "targeting_known_singleton": bool(targeting_known_singleton),
+            "conditional_on_correct_memory": True,
+        },
+    )
+
+def categorical_entropy(probabilities: Sequence[float], *, base: float = 2.0) -> float:
+    values = [probability("probability", value) for value in probabilities]
+    if not values or not math.isclose(sum(values), 1.0, rel_tol=1e-9, abs_tol=1e-9):
+        raise ProbabilityError("categorical probabilities must be non-empty and sum to one")
+    base = finite_number("entropy base", base)
+    if base <= 1:
+        raise ProbabilityError("entropy base must exceed one")
+    denominator = math.log(base)
+    return -sum(value * math.log(value) / denominator for value in values if value > 0.0)
+
+def surprisal_probability(
+    event_probability: float,
+    *,
+    base: float = 2.0,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    p = probability("event_probability", event_probability)
+    base = finite_number("surprisal base", base)
+    if base <= 1:
+        raise ProbabilityError("surprisal base must exceed one")
+    surprise = math.inf if p == 0.0 else -math.log(p) / math.log(base)
+    return ProbabilityAssessment(
+        ProbabilityLens.SURPRISAL,
+        AssessmentShape.POINT,
+        estimate=p,
+        lower=p,
+        upper=p,
+        provenance=tuple(provenance),
+        metadata={"surprisal": "inf" if math.isinf(surprise) else surprise, "base": base},
+    )
+
+def expected_information_gain(
+    prior: Sequence[float],
+    posterior_scenarios: Sequence[tuple[float, Sequence[float]]],
+    *,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    prior_values = [probability("prior", value) for value in prior]
+    if not prior_values or not math.isclose(sum(prior_values), 1.0, rel_tol=1e-9, abs_tol=1e-9):
+        raise ProbabilityError("prior must be non-empty and sum to one")
+    prior_entropy = categorical_entropy(prior_values)
+    weighted_entropy = 0.0
+    weight_total = 0.0
+    for weight, posterior in posterior_scenarios:
+        w = probability("scenario_weight", weight)
+        posterior_values = [probability("posterior", value) for value in posterior]
+        if len(posterior_values) != len(prior_values):
+            raise ProbabilityError("posterior scenarios must use the same state space as the prior")
+        if not posterior_values or not math.isclose(sum(posterior_values), 1.0, rel_tol=1e-9, abs_tol=1e-9):
+            raise ProbabilityError("each posterior scenario must sum to one")
+        weighted_entropy += w * categorical_entropy(posterior_values)
+        weight_total += w
+    if not math.isclose(weight_total, 1.0, rel_tol=1e-9, abs_tol=1e-9):
+        raise ProbabilityError("posterior scenario weights must sum to one")
+    gain = max(0.0, prior_entropy - weighted_entropy)
+    normalized = 0.0 if prior_entropy <= _EPS else min(1.0, gain / prior_entropy)
+    return ProbabilityAssessment(
+        ProbabilityLens.INFORMATION_GAIN,
+        AssessmentShape.EVIDENCE_WEIGHT,
+        estimate=normalized,
+        provenance=tuple(provenance),
+        metadata={
+            "prior_entropy_bits": prior_entropy,
+            "expected_posterior_entropy_bits": weighted_entropy,
+            "information_gain_bits": gain,
+            "normalized_information_gain": normalized,
+        },
+    )
+
+def discrete_cvar(
+    outcomes: Sequence[tuple[float, float]],
+    *,
+    alpha: float = 0.10,
+    lower_tail: bool = True,
+) -> float:
+    """Conditional value at risk for a discrete utility distribution."""
+    alpha = probability("alpha", alpha)
+    if alpha <= 0.0:
+        raise ProbabilityError("alpha must be positive")
+    values: list[tuple[float, float]] = []
+    total = 0.0
+    for utility, weight in outcomes:
+        u = finite_number("utility", utility)
+        w = probability("weight", weight)
+        values.append((u, w))
+        total += w
+    if not values or not math.isclose(total, 1.0, rel_tol=1e-9, abs_tol=1e-9):
+        raise ProbabilityError("outcome weights must sum to one")
+    values.sort(key=lambda item: item[0], reverse=not lower_tail)
+    remaining = alpha
+    accumulated = 0.0
+    used = 0.0
+    for utility, weight in values:
+        take = min(weight, remaining)
+        accumulated += take * utility
+        used += take
+        remaining -= take
+        if remaining <= _EPS:
+            break
+    if used <= 0:
+        raise ProbabilityError("empty CVaR tail")
+    return accumulated / used
+
+def ensemble_model_probability(
+    assessments: Sequence[ProbabilityAssessment],
+    *,
+    weights: Sequence[float] | None = None,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    values = tuple(assessment for assessment in assessments if assessment.estimate is not None)
+    if not values:
+        raise ProbabilityError("ensemble requires point-like component estimates")
+    if weights is None:
+        raw_weights = [1.0] * len(values)
+    else:
+        if len(weights) != len(values):
+            raise ProbabilityError("ensemble weight length mismatch")
+        raw_weights = [_non_negative("ensemble weight", weight) for weight in weights]
+    total = sum(raw_weights)
+    if total <= 0.0:
+        raise ProbabilityError("ensemble weights sum to zero")
+    normalized = [weight / total for weight in raw_weights]
+    component = [float(value.estimate) for value in values if value.estimate is not None]
+    mean = sum(weight * value for weight, value in zip(normalized, component))
+    variance = sum(weight * (value - mean) ** 2 for weight, value in zip(normalized, component))
+    disagreement = math.sqrt(max(0.0, variance))
+    radius = min(0.5, 1.959963984540054 * disagreement)
+    return ProbabilityAssessment(
+        ProbabilityLens.ENSEMBLE_MODEL,
+        AssessmentShape.POINT,
+        estimate=mean,
+        lower=max(0.0, mean - radius),
+        upper=min(1.0, mean + radius),
+        provenance=tuple(provenance),
+        metadata={
+            "weights": normalized,
+            "component_fingerprints": [value.fingerprint for value in values],
+            "between_model_sd": disagreement,
+            "effective_models": 1.0 / sum(weight * weight for weight in normalized),
+        },
+    )
+
+def aleatoric_epistemic_assessment(
+    predictive_variance: float,
+    expected_noise_variance: float,
+    *,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    total = _non_negative("predictive_variance", predictive_variance)
+    aleatoric = _non_negative("expected_noise_variance", expected_noise_variance)
+    epistemic = max(0.0, total - aleatoric)
+    denominator = max(_EPS, total)
+    epistemic_fraction = min(1.0, epistemic / denominator)
+    return ProbabilityAssessment(
+        ProbabilityLens.ALEATORIC_EPISTEMIC,
+        AssessmentShape.EVIDENCE_WEIGHT,
+        estimate=epistemic_fraction,
+        provenance=tuple(provenance),
+        metadata={
+            "predictive_variance": total,
+            "aleatoric_variance": min(total, aleatoric),
+            "epistemic_variance": epistemic,
+            "estimate_semantics": "fraction_of_predictive_variance_attributed_to_epistemic_uncertainty",
+        },
+    )
+
+def conformal_coverage_assessment(
+    covered: int,
+    total: int,
+    *,
+    target_coverage: float,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    empirical = frequentist_probability(covered, total, provenance=provenance)
+    target = probability("target_coverage", target_coverage)
+    return ProbabilityAssessment(
+        ProbabilityLens.CONFORMAL_COVERAGE,
+        AssessmentShape.POINT,
+        estimate=empirical.estimate,
+        lower=empirical.lower,
+        upper=empirical.upper,
+        effective_samples=empirical.effective_samples,
+        calibrated=True,
+        provenance=empirical.provenance,
+        metadata={
+            "target_coverage": target,
+            "coverage_gap": None if empirical.estimate is None else empirical.estimate - target,
+            "exchangeability_required_for_nominal_guarantee": True,
+            "interval": "wilson_95",
+        },
+    )
+
+def hidden_state_binary_update(
+    prior_state_probability: float,
+    observation_likelihood_if_state: float,
+    observation_likelihood_if_not_state: float,
+    *,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    prior = probability("prior_state_probability", prior_state_probability)
+    yes = probability("observation_likelihood_if_state", observation_likelihood_if_state)
+    no = probability("observation_likelihood_if_not_state", observation_likelihood_if_not_state)
+    evidence = yes * prior + no * (1.0 - prior)
+    if evidence <= 0.0:
+        raise ProbabilityError("hidden-state observation has zero marginal probability")
+    posterior = yes * prior / evidence
+    return ProbabilityAssessment(
+        ProbabilityLens.HIDDEN_STATE,
+        AssessmentShape.POINT,
+        estimate=posterior,
+        provenance=tuple(provenance),
+        metadata={
+            "prior": prior,
+            "likelihood_if_state": yes,
+            "likelihood_if_not_state": no,
+            "observation_probability": evidence,
+        },
+    )
+
+def robust_bayes_envelope(
+    posterior_probabilities: Sequence[float],
+    *,
+    provenance: Sequence[str] = (),
+) -> ProbabilityAssessment:
+    values = [probability("posterior_probability", value) for value in posterior_probabilities]
+    if not values:
+        raise ProbabilityError("robust Bayes envelope needs posterior candidates")
+    lower = min(values)
+    upper = max(values)
+    return ProbabilityAssessment(
+        ProbabilityLens.ROBUST_BAYES,
+        AssessmentShape.INTERVAL,
+        lower=lower,
+        upper=upper,
+        provenance=tuple(provenance),
+        metadata={
+            "candidate_count": len(values),
+            "midpoint": (lower + upper) / 2.0,
+            "width": upper - lower,
+            "semantics": "posterior_envelope_across_admissible_models_or_priors",
+        },
+    )
 
 class ProbabilityWorkbench:
     """Small façade exposing common predictive diagnostics and lens metadata."""
