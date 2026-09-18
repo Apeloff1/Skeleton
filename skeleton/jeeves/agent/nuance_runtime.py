@@ -35,6 +35,7 @@ from .perpendicular_semantics import PerpendicularExpansionPlan, PerpendicularEx
 from .relational_memory import RelationKind, RelationTrace, SequenceObservation
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
 from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
+from .semantic_plane import SemanticLensPlane
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
 from .semantic_tangent_bridge import SemanticRestartPacket, SemanticTangentBridge
 from .tangent_graph import TangentNode
@@ -646,6 +647,7 @@ class ScientificContextCompiler:
         *,
         nuance: ScientificNuanceRuntime | None = None,
         base_compiler: ContextCompiler | None = None,
+        semantic_plane: SemanticLensPlane | None = None,
         policy: ScientificContextCompilerPolicy | None = None,
     ) -> None:
         if not isinstance(resolver, LayeredContextResolver):
@@ -657,6 +659,7 @@ class ScientificContextCompiler:
                 "nuance runtime and scientific compiler must share one resolver"
             )
         self.base = base_compiler or ContextCompiler()
+        self.semantic_plane = semantic_plane
         self.policy = policy or ScientificContextCompilerPolicy()
 
     @staticmethod
@@ -695,7 +698,12 @@ class ScientificContextCompiler:
                 tags.add(value.strip().casefold()[:128])
         return tuple(sorted(tags))
 
-    def _workbench_section(self, frame: NuanceFrame) -> ContextSection:
+    def _workbench_section(
+        self,
+        frame: NuanceFrame,
+        *,
+        semantic_domain: str | None = None,
+    ) -> ContextSection:
         lenses = [
             {
                 "key": spec.key,
@@ -712,6 +720,63 @@ class ScientificContextCompiler:
             }
             for spec in frame.lens_selection.lenses
         ]
+        governed_semantic_lenses: list[dict[str, Any]] = []
+        governance_fingerprint: str | None = None
+        if self.semantic_plane is not None:
+            selection = self.semantic_plane.select(frame.observations)
+            governance = self.semantic_plane.governance.assess(
+                selection,
+                observations=frame.observations,
+                domain=semantic_domain,
+            )
+            governance_fingerprint = governance.fingerprint
+            for spec in selection.lenses:
+                decision = governance.decision_for(spec.key)
+                governed_semantic_lenses.append(
+                    {
+                        "key": spec.key,
+                        "family": spec.family.value,
+                        "role": spec.role.value,
+                        "activation": round(
+                            float(
+                                selection.activation_scores.get(
+                                    spec.key,
+                                    0.0,
+                                )
+                            ),
+                            8,
+                        ),
+                        "scientific_grade": (
+                            decision.grade.value
+                            if decision is not None
+                            else "interpretive"
+                        ),
+                        "scientific_status": (
+                            decision.scientific_status.value
+                            if decision is not None
+                            else "shadow"
+                        ),
+                        "global_predictive_weight": round(
+                            governance.global_weight_for(spec.key),
+                            8,
+                        ),
+                        "predictive_weight": round(
+                            governance.weight_for(spec.key),
+                            8,
+                        ),
+                        "domain_status": governance.domain_status_for(
+                            spec.key
+                        ),
+                        "decision_feature_authorized": (
+                            decision.decision_feature_authorized
+                            if decision is not None
+                            else False
+                        ),
+                        "factual_assertion_authorized": False,
+                        "causal_assertion_authorized": False,
+                    }
+                )
+
         uncertainty = [
             {
                 "lens": item.lens.value,
@@ -735,11 +800,19 @@ class ScientificContextCompiler:
                 "relational_transitions_are_scored_before_learning": True,
                 "uncertainty_lenses_require_their_stated_assumptions": True,
                 "predictions_must_be_falsifiable_and_scored_later": True,
+                "governed_semantic_plane": self.semantic_plane is not None,
+                "semantic_lens_weights_are_domain_scoped": (
+                    self.semantic_plane is not None
+                    and semantic_domain is not None
+                ),
             },
             "frame_id": frame.frame_id,
             "frame_fingerprint": frame.fingerprint,
             "context_fingerprint": frame.context.fingerprint,
+            "semantic_domain": semantic_domain,
+            "semantic_governance_fingerprint": governance_fingerprint,
             "lenses": lenses,
+            "governed_semantic_lenses": governed_semantic_lenses,
             "uncertainty": uncertainty,
             "relation_sequence": None
             if relation is None
@@ -762,6 +835,19 @@ class ScientificContextCompiler:
                 }
                 for row in lenses
             ]
+            payload["governed_semantic_lenses"] = [
+                {
+                    "key": row["key"],
+                    "family": row["family"],
+                    "role": row["role"],
+                    "activation": row["activation"],
+                    "scientific_grade": row["scientific_grade"],
+                    "scientific_status": row["scientific_status"],
+                    "predictive_weight": row["predictive_weight"],
+                    "domain_status": row["domain_status"],
+                }
+                for row in governed_semantic_lenses
+            ]
             payload["uncertainty"] = [
                 {
                     "lens": row["lens"],
@@ -780,7 +866,13 @@ class ScientificContextCompiler:
                     "frame_id": frame.frame_id,
                     "frame_fingerprint": frame.fingerprint,
                     "context_fingerprint": frame.context.fingerprint,
+                    "semantic_domain": semantic_domain,
+                    "semantic_governance_fingerprint": governance_fingerprint,
                     "lens_keys": [item.key for item in frame.lens_selection.lenses],
+                    "governed_lens_keys": [
+                        item["key"]
+                        for item in governed_semantic_lenses
+                    ],
                     "uncertainty_lenses": [
                         item.lens.value
                         for item in frame.uncertainty_recommendations
@@ -815,6 +907,12 @@ class ScientificContextCompiler:
             raise NuanceRuntimeError(
                 "scientific context compiler must share the runtime MemoryManager"
             )
+        domain_value = goal.metadata.get("domain")
+        semantic_domain = (
+            domain_value.strip().casefold()
+            if isinstance(domain_value, str) and domain_value.strip()
+            else None
+        )
         frame = self.nuance.prepare(
             namespace,
             self._query(task_instruction, goal, current_step),
@@ -837,7 +935,12 @@ class ScientificContextCompiler:
             scratchpad=scratchpad,
             extra_sections=(
                 tuple(layered)
-                + (self._workbench_section(frame),)
+                + (
+                    self._workbench_section(
+                        frame,
+                        semantic_domain=semantic_domain,
+                    ),
+                )
                 + tuple(extra_sections)
             ),
         )
@@ -886,6 +989,11 @@ class ScientificContextCompiler:
                     "max_total_chars": self.resolver.policy.max_total_chars,
                 },
                 "nuance": self.nuance.fingerprint,
+                "semantic_plane": (
+                    self.semantic_plane.fingerprint
+                    if self.semantic_plane is not None
+                    else None
+                ),
                 "base_budget": {
                     "total_chars": self.base.budget.total_chars,
                     "memory_chars": self.base.budget.memory_chars,
