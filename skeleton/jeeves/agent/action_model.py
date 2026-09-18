@@ -513,6 +513,8 @@ class SkillLibrary:
         profile = self.profile(spec.skill_id)
         if profile is None:
             profile = self.register(spec)
+        else:
+            profile = self._reconcile_observed_tool_spec(profile, spec)
         if observation.ok and verified:
             outcome = OutcomeKind.SUCCESS
         elif observation.ok:
@@ -549,6 +551,48 @@ class SkillLibrary:
             metadata={"call_id": observation.call_id, "cached": observation.cached},
         )
         return self.record(episode)
+
+    def _reconcile_observed_tool_spec(
+        self,
+        profile: SkillProfile,
+        observed: SkillSpec,
+    ) -> SkillProfile:
+        """Conservatively tighten a learned tool profile from runtime evidence.
+
+        Tool skill identity is stable by tool name, so later observations can
+        legitimately carry stronger risk/capability information than the first
+        registration. Risk may only move upward; capabilities are unioned.
+        """
+
+        if profile.spec.kind is not SkillKind.TOOL or observed.kind is not SkillKind.TOOL:
+            raise ActionModelError("tool observation cannot reconcile a non-tool skill")
+        if profile.spec.skill_id != observed.skill_id:
+            raise ActionModelError("tool observation skill identity mismatch")
+        with self._lock:
+            current = self._profiles.get(profile.spec.skill_id, profile)
+            current_risk = current.spec.risk
+            observed_risk = observed.risk
+            risk = (
+                observed_risk
+                if self._RISK_PENALTY[observed_risk]
+                > self._RISK_PENALTY[current_risk]
+                else current_risk
+            )
+            capabilities = tuple(
+                sorted(set(current.spec.capabilities) | set(observed.capabilities))
+            )
+            if risk is current_risk and capabilities == current.spec.capabilities:
+                return current
+            revised_spec = replace(
+                current.spec,
+                risk=risk,
+                capabilities=capabilities,
+            )
+            revised = replace(current, spec=revised_spec)
+            self._profiles[current.spec.skill_id] = revised
+            for capability in capabilities:
+                self._capability_index[capability].add(current.spec.skill_id)
+            return revised
 
     def candidates(self, required_capabilities: Sequence[str]) -> tuple[SkillProfile, ...]:
         capabilities = tuple(sorted({require_id("capability", item) for item in required_capabilities}))
