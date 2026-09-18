@@ -346,3 +346,40 @@ def test_execution_seal_registry_single_use():
 def test_execution_seal_key_minimum():
     with pytest.raises(ValueError):
         ExecutionSealAuthority(b"short")
+
+
+def test_execution_seal_ttl_cannot_exceed_authority_maximum():
+    authority = ExecutionSealAuthority(
+        b"k" * 32,
+        max_ttl_seconds=10,
+    )
+    with pytest.raises(ValueError, match="maximum"):
+        authority.issue(
+            principal="alice",
+            session_id="s",
+            plan_pin=pin(),
+            ttl_seconds=11,
+        )
+
+
+def test_execution_seal_rejects_issue_time_too_far_in_future():
+    now = [10.0]
+    authority = ExecutionSealAuthority(
+        b"k" * 32,
+        clock=lambda: now[0],
+        max_clock_skew_seconds=1,
+    )
+    seal = authority.issue(
+        principal="alice",
+        session_id="s",
+        plan_pin=pin(),
+        ttl_seconds=5,
+    )
+    now[0] = 0.0
+    with pytest.raises(ExecutionSealError, match="future"):
+        authority.verify(
+            seal,
+            principal="alice",
+            session_id="s",
+            plan_pin=pin(),
+        )
