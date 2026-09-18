@@ -273,6 +273,29 @@ def test_ffi_and_process_construction_require_process_capability(
     assert decision.operation.kind is OperationKind.PROCESS
 
 
+def test_process_allowlist_does_not_authorize_matching_basename_at_another_path(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.PROCESS},
+        process_allowlist=("python",),
+    )
+    box.seal()
+
+    assert box.authorize(
+        Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS)
+    ).allowed is True
+    with pytest.raises(SandboxPolicyError, match="process target"):
+        box.attempt(
+            Operation(
+                OperationKind.PROCESS,
+                "/tmp/python",
+                SandboxCapability.PROCESS,
+            )
+        )
+
+
 def test_parse_failure_fails_closed_and_does_not_pass(tmp_path: Path) -> None:
     decision = _sandbox(tmp_path).admit("def broken(:\n", kind=PayloadKind.PYTHON)
     assert decision.allowed is False
