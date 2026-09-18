@@ -19,7 +19,7 @@ import time
 from typing import Any, Callable, Mapping, Sequence
 
 from .adaptive_runtime import AdaptiveJeevesRuntime
-from .associative_memory import AssociativeMemoryMesh
+from .relational_memory import RelationalMemoryIndex
 from .context_pipeline import ContextSourceAdapter, LayeredContextResolver, ResolutionPolicy
 from .context_repository import ContextRepository
 from .memory import MemoryManager, MemoryNamespace
@@ -41,7 +41,7 @@ class _ScientificRuntimeMixin:
         *,
         memory: MemoryManager | None = None,
         memory_cards: MemoryGameIndex | None = None,
-        associative_memory: AssociativeMemoryMesh | None = None,
+        relational_memory: RelationalMemoryIndex | None = None,
         context_resolver: LayeredContextResolver | None = None,
         context_repository: ContextRepository | None = None,
         context_adapters: Sequence[ContextSourceAdapter] = (),
@@ -61,14 +61,14 @@ class _ScientificRuntimeMixin:
             policy=memory_game_policy,
             clock=wall_clock,
         )
-        associations = associative_memory or AssociativeMemoryMesh(clock=wall_clock)
+        relations = relational_memory or RelationalMemoryIndex(cards, clock=wall_clock)
 
         if context_resolver is None:
             resolver = LayeredContextResolver(
                 cards=cards,
                 memory=shared_memory,
                 repository=context_repository,
-                associations=associations,
+                relations=relations,
                 adapters=context_adapters,
                 policy=resolution_policy,
             )
@@ -88,10 +88,22 @@ class _ScientificRuntimeMixin:
                     "context_resolver and memory_cards refer to different L0 indexes"
                 )
             cards = resolver.cards
-            if resolver.associations is None:
-                resolver.associations = associations
+            if resolver.relations is None:
+                if relational_memory is not None:
+                    if relational_memory.cards is not cards:
+                        raise ValueError(
+                            "relational_memory must use context_resolver cards"
+                        )
+                    relations = relational_memory
+                else:
+                    relations = RelationalMemoryIndex(cards, clock=wall_clock)
+                resolver.relations = relations
+            elif relational_memory is not None and resolver.relations is not relational_memory:
+                raise ValueError(
+                    "context_resolver and relational_memory refer to different indexes"
+                )
             else:
-                associations = resolver.associations
+                relations = resolver.relations
 
         if scientific_context is None:
             nuance = nuance_runtime or ScientificNuanceRuntime(resolver)
@@ -108,7 +120,7 @@ class _ScientificRuntimeMixin:
                 )
 
         self.memory_cards = cards
-        self.associative_memory = associations
+        self.relational_memory = relations
         self.context_resolver = resolver
         self.scientific_context = compiler
         self.nuance_runtime = compiler.nuance
@@ -202,11 +214,11 @@ class _ScientificRuntimeMixin:
         return {
             "context_compiler_fingerprint": self.scientific_context.fingerprint,
             "nuance_runtime_fingerprint": self.nuance_runtime.fingerprint,
-            "associative_memory_fingerprint": self.associative_memory.fingerprint,
+            "relational_memory_count": self.relational_memory.store.count(),
             "captured_runs": tuple(sorted(self._scientific_captured_runs)),
             "invariants": {
                 "capture_after_initial_resolution": True,
-                "association_never_promotes_trust": True,
+                "relational_memory_never_promotes_factual_trust": True,
                 "semantic_interpretation_is_not_evidence": True,
             },
         }
