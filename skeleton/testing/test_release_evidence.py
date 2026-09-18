@@ -160,6 +160,24 @@ def valid_observed() -> dict[str, bytes]:
     return {"wheel": WHEEL}
 
 
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "../escape.whl",
+        "/absolute.whl",
+        "dist\\windows.whl",
+        "dist//double.whl",
+        "dist/./dot.whl",
+        "C:/drive.whl",
+    ],
+)
+def test_noncanonical_release_paths_fail_closed(bad_name: str) -> None:
+    artifact = _artifact("wheel", "skeleton-16.0.0-py3-none-any.whl", WHEEL)
+    artifact["name"] = bad_name
+    with pytest.raises(EvidenceSchemaError, match="name"):
+        build_evidence(**valid_kwargs(artifacts=[artifact]))
+
+
 def test_non_string_artifact_and_evidence_ids_fail_closed() -> None:
     bad_artifact = _artifact("wheel", "skeleton-16.0.0-py3-none-any.whl", WHEEL)
     bad_artifact["artifact_id"] = 7
