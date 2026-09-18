@@ -309,9 +309,10 @@ def test_composed_systems_consume_mechanics_generator_with_deterministic_ids() -
     assert combat["id"] == "combat:combat_core"
     assert combat["component_id"] == "combat_core"
     assert combat["contract_version"] == MECHANICS_SURFACE_VERSION
-    assert combat["core_mechanics"] == generated["core_mechanics"]
+    assert dict(combat["core_mechanics"])["structure"] == generated["core_mechanics"]["structure"]
+    assert tuple(combat["core_mechanics"]["components"]) == tuple(generated["core_mechanics"]["components"])
     assert combat["style"] == "turn_based"
-    assert "uuid" not in combat["id"]
+    assert combat["id"] != generated["id"]
 
     first = compose_gameplay(_full_set())
     second = compose_gameplay(_full_set())

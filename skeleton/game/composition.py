@@ -79,19 +79,23 @@ class CompositionEventKind(str, Enum):
     AI_TRANSITION = "ai_transition"
 
 
-def _bounded_token(name: str, value: object) -> str:
+def _bounded_text(name: str, value: object, maximum: int) -> str:
     if not isinstance(value, str) or not value.strip():
         raise GameCompositionError(
             f"{name} must be a non-empty string",
             context={"field": name, "reason": "invalid_identifier"},
         )
     token = value.strip()
-    if len(token) > MAX_COMPONENT_ID_CHARS:
+    if len(token) > maximum:
         raise GameCompositionError(
             f"{name} is too long",
-            context={"field": name, "reason": "too_long", "max_chars": MAX_COMPONENT_ID_CHARS},
+            context={"field": name, "reason": "too_long", "max_chars": maximum},
         )
     return token
+
+
+def _bounded_token(name: str, value: object) -> str:
+    return _bounded_text(name, value, MAX_COMPONENT_ID_CHARS)
 
 
 def _component_id(value: object) -> str:
@@ -216,13 +220,9 @@ class CompositionDiagnostic:
     component_ids: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        code = _bounded_token("diagnostic_code", self.code)
-        if len(code) > MAX_DIAGNOSTIC_CHARS:
-            raise GameCompositionError("diagnostic code is too long")
-        message = _bounded_token("diagnostic_message", self.message)
-        if len(message) > MAX_DIAGNOSTIC_CHARS:
-            raise GameCompositionError("diagnostic message is too long")
-        ids = tuple(_component_id(item) if item else item for item in self.component_ids)
+        code = _bounded_text("diagnostic_code", self.code, MAX_COMPONENT_ID_CHARS)
+        message = _bounded_text("diagnostic_message", self.message, MAX_DIAGNOSTIC_CHARS)
+        ids = tuple(_component_id(item) for item in self.component_ids)
         object.__setattr__(self, "code", code)
         object.__setattr__(self, "message", message)
         object.__setattr__(self, "component_ids", ids)
