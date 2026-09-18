@@ -2,9 +2,10 @@ name: PR Hygiene
 
 on:
   pull_request:
-    # Classification is a pure function of the PR diff. Metadata-only edits,
-    # draft-state changes, and close events cannot change size/area/risk labels.
-    types: [opened, reopened, synchronize]
+    # Classification is a pure function of the PR diff. A close event is kept
+    # only as a zero-work concurrency tombstone so queued/running classifiers
+    # for a PR cannot survive after that PR is closed.
+    types: [opened, reopened, synchronize, closed]
 
 concurrency:
   group: pr-hygiene-${{ github.event.pull_request.number }}

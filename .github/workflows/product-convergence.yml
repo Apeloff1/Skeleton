@@ -87,6 +87,7 @@ on:
       - ".github/workflows/product-convergence.yml"
       - ".github/workflows/deployment-trust.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/**"
       - "backend/routes/ops.py"
@@ -180,6 +181,9 @@ permissions:
 
 jobs:
   convergence:
+    # Close events are cancellation tombstones only; the shared PR-number
+    # concurrency group evicts obsolete validation without running the suite.
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     defaults:
       run:
