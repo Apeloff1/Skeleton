@@ -58,6 +58,7 @@ from .semantic_topology_learning import (
     LearnedTopologyRule,
     SemanticTopologyLearningLab,
     SemanticTopologyLearningSnapshot,
+    TopologyBridgePrediction,
     TopologyBridgeReport,
     TopologyBridgeTrial,
 )
@@ -1002,11 +1003,42 @@ class SemanticLensPlane:
             fingerprint=fingerprint,
         )
 
+    def declare_topology_bridge_prediction(
+        self,
+        prediction: TopologyBridgePrediction,
+    ) -> TopologyBridgePrediction:
+        """Persist a topology bridge prediction before outcome observation."""
+
+        return self.topology_learning.declare(prediction)
+
+    def resolve_topology_bridge_prediction(
+        self,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeReport:
+        """Resolve a declared bridge prediction and return its current report."""
+
+        trial = self.topology_learning.resolve(
+            prediction_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            outcome_evidence_ids=outcome_evidence_ids,
+            metadata=metadata,
+        )
+        return self.topology_learning.report(
+            trial.candidate_id,
+            trial.kind,
+        )
+
     def record_topology_bridge_trial(
         self,
         trial: TopologyBridgeTrial,
     ) -> TopologyBridgeReport:
-        """Record a predeclared bridge trial and return its current report."""
+        """Import a resolved trial only when its prediction is already declared."""
 
         recorded = self.topology_learning.record(trial)
         return self.topology_learning.report(
@@ -1017,6 +1049,8 @@ class SemanticLensPlane:
     def topology_learning_summary(self) -> Mapping[str, Any]:
         snapshot = self.topology_learning.snapshot()
         return {
+            "prediction_count": snapshot.prediction_count,
+            "unresolved_prediction_count": snapshot.unresolved_prediction_count,
             "trial_count": snapshot.trial_count,
             "tested_bridge_count": snapshot.tested_bridge_count,
             "active_report_ids": snapshot.active_report_ids,
@@ -1033,6 +1067,8 @@ class SemanticLensPlane:
             ),
             "invariants": {
                 "cue_overlap_never_auto_promotes": True,
+                "outcomes_require_predeclared_predictions": True,
+                "each_prediction_resolves_at_most_once": True,
                 "learned_bridges_remain_interpretive": True,
                 "negative_controls_are_required": True,
                 "replication_across_runs_and_domains_is_required": True,
