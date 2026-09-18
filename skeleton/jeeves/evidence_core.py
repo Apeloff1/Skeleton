@@ -333,8 +333,8 @@ class EvidenceJeevesCore(JeevesCore):
             return raw
 
         now = float(self._evidence_clock())
-        if not math.isfinite(now):
-            raise RuntimeError("evidence_clock returned a non-finite timestamp")
+        if not math.isfinite(now) or now < 0.0:
+            raise RuntimeError("evidence_clock returned an invalid timestamp")
 
         if isinstance(raw, EvidenceResult):
             data = raw.data
@@ -353,33 +353,25 @@ class EvidenceJeevesCore(JeevesCore):
         }
 
         max_age = source["max_age_seconds"]
-        if max_age is not None:
-            if observed_at is None:
+        if observed_at is None:
+            if max_age is not None:
                 raise _EvidencePolicyError("freshness_required")
+        else:
             if isinstance(observed_at, bool):
                 raise _EvidencePolicyError("invalid_observed_at")
             try:
                 observed = float(observed_at)
             except (TypeError, ValueError) as exc:
                 raise _EvidencePolicyError("invalid_observed_at") from exc
-            if not math.isfinite(observed):
+            if not math.isfinite(observed) or observed < 0.0:
                 raise _EvidencePolicyError("invalid_observed_at")
             if observed > now + 60.0:
                 raise _EvidencePolicyError("future_evidence")
-            if now - observed > max_age:
+            if max_age is not None and now - observed > max_age:
                 raise _EvidencePolicyError("stale_evidence")
             provenance["observed_at"] = observed
-            provenance["age_seconds"] = max(0.0, now - observed)
-        elif observed_at is not None:
-            if isinstance(observed_at, bool):
-                raise _EvidencePolicyError("invalid_observed_at")
-            try:
-                observed = float(observed_at)
-            except (TypeError, ValueError) as exc:
-                raise _EvidencePolicyError("invalid_observed_at") from exc
-            if not math.isfinite(observed):
-                raise _EvidencePolicyError("invalid_observed_at")
-            provenance["observed_at"] = observed
+            if max_age is not None:
+                provenance["age_seconds"] = max(0.0, now - observed)
 
         if revision is not None:
             provenance["revision"] = self._revision(revision)
