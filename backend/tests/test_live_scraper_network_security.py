@@ -53,6 +53,8 @@ def _run_get(
         "https://169.254.169.254/latest/meta-data",
         "https://2130706433/feed",
         "https://[::1]/feed",
+        "https://224.0.0.1/feed",
+        "https://[ff02::1]/feed",
         "https://metadata.google.internal/computeMetadata/v1/",
         "https://user:password@example.com/feed",
     ],
@@ -250,3 +252,19 @@ def test_redirect_dns_policy_is_rechecked_before_second_request(
         is None
     )
     assert seen == ["https://public.example/feed"]
+
+
+
+@pytest.mark.parametrize("address", ["224.0.0.1", "ff02::1"])
+def test_dns_resolution_rejects_multicast_answers(
+    address: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [_dns_row(address)],
+    )
+
+    with pytest.raises(ValueError, match="non-public"):
+        asyncio.run(scrapers._resolve_public_host("multicast.example", 443))
