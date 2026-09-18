@@ -21,6 +21,10 @@ from skeleton.jeeves.agent.research_assurance import (
     ResearchEvidenceSummary,
     ResearchResolution,
 )
+from skeleton.jeeves.agent.research_synthesis import (
+    HypothesisProposal,
+    HypothesisSynthesisGate,
+)
 from skeleton.jeeves.agent.types import RiskTier
 
 
@@ -389,3 +393,96 @@ def test_completion_gate_only_provisional_without_prediction_history() -> None:
     assert certificate.accepted is False
     assert certificate.provisional is True
     assert certificate.resolution is ResearchResolution.PROVISIONAL
+
+
+
+def _proposal(
+    hypothesis_id: str,
+    mechanism_family: str,
+    *,
+    cheap_yes: float,
+    expensive_yes: float,
+    is_null: bool = False,
+) -> HypothesisProposal:
+    return HypothesisProposal(
+        hypothesis_id=hypothesis_id,
+        statement=f"Structured explanation {hypothesis_id}",
+        mechanism_family=mechanism_family,
+        prior_weight=1.0 / 3.0,
+        predictions=(
+            HypothesisPrediction(
+                probe_id="cheap-check",
+                distribution={"yes": cheap_yes, "no": 1.0 - cheap_yes},
+            ),
+            HypothesisPrediction(
+                probe_id="expensive-check",
+                distribution={"yes": expensive_yes, "no": 1.0 - expensive_yes},
+            ),
+        ),
+        is_null=is_null,
+        assumptions=(f"assumption-{hypothesis_id}",),
+        provenance=(f"proposal-{hypothesis_id}",),
+    )
+
+
+def test_synthesis_gate_rejects_mechanism_collapse_even_with_many_hypotheses() -> None:
+    gate = HypothesisSynthesisGate()
+    proposals = (
+        _proposal("h-1", "same-family", cheap_yes=0.9, expensive_yes=0.5, is_null=True),
+        _proposal("h-2", "same-family", cheap_yes=0.1, expensive_yes=0.5),
+        _proposal("h-3", "same-family", cheap_yes=0.5, expensive_yes=0.5),
+    )
+    probes = (
+        DiscriminatingProbe(
+            probe_id="cheap-check",
+            question="Cheap observation?",
+            outcome_support=("yes", "no"),
+        ),
+        DiscriminatingProbe(
+            probe_id="expensive-check",
+            question="Expensive observation?",
+            outcome_support=("yes", "no"),
+        ),
+    )
+
+    report = gate.assess(proposals, probes)
+
+    assert report.accepted is False
+    assert any(item.code == "mechanism-diversity" for item in report.errors)
+
+
+def test_strict_synthesis_builds_tournament_only_after_diverse_admission() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 5000.0)
+    proposals = (
+        _proposal("h-causal", "causal", cheap_yes=0.95, expensive_yes=0.60),
+        _proposal("h-confound", "confounding", cheap_yes=0.10, expensive_yes=0.75),
+        _proposal("h-null", "null", cheap_yes=0.50, expensive_yes=0.50, is_null=True),
+    )
+    probes = (
+        DiscriminatingProbe(
+            probe_id="cheap-check",
+            question="Cheap observation?",
+            outcome_support=("yes", "no"),
+            expected_cost=0.05,
+            risk=RiskTier.READ_ONLY,
+        ),
+        DiscriminatingProbe(
+            probe_id="expensive-check",
+            question="Expensive observation?",
+            outcome_support=("yes", "no"),
+            expected_cost=0.30,
+            risk=RiskTier.REVERSIBLE,
+        ),
+    )
+
+    report, tournament = control.start_synthesized_tournament(
+        proposals,
+        probes,
+        decision_impact=0.9,
+    )
+
+    assert report.accepted is True
+    assert set(report.mechanism_families) == {"causal", "confounding", "null"}
+    assert report.null_hypothesis_ids == ("h-null",)
+    assert tournament.round().selected_probe_id in {"cheap-check", "expensive-check"}
+    assert control.hypothesis_tournament(tournament.tournament_id) is tournament
