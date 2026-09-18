@@ -80,6 +80,10 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
         with self._lock:
             return self._repositories.get(str(namespace_key))
 
+    def namespaces(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(sorted(self._repositories))
+
     def fetch_refs(
         self,
         namespace_key: str,
@@ -203,9 +207,7 @@ class ContextRepositoryMesh:
         return self._adapters[tier]
 
     def attached_namespaces(self) -> tuple[str, ...]:
-        generic = self._adapters[SourceTier.CONTEXT_REPOSITORY]
-        with generic._lock:
-            return tuple(sorted(generic._repositories))
+        return self._adapters[SourceTier.CONTEXT_REPOSITORY].namespaces()
 
     @property
     def source_tiers(self) -> tuple[SourceTier, ...]:
