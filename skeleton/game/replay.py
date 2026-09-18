@@ -201,17 +201,8 @@ class MechanicsReplay:
             inputs=dict(recorded.inputs),
             steps=recorded.steps,
         )
-        if fresh.result_digest != recorded.result_digest:
-            raise GameReplayError(
-                "divergent mechanics execution",
-                context={
-                    "reason": "divergence",
-                    "expected": recorded.result_digest,
-                    "actual": fresh.result_digest,
-                    "state_expected": recorded.state_digest,
-                    "state_actual": fresh.state_digest,
-                },
-            )
+        comparison = self.compare(recorded, fresh)
+        comparison.reject_if_divergent()
         return fresh
 
     def compare(
