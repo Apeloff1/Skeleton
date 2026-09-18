@@ -30,6 +30,8 @@ from typing import Any, Mapping, Sequence
 from .context_pipeline import ContextResolution, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
+from .perpendicular_semantics import PerpendicularExpansionPlan, PerpendicularExpansionPlanner
+from .relational_memory import RelationKind, RelationTrace, SequenceObservation
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
 from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
@@ -70,6 +72,7 @@ class NuanceFrame:
     uncertainty_recommendations: tuple[UncertaintyRecommendation, ...]
     captured_card_id: str | None
     fingerprint: str
+    relation_sequence: SequenceObservation | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +83,8 @@ class NuanceUpdate:
     forecasts: tuple[SemanticForecast, ...]
     tangent_nodes: tuple[TangentNode, ...]
     fingerprint: str
+    perpendicular_plan: PerpendicularExpansionPlan | None = None
+    relational_hypothesis_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +202,7 @@ class ScientificNuanceRuntime:
         prediction_ledger: SemanticPredictionLedger | None = None,
         tangent_bridge: SemanticTangentBridge | None = None,
         uncertainty_router: FrontierUncertaintyRouter | None = None,
+        perpendicular_planner: PerpendicularExpansionPlanner | None = None,
         policy: NuanceRuntimePolicy | None = None,
     ) -> None:
         if not isinstance(resolver, LayeredContextResolver):
@@ -209,9 +215,15 @@ class ScientificNuanceRuntime:
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.tangent_bridge = tangent_bridge or SemanticTangentBridge()
         self.uncertainty_router = uncertainty_router or FrontierUncertaintyRouter()
+        self.perpendicular_planner = perpendicular_planner or PerpendicularExpansionPlanner(self.semantic_registry)
         self.policy = policy or NuanceRuntimePolicy()
         self._frames: dict[str, NuanceFrame] = {}
         self._updates: dict[str, NuanceUpdate] = {}
+        # Streaming chronology is deliberately separate from card timestamps:
+        # re-exposure updates an existing card timestamp and must not rewrite
+        # interaction order. Only the last two ids are needed for pair/triad
+        # learning; durable relation traces remain in the relational index.
+        self._recent_cards: dict[str, tuple[str, ...]] = {}
 
     @staticmethod
     def _observation_from_context(item: Any, position: int) -> SemanticObservation:
@@ -282,7 +294,9 @@ class ScientificNuanceRuntime:
 
         should_capture = self.policy.capture_interactions if capture_interaction is None else bool(capture_interaction)
         captured: InteractionCard | None = None
+        relation_sequence: SequenceObservation | None = None
         if should_capture:
+            prior_cards = self._recent_cards.get(namespace.key, ())
             captured = self.resolver.cards.capture_interaction(
                 namespace,
                 query,
@@ -294,9 +308,22 @@ class ScientificNuanceRuntime:
                 metadata={
                     "captured_after_context_resolution": True,
                     "context_fingerprint": context.fingerprint,
+                    "prior_card_ids": prior_cards,
                     **dict(interaction_metadata or {}),
                 },
             )
+            if self.resolver.relations is not None:
+                # Prequential invariant: context was resolved before the card
+                # existed; the previous->current transition is scored before it
+                # is learned by observe_stream_step.
+                relation_sequence = self.resolver.relations.observe_stream_step(
+                    namespace,
+                    captured.card_id,
+                    previous_card_ids=prior_cards,
+                    context_tags=context_tags,
+                    provenance=interaction_provenance,
+                )
+            self._recent_cards[namespace.key] = (*prior_cards[-1:], captured.card_id)
 
         frame_id = stable_id(
             "nuance-frame",
@@ -317,6 +344,7 @@ class ScientificNuanceRuntime:
                 "lenses": [item.key for item in selection.lenses],
                 "uncertainty": [item.lens.value for item in uncertainty],
                 "captured_card": captured.card_id if captured else None,
+                "relation_sequence": relation_sequence.fingerprint if relation_sequence else None,
             }
         )
         frame = NuanceFrame(
@@ -329,6 +357,7 @@ class ScientificNuanceRuntime:
             uncertainty_recommendations=uncertainty,
             captured_card_id=captured.card_id if captured else None,
             fingerprint=fingerprint,
+            relation_sequence=relation_sequence,
         )
         self._frames[frame_id] = frame
         return frame
@@ -369,6 +398,84 @@ class ScientificNuanceRuntime:
             validated.append(finding)
         return tuple(validated)
 
+    def _bridge_findings_to_relations(
+        self,
+        frame: NuanceFrame,
+        findings: Sequence[SemanticFinding],
+    ) -> tuple[RelationTrace, ...]:
+        """Store validated pairwise readings as non-authoritative relation hypotheses."""
+
+        relations = self.resolver.relations
+        if relations is None or frame.captured_card_id is None:
+            return ()
+        captured_card = self.resolver.cards.store.get(frame.captured_card_id)
+        if captured_card is None:
+            # A bounded fast-memory store may evict a card between prepare()
+            # and model-returned finding registration. Never reconstruct or
+            # guess an evicted identity from semantic text.
+            return ()
+
+        observation_to_card: dict[str, str] = {}
+        for observation in frame.observations:
+            if observation.source == "current-user-input":
+                observation_to_card[observation.observation_id] = frame.captured_card_id
+                continue
+            item_id = str(observation.metadata.get("context_item_id", ""))
+            if item_id and self.resolver.cards.store.get(item_id) is not None:
+                observation_to_card[observation.observation_id] = item_id
+
+        created: list[RelationTrace] = []
+        namespace = captured_card.namespace
+        for finding in findings:
+            spec = self.semantic_registry.get(finding.lens_key)
+            if not spec.pairwise:
+                continue
+            card_ids = tuple(
+                dict.fromkeys(
+                    observation_to_card[observation_id]
+                    for observation_id in finding.observation_ids
+                    if observation_id in observation_to_card
+                )
+            )
+            if len(card_ids) != 2 or card_ids[0] == card_ids[1]:
+                continue
+
+            if spec.role.value == "contrast":
+                kind = RelationKind.CONTRAST
+            elif spec.role.value == "causal_hint":
+                kind = RelationKind.CAUSAL_CANDIDATE
+            elif "reversal" in spec.key:
+                kind = RelationKind.REVERSAL
+            elif "reinforc" in spec.key:
+                kind = RelationKind.REINFORCEMENT
+            else:
+                kind = RelationKind.JUXTAPOSITION
+
+            created.append(
+                relations.register_semantic_pair(
+                    namespace,
+                    card_ids[0],
+                    card_ids[1],
+                    relation=kind,
+                    rationale=finding.interpretation,
+                    confidence=finding.confidence,
+                    salience=max(0.55, finding.novelty),
+                    provenance=finding.evidence_ids,
+                    metadata={
+                        "finding_id": finding.finding_id,
+                        "lens_key": finding.lens_key,
+                        "reading_status": finding.status.value,
+                        "prediction": finding.prediction,
+                        "counterreading": finding.counterreading,
+                        "ambiguity": finding.ambiguity,
+                        "novelty": finding.novelty,
+                        "validated_frame": frame.frame_id,
+                    },
+                )
+            )
+        unique = {trace.relation_id: trace for trace in created}
+        return tuple(sorted(unique.values(), key=lambda trace: trace.relation_id))
+
     def register_findings(
         self,
         frame: NuanceFrame,
@@ -386,14 +493,32 @@ class ScientificNuanceRuntime:
             raise NuanceRuntimeError("sequence must be non-negative")
         validated = self._validate_findings(frame, findings)
         composition = self.composition_engine.compose(validated)
+        relational_hypotheses = self._bridge_findings_to_relations(frame, validated)
         forecasts = self.predictive_model.propose(validated, composition=composition)
         for forecast in forecasts:
             self.prediction_ledger.add(forecast)
-        tangents = self.tangent_bridge.ingest(
-            validated,
-            composition=composition,
-            root_fingerprint=frame.fingerprint,
-            sequence=sequence,
+        tangents = list(
+            self.tangent_bridge.ingest(
+                validated,
+                composition=composition,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
+        )
+        perpendicular_plan = self.perpendicular_planner.plan(
+            frame.observations,
+            findings=validated,
+            selected_lens_keys=tuple(item.key for item in frame.lens_selection.lenses),
+        )
+        tangents.extend(
+            self.tangent_bridge.ingest_perpendicular(
+                perpendicular_plan,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
+        )
+        tangent_tuple = tuple(
+            sorted({item.tangent_id: item for item in tangents}.values(), key=lambda item: item.tangent_id)
         )
         fingerprint = stable_fingerprint(
             {
@@ -401,7 +526,9 @@ class ScientificNuanceRuntime:
                 "findings": [item.fingerprint for item in validated],
                 "composition": composition.fingerprint,
                 "forecasts": [item.fingerprint for item in forecasts],
-                "tangents": [item.fingerprint for item in tangents],
+                "tangents": [item.fingerprint for item in tangent_tuple],
+                "perpendicular_plan": perpendicular_plan.fingerprint,
+                "relational_hypotheses": [item.fingerprint for item in relational_hypotheses],
             }
         )
         update = NuanceUpdate(
@@ -409,8 +536,10 @@ class ScientificNuanceRuntime:
             findings=validated,
             composition=composition,
             forecasts=forecasts,
-            tangent_nodes=tangents,
+            tangent_nodes=tangent_tuple,
             fingerprint=fingerprint,
+            perpendicular_plan=perpendicular_plan,
+            relational_hypothesis_ids=tuple(item.relation_id for item in relational_hypotheses),
         )
         self._updates[frame.frame_id] = update
         return update
@@ -420,6 +549,20 @@ class ScientificNuanceRuntime:
         if frame is None:
             raise NuanceRuntimeError("unknown nuance frame")
         update = self._updates.get(frame.frame_id)
+        if update is None:
+            # Even if no semantic findings were registered, a restart must not
+            # discard cue-supported orthogonal directions that were visible in
+            # the frame. Persist them before checkpointing.
+            restart_plan = self.perpendicular_planner.plan(
+                frame.observations,
+                findings=(),
+                selected_lens_keys=tuple(item.key for item in frame.lens_selection.lenses),
+            )
+            self.tangent_bridge.ingest_perpendicular(
+                restart_plan,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
         return self.tangent_bridge.restart_packet(
             root_fingerprint=frame.fingerprint,
             sequence=sequence,
