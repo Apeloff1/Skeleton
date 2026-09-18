@@ -2001,10 +2001,16 @@ class SemanticTopologyLearningLab:
                 if rejected_only and not include_rejected:
                     continue
 
+                candidate_trial_ids = {
+                    trial_id
+                    for (indexed_candidate, _), trial_ids
+                    in self._trials_by_candidate_kind.items()
+                    if indexed_candidate == candidate.candidate_id
+                    for trial_id in trial_ids
+                }
                 candidate_trials = [
-                    item
-                    for item in self._trials.values()
-                    if item.candidate_id == candidate.candidate_id
+                    self._trials[trial_id]
+                    for trial_id in candidate_trial_ids
                 ]
                 primary = [
                     item
