@@ -257,7 +257,9 @@ jobs:
     name: Clear attention after PR lifecycle activity
     if: >-
       github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (contains(github.event.pull_request.labels.*.name, 'needs-attention') ||
+       contains(github.event.pull_request.labels.*.name, 'stale-draft'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     # SECURITY: ordinary pull_request plus a same-repository guard keeps label
@@ -291,7 +293,10 @@ jobs:
 
   clear-issue-attention:
     name: Clear attention after human issue activity
-    if: github.event_name == 'issues' && github.event.sender.type != 'Bot'
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.sender.type != 'Bot' &&
+      contains(github.event.issue.labels.*.name, 'needs-attention')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -323,7 +328,9 @@ jobs:
       github.event.sender.type != 'Bot' &&
       (github.event.comment.author_association == 'OWNER' ||
        github.event.comment.author_association == 'MEMBER' ||
-       github.event.comment.author_association == 'COLLABORATOR')
+       github.event.comment.author_association == 'COLLABORATOR') &&
+      (contains(github.event.issue.labels.*.name, 'needs-attention') ||
+       contains(github.event.issue.labels.*.name, 'stale-draft'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -376,7 +383,9 @@ jobs:
        (github.event_name == 'pull_request_review_comment' &&
         (github.event.comment.author_association == 'OWNER' ||
          github.event.comment.author_association == 'MEMBER' ||
-         github.event.comment.author_association == 'COLLABORATOR')))
+         github.event.comment.author_association == 'COLLABORATOR'))) &&
+      (contains(github.event.pull_request.labels.*.name, 'needs-attention') ||
+       contains(github.event.pull_request.labels.*.name, 'stale-draft'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
