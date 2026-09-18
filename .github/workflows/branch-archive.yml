@@ -5,7 +5,9 @@ on:
   workflow_run:
     workflows: ["Prune redundant branches safely"]
     types: [completed]
-    branches: [main]
+    branches:
+      - "*"
+      - "**"
   schedule:
     - cron: '7-57/10 * * * *'
   push:
