@@ -515,6 +515,22 @@ def test_ack_missing_sequence_contract_is_strict(
         authority.record_ack(packet)
 
 
+def test_ack_gap_must_start_at_next_unapplied_sequence() -> None:
+    authority = Authority()
+    authority.snapshot(0, {})
+    authority.mutate(1, (Patch.set("hero", {"x": 1}),))
+    authority.mutate(2, (Patch.set("hero", {"x": 2}),))
+
+    impossible = _ack_packet(authority, applied=1, received=3, missing=[3])
+    with pytest.raises(SequenceError, match="next unapplied"):
+        authority.record_ack(impossible)
+
+    buffered_later_packet = _ack_packet(authority, applied=1, received=3, missing=[2])
+    accepted = authority.record_ack(buffered_later_packet)
+    assert accepted.missing_sequences == (2,)
+    assert accepted.last_received_sequence == 3
+
+
 def test_ack_received_sequence_cannot_precede_applied_sequence() -> None:
     authority = Authority()
     authority.snapshot(0, {})
@@ -594,6 +610,25 @@ def test_ack_digest_must_be_lowercase_sha256(bad_digest: str) -> None:
     packet = _ack_packet(authority, digest=bad_digest)
     with pytest.raises(SerializationError, match="lowercase hex"):
         authority.record_ack(packet)
+
+
+def test_packet_encode_rejects_unsupported_schema_version() -> None:
+    payload = {
+        "tick": 0,
+        "entities": {},
+        "digest": "0" * 64,
+        "state_digest": "0" * 64,
+    }
+    unsupported = replication_mod.SCHEMA_VERSION + 1
+    checksum = replication_mod._packet_checksum(  # type: ignore[attr-defined]
+        "snapshot",
+        unsupported,
+        1,
+        payload,
+    )
+    packet = Packet("snapshot", unsupported, 1, payload, checksum)
+    with pytest.raises(SchemaCompatibilityError, match="incompatible replication schema"):
+        packet.encode()
 
 
 def test_direct_packet_envelope_rejects_boolean_sequence() -> None:
