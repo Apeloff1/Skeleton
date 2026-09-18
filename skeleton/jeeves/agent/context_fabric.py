@@ -730,44 +730,48 @@ class CognitiveContextFabric:
     @staticmethod
     def _dedupe(records: Sequence[DeepContextRecord]) -> list[DeepContextRecord]:
         by_key: dict[tuple[SourceTier, str, str], DeepContextRecord] = {}
-        by_fingerprint: dict[str, DeepContextRecord] = {}
-        for record in records:
-            key = (record.source_tier, record.source_provider, record.source_ref)
-            prior = by_key.get(key)
-            if prior is None or (
-                record.canonical,
-                record.trust,
-                record.confidence,
-                record.salience,
-            ) > (
-                prior.canonical,
-                prior.trust,
-                prior.confidence,
-                prior.salience,
-            ):
-                by_key[key] = record
-        for record in by_key.values():
-            prior = by_fingerprint.get(record.source_fingerprint)
-            if prior is None or (
-                record.canonical,
-                record.trust,
-                record.confidence,
-                record.salience,
-            ) > (
-                prior.canonical,
-                prior.trust,
-                prior.confidence,
-                prior.salience,
-            ):
-                by_fingerprint[record.source_fingerprint] = record
-        values = list(by_fingerprint.values())
-        values.sort(
-            key=lambda record: (
+        by_fingerprint: dict[tuple[SourceTier, str, str], DeepContextRecord] = {}
+
+        def rank(record: DeepContextRecord) -> tuple[Any, ...]:
+            return (
                 record.canonical,
                 record.trust,
                 record.confidence,
                 record.salience,
                 -record.token_estimate,
+                record.source_fingerprint,
+            )
+
+        for record in records:
+            key = (record.source_tier, record.source_provider, record.source_ref)
+            prior = by_key.get(key)
+            if prior is None or rank(record) > rank(prior):
+                by_key[key] = record
+
+        # Identical canonical content may be duplicated under multiple refs from
+        # one provider, but independent providers remain distinct provenance.
+        for record in by_key.values():
+            fingerprint_key = (
+                record.source_tier,
+                record.source_provider,
+                record.source_fingerprint,
+            )
+            prior = by_fingerprint.get(fingerprint_key)
+            if prior is None or (
+                rank(record),
+                record.source_ref,
+            ) > (
+                rank(prior),
+                prior.source_ref,
+            ):
+                by_fingerprint[fingerprint_key] = record
+
+        values = list(by_fingerprint.values())
+        values.sort(
+            key=lambda record: (
+                rank(record),
+                record.source_tier.value,
+                record.source_provider,
                 record.source_ref,
             ),
             reverse=True,
