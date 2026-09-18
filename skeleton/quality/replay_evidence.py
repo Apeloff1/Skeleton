@@ -645,7 +645,13 @@ def run_harness(
 
     try:
         baseline = _load_trace(manifest.source, manifest.trace)
-        baseline_digest = manifest.baseline_digest or _trace_digest(manifest.source, baseline)
+        actual_baseline_digest = _trace_digest(manifest.source, baseline)
+        if manifest.baseline_digest and manifest.baseline_digest != actual_baseline_digest:
+            return _corrupt_report(
+                "baseline digest does not match baseline trace",
+                manifest=manifest,
+            )
+        baseline_digest = actual_baseline_digest
         payloads = _candidate_payloads(manifest, candidate, candidates)
         durations = _durations(manifest, observed_duration_ms)
     except QualityEvidenceError as exc:
@@ -768,7 +774,12 @@ def verify_evidence(payload: Mapping[str, Any]) -> EvidenceReport:
             "corrupt evidence: digest mismatch",
             manifest=_placeholder_manifest(str(body.get("scenario_id") or "corrupt-evidence")),
         )
-    if body["passed"] is True and verdict is not Verdict.PASS:
+    if body["schema"] != SCHEMA_ID:
+        return _corrupt_report(
+            "corrupt evidence: unsupported schema",
+            manifest=_placeholder_manifest(str(body["scenario_id"])),
+        )
+    if not isinstance(body["passed"], bool) or body["passed"] != (verdict is Verdict.PASS):
         return _corrupt_report(
             "corrupt evidence: passed flag disagrees with verdict",
             manifest=_placeholder_manifest(str(body["scenario_id"])),
