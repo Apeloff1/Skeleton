@@ -16,6 +16,7 @@ AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
     r'(?m)^    branches-ignore:\s*\n(?P<items>(?:      - .+\n)+)'
 )
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
+QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
@@ -57,11 +58,22 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
-    if not has_all_branch_globs and not automation_main_only_exclusion:
+    queue_default_branch_only = (
+        _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
+        and "branches: [main]" in text
+        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+        in text
+    )
+
+    if (
+        not has_all_branch_globs
+        and not automation_main_only_exclusion
+        and not queue_default_branch_only
+    ):
         findings.append(
             f"{path_name}: workflow_run consumers must match every completing head "
-            'with branches: ["*", "**"]; PR Automation may exclude only main '
-            "because scheduled reconciliation covers the default branch"
+            'with branches: ["*", "**"]; PR Automation may exclude only main, '
+            "and Queue Drain may wake only from guarded default-branch completions"
         )
     if "pull_requests[0]" in text:
         findings.append(
