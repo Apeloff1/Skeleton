@@ -556,6 +556,28 @@ def test_aliased_open_still_enforces_workspace_containment_with_filesystem_grant
     assert decision.operation.target == "/etc/passwd"
     assert "path escapes" in decision.reason
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        'list(map(open, ["/etc/passwd"]))\n',
+        'sorted(["1 + 1"], key=eval)\n',
+        'open.__call__("/etc/passwd", "r")\n',
+        'eval.__call__("1 + 1")\n',
+    ],
+)
+def test_higher_order_and_dunder_call_sensitive_callable_bypasses_fail_closed(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {
+        OperationKind.FS_READ,
+        OperationKind.UNSAFE_EVAL,
+    }
+
+
 def test_secret_symlink_cannot_bypass_secrets_capability(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=REDACTED_SECRET_PLACEHOLDER\n", encoding="utf-8")
