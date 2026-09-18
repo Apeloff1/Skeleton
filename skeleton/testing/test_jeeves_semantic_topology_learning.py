@@ -73,6 +73,8 @@ def _trial(
         outcome=outcome,
         domain=domain,
         independent_run=run or f"run-{index}",
+        predicted_at=float(index * 2),
+        observed_at=float(index * 2 + 1),
         negative_control=negative_control,
         source_finding_ids=(f"finding:{index}:left", f"finding:{index}:right"),
         source_forecast_ids=(f"forecast:{index}",),
@@ -136,6 +138,8 @@ def test_bridge_trial_is_bound_to_exact_candidate_fingerprint() -> None:
         outcome=trial.outcome,
         domain=trial.domain,
         independent_run=trial.independent_run,
+        predicted_at=trial.predicted_at,
+        observed_at=trial.observed_at,
     )
 
     with pytest.raises(
@@ -143,6 +147,29 @@ def test_bridge_trial_is_bound_to_exact_candidate_fingerprint() -> None:
         match="candidate changed after trial declaration",
     ):
         lab.record(mutated)
+
+
+def test_bridge_trial_rejects_post_outcome_prediction() -> None:
+    _, _, candidate, lab = _system()
+
+    with pytest.raises(
+        AgentContractError,
+        match="outcome cannot predate",
+    ):
+        TopologyBridgeTrial(
+            trial_id="bridge-trial:time",
+            candidate_id=candidate.candidate_id,
+            candidate_fingerprint=lab.candidate_fingerprint(candidate),
+            left_key=candidate.left_key,
+            right_key=candidate.right_key,
+            kind=LensInteractionKind.REINFORCES,
+            predicted_probability=0.8,
+            outcome=True,
+            domain="film",
+            independent_run="run-time",
+            predicted_at=20.0,
+            observed_at=19.0,
+        )
 
 
 def test_replicated_bridge_promotes_to_active_learned_rule() -> None:
@@ -174,6 +201,50 @@ def test_replicated_bridge_promotes_to_active_learned_rule() -> None:
     assert "cannot create evidence" in learned[0].rule.rationale
     assert snapshot.active_report_ids == (report.report_id,)
     assert snapshot.learned_rule_keys == (learned[0].rule.key,)
+
+
+def test_persistently_wrong_bridge_is_rejected() -> None:
+    _, _, candidate, lab = _system()
+    for index, domain, run in (
+        (1, "film", "bad-a"),
+        (2, "film", "bad-b"),
+        (3, "game", "bad-c"),
+        (4, "game", "bad-d"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=False,
+                domain=domain,
+                run=run,
+            )
+        )
+    for index, domain in ((101, "film"), (102, "game")):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.05,
+                outcome=False,
+                domain=domain,
+                run=f"bad-control-{index}",
+                negative_control=True,
+            )
+        )
+
+    report = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+
+    assert report.status is TopologyBridgeStatus.REJECTED
+    assert "brier_rejection_threshold" in report.reasons
+    assert "empirical_rate_rejection_threshold" in report.reasons
+    assert lab.learned_rules() == ()
 
 
 def test_negative_control_failure_blocks_promotion() -> None:
