@@ -49,19 +49,17 @@ class TopologyBridgeStatus(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
-class TopologyBridgeTrial:
-    trial_id: str
+class TopologyBridgePrediction:
+    prediction_id: str
     candidate_id: str
     candidate_fingerprint: str
     left_key: str
     right_key: str
     kind: LensInteractionKind
     predicted_probability: float
-    outcome: bool
     domain: str
     independent_run: str
     predicted_at: float
-    observed_at: float
     negative_control: bool = False
     source_finding_ids: tuple[str, ...] = ()
     source_forecast_ids: tuple[str, ...] = ()
@@ -70,7 +68,7 @@ class TopologyBridgeTrial:
 
     def __post_init__(self) -> None:
         for name in (
-            "trial_id",
+            "prediction_id",
             "candidate_id",
             "candidate_fingerprint",
             "left_key",
@@ -85,26 +83,29 @@ class TopologyBridgeTrial:
                 value = value.casefold()
             object.__setattr__(self, name, value)
         if self.left_key == self.right_key:
-            raise AgentContractError("topology bridge trial requires distinct lenses")
-        if not isinstance(self.kind, LensInteractionKind):
-            object.__setattr__(self, "kind", LensInteractionKind(str(self.kind)))
-        predicted_at = finite_number("predicted_at", self.predicted_at)
-        observed_at = finite_number("observed_at", self.observed_at)
-        if predicted_at < 0 or observed_at < 0:
-            raise AgentContractError("topology bridge trial times must be non-negative")
-        if observed_at < predicted_at:
             raise AgentContractError(
-                "topology bridge outcome cannot predate its prediction"
+                "topology bridge prediction requires distinct lenses"
+            )
+        if not isinstance(self.kind, LensInteractionKind):
+            object.__setattr__(
+                self,
+                "kind",
+                LensInteractionKind(str(self.kind)),
+            )
+        predicted_at = finite_number("predicted_at", self.predicted_at)
+        if predicted_at < 0:
+            raise AgentContractError(
+                "topology bridge prediction time must be non-negative"
             )
         object.__setattr__(self, "predicted_at", predicted_at)
-        object.__setattr__(self, "observed_at", observed_at)
         object.__setattr__(
             self,
             "predicted_probability",
-            probability("predicted_probability", self.predicted_probability),
+            probability(
+                "predicted_probability",
+                self.predicted_probability,
+            ),
         )
-        if not isinstance(self.outcome, bool):
-            raise AgentContractError("topology bridge trial outcome must be boolean")
         if not isinstance(self.negative_control, bool):
             raise AgentContractError("negative_control must be boolean")
         for name in (
@@ -125,7 +126,181 @@ class TopologyBridgeTrial:
                     )
                 ),
             )
-        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
+        object.__setattr__(
+            self,
+            "metadata",
+            json_safe(dict(self.metadata)),
+        )
+
+    @property
+    def bridge_key(self) -> tuple[str, str]:
+        return tuple(sorted((self.left_key, self.right_key)))
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "prediction": self.prediction_id,
+                "candidate": self.candidate_id,
+                "candidate_fingerprint": self.candidate_fingerprint,
+                "bridge": self.bridge_key,
+                "kind": self.kind.value,
+                "probability": self.predicted_probability,
+                "domain": self.domain,
+                "run": self.independent_run,
+                "predicted_at": self.predicted_at,
+                "negative_control": self.negative_control,
+                "findings": self.source_finding_ids,
+                "forecasts": self.source_forecast_ids,
+                "evidence": self.evidence_ids,
+                "metadata": dict(self.metadata),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TopologyBridgeTrial:
+    trial_id: str
+    prediction_id: str
+    prediction_fingerprint: str
+    candidate_id: str
+    candidate_fingerprint: str
+    left_key: str
+    right_key: str
+    kind: LensInteractionKind
+    predicted_probability: float
+    outcome: bool
+    domain: str
+    independent_run: str
+    predicted_at: float
+    observed_at: float
+    negative_control: bool = False
+    source_finding_ids: tuple[str, ...] = ()
+    source_forecast_ids: tuple[str, ...] = ()
+    evidence_ids: tuple[str, ...] = ()
+    outcome_evidence_ids: tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        for name in (
+            "trial_id",
+            "prediction_id",
+            "prediction_fingerprint",
+            "candidate_id",
+            "candidate_fingerprint",
+            "left_key",
+            "right_key",
+            "domain",
+            "independent_run",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise AgentContractError(f"{name} is required")
+            if name in {"left_key", "right_key", "domain"}:
+                value = value.casefold()
+            object.__setattr__(self, name, value)
+        if self.left_key == self.right_key:
+            raise AgentContractError(
+                "topology bridge trial requires distinct lenses"
+            )
+        if not isinstance(self.kind, LensInteractionKind):
+            object.__setattr__(
+                self,
+                "kind",
+                LensInteractionKind(str(self.kind)),
+            )
+        predicted_at = finite_number("predicted_at", self.predicted_at)
+        observed_at = finite_number("observed_at", self.observed_at)
+        if predicted_at < 0 or observed_at < 0:
+            raise AgentContractError(
+                "topology bridge trial times must be non-negative"
+            )
+        if observed_at < predicted_at:
+            raise AgentContractError(
+                "topology bridge outcome cannot predate its prediction"
+            )
+        object.__setattr__(self, "predicted_at", predicted_at)
+        object.__setattr__(self, "observed_at", observed_at)
+        object.__setattr__(
+            self,
+            "predicted_probability",
+            probability(
+                "predicted_probability",
+                self.predicted_probability,
+            ),
+        )
+        if not isinstance(self.outcome, bool):
+            raise AgentContractError(
+                "topology bridge trial outcome must be boolean"
+            )
+        if not isinstance(self.negative_control, bool):
+            raise AgentContractError("negative_control must be boolean")
+        for name in (
+            "source_finding_ids",
+            "source_forecast_ids",
+            "evidence_ids",
+            "outcome_evidence_ids",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                tuple(
+                    sorted(
+                        {
+                            str(value).strip()
+                            for value in getattr(self, name)
+                            if str(value).strip()
+                        }
+                    )
+                ),
+            )
+        object.__setattr__(
+            self,
+            "metadata",
+            json_safe(dict(self.metadata)),
+        )
+
+    @classmethod
+    def from_prediction(
+        cls,
+        prediction: TopologyBridgePrediction,
+        *,
+        trial_id: str,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> "TopologyBridgeTrial":
+        if not isinstance(prediction, TopologyBridgePrediction):
+            raise TypeError(
+                "prediction must be TopologyBridgePrediction"
+            )
+        return cls(
+            trial_id=trial_id,
+            prediction_id=prediction.prediction_id,
+            prediction_fingerprint=prediction.fingerprint,
+            candidate_id=prediction.candidate_id,
+            candidate_fingerprint=prediction.candidate_fingerprint,
+            left_key=prediction.left_key,
+            right_key=prediction.right_key,
+            kind=prediction.kind,
+            predicted_probability=prediction.predicted_probability,
+            outcome=outcome,
+            domain=prediction.domain,
+            independent_run=prediction.independent_run,
+            predicted_at=prediction.predicted_at,
+            observed_at=observed_at,
+            negative_control=prediction.negative_control,
+            source_finding_ids=prediction.source_finding_ids,
+            source_forecast_ids=prediction.source_forecast_ids,
+            evidence_ids=prediction.evidence_ids,
+            outcome_evidence_ids=tuple(outcome_evidence_ids),
+            metadata={
+                "declared_before_outcome": True,
+                **dict(prediction.metadata),
+                **dict(metadata or {}),
+            },
+        )
 
     @property
     def bridge_key(self) -> tuple[str, str]:
@@ -136,6 +311,8 @@ class TopologyBridgeTrial:
         return stable_fingerprint(
             {
                 "trial": self.trial_id,
+                "prediction": self.prediction_id,
+                "prediction_fingerprint": self.prediction_fingerprint,
                 "candidate": self.candidate_id,
                 "candidate_fingerprint": self.candidate_fingerprint,
                 "bridge": self.bridge_key,
@@ -150,6 +327,7 @@ class TopologyBridgeTrial:
                 "findings": self.source_finding_ids,
                 "forecasts": self.source_forecast_ids,
                 "evidence": self.evidence_ids,
+                "outcome_evidence": self.outcome_evidence_ids,
                 "metadata": dict(self.metadata),
             }
         )
