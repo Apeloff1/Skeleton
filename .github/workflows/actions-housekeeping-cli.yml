@@ -38,6 +38,8 @@ jobs:
       MAX_RUN_DELETES: '1000'
       LIVE_RUN_STALE_MINUTES: '30'
       LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
+      FORCE_CANCEL_ATTEMPTS: '4'
+      FORCE_CANCEL_POLL_SECONDS: '2'
       MAX_LIVE_CANCELS: '100'
     steps:
       - name: Verify GitHub CLI
@@ -88,6 +90,8 @@ jobs:
           inspected=0
           cancelled=0
           forced=0
+          force_stuck=0
+          force_transitioned=0
           moved=0
           preserved_errors=0
           kept_current=0
@@ -270,60 +274,116 @@ jobs:
               continue
             fi
 
-            force_obsolete=true
-            for pr_number in "${pr_numbers[@]}"; do
-              force_pr_json="$RUNNER_TEMP/force-pr-${pr_number}.json"
-              if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$force_pr_json"; then
-                force_obsolete=false
-                break
-              fi
-              force_pr_state=$(jq -r '.state // empty' "$force_pr_json")
-              force_pr_head_sha=$(jq -r '.head.sha // empty' "$force_pr_json")
-              force_pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$force_pr_json")
-              force_pr_head_ref=$(jq -r '.head.ref // empty' "$force_pr_json")
+            force_accepted=false
+            force_done=false
+            for force_attempt in $(seq 1 "$FORCE_CANCEL_ATTEMPTS"); do
+              # Re-prove PR authority before every retry. A reopen or head move
+              # wins over cleanup even after an earlier force request was accepted.
+              force_obsolete=true
+              for pr_number in "${pr_numbers[@]}"; do
+                force_pr_json="$RUNNER_TEMP/force-pr-${id}-${force_attempt}-${pr_number}.json"
+                if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$force_pr_json"; then
+                  force_obsolete=false
+                  break
+                fi
+                force_pr_state=$(jq -r '.state // empty' "$force_pr_json")
+                force_pr_head_sha=$(jq -r '.head.sha // empty' "$force_pr_json")
+                force_pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$force_pr_json")
+                force_pr_head_ref=$(jq -r '.head.ref // empty' "$force_pr_json")
 
-              if [[ "$force_pr_head_repo" != "$REPO" || "$force_pr_head_ref" != "$head_branch" ]]; then
-                force_obsolete=false
+                if [[ "$force_pr_head_repo" != "$REPO" || "$force_pr_head_ref" != "$head_branch" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+                if [[ "$force_pr_state" == "open" && "$force_pr_head_sha" == "$head_sha" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+                if [[ "$force_pr_state" != "open" && "$force_pr_state" != "closed" ]]; then
+                  force_obsolete=false
+                  break
+                fi
+              done
+              if [[ "$force_obsolete" != "true" ]]; then
+                echo "force-cancel preserve: run=${id} attempt=${force_attempt} reason=pr-authority-changed"
+                force_done=true
+                preserved_errors=$((preserved_errors + 1))
                 break
               fi
-              if [[ "$force_pr_state" == "open" && "$force_pr_head_sha" == "$head_sha" ]]; then
-                force_obsolete=false
+
+              force_run_json="$RUNNER_TEMP/force-run-${id}-${force_attempt}.json"
+              if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_run_json"; then
+                echo "force-cancel preserve: run=${id} attempt=${force_attempt} reason=run-read-failed"
+                force_done=true
+                preserved_errors=$((preserved_errors + 1))
                 break
               fi
-              if [[ "$force_pr_state" != "open" && "$force_pr_state" != "closed" ]]; then
-                force_obsolete=false
+              force_status=$(jq -r '.status // empty' "$force_run_json")
+              force_sha=$(jq -r '.head_sha // empty' "$force_run_json")
+              force_branch=$(jq -r '.head_branch // empty' "$force_run_json")
+              force_event=$(jq -r '.event // empty' "$force_run_json")
+              if [[ "$force_status" != "queued" || "$force_sha" != "$head_sha" || "$force_branch" != "$head_branch" || "$force_event" != "pull_request" ]]; then
+                if [[ "$force_status" == "completed" ]]; then
+                  moved=$((moved + 1))
+                  echo "force-cancel moved: run=${id} attempt=${force_attempt} status=completed"
+                else
+                  force_transitioned=$((force_transitioned + 1))
+                  echo "force-cancel preserve: run=${id} attempt=${force_attempt} status=${force_status:-unknown}"
+                fi
+                force_done=true
                 break
               fi
+
+              if gh api --method POST "/repos/${REPO}/actions/runs/${id}/force-cancel" >/dev/null 2>&1; then
+                if [[ "$force_accepted" != "true" ]]; then
+                  forced=$((forced + 1))
+                  force_accepted=true
+                fi
+                echo "force-cancel accepted: run=${id} attempt=${force_attempt} branch=${head_branch} sha=${head_sha}"
+              else
+                echo "force-cancel rejected: run=${id} attempt=${force_attempt}; retrying after fresh identity checks"
+              fi
+
+              # An accepted provider request can be asynchronous. Poll before
+              # deciding the run is still stuck, then retry only if it remains
+              # exactly queued with the same immutable identity.
+              for force_poll in 1 2 3; do
+                sleep "$FORCE_CANCEL_POLL_SECONDS"
+                force_poll_json="$RUNNER_TEMP/force-poll-${id}-${force_attempt}-${force_poll}.json"
+                if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_poll_json"; then
+                  continue
+                fi
+                poll_status=$(jq -r '.status // empty' "$force_poll_json")
+                poll_sha=$(jq -r '.head_sha // empty' "$force_poll_json")
+                poll_branch=$(jq -r '.head_branch // empty' "$force_poll_json")
+                poll_event=$(jq -r '.event // empty' "$force_poll_json")
+                if [[ "$poll_sha" != "$head_sha" || "$poll_branch" != "$head_branch" || "$poll_event" != "pull_request" ]]; then
+                  echo "force-cancel preserve: run=${id} reason=identity-changed-during-poll"
+                  preserved_errors=$((preserved_errors + 1))
+                  force_done=true
+                  break
+                fi
+                if [[ "$poll_status" == "completed" ]]; then
+                  moved=$((moved + 1))
+                  echo "force-cancel completed: run=${id} attempt=${force_attempt} poll=${force_poll}"
+                  force_done=true
+                  break
+                fi
+                if [[ "$poll_status" != "queued" ]]; then
+                  force_transitioned=$((force_transitioned + 1))
+                  echo "force-cancel transitioned: run=${id} status=${poll_status:-unknown}"
+                  force_done=true
+                  break
+                fi
+              done
+
+              [[ "$force_done" == "true" ]] && break
             done
-            if [[ "$force_obsolete" != "true" ]]; then
-              preserved_errors=$((preserved_errors + 1))
-              continue
-            fi
 
-            force_run_json="$RUNNER_TEMP/force-run-${id}.json"
-            if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_run_json"; then
+            if [[ "$force_done" != "true" ]]; then
+              force_stuck=$((force_stuck + 1))
               preserved_errors=$((preserved_errors + 1))
-              continue
-            fi
-            force_status=$(jq -r '.status // empty' "$force_run_json")
-            force_sha=$(jq -r '.head_sha // empty' "$force_run_json")
-            force_branch=$(jq -r '.head_branch // empty' "$force_run_json")
-            force_event=$(jq -r '.event // empty' "$force_run_json")
-            if [[ "$force_status" != "queued" || "$force_sha" != "$head_sha" || "$force_branch" != "$head_branch" || "$force_event" != "pull_request" ]]; then
-              preserved_errors=$((preserved_errors + 1))
-              continue
-            fi
-
-            if gh api --method POST "/repos/${REPO}/actions/runs/${id}/force-cancel" >/dev/null 2>&1; then
-              forced=$((forced + 1))
-              continue
-            fi
-
-            status_now=$(gh api "/repos/${REPO}/actions/runs/${id}" --jq '.status // empty' 2>/dev/null || true)
-            if [[ "$status_now" == "completed" ]]; then
-              moved=$((moved + 1))
-            else
-              preserved_errors=$((preserved_errors + 1))
+              echo "force-cancel stuck: run=${id} remained queued after ${FORCE_CANCEL_ATTEMPTS} freshly revalidated attempts"
             fi
           done < "$inventory"
 
@@ -331,8 +391,10 @@ jobs:
             echo '## Live Actions reaper'
             echo "- Live runs inspected: $inspected"
             echo "- Obsolete PR runs cancelled normally: $cancelled"
-            echo "- Provider-stuck queued PR runs force-cancelled: $forced"
-            echo "- Runs that completed before cancellation: $moved"
+            echo "- Provider-stuck queued PR runs with accepted force requests: $forced"
+            echo "- Force-cancelled runs still queued after all retries: $force_stuck"
+            echo "- Force-cancel targets that transitioned out of queued without completing: $force_transitioned"
+            echo "- Runs that completed before/during cancellation: $moved"
             echo "- Ambiguous/API/cancellation runs preserved: $preserved_errors"
             echo "- Current PR-head runs preserved: $kept_current"
             echo "- Security/provenance/artifact/dependency runs preserved: $kept_security"
@@ -340,6 +402,8 @@ jobs:
             echo "- Recent live runs preserved: $kept_recent"
             echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
             echo "- Force-cancel threshold: ${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes"
+            echo "- Force-cancel attempts per proven target: ${FORCE_CANCEL_ATTEMPTS}"
+            echo "- Force-cancel poll interval: ${FORCE_CANCEL_POLL_SECONDS}s"
             echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
             echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
             echo '- Force-cancel additionally requires a fresh queued-only run check and a fresh PR-state revalidation after ordinary cancellation fails.'
