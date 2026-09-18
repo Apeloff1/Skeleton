@@ -5,8 +5,8 @@ Conflict domain: ``ai.spec.provider_capabilities``. This is a declaration
 schema, not model routing. Unknown capability remains unknown and is never
 guessed from aliases, sibling capabilities, missing rows, or vendor names.
 
-Finding prefix: ``provider-capability``. Distinct from #1036
-``skeleton/frontier/model_routing.py``.
+Finding prefix: ``provider-capability``. Distinct from #1036 model
+selection/routing; this module never ranks, scores, or selects models.
 """
 
 from __future__ import annotations

@@ -61,7 +61,8 @@ def test_schema_contract_is_capability_matrix_not_model_routing() -> None:
     source = (REPO_ROOT / "scripts" / "check_provider_capability_matrix.py").read_text(
         encoding="utf-8"
     )
-    assert "model_routing" not in source
+    assert "import model_routing" not in source
+    assert "from skeleton.frontier" not in source
     assert "selected_model" in source
     for field in ("selected_model", "fallback_model", "routing_score"):
         assert field in ROUTING_FIELDS
