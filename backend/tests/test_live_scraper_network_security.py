@@ -52,6 +52,8 @@ def _run_get(
         "https://169.254.169.254/latest/meta-data",
         "https://2130706433/feed",
         "https://[::1]/feed",
+        "https://224.0.0.1/feed",
+        "https://[ff02::1]/feed",
         "https://metadata.google.internal/computeMetadata/v1/",
         "https://user:password@example.com/feed",
     ],
@@ -180,6 +182,24 @@ def test_dns_policy_rejects_mixed_public_private_answers(
     )
 
     assert asyncio.run(scrapers._host_resolves_public("mixed.example")) is False
+
+
+@pytest.mark.parametrize("resolved_ip", ["224.0.0.1", "239.255.255.250", "ff02::1"])
+def test_dns_policy_rejects_global_multicast_answers(
+    monkeypatch: pytest.MonkeyPatch,
+    resolved_ip: str,
+) -> None:
+    family = scrapers.socket.AF_INET6 if ":" in resolved_ip else scrapers.socket.AF_INET
+    sockaddr = (resolved_ip, 443, 0, 0) if family == scrapers.socket.AF_INET6 else (resolved_ip, 443)
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (family, scrapers.socket.SOCK_STREAM, 6, "", sockaddr)
+        ],
+    )
+
+    assert asyncio.run(scrapers._host_resolves_public("multicast.example")) is False
 
 
 def test_dns_policy_allows_only_global_answers(monkeypatch: pytest.MonkeyPatch) -> None:
