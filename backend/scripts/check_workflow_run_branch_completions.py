@@ -64,6 +64,12 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
         and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
         in text
     )
+    if _is_named(path_name, QUEUE_DRAIN_WORKFLOW) and not queue_default_branch_only:
+        findings.append(
+            f"{path_name}: workflow_run consumers must match every completing head "
+            'with branches: ["*", "**"]; Queue Drain may wake only from guarded '
+            "default-branch completions"
+        )
 
     if (
         not has_all_branch_globs
