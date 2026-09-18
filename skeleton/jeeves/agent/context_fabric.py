@@ -55,7 +55,10 @@ class DeepContextRecord:
         if not source_fingerprint:
             raise AgentContractError("source_fingerprint cannot be empty")
         object.__setattr__(self, "source_fingerprint", source_fingerprint[:2048])
-        object.__setattr__(self, "content", str(self.content))
+        content = str(self.content)
+        object.__setattr__(self, "content", content)
+        if not isinstance(self.canonical, bool):
+            raise AgentContractError("canonical must be boolean")
         object.__setattr__(
             self,
             "source_provider",
@@ -63,12 +66,29 @@ class DeepContextRecord:
         )
         for name in ("trust", "confidence", "salience"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
-        object.__setattr__(
-            self,
+        token_estimate = positive_int(
             "token_estimate",
-            positive_int("token_estimate", self.token_estimate, maximum=10_000_000),
+            self.token_estimate,
+            maximum=10_000_000,
         )
-        object.__setattr__(self, "tags", tuple(sorted({str(value).casefold().strip() for value in self.tags if str(value).strip()})))
+        minimum_token_estimate = max(1, (len(content) + 3) // 4)
+        if token_estimate < minimum_token_estimate:
+            raise AgentContractError(
+                "token_estimate understates context content size"
+            )
+        object.__setattr__(self, "token_estimate", token_estimate)
+        tags = tuple(
+            sorted(
+                {
+                    str(value).casefold().strip()
+                    for value in self.tags
+                    if str(value).strip()
+                }
+            )
+        )
+        if len(tags) > 64 or any(len(tag) > 128 for tag in tags):
+            raise AgentContractError("invalid context tags")
+        object.__setattr__(self, "tags", tags)
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
 
@@ -113,7 +133,19 @@ class ContextFabricPolicy:
     def __post_init__(self) -> None:
         for name in ("fast_limit", "associative_limit", "deep_limit", "maximum_tokens", "minimum_fast_hits_before_skip_deep", "lens_limit"):
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1_000_000))
-        object.__setattr__(self, "minimum_deep_trust", probability("minimum_deep_trust", self.minimum_deep_trust))
+        object.__setattr__(
+            self,
+            "minimum_deep_trust",
+            probability("minimum_deep_trust", self.minimum_deep_trust),
+        )
+        for name in (
+            "always_rehydrate_index_hits",
+            "broad_search_on_conflict",
+            "broad_search_on_fast_fallback",
+            "index_deep_results",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise AgentContractError(f"{name} must be boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,7 +249,7 @@ class RepositoryContextAdapter:
             trust=entry.trust,
             confidence=entry.confidence,
             salience=entry.salience,
-            token_estimate=max(1, len(entry.content) // 4),
+            token_estimate=max(1, (len(entry.content) + 3) // 4),
             source_provider=f"context-repository:{entry.namespace.key}",
             tags=entry.tags,
             metadata={
@@ -324,7 +356,7 @@ class MemoryManagerAdapter:
             trust=record.trust,
             confidence=record.trust,
             salience=record.salience,
-            token_estimate=max(1, len(record.content) // 4),
+            token_estimate=max(1, (len(record.content) + 3) // 4),
             source_provider=f"memory-store:{record.namespace.key}",
             tags=record.tags,
             metadata={
@@ -349,6 +381,8 @@ class CallableContextAdapter:
     ) -> None:
         self.source_tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
         self.source_provider = str(source_provider).strip()[:512]
+        if not callable(fetcher) or not callable(searcher):
+            raise TypeError("context adapter fetcher/searcher must be callable")
         self._fetcher = fetcher
         self._searcher = searcher
 
