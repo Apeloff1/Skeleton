@@ -8,9 +8,12 @@ import scripts.pr_churn_control as churn
 from scripts.pr_churn_control import (
     ABSOLUTE_MAX_MUTATIONS,
     Retirement,
+    ReverseSyncRetirement,
     _bounded_mutation_limit,
     build_retirement_plan,
+    build_reverse_sync_plan,
     eligible_pair,
+    eligible_reverse_sync,
     superseded_numbers,
 )
 
@@ -29,7 +32,9 @@ def _pr(
     draft: bool = False,
     author: str = AUTHOR,
     head_repo: str = REPO,
+    head_ref: str | None = None,
     base: str = "main",
+    base_repo: str = REPO,
     labels: tuple[str, ...] = (),
     merged: bool = False,
 ) -> dict[str, object]:
@@ -46,11 +51,11 @@ def _pr(
         "merged_at": "2026-09-16T20:00:00Z" if merged else None,
         "user": {"login": author},
         "head": {
-            "ref": f"repair/{number}",
+            "ref": head_ref or f"repair/{number}",
             "sha": f"sha-{number}",
             "repo": {"full_name": head_repo},
         },
-        "base": {"ref": base},
+        "base": {"ref": base, "repo": {"full_name": base_repo}},
         "labels": [{"name": label} for label in labels],
     }
 
@@ -71,6 +76,128 @@ Supersedes #17.
 """
 
     assert superseded_numbers(body) == (10, 11, 12)
+
+
+def _sync_pr(
+    number: int,
+    *,
+    base: str = "feature/stale",
+    title: str | None = None,
+    body: str | None = None,
+    author: str = AUTHOR,
+    head_repo: str = REPO,
+    base_repo: str = REPO,
+    labels: tuple[str, ...] = (),
+    draft: bool = False,
+) -> dict[str, object]:
+    if title is None:
+        title = f"chore(sync): refresh {base} from main"
+    if body is None:
+        body = (
+            "Automated stale-branch refresh. Merge current `main` into this "
+            "branch without rewriting branch history."
+        )
+    return _pr(
+        number,
+        body=body,
+        title=title,
+        draft=draft,
+        author=author,
+        head_repo=head_repo,
+        head_ref="main",
+        base=base,
+        base_repo=base_repo,
+        labels=labels,
+    )
+
+
+def test_exact_reverse_sync_automation_is_retirable() -> None:
+    pr = _sync_pr(401, base="reconcile/runtime-current-main")
+
+    assert eligible_reverse_sync(
+        pr,
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+    ) == (True, "exact trusted reverse-sync automation")
+
+    assert build_reverse_sync_plan(
+        [pr],
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+        max_mutations=10,
+    ) == [ReverseSyncRetirement(number=401)]
+
+
+@pytest.mark.parametrize(
+    "pr",
+    [
+        _sync_pr(402, title="chore(sync): refresh some-other-branch from main"),
+        _sync_pr(403, body="human-authored branch refresh"),
+        _sync_pr(404, author="other-user"),
+        _sync_pr(405, head_repo="fork/repo"),
+        _sync_pr(406, base_repo="other/repo"),
+        _sync_pr(407, base="release/2026.09"),
+        _sync_pr(408, base="keep/long-lived"),
+        _sync_pr(409, base="backup/snapshot"),
+        _sync_pr(410, base="archive/old"),
+        _sync_pr(411, labels=("keep-open",)),
+        _sync_pr(412, draft=True),
+        {
+            **_sync_pr(413),
+            "number": 0,
+        },
+        _pr(
+            414,
+            title="chore(sync): refresh feature/stale from main",
+            body=(
+                "Automated stale-branch refresh. Merge current `main` into this "
+                "branch without rewriting branch history."
+            ),
+            head_ref="feature/not-main",
+            base="feature/stale",
+        ),
+    ],
+)
+def test_reverse_sync_retirement_is_fail_closed(pr: dict[str, object]) -> None:
+    allowed, _ = eligible_reverse_sync(
+        pr,
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+    )
+    assert allowed is False
+
+
+def test_reverse_sync_requires_complete_same_repository_identity() -> None:
+    missing_base_repo = _sync_pr(415)
+    missing_base_repo["base"] = {"ref": "feature/stale"}
+
+    allowed, reason = eligible_reverse_sync(
+        missing_base_repo,
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+    )
+
+    assert allowed is False
+    assert reason == "sync PR base is not same-repository"
+
+
+def test_reverse_sync_plan_is_oldest_first_and_bounded() -> None:
+    older = _sync_pr(420, base="reconcile/older")
+    older["created_at"] = "2026-09-18T14:00:00Z"
+    newer = _sync_pr(421, base="reconcile/newer")
+    newer["created_at"] = "2026-09-18T14:01:00Z"
+
+    assert build_reverse_sync_plan(
+        [newer, older],
+        repo=REPO,
+        default_branch="main",
+        trusted_author=AUTHOR,
+        max_mutations=1,
+    ) == [ReverseSyncRetirement(number=420)]
 
 
 def test_explicit_newer_owner_pr_can_retire_older_owner_pr() -> None:

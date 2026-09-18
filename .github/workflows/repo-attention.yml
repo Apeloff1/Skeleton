@@ -26,8 +26,6 @@ on:
       - unlocked
       - auto_merge_enabled
       - auto_merge_disabled
-      - enqueued
-      - dequeued
   pull_request_review:
     types: [submitted, edited]
   pull_request_review_comment:
