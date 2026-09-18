@@ -1,5 +1,14 @@
 """Safe repository-backlog automation primitives."""
 
+from .backlog_engine import (
+    BacklogCapacityError,
+    BacklogFinding,
+    BacklogState,
+    BacklogStateError,
+    RootCauseRecord,
+    SourceHealth,
+    workflow_failure_finding,
+)
 from .backlog_index import (
     DependencyRecord,
     ReferenceRecord,
@@ -11,6 +20,13 @@ from .backlog_reader import Document, Index, RepositoryReader
 
 __all__ = [
     "ChatGPTReasoner",
+    "workflow_failure_finding",
+    "SourceHealth",
+    "RootCauseRecord",
+    "BacklogStateError",
+    "BacklogState",
+    "BacklogFinding",
+    "BacklogCapacityError",
     "DependencyRecord",
     "Document",
     "Index",
