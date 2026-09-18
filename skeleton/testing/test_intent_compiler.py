@@ -368,16 +368,22 @@ def test_mismatched_inverse_fails_closed() -> None:
 
 
 def test_bounded_node_count_fails_closed() -> None:
-    payload = _request(nodes=[])
-    for index in range(MAX_NODES + 1):
-        payload["nodes"].append(
+    payload = {
+        "schema": INTENT_SCHEMA,
+        "schema_version": 1,
+        "request_id": "req_bound",
+        "title": "Bound",
+        "goal": "Prove the node cap.",
+        "nodes": [
             {
                 "id": f"n_{index}",
                 "kind": "content",
                 "title": f"Prop {index}",
                 "editable": True,
             }
-        )
+            for index in range(MAX_NODES + 1)
+        ],
+    }
     with pytest.raises(IntentCompilerError) as caught:
         compile_intent(payload)
     assert _reason(caught) == "bound"

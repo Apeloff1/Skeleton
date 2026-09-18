@@ -16,8 +16,9 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, Mapping, NoReturn, Sequence
+from typing import Any, Final, NoReturn
 
 from skeleton.kernel.errors import SkeletonError
 
@@ -968,11 +969,24 @@ class IntentCompiler:
         _reject_execution_and_engine_keys("request", payload)
         _reject_unknown("request", payload, _REQUEST_KEYS)
         schema = _token("schema", payload.get("schema"), maximum=64)
-        version = _strict_int("schema_version", payload.get("schema_version"), minimum=1, maximum=1)
-        if schema != INTENT_SCHEMA or version != INTENT_VERSION:
+        raw_version = payload.get("schema_version")
+        if isinstance(raw_version, bool) or not isinstance(raw_version, int):
+            raise IntentVersionError(
+                "schema_version must be an integer",
+                context={
+                    "reason": "schema_drift",
+                    "schema": schema,
+                    "schema_version": raw_version,
+                },
+            )
+        if schema != INTENT_SCHEMA or raw_version != INTENT_VERSION:
             raise IntentVersionError(
                 "intent schema is not this boundary",
-                context={"reason": "schema_drift", "schema": schema, "schema_version": version},
+                context={
+                    "reason": "schema_drift",
+                    "schema": schema,
+                    "schema_version": raw_version,
+                },
             )
         kind = payload.get("kind")
         if kind is not None and _token("kind", kind, maximum=64) != INTENT_SCHEMA:
