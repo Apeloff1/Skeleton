@@ -72,6 +72,22 @@ def test_rebound_callable_alias_is_not_assumed_to_keep_provenance(tmp_path: Path
     assert findings == []
 
 
+def test_rejects_tuple_destructured_callable_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\nrestore, other = (pickle.loads, safe_loader)\nvalue = restore(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_tuple_destructured_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\ncodec, other = (torch, safe_codec)\nvalue = codec.load(path)\n",
+    )
+    assert any("weights_only=True" in finding for finding in findings)
+
+
 def test_rejects_stable_pickle_module_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
