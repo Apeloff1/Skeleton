@@ -103,7 +103,15 @@ class QualityEvidenceError(ValueError):
 
 
 def _canonical_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False, default=str)
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise QualityEvidenceError("value is not canonically serializable") from exc
 
 
 def _digest(value: Any) -> str:
@@ -784,23 +792,68 @@ def verify_evidence(payload: Mapping[str, Any]) -> EvidenceReport:
             "corrupt evidence: passed flag disagrees with verdict",
             manifest=_placeholder_manifest(str(body["scenario_id"])),
         )
+    try:
+        scenario_id = _scenario_id(body["scenario_id"])
+        kind = body["kind"]
+        if kind not in _ALLOWED_KINDS:
+            raise QualityEvidenceError("unknown scenario kind")
+        source = body["source"]
+        if source not in _ALLOWED_SOURCES:
+            raise QualityEvidenceError("unknown replay source")
+        max_runs = _bounded_int(body["max_runs"], "max_runs", minimum=1, maximum=MAX_RUNS)
+        runs = _bounded_int(body["runs"], "runs", minimum=0, maximum=MAX_RUNS)
+        if runs > max_runs:
+            raise QualityEvidenceError("runs exceeds max_runs")
+        time_budget_ms = _bounded_float(
+            body["time_budget_ms"],
+            "time_budget_ms",
+            minimum=1.0,
+            maximum=MAX_TIME_BUDGET_MS,
+        )
+        reasons_raw = body["reasons"]
+        if not isinstance(reasons_raw, list) or any(
+            not isinstance(reason, str) or not reason for reason in reasons_raw
+        ):
+            raise QualityEvidenceError("reasons must be a list of non-empty strings")
+        trace_raw = body["trace_digests"]
+        if not isinstance(trace_raw, list) or len(trace_raw) > max_runs:
+            raise QualityEvidenceError("trace_digests must be a bounded list")
+        trace_digests = tuple(
+            _sha256_hex(item, "trace_digest") for item in trace_raw
+        )
+        baseline_raw = body["baseline_digest"]
+        if baseline_raw != "":
+            baseline_digest = _sha256_hex(baseline_raw, "baseline_digest")
+        else:
+            baseline_digest = ""
+        tolerances = Tolerances.from_mapping(body["tolerances"]).to_mapping()
+        for name in ("divergence", "envelope", "quarantine"):
+            value = body[name]
+            if value is not None and not isinstance(value, Mapping):
+                raise QualityEvidenceError(f"{name} must be an object or null")
+        seed = _bounded_int(body["seed"], "seed", minimum=0, maximum=2**32 - 1)
+    except (QualityEvidenceError, KeyError, TypeError) as exc:
+        return _corrupt_report(
+            f"corrupt evidence: {exc}",
+            manifest=_placeholder_manifest(str(body.get("scenario_id") or "corrupt-evidence")),
+        )
     return EvidenceReport(
         schema=SCHEMA_ID,
-        scenario_id=str(body["scenario_id"]),
-        kind=str(body["kind"]),
+        scenario_id=scenario_id,
+        kind=kind,
         verdict=verdict,
-        reasons=tuple(body["reasons"]),
-        runs=int(body["runs"]),
-        max_runs=int(body["max_runs"]),
-        time_budget_ms=float(body["time_budget_ms"]),
-        trace_digests=tuple(body["trace_digests"]),
-        baseline_digest=str(body["baseline_digest"]),
-        divergence=body["divergence"],
-        tolerances=dict(body["tolerances"]),
-        envelope=body["envelope"],
-        quarantine=body["quarantine"],
-        source=str(body["source"]),
-        seed=int(body["seed"]),
+        reasons=tuple(reasons_raw),
+        runs=runs,
+        max_runs=max_runs,
+        time_budget_ms=time_budget_ms,
+        trace_digests=trace_digests,
+        baseline_digest=baseline_digest,
+        divergence=None if body["divergence"] is None else dict(body["divergence"]),
+        tolerances=tolerances,
+        envelope=None if body["envelope"] is None else dict(body["envelope"]),
+        quarantine=None if body["quarantine"] is None else dict(body["quarantine"]),
+        source=source,
+        seed=seed,
         evidence_digest=digest,
     )
 
