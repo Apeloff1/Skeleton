@@ -567,16 +567,25 @@ class AIShellService:
             quorum_digest=quorum_digest,
             execution_fence_digest=execution_fence_digest,
         )
-        self._require_assurance(
-            review,
-            execution_backend=execution_backend,
-            sealed=True,
-            preconditions_verified=(
-                precondition_report is not None and precondition_report.ok
-            ),
-            human_approved=human_approved,
-            quorum_approved=bool(quorum_digest),
-        )
+        try:
+            self._require_assurance(
+                review,
+                execution_backend=execution_backend,
+                sealed=True,
+                preconditions_verified=(
+                    precondition_report is not None
+                    and precondition_report.ok
+                ),
+                human_approved=human_approved,
+                quorum_approved=bool(quorum_digest),
+            )
+        except BaseException:
+            if (
+                execution_fence is not None
+                and self.execution_fences is not None
+            ):
+                self.execution_fences.release(execution_fence)
+            raise
         attempt: AIExecutionAttempt | None = None
         tracking_backend: AttemptTrackingExecutionBackend | None = None
         try:
