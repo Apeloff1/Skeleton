@@ -4,7 +4,11 @@ import json
 
 import pytest
 
-from skeleton.jeeves.agent.cognition import ContextCompiler
+from skeleton.jeeves.agent.cognition import (
+    ContextBudget,
+    ContextCompiler,
+    MemoryContextPolicy,
+)
 from skeleton.jeeves.agent.context_fabric import (
     CallableContextAdapter,
     CognitiveContextFabric,
@@ -74,30 +78,59 @@ def _compile(
     )
 
 
-def _fabric_payload(packet) -> dict:
-    section = next(section for section in packet.sections if section.name == "context_fabric")
-    return json.loads(section.content)
+def _section(packet, name: str):
+    return next(section for section in packet.sections if section.name == name)
+
+
+def _payload(packet, name: str):
+    section = _section(packet, name)
+    return section, json.loads(section.content)
 
 
 def _external_record(
     *,
     content: str = "Canonical external alpha clue.",
     fingerprint: str | None = None,
+    source_ref: str = "external-alpha",
+    provider: str = "test-external",
+    token_estimate: int = 12,
 ) -> DeepContextRecord:
     return DeepContextRecord(
         source_tier=SourceTier.EXTERNAL,
-        source_ref="external-alpha",
-        source_provider="test-external",
-        source_fingerprint=fingerprint or stable_fingerprint(content),
+        source_ref=source_ref,
+        source_provider=provider,
+        source_fingerprint=fingerprint or stable_fingerprint((provider, source_ref, content)),
         content=content,
         canonical=True,
         trust=0.92,
         confidence=0.88,
         salience=0.80,
-        token_estimate=12,
+        token_estimate=token_estimate,
         tags=("alpha", "canonical"),
         metadata={"fixture": True},
     )
+
+
+def _external_fabric(record: DeepContextRecord) -> CognitiveContextFabric:
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=8,
+            maximum_tokens=2_000,
+            minimum_deep_trust=0.35,
+            minimum_fast_hits_before_skip_deep=1,
+        )
+    )
+    fabric.register(
+        CallableContextAdapter(
+            SourceTier.EXTERNAL,
+            fetcher=lambda ns, refs, max_records, max_tokens: (
+                (record,) if record.source_ref in refs else ()
+            ),
+            searcher=lambda ns, query, max_records, max_tokens: (record,),
+            source_provider=record.source_provider,
+        )
+    )
+    return fabric
 
 
 def test_default_runtime_uses_fabric_compiler_but_explicit_compiler_is_preserved() -> None:
@@ -123,7 +156,69 @@ def test_default_runtime_uses_fabric_compiler_but_explicit_compiler_is_preserved
     assert explicit.context is custom
 
 
-def test_fabric_deduplicates_memory_already_present_in_base_context() -> None:
+def test_base_context_compiler_restores_explicit_fabric_contract() -> None:
+    clock = TickClock()
+    namespace = _namespace()
+    memory = MemoryManager(clock=clock)
+    record = memory.remember(
+        namespace,
+        "User prefers evidence-first deterministic compiler validation.",
+        kind=MemoryKind.EPISODIC,
+        trust=1.0,
+        salience=0.9,
+        source="user-interaction",
+        tags=("compiler", "evidence"),
+    )
+    fabric = CognitiveContextFabric()
+    fabric.index_record(
+        namespace.key,
+        DeepContextRecord(
+            source_tier=SourceTier.MEMORY_STORE,
+            source_ref=record.memory_id,
+            source_provider=f"memory-store:{namespace.key}",
+            source_fingerprint=record.fingerprint,
+            content=record.content,
+            canonical=True,
+            trust=record.trust,
+            confidence=record.trust,
+            salience=record.salience,
+            token_estimate=max(1, len(record.content) // 4),
+            tags=record.tags,
+        ),
+        cue=record.content,
+    )
+
+    packet = ContextCompiler().compile(
+        system_instruction="system",
+        task_instruction="plan the compiler work",
+        goal=Goal("goal-context-fabric-explicit", "deterministic compiler evidence"),
+        namespace=namespace,
+        memory=memory,
+        evidence=EvidenceLedger(clock=clock),
+        context_fabric=fabric,
+    )
+
+    names = set(packet.retained_sections)
+    assert {"fast_memory_index", "canonical_context", "semantic_lenses"} <= names
+    assert "memory" not in names
+
+    fast_section, fast_rows = _payload(packet, "fast_memory_index")
+    canonical_section, canonical_rows = _payload(packet, "canonical_context")
+    _, semantic = _payload(packet, "semantic_lenses")
+
+    assert canonical_section.priority > fast_section.priority
+    assert record.content not in fast_section.content
+    assert fast_rows[0]["authoritative"] is False
+    assert fast_rows[0]["purpose"] == "retrieval-index-only"
+    assert record.memory_id in canonical_section.content
+    assert any(row["content"] == record.content for row in canonical_rows)
+    assert semantic["interpretive_only"] is True
+    assert all(row["factual_assertion_authorized"] is False for row in semantic["lenses"])
+    assert all(row["causal_assertion_authorized"] is False for row in semantic["lenses"])
+    assert "not factual evidence" in semantic["instruction"]
+
+
+def test_fabric_replaces_legacy_memory_with_canonical_rehydration() -> None:
     clock = TickClock()
     namespace = _namespace()
     memory = MemoryManager(clock=clock)
@@ -147,11 +242,14 @@ def test_fabric_deduplicates_memory_already_present_in_base_context() -> None:
         evidence=EvidenceLedger(clock=clock),
     )
 
+    names = {section.name for section in packet.sections}
+    assert "memory" not in names
+    assert "canonical_context" in names
     assert record.memory_id in packet.memory_ids
-    payload = _fabric_payload(packet)
-    assert payload["records"] == []
-    assert payload["contract"]["records_are_not_evidence_by_inclusion"] is True
-    assert payload["contract"]["evidence_ledger_remains_authoritative"] is True
+
+    _, canonical = _payload(packet, "canonical_context")
+    assert any(row["source_ref"] == record.memory_id for row in canonical)
+    assert any(row["content"] == record.content for row in canonical)
     snapshot = compiler.last_fabric_snapshot()
     assert snapshot["ok"] is True
     assert snapshot["record_count"] >= 1
@@ -160,50 +258,32 @@ def test_fabric_deduplicates_memory_already_present_in_base_context() -> None:
 def test_external_canonical_adapter_reaches_context_without_becoming_evidence() -> None:
     clock = TickClock()
     namespace = _namespace()
-    memory = MemoryManager(clock=clock)
     record = _external_record()
-    fabric = CognitiveContextFabric(
-        policy=ContextFabricPolicy(
-            deep_limit=8,
-            maximum_tokens=2_000,
-            minimum_deep_trust=0.35,
-            minimum_fast_hits_before_skip_deep=1,
-        )
-    )
-    adapter = CallableContextAdapter(
-        SourceTier.EXTERNAL,
-        fetcher=lambda ns, refs, max_records, max_tokens: (
-            (record,) if record.source_ref in refs else ()
-        ),
-        searcher=lambda ns, query, max_records, max_tokens: (record,),
-        source_provider=record.source_provider,
-    )
-    fabric.register(adapter)
-    compiler = FabricContextCompiler(fabric=fabric)
+    compiler = FabricContextCompiler(fabric=_external_fabric(record))
 
     packet = compiler.compile(
         system_instruction="Use evidence carefully.",
         task_instruction="Build a bounded plan.",
         goal=_goal(),
         namespace=namespace,
-        memory=memory,
+        memory=MemoryManager(clock=clock),
         evidence=EvidenceLedger(clock=clock),
     )
 
-    payload = _fabric_payload(packet)
-    assert len(payload["records"]) == 1
-    row = payload["records"][0]
-    assert row["source_ref"] == record.source_ref
-    assert row["source_provider"] == "test-external"
+    _, canonical = _payload(packet, "canonical_context")
+    row = next(item for item in canonical if item["source_ref"] == record.source_ref)
+    assert row["source_provider"] == record.source_provider
     assert row["content"] == record.content
     assert row["canonical"] is True
-    assert payload["contract"]["records_are_not_evidence_by_inclusion"] is True
-    assert all(item["factual_assertion_authorized"] is False for item in payload["lens_governance"])
-    assert all(item["causal_assertion_authorized"] is False for item in payload["lens_governance"])
+
+    _, semantic = _payload(packet, "semantic_lenses")
+    assert semantic["interpretive_only"] is True
+    assert all(item["factual_assertion_authorized"] is False for item in semantic["lenses"])
+    assert all(item["causal_assertion_authorized"] is False for item in semantic["lenses"])
     assert packet.evidence_ids == ()
 
 
-def test_stale_index_card_is_reported_when_canonical_fingerprint_changes() -> None:
+def test_stale_index_card_is_reported_and_canonical_content_wins() -> None:
     clock = TickClock()
     namespace = _namespace()
     old = _external_record(
@@ -214,25 +294,8 @@ def test_stale_index_card_is_reported_when_canonical_fingerprint_changes() -> No
         content="Updated canonical alpha clue.",
         fingerprint=stable_fingerprint("new-alpha"),
     )
-    fabric = CognitiveContextFabric(
-        policy=ContextFabricPolicy(
-            deep_limit=8,
-            maximum_tokens=2_000,
-            minimum_deep_trust=0.35,
-            minimum_fast_hits_before_skip_deep=1,
-        )
-    )
+    fabric = _external_fabric(current)
     stale_card = fabric.index_record(namespace.key, old, cue="alpha clue")
-    fabric.register(
-        CallableContextAdapter(
-            SourceTier.EXTERNAL,
-            fetcher=lambda ns, refs, max_records, max_tokens: (
-                (current,) if current.source_ref in refs else ()
-            ),
-            searcher=lambda ns, query, max_records, max_tokens: (current,),
-            source_provider=current.source_provider,
-        )
-    )
     compiler = FabricContextCompiler(fabric=fabric)
 
     packet = compiler.compile(
@@ -244,10 +307,11 @@ def test_stale_index_card_is_reported_when_canonical_fingerprint_changes() -> No
         evidence=EvidenceLedger(clock=clock),
     )
 
-    payload = _fabric_payload(packet)
-    assert stale_card.card_id in payload["stale_card_ids"]
-    assert payload["contract"]["stale_index_cards_are_not_canonical"] is True
-    assert any(row["source_fingerprint"] == current.source_fingerprint for row in payload["records"])
+    _, semantic = _payload(packet, "semantic_lenses")
+    _, canonical = _payload(packet, "canonical_context")
+    assert stale_card.card_id in semantic["stale_card_ids"]
+    assert any(row["source_fingerprint"] == current.source_fingerprint for row in canonical)
+    assert all(row["content"] != old.content for row in canonical)
 
 
 def test_optional_fabric_failure_falls_back_to_base_context_and_is_observable() -> None:
@@ -259,7 +323,10 @@ def test_optional_fabric_failure_falls_back_to_base_context_and_is_observable() 
     packet = _compile(compiler)
 
     assert "goal" in packet.retained_sections
-    assert "context_fabric" not in {section.name for section in packet.sections}
+    names = {section.name for section in packet.sections}
+    assert "fast_memory_index" not in names
+    assert "canonical_context" not in names
+    assert "semantic_lenses" not in names
     snapshot = compiler.last_fabric_snapshot()
     assert snapshot["ok"] is False
     assert "synthetic fabric failure" in snapshot["error"]
@@ -275,18 +342,10 @@ def test_required_fabric_failure_fails_closed() -> None:
         _compile(compiler)
 
 
-def test_fabric_index_recall_is_not_accidentally_filtered_by_runtime_tags() -> None:
+def test_indexed_deep_result_is_used_by_next_fast_pass_without_tag_filtering() -> None:
     clock = TickClock()
     namespace = _namespace()
     record = _external_record()
-    fabric = CognitiveContextFabric(
-        policy=ContextFabricPolicy(
-            deep_limit=8,
-            maximum_tokens=2_000,
-            minimum_deep_trust=0.35,
-            minimum_fast_hits_before_skip_deep=1,
-        )
-    )
     calls = {"search": 0, "fetch": 0}
 
     def fetcher(ns, refs, max_records, max_tokens):
@@ -297,6 +356,14 @@ def test_fabric_index_recall_is_not_accidentally_filtered_by_runtime_tags() -> N
         calls["search"] += 1
         return (record,)
 
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=8,
+            maximum_tokens=2_000,
+            minimum_deep_trust=0.35,
+            minimum_fast_hits_before_skip_deep=1,
+        )
+    )
     fabric.register(
         CallableContextAdapter(
             SourceTier.EXTERNAL,
@@ -327,11 +394,12 @@ def test_fabric_index_recall_is_not_accidentally_filtered_by_runtime_tags() -> N
         evidence=EvidenceLedger(clock=clock),
     )
 
-    payload = _fabric_payload(second)
+    _, fast_rows = _payload(second, "fast_memory_index")
+    assert fast_rows
+    assert any(row["source_ref"] == record.source_ref for row in fast_rows)
     assert calls["fetch"] >= 1
-    assert payload["fast_recall_fingerprint"]
-    assert compiler.last_fabric_snapshot()["ok"] is True
     assert calls["search"] >= first_searches
+    assert compiler.last_fabric_snapshot()["ok"] is True
 
 
 def test_deep_context_record_rejects_invalid_token_estimates() -> None:
@@ -352,29 +420,15 @@ def test_deep_context_record_rejects_invalid_token_estimates() -> None:
 
 
 def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> None:
-    left = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
-        source_ref="shared-ref",
-        source_provider="provider-a",
-        source_fingerprint=stable_fingerprint("provider-a-content"),
+    left = _external_record(
         content="Provider A canonical content.",
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
-        token_estimate=8,
-    )
-    right = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
         source_ref="shared-ref",
-        source_provider="provider-b",
-        source_fingerprint=stable_fingerprint("provider-b-content"),
+        provider="provider-a",
+    )
+    right = _external_record(
         content="Provider B canonical content.",
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
-        token_estimate=8,
+        source_ref="shared-ref",
+        provider="provider-b",
     )
 
     packed = CognitiveContextFabric._dedupe((left, right))
@@ -424,28 +478,16 @@ def test_memory_adapter_fetch_order_is_deterministic_and_respects_token_budget()
 
 
 def test_callable_adapter_enforces_budget_even_when_callback_ignores_it() -> None:
-    oversized = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
-        source_ref="oversized",
-        source_provider="provider-a",
-        source_fingerprint=stable_fingerprint("oversized"),
+    oversized = _external_record(
         content="oversized",
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
+        source_ref="oversized",
+        provider="provider-a",
         token_estimate=100,
     )
-    small = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
-        source_ref="small",
-        source_provider="provider-a",
-        source_fingerprint=stable_fingerprint("small"),
+    small = _external_record(
         content="small",
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
+        source_ref="small",
+        provider="provider-a",
         token_estimate=5,
     )
     adapter = CallableContextAdapter(
@@ -466,16 +508,10 @@ def test_callable_adapter_enforces_budget_even_when_callback_ignores_it() -> Non
 
 
 def test_outer_fabric_rejects_oversized_record_from_noncompliant_adapter() -> None:
-    oversized = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
-        source_ref="oversized-outer",
-        source_provider="bad-provider",
-        source_fingerprint=stable_fingerprint("oversized-outer"),
+    oversized = _external_record(
         content="oversized outer record",
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
+        source_ref="oversized-outer",
+        provider="bad-provider",
         token_estimate=100,
     )
 
@@ -505,42 +541,32 @@ def test_outer_fabric_rejects_oversized_record_from_noncompliant_adapter() -> No
     assert result.token_estimate == 0
 
 
-def test_fabric_section_fallback_keeps_hard_size_and_provenance_bounds() -> None:
+def test_canonical_and_semantic_sections_are_valid_json_within_memory_budget() -> None:
     clock = TickClock()
     namespace = _namespace()
-    record = DeepContextRecord(
-        source_tier=SourceTier.EXTERNAL,
-        source_ref="large-source",
-        source_provider="provider-a",
-        source_fingerprint=stable_fingerprint("large-source"),
+    record = _external_record(
         content="x" * 8_000,
-        canonical=True,
-        trust=0.9,
-        confidence=0.9,
-        salience=0.8,
+        source_ref="large-source",
+        provider="provider-a",
         token_estimate=100,
     )
-    fabric = CognitiveContextFabric(
-        policy=ContextFabricPolicy(
-            deep_limit=4,
-            maximum_tokens=2_000,
-            minimum_deep_trust=0.0,
-            minimum_fast_hits_before_skip_deep=1,
-        )
-    )
-    fabric.register(
-        CallableContextAdapter(
-            SourceTier.EXTERNAL,
-            fetcher=lambda ns, refs, max_records, max_tokens: (record,),
-            searcher=lambda ns, query, max_records, max_tokens: (record,),
-            source_provider=record.source_provider,
-        )
-    )
     compiler = FabricContextCompiler(
-        fabric=fabric,
-        fabric_policy=FabricCompilerPolicy(
-            maximum_section_chars=1_024,
-            maximum_record_chars=8_000,
+        fabric=_external_fabric(record),
+        budget=ContextBudget(
+            total_chars=12_000,
+            system_chars=2_000,
+            goal_chars=2_000,
+            plan_chars=2_000,
+            memory_chars=1_024,
+            evidence_chars=2_000,
+            observation_chars=2_000,
+            scratch_chars=2_000,
+        ),
+        memory_policy=MemoryContextPolicy(
+            limit=8,
+            minimum_trust=0.35,
+            include_parent_namespace=True,
+            maximum_record_chars=512,
         ),
     )
 
@@ -553,8 +579,12 @@ def test_fabric_section_fallback_keeps_hard_size_and_provenance_bounds() -> None
         evidence=EvidenceLedger(clock=clock),
     )
 
-    section = next(item for item in packet.sections if item.name == "context_fabric")
-    payload = json.loads(section.content)
-    assert len(section.content) <= 1_024
-    assert payload["records"] == []
-    assert section.source_ids == ()
+    canonical_section, canonical = _payload(packet, "canonical_context")
+    semantic_section, semantic = _payload(packet, "semantic_lenses")
+    assert len(canonical_section.content) <= 1_024
+    assert len(semantic_section.content) <= 1_024
+    assert isinstance(canonical, list)
+    assert isinstance(semantic, dict)
+    assert canonical
+    assert len(canonical[0]["content"]) <= 512
+    assert tuple(row["source_ref"] for row in canonical) == canonical_section.source_ids
