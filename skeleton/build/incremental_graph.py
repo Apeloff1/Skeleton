@@ -502,58 +502,76 @@ def _coerce_repo_index(raw: Any) -> Mapping[str, Any]:
     elif isinstance(raw, Mapping):
         payload = dict(raw)
     else:
-        required = (
-            "schema",
-            "head",
-            "object_format",
-            "source_digest",
-            "tracked_files",
-            "tracked_bytes",
-            "files",
-        )
-        missing = [name for name in required if not hasattr(raw, name)]
-        if missing:
+        files = getattr(raw, "files", None)
+        if files is None:
             raise IncrementalGraphError(
-                "repo index object is missing required fields",
-                context={"fields": missing, "type": type(raw).__name__},
+                "repo index must be a mapping, snapshot, or object with files",
+                context={"type": type(raw).__name__},
             )
-        payload = {name: getattr(raw, name) for name in required}
+        payload = {
+            "schema": getattr(raw, "schema", GRAPH_SCHEMA),
+            "head": getattr(raw, "head", None),
+            "object_format": getattr(raw, "object_format", None),
+            "source_digest": getattr(raw, "source_digest", None),
+            "tracked_files": getattr(raw, "tracked_files", None),
+            "tracked_bytes": getattr(raw, "tracked_bytes", None),
+            "files": files,
+        }
     if not isinstance(payload, Mapping):
         raise IncrementalGraphError("repo index payload must be a mapping")
     _unknown_keys(payload, _REPO_INDEX_KEYS, field="repo_index")
-    missing = sorted(_REPO_INDEX_KEYS.difference(payload))
-    if missing:
-        raise IncrementalGraphError(
-            "repo index is missing required keys",
-            context={"keys": missing},
-        )
     return payload
 
 
-def _require_repo_int(value: Any, *, field: str, minimum: int = 0) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+_GIT_OBJECT_LENGTHS = {"sha1": 40, "sha256": 64}
+_GIT_INDEX_MODES = frozenset({"100644", "100755", "120000", "160000"})
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+def _require_non_negative_int(value: Any, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise IncrementalGraphError(
-            f"repo index {field} must be an integer >= {minimum}",
+            f"{field} must be a non-negative integer",
             context={"field": field},
         )
     return value
 
 
-def _require_repo_digest(value: Any, *, field: str, length: int) -> str:
-    if not isinstance(value, str) or len(value) != length:
+def _require_object_id(value: Any, *, field: str, object_format: str) -> str:
+    expected = _GIT_OBJECT_LENGTHS[object_format]
+    if (
+        not isinstance(value, str)
+        or len(value) != expected
+        or any(ch not in _HEX_DIGITS for ch in value)
+    ):
         raise IncrementalGraphError(
-            f"repo index {field} has invalid digest length",
-            context={"field": field, "length": length},
+            f"{field} does not match {object_format} object id",
+            context={"field": field, "object_format": object_format},
         )
-    if any(ch not in "0123456789abcdef" for ch in value):
+    return value
+
+
+def _require_git_mode(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or value not in _GIT_INDEX_MODES:
         raise IncrementalGraphError(
-            f"repo index {field} must be lowercase hexadecimal",
+            f"{field} is not a supported git mode",
             context={"field": field},
         )
     return value
 
 
-def _normalize_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
+def _require_repo_path(value: Any) -> str:
+    path = _require_id(value, field="path")
+    parts = path.split("/")
+    if path.startswith("/") or any(part in {"", ".", ".."} for part in parts):
+        raise IncrementalGraphError(
+            "tracked file path is not canonical",
+            context={"path": path},
+        )
+    return path
+
+
+def _coerce_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
     if hasattr(raw, "__dataclass_fields__"):
         payload = {
             key: getattr(raw, key)
@@ -568,71 +586,65 @@ def _normalize_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
             context={"type": type(raw).__name__},
         )
     _unknown_keys(payload, _TRACKED_FILE_KEYS, field="tracked_file")
-    missing = sorted(_TRACKED_FILE_KEYS.difference(payload))
-    if missing:
-        raise IncrementalGraphError(
-            "tracked file is missing required keys",
-            context={"keys": missing},
-        )
 
-    path = _require_id(payload["path"], field="path")
-    mode = payload["mode"]
-    if mode not in {"100644", "100755", "120000", "160000"}:
-        raise IncrementalGraphError(
-            "tracked file mode is unsupported",
-            context={"path": path, "mode": mode},
-        )
-    oid_length = 40 if object_format == "sha1" else 64
-    index_blob = _require_repo_digest(
-        payload["index_blob"],
-        field="index_blob",
-        length=oid_length,
+    path = _require_repo_path(payload.get("path"))
+    mode = _require_git_mode(payload.get("mode"), field="tracked file mode")
+    index_blob = _require_object_id(
+        payload.get("index_blob"),
+        field="tracked file index_blob",
+        object_format=object_format,
     )
-    deleted = payload["deleted"]
-    working_tree = payload["working_tree"]
-    if not isinstance(deleted, bool) or not isinstance(working_tree, bool):
-        raise IncrementalGraphError(
-            "tracked file flags must be booleans",
-            context={"path": path},
-        )
-    size = payload["size"]
-    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
-        raise IncrementalGraphError(
-            "tracked file size must be a non-negative integer",
-            context={"path": path},
-        )
-    working_mode = payload["working_mode"]
+
+    deleted = payload.get("deleted", False)
+    working_tree = payload.get("working_tree", False)
+    if not isinstance(deleted, bool):
+        raise IncrementalGraphError("tracked file deleted must be a boolean")
+    if not isinstance(working_tree, bool):
+        raise IncrementalGraphError("tracked file working_tree must be a boolean")
+
+    working_mode = payload.get("working_mode")
     if working_mode is not None:
-        if working_mode not in {"100644", "100755", "120000", "160000"}:
+        working_mode = _require_git_mode(working_mode, field="tracked file working_mode")
+
+    effective_blob = payload.get("effective_blob", index_blob)
+    if deleted:
+        if effective_blob != "DELETED":
             raise IncrementalGraphError(
-                "tracked file working_mode is unsupported",
-                context={"path": path, "working_mode": working_mode},
-            )
-        if working_mode == mode:
-            raise IncrementalGraphError(
-                "tracked file working_mode redundantly matches index mode",
+                "deleted tracked file must use DELETED effective_blob",
                 context={"path": path},
             )
-
-    effective_blob = payload["effective_blob"]
-    if deleted:
-        if effective_blob != "DELETED" or size != 0 or not working_tree or working_mode is not None:
+        if working_mode is not None:
             raise IncrementalGraphError(
-                "deleted tracked file state is inconsistent",
+                "deleted tracked file cannot carry a working_mode",
                 context={"path": path},
             )
     else:
-        effective_blob = _require_repo_digest(
+        effective_blob = _require_object_id(
             effective_blob,
-            field="effective_blob",
-            length=oid_length,
+            field="tracked file effective_blob",
+            object_format=object_format,
         )
-        changed = effective_blob != index_blob or working_mode is not None
-        if working_tree != changed:
-            raise IncrementalGraphError(
-                "tracked file working_tree flag is inconsistent",
-                context={"path": path},
-            )
+
+    size = _require_non_negative_int(payload.get("size"), field="tracked file size")
+    if deleted and size != 0:
+        raise IncrementalGraphError(
+            "deleted tracked file size must be zero",
+            context={"path": path, "size": size},
+        )
+
+    changed = deleted or effective_blob != index_blob or (
+        working_mode is not None and working_mode != mode
+    )
+    if working_tree != changed:
+        raise IncrementalGraphError(
+            "tracked file working_tree flag contradicts content or mode state",
+            context={"path": path},
+        )
+    if working_mode == mode:
+        raise IncrementalGraphError(
+            "tracked file working_mode must describe an actual mode change",
+            context={"path": path},
+        )
 
     return {
         "path": path,
@@ -646,7 +658,7 @@ def _normalize_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
     }
 
 
-def _repo_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
+def _repo_index_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
     digest = hashlib.sha256()
     for item in files:
         effective_mode = item["working_mode"] or item["mode"]
@@ -668,91 +680,106 @@ def _repo_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
     return digest.hexdigest()
 
 
-def _source_specs_from_repo_index(raw: Any, *, max_nodes: int) -> list[NodeSpec]:
+def _validated_repo_index(raw: Any) -> tuple[dict[str, Any], ...]:
     payload = _coerce_repo_index(raw)
-    schema = payload["schema"]
-    if isinstance(schema, bool) or not isinstance(schema, int) or schema != 1:
-        raise IncrementalGraphError("repo index schema must equal 1")
-    object_format = payload["object_format"]
-    if object_format not in {"sha1", "sha256"}:
+    schema = payload.get("schema")
+    if isinstance(schema, bool) or schema != GRAPH_SCHEMA:
         raise IncrementalGraphError(
-            "repo index object_format is unsupported",
+            "repo index schema is incompatible",
+            context={"schema": schema, "expected": GRAPH_SCHEMA},
+        )
+
+    object_format = payload.get("object_format")
+    if object_format not in _GIT_OBJECT_LENGTHS:
+        raise IncrementalGraphError(
+            "repo index object_format must be sha1 or sha256",
             context={"object_format": object_format},
         )
-    oid_length = 40 if object_format == "sha1" else 64
-    head = payload["head"]
+
+    head = payload.get("head")
     if head is not None:
-        _require_repo_digest(head, field="head", length=oid_length)
-    expected_source_digest = _require_repo_digest(
-        payload["source_digest"],
-        field="source_digest",
-        length=64,
-    )
-    files = payload["files"]
+        _require_object_id(head, field="repo index head", object_format=object_format)
+
+    source_digest = payload.get("source_digest")
+    if (
+        not isinstance(source_digest, str)
+        or len(source_digest) != 64
+        or any(ch not in _HEX_DIGITS for ch in source_digest)
+    ):
+        raise IncrementalGraphError("repo index source_digest must be a sha256 digest")
+
+    files = payload.get("files")
     if not isinstance(files, Sequence) or isinstance(files, (str, bytes, bytearray)):
         raise IncrementalGraphError("repo index files must be a sequence")
-    if len(files) > max_nodes:
-        raise IncrementalGraphError(
-            "repo index file count exceeds configured node limit",
-            context={"files": len(files), "max_nodes": max_nodes},
-        )
-    tracked_files = _require_repo_int(payload["tracked_files"], field="tracked_files")
-    if tracked_files != len(files):
-        raise IncrementalGraphError(
-            "repo index tracked_files count mismatch",
-            context={"declared": tracked_files, "actual": len(files)},
-        )
-    tracked_bytes = _require_repo_int(payload["tracked_bytes"], field="tracked_bytes")
 
-    normalized: list[dict[str, Any]] = []
-    seen_paths: set[str] = set()
-    previous_path: bytes | None = None
-    total_bytes = 0
-    for item in files:
-        row = _normalize_tracked_file(item, object_format=object_format)
-        path_bytes = os.fsencode(row["path"])
-        if row["path"] in seen_paths:
-            raise IncrementalGraphError(
-                "repo index contains duplicate tracked path",
-                context={"path": row["path"]},
-            )
-        if previous_path is not None and path_bytes <= previous_path:
-            raise IncrementalGraphError("repo index files are not in canonical path order")
-        previous_path = path_bytes
-        seen_paths.add(row["path"])
-        total_bytes += row["size"]
-        normalized.append(row)
-    if total_bytes != tracked_bytes:
+    normalized = tuple(
+        _coerce_tracked_file(item, object_format=object_format)
+        for item in files
+    )
+    canonical_paths = sorted(
+        (item["path"] for item in normalized),
+        key=os.fsencode,
+    )
+    actual_paths = [item["path"] for item in normalized]
+    if actual_paths != canonical_paths:
+        raise IncrementalGraphError("repo index files are not in canonical path order")
+    if len(set(actual_paths)) != len(actual_paths):
+        raise IncrementalGraphError("repo index contains duplicate tracked paths")
+
+    tracked_files = _require_non_negative_int(
+        payload.get("tracked_files"),
+        field="repo index tracked_files",
+    )
+    if tracked_files != len(normalized):
         raise IncrementalGraphError(
-            "repo index tracked_bytes count mismatch",
-            context={"declared": tracked_bytes, "actual": total_bytes},
+            "repo index tracked_files mismatch",
+            context={"declared": tracked_files, "actual": len(normalized)},
         )
-    actual_source_digest = _repo_source_digest(normalized)
-    if actual_source_digest != expected_source_digest:
+
+    tracked_bytes = _require_non_negative_int(
+        payload.get("tracked_bytes"),
+        field="repo index tracked_bytes",
+    )
+    actual_bytes = sum(item["size"] for item in normalized)
+    if tracked_bytes != actual_bytes:
+        raise IncrementalGraphError(
+            "repo index tracked_bytes mismatch",
+            context={"declared": tracked_bytes, "actual": actual_bytes},
+        )
+
+    actual_digest = _repo_index_source_digest(normalized)
+    if source_digest != actual_digest:
         raise IncrementalGraphError(
             "repo index source_digest mismatch",
-            context={"expected": expected_source_digest, "actual": actual_source_digest},
+            context={"declared": source_digest, "actual": actual_digest},
         )
+    return normalized
 
+
+def _source_specs_from_repo_index(raw: Any) -> list[NodeSpec]:
     specs: list[NodeSpec] = []
-    for row in normalized:
-        if row["deleted"]:
-            continue
-        effective_mode = row["working_mode"] or row["mode"]
-        specs.append(
-            NodeSpec(
-                node_id=row["path"],
-                kind=SOURCE_KIND,
-                inputs={
-                    "blob": row["effective_blob"],
-                    "mode": effective_mode,
-                    "size": str(row["size"]),
-                },
-                dependencies=(),
-                cost=1,
-            )
-        )
+    for item in _validated_repo_index(raw):
+        spec = _source_spec_from_tracked_file(item)
+        if spec is not None:
+            specs.append(spec)
     return specs
+
+
+def _source_spec_from_tracked_file(payload: Mapping[str, Any]) -> NodeSpec | None:
+    if payload["deleted"]:
+        return None
+    effective_mode = payload["working_mode"] or payload["mode"]
+    return NodeSpec(
+        node_id=payload["path"],
+        kind=SOURCE_KIND,
+        inputs={
+            "blob": payload["effective_blob"],
+            "mode": effective_mode,
+            "size": str(payload["size"]),
+        },
+        dependencies=(),
+        cost=1,
+    )
 
 
 def _walk_bound(max_visits: int) -> Any:

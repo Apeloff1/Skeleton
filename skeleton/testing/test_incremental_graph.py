@@ -250,41 +250,69 @@ def test_scale_bounds_fail_closed_and_admit_the_limit() -> None:
     assert MAX_TRAVERSAL_VISITS >= MAX_EDGES
 
 
-def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
-    snapshot = {
+def _repo_source_digest(files: list[dict[str, object]]) -> str:
+    digest = hashlib.sha256()
+    for item in files:
+        effective_mode = item.get("working_mode") or item["mode"]
+        digest.update(str(item["path"]).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(item["mode"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(effective_mode).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(item["index_blob"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(item["effective_blob"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(item["size"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(b"1" if item.get("working_tree", False) else b"0")
+        digest.update(b"1" if item.get("deleted", False) else b"0")
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _valid_repo_index() -> dict[str, object]:
+    files: list[dict[str, object]] = [
+        {
+            "path": "gone.c",
+            "mode": "100644",
+            "index_blob": "d" * 64,
+            "effective_blob": "DELETED",
+            "size": 0,
+            "working_tree": True,
+            "deleted": True,
+        },
+        {
+            "path": "src/a.c",
+            "mode": "100644",
+            "index_blob": "a" * 64,
+            "effective_blob": "a" * 64,
+            "size": 3,
+        },
+        {
+            "path": "src/b.c",
+            "mode": "100644",
+            "index_blob": "b" * 64,
+            "effective_blob": "c" * 64,
+            "size": 3,
+            "working_tree": True,
+            "deleted": False,
+        },
+    ]
+    return {
         "schema": 1,
-        "head": "abc",
+        "head": "e" * 64,
         "object_format": "sha256",
-        "source_digest": "deadbeef",
-        "tracked_files": 2,
-        "tracked_bytes": 8,
-        "files": [
-            {
-                "path": "src/b.c",
-                "mode": "100644",
-                "index_blob": "bbb",
-                "effective_blob": "BBB",
-                "size": 3,
-                "working_tree": True,
-                "deleted": False,
-            },
-            {
-                "path": "src/a.c",
-                "mode": "100644",
-                "index_blob": "aaa",
-                "effective_blob": "AAA",
-                "size": 3,
-            },
-            {
-                "path": "gone.c",
-                "mode": "100644",
-                "index_blob": "zzz",
-                "effective_blob": "zzz",
-                "size": 1,
-                "deleted": True,
-            },
-        ],
+        "source_digest": _repo_source_digest(files),
+        "tracked_files": len(files),
+        "tracked_bytes": sum(int(item["size"]) for item in files),
+        "files": files,
     }
+
+
+def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
+    snapshot = _valid_repo_index()
     graph = build_incremental_graph(
         [{"id": "obj", "dependencies": ["src/a.c", "src/b.c"], "inputs": {"cmd": "cc"}}],
         repo_index=snapshot,
@@ -294,9 +322,7 @@ def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
     assert graph.node_map()["src/a.c"].kind == "source"
     assert "gone.c" not in graph.node_map()
 
-    duck = SimpleNamespace(
-        to_dict=lambda: snapshot,
-    )
+    duck = SimpleNamespace(to_dict=lambda: snapshot)
     again = build_incremental_graph(
         [{"id": "obj", "dependencies": ["src/a.c", "src/b.c"], "inputs": {"cmd": "cc"}}],
         repo_index=duck,
@@ -314,23 +340,105 @@ def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
         deleted: bool = False
         working_mode: str | None = None
 
+    files = tuple(TrackedFile(**item) for item in snapshot["files"])  # type: ignore[arg-type]
     typed = SimpleNamespace(
-        files=(
-            TrackedFile("src/a.c", "100644", "aaa", "AAA", 3),
-            TrackedFile("src/b.c", "100644", "bbb", "BBB", 3),
-        ),
-        schema=1,
-        head="abc",
-        object_format="sha256",
-        source_digest="deadbeef",
-        tracked_files=2,
-        tracked_bytes=8,
+        files=files,
+        schema=snapshot["schema"],
+        head=snapshot["head"],
+        object_format=snapshot["object_format"],
+        source_digest=snapshot["source_digest"],
+        tracked_files=snapshot["tracked_files"],
+        tracked_bytes=snapshot["tracked_bytes"],
     )
     typed_graph = build_incremental_graph(
         [{"id": "obj", "dependencies": ["src/a.c", "src/b.c"], "inputs": {"cmd": "cc"}}],
         repo_index=typed,
     )
     assert typed_graph.fingerprint == graph.fingerprint
+
+
+def test_repo_index_metadata_tampering_fails_closed() -> None:
+    snapshot = _valid_repo_index()
+
+    wrong_schema = {**snapshot, "schema": 2}
+    with pytest.raises(IncrementalGraphError, match="schema is incompatible"):
+        build_incremental_graph(repo_index=wrong_schema)
+
+    wrong_format = {**snapshot, "object_format": "md5"}
+    with pytest.raises(IncrementalGraphError, match="object_format"):
+        build_incremental_graph(repo_index=wrong_format)
+
+    wrong_head = {**snapshot, "head": "abc"}
+    with pytest.raises(IncrementalGraphError, match="repo index head"):
+        build_incremental_graph(repo_index=wrong_head)
+
+    wrong_digest = {**snapshot, "source_digest": "0" * 64}
+    with pytest.raises(IncrementalGraphError, match="source_digest mismatch"):
+        build_incremental_graph(repo_index=wrong_digest)
+
+    wrong_count = {**snapshot, "tracked_files": 99}
+    with pytest.raises(IncrementalGraphError, match="tracked_files mismatch"):
+        build_incremental_graph(repo_index=wrong_count)
+
+    wrong_bytes = {**snapshot, "tracked_bytes": 99}
+    with pytest.raises(IncrementalGraphError, match="tracked_bytes mismatch"):
+        build_incremental_graph(repo_index=wrong_bytes)
+
+
+def test_repo_index_file_tampering_fails_closed() -> None:
+    snapshot = _valid_repo_index()
+    base_files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
+
+    invalid_path = [dict(item) for item in base_files]
+    invalid_path[1]["path"] = "../src/a.c"
+    bad = {**snapshot, "files": invalid_path}
+    with pytest.raises(IncrementalGraphError, match="path is not canonical"):
+        build_incremental_graph(repo_index=bad)
+
+    invalid_mode = [dict(item) for item in base_files]
+    invalid_mode[1]["mode"] = "0777"
+    bad = {**snapshot, "files": invalid_mode}
+    with pytest.raises(IncrementalGraphError, match="supported git mode"):
+        build_incremental_graph(repo_index=bad)
+
+    invalid_oid = [dict(item) for item in base_files]
+    invalid_oid[1]["index_blob"] = "not-an-object-id"
+    bad = {**snapshot, "files": invalid_oid}
+    with pytest.raises(IncrementalGraphError, match="index_blob"):
+        build_incremental_graph(repo_index=bad)
+
+    invalid_flag = [dict(item) for item in base_files]
+    invalid_flag[1]["working_tree"] = "yes"
+    bad = {**snapshot, "files": invalid_flag}
+    with pytest.raises(IncrementalGraphError, match="working_tree must be a boolean"):
+        build_incremental_graph(repo_index=bad)
+
+    contradictory = [dict(item) for item in base_files]
+    contradictory[2]["working_tree"] = False
+    bad = {**snapshot, "files": contradictory}
+    with pytest.raises(IncrementalGraphError, match="working_tree flag contradicts"):
+        build_incremental_graph(repo_index=bad)
+
+    unsorted = list(reversed(base_files))
+    bad = {**snapshot, "files": unsorted}
+    with pytest.raises(IncrementalGraphError, match="canonical path order"):
+        build_incremental_graph(repo_index=bad)
+
+
+def test_working_mode_change_invalidates_source_fingerprint() -> None:
+    clean = _valid_repo_index()
+    files = [dict(item) for item in clean["files"]]  # type: ignore[union-attr]
+    files[1]["working_mode"] = "100755"
+    files[1]["working_tree"] = True
+    changed = {
+        **clean,
+        "files": files,
+        "source_digest": _repo_source_digest(files),
+    }
+    clean_graph = build_incremental_graph(repo_index=clean)
+    changed_graph = build_incremental_graph(repo_index=changed)
+    assert clean_graph.node_map()["src/a.c"].fingerprint != changed_graph.node_map()["src/a.c"].fingerprint
+    assert clean_graph.fingerprint != changed_graph.fingerprint
 
 
 def test_malformed_repo_index_fails_closed() -> None:
@@ -340,14 +448,19 @@ def test_malformed_repo_index_fails_closed() -> None:
         build_incremental_graph(
             repo_index={"files": [], "execute": "make"},
         )
+    snapshot = _valid_repo_index()
     with pytest.raises(IncrementalGraphError, match="files must be a sequence"):
-        build_incremental_graph(repo_index={"files": {"path": "a.c"}})
-    with pytest.raises(IncrementalGraphError, match="missing content digest"):
-        build_incremental_graph(repo_index={"files": [{"path": "a.c", "mode": "100644"}]})
+        build_incremental_graph(repo_index={**snapshot, "files": {"path": "a.c"}})
+
+    missing_digest_files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
+    missing_digest_files[1].pop("index_blob")
+    with pytest.raises(IncrementalGraphError, match="index_blob"):
+        build_incremental_graph(repo_index={**snapshot, "files": missing_digest_files})
+
     with pytest.raises(IncrementalGraphError, match="duplicate node"):
         build_incremental_graph(
             [{"id": "src/a.c"}],
-            repo_index={"files": [{"path": "src/a.c", "effective_blob": "x", "mode": "100644"}]},
+            repo_index=snapshot,
         )
 
 
