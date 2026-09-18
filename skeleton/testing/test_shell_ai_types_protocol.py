@@ -48,7 +48,7 @@ def proposal(proposal_id="p", intent_id="i", actions=None, **changes):
     values = dict(
         proposal_id=proposal_id,
         intent_id=intent_id,
-        actions=tuple(actions or (action(),)),
+        actions=tuple((action(),) if actions is None else actions),
         confidence=0.9,
         uncertainty=0.1,
         model_id="model",
