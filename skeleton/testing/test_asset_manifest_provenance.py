@@ -11,6 +11,7 @@ import hashlib
 import inspect
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -311,6 +312,37 @@ def test_unknown_schema_version_fails_closed():
         migrate_manifest({"schema_version": "1", "assets": []})
     empty = parse_manifest({"schema_version": 1, "assets": []})
     assert empty.assets == ()
+
+
+def test_typed_asset_record_rejects_invalid_content_metadata_and_release_flag():
+    record = AssetRecord.from_bytes(
+        asset_id="typed-asset",
+        kind="image",
+        data=b"asset-bytes",
+    )
+
+    bad_size = replace(record, content=replace(record.content, size_bytes=-1))
+    with pytest.raises(AssetManifestError, match="size_bytes"):
+        validate_manifest(AssetManifest(schema_version=SCHEMA_VERSION, assets=(bad_size,)))
+
+    bad_media = replace(
+        record,
+        content=replace(record.content, media_type="bad\x00type"),
+    )
+    with pytest.raises(AssetManifestError, match="media_type"):
+        validate_manifest(AssetManifest(schema_version=SCHEMA_VERSION, assets=(bad_media,)))
+
+    bad_flag = replace(record, release_marked="false")  # type: ignore[arg-type]
+    with pytest.raises(SerializationError, match="release_marked"):
+        validate_manifest(AssetManifest(schema_version=SCHEMA_VERSION, assets=(bad_flag,)))
+
+    with pytest.raises(SerializationError, match="release_marked"):
+        AssetRecord.from_bytes(
+            asset_id="typed-asset",
+            kind="image",
+            data=b"asset-bytes",
+            release_marked="false",  # type: ignore[arg-type]
+        )
 
 
 def test_release_marked_missing_rights_or_source_fails_closed():
