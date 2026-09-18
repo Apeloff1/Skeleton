@@ -10,6 +10,7 @@ import pytest
 from skeleton.shells.ai.audit_anchor import AIAuditAnchorStore
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
+from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore
 from skeleton.shells.ai.journal import AIDecisionJournal
 from skeleton.shells.ai.provenance import AIDecisionProvenance
 from skeleton.shells.ai.session import AISessionPhase, AIShellSession
@@ -306,3 +307,89 @@ def test_finalizer_accepts_stable_reconstructed_proposal_identity():
     )
     assert anchors.verify()
     assert result.audit_anchor.anchor.provenance_digest == bundle.provenance.digest
+
+
+def test_finalizer_can_emit_signed_top_level_execution_evidence():
+    session, proposal = completed_session()
+    backend = InMemoryFencedStore()
+    journal = AIDecisionJournal(clock=lambda: 10.0)
+    receipts = ReceiptChain()
+    session_store = SessionEvidenceStore(
+        backend,
+        namespace="session-evidence",
+    )
+    audit_store = AIAuditAnchorStore(
+        backend,
+        ArtifactSigner("audit", b"a" * 32, clock=lambda: 10.0),
+        namespace="audit",
+        clock=lambda: 10.0,
+    )
+    execution_store = AIExecutionEvidenceStore(
+        backend,
+        ArtifactSigner("execution", b"e" * 32, clock=lambda: 10.0),
+        namespace="execution-evidence",
+    )
+    finalizer = AIExecutionEvidenceFinalizer(
+        journal=journal,
+        receipt_chain=receipts,
+        session_evidence=session_store,
+        audit_anchors=audit_store,
+        execution_evidence=execution_store,
+        execution_evidence_builder=AIExecutionEvidenceBuilder(
+            clock=lambda: 11.0,
+        ),
+    )
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    bundle = execution_bundle(session, proposal, receipts)
+    result = finalizer.finalize(
+        session,
+        bundle,
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+        model_attestation_digest=fp("m"),
+        execution_seal_id="seal-1",
+        quorum_approval_digest=fp("q"),
+    )
+    assert result.execution_evidence is not None
+    signed = result.execution_evidence
+    assert signed.evidence.session_id == session.session_id
+    assert signed.evidence.provenance_digest == bundle.provenance.digest
+    assert signed.evidence.checkpoint_digest == result.recovery_checkpoint.digest
+    assert signed.evidence.session_evidence_digest == result.session_evidence.digest
+    assert signed.evidence.session_journal_digest == result.session_journal.digest
+    assert signed.evidence.audit_anchor_digest == result.audit_anchor.anchor.digest
+    assert signed.evidence.audit_chain_node_hash == result.audit_anchor.chain_node_hash
+    assert signed.evidence.release_evidence_digest == fp("l")
+    assert signed.evidence.model_attestation_digest == fp("m")
+    assert signed.evidence.execution_seal_id == "seal-1"
+    assert signed.evidence.quorum_approval_digest == fp("q")
+    assert execution_store.verify()
+
+
+def test_finalizer_without_execution_store_remains_backward_compatible():
+    session, proposal = completed_session()
+    journal, receipts, _, anchors, finalizer = environment()
+    journal.append(
+        "done",
+        session_id=session.session_id,
+        intent_id=session.intent.intent_id,
+        proposal_id=proposal.proposal_id,
+    )
+    result = finalizer.finalize(
+        session,
+        execution_bundle(session, proposal, receipts),
+        policy_fingerprint=fp("p"),
+        tool_catalog_digest=fp("t"),
+        effect_digest=fp("e"),
+        release_evidence_digest=fp("l"),
+    )
+    assert result.execution_evidence is None
+    assert result.to_dict()["execution_evidence"] is None
+    assert anchors.verify()
