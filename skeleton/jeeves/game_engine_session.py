@@ -386,6 +386,9 @@ class DeterministicGameLoop:
         before_clock = (
             self.clock.snapshot()
         )
+        before_machine = (
+            self.machine.snapshot()
+        )
         start_tick = (
             self.machine.tick
         )
@@ -427,93 +430,147 @@ class DeterministicGameLoop:
         evidence: list[
             SimulationTickEvidence
         ] = []
-        for tick in range(
-            start_tick,
-            expected_clock_tick,
-        ):
-            tick_inputs = (
-                grouped.get(
-                    tick,
-                    (),
+        executed_steps = 0
+        try:
+            for tick in range(
+                start_tick,
+                expected_clock_tick,
+            ):
+                tick_inputs = (
+                    grouped.get(
+                        tick,
+                        (),
+                    )
                 )
-            )
-            compatibility = (
-                self._compatibility_frame(
-                    tick,
-                    tick_inputs,
+                compatibility = (
+                    self._compatibility_frame(
+                        tick,
+                        tick_inputs,
+                    )
                 )
-            )
-            before_machine = (
-                self.machine.fingerprint()
-            )
-            frame = self.machine.step(
-                compatibility
-            )
-            after_machine = (
-                self.machine.fingerprint()
-            )
-            frame_digest = (
-                self._machine_frame_digest(
-                    frame
+                machine_before_digest = (
+                    self.machine.fingerprint()
                 )
-            )
-            tick_identity = {
-                "engine_era":
-                    self.era.value,
-                "tick":
-                    tick,
-                "input_digests":
-                    tuple(
-                        item.digest
-                        for item
-                        in tick_inputs
-                    ),
-                "players":
-                    tuple(
-                        item.player
-                        for item
-                        in tick_inputs
-                    ),
-                "compatibility_buttons":
-                    int(
-                        compatibility.buttons
-                    ),
-                "machine_before":
-                    before_machine,
-                "machine_after":
-                    after_machine,
-                "machine_frame":
-                    frame_digest,
-            }
-            tick_digest = (
-                _digest(
-                    tick_identity
+                frame = self.machine.step(
+                    compatibility
                 )
-            )
-            evidence.append(
-                SimulationTickEvidence(
-                    tick,
-                    tuple(
-                        item.digest
-                        for item
-                        in tick_inputs
-                    ),
-                    tuple(
-                        item.player
-                        for item
-                        in tick_inputs
-                    ),
-                    int(
-                        compatibility.buttons
-                    ),
-                    before_machine,
-                    after_machine,
-                    frame_digest,
-                    tick_digest,
+                executed_steps += 1
+                after_machine = (
+                    self.machine.fingerprint()
                 )
+                frame_digest = (
+                    self._machine_frame_digest(
+                        frame
+                    )
+                )
+                tick_identity = {
+                    "engine_era":
+                        self.era.value,
+                    "tick":
+                        tick,
+                    "input_digests":
+                        tuple(
+                            item.digest
+                            for item
+                            in tick_inputs
+                        ),
+                    "players":
+                        tuple(
+                            item.player
+                            for item
+                            in tick_inputs
+                        ),
+                    "compatibility_buttons":
+                        int(
+                            compatibility.buttons
+                        ),
+                    "machine_before":
+                        machine_before_digest,
+                    "machine_after":
+                        after_machine,
+                    "machine_frame":
+                        frame_digest,
+                }
+                tick_digest = (
+                    _digest(
+                        tick_identity
+                    )
+                )
+                evidence.append(
+                    SimulationTickEvidence(
+                        tick,
+                        tuple(
+                            item.digest
+                            for item
+                            in tick_inputs
+                        ),
+                        tuple(
+                            item.player
+                            for item
+                            in tick_inputs
+                        ),
+                        int(
+                            compatibility.buttons
+                        ),
+                        machine_before_digest,
+                        after_machine,
+                        frame_digest,
+                        tick_digest,
+                    )
+                )
+            self._assert_alignment()
+        except Exception:
+            restored = False
+            rollback = getattr(
+                self.machine,
+                "rollback",
+                None,
             )
-
-        self._assert_alignment()
+            rollback_depth = getattr(
+                self.machine,
+                "rollback_depth",
+                None,
+            )
+            if (
+                executed_steps > 0
+                and callable(
+                    rollback
+                )
+                and type(
+                    rollback_depth
+                )
+                is int
+                and rollback_depth
+                >= executed_steps
+            ):
+                try:
+                    rollback(
+                        executed_steps
+                    )
+                    restored = (
+                        self.machine.fingerprint()
+                        == before_machine.digest
+                    )
+                except Exception:
+                    restored = False
+            if not restored:
+                self.machine.restore(
+                    before_machine
+                )
+                clear_history = getattr(
+                    self.machine,
+                    "clear_rollback_history",
+                    None,
+                )
+                if callable(
+                    clear_history
+                ):
+                    clear_history()
+            self.clock.restore(
+                before_clock
+            )
+            self._assert_alignment()
+            raise
         machine_digest = (
             self.machine.fingerprint()
         )
