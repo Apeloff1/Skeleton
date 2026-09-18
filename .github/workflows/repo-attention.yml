@@ -46,7 +46,7 @@ jobs:
   sweep:
     name: Reconcile quiet work without closing it
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       issues: write
@@ -258,7 +258,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     # SECURITY: ordinary pull_request plus a same-repository guard keeps label
     # mutation write access away from untrusted fork pull requests. No job in
@@ -292,7 +292,7 @@ jobs:
   clear-issue-attention:
     name: Clear attention after human issue activity
     if: github.event_name == 'issues' && github.event.sender.type != 'Bot'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       issues: write
@@ -324,7 +324,7 @@ jobs:
       (github.event.comment.author_association == 'OWNER' ||
        github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'COLLABORATOR')
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       issues: write
@@ -377,7 +377,7 @@ jobs:
         (github.event.comment.author_association == 'OWNER' ||
          github.event.comment.author_association == 'MEMBER' ||
          github.event.comment.author_association == 'COLLABORATOR')))
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       issues: write

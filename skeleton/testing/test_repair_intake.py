@@ -302,6 +302,15 @@ def test_classify_intake_preempts_duplicate_stale_recovered_and_family_work() ->
     )
 
 
+def test_workflow_run_trigger_surface_is_bounded() -> None:
+    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
+
+    assert "- Merge Readiness" in workflow
+    assert "- Malware Gate" in workflow
+    for workflow_name in ("CodeQL", "Dependency Review", "Repository Hygiene Gate"):
+        assert f"- {workflow_name}" not in workflow
+
+
 def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
     workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
 
