@@ -23,6 +23,7 @@ from .cognition import (
     PromptCompiler,
     RunScratchpad,
 )
+from .fabric_cognition import FabricContextCompiler
 from .evidence import (
     EvidenceArtifact,
     EvidenceLedger,
@@ -404,7 +405,7 @@ class JeevesAgentRuntime:
         )
         self.grounding_policy = grounding_policy or GroundingPolicy()
         self.verification_policy = verification_policy or VerificationPolicy()
-        self.context = context_compiler or ContextCompiler()
+        self.context = context_compiler or FabricContextCompiler()
         self.prompts = prompt_compiler or PromptCompiler()
         self.config = config or AgentConfig()
         self.metrics = metrics or MetricsRegistry()
