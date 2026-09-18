@@ -125,6 +125,29 @@ def test_topological_order_is_dependencies_first_and_stable() -> None:
     assert graph.topological_order[:2] == ("a", "b")
 
 
+def test_deep_acyclic_chain_stays_within_graph_bounds_without_python_recursion() -> None:
+    node_count = 1_500
+    specs: list[dict[str, object]] = [{"id": "n0000"}]
+    specs.extend(
+        {
+            "id": f"n{index:04d}",
+            "dependencies": [f"n{index - 1:04d}"],
+        }
+        for index in range(1, node_count)
+    )
+
+    graph = build_incremental_graph(
+        specs,
+        max_nodes=2_000,
+        max_edges=2_000,
+    )
+
+    assert len(graph.nodes) == node_count
+    assert graph.topological_order[0] == "n0000"
+    assert graph.topological_order[-1] == f"n{node_count - 1:04d}"
+    assert graph.critical_path.length == node_count
+
+
 def test_fanout_invalidates_every_dependent_and_not_unrelated_siblings() -> None:
     graph = build_incremental_graph(
         [
