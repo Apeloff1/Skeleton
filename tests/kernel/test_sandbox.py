@@ -45,6 +45,23 @@ def test_none_ttl_remains_explicit_permanent_grant() -> None:
     assert sandbox.can("worker", Capability.FS_READ) is True
 
 
+def test_expired_grants_disappear_from_active_introspection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = {"value": 100.0}
+    monkeypatch.setattr("skeleton.kernel.sandbox.time.time", lambda: now["value"])
+    sandbox = Sandbox()
+    sandbox.grant("worker", Capability.FS_READ, ttl_seconds=2)
+
+    assert sandbox.grants_for("worker")
+    assert sandbox.holders() == {"worker"}
+
+    now["value"] = 102.0
+
+    assert sandbox.grants_for("worker") == ()
+    assert sandbox.holders() == set()
+
+
 def test_positive_ttl_is_normalized_and_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("skeleton.kernel.sandbox.time.time", lambda: 100.0)
     sandbox = Sandbox()
