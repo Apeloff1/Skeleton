@@ -257,10 +257,30 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve aliases assigned from tracked process callables or policy helpers."""
+    """Resolve aliases assigned from tracked process callables, modules, or helpers.
+
+    Module aliases are admitted only for a single unambiguous store and never when
+    the same name is a function/lambda parameter. This closes local module-alias
+    bypasses without treating later-reassigned locals as tracked modules.
+    """
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
+    store_counts: dict[str, int] = {}
+    parameter_names: set[str] = set()
+
     for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            store_counts[node.id] = store_counts.get(node.id, 0) + 1
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            args = node.args
+            parameter_names.update(
+                arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)
+            )
+            if args.vararg is not None:
+                parameter_names.add(args.vararg.arg)
+            if args.kwarg is not None:
+                parameter_names.add(args.kwarg.arg)
+
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 assignments.extend(destructured_assignments(target, node.value))
@@ -268,8 +288,10 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             assignments.append((node.target.id, node.value))
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             assignments.append((node.target.id, node.value))
+
     tracked_names = (
-        UNSAFE_CALLS.keys()
+        TRACKED_MODULES
+        | UNSAFE_CALLS.keys()
         | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
         | {f"{module}.__dict__" for module in TRACKED_MODULES}
         | ALIASABLE_HELPERS
@@ -279,9 +301,14 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
         changed = False
         for target, value in assignments:
             source = canonical_name(value, resolved)
-            if source in tracked_names and resolved.get(target) != source:
-                resolved[target] = source
-                changed = True
+            if source not in tracked_names or resolved.get(target) == source:
+                continue
+            if source in TRACKED_MODULES and (
+                store_counts.get(target, 0) != 1 or target in parameter_names
+            ):
+                continue
+            resolved[target] = source
+            changed = True
     return resolved
 
 
