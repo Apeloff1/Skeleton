@@ -34,6 +34,10 @@ class SolverError(PhysicsError):
     """Raised when a solver encounters invalid or non-finite state."""
 
 
+class ConvexQueryError(PhysicsError):
+    """Raised when bounded convex geometry cannot produce a stable result."""
+
+
 class DuplicateJointError(PhysicsError):
     """Raised when a world receives an already registered joint id."""
 
