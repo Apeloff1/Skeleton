@@ -1410,6 +1410,17 @@ def _ack_from_payload(payload: Mapping[str, Any]) -> Ack:
             "missing_sequences must fall strictly after applied and at or before received",
             context={"last_applied": last_applied, "last_received": last_received},
         )
+    if last_received > last_applied and (
+        not missing or missing[0] != last_applied + 1
+    ):
+        raise SequenceError(
+            "missing_sequences must begin with the next unapplied sequence",
+            context={
+                "last_applied": last_applied,
+                "last_received": last_received,
+                "first_missing": missing[0] if missing else None,
+            },
+        )
     return Ack(
         peer_id=_bounded_token("peer_id", data["peer_id"], maximum=MAX_PEER_ID_CHARS),
         last_applied_sequence=last_applied,
@@ -1594,7 +1605,12 @@ def _require_digest(value: Any) -> str:
 def _validate_packet_envelope(packet: Packet) -> None:
     if not isinstance(packet.kind, str) or packet.kind not in {"snapshot", "delta", "ack"}:
         raise SerializationError("unknown packet kind", context={"kind": packet.kind})
-    _require_int("schema_version", packet.schema_version, minimum=1)
+    schema_version = _require_int("schema_version", packet.schema_version, minimum=1)
+    if schema_version != SCHEMA_VERSION:
+        raise SchemaCompatibilityError(
+            "incompatible replication schema",
+            context={"schema_version": schema_version, "supported": SCHEMA_VERSION},
+        )
     _require_int("sequence", packet.sequence, minimum=0)
     if not isinstance(packet.payload, dict):
         raise SerializationError("payload must be an object")
