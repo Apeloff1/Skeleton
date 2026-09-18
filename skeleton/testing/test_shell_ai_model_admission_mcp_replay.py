@@ -582,6 +582,7 @@ def test_mcp_replay_remaining_zero_after_expiry():
 def test_mcp_replay_ttl_validation(ttl):
     guard = MCPReplayGuard(
         InMemoryFencedStore(),
+        default_ttl_seconds=1,
         max_ttl_seconds=10,
     )
     with pytest.raises(ValueError):
