@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -751,6 +752,21 @@ def test_callable_adapter_enforces_budget_even_when_callback_ignores_it() -> Non
     )
 
     assert values == (small,)
+
+
+def test_context_fabric_result_rejects_inconsistent_integrity_fields() -> None:
+    record = _external_record()
+    result = _external_fabric(record).retrieve(
+        _namespace().key,
+        "canonical alpha clue",
+    )
+
+    with pytest.raises(AgentContractError, match="does not match packed"):
+        replace(result, token_estimate=result.token_estimate + 1)
+    with pytest.raises(AgentContractError, match="broad_search_used must be boolean"):
+        replace(result, broad_search_used="false")
+    with pytest.raises(AgentContractError, match="fabric fingerprint"):
+        replace(result, fingerprint="not-a-fingerprint")
 
 
 def test_outer_fabric_rejects_oversized_record_from_noncompliant_adapter() -> None:
