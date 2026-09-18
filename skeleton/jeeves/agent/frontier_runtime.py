@@ -42,6 +42,7 @@ from .execution_audit import (
     ReplayReport,
 )
 from .model_based_control import CompactState
+from .epistemic_frontier import KnowledgeObligation
 from .runtime import RunCheckpoint, RunInputs, _RunState
 from .runtime_abstraction import (
     ArgumentAbstractor,
@@ -390,6 +391,21 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         """Import a resolved trial whose prediction is already in custody."""
 
         return self.semantic_plane.record_topology_bridge_trial(trial)
+
+    def semantic_topology_research_obligations(
+        self,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+    ) -> tuple[KnowledgeObligation, ...]:
+        """Return semantic-topology gaps as typed research obligations."""
+
+        return self.semantic_plane.topology_research_obligations(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
+        )
 
     def export_semantic_topology_learning_state(
         self,
