@@ -189,6 +189,19 @@ from .memory_game import (
     MemoryGamePolicy,
     RecallFeedback,
 )
+
+from .relational_memory import (
+    RelationKind,
+    RelationPrediction,
+    RelationStore,
+    RelationTrace,
+    RelationalHit,
+    RelationalMemoryError,
+    RelationalMemoryIndex,
+    RelationalMemoryPolicy,
+    SequenceObservation,
+    TransitionFeedback,
+)
 from .metacognition import (
     ActionSignals,
     BudgetPressure,
@@ -210,6 +223,22 @@ from .metacognition import (
     budget_pressure,
     epistemic_signals,
     progress_signals,
+)
+
+from .nuance_runtime import (
+    FrontierUncertaintyRouter,
+    NuanceFrame,
+    NuanceRuntimeError,
+    NuanceRuntimePolicy,
+    NuanceUpdate,
+    ScientificNuanceRuntime,
+    UncertaintyRecommendation,
+)
+from .perpendicular_semantics import (
+    PerpendicularAxisCandidate,
+    PerpendicularExpansionPlan,
+    PerpendicularExpansionPlanner,
+    PerpendicularPolicy,
 )
 from .planning import (
     ModelPlanParser,
@@ -322,6 +351,8 @@ from .semantic_extreme_lenses import (
     rare_semantic_specs,
     register_rare_lenses,
 )
+
+from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
     FrontierLensRouter,
     FrontierSemanticRegistry,

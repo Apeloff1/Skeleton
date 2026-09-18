@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
+from .semantic_deep_lenses import deep_semantic_lenses
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
@@ -509,6 +510,8 @@ class FrontierSemanticRegistry(SemanticLensRegistry):
     def __init__(self, extra: Iterable[SemanticLensSpec] = ()) -> None:
         super().__init__()
         for spec in frontier_semantic_lenses():
+            self.register(spec)
+        for spec in deep_semantic_lenses():
             self.register(spec)
         for spec in extra:
             self.register(spec)
