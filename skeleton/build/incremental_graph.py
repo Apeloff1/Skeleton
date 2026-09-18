@@ -142,12 +142,24 @@ class IncrementalBuildGraph:
                 reverse[dep].append(node.node_id)
         return {node_id: tuple(sorted(children)) for node_id, children in reverse.items()}
 
-    def invalidate(self, changed: Iterable[str]) -> frozenset[str]:
-        """Return ``changed`` plus every transitive dependent. Unknown ids fail closed."""
+    def invalidate(
+        self,
+        changed: Iterable[str],
+        *,
+        max_visits: int = MAX_TRAVERSAL_VISITS,
+    ) -> frozenset[str]:
+        """Return ``changed`` plus every transitive dependent.
+
+        Both seed ingestion and dependent traversal are bounded. Unknown ids
+        fail closed.
+        """
+        _require_positive_bound(max_visits, "max_visits")
         known = self.node_map()
         seeds: list[str] = []
         seen_seed: set[str] = set()
+        bump = _walk_bound(max_visits)
         for raw in changed:
+            bump()
             node_id = _require_id(raw, field="changed")
             if node_id not in known:
                 raise IncrementalGraphError(
@@ -157,7 +169,7 @@ class IncrementalBuildGraph:
             if node_id not in seen_seed:
                 seen_seed.add(node_id)
                 seeds.append(node_id)
-        return _dependent_closure(self.dependents(), seeds)
+        return _dependent_closure(self.dependents(), seeds, max_visits=max_visits)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -928,8 +940,10 @@ def _critical_path(
 def _dependent_closure(
     dependents: Mapping[str, Sequence[str]],
     seeds: Sequence[str],
+    *,
+    max_visits: int = MAX_TRAVERSAL_VISITS,
 ) -> frozenset[str]:
-    bump = _walk_bound(MAX_TRAVERSAL_VISITS)
+    bump = _walk_bound(max_visits)
     invalidated: set[str] = set()
     queue = deque(seeds)
     while queue:
