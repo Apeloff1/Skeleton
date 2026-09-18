@@ -283,7 +283,9 @@ def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path
     [
         'import ctypes\nctypes.CDLL("libc.so.6")\n',
         'from ctypes import CDLL\nCDLL("libc.so.6")\n',
+        'import ctypes\nctypes.cdll.LoadLibrary("libc.so.6")\n',
         'import multiprocessing\nmultiprocessing.Process(target=print).start()\n',
+        'import multiprocessing\nmultiprocessing.get_context("spawn")\n',
         'from multiprocessing import Process\nProcess(target=print).start()\n',
         'import pty\npty.spawn("/bin/sh")\n',
         'from pty import spawn\nspawn("/bin/sh")\n',
@@ -443,6 +445,17 @@ def test_nested_tool_policy_keys_cannot_bypass_self_grant_detection(
     assert decision.operation is not None
     assert decision.operation.kind is OperationKind.POLICY_MUTATE
     assert nested_key in decision.operation.target
+    assert box.granted_capabilities() == frozenset()
+
+
+def test_tool_json_duplicate_keys_fail_closed_before_semantic_dispatch(
+    tmp_path: Path,
+) -> None:
+    box = _sandbox(tmp_path)
+    payload = '{"name":"fetch","name":"noop","arguments":{"value":"ok"}}'
+    decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
+    assert decision.allowed is False
+    assert "duplicate JSON keys" in decision.reason
     assert box.granted_capabilities() == frozenset()
 
 
