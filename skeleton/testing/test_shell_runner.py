@@ -24,6 +24,7 @@ def _policy(tmp_path: Path, **overrides) -> ShellPolicy:
         "max_timeout": 2.0,
         "max_output_bytes": 4096,
         "max_input_bytes": 4096,
+        "max_env_bytes": 4096,
         "max_args": 16,
         "max_arg_bytes": 4096,
     }
@@ -82,6 +83,22 @@ def test_rejects_unapproved_environment_key(tmp_path: Path) -> None:
     runner = ShellRunner(_policy(tmp_path))
     with pytest.raises(ShellPolicyError):
         runner.run(ShellCommand("python", cwd=tmp_path, env={"SECRET_VALUE": "nope"}))
+
+
+
+def test_policy_copies_environment_allowlists(tmp_path: Path) -> None:
+    allowed = {"SAFE_VALUE"}
+    policy = _policy(tmp_path, allowed_env=allowed)
+    allowed.add("LATE_MUTATION")
+    runner = ShellRunner(policy)
+    with pytest.raises(ShellPolicyError):
+        runner.run(ShellCommand("python", cwd=tmp_path, env={"LATE_MUTATION": "nope"}))
+
+
+def test_rejects_oversize_environment(tmp_path: Path) -> None:
+    runner = ShellRunner(_policy(tmp_path, max_env_bytes=8))
+    with pytest.raises(ShellPolicyError):
+        runner.run(ShellCommand("python", cwd=tmp_path, env={"SAFE_VALUE": "too-large"}))
 
 
 def test_rejects_cwd_escape(tmp_path: Path) -> None:
