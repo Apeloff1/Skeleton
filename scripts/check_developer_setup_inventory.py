@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-TASK_KEY = "reserve-S101-developer-setup-audit"
+TASK_ID = "reserve-S101-developer-setup-audit"
 CONFLICT_DOMAIN = "dx.readonly.setup_audit"
 INVENTORY_VERSION = 1
 
@@ -719,7 +719,7 @@ def scan_developer_setup(root: Path) -> SetupInventory:
 
     items = classify_claims(_unique_claims(claims))
     return SetupInventory(
-        task_key=TASK_KEY,
+        task_key=TASK_ID,
         conflict_domain=CONFLICT_DOMAIN,
         schema_version=INVENTORY_VERSION,
         items=items,

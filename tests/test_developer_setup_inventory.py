@@ -113,7 +113,7 @@ class DeveloperSetupInventoryTests(unittest.TestCase):
         return {item.name: item for item in scanned.items}
 
     def test_task_identity_is_stable(self) -> None:
-        self.assertEqual(inventory.TASK_KEY, "reserve-S101-developer-setup-audit")
+        self.assertEqual(inventory.TASK_ID, "reserve-S101-developer-setup-audit")
         self.assertEqual(inventory.CONFLICT_DOMAIN, "dx.readonly.setup_audit")
         self.assertEqual(
             inventory.CLOSED_CLASSES,
@@ -337,7 +337,7 @@ required-version = "==0.12.15"
         first = inventory.scan_developer_setup(REPO_ROOT)
         second = inventory.scan_developer_setup(REPO_ROOT)
         self.assertEqual(first, second)
-        self.assertEqual(first.task_key, inventory.TASK_KEY)
+        self.assertEqual(first.task_key, inventory.TASK_ID)
         self.assertEqual(first.conflict_domain, inventory.CONFLICT_DOMAIN)
         self.assertTrue(any("AGENTS.md" in error for error in first.errors))
         names = [item.name for item in first.items]
@@ -367,7 +367,7 @@ required-version = "==0.12.15"
         _closed_fixture(self.root)
         scanned = self.scan()
         payload = scanned.to_dict()
-        self.assertEqual(payload["task_key"], inventory.TASK_KEY)
+        self.assertEqual(payload["task_key"], inventory.TASK_ID)
         self.assertEqual(payload["conflict_domain"], inventory.CONFLICT_DOMAIN)
         self.assertTrue(payload["closed"])
         encoded = json.dumps(payload, sort_keys=True)
