@@ -469,6 +469,27 @@ def test_malformed_provider_metadata_fails_closed_and_is_atomic() -> None:
     assert asyncio.run(router.invoke(_request())).selected_provider_id == "ok"
 
 
+def test_duplicate_provider_id_does_not_leak_new_runtime_adapter() -> None:
+    router = ModelRouter()
+    primary = FakeAdapter("primary-adapter")
+    router.register(
+        _metadata("same-id", adapter_name="primary-adapter"),
+        primary,
+    )
+    stray = FakeAdapter("stray-adapter")
+
+    with pytest.raises(ProviderMetadataError, match="already registered"):
+        router.register(
+            _metadata("same-id", adapter_name="stray-adapter"),
+            stray,
+        )
+
+    with pytest.raises(KeyError):
+        router.runtime.resolve("stray-adapter")
+    assert router.runtime.resolve("primary-adapter") is primary
+    assert router.catalog()["same-id"].adapter_name == "primary-adapter"
+
+
 def test_traces_and_eval_contract_keep_secrets_and_provenance() -> None:
     adapter = FakeAdapter("traceable", text="routed-answer")
     router = _router_with(
