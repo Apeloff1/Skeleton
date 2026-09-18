@@ -181,3 +181,26 @@ def test_housekeeping_wake_is_independent_arm_job() -> None:
     assert "actions: write" in wake
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in wake
     assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in wake
+
+
+def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
+    workflow = _workflow_text()
+
+    assert "def closed_dynamic_ai_pr_run(run):" in workflow
+    assert "dynamic/agents/github-advanced-security" in workflow
+    assert "prefix = 'Code scanning AI findings on PR #'" in workflow
+    assert "status, payload = request(f'/repos/{repo}/pulls/{number}')" in workflow
+    assert "closed_dynamic_ai_cache" not in workflow
+    assert "str(payload.get('state') or '') == 'closed'" in workflow
+    assert "closed and head_repo == repo and head_ref == branch" in workflow
+    assert "closed_dynamic_ai_queued" in workflow
+    assert "closed_dynamic_ai_active" in workflow
+
+    helper = workflow[
+        workflow.index("def closed_dynamic_ai_pr_run"):
+        workflow.index("def path(run):")
+    ]
+    assert "run_repo != repo" in helper
+    assert "branch == 'main'" in helper
+    assert "number_text.isdigit()" in helper
+    assert "state') or '') == 'closed'" in helper

@@ -36,7 +36,7 @@ jobs:
       FAILED_RUN_RETENTION_DAYS: '21'
       MAX_CACHE_DELETES: '500'
       MAX_RUN_DELETES: '1000'
-      LIVE_RUN_STALE_MINUTES: '30'
+      LIVE_RUN_STALE_MINUTES: '10'
       LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
       FORCE_CANCEL_ATTEMPTS: '4'
       FORCE_CANCEL_POLL_SECONDS: '2'
@@ -185,17 +185,21 @@ jobs:
               continue
             fi
 
+            security_pr_candidate=false
             case "$name" in
               *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency*|*Repository\ Hygiene*|*Workflow\ Input\ Security*)
-                kept_security=$((kept_security + 1))
-                continue
+                security_pr_candidate=true
                 ;;
             esac
 
             case "$event" in
               pull_request) ;;
               *)
-                kept_unlinked=$((kept_unlinked + 1))
+                if [[ "$security_pr_candidate" == "true" ]]; then
+                  kept_security=$((kept_security + 1))
+                else
+                  kept_unlinked=$((kept_unlinked + 1))
+                fi
                 continue
                 ;;
             esac
@@ -261,6 +265,17 @@ jobs:
             status_now=$(gh api "/repos/${REPO}/actions/runs/${id}" --jq '.status // empty' 2>/dev/null || true)
             if [[ "$status_now" == "completed" ]]; then
               moved=$((moved + 1))
+              continue
+            fi
+
+            # Security/provenance/artifact/dependency PR runs may be normally
+            # cancelled once exact stale identity is proven, but never escalate
+            # them through force-cancel. Provider ambiguity on a security lane
+            # preserves the run rather than weakening evidence custody.
+            if [[ "$security_pr_candidate" == "true" ]]; then
+              kept_security=$((kept_security + 1))
+              preserved_errors=$((preserved_errors + 1))
+              echo "security PR preserve after ordinary cancel failure: run=${id} status=${status_now:-unknown}"
               continue
             fi
 
@@ -397,7 +412,7 @@ jobs:
             echo "- Runs that completed before/during cancellation: $moved"
             echo "- Ambiguous/API/cancellation runs preserved: $preserved_errors"
             echo "- Current PR-head runs preserved: $kept_current"
-            echo "- Security/provenance/artifact/dependency runs preserved: $kept_security"
+            echo "- Security/provenance/artifact/dependency runs preserved from force escalation: $kept_security"
             echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
             echo "- Recent live runs preserved: $kept_recent"
             echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
@@ -405,8 +420,9 @@ jobs:
             echo "- Force-cancel attempts per proven target: ${FORCE_CANCEL_ATTEMPTS}"
             echo "- Force-cancel poll interval: ${FORCE_CANCEL_POLL_SECONDS}s"
             echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
-            echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
-            echo '- Force-cancel additionally requires a fresh queued-only run check and a fresh PR-state revalidation after ordinary cancellation fails.'
+            echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA, including security-class PR runs.'
+            echo '- Security/provenance/artifact/dependency PR runs are never force-cancelled after an ordinary cancellation failure.'
+            echo '- Force-cancel for non-security runs additionally requires a fresh queued-only run check and a fresh PR-state revalidation after ordinary cancellation fails.'
           } >> "$GITHUB_STEP_SUMMARY"
 
           if (( preserved_errors > 0 )); then
