@@ -253,7 +253,7 @@ def depth_semantic_definitions() -> tuple[RareLensDefinition, ...]:
             "Calling rational residual belief perseverance when independent evidence remains.",
             ("belief perseverance", "belief revision"), LensMaturity.EMPIRICAL,
             "Audit all remaining evidence before labeling under-updating."),
-        
+
         # RHETORIC
         _d(
             "implicature_cancellation", LensFamily.RHETORIC, SemanticRole.ADVERSARIAL_READING, 1975,
