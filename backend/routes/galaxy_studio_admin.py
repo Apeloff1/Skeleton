@@ -86,8 +86,8 @@ async def list_resumable_builds():
                 "resumable":            not is_active,
             })
         return {"builds": out, "count": len(out)}
-    except Exception as e:
-        return {"builds": [], "count": 0, "error": str(e)[:200]}
+    except Exception:
+        return {"builds": [], "count": 0, "error": "build_list_unavailable"}
 
 
 @router.get("/my-builds")
@@ -135,8 +135,8 @@ async def list_my_builds(limit: int = 50, status: str = ""):
                 "total_phases":   d.get("total_phases",   100),
             })
         return {"builds": out, "count": len(out)}
-    except Exception as e:
-        return {"builds": [], "count": 0, "error": str(e)[:200]}
+    except Exception:
+        return {"builds": [], "count": 0, "error": "build_list_unavailable"}
 
 
 @router.get("/admin-status")

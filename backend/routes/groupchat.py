@@ -87,8 +87,8 @@ async def _run_groupchat(pid: str, job_id: str, only_missing: bool, only_stale: 
             pass
         try:
             res = await _stamped(pid, stage, _FORGES[stage](pid))
-        except Exception as e:  # noqa
-            res = {"ok": False, "error": str(e)[:200]}
+        except Exception:  # noqa
+            res = {"ok": False, "error": "forge_step_failed"}
         if res.get("ok"):
             done += 1
             await _say(job_id, transcript, agent,

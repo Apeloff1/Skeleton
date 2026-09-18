@@ -502,6 +502,6 @@ def prune_gamefiles(build_id: str | None = None) -> dict:
         hq = ({"build_id": build_id} if build_id else {})
         res["gamefiles_deleted"] = db["galaxy_text_gamefiles"].delete_many(gq).deleted_count
         res["history_deleted"] = db["galaxy_pipeline_history"].delete_many(hq).deleted_count
-    except Exception as e:
-        res["error"] = str(e)
+    except Exception:
+        res["error"] = "prune_failed"
     return res

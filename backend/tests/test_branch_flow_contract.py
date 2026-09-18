@@ -26,8 +26,21 @@ def test_live_branch_flow_contract_passes() -> None:
 
 
 def test_rejects_pull_request_trigger() -> None:
-    source = _replace_once(_source(), "  push:\n    branches: [main]\n", "  push:\n    branches: [main]\n  pull_request:\n    types: [synchronize]\n")
+    source = _replace_once(
+        _source(),
+        "  workflow_dispatch:\n",
+        "  workflow_dispatch:\n  pull_request:\n    types: [synchronize]\n",
+    )
     assert "must never run on pull-request events" in _messages(source)
+
+
+def test_rejects_main_push_trigger() -> None:
+    source = _replace_once(
+        _source(),
+        "  workflow_dispatch:\n",
+        "  workflow_dispatch:\n  push:\n    branches: [main]\n",
+    )
+    assert "must not run on every main push" in _messages(source)
 
 
 def test_rejects_async_update_branch_endpoint() -> None:
@@ -125,3 +138,12 @@ def test_rejects_action_checkout() -> None:
 def test_rejects_loss_of_mutation_cap() -> None:
     source = _replace_once(_source(), "          max_updates = 4", "          max_updates = 100")
     assert "bounded per-pass mutation cap" in _messages(source)
+
+
+def test_rejects_loss_of_queue_pressure_guard() -> None:
+    source = _replace_once(
+        _source(),
+        "      MAX_QUEUED_ACTIONS_RUNS: '40'\n",
+        "",
+    )
+    assert "queue-pressure contract missing" in _messages(source)

@@ -776,7 +776,6 @@ def _fallback_convex_toi_scan(
 
     return None
 
-
 def convex_time_of_impact(
     a: RigidBody,
     b: RigidBody,

@@ -12,7 +12,26 @@ SPECIAL_MOUNTS = {"routes.registry_health"}
 # the same /api/academy prefix and is the registered MongoDB-backed successor;
 # mounting both would create ambiguous duplicate routes rather than reconnect
 # useful functionality.
-INTENTIONAL_UNMOUNTED = {"routes.academy"}
+# Galaxy Studio sub-routers are mounted by ``routes.galaxy_studio`` via
+# ``include_router``; listing them here avoids double-mounting the same paths.
+INTENTIONAL_UNMOUNTED = {
+    "routes.academy",
+    "routes.galaxy_studio_admin",
+    "routes.galaxy_studio_agents",
+    "routes.galaxy_studio_catalogs",
+    "routes.galaxy_studio_code_library",
+    "routes.galaxy_studio_eas",
+    "routes.galaxy_studio_files",
+    "routes.galaxy_studio_flair",
+    "routes.galaxy_studio_manifest",
+    "routes.galaxy_studio_mega_dbs",
+    "routes.galaxy_studio_meta",
+    "routes.galaxy_studio_ml_config",
+    "routes.galaxy_studio_pipeline",
+    "routes.galaxy_studio_vault",
+    "routes.galaxy_studio_vault_admin",
+    "routes.galaxy_studio_watchdog",
+}
 
 
 def _declared_modules() -> set[str]:

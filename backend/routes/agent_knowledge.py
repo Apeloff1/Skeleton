@@ -554,17 +554,20 @@ async def reseed_all():
         from seeds.patch_notes_seed import seed_patch_notes
         out["patch_notes"] = await seed_patch_notes(_db)
     except Exception as e:
-        out["patch_notes_error"] = str(e)[:200]
+        log.warning("patch notes reseed failed: %s", type(e).__name__)
+        out["patch_notes_error"] = "seed_failed"
     try:
         from seeds.github_code_seed import seed_github_code
         out["github_code"] = await seed_github_code(_db)
     except Exception as e:
-        out["github_code_error"] = str(e)[:200]
+        log.warning("github code reseed failed: %s", type(e).__name__)
+        out["github_code_error"] = "seed_failed"
     try:
         from seeds.language_classes_seed import seed_language_classes
         out["language_classes"] = await seed_language_classes(_db)
     except Exception as e:
-        out["language_classes_error"] = str(e)[:200]
+        log.warning("language classes reseed failed: %s", type(e).__name__)
+        out["language_classes_error"] = "seed_failed"
     return {"status": "ok", "results": out}
 
 
@@ -595,8 +598,8 @@ async def scrapers_run_now():
     try:
         from services.live_scrapers import run_scrapers_once
         return await run_scrapers_once(_db)
-    except Exception as e:
-        return {"error": str(e)[:240]}
+    except Exception:
+        return {"error": "scraper_run_failed"}
 
 
 # ═══ Training-recipes shortcut endpoints (Cross-Entropy, LoRA, ICL log-probs) ═══

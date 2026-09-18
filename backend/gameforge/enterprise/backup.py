@@ -64,8 +64,8 @@ class BackupService:
         if self.s3 and getattr(self.s3, "enabled", False):
             try:
                 result["s3"] = self.s3.upload_file(str(local_path))
-            except Exception as e:
-                result["s3"] = {"uploaded": False, "error": str(e)}
+            except Exception:
+                result["s3"] = {"uploaded": False, "error": "s3_upload_failed"}
         else:
             result["s3"] = {"uploaded": False, "reason": "disabled"}
         logger.info("Backup created %s", result["local_path"])

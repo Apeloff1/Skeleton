@@ -66,10 +66,10 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
             else:
                 app.include_router(router)
             ok += 1
-        except Exception as e:
-            skipped_names.append(f"{module_path} ({type(e).__name__}: {e})")
+        except Exception:
+            skipped_names.append(f"{module_path} (import_failed)")
             print(
-                f"[BOOT] route import SKIPPED: {module_path} -> {type(e).__name__}: {e}",
+                f"[BOOT] route import SKIPPED: {module_path} -> import_failed",
                 flush=True,
                 file=sys.stderr,
             )

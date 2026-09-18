@@ -51,7 +51,7 @@ async def log_change(
             if ids:
                 await core_db[COLLECTION].delete_many({"_id": {"$in": ids}})
     except Exception as e:  # noqa: BLE001
-        print(f"[feature_flags_audit] log_change error: {type(e).__name__}: {e}", flush=True)
+        print(f"[feature_flags_audit] log_change error: {type(e).__name__}", flush=True)
 
 
 async def recent(limit: int = 100, name: str | None = None) -> list[dict[str, Any]]:
@@ -64,7 +64,7 @@ async def recent(limit: int = 100, name: str | None = None) -> list[dict[str, An
             r.pop("_id", None)
         return rows
     except Exception as e:  # noqa: BLE001
-        print(f"[feature_flags_audit] recent error: {type(e).__name__}: {e}", flush=True)
+        print(f"[feature_flags_audit] recent error: {type(e).__name__}", flush=True)
         return []
 
 
@@ -72,8 +72,8 @@ async def stats() -> dict[str, Any]:
     try:
         total = await core_db[COLLECTION].estimated_document_count()
         return {"ok": True, "total_rows": int(total), "max_rows": MAX_ROWS}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "audit_stats_failed"}
 
 
 async def ensure_indexes() -> None:
@@ -82,4 +82,4 @@ async def ensure_indexes() -> None:
         await core_db[COLLECTION].create_index([("ts", -1)])
         await core_db[COLLECTION].create_index([("name", 1), ("ts", -1)])
     except Exception as e:  # noqa: BLE001
-        print(f"[feature_flags_audit] index error: {type(e).__name__}: {e}", flush=True)
+        print(f"[feature_flags_audit] index error: {type(e).__name__}", flush=True)

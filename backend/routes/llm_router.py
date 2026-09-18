@@ -236,7 +236,6 @@ async def route_complete(task: str, prompt: str, system: str = "",
 
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     sid = session_id or f"router-{uuid.uuid4().hex[:8]}"
-    last_err = None
     for i, model in enumerate(ensemble):
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
@@ -257,12 +256,12 @@ async def route_complete(task: str, prompt: str, system: str = "",
             await _log_call({"task": task, "model": model, "provider": provider, "cached": False,
                              "latency_ms": latency_ms, "est_cost_usd": cost, "fallback": i > 0})
             return result
-        except Exception as e:  # timeout or provider error → try next in ensemble
-            last_err = str(e)
+        except Exception:  # timeout or provider error → try next in ensemble
+            pass
 
     _STATS["errors"] += 1
-    await _log_call({"task": task, "model": None, "cached": False, "error": str(last_err)})
-    return {"content": "", "error": f"all models failed: {last_err}", "model": None,
+    await _log_call({"task": task, "model": None, "cached": False, "error": "llm_request_failed"})
+    return {"content": "", "error": "llm_request_failed", "model": None,
             "provider": None, "cached": False, "task": task, "attempts": len(ensemble)}
 
 

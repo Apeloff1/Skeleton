@@ -34,14 +34,23 @@ def test_parity_matrix_maps_all_required_operation_families():
         "configuration",
         "capabilities",
         "admin",
+        "retrieve",
+        "plan",
+        "evidence",
     }
     assert matrix["full_surface_parity"] is True
+    assert matrix["schema_version"] == 1
+    assert matrix["mode"] == "sync"
+    assert matrix["async_supported"] is False
     assert all(row["api"] and row["cli"] for row in rows.values())
     assert {name for name, row in rows.items() if row["auth_required"]} == {
         "run",
         "tool",
         "memory",
         "admin",
+        "retrieve",
+        "plan",
+        "evidence",
     }
 
 
@@ -119,7 +128,7 @@ def test_api_capabilities_uses_shared_contract_without_seal(monkeypatch):
     assert response["data"] == capability_manifest()
 
 
-@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])
+@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin", "retrieve", "plan", "evidence"])
 def test_api_auth_required_commands_reject_missing_seal(monkeypatch, command):
     observed = []
 
@@ -139,7 +148,7 @@ def test_api_auth_required_commands_reject_missing_seal(monkeypatch, command):
     assert observed == [None]
 
 
-@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])
+@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin", "retrieve", "plan", "evidence"])
 def test_api_auth_required_commands_accept_valid_seal_before_dispatch(monkeypatch, command):
     observed = []
 

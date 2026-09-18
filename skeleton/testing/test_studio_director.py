@@ -174,7 +174,7 @@ def test_audit_log_redacts_secret_like_values_without_corrupting_json(tmp_path) 
     assert "[REDACTED]" in row["value"]
 
 
-def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_path, monkeypatch) -> None:
+def test_propose_smoke_exercises_four_agent_squad_and_restores_worktree(tmp_path, monkeypatch) -> None:
     _init_smoke_repo(tmp_path, monkeypatch)
     responses = [
         json.dumps(
@@ -187,6 +187,13 @@ def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_pat
                         "paths": ["docs/smoke.txt"],
                     }
                 ]
+            }
+        ),
+        json.dumps(
+            {
+                "findings": ["docs/smoke.txt contains the old fixture value"],
+                "risks": ["fixture must remain plain text"],
+                "recommended_checks": ["git apply --check", "credential-free smoke"],
             }
         ),
         json.dumps(
@@ -204,6 +211,116 @@ def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_pat
             }
         ),
         json.dumps({"approve": True, "reasons": ["bounded fixture-only change"]}),
+        json.dumps(
+            {
+                "approve": True,
+                "reasons": ["patch has deterministic smoke coverage"],
+                "required_checks": ["credential-free autonomous studio smoke"],
+            }
+        ),
+    ]
+
+    class FakeReasoner:
+        def __init__(self) -> None:
+            self.index = 0
+            self.requests = []
+
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, request):
+            self.requests.append(request)
+            text = responses[self.index]
+            self.index += 1
+            return SimpleNamespace(ok=True, text=text, error_kind=None)
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
+    patch_path, audit_path = _artifact_paths(tmp_path)
+
+    assert studio_director.propose(
+        patch_path=patch_path,
+        audit_path=audit_path,
+        max_tasks=1,
+        cohort_size=4,
+        seed="smoke-seed",
+        repo_state_path=None,
+    ) == 0
+
+    patch = patch_path.read_text(encoding="utf-8")
+    assert "docs/smoke.txt" in patch
+    assert "+new" in patch
+    assert (tmp_path / "docs/smoke.txt").read_text(encoding="utf-8") == "old\n"
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert status == ""
+
+
+def test_propose_refuses_independent_planning_when_live_repo_state_exists(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+    repo_state = tmp_path / "repo-state.json"
+    repo_state.write_text(
+        json.dumps(
+            {
+                "_shift_supervisor": {
+                    "status": "loaded",
+                    "team": "night",
+                    "generation_id": "gen-1",
+                    "plan_items": [
+                        {
+                            "id": "night-plan-1",
+                            "title": "Canonical",
+                            "description": "Must be consumed by supervised_studio.",
+                            "status": "queued",
+                        }
+                    ],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class ForbiddenPlanner:
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            raise AssertionError("independent planner must not run against live supervisor state")
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", ForbiddenPlanner)
+    patch_path, audit_path = _artifact_paths(tmp_path)
+    with pytest.raises(ValueError, match="supervised_studio"):
+        studio_director.propose(
+            patch_path=patch_path,
+            audit_path=audit_path,
+            max_tasks=1,
+            cohort_size=4,
+            seed="live-state",
+            repo_state_path=repo_state,
+        )
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert records[-1]["event"] == "run_failed_closed"
+    assert records[-1]["stage"] == "planning"
+
+
+def test_researcher_cannot_author_a_patch_during_squad_execution(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+    responses = [
+        json.dumps(
+            {"tasks": [{"title": "Smoke change", "objective": "Exercise research boundary.", "division": "gameplay_systems", "paths": ["docs/smoke.txt"]}]}
+        ),
+        json.dumps(
+            {
+                "findings": ["should stay evidence-only"],
+                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\n",
+            }
+        ),
     ]
 
     class FakeReasoner:
@@ -221,30 +338,111 @@ def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_pat
 
     monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
     patch_path, audit_path = _artifact_paths(tmp_path)
-
     assert studio_director.propose(
         patch_path=patch_path,
         audit_path=audit_path,
         max_tasks=1,
-        cohort_size=3,
-        seed="smoke-seed",
+        cohort_size=4,
+        seed="research-patch",
         repo_state_path=None,
     ) == 0
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert [record["event"] for record in records] == [
+        "run_started",
+        "plan_created",
+        "task_failed_closed",
+        "run_finished",
+    ]
+    failure = records[2]
+    assert failure["task"] == "Smoke change"
+    assert "researcher must remain evidence-only" in failure["error"]
+    assert records[-1]["accepted_tasks"] == 0
+    assert records[-1]["emitted_patch_chars"] == 0
+    assert patch_path.read_text(encoding="utf-8") == ""
 
-    patch = patch_path.read_text(encoding="utf-8")
-    assert "docs/smoke.txt" in patch
-    assert "+new" in patch
-    assert (tmp_path / "docs/smoke.txt").read_text(encoding="utf-8") == "old\n"
-    status = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    assert status == ""
+
+def test_verifier_can_reject_reviewed_patch_before_it_reaches_ci(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+    responses = [
+        json.dumps(
+            {"tasks": [{"title": "Smoke change", "objective": "Exercise verification.", "division": "gameplay_systems", "paths": ["docs/smoke.txt"]}]}
+        ),
+        json.dumps({"findings": ["fixture"], "risks": [], "recommended_checks": ["smoke"]}),
+        json.dumps(
+            {
+                "patch": "diff --git a/docs/smoke.txt b/docs/smoke.txt\n--- a/docs/smoke.txt\n+++ b/docs/smoke.txt\n@@ -1 +1 @@\n-old\n+new\n",
+                "summary": "change",
+                "tests": ["smoke"],
+            }
+        ),
+        json.dumps({"approve": True, "reasons": ["review ok"]}),
+        json.dumps({"approve": False, "reasons": ["acceptance evidence is insufficient"], "required_checks": ["missing contract"]}),
+    ]
+
+    class FakeReasoner:
+        def __init__(self) -> None:
+            self.index = 0
+
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            text = responses[self.index]
+            self.index += 1
+            return SimpleNamespace(ok=True, text=text, error_kind=None)
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
+    patch_path, audit_path = _artifact_paths(tmp_path)
+    assert studio_director.propose(
+        patch_path=patch_path,
+        audit_path=audit_path,
+        max_tasks=1,
+        cohort_size=4,
+        seed="verify-reject",
+        repo_state_path=None,
+    ) == 0
+    assert patch_path.read_text(encoding="utf-8") == ""
     events = [json.loads(line)["event"] for line in audit_path.read_text(encoding="utf-8").splitlines()]
-    assert events == ["run_started", "plan_created", "patch_accepted", "run_finished"]
+    assert events == ["run_started", "plan_created", "patch_rejected_by_squad", "run_finished"]
+
+
+def test_planner_rejects_overlapping_paths_before_squads_activate(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+    responses = [
+        json.dumps(
+            {
+                "tasks": [
+                    {"title": "A", "objective": "A", "division": "gameplay_systems", "paths": ["docs/smoke.txt"]},
+                    {"title": "B", "objective": "B", "division": "gameplay_systems", "paths": ["docs/smoke.txt"]},
+                ]
+            }
+        )
+    ]
+
+    class FakeReasoner:
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            return SimpleNamespace(ok=True, text=responses[0], error_kind=None)
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
+    patch_path, audit_path = _artifact_paths(tmp_path)
+    with pytest.raises(ValueError, match="overlapping squad paths"):
+        studio_director.propose(
+            patch_path=patch_path,
+            audit_path=audit_path,
+            max_tasks=2,
+            cohort_size=4,
+            seed="overlap",
+            repo_state_path=None,
+        )
+    assert patch_path.read_text(encoding="utf-8") == ""
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert records[-1]["event"] == "run_failed_closed"
+    assert records[-1]["stage"] == "planning"
 
 
 def test_propose_planning_failure_is_audited_and_emits_empty_patch(tmp_path, monkeypatch) -> None:
@@ -266,7 +464,7 @@ def test_propose_planning_failure_is_audited_and_emits_empty_patch(tmp_path, mon
             patch_path=patch_path,
             audit_path=audit_path,
             max_tasks=1,
-            cohort_size=3,
+            cohort_size=4,
             seed="failure-seed",
             repo_state_path=None,
         )

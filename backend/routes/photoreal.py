@@ -68,8 +68,8 @@ def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str):
             _JOBS[job_id] = {"status": "error", "error": "no image returned",
                              "elapsed": round(time.time() - t0, 1)}
     except Exception as e:  # noqa
-        _log.warning("photoreal job %s failed: %s", job_id, e)
-        _JOBS[job_id] = {"status": "error", "error": str(e)[:200], "elapsed": round(time.time() - t0, 1)}
+        _log.warning("photoreal job %s failed: %s", job_id, type(e).__name__)
+        _JOBS[job_id] = {"status": "error", "error": "photoreal_generation_failed", "elapsed": round(time.time() - t0, 1)}
 
 
 class GenBody(BaseModel):

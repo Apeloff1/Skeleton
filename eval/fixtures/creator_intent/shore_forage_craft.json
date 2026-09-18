@@ -1,0 +1,57 @@
+{
+  "schema": "eval.fixtures.creator_intent.v1",
+  "schema_version": 1,
+  "fixture_id": "shore_forage_craft",
+  "concept": {
+    "title": "Shore Forage",
+    "statement": "A single-player shore forage and craft loop with a required local save. Player-uploaded marketplace content is forbidden."
+  },
+  "expected_normalized": {
+    "constraints": [
+      {
+        "id": "c_local_save",
+        "field": "save_mode",
+        "op": "require",
+        "value": "local"
+      },
+      {
+        "id": "c_no_ugc_market",
+        "field": "ugc_marketplace",
+        "op": "forbid",
+        "value": true
+      }
+    ]
+  },
+  "expected_design_graph": {
+    "nodes": [
+      {
+        "id": "n_shore",
+        "kind": "world",
+        "title": "Tidal shore",
+        "depends_on": []
+      },
+      {
+        "id": "n_forage",
+        "kind": "mechanic",
+        "title": "Forage loop",
+        "depends_on": ["n_shore"]
+      },
+      {
+        "id": "n_craft",
+        "kind": "system",
+        "title": "Craft bench",
+        "depends_on": ["n_forage"]
+      }
+    ],
+    "constraints": [
+      {
+        "id": "c_local_save",
+        "applies_to": ["n_craft"]
+      },
+      {
+        "id": "c_no_ugc_market",
+        "applies_to": ["n_craft"]
+      }
+    ]
+  }
+}

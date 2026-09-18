@@ -52,8 +52,8 @@ async def _probe_registry() -> dict[str, Any]:
             "skipped_names": _LAST_REPORT.get("skipped_names", []),
             "age_s": (time.time() - _LAST_REPORT.get("at", 0.0)) if _LAST_REPORT.get("at") else None,
         }
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "probe_failed"}
 
 
 async def _probe_watchdog() -> dict[str, Any]:
@@ -61,21 +61,21 @@ async def _probe_watchdog() -> dict[str, Any]:
         from core import build_watchdog as _wd
         snap = await _wd.health_snapshot()
         return {"ok": True, **snap}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "probe_failed"}
 
 
 async def _probe_cold_storage() -> dict[str, Any]:
     try:
         from core import cold_storage as _cs
         return {"ok": True, "stats": _cs.vault_stats(), "evictor_running": _cs.is_evictor_running()}
-    except Exception as e:
+    except Exception:
         # cold_storage may not expose is_evictor_running yet → degrade gracefully.
         try:
             from core import cold_storage as _cs
             return {"ok": True, "stats": _cs.vault_stats(), "evictor_running": None}
-        except Exception as e2:
-            return {"ok": False, "error": f"{type(e2).__name__}: {e2}"}
+        except Exception:
+            return {"ok": False, "error": "probe_failed"}
 
 
 async def _probe_databases() -> dict[str, Any]:
@@ -94,11 +94,11 @@ async def _probe_databases() -> dict[str, Any]:
         try:
             _sdb = get_sync_db()
             out["sync_db"] = _sdb.name if _sdb is not None else None
-        except Exception as e:
+        except Exception:
             out["sync_db"] = None
-            out["sync_db_error"] = str(e)[:200]
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+            out["sync_db_error"] = "probe_failed"
+    except Exception:
+        return {"ok": False, "error": "probe_failed"}
     return out
 
 
@@ -111,16 +111,16 @@ async def _probe_feature_flags() -> dict[str, Any]:
         try:
             import routes.feature_flags as _ff  # noqa: F401
             return {"ok": True, "cache_age_ms": None, "cache_size": None, "note": "module loaded; no cache hooks"}
-        except Exception as e:
-            return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+        except Exception:
+            return {"ok": False, "error": "probe_failed"}
 
 
 async def _probe_deprecations() -> dict[str, Any]:
     try:
         from core._deprecations import _seen  # type: ignore
         return {"ok": True, "emitted_count": len(_seen), "emitted": sorted(_seen)[:20]}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "probe_failed"}
 
 
 async def _probe_boot_stages() -> dict[str, Any]:
@@ -181,7 +181,7 @@ async def overview() -> dict[str, Any]:
     out: dict[str, Any] = {"process": _process_info(), "elapsed_ms": 0}
     for key, val in zip(keys, probes):
         if isinstance(val, Exception):
-            out[key] = {"ok": False, "error": f"probe_crashed: {type(val).__name__}: {val}"}
+            out[key] = {"ok": False, "error": "probe_failed"}
         else:
             out[key] = val
     out["elapsed_ms"] = int((time.time() - started) * 1000)

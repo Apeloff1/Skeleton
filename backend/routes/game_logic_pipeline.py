@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
@@ -715,7 +716,7 @@ async def generate_mechanic(request: MechanicGenerationRequest):
         return {"success": True, "mechanic": result}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Game logic request failed", e) from None
 
 @router.post("/combat/generate")
 async def generate_combat_system(request: CombatSystemRequest):
@@ -830,7 +831,7 @@ async def ai_design_combat_system(request: AICombatDesignRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI combat design failed: {str(e)}")
+        raise internal_http_error("AI combat design failed", e) from None
 
 
 @router.post("/ai/progression/design")
@@ -864,7 +865,7 @@ async def ai_design_progression_system(request: AIProgressionDesignRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI progression design failed: {str(e)}")
+        raise internal_http_error("AI progression design failed", e) from None
 
 
 @router.post("/ai/rules/generate")
@@ -896,7 +897,7 @@ async def ai_generate_game_rules(request: AIGameRulesRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI rules generation failed: {str(e)}")
+        raise internal_http_error("AI rules generation failed", e) from None
 
 
 @router.post("/ai/behavior/design")
@@ -930,4 +931,4 @@ async def ai_design_ai_behavior(agent_type: str, behavior_style: str = "balanced
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI behavior design failed: {str(e)}")
+        raise internal_http_error("AI behavior design failed", e) from None

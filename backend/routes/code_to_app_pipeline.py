@@ -10,6 +10,7 @@
 """
 
 from fastapi import APIRouter, HTTPException, Request
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
@@ -288,7 +289,7 @@ Ensure all code is complete and functional."""
             timestamp=datetime.utcnow().isoformat()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Code-to-app request failed", e) from None
 
 @router.post("/generate-game", response_model=PipelineResult)
 async def generate_game(request: GameGenerationRequest):
@@ -385,7 +386,7 @@ Make the game fun and complete!
             timestamp=datetime.utcnow().isoformat()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Code-to-app request failed", e) from None
 
 class EnhanceCodeRequest(BaseModel):
     code: str = Field(..., min_length=10, description="Code to enhance")
@@ -455,7 +456,7 @@ Include comments explaining the enhancements made.
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Code-to-app request failed", e) from None
 
 @router.post("/convert")
 async def convert_code(request: ConvertCodeRequest):
@@ -495,7 +496,7 @@ Return only the converted code with brief comments explaining any non-obvious tr
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Code-to-app request failed", e) from None
 
 class DnaPreviewRequest(BaseModel):
     """Schema for /dna/preview — typed for safety and self-documentation."""

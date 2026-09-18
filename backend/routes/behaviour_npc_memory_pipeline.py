@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -474,7 +475,7 @@ async def ai_generate_behavior_tree(request: AIBehaviorTreeRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI behavior generation failed: {str(e)}")
+        raise internal_http_error("AI behavior generation failed", e) from None
 
 
 @router.post("/ai/memory/design")
@@ -506,4 +507,4 @@ async def ai_design_memory_system(request: AIMemorySystemRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI memory design failed: {str(e)}")
+        raise internal_http_error("AI memory design failed", e) from None

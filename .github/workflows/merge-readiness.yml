@@ -14,12 +14,14 @@ on:
 permissions:
   contents: read
 
-# PR validation can safely supersede an older run for the same pull request.
-# Every main push uses its immutable head SHA so canonical post-merge evidence
-# is never cancelled merely because main advances again before runners start.
+# Merge Readiness validates the repository's current integration state rather
+# than serving as the archival security record for every historical main SHA.
+# Collapse superseded PR and main-branch runs so rapid merge waves cannot pin
+# runner capacity behind stale integration evidence. Secret/malware/provenance
+# workflows retain their separate evidence policies.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.11.16"
@@ -190,6 +192,7 @@ jobs:
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
+          skeleton/testing/test_pr_automation_branch_completions.py
 
   readiness:
     name: Merge Readiness

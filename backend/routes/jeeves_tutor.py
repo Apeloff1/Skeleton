@@ -32,6 +32,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.http_errors import internal_http_error
 
 router = APIRouter(prefix="/jeeves", tags=["Jeeves AI Tutor"])
 
@@ -223,11 +224,12 @@ Always be helpful, accurate, and adapt to the user's level."""
             log.warning("call_jeeves: timeout on attempt %d/%d", attempt, attempts)
         except Exception as e:  # noqa: BLE001
             last_err = e
-            log.warning("call_jeeves: error on attempt %d/%d: %s", attempt, attempts, e)
+            log.warning("call_jeeves: error on attempt %d/%d: %s", attempt, attempts, type(e).__name__)
+    _ = last_err
     raise HTTPException(
         status_code=502,
         detail="Jeeves is taking a brief tea break. Please try again in a moment.",
-    ) from last_err
+    ) from None
 
 # ============================================================================
 # JEEVES ENDPOINTS
@@ -351,7 +353,7 @@ Provide:
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.post("/debug-help")
 async def debug_help(request: DebugHelpRequest):
@@ -387,7 +389,7 @@ Be supportive - debugging is hard!"""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.post("/teach-concept")
 async def teach_concept(request: ConceptRequest):
@@ -423,7 +425,7 @@ Make it engaging and memorable!"""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.post("/practice")
 async def generate_practice(request: PracticeRequest):
@@ -463,7 +465,7 @@ Make problems:
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.post("/motivate")
 async def get_motivation(mood: str = "stuck", context: Optional[str] = None):
@@ -502,7 +504,7 @@ Be genuinely supportive, not generic or preachy."""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.get("/tip-of-the-day")
 async def tip_of_the_day(language: str = "python", level: str = "intermediate"):
@@ -543,7 +545,7 @@ Seed for variety: {seed}"""
             "level": level
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 # ============================================================================
@@ -635,7 +637,7 @@ Respond as a helpful tutor who knows the user's learning journey."""
             "session_id": request.session_id
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.get("/my-learning-profile")
 async def get_learning_profile():
@@ -714,7 +716,8 @@ async def learn_from_interaction(
             "jeeves_says": "Your feedback helps me become a better butler. Most appreciated!" if was_helpful else "I apologize for any confusion. I'll strive to do better."
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        log.warning("jeeves feedback persist failed: %s", type(e).__name__)
+        return {"status": "error", "message": "Could not record feedback"}
 
 @router.get("/curriculum-guide/{track_key}")
 async def get_curriculum_guide(track_key: str, skill_level: str = "intermediate"):
@@ -752,7 +755,7 @@ Provide:
             "message": "I'll be here throughout your journey. Don't hesitate to ask questions!"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 @router.post("/interactive-lesson")
 async def interactive_lesson(
@@ -804,7 +807,7 @@ Make it conversational and engaging. End with a question for the student to answ
             "next_action": "Reply with your answer to continue the lesson"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 # ============================================================================
@@ -955,7 +958,7 @@ Be warm, encouraging, and genuinely helpful."""
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 @router.get("/user-learning-summary/{user_id}")
@@ -1338,7 +1341,7 @@ Make the lesson engaging and practical. Use analogies where helpful."""
             "next_topics": [m["module"] for m in relevant_modules[:3]] if relevant_modules else []
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 @router.post("/teach-math")
@@ -1417,7 +1420,7 @@ Make math accessible and show its practical value in game development."""
             "related_topics": [m["module"] for m in relevant_modules[:3]] if relevant_modules else []
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 @router.post("/teach-cs")
@@ -1499,7 +1502,7 @@ Make CS practical and directly applicable to game development."""
             "implementations_available": [impl for m in relevant_modules for impl in m.get("implementations", [])]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 @router.post("/game-dev-qa")
@@ -1553,7 +1556,7 @@ Be the knowledgeable, supportive tutor you are!"""
             "jeeves_says": "I'm here to help you master game development. Ask me anything!"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None
 
 
 @router.get("/study-path/{goal}")
@@ -1620,4 +1623,4 @@ Be specific and actionable. Include estimated weeks/months for each phase."""
             "jeeves_encouragement": "Remember, consistency beats intensity. Let's build your skills together!"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Jeeves request failed", e) from None

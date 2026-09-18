@@ -1,0 +1,161 @@
+name: Jeeves Game Engine Era Lab
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/jeeves/game_engine_lab.py"
+      - "skeleton/jeeves/core.py"
+      - "skeleton/jeeves/game_engine_legacy.py"
+      - "skeleton/jeeves/game_engine_3d.py"
+      - "skeleton/jeeves/game_engine_modern.py"
+      - "skeleton/jeeves/game_engine_runtime.py"
+      - "skeleton/jeeves/game_engine_assets.py"
+      - "skeleton/jeeves/game_engine_scripts.py"
+      - "skeleton/jeeves/game_engine_physics.py"
+      - "skeleton/jeeves/game_engine_audio.py"
+      - "skeleton/jeeves/game_engine_animation.py"
+      - "skeleton/jeeves/game_engine_rendering.py"
+      - "skeleton/jeeves/game_engine_render_graph.py"
+      - "skeleton/jeeves/game_engine_export.py"
+      - "skeleton/jeeves/game_engine_saves.py"
+      - "skeleton/jeeves/game_engine_input.py"
+      - "skeleton/jeeves/game_engine_timing.py"
+      - "skeleton/jeeves/game_engine_session.py"
+      - "skeleton/jeeves/game_engine_navigation.py"
+      - "skeleton/jeeves/game_engine_project.py"
+      - "skeleton/jeeves/__init__.py"
+      - "skeleton/testing/test_jeeves_game_engine_lab.py"
+      - "skeleton/testing/test_jeeves_game_engine_legacy.py"
+      - "skeleton/testing/test_jeeves_game_engine_3d.py"
+      - "skeleton/testing/test_jeeves_game_engine_modern.py"
+      - "skeleton/testing/test_jeeves_game_engine_runtime.py"
+      - "skeleton/testing/test_jeeves_game_engine_assets.py"
+      - "skeleton/testing/test_jeeves_game_engine_scripts.py"
+      - "skeleton/testing/test_jeeves_game_engine_physics.py"
+      - "skeleton/testing/test_jeeves_game_engine_audio.py"
+      - "skeleton/testing/test_jeeves_game_engine_animation.py"
+      - "skeleton/testing/test_jeeves_game_engine_rendering.py"
+      - "skeleton/testing/test_jeeves_game_engine_render_graph.py"
+      - "skeleton/testing/test_jeeves_game_engine_export.py"
+      - "skeleton/testing/test_jeeves_game_engine_saves.py"
+      - "skeleton/testing/test_jeeves_game_engine_input.py"
+      - "skeleton/testing/test_jeeves_game_engine_timing.py"
+      - "skeleton/testing/test_jeeves_game_engine_session.py"
+      - "skeleton/testing/test_jeeves_game_engine_navigation.py"
+      - "skeleton/testing/test_jeeves_game_engine_project.py"
+      - ".github/workflows/jeeves-game-engine-era-lab.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/jeeves/game_engine_lab.py"
+      - "skeleton/jeeves/core.py"
+      - "skeleton/jeeves/game_engine_legacy.py"
+      - "skeleton/jeeves/game_engine_3d.py"
+      - "skeleton/jeeves/game_engine_modern.py"
+      - "skeleton/testing/test_jeeves_game_engine_runtime.py"
+      - "skeleton/testing/test_jeeves_game_engine_assets.py"
+      - "skeleton/testing/test_jeeves_game_engine_scripts.py"
+      - "skeleton/testing/test_jeeves_game_engine_physics.py"
+      - "skeleton/testing/test_jeeves_game_engine_audio.py"
+      - "skeleton/testing/test_jeeves_game_engine_animation.py"
+      - "skeleton/testing/test_jeeves_game_engine_rendering.py"
+      - "skeleton/testing/test_jeeves_game_engine_render_graph.py"
+      - "skeleton/testing/test_jeeves_game_engine_export.py"
+      - "skeleton/testing/test_jeeves_game_engine_saves.py"
+      - "skeleton/testing/test_jeeves_game_engine_input.py"
+      - "skeleton/testing/test_jeeves_game_engine_timing.py"
+      - "skeleton/testing/test_jeeves_game_engine_session.py"
+      - "skeleton/testing/test_jeeves_game_engine_navigation.py"
+      - "skeleton/testing/test_jeeves_game_engine_project.py"
+      - "skeleton/jeeves/game_engine_runtime.py"
+      - "skeleton/jeeves/game_engine_assets.py"
+      - "skeleton/jeeves/game_engine_scripts.py"
+      - "skeleton/jeeves/game_engine_physics.py"
+      - "skeleton/jeeves/game_engine_audio.py"
+      - "skeleton/jeeves/game_engine_animation.py"
+      - "skeleton/jeeves/game_engine_rendering.py"
+      - "skeleton/jeeves/game_engine_render_graph.py"
+      - "skeleton/jeeves/game_engine_export.py"
+      - "skeleton/jeeves/game_engine_saves.py"
+      - "skeleton/jeeves/game_engine_input.py"
+      - "skeleton/jeeves/game_engine_timing.py"
+      - "skeleton/jeeves/game_engine_session.py"
+      - "skeleton/jeeves/game_engine_navigation.py"
+      - "skeleton/jeeves/game_engine_project.py"
+      - "skeleton/jeeves/__init__.py"
+      - "skeleton/testing/test_jeeves_game_engine_lab.py"
+      - "skeleton/testing/test_jeeves_game_engine_legacy.py"
+      - "skeleton/testing/test_jeeves_game_engine_3d.py"
+      - "skeleton/testing/test_jeeves_game_engine_modern.py"
+      - ".github/workflows/jeeves-game-engine-era-lab.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-game-engine-era-lab-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  era-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Install package and focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e .
+          "pytest>=8,<9"
+      - name: Compile game-engine lab
+        run: >-
+          python -m compileall -q
+          skeleton/jeeves/game_engine_lab.py
+          skeleton/jeeves/core.py
+          skeleton/jeeves/game_engine_legacy.py
+          skeleton/jeeves/game_engine_3d.py
+          skeleton/jeeves/game_engine_modern.py
+          skeleton/jeeves/game_engine_runtime.py
+          skeleton/jeeves/game_engine_assets.py
+          skeleton/jeeves/game_engine_scripts.py
+          skeleton/jeeves/game_engine_physics.py
+          skeleton/jeeves/game_engine_audio.py
+          skeleton/jeeves/game_engine_animation.py
+          skeleton/jeeves/game_engine_rendering.py
+          skeleton/jeeves/game_engine_render_graph.py
+          skeleton/jeeves/game_engine_export.py
+          skeleton/jeeves/game_engine_saves.py
+          skeleton/jeeves/game_engine_input.py
+          skeleton/jeeves/game_engine_timing.py
+          skeleton/jeeves/game_engine_session.py
+          skeleton/jeeves/game_engine_navigation.py
+          skeleton/jeeves/game_engine_project.py
+      - name: Run Pong-to-next sandbox regressions
+        env:
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_jeeves_game_engine_lab.py
+          skeleton/testing/test_jeeves_game_engine_legacy.py
+          skeleton/testing/test_jeeves_game_engine_3d.py
+          skeleton/testing/test_jeeves_game_engine_modern.py
+          skeleton/testing/test_jeeves_game_engine_runtime.py
+          skeleton/testing/test_jeeves_game_engine_assets.py
+          skeleton/testing/test_jeeves_game_engine_scripts.py
+          skeleton/testing/test_jeeves_game_engine_physics.py
+          skeleton/testing/test_jeeves_game_engine_audio.py
+          skeleton/testing/test_jeeves_game_engine_animation.py
+          skeleton/testing/test_jeeves_game_engine_rendering.py
+          skeleton/testing/test_jeeves_game_engine_render_graph.py
+          skeleton/testing/test_jeeves_game_engine_export.py
+          skeleton/testing/test_jeeves_game_engine_saves.py
+          skeleton/testing/test_jeeves_game_engine_input.py
+          skeleton/testing/test_jeeves_game_engine_timing.py
+          skeleton/testing/test_jeeves_game_engine_session.py
+          skeleton/testing/test_jeeves_game_engine_navigation.py
+          skeleton/testing/test_jeeves_game_engine_project.py

@@ -239,8 +239,8 @@ class OmegaFabric:
             self.blocked_repeats += 1
             return {"accepted": False, "blocked": True, "reason": "duplicate",
                     "system_iq": self.system_iq}
-        except (MarathonStateError, Exception) as e:  # noqa: BLE001
-            return {"accepted": False, "blocked": False, "error": f"{type(e).__name__}: {e}",
+        except (MarathonStateError, Exception):  # noqa: BLE001
+            return {"accepted": False, "blocked": False, "error": "omega_emit_failed",
                     "system_iq": self.system_iq}
 
     async def jeeves_emit(self, content: str, topic: str = "jeeves") -> Dict:
@@ -256,8 +256,8 @@ class OmegaFabric:
             self.blocked_repeats += 1
             return {"accepted": False, "blocked": True, "reason": "duplicate",
                     "system_iq": self.system_iq}
-        except Exception as e:  # noqa: BLE001
-            return {"accepted": False, "blocked": False, "error": f"{type(e).__name__}: {e}",
+        except Exception:  # noqa: BLE001
+            return {"accepted": False, "blocked": False, "error": "omega_emit_failed",
                     "system_iq": self.system_iq}
 
     # ── views ─────────────────────────────────────────────────

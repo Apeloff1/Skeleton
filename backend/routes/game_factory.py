@@ -1894,8 +1894,8 @@ async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None)
 
         response = await chat.send_message(UserMessage(text=user_prompt))
         return {"success": True, "response": response, "error": None}
-    except Exception as e:
-        return {"success": False, "response": None, "error": str(e)}
+    except Exception:
+        return {"success": False, "response": None, "error": "llm_request_failed"}
 
 
 def parse_json_response(text: str) -> dict:
