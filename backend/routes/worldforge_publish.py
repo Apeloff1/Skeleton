@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from core.http_errors import internal_http_error
 from routes.llm_router import route_complete
 from routes.worldforge import WorldConfig, build_world, _db, _log, _render_world_hi, MAX_SIZE
 
@@ -237,8 +238,8 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
             _MONO_JOBS[job_id] = {"status": "done", "monograph": text, "model": model,
                                   "name": world["name"], "scale": cfg.scale, "elapsed": round(time.time() - t0, 1)}
     except Exception as e:
-        _log.warning("monograph job %s failed: %s", job_id, e)
-        _MONO_JOBS[job_id] = {"status": "error", "error": str(e), "elapsed": round(time.time() - t0, 1)}
+        _log.warning("monograph job %s failed: %s", job_id, type(e).__name__)
+        _MONO_JOBS[job_id] = {"status": "error", "error": "monograph generation failed", "elapsed": round(time.time() - t0, 1)}
 
 
 class MonographBody(BaseModel):
@@ -369,8 +370,8 @@ def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
             _POSTER_JOBS[job_id] = {"status": "error", "error": "no image returned", "prompt": prompt,
                                     "elapsed": round(time.time() - t0, 1)}
     except Exception as e:
-        _log.warning("poster job %s failed: %s", job_id, e)
-        _POSTER_JOBS[job_id] = {"status": "error", "error": str(e), "elapsed": round(time.time() - t0, 1)}
+        _log.warning("poster job %s failed: %s", job_id, type(e).__name__)
+        _POSTER_JOBS[job_id] = {"status": "error", "error": "poster generation failed", "elapsed": round(time.time() - t0, 1)}
 
 
 class PosterBody(BaseModel):
@@ -477,7 +478,7 @@ async def stream_chunk(seed: int = Query(1337), scale: str = Query("region"),
     try:
         png = await __import__("asyncio").to_thread(_render_world_hi, cfg, mode)
     except Exception as e:
-        raise HTTPException(500, f"chunk render failed: {e}")
+        raise internal_http_error("chunk render failed", e) from None
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=3600"})
 
@@ -502,5 +503,5 @@ async def stream_tile(z: int, x: int, y: int, seed: int = Query(1337), scale: st
     try:
         png = await __import__("asyncio").to_thread(_render_world_hi, cfg, mode)
     except Exception as e:
-        raise HTTPException(500, f"tile render failed: {e}")
+        raise internal_http_error("tile render failed", e) from None
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})

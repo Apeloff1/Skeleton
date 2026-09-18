@@ -9,8 +9,14 @@ work unchanged.
 """
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime
+
+
+_LANGUAGE_TOKEN_RE = re.compile(r"[^A-Za-z0-9_+-]+")
+_LANGUAGE_LABEL_RE = re.compile(r"[^A-Za-z0-9]+")
+_BACKTICK_RUN_RE = re.compile(r"`+")
 
 
 class ImportExportService:
@@ -51,7 +57,7 @@ class ImportExportService:
             html = self._code_to_html(code, language, options)
             return {"content": html, "mime_type": "text/html", "extension": ".html"}
         if format == "md":
-            md = f"```{language}\n{code}\n```"
+            md = self._code_to_markdown(code, language)
             return {"content": md, "mime_type": "text/markdown", "extension": ".md"}
         if format == "json":
             import json
@@ -120,15 +126,35 @@ class ImportExportService:
             metadata["comments_ratio"] = round(comment_lines / len(lines) * 100, 1)
         return metadata
 
+    def _safe_language_token(self, language: str) -> str:
+        first = str(language or "text").splitlines()[0].strip()
+        token = _LANGUAGE_TOKEN_RE.sub("", first)
+        return token or "text"
+
+    def _safe_language_label(self, language: str) -> str:
+        label = _LANGUAGE_LABEL_RE.sub("", str(language or ""))
+        return label or "text"
+
+    def _markdown_fence(self, code: str) -> str:
+        longest = max((len(match.group(0)) for match in _BACKTICK_RUN_RE.finditer(code)), default=0)
+        return "`" * max(3, longest + 1)
+
+    def _code_to_markdown(self, code: str, language: str) -> str:
+        fence = self._markdown_fence(code)
+        token = self._safe_language_token(language)
+        return f"{fence}{token}\n{code}\n{fence}"
+
     def _code_to_html(self, code: str, language: str, options: dict) -> str:
         theme      = options.get("theme", "dark")
         bg_color   = "#1E1E1E" if theme == "dark" else "#FFFFFF"
         text_color = "#D4D4D4" if theme == "dark" else "#000000"
-        escaped    = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped    = html.escape(code, quote=True)
+        label      = html.escape(self._safe_language_label(language), quote=True)
         return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; script-src 'none'">
     <title>CodeDock Export</title>
     <style>
         body {{ background: {bg_color}; color: {text_color}; font-family: 'Fira Code', monospace; padding: 20px; }}
@@ -137,7 +163,7 @@ class ImportExportService:
     </style>
 </head>
 <body>
-    <div class="header">Language: {language} | Exported from CodeDock v9.0.0</div>
+    <div class="header">Language: {label} | Exported from CodeDock v9.0.0</div>
     <pre><code>{escaped}</code></pre>
 </body>
 </html>"""

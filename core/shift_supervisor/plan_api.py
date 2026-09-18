@@ -6,6 +6,7 @@ from typing import Any, Mapping, Sequence
 
 from .models import PlanItem
 from .plan_store import InMemoryPlanStore
+from .policy import may_admit_worker
 from .squads import SQUAD_SIZE, SquadCoordinator, safe_squad_capacity
 
 
@@ -71,18 +72,12 @@ class PlanQueueAPI:
             worker = self.store._workers.get(worker_id)  # noqa: SLF001
             if worker is None:
                 raise KeyError(worker_id)
-            if worker.status in {"offline", "blocked"}:
-                return None
-            if worker.current_task_id:
+            if not may_admit_worker(
+                worker=worker,
+                overtime_soft_limit_minutes=self.overtime_soft_limit_minutes,
+            ).allowed:
                 return None
             if self._worker_reserved_by_active_squad_locked(worker_id):
-                return None
-            overtime_limit = max(0, int(self.overtime_soft_limit_minutes))
-            if (
-                worker.overtime_minutes > 0
-                if overtime_limit == 0
-                else worker.overtime_minutes >= overtime_limit
-            ):
                 return None
 
             active_owned = any(

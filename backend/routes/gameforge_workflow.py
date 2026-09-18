@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from core.http_errors import internal_http_error
 from gameforge.workflow.autonomous_workflow import autonomous_workflow
 from gameforge.workflow.jeeves_vault import jeeves_vault
 from gameforge.workflow.project_orchestrator import create_project_orchestrator
@@ -56,7 +57,7 @@ async def run_workflow(req: RunRequest):
         result = autonomous_workflow.run(req.project_name, req.prompt, req.max_iterations)
         return {"ok": True, **result}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"workflow_failed: {type(e).__name__}: {e}")
+        raise internal_http_error("workflow_failed", e) from None
 
 
 @router.post("/resume")
@@ -86,7 +87,7 @@ async def run_project(req: ProjectRequest):
         )
         return {"ok": True, **result}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"project_failed: {type(e).__name__}: {e}")
+        raise internal_http_error("project_failed", e) from None
 
 
 # ── history + status ────────────────────────────────────────────────────

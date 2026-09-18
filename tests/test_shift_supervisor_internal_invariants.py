@@ -64,6 +64,18 @@ def test_store_zero_overtime_limit_allows_zero_overtime_worker() -> None:
     assert claimed.id == "legacy-task"
 
 
+def test_store_and_queue_refuse_working_workers_before_inspecting_plan() -> None:
+    store = InMemoryPlanStore()
+    worker = _worker("night-working")
+    worker.status = "working"
+    store.upsert_worker(worker)
+    store.add_items([_legacy_task()])
+
+    assert PlanQueueAPI(store).claim_next("night-working") is None
+    assert store.claim_next_for_worker("night-working") is None
+    assert store.snapshot_items()[0].status == "queued"
+
+
 def test_explicit_unsupported_squad_size_never_falls_through_to_legacy_queue() -> None:
     store = InMemoryPlanStore()
     store.upsert_worker(_worker("night-0"))

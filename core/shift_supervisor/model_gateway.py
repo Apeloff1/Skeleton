@@ -33,9 +33,11 @@ class ModelGateway:
     model_env: str = "SHIFT_MODEL_NAME"
     web_search_env: str = "SHIFT_MODEL_WEB_SEARCH"
     timeout_seconds: float = 45.0
-    max_attempts: int = 3
+    max_attempts: int = 6
+    max_non_rate_limit_attempts: int = 3
     max_response_bytes: int = 2_000_000
     max_tool_calls: int = 4
+    max_retry_delay_seconds: float = 30.0
 
     def _config(self) -> tuple[str, str, str]:
         endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/responses").strip()
@@ -52,6 +54,18 @@ class ModelGateway:
     def _web_search_enabled(self) -> bool:
         value = os.getenv(self.web_search_env, "").strip().casefold()
         return value in {"1", "true", "yes", "on"}
+
+    def _retry_delay(self, exc: BaseException, attempt: int) -> float:
+        fallback = min(2 ** (attempt - 1), 16)
+        if isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            if retry_after:
+                try:
+                    requested = float(retry_after)
+                except ValueError:
+                    requested = fallback
+                return max(0.0, min(requested, self.max_retry_delay_seconds))
+        return float(fallback)
 
     def call_json(
         self,
@@ -95,7 +109,13 @@ class ModelGateway:
         encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
         last_error: BaseException | None = None
         attempts = max(1, int(self.max_attempts))
+        standard_attempts = max(
+            1,
+            min(attempts, int(self.max_non_rate_limit_attempts)),
+        )
+        attempts_used = 0
         for attempt in range(1, attempts + 1):
+            attempts_used = attempt
             request = urllib.request.Request(endpoint, data=encoded, headers=headers, method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
@@ -122,9 +142,18 @@ class ModelGateway:
                 ValueError,
             ) as exc:
                 last_error = exc
-                if attempt < attempts:
-                    time.sleep(min(2 ** (attempt - 1), 4))
-        raise ModelRequestError(f"model request failed after {attempts} attempts: {last_error}")
+                retry_limit = (
+                    attempts
+                    if isinstance(exc, urllib.error.HTTPError) and exc.code == 429
+                    else standard_attempts
+                )
+                if attempt < retry_limit:
+                    time.sleep(self._retry_delay(exc, attempt))
+                    continue
+                break
+        raise ModelRequestError(
+            f"model request failed after {attempts_used} attempts: {last_error}"
+        )
 
     @staticmethod
     def _request_body(

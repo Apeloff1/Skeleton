@@ -101,11 +101,11 @@ class CerebellumAutomator:
             job["ms"] = (time.perf_counter() - t0) * 1000
             self.logs.append({"ts": datetime.utcnow().isoformat(), "event": "auto_complete", "job_id": job["job_id"], "ok": result.get("ok")})
             return {"ok": True, "job": job}
-        except Exception as e:
+        except Exception:
             job["status"] = "failed"
-            job["error"] = str(e)
-            self.logs.append({"ts": datetime.utcnow().isoformat(), "event": "auto_fail", "error": str(e)})
-            return {"ok": False, "error": str(e), "job": job}
+            job["error"] = "job_failed"
+            self.logs.append({"ts": datetime.utcnow().isoformat(), "event": "auto_fail", "error": "job_failed"})
+            return {"ok": False, "error": "job_failed", "job": job}
 
 
 # ----- 3. ACC — variance / conflict monitor ---------------------------------

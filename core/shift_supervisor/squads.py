@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from .models import PlanItem, WorkerState
 from .plan_store import InMemoryPlanStore
+from .policy import may_admit_worker
 
 SQUAD_SIZE = 4
 SQUAD_ROLES = ("researcher", "lead", "reviewer", "verifier")
@@ -44,11 +45,6 @@ class SquadLease:
         }
 
 
-def _below_overtime_limit(minutes: int, limit: int) -> bool:
-    bounded = max(0, int(limit))
-    return minutes <= 0 if bounded == 0 else minutes < bounded
-
-
 def safe_squad_capacity(
     workers: Iterable[WorkerState],
     team: str,
@@ -62,9 +58,10 @@ def safe_squad_capacity(
         1
         for worker in workers
         if worker.team == team
-        and worker.status == "idle"
-        and worker.current_task_id is None
-        and _below_overtime_limit(worker.overtime_minutes, overtime_soft_limit_minutes)
+        and may_admit_worker(
+            worker=worker,
+            overtime_soft_limit_minutes=overtime_soft_limit_minutes,
+        ).allowed
     )
     return eligible // SQUAD_SIZE
 
@@ -349,13 +346,12 @@ class SquadCoordinator:
     ) -> list[WorkerState]:
         result: list[WorkerState] = []
         for worker in self.store._workers.values():  # noqa: SLF001
-            if worker.team != team or worker.status != "idle":
+            if worker.team != team:
                 continue
-            if worker.current_task_id is not None:
-                continue
-            if not _below_overtime_limit(
-                worker.overtime_minutes, self.overtime_soft_limit_minutes
-            ):
+            if not may_admit_worker(
+                worker=worker,
+                overtime_soft_limit_minutes=self.overtime_soft_limit_minutes,
+            ).allowed:
                 continue
             if allowed_workers is not None and worker.worker_id not in allowed_workers:
                 continue

@@ -55,3 +55,15 @@ def test_fallback_does_not_broaden_supervisor_permissions():
     assert "contents: write" not in workflow
     assert "actions: write" not in workflow
     assert "pull-requests: write" not in workflow
+
+
+def test_github_automation_uses_bounded_run_once_not_run_forever():
+    workflow = _workflow_text()
+
+    assert "python -m core.shift_supervisor" in workflow
+    assert "--once" in workflow
+    assert "--role" in workflow
+    assert "--state-in" in workflow
+    assert "--state-out" in workflow
+    assert "run_forever" not in workflow
+    assert "python -m core.shift_supervisor \\\n            --once" in workflow

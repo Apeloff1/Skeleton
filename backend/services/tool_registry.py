@@ -97,13 +97,17 @@ async def _tool_compile_code(params: dict) -> dict:
             }
         except subprocess.TimeoutExpired:
             return {"ok": False, "error": "compile timed out"}
-        except FileNotFoundError as e:
-            return {"ok": False, "error": f"toolchain missing: {e}"}
+        except FileNotFoundError:
+            return {"ok": False, "error": "toolchain_missing"}
 
 
 async def _tool_run_code(params: dict) -> dict:
-    """Reuse the playground's run pipeline via local Python eval for python only;
-    other langs go through the existing route."""
+    """Fail closed instead of evaluating agent-supplied Python in the backend.
+
+    Executable snippets must go through the dedicated playground sandbox.  The
+    registry previously used builtins.exec(), which bypassed that isolation and
+    ran untrusted code inside the long-lived backend process.
+    """
     if not code_execution_enabled():
         return {
             "ok": False,
@@ -114,16 +118,14 @@ async def _tool_run_code(params: dict) -> dict:
 
     code = params.get("code", "")
     lang = params.get("language", "python")
-    if lang != "python":
-        return {"ok": False, "error": f"inline run only supports python; for {lang} call /api/playground/run"}
-    import io, contextlib, builtins
-    buf_out, buf_err = io.StringIO(), io.StringIO()
-    try:
-        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            builtins.exec(builtins.compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
-        return {"ok": True, "stdout": buf_out.getvalue()[-4000:], "stderr": buf_err.getvalue()[-4000:], "exit_code": 0}
-    except Exception as e:
-        return {"ok": False, "stdout": buf_out.getvalue()[-4000:], "stderr": f"{buf_err.getvalue()}\n{type(e).__name__}: {e}"[-4000:], "exit_code": 1}
+    if not code:
+        return {"ok": False, "error": "empty code", "exit_code": 0}
+    return {
+        "ok": False,
+        "disabled": True,
+        "error": f"inline {lang} execution is disabled; use /api/playground/run",
+        "exit_code": 0,
+    }
 
 
 async def _tool_package_build(params: dict) -> dict:
@@ -174,8 +176,8 @@ async def _tool_llm_chat(params: dict) -> dict:
         chat = LlmChat(api_key=key, session_id=params.get("session_id", "tool"), system_message=params.get("system", "You are a helpful assistant.")).with_model("openai", model)
         msg = await chat.send_message(UserMessage(text=params.get("prompt", "")))
         return {"ok": True, "response": str(msg)[:8000], "model": model}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "llm_request_failed"}
 
 
 async def _tool_web_search(params: dict) -> dict:
@@ -185,8 +187,8 @@ async def _tool_web_search(params: dict) -> dict:
         return {"ok": False, "error": "query required"}
     try:
         from ddgs import DDGS
-    except Exception as e:
-        return {"ok": False, "error": f"ddgs not installed: {e}"}
+    except Exception:
+        return {"ok": False, "error": "ddgs_not_installed"}
     try:
         max_results = int(params.get("max_results", 5))
         kind = params.get("kind", "text")  # text | news | images
@@ -211,8 +213,8 @@ async def _tool_web_search(params: dict) -> dict:
                 "snippet": (r.get("body") or r.get("description") or "")[:600],
             })
         return {"ok": True, "query": query, "kind": kind, "results": clean, "count": len(clean)}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "web_search_failed"}
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -238,8 +240,8 @@ async def invoke(tool: str, params: dict) -> dict:
         return {"ok": False, "error": f"unknown tool: {tool}", "available": list(TOOLS.keys())}
     try:
         return await fn(params or {})
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:
+        return {"ok": False, "error": "tool_failed"}
 
 
 async def invoke_many(calls: list[dict]) -> list[dict]:

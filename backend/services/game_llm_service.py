@@ -166,8 +166,8 @@ class GameLLMService:
             response = await chat.send_message(UserMessage(text=user_prompt))
             return {"success": True, "response": response, "fallback": False, "rag_chars": len(rag_block)}
         except Exception as e:
-            logger.error(f"LLM generation error: {e}")
-            return {"success": False, "error": str(e), "fallback": True}
+            logger.error("LLM generation error: {}", type(e).__name__)
+            return {"success": False, "error": "llm_request_failed", "fallback": True}
     
     # =========================================================================
     # NPC & CHARACTER GENERATION

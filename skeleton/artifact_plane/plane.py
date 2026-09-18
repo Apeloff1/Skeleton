@@ -1,0 +1,29 @@
+"""Composite artifact plane surface."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from skeleton.artifact_plane.cards import plane_card
+from skeleton.artifact_plane.godot_locate import GodotLocator
+from skeleton.artifact_plane.track_e import TrackEAuditor
+
+
+class ArtifactPlane:
+    def __init__(self, root: str | Path | None = None) -> None:
+        self.root = Path(root) if root is not None else Path.cwd()
+        self.track_e = TrackEAuditor(self.root)
+        self.godot = GodotLocator(self.root)
+
+    def snapshot(self) -> dict[str, Any]:
+        track = self.track_e.audit()
+        godot = self.godot.locate()
+        hit = 1 if track.get("hit") == 1 else 0
+        return plane_card(
+            kind="artifact-plane",
+            hit=hit,
+            law="GB-8",
+            citation="docs/ARTIFACT_PLANE.md",
+            extra={"track_e": track, "godot": godot},
+        )

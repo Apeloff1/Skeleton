@@ -143,8 +143,8 @@ async def godot_status() -> dict:
         return status
     try:
         status["version"] = (await get_binary().probe()).version
-    except Exception as e:
-        status["probe_error"] = f"{type(e).__name__}: {e}"
+    except Exception:
+        status["probe_error"] = "godot_probe_failed"
     status["projects_root"] = str(_PROJECTS_ROOT)
     status["pipeline"] = get_pipeline().stats()
     return status

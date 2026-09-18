@@ -13,6 +13,7 @@ Generates complete game packages from a single text description.
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
@@ -263,7 +264,7 @@ async def generate_hybrid_game(request: HybridGenerationRequest):
         return game_package
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Hybrid pipeline request failed", e) from None
 
 @router.post("/analyze-concept")
 async def analyze_concept(concept: str):

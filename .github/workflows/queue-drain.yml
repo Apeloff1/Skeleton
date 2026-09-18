@@ -2,21 +2,34 @@ name: Drain superseded Actions queue
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Merge Readiness"]
+    types: [completed]
+    branches: [main]
   schedule:
     # Avoid top-of-five-minute scheduler hotspots while preserving 5-minute cadence.
     - cron: "2-57/5 * * * *"
+  push:
+    branches: [main]
+    paths: ['.github/workflows/queue-drain.yml']
 
 # One live drainer plus one coalesced pending run. Do not trigger on every main
-# push: during merge storms GitHub replaces the pending run in this concurrency
-# group before it receives a runner, which can starve queue recovery indefinitely.
+# push: during merge storms GitHub replaces the pending run before it receives
+# a runner. Successful canonical main Merge Readiness completion provides a
+# lower-frequency recovery wake when scheduled workflows are delayed.
 concurrency:
-  group: queue-drain-${{ github.repository }}
+  group: queue-drain-v2-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   drain:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     permissions:
       actions: write
       contents: read
@@ -59,7 +72,9 @@ jobs:
           # be garbage-collected as stale workload merely because a newer commit
           # appears while they are queued.
           control_plane_paths = frozenset({
+              '.github/workflows/actions-housekeeping-cli.yml',
               '.github/workflows/branch-clean.yml',
+              '.github/workflows/branch-archive.yml',
               '.github/workflows/branch-flow.yml',
               '.github/workflows/branch-repair-100.yml',
               '.github/workflows/merge-readiness.yml',
@@ -322,7 +337,7 @@ jobs:
                       f'- Terminal cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
-                      '- Safety: `branch-clean.yml`, `branch-flow.yml`, '
+                      '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
                       '`branch-repair-100.yml`, `merge-readiness.yml`, '
                       '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
                       'never cancellation targets; current main, PR work, and '

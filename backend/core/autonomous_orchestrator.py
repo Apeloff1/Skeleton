@@ -133,10 +133,18 @@ def _ready(node: dict, by_id: dict) -> bool:
 
 
 def _dependency_index(nodes: list[dict]) -> tuple[dict[str, dict], dict[str, list[str]]]:
-    """Build direct lookup plus reverse dependency edges in linear time."""
-    by_id = {node["id"]: node for node in nodes}
-    dependents: dict[str, list[str]] = {node_id: [] for node_id in by_id}
-    for node in nodes:
+    """Build direct lookup plus reverse dependency edges without rescanning DAGs."""
+    by_id: dict[str, dict] = {}
+    for index in range(len(nodes)):
+        node = nodes[index]
+        by_id[node["id"]] = node
+
+    dependents: dict[str, list[str]] = {
+        node_id: []
+        for node_id in by_id
+    }
+    for index in range(len(nodes)):
+        node = nodes[index]
         for dep_id in node.get("depends_on", []):
             if dep_id in dependents:
                 dependents[dep_id].append(node["id"])
@@ -190,9 +198,9 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
         if kind == "review":
             node["status"] = "manual_review"
             return {"awaiting": "human sign-off", "note": node.get("text")}
-    except Exception as e:
+    except Exception:
         node["status"] = "error"
-        return {"error": str(e)}
+        return {"error": "node_failed"}
     node["status"] = "manual_review"
     return {"error": "unknown_kind"}
 
@@ -281,11 +289,11 @@ def replan_from(plan_id: str, node_id: str) -> dict:
             to_reset.add(child_id)
             queue.append(child_id)
 
-    for n in plan["nodes"]:
-        if n["id"] in to_reset:
-            n["status"] = "planned"
-            n["result"] = None
-            n["produced_gid"] = None
+    for reset_id in to_reset:
+        node = by_id[reset_id]
+        node["status"] = "planned"
+        node["result"] = None
+        node["produced_gid"] = None
     plan["version"] += 1
     plan["status"] = "planned"
     _save_plan(plan)
@@ -353,8 +361,8 @@ def start_execute_job(plan_id: str) -> str:
                 _put(jid, {"current": f"{node['kind']}:{node.get('target') or node['id']}"})
             res = execute_plan(plan_id, on_progress=_prog)
             _put(jid, {"status": "error" if res.get("error") else "done", "result": res})
-        except Exception as e:
-            _put(jid, {"status": "error", "error": str(e)})
+        except Exception:
+            _put(jid, {"status": "error", "error": "execute_failed"})
 
     threading.Thread(target=_worker, daemon=True, name=f"orch-{jid}").start()
     return jid

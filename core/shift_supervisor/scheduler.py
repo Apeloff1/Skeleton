@@ -9,9 +9,18 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .constants import MAX_WORKER_SNAPSHOTS
 from .models import WorkerState
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
+
+_GITHUB_ACTIONS_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def github_actions_forbids_unbounded_loop(environ: Mapping[str, str] | None = None) -> bool:
+    """GitHub-hosted jobs must use ``run_once``; an unbounded loop would hang the workflow."""
+    env = os.environ if environ is None else environ
+    return str(env.get("GITHUB_ACTIONS", "")).strip().lower() in _GITHUB_ACTIONS_TRUTHY
 
 
 @dataclass(slots=True)
@@ -55,25 +64,13 @@ class SupervisorScheduler:
 
         GitHub-hosted automation should use this mode instead of ``run_forever``
         so each Actions job has a finite lifetime. When both actors run they
-        share the same store, allowing the Manager to see Secretary additions
-        from the same cycle before producing its refresh.
+        share one project snapshot and the same store, allowing the Manager to
+        see Secretary additions from the same cycle before producing its refresh.
         """
-        if not run_secretary and not run_manager:
-            raise ValueError("at least one supervisor actor must run")
-
-        project_context = self.project_context_supplier()
-        self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
-        self._rollover_daily_totals()
-        revisions: dict[str, Any] = {}
-        if run_secretary:
-            revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
-        if run_manager:
-            revisions["manager"] = asdict(
-                self.manager.refresh_plan(
-                    project_context=project_context,
-                    research=self.research_supplier(),
-                )
-            )
+        revisions = self._execute_cycle(
+            run_secretary=run_secretary,
+            run_manager=run_manager,
+        )
 
         items = sorted(
             self.manager.store.snapshot_items(),
@@ -90,26 +87,69 @@ class SupervisorScheduler:
             "workers": [asdict(worker) for worker in workers],
         }
 
-    def run_forever(self) -> None:
-        next_secretary = time.monotonic()
-        next_manager = time.monotonic()
-        while not self._stop.is_set():
-            now = time.monotonic()
-            if now >= next_secretary:
-                context = self.project_context_supplier()
-                self._ingest_worker_snapshots(context.get("worker_snapshots", []))
-                self._rollover_daily_totals()
-                self.secretary.enrich_plan(context)
-                next_secretary = self._advance(next_secretary, self.cadence.secretary_seconds, now)
-            if now >= next_manager:
-                context = self.project_context_supplier()
-                self._ingest_worker_snapshots(context.get("worker_snapshots", []))
-                self._rollover_daily_totals()
+    def _execute_cycle(
+        self,
+        *,
+        run_secretary: bool,
+        run_manager: bool,
+    ) -> dict[str, Any]:
+        """Execute due planning actors against one shared project snapshot."""
+        if not run_secretary and not run_manager:
+            raise ValueError("at least one supervisor actor must run")
+
+        project_context = self.project_context_supplier()
+        self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
+        self._rollover_daily_totals()
+        revisions: dict[str, Any] = {}
+        if run_secretary:
+            revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
+        if run_manager:
+            revisions["manager"] = asdict(
                 self.manager.refresh_plan(
-                    project_context=context,
+                    project_context=project_context,
                     research=self.research_supplier(),
                 )
-                next_manager = self._advance(next_manager, self.cadence.manager_seconds, now)
+            )
+        return revisions
+
+    def run_forever(self) -> None:
+        """Run the 15/30-minute loop without duplicating coincident snapshots.
+
+        Every 30 minutes both actors are due. They intentionally share one
+        context/worker-ingest pass, with Secretary first and SMB second, so a
+        large workforce is not read twice and SMB sees Secretary additions from
+        the exact same planning snapshot.
+        """
+        if github_actions_forbids_unbounded_loop():
+            raise RuntimeError(
+                "unbounded supervisor loops are forbidden in GitHub Actions; use run_once"
+            )
+        start = time.monotonic()
+        next_secretary = start
+        next_manager = start
+        while not self._stop.is_set():
+            now = time.monotonic()
+            secretary_due = now >= next_secretary
+            manager_due = now >= next_manager
+
+            if secretary_due or manager_due:
+                self._execute_cycle(
+                    run_secretary=secretary_due,
+                    run_manager=manager_due,
+                )
+            if secretary_due:
+                next_secretary = self._advance(
+                    next_secretary,
+                    self.cadence.secretary_seconds,
+                    now,
+                )
+            if manager_due:
+                next_manager = self._advance(
+                    next_manager,
+                    self.cadence.manager_seconds,
+                    now,
+                )
+
             delay = max(0.1, min(next_secretary, next_manager) - time.monotonic())
             self._stop.wait(min(delay, self.cadence.heartbeat_seconds))
 
@@ -120,7 +160,7 @@ class SupervisorScheduler:
         if not isinstance(raw, list):
             return
         known = {worker.worker_id: worker for worker in self.manager.store.snapshot_workers()}
-        for row in raw[:512]:
+        for row in raw[:MAX_WORKER_SNAPSHOTS]:
             if not isinstance(row, Mapping):
                 continue
             worker_id = str(row.get("worker_id", "")).strip()

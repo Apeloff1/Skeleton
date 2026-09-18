@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from skeleton.cortex.live import (
     attach,
     configured_own_path,
@@ -9,6 +11,7 @@ from skeleton.cortex.live import (
     persist,
     persistence_configured,
     reset_live,
+    status,
 )
 from skeleton.genesis import Genesis
 from skeleton.kernel.events import EventBus
@@ -90,6 +93,38 @@ def test_blank_persistence_env_keeps_legacy_path_without_sharing(monkeypatch):
     assert persistence_configured() is False
     assert own_path() == Path(".skeleton") / "own.json"
     assert first.handles["cortex"] is not second.handles["cortex"]
+    reset_live()
+
+
+def test_configured_corrupt_state_fails_closed(monkeypatch, tmp_path):
+    from skeleton.cortex.live import CortexPersistenceError, live_cortex
+
+    state_path = tmp_path / "own.json"
+    state_path.write_text("{not-json", encoding="utf-8")
+    monkeypatch.setenv("SKELETON_OWN", str(state_path))
+    reset_live()
+
+    with pytest.raises(CortexPersistenceError, match="failed to restore"):
+        live_cortex()
+    assert status()["last_load"]["ok"] is False
+    reset_live()
+
+
+def test_unconfigured_live_does_not_restore_legacy_disk(monkeypatch, tmp_path):
+    import json
+
+    from skeleton.cortex.live import live_cortex
+
+    monkeypatch.delenv("SKELETON_OWN", raising=False)
+    monkeypatch.chdir(tmp_path)
+    legacy = tmp_path / ".skeleton" / "own.json"
+    legacy.parent.mkdir()
+    legacy.write_text(json.dumps({"acquired": {"poison": 9}, "own": {}}), encoding="utf-8")
+    reset_live()
+
+    cortex = live_cortex()
+    assert "poison" not in cortex.acquired
+    assert status()["last_load"]["reason"] == "persistence_not_configured"
     reset_live()
 
 

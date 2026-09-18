@@ -1,0 +1,40 @@
+{
+  "schema": "world.scene_state.v1",
+  "schema_version": 1,
+  "world_id": "run_alpha",
+  "tick": 0,
+  "revision": 0,
+  "roots": ["room_spawn"],
+  "entities": {
+    "hero": {
+      "entity_id": "hero",
+      "kind": "player",
+      "parent_id": "room_spawn",
+      "name": "Hero",
+      "child_ids": [],
+      "transform": {
+        "translation": [16.0, 24.0, 0.0],
+        "rotation": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "attributes": {},
+      "created_tick": 0,
+      "revised_tick": 0
+    },
+    "room_spawn": {
+      "entity_id": "room_spawn",
+      "kind": "room",
+      "parent_id": null,
+      "name": "Spawn",
+      "child_ids": ["hero"],
+      "transform": {
+        "translation": [320.0, 180.0, 0.0],
+        "rotation": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "attributes": {},
+      "created_tick": 0,
+      "revised_tick": 0
+    }
+  }
+}

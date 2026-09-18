@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from .models import PlanItem, PlanRevision, WorkerState
+from .policy import may_admit_worker
 
 
 class InMemoryPlanStore:
@@ -81,19 +82,13 @@ class InMemoryPlanStore:
             worker = self._workers.get(worker_id)
             if worker is None:
                 raise KeyError(worker_id)
-            if worker.status in {"offline", "blocked"}:
-                return None
-            if worker.current_task_id:
+            if not may_admit_worker(
+                worker=worker,
+                overtime_soft_limit_minutes=overtime_soft_limit_minutes,
+            ).allowed:
                 return None
             now = datetime.now(timezone.utc)
             if self._worker_reserved_by_active_squad(worker_id, now=now):
-                return None
-            overtime_limit = max(0, int(overtime_soft_limit_minutes))
-            if (
-                worker.overtime_minutes > 0
-                if overtime_limit == 0
-                else worker.overtime_minutes >= overtime_limit
-            ):
                 return None
 
             active_owned = any(

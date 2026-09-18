@@ -173,7 +173,7 @@ Do these in order. Do not fan out until the current row is closed.
 - One module per folder. kebab-case files.
 - Provenance header or sibling `.meta.json` with seed + step + rotor cue.
 - Validate on write. Max 2 auto-fix passes.
-- Engine-agnostic core + thin Godot adapter first.
+- Engine-agnostic core + thin Godot adapter first. Canonical boundary: `skeleton/platform/godot_adapter.py` (`platform.godot_adapter.v1`, #950).
 - No giant monofiles.
 
 Godot target tree:

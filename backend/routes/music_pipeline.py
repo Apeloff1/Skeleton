@@ -17,6 +17,7 @@ from typing import Optional, Literal
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+from core.http_errors import internal_http_error
 import uuid
 import os
 
@@ -83,7 +84,7 @@ async def call_music_ai(prompt: str, system_prompt: str) -> str:
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+        raise internal_http_error("Music generation failed", e) from None
 
 # ============================================================================
 # MUSIC PIPELINE ENDPOINTS
@@ -232,7 +233,7 @@ Your compositions are memorable, appropriate for games, and technically sound.""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Music generation failed", e) from None
 
 @router.post("/sound-effect")
 async def generate_sound_effect(request: SoundEffectRequest):
@@ -304,7 +305,7 @@ async def generate_sound_effect(request: SoundEffectRequest):
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Music generation failed", e) from None
 
 @router.post("/adaptive-music")
 async def generate_adaptive_music(request: AdaptiveMusicRequest):
@@ -379,7 +380,7 @@ async def generate_adaptive_music(request: AdaptiveMusicRequest):
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Music generation failed", e) from None
 
 @router.post("/music-theory")
 async def music_theory_assist(request: MusicTheoryRequest):
@@ -417,7 +418,7 @@ Provide comprehensive musical data that can be used for:
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Music generation failed", e) from None
 
 @router.get("/presets")
 async def get_music_presets():

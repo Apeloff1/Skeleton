@@ -159,9 +159,9 @@ class TruthWatchFeed:
                     result = engine.reverify_claim(event.target)
                 self._finish(event.event_id, "applied", result, checkpoint=(event.provider, event.provider_cursor))
                 report["applied"].append(event.event_id)
-            except Exception as exc:
-                self._finish(event.event_id, "failed", {"error": f"{type(exc).__name__}: {exc}"})
-                report["failed"].append({"event_id": event.event_id, "error": f"{type(exc).__name__}: {exc}"})
+            except Exception:
+                self._finish(event.event_id, "failed", {"error": "watch_apply_failed"})
+                report["failed"].append({"event_id": event.event_id, "error": "watch_apply_failed"})
         return report
 
     def _finish(self, event_id: str, disposition: str, result: dict[str, Any], checkpoint: tuple[str, str] | None = None) -> None:

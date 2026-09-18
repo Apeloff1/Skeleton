@@ -79,9 +79,9 @@ async def consult(context: str, topic: str = "", limit: int = 1) -> dict:
                         candidates.append(p)
             if candidates:
                 out["catchphrase"] = random.choice(candidates)
-    except Exception as e:
+    except Exception:
         out["catchphrase"] = ""
-        out["_cp_err"] = str(e)
+        out["_cp_err"] = "consult_failed"
 
     # 2) Knowledge — fuzzy topic match from knowledge_database / knowledge_domains
     if topic:

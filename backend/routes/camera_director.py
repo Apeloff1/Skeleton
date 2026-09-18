@@ -156,5 +156,5 @@ async def narrate(pid: str):
         return {"ok": True, "script": script,
                 "audio_base64": out.get("audio_base64"), "format": "mp3",
                 "voice": out.get("voice")}
-    except Exception as e:
-        return {"ok": True, "script": script, "audio_base64": None, "error": str(e)}
+    except Exception:
+        return {"ok": True, "script": script, "audio_base64": None, "error": "tts_failed"}

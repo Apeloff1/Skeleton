@@ -36,14 +36,30 @@ SKIP_DIRS = {
 
 
 def python_files() -> Iterable[Path]:
-    """Yield repository Python files not already covered by the backend gate."""
+    """Yield required core/tooling Python files, failing closed on missing roots."""
     for root in SCAN_ROOTS:
         if not root.exists():
-            continue
+            raise OSError("required scan root missing")
+        if root.is_symlink():
+            raise OSError("required scan root must not be a symlink")
         for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
+            relative = path.relative_to(REPO_ROOT)
+            parts = relative.parts
+            filtered_parts = (
+                (parts[0], *parts[2:])
+                if len(parts) >= 2 and parts[:2] == ("skeleton", "build")
+                else parts
+            )
+            if any(part in SKIP_DIRS for part in filtered_parts):
                 continue
             yield path
+
+
+def _root_label(root: Path) -> Path:
+    try:
+        return root.relative_to(REPO_ROOT)
+    except ValueError:
+        return root
 
 
 def _load_violation_engine() -> Callable[[Path], list[str]]:
@@ -63,11 +79,38 @@ def main() -> int:
         print(f"Repository Python SAST bootstrap failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
+    try:
+        files = list(python_files())
+    except OSError as exc:
+        detail = str(exc)
+        safe_details = {
+            "required scan root missing",
+            "required scan root must not be a symlink",
+        }
+        suffix = f": {detail}" if detail in safe_details else ""
+        print(
+            f"Repository Python SAST scan failed: {type(exc).__name__}{suffix}",
+            file=sys.stderr,
+        )
+        return 1
+
     findings: list[str] = []
-    count = 0
-    for path in python_files():
-        count += 1
+    root_counts = {root: 0 for root in SCAN_ROOTS}
+    for path in files:
+        for root in SCAN_ROOTS:
+            try:
+                path.relative_to(root)
+            except ValueError:
+                continue
+            root_counts[root] += 1
+            break
         findings.extend(violations(path))
+
+    for root, count in root_counts.items():
+        if count == 0:
+            findings.append(
+                f"scanner coverage failure: no Python files scanned under {_root_label(root)}"
+            )
 
     if findings:
         print("High-confidence repository Python SAST violations detected:", file=sys.stderr)
@@ -75,7 +118,14 @@ def main() -> int:
             print(f"  - {finding}", file=sys.stderr)
         return 1
 
-    print(f"Repository Python SAST gate passed ({count} core/tooling Python files).")
+    print(
+        f"Repository Python SAST gate passed ({len(files)} core/tooling Python files; "
+        + ", ".join(
+            f"{_root_label(root)}={count}"
+            for root, count in root_counts.items()
+        )
+        + ")."
+    )
     return 0
 
 

@@ -113,8 +113,8 @@ async def eas_whoami() -> dict:
             "mocked": True,
             "message": "eas CLI not installed on backend host. Install via npm i -g eas-cli.",
         }
-    except Exception as e:
-        return {"status": "error", "mocked": True, "message": str(e)[:300]}
+    except Exception:
+        return {"status": "error", "mocked": True, "message": "eas_whoami_failed"}
 
 
 @router.get("/eas/build-status/{eas_build_id}")
@@ -157,8 +157,8 @@ async def eas_build_status(eas_build_id: str) -> dict:
         }
     except subprocess.TimeoutExpired:
         return {"status": "timeout", "eas_build_id": eas_build_id}
-    except Exception as e:
-        return {"status": "error", "eas_build_id": eas_build_id, "error": str(e)[:300]}
+    except Exception:
+        return {"status": "error", "eas_build_id": eas_build_id, "error": "eas_status_failed"}
 
 
 __all__ = ["router", "eas_build_status"]
