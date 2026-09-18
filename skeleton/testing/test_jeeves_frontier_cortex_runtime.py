@@ -328,3 +328,23 @@ def test_fresh_cortex_can_rebind_shared_world_model_to_restored_ledger() -> None
 
     assert restored_state.world is first_state.world
     assert restored_state.world.evidence_ledger is restored_ledger
+
+
+def test_repeated_checkpoint_assessment_is_idempotent() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-cortex-idempotent")
+    state = runtime._new_state("run-cortex-idempotent", inputs)
+    checkpoint = runtime.checkpointer.latest(state.run_id)
+    assert checkpoint is not None
+    first = runtime.cortex.observe_checkpoint(inputs, checkpoint)
+    after_first = runtime.cortex.require_state(state.run_id)
+
+    second = runtime.cortex.observe_checkpoint(inputs, checkpoint)
+    after_second = runtime.cortex.require_state(state.run_id)
+
+    assert second == first
+    assert second.decision.decision_id == first.decision.decision_id
+    assert after_first.checkpoint_count == 1
+    assert after_second.checkpoint_count == 1
+    assert len(runtime.cortex.meta.history(run_id=state.run_id)) == 1
