@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from skeleton.shells.ai.policy import AIShellPolicy
 from skeleton.shells.ai.policy_rollout import AIPolicyRollout
-from skeleton.shells.ai.release_gate import AIReleaseGate, ReleaseGateResult
+from skeleton.shells.ai.release_gate import AIReleaseGate, ReleaseGateDecision, ReleaseGateResult
 from skeleton.shells.ai.release_registry import AIReleaseRegistry, RegisteredRelease
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.release_evidence import ReleaseEvidence
@@ -58,7 +58,7 @@ class AIReleaseManager:
         if target_policy is None:
             if evidence.policy_fingerprint != current_policy.fingerprint:
                 gate = ReleaseGateResult(
-                    gate.decision.__class__.DENY,
+                    ReleaseGateDecision.DENY,
                     evidence.release_id,
                     evidence.digest,
                     gate.reasons + ("release policy does not match active policy",),
@@ -66,7 +66,7 @@ class AIReleaseManager:
         else:
             if evidence.policy_fingerprint != target_policy.fingerprint:
                 gate = ReleaseGateResult(
-                    gate.decision.__class__.DENY,
+                    ReleaseGateDecision.DENY,
                     evidence.release_id,
                     evidence.digest,
                     gate.reasons + ("release evidence does not match target policy",),
