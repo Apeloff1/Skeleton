@@ -291,6 +291,30 @@ def test_rejects_builtin_text_renderer_command(tmp_path: Path, builder: str) -> 
     assert any("argument vector, not a string-shaped command" in finding for finding in findings)
 
 
+def test_rejects_single_assignment_string_command_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\nsubprocess.run(cmd, shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_rejects_chained_single_assignment_string_command_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\nalias = cmd\nsubprocess.run(alias)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_reassigned_string_command_name_is_not_guessed(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncmd = 'python --version'\ncmd = build_command()\nsubprocess.run(cmd)\n",
+    )
+    assert not any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
 def test_unknown_string_like_method_receiver_is_not_guessed(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
