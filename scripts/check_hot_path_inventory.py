@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 
-TASK_KEY = "reserve-S152-hot-path-inventory"
+TASK_ID = "reserve-S152-hot-path-inventory"
 CONFLICT_DOMAIN = "perf.readonly.hot_path_inventory"
 INVENTORY_VERSION = 1
 EVIDENCE_KIND = "structural"
@@ -821,7 +821,7 @@ def report_from_records(records: list[HotPathRecord]) -> dict[str, object]:
     if not records:
         raise HotPathInventoryError("hot-path coverage failure: zero candidates classified")
     return {
-        "task_key": TASK_KEY,
+        "task_id": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "inventory_version": INVENTORY_VERSION,
         "evidence_kind": EVIDENCE_KIND,

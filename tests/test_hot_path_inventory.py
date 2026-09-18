@@ -114,7 +114,7 @@ def _entry(
 
 
 def test_task_identity_is_stable() -> None:
-    assert inventory.TASK_KEY == "reserve-S152-hot-path-inventory"
+    assert inventory.TASK_ID == "reserve-S152-hot-path-inventory"
     assert inventory.CONFLICT_DOMAIN == "perf.readonly.hot_path_inventory"
     assert inventory.INVENTORY_VERSION == 1
     assert inventory.EVIDENCE_KIND == "structural"
@@ -309,7 +309,7 @@ def test_current_repo_report_is_deterministic_and_has_no_invented_timings() -> N
     encoded_first = json.dumps(first, sort_keys=True, separators=(",", ":"))
     encoded_second = json.dumps(second, sort_keys=True, separators=(",", ":"))
     assert encoded_first == encoded_second
-    assert first["task_key"] == "reserve-S152-hot-path-inventory"
+    assert first["task_id"] == "reserve-S152-hot-path-inventory"
     assert first["conflict_domain"] == "perf.readonly.hot_path_inventory"
     assert first["unknown_count"] == 0
     assert first["candidate_count"] > 0
@@ -378,7 +378,7 @@ def test_main_writes_json_and_succeeds_for_classified_repo(
     payload = json.loads(capsys.readouterr().out)
     assert payload["unknown_count"] == 0
     assert payload["measured_count"] >= 1
-    assert payload["task_key"] == "reserve-S152-hot-path-inventory"
+    assert payload["task_id"] == "reserve-S152-hot-path-inventory"
 
 
 def test_chmod_unreadable_directory_fails_closed(tmp_path: Path) -> None:
