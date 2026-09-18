@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.execution_evidence import AIExecutionEvidence, AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
+from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval, QuorumApprovalError, QuorumApprovalPolicy, QuorumApprovalState, QuorumVote, QuorumVoteDecision, StoredQuorumApproval
 from skeleton.shells.ai.strict_recovery import StrictAIRecoveryManager, StrictRecoveryReport
 from skeleton.shells.ai.startup_release import AIStartupReleaseGuard, RuntimeReleaseExpectation, StartupReleaseReport
 from skeleton.shells.ai.session_journal import SessionJournalEvent, SessionJournalEvidence
