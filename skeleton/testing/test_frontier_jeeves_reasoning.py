@@ -17,6 +17,7 @@ from skeleton.jeeves.agent.frontier_feedback import FrontierEvalFeedback, Fronti
 from skeleton.jeeves.agent.frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
+    FrontierReasoningPolicy,
     InferenceDisposition,
 )
 from skeleton.jeeves.agent.lens_fusion import LensSignal
@@ -762,3 +763,69 @@ def test_consensus_cannot_rescue_low_absolute_quality_or_grounding() -> None:
     assert EscalationCause.LOW_ABSOLUTE_QUALITY in decision.causes
     assert EscalationCause.INSUFFICIENT_EVIDENCE in decision.causes
     assert decision.disposition is not InferenceDisposition.COMMIT
+
+
+
+def test_eval_gated_policy_tuning_promotes_useful_extra_compute_safely() -> None:
+    coordinator = FrontierReasoningCoordinator()
+    feedback = FrontierReasoningFeedback()
+    for index in range(6):
+        feedback.observe(
+            coordinator.decide(_strong_search(trace=f"direct:{index}")),
+            verified_success=False,
+            escalation_rounds=0,
+            model_calls=2,
+            estimated_tokens=1000,
+        )
+        feedback.observe(
+            coordinator.decide(_strong_search(trace=f"escalated:{index}")),
+            verified_success=True,
+            escalation_rounds=1,
+            model_calls=5,
+            estimated_tokens=3000,
+        )
+
+    recommendation = feedback.recommendation()
+    assert recommendation.maximum_entropy_delta < 0.0
+
+    eval_feedback = FrontierEvalFeedback()
+    for index in range(8):
+        eval_feedback.observe(
+            EvalResult(
+                case_id=f"case:tune-{index}",
+                run_id=f"run:baseline-tune-{index}",
+                score=0.70,
+                passed=True,
+                checks=(),
+                result_fingerprint=stable_fingerprint({"baseline-tune": index}),
+            ),
+            EvalResult(
+                case_id=f"case:tune-{index}",
+                run_id=f"run:frontier-tune-{index}",
+                score=0.82,
+                passed=True,
+                checks=(),
+                result_fingerprint=stable_fingerprint({"frontier-tune": index}),
+            ),
+        )
+    gate = eval_feedback.promotion_gate(
+        minimum_cases=8,
+        minimum_mean_delta=0.05,
+        maximum_loss_rate=0.0,
+        allow_pass_losses=0,
+    )
+
+    baseline = FrontierReasoningPolicy()
+    proposal = FrontierPolicyTuner().propose(baseline, recommendation, gate)
+
+    assert proposal.approved_for_trial is True
+    assert proposal.proposed_policy.maximum_normalized_entropy < baseline.maximum_normalized_entropy
+    assert proposal.proposed_policy.verification_required_at is baseline.verification_required_at
+    assert (
+        proposal.proposed_policy.minimum_verification_lower_bound
+        == baseline.minimum_verification_lower_bound
+    )
+    assert (
+        proposal.proposed_policy.block_on_verifier_abstention
+        == baseline.block_on_verifier_abstention
+    )
