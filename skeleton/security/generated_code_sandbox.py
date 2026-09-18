@@ -13,7 +13,6 @@ checks, and a frozen policy snapshot that untrusted input cannot mutate.
 from __future__ import annotations
 
 import ast
-from collections import Counter
 import ipaddress
 import json
 from dataclasses import dataclass
@@ -567,13 +566,8 @@ def _stable_callable_aliases(
     nodes: Iterable[ast.AST],
     import_aliases: Mapping[str, str],
 ) -> dict[str, str]:
-    """Resolve stable local aliases to sensitive callables, including chains."""
+    """Conservatively resolve local aliases to sensitive callables, including chains."""
     node_list = list(nodes)
-    stores = Counter(
-        node.id
-        for node in node_list
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
-    )
     resolved: dict[str, str] = {}
 
     changed = True
@@ -598,7 +592,10 @@ def _stable_callable_aliases(
             if source not in _TRACKED_CALLABLES:
                 continue
             for name in names:
-                if stores[name] != 1 or name in resolved:
+                # Generated code is adversarial: once a local name is observed
+                # aliasing a sensitive callable, later reassignment must not be
+                # allowed to erase that provenance and create a bypass.
+                if name in resolved:
                     continue
                 resolved[name] = source
                 changed = True
