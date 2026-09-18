@@ -1001,7 +1001,7 @@ def test_strict_recovery_report_exposes_attempt_evidence_fields():
     assert data["execution_attempt_recovery"] == "not_started"
 
 
-def test_strict_recovery_terminal_success_with_matching_evidence_does_not_strengthen_action():
+def test_strict_recovery_terminal_success_newer_than_review_checkpoint_requires_verification():
     backend, journal, receipts, store, recovery = recovery_environment("review")
     attempts = AIExecutionAttemptStore(backend)
     recovery, attempt = _attempt_checkpoint(
@@ -1017,9 +1017,10 @@ def test_strict_recovery_terminal_success_with_matching_evidence_does_not_streng
         store,
         execution_attempts=attempts,
     )
-    assert result.action is RecoveryAction.RESUME_REVIEW
+    assert result.action is RecoveryAction.REQUIRE_VERIFICATION
     assert result.execution_attempt_matches
     assert result.execution_attempt_recovery == "terminal_success"
+    assert any("newer than" in reason for reason in result.reasons)
 
 
 def test_strict_recovery_terminal_success_authority_tamper_is_manual_review():
