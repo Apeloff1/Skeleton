@@ -96,6 +96,10 @@ def test_inherited_git_repository_overrides_are_ignored(
     monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
     monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git" / "index"))
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", str(decoy / "objects"))
+    monkeypatch.setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", str(decoy / "objects"))
+    monkeypatch.setenv("GIT_EXEC_PATH", str(tmp_path / "evil-git-exec"))
+    monkeypatch.setenv("GIT_CONFIG_PARAMETERS", "'core.fsmonitor=definitely-not-a-safe-command'")
     monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
     monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.fsmonitor")
     monkeypatch.setenv("GIT_CONFIG_VALUE_0", "definitely-not-a-safe-command")
@@ -207,3 +211,122 @@ def test_unmerged_index_fails_closed(tmp_path: Path) -> None:
 
     with pytest.raises(GitIndexError, match="unmerged index"):
         GitIndex(repo).snapshot()
+
+
+def _add_gitlink(repo: Path, path: str, sha: str = "a" * 40) -> None:
+    _git(repo, "update-index", "--add", "--cacheinfo", f"160000,{sha},{path}")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink semantics differ on Windows")
+def test_relative_symlink_escape_is_hashed_from_link_text(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    outside = tmp_path / "secret.txt"
+    outside.write_text("secret-one\n", encoding="utf-8")
+    (repo / "rel-link").symlink_to(os.path.relpath(outside, repo))
+    _commit_all(repo)
+
+    first = GitIndex(repo).snapshot()
+    outside.write_text("secret-two\n", encoding="utf-8")
+    second = GitIndex(repo).snapshot()
+
+    assert first.files[0].mode == "120000"
+    assert first.source_digest == second.source_digest
+    assert first.files[0].effective_blob == second.files[0].effective_blob
+
+
+def test_gitlink_stays_opaque_and_ignores_nested_payload(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_text("safe\n", encoding="utf-8")
+    _commit_all(repo)
+    _add_gitlink(repo, "vendor")
+    vendor = repo / "vendor"
+    vendor.mkdir()
+    (vendor / "nested-secret.txt").write_text("nested-v1\n", encoding="utf-8")
+
+    first = GitIndex(repo).snapshot()
+    gitlink = next(row for row in first.files if row.path == "vendor")
+    assert gitlink.mode == "160000"
+    assert gitlink.size == 0
+    assert gitlink.working_tree is False
+    assert gitlink.effective_blob == gitlink.index_blob
+    assert all(row.path != "vendor/nested-secret.txt" for row in first.files)
+
+    (vendor / "nested-secret.txt").write_text("nested-v2-should-not-leak\n", encoding="utf-8")
+    second = GitIndex(repo).snapshot()
+    gitlink2 = next(row for row in second.files if row.path == "vendor")
+    assert gitlink2.effective_blob == gitlink.effective_blob
+    assert second.source_digest == first.source_digest
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink semantics differ on Windows")
+def test_gitlink_symlink_directory_fails_closed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_text("safe\n", encoding="utf-8")
+    _commit_all(repo)
+    _add_gitlink(repo, "vendor")
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload.txt").write_text("escaped-secret\n", encoding="utf-8")
+    (repo / "vendor").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(GitIndexError, match="gitlink"):
+        GitIndex(repo).snapshot()
+
+
+def test_file_limit_fails_closed_before_extra_paths_are_accepted(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "a.txt").write_text("a\n", encoding="utf-8")
+    (repo / "b.txt").write_text("b\n", encoding="utf-8")
+    _commit_all(repo)
+
+    with pytest.raises(GitIndexError, match="file count"):
+        GitIndex(repo, max_files=1).snapshot()
+
+
+def test_index_change_during_snapshot_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_text("safe\n", encoding="utf-8")
+    _commit_all(repo)
+    index = GitIndex(repo)
+    original_git = index._git
+    calls = {"n": 0}
+
+    def wrapped(args, *, check: bool = True):
+        result = original_git(args, check=check)
+        if tuple(args)[:2] == ("ls-files", "-s") and calls["n"] == 0:
+            calls["n"] += 1
+            (repo / "tracked.txt").write_text("mutated-after-first-ls\n", encoding="utf-8")
+            _git(repo, "add", "tracked.txt")
+        return result
+
+    monkeypatch.setattr(index, "_git", wrapped)
+    with pytest.raises(GitIndexError, match="git index changed"):
+        index.snapshot()
+
+
+def test_head_change_during_snapshot_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    tracked.write_text("first\n", encoding="utf-8")
+    _commit_all(repo, "first")
+    tracked.write_text("second\n", encoding="utf-8")
+    _commit_all(repo, "second")
+    index = GitIndex(repo)
+    original_git = index._git
+    seen_head = {"n": 0}
+
+    def wrapped(args, *, check: bool = True):
+        result = original_git(args, check=check)
+        if tuple(args)[:2] == ("rev-parse", "--verify") and seen_head["n"] == 0:
+            seen_head["n"] += 1
+            _git(repo, "checkout", "-q", "HEAD~1")
+        return result
+
+    monkeypatch.setattr(index, "_git", wrapped)
+    with pytest.raises(GitIndexError, match="HEAD changed"):
+        index.snapshot()

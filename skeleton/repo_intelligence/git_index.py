@@ -141,6 +141,7 @@ class GitIndex:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
+                shell=False,
                 timeout=self.timeout_seconds,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -192,10 +193,12 @@ class GitIndex:
             if mode not in {"100644", "100755", "120000", "160000"}:
                 raise GitIndexError("unsupported git index mode")
             entries.append((path, mode, blob))
+            # Bound while parsing so a hostile index cannot materialize an
+            # unbounded entry list before the advertised file-count limit.
+            if len(entries) > self.max_files:
+                raise GitIndexError("tracked file count exceeds configured limit")
         if unmerged:
             raise GitIndexError("unmerged index entries present")
-        if len(entries) > self.max_files:
-            raise GitIndexError("tracked file count exceeds configured limit")
         entries.sort(key=lambda item: os.fsencode(item[0]))
         return entries
 
