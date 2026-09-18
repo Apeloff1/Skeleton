@@ -94,7 +94,7 @@ def test_malformed_content_length_is_rejected_without_audit_crash() -> None:
     assert status == 400
     assert audit is not None
     assert audit["status"] == 400
-    assert audit["req_bytes"] == 0
+    assert audit["req_bytes"] is None
 
 
 def test_absurd_content_length_is_rejected_without_integer_conversion() -> None:
@@ -103,7 +103,7 @@ def test_absurd_content_length_is_rejected_without_integer_conversion() -> None:
     assert status == 413
     assert audit is not None
     assert audit["status"] == 413
-    assert audit["req_bytes"] == 0
+    assert audit["req_bytes"] is None
 
 
 def test_audit_uses_direct_peer_not_spoofed_forwarding_header() -> None:

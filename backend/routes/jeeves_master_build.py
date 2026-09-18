@@ -2220,19 +2220,19 @@ async def compile_build(build_id: str, expo_token: Optional[str] = None):
             "zip_available": True,
             "zip_path": f"/api/jeeves-master/download/{build_id}",
         }
-    except subprocess.TimeoutExpired as te:
+    except subprocess.TimeoutExpired:
         return {
             "build_id": build_id,
             "status": "timeout",
-            "message": f"EAS step timed out: {te.cmd}",
+            "message": "EAS step timed out",
             "zip_available": True,
             "zip_path": f"/api/jeeves-master/download/{build_id}",
         }
-    except Exception as e:
+    except Exception:
         return {
             "build_id": build_id,
             "status": "error",
-            "message": str(e)[:400],
+            "message": "EAS build failed",
             "zip_available": True,
             "zip_path": f"/api/jeeves-master/download/{build_id}",
         }
@@ -2271,8 +2271,8 @@ async def check_eas_status(build_id: str):
                 "download_url": build.get("download_url"),
                 "platform": data.get("platform"),
             }
-    except Exception as e:
-        return {"build_id": build_id, "status": "check_failed", "error": str(e)}
+    except Exception:
+        return {"build_id": build_id, "status": "check_failed", "error": "EAS status check failed"}
 
     return {"build_id": build_id, "status": build.get("eas_build_status", "unknown")}
 
@@ -2322,7 +2322,7 @@ async def download_build_apk(build_id: str):
     }
     art = await _a.get_event_loop().run_in_executor(None, binary_builder.build_apk, apk_build)
     if not art.get("is_installable"):
-        raise HTTPException(503, f"APK toolchain unavailable: {art.get('signature_info','')[:200]}")
+        raise HTTPException(503, "APK toolchain unavailable")
     filename = f"{build['title'].lower().replace(' ', '-')[:20]}-jeeves.apk"
     return FileResponse(art["path"], media_type="application/vnd.android.package-archive", filename=filename)
 

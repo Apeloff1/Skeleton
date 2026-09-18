@@ -15,7 +15,10 @@ organism ``context_loop`` (rot-compaction), or NSOG CLI shims.
 from __future__ import annotations
 
 import json
+import os
 import re
+import stat
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -45,19 +48,66 @@ def _safe_id(value: str, *, label: str = "id") -> str:
     return text
 
 
-def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
-        encoding="utf-8",
-    )
-    tmp.replace(path)
-
-
-def _read_json(path: Path) -> Dict[str, Any]:
+def _fsync_parent_directory(path: Path) -> None:
+    """Persist a published directory entry on POSIX after atomic replace."""
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    dir_fd = os.open(path.parent, flags)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    """Atomically replace JSON without a predictable temporary-file race."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rendered = json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n"
+    fd, raw_tmp = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+        text=True,
+    )
+    tmp = Path(raw_tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(rendered)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+        _fsync_parent_directory(path)
+    except BaseException:
+        try:
+            tmp.unlink(missing_ok=True)
+        finally:
+            raise
+
+
+def _read_json(path: Path, *, nofollow: bool = False) -> Dict[str, Any]:
+    try:
+        if nofollow:
+            flags = os.O_RDONLY
+            nofollow_flag = getattr(os, "O_NOFOLLOW", 0)
+            if nofollow_flag:
+                flags |= nofollow_flag
+            elif path.is_symlink():
+                raise OSError("symlinked skill/task file is not allowed")
+            fd = os.open(path, flags)
+            try:
+                file_stat = os.fstat(fd)
+                if not stat.S_ISREG(file_stat.st_mode):
+                    raise OSError("skill/task file must be regular")
+                with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                    fd = -1
+                    text = handle.read()
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+        else:
+            text = path.read_text(encoding="utf-8")
+        data = json.loads(text)
     except (OSError, json.JSONDecodeError) as exc:
         raise SkillsFilesError(
             "failed to read skill/task file",
@@ -294,7 +344,7 @@ class SkillBank:
                 "skill file missing",
                 context={"skill_id": skill_id, "path": str(path)},
             )
-        return SkillSpec.from_dict(_read_json(path))
+        return SkillSpec.from_dict(_read_json(path, nofollow=True))
 
     def list_skills(self) -> List[str]:
         return sorted(p.stem for p in self.skills_dir.glob("*.json") if p.is_file())
@@ -312,7 +362,7 @@ class SkillBank:
                 "task file missing",
                 context={"task_id": task_id, "path": str(path)},
             )
-        return TaskState.from_dict(_read_json(path))
+        return TaskState.from_dict(_read_json(path, nofollow=True))
 
     def list_tasks(self) -> List[str]:
         return sorted(p.stem for p in self.tasks_dir.glob("*.json") if p.is_file())

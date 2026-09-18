@@ -136,6 +136,14 @@ def test_body_bound_413(sealed):
     assert res.json()["error"] == "scroll_too_large"
 
 
+def test_header_bound_431(sealed):
+    client, _ = sealed
+    headers = {**_hdr(), **{f"x-extra-{index}": "y" for index in range(120)}}
+    res = client.get("/api/v1/forge/kinds", headers=headers)
+    assert res.status_code == 431
+    assert res.json()["error"] == "request_headers_too_large"
+
+
 def test_worm_audit_fail_503(monkeypatch):
     monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
 

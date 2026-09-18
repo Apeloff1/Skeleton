@@ -24,7 +24,10 @@ import pytest
 from starlette.testclient import TestClient
 
 # Import the FastAPI app.
-sys.path.insert(0, "/app/backend")
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+for _candidate in (str(_BACKEND_ROOT), "/app/backend"):
+    if _candidate not in sys.path and Path(_candidate).is_dir():
+        sys.path.insert(0, _candidate)
 from server import app
 
 

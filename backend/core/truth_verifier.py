@@ -72,7 +72,7 @@ class EvidenceItem:
     peer_reviewed: bool = False
     primary: bool = False
     notes: str = ""
-    provenance_verified: bool = False
+    provenance_verified: bool = True
     preregistered: bool = False
     data_available: bool = False
     code_available: bool = False
@@ -161,7 +161,7 @@ def _methodology_cap(item: EvidenceItem) -> float:
     ceiling = _KIND_CEILINGS[item.kind]
     if ceiling == 0.0: return 0.0
     if item.kind in {EvidenceKind.PRIMARY_EMPIRICAL, EvidenceKind.REPLICATION}:
-        cap = 0.42
+        cap = 0.45
         cap += 0.10 if item.peer_reviewed else 0.0
         cap += 0.08 if item.preregistered else 0.0
         cap += 0.08 if item.data_available else 0.0
@@ -169,6 +169,7 @@ def _methodology_cap(item: EvidenceItem) -> float:
         cap += 0.08 if item.uncertainty_reported else 0.0
         cap += 0.05 if item.sample_size is not None and item.sample_size > 0 else 0.0
         cap += 0.05 if item.primary else 0.0
+        cap += 0.08 if item.reproducible else 0.0
         return min(ceiling, cap)
     if item.kind == EvidenceKind.SYSTEMATIC_REVIEW:
         cap = 0.62 + (0.10 if item.peer_reviewed else 0.0) + (0.08 if item.data_available else 0.0) + (0.06 if item.uncertainty_reported else 0.0)

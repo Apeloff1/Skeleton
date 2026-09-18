@@ -12,6 +12,7 @@ Capabilities:
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
@@ -366,7 +367,7 @@ async def generate_mechanic(request: MechanicRequest):
         return mechanic
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Logic engine request failed", e) from None
 
 @router.post("/generate-ai")
 async def generate_ai_behavior(request: AIBehaviorRequest):
@@ -437,7 +438,7 @@ async def generate_ai_behavior(request: AIBehaviorRequest):
         return ai_system
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Logic engine request failed", e) from None
 
 @router.post("/generate-rules")
 async def generate_rule_system(request: RuleSystemRequest):

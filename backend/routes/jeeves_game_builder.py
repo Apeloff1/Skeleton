@@ -482,9 +482,9 @@ async def advance_build(req: BuildAdvanceRequest):
                 "completed_at": datetime.utcnow().isoformat(),
                 "aaa_enforced": True,
             }
-        except Exception as e:
+        except Exception:
             step_result = {
-                "raw": f"Agent {step_def['agent']} output pending — {str(e)[:100]}",
+                "raw": f"Agent {step_def['agent']} output pending",
                 "parsed": {"status": "pending", "agent": step_def["agent"]},
                 "agent": step_def["agent"],
                 "agent_name": step_def["name"],
@@ -645,8 +645,8 @@ AGENT OUTPUTS:
         )
         compiled = parse_json_response(result.get("response", "")) if result.get("success") else {}
         compiled["compile_status"] = "success" if result.get("success") else "fallback"
-    except Exception as e:
-        compiled = {"compile_status": "error", "error": str(e)}
+    except Exception:
+        compiled = {"compile_status": "error", "error": "compile_failed"}
 
     project["compiled_output"] = compiled
     project["status"] = "compiled"

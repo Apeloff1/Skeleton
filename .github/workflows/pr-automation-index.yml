@@ -2,14 +2,19 @@ name: PR Automation Index
 
 on:
   workflow_run:
+    # Merge Readiness is the canonical event-driven convergence point.
+    # Extra configured checks are still inspected fail-closed by the runner;
+    # if they complete later, the scheduled reconciliation observes them.
     workflows:
       - Merge Readiness
-      - CI/CD
-      - Backend Quality
-      - Dependency Review
-      - Dependency Security
-      - CodeQL
-    types: [requested, in_progress, completed]
+    # Evaluate terminal workflow state only. Requested/in-progress transitions
+    # multiplied Actions load without adding merge-readiness information.
+    types: [completed]
+    # Main completions already fan out through the watched workflows.
+    # Keep PR/feature heads event-driven and reconcile default-branch state on
+    # the existing schedule/manual paths instead of multiplying privileged runs.
+    branches-ignore:
+      - main
   schedule:
     - cron: "17,47 * * * *"
   workflow_dispatch:
@@ -60,6 +65,7 @@ jobs:
       PR_AUTOMATION_MAX_CHANGED_FILES: ${{ vars.PR_AUTOMATION_MAX_CHANGED_FILES || '250' }}
       PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
       PR_AUTOMATION_MAX_MUTATIONS: "1"
+      PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
 
     steps:
       - name: Checkout trusted default branch
@@ -106,7 +112,10 @@ jobs:
         shell: bash
         env:
           PR_AUTOMATION_MODE: ${{ steps.mode.outputs.mode }}
-          WORKFLOW_RUN_PR: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.pull_requests[0].number || '' }}
+          WORKFLOW_RUN_PR_HINTS: ${{ github.event_name == 'workflow_run' && toJSON(github.event.workflow_run.pull_requests.*.number) || '[]' }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          WORKFLOW_RUN_HEAD_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           INPUT_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}
         run: |
           set -euo pipefail
@@ -115,13 +124,25 @@ jobs:
               "$TRUSTED_PR_AUTOMATION_ROOT" "$@"
           }
 
-          pr="${INPUT_PR:-${WORKFLOW_RUN_PR:-}}"
+          args=(--repo "$GITHUB_REPOSITORY")
+          pr="${INPUT_PR:-}"
           if [[ -n "$pr" ]]; then
             [[ "$pr" =~ ^[0-9]+$ ]] || { echo "invalid PR number: $pr" >&2; exit 2; }
-            run_pr_automation --repo "$GITHUB_REPOSITORY" --pr "$pr"
+            args+=(--pr="$pr")
+          elif [[ -n "${WORKFLOW_RUN_HEAD_SHA}" || -n "${WORKFLOW_RUN_HEAD_REF}" ]]; then
+            if [[ -z "${WORKFLOW_RUN_HEAD_SHA}" || -z "${WORKFLOW_RUN_HEAD_REF}" ]]; then
+              echo "workflow_run completion is missing head SHA or branch" >&2
+              exit 2
+            fi
+            args+=(--head-sha="$WORKFLOW_RUN_HEAD_SHA" --head-ref="$WORKFLOW_RUN_HEAD_REF")
+            if [[ -n "${DEFAULT_BRANCH}" ]]; then
+              args+=(--default-branch="$DEFAULT_BRANCH")
+            fi
+            args+=(--pr-hints-json="${WORKFLOW_RUN_PR_HINTS:-[]}")
           else
-            run_pr_automation --repo "$GITHUB_REPOSITORY" --limit 25
+            args+=(--limit 25)
           fi
+          run_pr_automation "${args[@]}"
 
       - name: Save durable PR index
         if: always()

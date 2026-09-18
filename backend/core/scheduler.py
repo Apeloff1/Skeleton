@@ -27,11 +27,11 @@ async def _safe(job_name: str, coro):
         _last_runs[job_name] = {"ok": True, "ts": time.time(),
                                 "ms": round((time.time() - t0) * 1000, 1),
                                 "result": result}
-    except Exception as e:  # noqa: BLE001
-        _last_runs[job_name] = {"ok": False, "ts": time.time(), "error": str(e)[:200]}
+    except Exception:  # noqa: BLE001
+        _last_runs[job_name] = {"ok": False, "ts": time.time(), "error": "job_failed"}
         try:
             from gameforge.prood import event_bus
-            await event_bus.publish("scheduler.job.fail", {"job": job_name, "error": str(e)[:120]})
+            await event_bus.publish("scheduler.job.fail", {"job": job_name, "error": "job_failed"})
         except Exception:  # noqa: BLE001
             pass
 

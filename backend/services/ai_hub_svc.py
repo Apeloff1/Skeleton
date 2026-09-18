@@ -125,8 +125,8 @@ class AIHubService:
                 "analysis":  response,
                 "timestamp": datetime.utcnow().isoformat(),
             }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        except Exception:
+            return {"status": "error", "message": "sota_analysis_failed"}
 
     async def auto_implement_feature(self, feature_spec: dict) -> dict:
         """Generate implementation plan for a new feature."""
@@ -156,8 +156,8 @@ class AIHubService:
                 "implementation_plan":   response,
                 "estimated_complexity":  feature_spec.get("implementation_difficulty", "medium"),
             }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        except Exception:
+            return {"status": "error", "message": "feature_plan_failed"}
 
 
 # We can't construct the singleton at import time because it needs

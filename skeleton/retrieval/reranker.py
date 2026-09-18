@@ -92,39 +92,69 @@ class FeatureReranker:
 
     def rerank(self, query: str, results: List[Any], top_k: int = 10) -> List[Any]:
         """Re-rank results using extracted features.
-        
-        Args:
-            query: The original query string
-            results: List of result objects with 'content' and 'score' attributes
-            top_k: Number of results to return
-            
-        Returns:
-            Re-ranked list of results
+
+        Accepts typed result objects (``content``/``score``) and dict stand-ins
+        (``id``/``text``/``score``). Typed objects are returned unchanged so
+        pipeline stages keep ``ScoredResult`` identity; dict inputs become
+        lightweight records with ``item_id`` and ``features``.
         """
         self._stats["queries"] += 1
-        
+
+        query_terms = tuple(query.lower().split())
         scored = []
         for result in results:
-            content = getattr(result, 'content', str(result))
-            original_score = getattr(result, 'score', 0.5)
-            
+            if isinstance(result, dict):
+                item_id = str(result.get("id") or result.get("item_id") or "")
+                content = str(result.get("text") or result.get("content") or "")
+                original_score = float(result.get("score", 0.5) or 0.0)
+                original = None
+            else:
+                item_id = str(
+                    getattr(result, "item_id", None)
+                    or getattr(result, "fragment_id", None)
+                    or getattr(result, "document_id", "")
+                    or ""
+                )
+                content = str(getattr(result, "content", None) or getattr(result, "text", "") or result)
+                original_score = float(getattr(result, "score", 0.5) or 0.0)
+                original = result
+
             features = FeatureExtractor.extract(query, content)
-            
-            # Compute weighted score
-            feature_score = sum(
-                features.get(f, 0) * w 
-                for f, w in self._weights.items()
+            doc = content.lower()
+            doc_terms = doc.split()
+            covered = 0
+            for term in query_terms:
+                if term in doc or any(dt.startswith(term) or term.startswith(dt) for dt in doc_terms):
+                    covered += 1
+            features["coverage"] = 1.0 if query_terms and covered == len(query_terms) else (
+                covered / len(query_terms) if query_terms else 0.0
             )
-            
-            # Blend original and feature scores
-            reranked_score = original_score * 0.6 + feature_score * 0.4
-            
-            scored.append((reranked_score, result, features))
-        
-        # Sort by reranked score
-        scored.sort(key=lambda x: x[0], reverse=True)
+
+            feature_score = sum(features.get(name, 0.0) * weight for name, weight in self._weights.items())
+            reranked_score = original_score * 0.6 + feature_score * 0.4 + features["coverage"] * 10.0
+
+            if original is None:
+                outgoing: Any = type(
+                    "RerankedHit",
+                    (),
+                    {
+                        "item_id": item_id,
+                        "features": features,
+                        "score": reranked_score,
+                        "content": content,
+                    },
+                )()
+            else:
+                outgoing = original
+                if getattr(outgoing, "features", None) is None:
+                    try:
+                        outgoing.features = features
+                    except (AttributeError, TypeError):
+                        pass
+            scored.append((reranked_score, outgoing, features))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
         self._stats["reranked"] += len(scored)
-        
         return [result for _, result, _ in scored[:top_k]]
 
     def record_feedback(self, query: str, document_id: str, relevant: bool) -> None:
@@ -158,3 +188,9 @@ class FeatureReranker:
             **self._stats,
             "weights": self.get_weights(),
         }
+
+
+# Legacy alias — ``from skeleton.retrieval.reranker import Reranker``
+# keeps resolving while callers migrate to FeatureReranker. ``rerank.py``
+# owns the Reranker name for rule-based boosting in that module.
+Reranker = FeatureReranker

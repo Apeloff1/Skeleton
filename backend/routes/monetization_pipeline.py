@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -484,4 +485,4 @@ async def ai_design_monetization_strategy(request: AIMonetizationStrategyRequest
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI monetization strategy design failed: {str(e)}")
+        raise internal_http_error("AI monetization strategy design failed", e) from None

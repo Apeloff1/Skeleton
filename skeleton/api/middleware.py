@@ -4,7 +4,7 @@ FastAPI doesn't ship with these; they live here so routes stay thin.
 
 Gate stack (outer → inner), sibling of Zaibatsu.Gate Program.cs::
 
-    RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+    HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
 
 Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 """
@@ -55,18 +55,24 @@ class BearerAuth:
         return payload
 
 
+def _positive_finite(value: object, name: str) -> float:
+    """Reject bools; ``float(True)`` must not become a 1.0 capacity/refill."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a positive finite number")
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{name} must be a positive finite number")
+    return number
+
+
 class RateLimiter:
     """Thread-safe token bucket keyed by arbitrary string (IP, user-id, API key)."""
 
     _MIN_SWEEP_INTERVAL_S = 1.0
 
     def __init__(self, *, capacity: float = 100.0, refill_per_sec: float = 10.0) -> None:
-        if not math.isfinite(capacity) or capacity <= 0:
-            raise ValueError("capacity must be a positive finite number")
-        if not math.isfinite(refill_per_sec) or refill_per_sec <= 0:
-            raise ValueError("refill_per_sec must be a positive finite number")
-        self.capacity = float(capacity)
-        self.refill_per_sec = float(refill_per_sec)
+        self.capacity = _positive_finite(capacity, "capacity")
+        self.refill_per_sec = _positive_finite(refill_per_sec, "refill_per_sec")
         self._buckets: Dict[str, Tuple[float, float]] = {}
         self._lock = threading.Lock()
         self._last_sweep: Optional[float] = None
@@ -92,8 +98,12 @@ class RateLimiter:
         self._last_sweep = now
 
     def check(self, key: str, tokens: float = 1.0) -> None:
-        if not math.isfinite(tokens) or not 0 < tokens <= self.capacity:
+        if isinstance(tokens, bool) or not isinstance(tokens, (int, float)):
             raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        amount = float(tokens)
+        if not math.isfinite(amount) or not 0 < amount <= self.capacity:
+            raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        tokens = amount
         now = time.monotonic()
         with self._lock:
             self._sweep(now)
@@ -150,6 +160,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/ledger", "ledger"),
     ("/api/v1/scheduler", "scheduler"),
     ("/api/v1/genesis", "genesis"),
+    ("/api/v1/application", "application"),
     ("/api/v1/capabilities", "capabilities"),
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
@@ -297,13 +308,13 @@ class BodyBoundMiddleware:
 
     def __init__(self, app, *, max_body_bytes: Optional[int] = None) -> None:
         self.app = app
-        env = os.environ.get("SKELETON_GATE_MAX_BODY_BYTES")
-        configured = int(env) if env else (
-            max_body_bytes if max_body_bytes is not None else _DEFAULT_MAX_BODY
+        from skeleton.api.request_bounds import _positive_limit
+
+        self.max_body = _positive_limit(
+            "SKELETON_GATE_MAX_BODY_BYTES",
+            max_body_bytes,
+            _DEFAULT_MAX_BODY,
         )
-        if configured <= 0:
-            raise ValueError("max body size must be positive")
-        self.max_body = configured
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -509,9 +520,10 @@ def install_gate(
 
     Order (outer → inner), sibling of Zaibatsu.Gate + gf-server admit_write::
 
-        RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+        HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
     """
     from skeleton.api.admit_write import WriteAdmitMiddleware
+    from skeleton.api.request_bounds import HeaderBoundMiddleware
 
     policy = policy or GatePolicy()
     # Innermost first:
@@ -526,4 +538,5 @@ def install_gate(
         governor=write_governor,
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
+    app.add_middleware(HeaderBoundMiddleware)
     return app

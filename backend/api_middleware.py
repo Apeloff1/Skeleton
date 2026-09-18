@@ -14,7 +14,7 @@ Public surface:
 Tunable via env:
   RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP
   RATE_LIMIT_BURST        (int)   default 60         — initial bucket size
-  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost"
+  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost,testclient"
   RATE_LIMIT_MAX_BUCKETS  (int)   default 4096       — hard cap on tracked IPs
   RATE_LIMIT_BUCKET_TTL   (float) default 300        — idle seconds before expiry
   TRUSTED_PROXY_CIDRS     (csv)   default ""         — peers allowed to supply XFF
@@ -82,7 +82,7 @@ def _parse_trusted_proxy_networks(
 
 _RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600)
 _RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60)
-_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
+_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost,testclient")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 4096)
 _BUCKET_TTL = _positive_float_env("RATE_LIMIT_BUCKET_TTL", 300.0)
@@ -153,11 +153,11 @@ def get_stats() -> dict:
 
 # ── Request identity ──────────────────────────────────────────────────
 def _request_id(request: Request) -> str:
-    """Return one bounded header-safe request ID or mint a full UUID4 hex ID."""
+    """Return one bounded header-safe request ID or mint a compact UUID4 token."""
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex
+    return uuid.uuid4().hex[:16]
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -261,6 +261,11 @@ def _client_ip(request: Request) -> str:
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
     """Match a route root exactly or one of its descendants, never lookalikes."""
     return path == prefix or path.startswith(prefix + "/")
+
+
+def _is_api_path(path: str) -> bool:
+    """Publicly testable API-boundary predicate; reject lookalike prefixes."""
+    return _matches_path_prefix(path, "/api")
 
 
 # ── Access log ────────────────────────────────────────────────────────

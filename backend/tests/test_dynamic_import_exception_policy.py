@@ -94,7 +94,7 @@ def test_explicit_duplicate_exceptions_each_authorize_one_matching_call(
 
     findings = scanner.violations(path)
     assert len(findings) == 1
-    assert ":7: importlib.import_module() module name must be" in findings[0]
+    assert ":6: importlib.import_module() module name must be" in findings[0]
 
 
 def test_exception_does_not_cover_different_expression(

@@ -1,0 +1,112 @@
+name: Idle Studio Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/idle-studio.yml'
+      - '.github/workflows/idle-studio-validation.yml'
+      - '.github/workflows/autonomous-studio.yml'
+      - '.github/workflows/shift-supervisor-control.yml'
+      - 'core/shift_supervisor/**'
+      - 'skeleton/automation/chatgpt_adapter.py'
+      - 'skeleton/automation/idle_studio.py'
+      - 'skeleton/automation/idle_studio_v2.py'
+      - 'skeleton/automation/idle_studio_publisher.py'
+      - 'skeleton/automation/studio_director.py'
+      - 'skeleton/automation/supervised_studio.py'
+      - 'skeleton/automation/studio_registry.py'
+      - 'skeleton/automation/studio_report.py'
+      - 'skeleton/automation/task_squad.py'
+      - 'skeleton/testing/test_idle_studio.py'
+      - 'skeleton/testing/test_idle_studio_v2.py'
+      - 'skeleton/testing/test_idle_studio_publisher.py'
+      - 'skeleton/testing/test_studio_director.py'
+      - 'skeleton/testing/test_supervised_studio.py'
+      - 'skeleton/testing/test_studio_registry.py'
+      - 'skeleton/testing/test_studio_report.py'
+      - 'tests/test_shift_supervisor_consumer_plan.py'
+      - 'tests/test_shift_supervisor_scheduler.py'
+      - 'tests/test_shift_supervisor_workforce_report.py'
+      - 'tests/test_studio_task_squad.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: idle-studio-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Idle Studio contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout pull request without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Install focused trusted runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "fastapi>=0.141.1,<1"
+          "pydantic>=2.13.5,<3"
+          "pydantic-settings>=2.15.0,<3"
+          "pytest>=8,<9"
+
+      - name: Compile studio controllers
+        run: >-
+          python -m compileall -q
+          core/shift_supervisor
+          skeleton/automation/idle_studio.py
+          skeleton/automation/idle_studio_v2.py
+          skeleton/automation/idle_studio_publisher.py
+          skeleton/automation/studio_director.py
+          skeleton/automation/supervised_studio.py
+          skeleton/automation/studio_registry.py
+          skeleton/automation/studio_report.py
+          skeleton/automation/task_squad.py
+
+      - name: Run focused idle studio contracts
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        run: >-
+          python -m unittest -v
+          skeleton.testing.test_idle_studio
+          skeleton.testing.test_idle_studio_v2
+          skeleton.testing.test_idle_studio_publisher
+
+      - name: Run supervisor consumer, reconciliation, and workforce contracts
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        run: >-
+          python -m pytest -q
+          tests/test_shift_supervisor_consumer_plan.py
+          tests/test_shift_supervisor_model_retry.py
+          tests/test_shift_supervisor_scheduler.py
+          tests/test_shift_supervisor_workforce_report.py
+
+      - name: Run credential-free autonomous studio smoke and contracts
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_studio_registry.py
+          skeleton/testing/test_studio_director.py
+          skeleton/testing/test_supervised_studio.py
+          skeleton/testing/test_studio_report.py
+          tests/test_studio_task_squad.py

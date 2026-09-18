@@ -1,0 +1,69 @@
+name: Idle Backlog Bot
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: idle-backlog-bot
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  triage:
+    name: Triage stale work
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      STALE_DAYS: '14'
+      MAX_ITEMS: '25'
+    steps:
+      - name: Ensure bot labels exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh label create 'bot:stale' --repo "$REPO" --color '6f42c1' --description 'Needs maintainer attention after inactivity' --force
+          gh label create 'bot:triaged' --repo "$REPO" --color '0366d6' --description 'Reviewed by repository automation' --force
+
+      - name: Triage inactive issues and pull requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${STALE_DAYS} days ago" +%s)
+          triaged=0
+
+          # The issues REST endpoint returns both issues and pull requests.
+          # `gh issue list` does not expose an `isPullRequest` JSON field, so use
+          # the API's `pull_request` marker and `updated_at` field directly.
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${REPO}/issues?state=open&per_page=100" \
+            > "$RUNNER_TEMP/items.json"
+
+          while IFS=$'\t' read -r number title updated kind labels; do
+            [[ -n "${number:-}" ]] || continue
+            updated_epoch=$(date -u -d "$updated" +%s)
+            (( updated_epoch < cutoff )) || continue
+            (( triaged < MAX_ITEMS )) || break
+
+            if [[ "$labels" != *'bot:stale'* ]]; then
+              gh issue edit "$number" --repo "$REPO" --add-label 'bot:stale' >/dev/null
+              gh issue comment "$number" --repo "$REPO" --body "Repository bot triage: this ${kind} has had no update for at least ${STALE_DAYS} days. It remains open; review whether it is still actionable, blocked, superseded, or ready for work. No automatic closure was performed." >/dev/null
+              triaged=$((triaged + 1))
+            fi
+          done < <(jq -r '.[] | [.number,.title,.updated_at,(if has("pull_request") then "pull request" else "issue" end),([.labels[].name] | join(","))] | @tsv' "$RUNNER_TEMP/items.json")
+
+          {
+            echo '## Idle backlog bot'
+            echo "- Stale threshold: ${STALE_DAYS} days"
+            echo "- Newly triaged items: ${triaged}"
+            echo '- Policy: label/comment only; never auto-close backlog work.'
+          } >> "$GITHUB_STEP_SUMMARY"

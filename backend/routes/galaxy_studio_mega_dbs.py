@@ -39,8 +39,8 @@ async def list_mega_dbs():
             "docs_per_category":    by_cat,
             "collections":          out,
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "total_collections": 0}
+    except Exception:
+        return {"error": "mega_db_unavailable", "total_collections": 0}
 
 
 @router.post("/mega-dbs/query")
@@ -75,8 +75,8 @@ async def query_mega_db(req: dict):
             "returned":   len(results), "skip": skip, "limit": limit,
             "results":    results,
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "results": []}
+    except Exception:
+        return {"error": "mega_db_query_failed", "results": []}
 
 
 @router.post("/mega-dbs/seed")
@@ -92,8 +92,8 @@ async def trigger_mega_seed():
             "total_collections_planned": TOTAL_MEGA_COLLECTIONS,
             "message":                  "Mega DB seed kicked off in background. Poll /mega-dbs/list for progress.",
         }
-    except Exception as e:
-        return {"status": "error", "error": str(e)[:200]}
+    except Exception:
+        return {"status": "error", "error": "mega_db_seed_failed"}
 
 
 @router.get("/db-status")
@@ -128,8 +128,8 @@ async def db_fill_status():
             "empty_collections":   empty,
             "collections":         rows,
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "total_collections": 0}
+    except Exception:
+        return {"error": "mega_db_unavailable", "total_collections": 0}
 
 
 @router.post("/bootstrap-dbs")
@@ -149,5 +149,5 @@ async def bootstrap_all_dbs():
                 print(f"[bootstrap] code_library seed failed: {e}")
         result = await bootstrap_all(_db)
         return result
-    except Exception as e:
-        return {"error": str(e)[:200]}
+    except Exception:
+        return {"error": "bootstrap_failed"}

@@ -1,0 +1,174 @@
+name: Jeeves Probabilistic Modeling
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/jeeves/probabilistic.py"
+      - "skeleton/jeeves/probabilistic_state_space.py"
+      - "skeleton/jeeves/probabilistic_bayes.py"
+      - "skeleton/jeeves/probabilistic_ensemble.py"
+      - "skeleton/jeeves/probabilistic_calibration.py"
+      - "skeleton/jeeves/probabilistic_conformal.py"
+      - "skeleton/jeeves/probabilistic_conformal_stratified.py"
+      - "skeleton/jeeves/probabilistic_contracts.py"
+      - "skeleton/jeeves/probabilistic_governance.py"
+      - "skeleton/jeeves/probabilistic_joint_governance.py"
+      - "skeleton/jeeves/probabilistic_governance_bundle.py"
+      - "skeleton/jeeves/probabilistic_regimes.py"
+      - "skeleton/jeeves/probabilistic_arena.py"
+      - "skeleton/jeeves/probabilistic_spectral.py"
+      - "skeleton/jeeves/probabilistic_arbitration.py"
+      - "skeleton/jeeves/probabilistic_horizons.py"
+      - "skeleton/jeeves/probabilistic_horizon_integrity.py"
+      - "skeleton/jeeves/probabilistic_horizon_stratified.py"
+      - "skeleton/jeeves/probabilistic_joint_paths.py"
+      - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
+      - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
+      - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
+      - "skeleton/testing/test_jeeves_probabilistic_evidence_identity.py"
+      - "skeleton/testing/test_jeeves_probabilistic_conformal.py"
+      - "skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py"
+      - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance_stress.py"
+      - "skeleton/testing/test_jeeves_probabilistic_joint_governance.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance_bundle.py"
+      - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
+      - "skeleton/testing/test_jeeves_probabilistic_arena.py"
+      - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
+      - "skeleton/testing/test_jeeves_probabilistic_arbitration.py"
+      - "skeleton/testing/test_jeeves_probabilistic_horizons.py"
+      - "skeleton/testing/test_jeeves_probabilistic_horizon_integrity.py"
+      - "skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py"
+      - "skeleton/testing/test_jeeves_probabilistic_joint_paths.py"
+      - "skeleton/testing/test_jeeves_probabilistic_exports.py"
+      - "skeleton/testing/test_jeeves_probabilistic_stratified_exports.py"
+      - "skeleton/testing/test_jeeves_probabilistic_horizon_stratified_exports.py"
+      - "skeleton/testing/test_jeeves_probabilistic_joint_path_exports.py"
+      - ".github/workflows/jeeves-probabilistic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-probabilistic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probabilistic-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install project and canonical quality dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e . "ruff==0.9.10" "pytest>=8,<9"
+
+      - name: Compile probabilistic surfaces
+        run: |
+          python -m py_compile \
+            skeleton/jeeves/probabilistic.py \
+            skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
+            skeleton/jeeves/probabilistic_ensemble.py \
+            skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_conformal.py \
+            skeleton/jeeves/probabilistic_conformal_stratified.py \
+            skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_governance.py \
+            skeleton/jeeves/probabilistic_joint_governance.py \
+            skeleton/jeeves/probabilistic_governance_bundle.py \
+            skeleton/jeeves/probabilistic_regimes.py \
+            skeleton/jeeves/probabilistic_arena.py \
+            skeleton/jeeves/probabilistic_spectral.py \
+            skeleton/jeeves/probabilistic_arbitration.py \
+            skeleton/jeeves/probabilistic_horizons.py \
+            skeleton/jeeves/probabilistic_horizon_integrity.py \
+            skeleton/jeeves/probabilistic_horizon_stratified.py \
+            skeleton/jeeves/probabilistic_joint_paths.py
+
+      - name: Ruff probabilistic surfaces
+        run: |
+          ruff check \
+            skeleton/jeeves/probabilistic.py \
+            skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
+            skeleton/jeeves/probabilistic_ensemble.py \
+            skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_conformal.py \
+            skeleton/jeeves/probabilistic_conformal_stratified.py \
+            skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_governance.py \
+            skeleton/jeeves/probabilistic_joint_governance.py \
+            skeleton/jeeves/probabilistic_governance_bundle.py \
+            skeleton/jeeves/probabilistic_regimes.py \
+            skeleton/jeeves/probabilistic_arena.py \
+            skeleton/jeeves/probabilistic_spectral.py \
+            skeleton/jeeves/probabilistic_arbitration.py \
+            skeleton/jeeves/probabilistic_horizons.py \
+            skeleton/jeeves/probabilistic_horizon_integrity.py \
+            skeleton/jeeves/probabilistic_horizon_stratified.py \
+            skeleton/jeeves/probabilistic_joint_paths.py \
+            skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
+            skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_evidence_identity.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_bundle.py \
+            skeleton/testing/test_jeeves_probabilistic_regimes.py \
+            skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_spectral.py \
+            skeleton/testing/test_jeeves_probabilistic_arbitration.py \
+            skeleton/testing/test_jeeves_probabilistic_horizons.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_integrity.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_paths.py \
+            skeleton/testing/test_jeeves_probabilistic_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_stratified_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_path_exports.py
+
+      - name: Run probabilistic regression suite
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
+            skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_evidence_identity.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_bundle.py \
+            skeleton/testing/test_jeeves_probabilistic_regimes.py \
+            skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_spectral.py \
+            skeleton/testing/test_jeeves_probabilistic_arbitration.py \
+            skeleton/testing/test_jeeves_probabilistic_horizons.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_integrity.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_paths.py \
+            skeleton/testing/test_jeeves_probabilistic_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_stratified_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_joint_path_exports.py
