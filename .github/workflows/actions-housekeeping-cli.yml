@@ -83,7 +83,7 @@ jobs:
           inspected=0
           cancelled=0
           moved=0
-          failed=0
+          preserved_errors=0
           kept_current=0
           kept_security=0
           kept_unlinked=0
@@ -165,7 +165,7 @@ jobs:
             inspected=$((inspected + 1))
 
             if [[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
-              failed=$((failed + 1))
+              preserved_errors=$((preserved_errors + 1))
               continue
             fi
 
@@ -192,7 +192,7 @@ jobs:
 
             run_json="$RUNNER_TEMP/run-${id}.json"
             if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$run_json"; then
-              failed=$((failed + 1))
+              preserved_errors=$((preserved_errors + 1))
               continue
             fi
 
@@ -200,7 +200,7 @@ jobs:
             if (( ${#pr_numbers[@]} == 0 )); then
               recovered_prs="$RUNNER_TEMP/run-${id}-recovered-prs.txt"
               if ! recover_pr_numbers "$head_branch" "$head_sha" "$recovered_prs"; then
-                failed=$((failed + 1))
+                preserved_errors=$((preserved_errors + 1))
                 continue
               fi
               mapfile -t pr_numbers < "$recovered_prs"
@@ -252,7 +252,7 @@ jobs:
             if [[ "$status_now" == "completed" ]]; then
               moved=$((moved + 1))
             else
-              failed=$((failed + 1))
+              preserved_errors=$((preserved_errors + 1))
             fi
           done < "$inventory"
 
@@ -261,7 +261,7 @@ jobs:
             echo "- Live runs inspected: $inspected"
             echo "- Obsolete PR runs cancelled: $cancelled"
             echo "- Runs that completed before cancellation: $moved"
-            echo "- Cancellation/API failures: $failed"
+            echo "- Ambiguous/API/cancellation runs preserved: $preserved_errors"
             echo "- Current PR-head runs preserved: $kept_current"
             echo "- Security/provenance/artifact/dependency runs preserved: $kept_security"
             echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
@@ -271,9 +271,8 @@ jobs:
             echo '- Cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if (( failed > 0 )); then
-            echo "Live-run reaper encountered ${failed} fail-closed API/cancellation errors." >&2
-            exit 1
+          if (( preserved_errors > 0 )); then
+            echo "::warning::Live-run reaper preserved ${preserved_errors} ambiguous/API/cancellation candidate(s); no uncertain run was cancelled."
           fi
 
       - name: Prune only cold Actions caches
