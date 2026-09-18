@@ -541,10 +541,33 @@ class SemanticLensPlane:
 
     @property
     def fingerprint(self) -> str:
+        # Runtime/checkpoint identity binds the semantic contract, not mutable
+        # calibration outcomes. Scientific trial ledgers may legitimately grow
+        # between runs without changing which operators or safety rules exist.
         return stable_fingerprint(
             {
-                "registry": [spec.key for spec in self.registry.all()],
-                "governance": self.governance.registry.fingerprint,
+                "registry": [
+                    (
+                        spec.key,
+                        spec.family.value,
+                        spec.role.value,
+                        spec.lineage_year,
+                        spec.minimum_observations,
+                        spec.pairwise,
+                        spec.sequential,
+                        spec.rare,
+                    )
+                    for spec in self.registry.all()
+                ],
+                "interaction_rules": [
+                    (
+                        rule.key,
+                        rule.kind.value,
+                        rule.symmetric,
+                        rule.tangent_axis_hint,
+                    )
+                    for rule in plane_interaction_rules()
+                ],
                 "policy": {
                     "max_lenses": self.policy.max_lenses,
                     "max_per_family": self.policy.max_per_family,
