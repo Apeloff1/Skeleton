@@ -12,6 +12,12 @@ from .calculations import (
     linear_momentum,
     world_inertia,
 )
+from .coloring import (
+    ConstraintColorBatch,
+    ConstraintColorSchedule,
+    ConstraintColorStats,
+    color_constraints,
+)
 from .collision import (
     BroadPhasePair,
     ContactManifold,
@@ -55,6 +61,7 @@ from .gameplay import (
     JumpTuning,
     ProjectileSolution,
 )
+from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .islands import (
     IslandGraph,
     IslandGraphStats,
@@ -106,6 +113,9 @@ __all__ = [
     "BodyNotFoundError",
     "CCDHit",
     "CommandCorrectionReceipt",
+    "ConstraintColorBatch",
+    "ConstraintColorSchedule",
+    "ConstraintColorStats",
     "ConstraintSolver",
     "ConstraintStats",
     "ContactCache",
@@ -115,6 +125,8 @@ __all__ = [
     "DistanceLimitJoint",
     "DuplicateJointError",
     "JointConstraint",
+    "JointImpulseCache",
+    "JointImpulseEntry",
     "JointKind",
     "JointNotFoundError",
     "BodyType",
@@ -188,6 +200,7 @@ __all__ = [
     "angular_momentum",
     "build_islands",
     "build_snapshot",
+    "color_constraints",
     "combine_materials",
     "detect_collision",
     "generate_manifolds",

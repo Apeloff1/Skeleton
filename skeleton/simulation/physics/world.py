@@ -14,6 +14,7 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
+from .coloring import ConstraintColorSchedule, color_constraints
 from .constraints import (
     ConstraintSolver,
     ConstraintStats,
@@ -30,6 +31,7 @@ from .errors import (
     PhysicsValidationError,
 )
 from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
+from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
@@ -63,6 +65,7 @@ class _StepCheckpoint:
     tick: int
     body_states: tuple[tuple[str, _BodyStepState], ...]
     contact_cache: tuple[ContactCacheEntry, ...]
+    joint_cache: tuple[JointImpulseEntry, ...]
     manifolds: tuple[ContactManifold, ...]
     state_digest: str
 
@@ -96,6 +99,8 @@ class PhysicsSettings:
     position_iterations: int = 4
     contact_cache_entries: int = 65_536
     contact_cache_age_ticks: int = 8
+    joint_cache_entries: int = 65_536
+    joint_cache_age_ticks: int = 8
     ccd_enabled: bool = True
     ccd_motion_threshold: float = 0.5
     ccd_contact_slop: float = 1.0e-7
@@ -165,6 +170,16 @@ class PhysicsSettings:
             name="contact_cache_age_ticks",
             maximum=10_000,
         )
+        _bounded_int(
+            self.joint_cache_entries,
+            name="joint_cache_entries",
+            maximum=1_000_000,
+        )
+        _bounded_int(
+            self.joint_cache_age_ticks,
+            name="joint_cache_age_ticks",
+            maximum=10_000,
+        )
         _bounded_int(self.max_ccd_checks, name="max_ccd_checks", maximum=1_000_000)
         _bounded_int(
             self.ccd_max_substeps,
@@ -183,7 +198,7 @@ class PhysicsSettings:
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v3",
+                "domain": "skeleton.simulation.physics.settings.v4",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
@@ -196,6 +211,8 @@ class PhysicsSettings:
                 "position_iterations": self.position_iterations,
                 "contact_cache_entries": self.contact_cache_entries,
                 "contact_cache_age_ticks": self.contact_cache_age_ticks,
+                "joint_cache_entries": self.joint_cache_entries,
+                "joint_cache_age_ticks": self.joint_cache_age_ticks,
                 "ccd_enabled": self.ccd_enabled,
                 "ccd_motion_threshold": self.ccd_motion_threshold,
                 "ccd_contact_slop": self.ccd_contact_slop,
@@ -250,6 +267,10 @@ class PhysicsWorld:
             max_entries=self.settings.contact_cache_entries,
             max_age_ticks=self.settings.contact_cache_age_ticks,
         )
+        self._joint_cache = JointImpulseCache(
+            max_entries=self.settings.joint_cache_entries,
+            max_age_ticks=self.settings.joint_cache_age_ticks,
+        )
         self._ccd = ContinuousCollisionDetector(
             motion_threshold=self.settings.ccd_motion_threshold,
             max_checks=self.settings.max_ccd_checks,
@@ -293,6 +314,7 @@ class PhysicsWorld:
         except KeyError as exc:
             raise BodyNotFoundError(body_id) from exc
         self._contact_cache.remove_body(body_id)
+        self._joint_cache.remove_body(body_id)
         self._last_manifolds = tuple(
             row
             for row in self._last_manifolds
@@ -328,15 +350,27 @@ class PhysicsWorld:
 
     def remove_joint(self, joint_id: str) -> JointConstraint:
         try:
-            return self._joints.pop(joint_id)
+            joint = self._joints.pop(joint_id)
         except KeyError as exc:
             raise JointNotFoundError(joint_id) from exc
+        self._joint_cache.remove_joint(joint_id)
+        return joint
 
     def contacts(self) -> tuple[ContactManifold, ...]:
         return self._last_manifolds
 
     def contact_cache_size(self) -> int:
         return len(self._contact_cache)
+
+    def joint_cache_size(self) -> int:
+        return len(self._joint_cache)
+
+    def constraint_schedule(self) -> ConstraintColorSchedule:
+        return color_constraints(
+            self._bodies,
+            self._last_manifolds,
+            self.joints(),
+        )
 
     def measure(
         self,
@@ -491,12 +525,13 @@ class PhysicsWorld:
     def state_digest(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.world_state.v3",
+                "domain": "skeleton.simulation.physics.world_state.v4",
                 "settings": self.settings.fingerprint,
                 "tick": self._tick,
                 "bodies": [self._body_record(body) for body in self.bodies()],
                 "joints": [joint.state_record() for joint in self.joints()],
                 "contact_cache": self._contact_cache.state_record(),
+                "joint_cache": self._joint_cache.state_record(),
                 "last_manifolds": [
                     self._manifold_record(manifold)
                     for manifold in self._last_manifolds
@@ -526,6 +561,7 @@ class PhysicsWorld:
             contact_cache=self._contact_cache.snapshot(),
             manifolds=self._last_manifolds,
             state_digest=self.state_digest,
+            joint_cache=self._joint_cache.snapshot(),
         )
 
     def _apply_snapshot_state(self, snapshot: PhysicsSnapshot) -> None:
@@ -540,6 +576,7 @@ class PhysicsWorld:
             body.awake = state.awake
             body.sleep_time = state.sleep_time
         self._contact_cache.restore(snapshot.contact_cache)
+        self._joint_cache.restore(snapshot.joint_cache)
         self._last_manifolds = snapshot.manifolds
         self._tick = snapshot.tick
 
@@ -588,6 +625,7 @@ class PhysicsWorld:
             tick=self._tick,
             body_states=states,
             contact_cache=self._contact_cache.snapshot(),
+            joint_cache=self._joint_cache.snapshot(),
             manifolds=self._last_manifolds,
             state_digest=self.state_digest,
         )
@@ -606,6 +644,7 @@ class PhysicsWorld:
             body.awake = state.awake
             body.sleep_time = state.sleep_time
         self._contact_cache.restore(checkpoint.contact_cache)
+        self._joint_cache.restore(checkpoint.joint_cache)
         self._tick = checkpoint.tick
         self._last_manifolds = checkpoint.manifolds
         if self.state_digest != checkpoint.state_digest:
@@ -769,6 +808,7 @@ class PhysicsWorld:
                 contact_solver=self._solver,
                 constraint_solver=self._constraint_solver,
                 cache=self._contact_cache,
+                joint_cache=self._joint_cache,
                 tick=next_tick,
                 dt=dt,
             )
