@@ -96,6 +96,39 @@ def test_frontier_runtime_automatically_feeds_cortex_advice_into_run_scratch() -
     assert summary["authority"] == "advisory_only"
 
 
+def test_planner_receives_cortex_advisory_through_compiled_context() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(
+        (
+            (
+                '{"rationale":"bounded","steps":[{"id":"step-1","title":"Reason",'
+                '"description":"Analyze the bounded goal.","dependencies":[],"tool":null,'
+                '"arguments":{},"expected_outcome":"bounded analysis","verification":"",'
+                '"risk":"read_only","max_attempts":1}]}'
+            ),
+        )
+    )
+    runtime = FrontierJeevesAgentRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    inputs = _inputs("run-cortex-planner-context")
+    state = runtime._new_state("run-cortex-planner-context", inputs)
+
+    runtime._plan(state)
+
+    assert len(provider.requests) == 1
+    user_message = next(
+        message.content
+        for message in provider.requests[0].messages
+        if message.role.value == "user"
+    )
+    assert "cortex:assessment" in user_message
+    assert "advisory_only" in user_message
+    assert "checkpoint_sequence" in user_message
+
+
 def test_frontier_runtime_attaches_cortex_report_to_terminal_result() -> None:
     clock = TickClock()
     runtime = _runtime(clock)
