@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
+from .epistemic_frontier import KnowledgeObligation
 from .lens_fusion import LensFusionEngine, LensFusionResult, LensSignal
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
 from .interpretive_science import LensOutcomeTrial, ScientificLensReport
@@ -1045,6 +1046,21 @@ class SemanticLensPlane:
         return self.topology_learning.report(
             recorded.candidate_id,
             recorded.kind,
+        )
+
+    def topology_research_obligations(
+        self,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+    ) -> tuple[KnowledgeObligation, ...]:
+        """Emit unresolved semantic-topology gaps for the research frontier."""
+
+        return self.topology_learning.research_obligations(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
         )
 
     def export_topology_learning_state(
