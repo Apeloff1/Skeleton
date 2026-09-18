@@ -78,6 +78,9 @@ python scripts/check_repository_process_safety.py
 printf '\n== Backend unsafe deserialization safety ==\n'
 python backend/scripts/check_deserialization_safety.py
 
+printf '\n== Repository unsafe deserialization safety ==\n'
+python scripts/check_repository_deserialization_safety.py
+
 printf '\n== Backend dynamic import safety ==\n'
 python backend/scripts/check_dynamic_import_safety.py
 
@@ -136,6 +139,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_process_safety_scanner_coverage.py \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
+  backend/tests/test_repository_deserialization_safety.py \
   backend/tests/test_dynamic_import_safety.py \
   backend/tests/test_dynamic_import_exception_policy.py \
   backend/tests/test_repository_dynamic_import_safety.py \
