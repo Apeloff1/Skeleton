@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-TASK_KEY = "reserve-S171-durable-state-inventory"
+TASK_ID = "reserve-S171-durable-state-inventory"
 CONFLICT_DOMAIN = "reliability.readonly.state_inventory"
 INVENTORY_VERSION = 1
 

@@ -11,7 +11,7 @@ from skeleton.reliability.state_inventory import (
     FAMILY_SET,
     INVENTORY_VERSION,
     STORES,
-    TASK_KEY,
+    TASK_ID,
     DurableStore,
     UnknownDurableStoreError,
     assert_inventory_closed,
@@ -52,7 +52,7 @@ def _classified(**overrides: object) -> DurableStore:
 
 
 def test_task_identity_and_inventory_version_are_stable() -> None:
-    assert TASK_KEY == "reserve-S171-durable-state-inventory"
+    assert TASK_ID == "reserve-S171-durable-state-inventory"
     assert CONFLICT_DOMAIN == "reliability.readonly.state_inventory"
     assert INVENTORY_VERSION == 1
     assert FAMILIES == (
