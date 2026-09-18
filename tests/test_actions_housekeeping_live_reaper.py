@@ -66,7 +66,6 @@ def test_live_reaper_fails_closed_on_api_or_cancel_errors() -> None:
     assert '[[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]' in workflow
 
 
-
 def test_housekeeping_drain_uses_independent_arm_pool_and_supersedes_itself() -> None:
     workflow = _workflow()
 
