@@ -383,8 +383,28 @@ class DeterministicGameLoop:
                 "game-loop replay history budget exceeded"
             )
         self._assert_alignment()
-        raw_samples = tuple(
+        supplied_samples = tuple(
             samples
+        )
+        if any(
+            not isinstance(
+                sample,
+                RawInputSample,
+            )
+            for sample
+            in supplied_samples
+        ):
+            raise GameEngineLabError(
+                "game-loop samples must be RawInputSample values"
+            )
+        raw_samples = tuple(
+            sorted(
+                supplied_samples,
+                key=lambda sample: (
+                    sample.tick,
+                    sample.player,
+                ),
+            )
         )
         before_clock = (
             self.clock.snapshot()
