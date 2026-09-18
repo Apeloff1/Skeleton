@@ -135,6 +135,12 @@ _FAMILY_QUESTIONS: dict[LensFamily, str] = {
     LensFamily.SOCIAL: "Test actor-specific incentives, norms, roles, common knowledge, and strategic signaling.",
     LensFamily.TEMPORAL: "Change the time scale and reconstruct ordering, delay, recurrence, and horizon effects.",
     LensFamily.SYSTEM: "Search for invariants, feedback loops, interfaces, hidden state, failure modes, and alternative abstractions.",
+    LensFamily.CAUSAL: "Construct competing causal graphs, interventions, confounders, mediators, and reverse-direction alternatives.",
+    LensFamily.INFORMATION: "Measure uncertainty reduction, redundancy, synergy, bottlenecks, and value of additional observations.",
+    LensFamily.COMPUTATIONAL: "Test complexity, concurrency, transactional boundaries, representation invariance, and abstraction leakage.",
+    LensFamily.METACOGNITIVE: "Audit calibration, stopping, hypothesis diversity, reasoning loops, and unresolved epistemic debt.",
+    LensFamily.PROBABILITY: "Reconstruct priors, dependence, tail mass, sequential validity, model mixtures, and uncertainty decomposition.",
+    LensFamily.PREDICTIVE: "Stress horizons, dataset shift, regime change, indicators, interval coverage, and forecast coherence.",
 }
 
 
