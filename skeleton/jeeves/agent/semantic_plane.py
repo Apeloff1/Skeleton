@@ -58,6 +58,7 @@ from .semantic_topology_learning import (
     LearnedTopologyRule,
     SemanticTopologyLearningLab,
     SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
     TopologyBridgePrediction,
     TopologyBridgeReport,
     TopologyBridgeTrial,
@@ -1045,6 +1046,21 @@ class SemanticLensPlane:
             recorded.candidate_id,
             recorded.kind,
         )
+
+    def export_topology_learning_state(
+        self,
+    ) -> SemanticTopologyLearningState:
+        """Export topology-learning state for contract-bound persistence."""
+
+        return self.topology_learning.export_state()
+
+    def restore_topology_learning_state(
+        self,
+        state: SemanticTopologyLearningState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        """Restore topology learning only when the runtime contract matches."""
+
+        return self.topology_learning.restore_state(state)
 
     def topology_learning_summary(self) -> Mapping[str, Any]:
         snapshot = self.topology_learning.snapshot()
