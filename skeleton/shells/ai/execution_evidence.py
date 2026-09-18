@@ -33,6 +33,10 @@ class AIExecutionEvidence:
     model_attestation_digest: str = ""
     execution_seal_id: str = ""
     quorum_approval_digest: str = ""
+    runtime_trust_digest: str = ""
+    authority_health_policy_digest: str = ""
+    audit_witness_digest: str = ""
+    audit_witness_sequence: int | None = None
     completed_at: float = 0.0
 
     def __post_init__(self) -> None:
@@ -58,6 +62,9 @@ class AIExecutionEvidence:
             "sandbox_binding_digest",
             "model_attestation_digest",
             "quorum_approval_digest",
+            "runtime_trust_digest",
+            "authority_health_policy_digest",
+            "audit_witness_digest",
         )
         for name in optional:
             value = getattr(self, name)
@@ -65,6 +72,18 @@ class AIExecutionEvidence:
                 raise ValueError(f"{name} must be SHA-256 hex")
         if len(self.execution_seal_id) > 128:
             raise ValueError("execution_seal_id too long")
+        if self.audit_witness_sequence is not None and (
+            isinstance(self.audit_witness_sequence, bool)
+            or not isinstance(self.audit_witness_sequence, int)
+            or self.audit_witness_sequence <= 0
+        ):
+            raise ValueError("audit_witness_sequence must be positive")
+        if bool(self.audit_witness_digest) != (
+            self.audit_witness_sequence is not None
+        ):
+            raise ValueError(
+                "audit witness digest and sequence must be configured together"
+            )
         if self.completed_at < 0:
             raise ValueError("completed_at may not be negative")
 
@@ -85,6 +104,12 @@ class AIExecutionEvidence:
             "model_attestation_digest": self.model_attestation_digest,
             "execution_seal_id": self.execution_seal_id,
             "quorum_approval_digest": self.quorum_approval_digest,
+            "runtime_trust_digest": self.runtime_trust_digest,
+            "authority_health_policy_digest": (
+                self.authority_health_policy_digest
+            ),
+            "audit_witness_digest": self.audit_witness_digest,
+            "audit_witness_sequence": self.audit_witness_sequence,
             "completed_at": self.completed_at,
         }
 
@@ -142,6 +167,10 @@ class AIExecutionEvidenceBuilder:
         model_attestation_digest: str = "",
         execution_seal_id: str = "",
         quorum_approval_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
+        audit_witness_digest: str = "",
+        audit_witness_sequence: int | None = None,
     ) -> AIExecutionEvidence:
         return AIExecutionEvidence(
             1,
@@ -159,6 +188,10 @@ class AIExecutionEvidenceBuilder:
             model_attestation_digest,
             execution_seal_id,
             quorum_approval_digest,
+            runtime_trust_digest,
+            authority_health_policy_digest,
+            audit_witness_digest,
+            audit_witness_sequence,
             self._clock(),
         )
 
@@ -224,6 +257,14 @@ class AIExecutionEvidenceStore:
             str(raw.get("model_attestation_digest", "")),
             str(raw.get("execution_seal_id", "")),
             str(raw.get("quorum_approval_digest", "")),
+            str(raw.get("runtime_trust_digest", "")),
+            str(raw.get("authority_health_policy_digest", "")),
+            str(raw.get("audit_witness_digest", "")),
+            (
+                None
+                if raw.get("audit_witness_sequence") is None
+                else int(raw["audit_witness_sequence"])
+            ),
             float(raw["completed_at"]),
         )
 
