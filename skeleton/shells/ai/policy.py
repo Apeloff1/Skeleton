@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
+import json
 
 from skeleton.shells.ai.effects import EffectKind
 from skeleton.shells.ai.risk import RiskAssessment, RiskBand
@@ -71,6 +73,24 @@ class AIShellPolicy:
             "denied_effects",
             frozenset(EffectKind(item) for item in self.denied_effects),
         )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "autonomy": self.autonomy.value,
+            "max_actions": self.max_actions,
+            "min_confidence": self.min_confidence,
+            "max_uncertainty": self.max_uncertainty,
+            "auto_execute_bands": sorted(item.value for item in self.auto_execute_bands),
+            "approval_bands": sorted(item.value for item in self.approval_bands),
+            "denied_effects": sorted(item.value for item in self.denied_effects),
+            "deny_unknown_effects": self.deny_unknown_effects,
+            "require_reversible_for_autonomy": self.require_reversible_for_autonomy,
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        raw = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(raw).hexdigest()
 
     def evaluate(
         self,
