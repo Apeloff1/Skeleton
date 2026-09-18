@@ -16,7 +16,7 @@ from typing import TypeAlias
 
 from .body import BodyType, RigidBody
 from .errors import BodyNotFoundError, PhysicsValidationError
-from .math3d import EPSILON, Vec3
+from .math3d import EPSILON, Quat, Vec3
 
 _JOINT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 
@@ -91,7 +91,7 @@ def _reference_perpendicular(
         return projected.normalized()
     except Exception as exc:
         raise PhysicsValidationError(
-            f"{name} must not be parallel to hinge axis"
+            f"{name} must not be parallel to joint axis"
         ) from exc
 
 
@@ -101,6 +101,8 @@ class JointKind(str, Enum):
     SPRING = "spring"
     DISTANCE_LIMIT = "distance_limit"
     HINGE = "hinge"
+    FIXED = "fixed"
+    SLIDER = "slider"
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,8 +402,179 @@ class HingeJoint:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class FixedJoint:
+    """Lock two explicit local frames in both translation and rotation."""
+
+    joint_id: str
+    body_a: str
+    body_b: str
+    local_anchor_a: Vec3 = Vec3()
+    local_anchor_b: Vec3 = Vec3()
+    local_frame_a: Quat = Quat.identity()
+    local_frame_b: Quat = Quat.identity()
+    bias_factor: float = 0.2
+
+    def __post_init__(self) -> None:
+        _validate_joint_identity(self.joint_id, self.body_a, self.body_b)
+        _validate_anchors(self.local_anchor_a, self.local_anchor_b)
+        if not isinstance(self.local_frame_a, Quat) or not isinstance(
+            self.local_frame_b,
+            Quat,
+        ):
+            raise PhysicsValidationError("fixed joint frames must be Quat")
+        object.__setattr__(self, "local_frame_a", self.local_frame_a.normalized())
+        object.__setattr__(self, "local_frame_b", self.local_frame_b.normalized())
+        object.__setattr__(
+            self,
+            "bias_factor",
+            _unit_interval(self.bias_factor, name="bias_factor"),
+        )
+
+    @property
+    def kind(self) -> JointKind:
+        return JointKind.FIXED
+
+    def state_record(self) -> dict[str, object]:
+        return {
+            "kind": self.kind.value,
+            "joint_id": self.joint_id,
+            "body_a": self.body_a,
+            "body_b": self.body_b,
+            "local_anchor_a": self.local_anchor_a.to_tuple(),
+            "local_anchor_b": self.local_anchor_b.to_tuple(),
+            "local_frame_a": (
+                self.local_frame_a.w,
+                self.local_frame_a.x,
+                self.local_frame_a.y,
+                self.local_frame_a.z,
+            ),
+            "local_frame_b": (
+                self.local_frame_b.w,
+                self.local_frame_b.x,
+                self.local_frame_b.y,
+                self.local_frame_b.z,
+            ),
+            "bias_factor": self.bias_factor,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SliderJoint:
+    """Five-DOF lock with one signed translation axis, stops and motor."""
+
+    joint_id: str
+    body_a: str
+    body_b: str
+    local_anchor_a: Vec3 = Vec3()
+    local_anchor_b: Vec3 = Vec3()
+    local_axis_a: Vec3 = Vec3(1.0, 0.0, 0.0)
+    local_axis_b: Vec3 = Vec3(1.0, 0.0, 0.0)
+    local_reference_a: Vec3 = Vec3(0.0, 1.0, 0.0)
+    local_reference_b: Vec3 = Vec3(0.0, 1.0, 0.0)
+    bias_factor: float = 0.2
+    lower_translation: float | None = None
+    upper_translation: float | None = None
+    motor_speed: float | None = None
+    max_motor_force: float | None = None
+
+    def __post_init__(self) -> None:
+        _validate_joint_identity(self.joint_id, self.body_a, self.body_b)
+        _validate_anchors(self.local_anchor_a, self.local_anchor_b)
+        axis_a = _normalized_axis(self.local_axis_a, name="local_axis_a")
+        axis_b = _normalized_axis(self.local_axis_b, name="local_axis_b")
+        object.__setattr__(self, "local_axis_a", axis_a)
+        object.__setattr__(self, "local_axis_b", axis_b)
+        object.__setattr__(
+            self,
+            "local_reference_a",
+            _reference_perpendicular(
+                axis_a,
+                self.local_reference_a,
+                name="local_reference_a",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "local_reference_b",
+            _reference_perpendicular(
+                axis_b,
+                self.local_reference_b,
+                name="local_reference_b",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "bias_factor",
+            _unit_interval(self.bias_factor, name="bias_factor"),
+        )
+
+        lower = (
+            None
+            if self.lower_translation is None
+            else _finite(self.lower_translation, name="lower_translation")
+        )
+        upper = (
+            None
+            if self.upper_translation is None
+            else _finite(self.upper_translation, name="upper_translation")
+        )
+        if lower is not None and upper is not None and upper < lower:
+            raise PhysicsValidationError(
+                "upper_translation must be greater than or equal to lower_translation"
+            )
+        object.__setattr__(self, "lower_translation", lower)
+        object.__setattr__(self, "upper_translation", upper)
+
+        speed = (
+            None
+            if self.motor_speed is None
+            else _finite(self.motor_speed, name="motor_speed")
+        )
+        force = (
+            None
+            if self.max_motor_force is None
+            else _positive(self.max_motor_force, name="max_motor_force")
+        )
+        if (speed is None) != (force is None):
+            raise PhysicsValidationError(
+                "slider motor requires motor_speed and max_motor_force together"
+            )
+        object.__setattr__(self, "motor_speed", speed)
+        object.__setattr__(self, "max_motor_force", force)
+
+    @property
+    def kind(self) -> JointKind:
+        return JointKind.SLIDER
+
+    def state_record(self) -> dict[str, object]:
+        return {
+            "kind": self.kind.value,
+            "joint_id": self.joint_id,
+            "body_a": self.body_a,
+            "body_b": self.body_b,
+            "local_anchor_a": self.local_anchor_a.to_tuple(),
+            "local_anchor_b": self.local_anchor_b.to_tuple(),
+            "local_axis_a": self.local_axis_a.to_tuple(),
+            "local_axis_b": self.local_axis_b.to_tuple(),
+            "local_reference_a": self.local_reference_a.to_tuple(),
+            "local_reference_b": self.local_reference_b.to_tuple(),
+            "bias_factor": self.bias_factor,
+            "lower_translation": self.lower_translation,
+            "upper_translation": self.upper_translation,
+            "motor_speed": self.motor_speed,
+            "max_motor_force": self.max_motor_force,
+        }
+
+
 JointConstraint: TypeAlias = (
-    DistanceJoint | PointJoint | SpringJoint | DistanceLimitJoint | HingeJoint
+    DistanceJoint
+    | PointJoint
+    | SpringJoint
+    | DistanceLimitJoint
+    | HingeJoint
+    | FixedJoint
+    | SliderJoint
 )
 JOINT_TYPES = (
     DistanceJoint,
@@ -409,6 +582,8 @@ JOINT_TYPES = (
     SpringJoint,
     DistanceLimitJoint,
     HingeJoint,
+    FixedJoint,
+    SliderJoint,
 )
 
 
@@ -427,6 +602,8 @@ class ConstraintStats:
     spring_joints: int = 0
     limit_joints: int = 0
     hinge_joints: int = 0
+    fixed_joints: int = 0
+    slider_joints: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -623,6 +800,78 @@ class ConstraintSolver:
             return angle - joint.lower_angle
         if joint.upper_angle is not None and angle > joint.upper_angle:
             return angle - joint.upper_angle
+        return None
+
+    @staticmethod
+    def _orientation_error_vector(
+        world_frame_a: Quat,
+        world_frame_b: Quat,
+    ) -> Vec3:
+        relative = (world_frame_b * world_frame_a.conjugate()).normalized()
+        if relative.w < 0.0:
+            relative = Quat(
+                -relative.w,
+                -relative.x,
+                -relative.y,
+                -relative.z,
+            )
+        vector = Vec3(relative.x, relative.y, relative.z)
+        magnitude = vector.length()
+        if magnitude <= EPSILON:
+            return Vec3.zero()
+        angle = 2.0 * math.atan2(magnitude, max(EPSILON, relative.w))
+        return vector * (angle / magnitude)
+
+    @staticmethod
+    def _slider_geometry(
+        joint: SliderJoint,
+        body_a: RigidBody,
+        body_b: RigidBody,
+    ) -> tuple[Vec3, Vec3, Vec3, Vec3, float, Vec3]:
+        axis_a = body_a.orientation.rotate(joint.local_axis_a).normalized()
+        axis_b = body_b.orientation.rotate(joint.local_axis_b).normalized()
+        reference_a = body_a.orientation.rotate(
+            joint.local_reference_a
+        )
+        reference_b = body_b.orientation.rotate(
+            joint.local_reference_b
+        )
+        reference_a = (
+            reference_a - axis_a * reference_a.dot(axis_a)
+        ).normalized()
+        projected_b = reference_b - axis_a * reference_b.dot(axis_a)
+        reference_b = (
+            reference_a
+            if projected_b.length_squared() <= EPSILON * EPSILON
+            else projected_b.normalized()
+        )
+        anchors = ConstraintSolver._anchors(joint, body_a, body_b)
+        delta = anchors.anchor_b - anchors.anchor_a
+        translation = delta.dot(axis_a)
+        return (
+            axis_a,
+            axis_b,
+            reference_a,
+            reference_b,
+            translation,
+            delta,
+        )
+
+    @staticmethod
+    def _slider_limit_error(
+        joint: SliderJoint,
+        translation: float,
+    ) -> float | None:
+        if (
+            joint.lower_translation is not None
+            and translation < joint.lower_translation
+        ):
+            return translation - joint.lower_translation
+        if (
+            joint.upper_translation is not None
+            and translation > joint.upper_translation
+        ):
+            return translation - joint.upper_translation
         return None
 
     @staticmethod
@@ -927,6 +1176,167 @@ class ConstraintSolver:
 
         return impulses, maximum_error, motor_impulse
 
+    def _solve_fixed_velocity(
+        self,
+        joint: FixedJoint,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        *,
+        dt: float,
+    ) -> tuple[int, float]:
+        impulses = 0
+        anchors = self._anchors(joint, body_a, body_b)
+        delta = anchors.anchor_b - anchors.anchor_a
+        maximum_error = delta.length()
+
+        for axis_index in range(3):
+            anchors = self._anchors(joint, body_a, body_b)
+            current_delta = anchors.anchor_b - anchors.anchor_a
+            impulses += self._solve_scalar_velocity(
+                body_a,
+                body_b,
+                anchors,
+                Vec3.axis(axis_index),
+                error=current_delta.to_tuple()[axis_index],
+                bias_factor=joint.bias_factor,
+                dt=dt,
+            )
+
+        frame_a = (body_a.orientation * joint.local_frame_a).normalized()
+        frame_b = (body_b.orientation * joint.local_frame_b).normalized()
+        orientation_error = self._orientation_error_vector(frame_a, frame_b)
+        maximum_error = max(maximum_error, orientation_error.length())
+        for axis_index in range(3):
+            axis = Vec3.axis(axis_index)
+            count, _ = self._solve_angular_scalar(
+                body_a,
+                body_b,
+                axis,
+                error=orientation_error.to_tuple()[axis_index],
+                bias_factor=joint.bias_factor,
+                dt=dt,
+            )
+            impulses += count
+        return impulses, maximum_error
+
+    def _solve_slider_velocity(
+        self,
+        joint: SliderJoint,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        *,
+        dt: float,
+        motor_impulse: float,
+    ) -> tuple[int, float, float]:
+        impulses = 0
+        axis_a, axis_b, reference_a, reference_b, translation, delta = (
+            self._slider_geometry(joint, body_a, body_b)
+        )
+        tangent_a, tangent_b = self._orthonormal_tangents(axis_a)
+
+        # Only the two perpendicular linear rows are locked.
+        for tangent in (tangent_a, tangent_b):
+            anchors = self._anchors(joint, body_a, body_b)
+            current_delta = anchors.anchor_b - anchors.anchor_a
+            impulses += self._solve_scalar_velocity(
+                body_a,
+                body_b,
+                anchors,
+                tangent,
+                error=current_delta.dot(tangent),
+                bias_factor=joint.bias_factor,
+                dt=dt,
+            )
+
+        # Lock all rotational DOFs: two swing rows plus twist around slider axis.
+        swing_error = axis_a.cross(axis_b)
+        for tangent in (tangent_a, tangent_b):
+            count, _ = self._solve_angular_scalar(
+                body_a,
+                body_b,
+                tangent,
+                error=swing_error.dot(tangent),
+                bias_factor=joint.bias_factor,
+                dt=dt,
+            )
+            impulses += count
+
+        twist_sine = axis_a.dot(reference_a.cross(reference_b))
+        twist_cosine = max(-1.0, min(1.0, reference_a.dot(reference_b)))
+        twist_error = math.atan2(twist_sine, twist_cosine)
+        count, _ = self._solve_angular_scalar(
+            body_a,
+            body_b,
+            axis_a,
+            error=twist_error,
+            bias_factor=joint.bias_factor,
+            dt=dt,
+        )
+        impulses += count
+
+        maximum_error = max(
+            (delta - axis_a * translation).length(),
+            math.acos(max(-1.0, min(1.0, axis_a.dot(axis_b)))),
+            abs(twist_error),
+        )
+
+        limit_error = self._slider_limit_error(joint, translation)
+        if limit_error is not None:
+            anchors = self._anchors(joint, body_a, body_b)
+            impulses += self._solve_scalar_velocity(
+                body_a,
+                body_b,
+                anchors,
+                axis_a,
+                error=limit_error,
+                bias_factor=joint.bias_factor,
+                dt=dt,
+            )
+            maximum_error = max(maximum_error, abs(limit_error))
+
+        if (
+            joint.motor_speed is not None
+            and joint.max_motor_force is not None
+        ):
+            anchors = self._anchors(joint, body_a, body_b)
+            denominator = self._denominator(
+                body_a,
+                body_b,
+                anchors,
+                axis_a,
+            )
+            if denominator > EPSILON:
+                relative_speed = self._relative_velocity(
+                    body_a,
+                    body_b,
+                    anchors,
+                ).dot(axis_a)
+                delta_impulse = -(
+                    relative_speed - joint.motor_speed
+                ) / denominator
+                new_impulse = motor_impulse + delta_impulse
+                maximum_impulse = joint.max_motor_force * dt
+                new_impulse = min(
+                    maximum_impulse,
+                    max(-maximum_impulse, new_impulse),
+                )
+                applied = new_impulse - motor_impulse
+                if not math.isfinite(applied):
+                    raise PhysicsValidationError(
+                        "slider motor produced non-finite impulse"
+                    )
+                if abs(applied) > EPSILON:
+                    self._apply_impulse(
+                        body_a,
+                        body_b,
+                        axis_a * applied,
+                        anchors,
+                    )
+                    impulses += 1
+                motor_impulse = new_impulse
+
+        return impulses, maximum_error, motor_impulse
+
     def _translate_position(
         self,
         body_a: RigidBody,
@@ -1071,6 +1481,73 @@ class ConstraintSolver:
         )
         return count, maximum_error
 
+    def _solve_fixed_position(
+        self,
+        joint: FixedJoint,
+        body_a: RigidBody,
+        body_b: RigidBody,
+    ) -> tuple[int, float]:
+        anchors = self._anchors(joint, body_a, body_b)
+        delta = anchors.anchor_b - anchors.anchor_a
+        length = delta.length()
+        count = 0
+        corrected = max(0.0, length - self.position_slop)
+        if corrected > EPSILON and length > EPSILON:
+            count += self._translate_position(
+                body_a,
+                body_b,
+                (delta / length)
+                * (
+                    corrected
+                    * (self.position_correction / self.position_iterations)
+                ),
+            )
+        frame_a = (body_a.orientation * joint.local_frame_a).normalized()
+        frame_b = (body_b.orientation * joint.local_frame_b).normalized()
+        orientation_error = self._orientation_error_vector(frame_a, frame_b)
+        return count, max(length, orientation_error.length())
+
+    def _solve_slider_position(
+        self,
+        joint: SliderJoint,
+        body_a: RigidBody,
+        body_b: RigidBody,
+    ) -> tuple[int, float]:
+        axis_a, axis_b, reference_a, reference_b, translation, delta = (
+            self._slider_geometry(joint, body_a, body_b)
+        )
+        perpendicular = delta - axis_a * translation
+        correction = perpendicular
+        maximum_error = perpendicular.length()
+
+        limit_error = self._slider_limit_error(joint, translation)
+        if limit_error is not None:
+            correction = correction + axis_a * limit_error
+            maximum_error = max(maximum_error, abs(limit_error))
+
+        count = 0
+        length = correction.length()
+        corrected = max(0.0, length - self.position_slop)
+        if corrected > EPSILON and length > EPSILON:
+            count += self._translate_position(
+                body_a,
+                body_b,
+                (correction / length)
+                * (
+                    corrected
+                    * (self.position_correction / self.position_iterations)
+                ),
+            )
+
+        twist_sine = axis_a.dot(reference_a.cross(reference_b))
+        twist_cosine = max(-1.0, min(1.0, reference_a.dot(reference_b)))
+        maximum_error = max(
+            maximum_error,
+            math.acos(max(-1.0, min(1.0, axis_a.dot(axis_b)))),
+            abs(math.atan2(twist_sine, twist_cosine)),
+        )
+        return count, maximum_error
+
     def solve(
         self,
         bodies: dict[str, RigidBody],
@@ -1098,6 +1575,11 @@ class ConstraintSolver:
             for joint in ordered
             if isinstance(joint, HingeJoint)
         }
+        slider_motor_impulses = {
+            joint.joint_id: 0.0
+            for joint in ordered
+            if isinstance(joint, SliderJoint)
+        }
 
         counts = {
             JointKind.DISTANCE: 0,
@@ -1105,6 +1587,8 @@ class ConstraintSolver:
             JointKind.SPRING: 0,
             JointKind.DISTANCE_LIMIT: 0,
             JointKind.HINGE: 0,
+            JointKind.FIXED: 0,
+            JointKind.SLIDER: 0,
         }
 
         for joint in ordered:
@@ -1153,6 +1637,22 @@ class ConstraintSolver:
                         motor_impulse=hinge_motor_impulses[joint.joint_id],
                     )
                     hinge_motor_impulses[joint.joint_id] = accumulated_motor
+                elif isinstance(joint, FixedJoint):
+                    count, error = self._solve_fixed_velocity(
+                        joint,
+                        body_a,
+                        body_b,
+                        dt=dt,
+                    )
+                elif isinstance(joint, SliderJoint):
+                    count, error, accumulated_motor = self._solve_slider_velocity(
+                        joint,
+                        body_a,
+                        body_b,
+                        dt=dt,
+                        motor_impulse=slider_motor_impulses[joint.joint_id],
+                    )
+                    slider_motor_impulses[joint.joint_id] = accumulated_motor
                 else:
                     raise PhysicsValidationError("unsupported joint constraint")
                 velocity_impulses += count
@@ -1193,6 +1693,18 @@ class ConstraintSolver:
                         body_a,
                         body_b,
                     )
+                elif isinstance(joint, FixedJoint):
+                    count, error = self._solve_fixed_position(
+                        joint,
+                        body_a,
+                        body_b,
+                    )
+                elif isinstance(joint, SliderJoint):
+                    count, error = self._solve_slider_position(
+                        joint,
+                        body_a,
+                        body_b,
+                    )
                 else:
                     raise PhysicsValidationError("unsupported joint constraint")
                 position_corrections += count
@@ -1208,4 +1720,6 @@ class ConstraintSolver:
             spring_joints=counts[JointKind.SPRING],
             limit_joints=counts[JointKind.DISTANCE_LIMIT],
             hinge_joints=counts[JointKind.HINGE],
+            fixed_joints=counts[JointKind.FIXED],
+            slider_joints=counts[JointKind.SLIDER],
         )
