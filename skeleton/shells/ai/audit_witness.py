@@ -448,6 +448,34 @@ class AIAuditWitnessStore:
             "audit witness publish retry bound exceeded"
         )
 
+    def require_witness(
+        self,
+        item: SignedAIAuditWitness,
+    ) -> SignedAIAuditWitness:
+        if not isinstance(item, SignedAIAuditWitness):
+            raise TypeError("item must be SignedAIAuditWitness")
+        current = self.current_head()
+        if current is None:
+            raise RuntimeError("audit witness chain is empty")
+        _, head = current
+        if item.witness.sequence > head.sequence:
+            raise RuntimeError("audit witness is newer than canonical head")
+        canonical = self.get(item.witness.sequence)
+        if canonical.witness.digest != item.witness.digest:
+            raise RuntimeError("audit witness is not canonical at its sequence")
+        if canonical.signature != item.signature:
+            raise RuntimeError("audit witness signature differs from canonical record")
+        try:
+            self.signer.verify(canonical.signature)
+        except ArtifactSignatureError as exc:
+            raise RuntimeError("audit witness signature verification failed") from exc
+        verification = self.verify()
+        if not verification.ok:
+            raise RuntimeError(
+                "audit witness chain integrity verification failed"
+            )
+        return canonical
+
     def require_current_root(
         self,
         audit_root: str,
