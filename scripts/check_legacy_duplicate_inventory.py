@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-TASK_KEY = "reserve-S097-legacy-duplicate-inventory"
+TASK_ID = "reserve-S097-legacy-duplicate-inventory"
 CONFLICT_DOMAIN = "consolidation.readonly.duplicate_inventory"
 INVENTORY_VERSION = 1
 
@@ -555,7 +555,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         counts[classification] = counts.get(classification, 0) + 1
     print(
         "legacy-duplicate-inventory: OK "
-        f"(task={TASK_KEY} domain={CONFLICT_DOMAIN} version={INVENTORY_VERSION} "
+        f"(task={TASK_ID} domain={CONFLICT_DOMAIN} version={INVENTORY_VERSION} "
         f"surfaces={len(rows)} canonical={counts['canonical']} "
         f"duplicate={counts['duplicate']} overlapping={counts['overlapping']} "
         f"unknown={counts['unknown']})"
