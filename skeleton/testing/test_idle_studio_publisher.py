@@ -175,5 +175,15 @@ class IdleStudioPublisherTests(unittest.TestCase):
         self.assertEqual(github.refs, [])
 
 
+    def test_malformed_package_base_sha_is_rejected(self) -> None:
+        github = _FakeGitHub(self.base_sha)
+        package = self.package()
+        package["base_sha"] = "not-an-oid"
+        with self.assertRaises(ValueError):
+            publish_entries(package, self.config, github, run_id="123", attempt="1")
+        self.assertEqual(github.refs, [])
+        self.assertEqual(github.created_pulls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
