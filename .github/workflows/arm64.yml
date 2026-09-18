@@ -14,6 +14,7 @@ on:
       - ".github/workflows/arm64.yml"
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "Dockerfile"
       - "backend/**"
@@ -38,6 +39,9 @@ env:
 
 jobs:
   arm64:
+    # Close events are cancellation tombstones only; do not consume scarce ARM
+    # capacity after the PR-number concurrency group evicts obsolete work.
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Ubuntu ARM64 compatibility
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
