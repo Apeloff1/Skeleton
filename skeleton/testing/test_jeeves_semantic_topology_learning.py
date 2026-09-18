@@ -40,15 +40,20 @@ from skeleton.jeeves.agent.semantic_topology_learning import (
 from skeleton.jeeves.agent.types import AgentContractError
 
 
-def test_system_role_is_available_to_system_oriented_lenses() -> None:
+def test_extended_roles_are_available_to_newer_semantic_catalogs() -> None:
     registry = MaximalSemanticRegistry()
 
     assert SemanticRole.SYSTEM.value == "system"
-    assert registry.get("mechanics_dynamics_aesthetics").role is SemanticRole.SYSTEM
-    assert any(
-        spec.role is SemanticRole.SYSTEM
-        for spec in registry.all()
+    assert SemanticRole.SOCIAL.value == "social"
+    assert SemanticRole.TEMPORAL.value == "temporal"
+    assert (
+        registry.get("mechanics_dynamics_aesthetics").role
+        is SemanticRole.SYSTEM
     )
+    roles = {spec.role for spec in registry.all()}
+    assert SemanticRole.SYSTEM in roles
+    assert SemanticRole.SOCIAL in roles
+    assert SemanticRole.TEMPORAL in roles
 
 
 class _FixedRouter(MaximalLensRouter):
