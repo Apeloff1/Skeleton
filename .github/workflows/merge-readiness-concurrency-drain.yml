@@ -28,13 +28,13 @@ jobs:
       # The current ref-scoped group is not present in this matrix.
       group: merge-readiness-${{ matrix.sha }}
       cancel-in-progress: true
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Confirm bounded tombstone identity
         env:
           LEGACY_SHA: ${{ matrix.sha }}
-          CURRENT_MAIN_SHA: 1344c3bf3c9fa1cf3b33a02236037a9d3a8e718e
+          CURRENT_MAIN_SHA: ca257df6a2b4170cc9bdca501a96a5ae57d31bdd
         shell: bash
         run: |
           set -euo pipefail
