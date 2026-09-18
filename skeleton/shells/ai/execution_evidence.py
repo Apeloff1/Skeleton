@@ -86,12 +86,6 @@ class AIExecutionEvidence:
             )
         if len(self.execution_attempt_state) > 64:
             raise ValueError("execution_attempt_state too long")
-        if bool(self.execution_attempt_id) != bool(
-            self.execution_attempt_authority_digest
-        ):
-            raise ValueError(
-                "execution attempt id and authority digest must be configured together"
-            )
         if self.execution_attempt_state and not self.execution_attempt_id:
             raise ValueError(
                 "execution attempt state requires execution attempt identity"
