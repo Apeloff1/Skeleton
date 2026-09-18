@@ -256,6 +256,32 @@ def test_kernel_capability_contract_remains_deny_by_default() -> None:
     assert not kernel.can("generated-code", Capability.FS_WRITE, "/workspace/file.txt")
 
 
+def test_partial_kernel_filesystem_grant_cannot_widen_to_write(tmp_path: Path) -> None:
+    kernel = Sandbox()
+    kernel.grant("generated-code", Capability.FS_READ, scope="*")
+    box = GeneratedCodeSandbox(tmp_path, kernel=kernel)
+    box.seal()
+
+    source = tmp_path / "source.txt"
+    source.write_text("readable", encoding="utf-8")
+    read = Operation(
+        OperationKind.FS_READ,
+        str(source),
+        SandboxCapability.FILESYSTEM,
+    )
+    write = Operation(
+        OperationKind.FS_WRITE,
+        str(tmp_path / "written.txt"),
+        SandboxCapability.FILESYSTEM,
+        "nope",
+    )
+
+    assert box.authorize(read).allowed is True
+    assert box.authorize(write).allowed is False
+    assert "fs.write" in box.authorize(write).reason
+    assert SandboxCapability.FILESYSTEM not in box.granted_capabilities()
+
+
 def test_tool_capability_strings_align_with_orchestrator_without_self_grant(tmp_path: Path) -> None:
     box = GeneratedCodeSandbox(
         workspace_root=tmp_path,
