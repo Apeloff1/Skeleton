@@ -52,3 +52,13 @@ def test_watchdog_parses_each_run_as_a_json_record() -> None:
     assert "created=$(jq -r '.createdAt // empty'" in text
     assert "url=$(jq -r '.url // empty'" in text
     assert '[[ -n "$id" && -n "$created" ]] || continue' in text
+
+
+def test_watchdog_reuses_and_keeps_machine_ledger_closed() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert '--state all --search "${ISSUE_TITLE} in:title"' in text
+    assert '--json number,title' in text
+    assert 'select(.title == \"$ISSUE_TITLE\")' in text
+    assert 'repos/${REPO}/issues/${issue}' in text
+    assert '-f state=closed' in text

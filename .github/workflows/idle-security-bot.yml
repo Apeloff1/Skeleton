@@ -72,7 +72,7 @@ jobs:
           } > "$body_file"
 
           existing=$(
-            gh api --paginate --slurp "/repos/${REPO}/issues?state=open&per_page=100" \
+            gh api --paginate --slurp "/repos/${REPO}/issues?state=all&per_page=100" \
               | jq -r --arg title "$ISSUE_TITLE" '
                   first(
                     .[] | if type == "array" then .[] else empty end
@@ -98,6 +98,7 @@ jobs:
             echo 'Idle security bot could not resolve a valid digest issue number.' >&2
             exit 1
           fi
+          gh api --method PATCH "repos/${REPO}/issues/${issue_number}" -f state=closed >/dev/null
 
           {
             echo '## Idle security bot'
