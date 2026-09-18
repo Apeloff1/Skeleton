@@ -19,6 +19,12 @@ DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
+QUEUE_DEFAULT_BRANCH_GUARD = (
+    "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+)
+QUEUE_DRAIN_JOB_IF_RE = re.compile(
+    r"(?m)^    if:\s*>-\s*$\n(?P<body>(?:      .*\n)+)"
+)
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
 OID_IDENTITY = "workflow_run head SHA must be a 40-character hex commit OID"
 IDENTITY_ADAPTERS = (
@@ -41,7 +47,6 @@ def _is_named(path_name: str, expected: str) -> bool:
     return path_name == expected or path_name.endswith(expected)
 
 
-
 def _workflow_run_trigger_block(text: str) -> str:
     match = WORKFLOW_RUN_TRIGGER_RE.search(text)
     if match is None:
@@ -50,15 +55,25 @@ def _workflow_run_trigger_block(text: str) -> str:
     next_trigger = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*(?:#.*)?$", tail)
     return tail if next_trigger is None else tail[: next_trigger.start()]
 
+
+def _queue_drain_job_guarded(text: str) -> bool:
+    """Require the trust guard in the executable job condition, not prose/code."""
+    match = QUEUE_DRAIN_JOB_IF_RE.search(text)
+    if match is None:
+        return False
+    return match.group("body").count(QUEUE_DEFAULT_BRANCH_GUARD) == 1
+
+
 def violations_for_text(path_name: str, text: str) -> list[str]:
     findings: list[str] = []
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
         return findings
 
-    has_all_branch_globs = ALL_BRANCH_GLOBS in text
+    workflow_run_block = _workflow_run_trigger_block(text)
+    has_all_branch_globs = ALL_BRANCH_GLOBS in workflow_run_block
     automation_main_only_exclusion = False
     if _is_named(path_name, AUTOMATION_WORKFLOW):
-        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(text)
+        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(workflow_run_block)
         if match is not None:
             ignored = [
                 line.removeprefix("      - ").strip().strip("'\\\"")
@@ -67,15 +82,19 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
-    workflow_run_block = _workflow_run_trigger_block(text)
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
-        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
-        in text
+        and _queue_drain_job_guarded(text)
     )
 
-    if (
+    if _is_named(path_name, QUEUE_DRAIN_WORKFLOW) and not queue_default_branch_only:
+        findings.append(
+            f"{path_name}: workflow_run consumers must match every completing head "
+            'with branches: ["*", "**"]; Queue Drain may wake only from guarded '
+            "default-branch completions"
+        )
+    elif (
         not has_all_branch_globs
         and not automation_main_only_exclusion
         and not queue_default_branch_only
