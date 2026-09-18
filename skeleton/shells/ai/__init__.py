@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.assurance_binding import AssuranceBinding
+
 from skeleton.shells.ai.mcp_replay import MCPReplayGuard, MCPRequestAdmission, MCPRequestReplay
 from skeleton.shells.ai.model_admission import AIModelAdmission, ModelAdmissionReport, ModelAdmissionRequirement
 from skeleton.shells.ai.admitted_ensemble import AdmittedEnsembleAIPlanner, AdmittedEnsembleResult
