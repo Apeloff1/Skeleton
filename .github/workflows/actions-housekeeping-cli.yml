@@ -10,6 +10,8 @@ on:
       - '.github/workflows/actions-housekeeping-cli.yml'
 
 concurrency:
+  # queue-drain.yml and the owner-side drainer explicitly preserve this
+  # recovery lane; only a newer housekeeping generation supersedes it.
   group: actions-housekeeping-cli-${{ github.repository }}
   cancel-in-progress: true
 
