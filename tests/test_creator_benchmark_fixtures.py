@@ -11,7 +11,7 @@ from scripts.check_creator_benchmark_fixtures import (
     NODE_KINDS,
     SCHEMA,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     catalog_paths,
     main,
     repo_root,
@@ -69,7 +69,7 @@ def _doc(**overrides):
 
 
 def test_seed_contract_constants() -> None:
-    assert TASK_KEY == "reserve-S039-creator-benchmark-fixtures"
+    assert TASK_ID == "reserve-S039-creator-benchmark-fixtures"
     assert CONFLICT_DOMAIN == "eval.fixtures.creator_intent"
     assert SCHEMA == "eval.fixtures.creator_intent.v1"
     assert SCHEMA_VERSION == 1

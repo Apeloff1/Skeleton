@@ -21,7 +21,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-TASK_KEY = "reserve-S039-creator-benchmark-fixtures"
+TASK_ID = "reserve-S039-creator-benchmark-fixtures"
 CONFLICT_DOMAIN = "eval.fixtures.creator_intent"
 SCHEMA = "eval.fixtures.creator_intent.v1"
 SCHEMA_VERSION = 1
@@ -607,7 +607,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(
         f"Creator-intent fixtures v{SCHEMA_VERSION} accepted {label} "
-        f"({TASK_KEY} {CONFLICT_DOMAIN})"
+        f"({TASK_ID} {CONFLICT_DOMAIN})"
     )
     return 0
 
