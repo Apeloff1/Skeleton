@@ -1,5 +1,17 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.strict_recovery import StrictAIRecoveryManager, StrictRecoveryReport
+from skeleton.shells.ai.startup_release import AIStartupReleaseGuard, RuntimeReleaseExpectation, StartupReleaseReport
+from skeleton.shells.ai.session_journal import SessionJournalEvent, SessionJournalEvidence
+from skeleton.shells.ai.session_evidence import SessionEvidenceConflict, SessionEvidenceStore, SessionExecutionEvidence, SessionReceiptEvidence, StoredSessionEvidence
+from skeleton.shells.ai.sandbox_backend import SandboxBinding, SandboxPlanExecutor, VerifiedSandboxExecutionBackend
+from skeleton.shells.ai.robust_consensus import ConsensusPolicy, RobustConsensusGroup, RobustConsensusReport, RobustProposalConsensus
+from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
+from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend, ShellServiceExecutionBackend
+from skeleton.shells.ai.ensemble_planner import EnsembleAIPlanner, EnsembleAttempt, EnsembleMember, EnsemblePlanningResult, EnsemblePolicy
+from skeleton.shells.ai.distributed_journal import DistributedAIDecisionJournal
+from skeleton.shells.ai.audit_anchor import AIAuditAnchor, AIAuditAnchorStore, SignedAIAuditAnchor
+from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector, AIExecutionAssurancePolicy, AssuranceDecision, AssuranceLevel
 from skeleton.shells.ai.approval import AIApprovalError, AIApprovalRegistry, AIPlanApproval
 from skeleton.shells.ai.audit_export import AIAuditExport, AIAuditExporter
 from skeleton.shells.ai.benchmark import AIBenchmarkCase, default_benchmark_cases
