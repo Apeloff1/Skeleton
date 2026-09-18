@@ -320,3 +320,46 @@ def test_semantic_plane_snapshot_exposes_static_topology_diagnostics() -> None:
     )
     assert snapshot.factual_assertion_authorized is False
     assert snapshot.causal_assertion_authorized is False
+
+
+
+def test_semantic_topology_bridge_candidates_can_focus_on_active_lenses() -> None:
+    topology = SemanticLensTopology(MaximalSemanticRegistry())
+    candidates = topology.bridge_candidates(
+        limit=12,
+        minimum_score=0.18,
+        focus_keys=("retry_storm",),
+    )
+
+    assert candidates
+    assert len(candidates) <= 12
+    assert all(
+        "retry_storm" in {candidate.left_key, candidate.right_key}
+        for candidate in candidates
+    )
+
+
+def test_plane_bridge_candidates_are_bounded_and_touch_selected_lenses() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=24,
+            max_per_family=5,
+            topology_bridge_limit=7,
+            topology_bridge_minimum_score=0.18,
+        )
+    )
+    snapshot = plane.analyze(
+        _observations(),
+        requested=("retry_storm", "target_leakage"),
+    )
+    selected = {spec.key for spec in snapshot.selection.lenses}
+
+    assert len(snapshot.topology_bridge_candidates) <= 7
+    assert (
+        snapshot.coverage.topology_candidate_bridges
+        == len(snapshot.topology_bridge_candidates)
+    )
+    assert all(
+        candidate.left_key in selected or candidate.right_key in selected
+        for candidate in snapshot.topology_bridge_candidates
+    )
