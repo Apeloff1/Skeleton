@@ -153,11 +153,11 @@ def get_stats() -> dict:
 
 # ── Request identity ──────────────────────────────────────────────────
 def _request_id(request: Request) -> str:
-    """Return one bounded header-safe request ID or mint a full UUID4 hex ID."""
+    """Return one bounded header-safe request ID or mint a 16-char UUID4 hex ID."""
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex
+    return uuid.uuid4().hex[:16]
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -256,6 +256,10 @@ def _client_ip(request: Request) -> str:
     resolved = _resolve_client_ip(request)
     request.state._middleware_client_ip = resolved
     return resolved
+
+
+def _is_api_path(path: str) -> bool:
+    return path == '/api' or path.startswith('/api/')
 
 
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
