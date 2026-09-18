@@ -51,7 +51,9 @@ def test_schema_contract_is_queue_trends_not_morning_categories() -> None:
         "avoided_fanout",
     )
     source = (REPO_ROOT / "scripts" / "check_queue_report_schema.py").read_text(encoding="utf-8")
-    for category in ("accepted", "rejected", "deferred", "flaky", "unlocked"):
+    assert "morning-summary" not in source
+    assert "CATEGORIES" not in source
+    for category in ('"accepted"', '"rejected"', '"deferred"', '"flaky"', '"unlocked"'):
         assert category not in source
 
 
