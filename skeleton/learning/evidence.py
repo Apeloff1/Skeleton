@@ -666,6 +666,20 @@ class LearningEvidenceStore:
         commit_time = self._reject_stale(hypothesis.provenance)
         self._reject_duplicate(hypothesis.hypothesis_id)
         self._require_existing(hypothesis.feature_ids, self._features, kind="feature")
+        mismatched = [
+            feature_id
+            for feature_id in hypothesis.feature_ids
+            if self._features[feature_id].subject_id != hypothesis.subject_id
+        ]
+        if mismatched:
+            raise LearningEvidenceError(
+                "hypothesis subject must match every cited feature",
+                context={
+                    "reason": "subject_mismatch",
+                    "hypothesis_id": hypothesis.hypothesis_id,
+                    "mismatched_features": mismatched,
+                },
+            )
         self._reject_hypothesis_contradiction(hypothesis)
         self._hypotheses[hypothesis.hypothesis_id] = hypothesis
         return self._commit(
