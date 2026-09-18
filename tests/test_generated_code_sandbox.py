@@ -413,6 +413,58 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
         'from pathlib import Path\ntarget = "/etc/passwd"\nPath(target).read_text()\n',
     ],
 )
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import io\nio.open("/etc/passwd", "r").read()\n',
+        'import io\nio.FileIO("/etc/passwd", "r").read()\n',
+    ],
+)
+def test_alternate_standard_library_open_paths_require_filesystem_capability(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}
+
+
+def test_io_open_still_enforces_workspace_containment_with_filesystem_grant(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+    decision = box.admit(
+        'import io\nio.open("/etc/passwd", "r").read()\n',
+        kind=PayloadKind.PYTHON,
+    )
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.target == "/etc/passwd"
+    assert "path escapes" in decision.reason
+
+
+def test_os_fdopen_dynamic_descriptor_fails_closed_with_filesystem_grant(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+    decision = box.admit(
+        'import os\nfd = 3\nos.fdopen(fd, "r").read()\n',
+        kind=PayloadKind.PYTHON,
+    )
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.target == "<dynamic>"
+
+
 def test_dynamic_filesystem_targets_fail_closed_even_with_filesystem_grant(
     tmp_path: Path,
     source: str,
