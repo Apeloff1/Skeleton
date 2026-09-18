@@ -2,6 +2,7 @@ name: Packaging and Runtime Image Gate
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "Dockerfile"
@@ -33,6 +34,7 @@ concurrency:
 
 jobs:
   packaging-contract:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,6 +50,7 @@ jobs:
         run: python -m pytest -q skeleton/testing/test_packaging_contract.py
 
   docker-builds:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

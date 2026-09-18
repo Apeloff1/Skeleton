@@ -11,6 +11,7 @@ on:
       - "skeleton/testing/process_resource_reliability_profiles.py"
       - ".github/workflows/reliability-capacity-baseline.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "skeleton/testing/api_gateway_reliability_profiles.py"
       - "skeleton/testing/provider_stream_reliability_profiles.py"
@@ -26,6 +27,7 @@ concurrency:
 
 jobs:
   baseline:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Capture ubuntu-latest capacity baseline
     runs-on: ubuntu-latest
     timeout-minutes: 15

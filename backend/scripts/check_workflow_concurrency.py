@@ -371,6 +371,12 @@ def _concurrency_findings(name: str, lines: list[str], events: frozenset[str]) -
     if not template or any(char in template for char in "*&"):
         return None, [f"{name}: opaque concurrency group value"]
 
+    if cancels[0] == "true" and "github.sha" in template:
+        findings.append(
+            f"{name}: cancel-in-progress is true but the concurrency group includes "
+            "github.sha; every commit gets a unique slot so superseded runs cannot preempt"
+        )
+
     prefix, group_findings = _group_findings(name, template, events)
     findings.extend(group_findings)
     if prefix is None:

@@ -9,6 +9,7 @@ on:
       - "satellites/branch-snapshots/**"
       - ".github/workflows/dependency-surface-guard.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "pyproject.toml"
       - ".github/dependabot.yml"
@@ -25,6 +26,7 @@ concurrency:
 
 jobs:
   guard:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

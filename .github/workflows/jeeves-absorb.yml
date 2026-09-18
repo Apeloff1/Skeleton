@@ -2,6 +2,7 @@ name: Jeeves Absorb
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "backend/core/adaptive_absorption_fabric.py"
@@ -34,11 +35,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: jeeves-absorb-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: jeeves-absorb-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   contract:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Absorb contract
     runs-on: ubuntu-latest
     timeout-minutes: 10

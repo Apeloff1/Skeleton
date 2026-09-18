@@ -2,6 +2,7 @@ name: Jeeves Probabilistic Modeling
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "skeleton/jeeves/probabilistic.py"
       - "skeleton/jeeves/probabilistic_state_space.py"
@@ -57,6 +58,7 @@ concurrency:
 
 jobs:
   probabilistic-contracts:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

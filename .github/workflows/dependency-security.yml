@@ -18,6 +18,7 @@ on:
       - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "Dockerfile"
       - "backend/Dockerfile"
@@ -45,6 +46,7 @@ concurrency:
 
 jobs:
   python-audit:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -93,6 +95,7 @@ jobs:
           exit 1
 
   javascript-audit:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -177,6 +180,7 @@ jobs:
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
 
   container-audit:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: "Container CVE Audit (${{ matrix.name }})"
     runs-on: ubuntu-latest
     timeout-minutes: 35

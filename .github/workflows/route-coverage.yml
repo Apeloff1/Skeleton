@@ -10,6 +10,7 @@ on:
       - 'scripts/test_route_coverage_check.py'
       - '.github/workflows/route-coverage.yml'
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - 'frontend/utils/routeRegistry.ts'
       - 'frontend/app/**'
@@ -25,6 +26,7 @@ concurrency:
 
 jobs:
   route-coverage:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Validate registry ↔ filesystem
     runs-on: ubuntu-latest
     timeout-minutes: 5

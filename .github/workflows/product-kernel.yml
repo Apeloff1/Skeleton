@@ -26,6 +26,7 @@ on:
       - "frontend/tsconfig.product.json"
       - ".github/workflows/product-kernel.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/product_kernel.py"
@@ -58,6 +59,7 @@ concurrency:
 
 jobs:
   backend-product-kernel:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -80,6 +82,7 @@ jobs:
           tests/test_native_product_executors.py
 
   frontend-product-contract:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     defaults:
       run:

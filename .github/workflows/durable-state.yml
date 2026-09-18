@@ -16,6 +16,7 @@ on:
       - "skeleton/testing/test_jeeves_durable_*.py"
       - ".github/workflows/durable-state.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "skeleton/state/**"
       - "skeleton/jeeves/agent/durable_audit.py"
@@ -38,6 +39,7 @@ concurrency:
 
 jobs:
   durable-state:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
