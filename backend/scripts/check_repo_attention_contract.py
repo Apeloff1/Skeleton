@@ -25,9 +25,9 @@ REQUIRED_PR_TYPES = {
     "unlocked",
     "auto_merge_enabled",
     "auto_merge_disabled",
-    "enqueued",
-    "dequeued",
 }
+FORBIDDEN_PR_TYPES = {"enqueued", "dequeued"}
+
 REQUIRED_ISSUE_TYPES = {
     "edited",
     "reopened",
@@ -109,6 +109,12 @@ def violations_for_text(text: str) -> list[str]:
     for event in sorted(REQUIRED_PR_TYPES):
         if not _has_token(pr_trigger, event):
             findings.append(f"pull_request trigger is missing activity type: {event}")
+
+    for event in sorted(FORBIDDEN_PR_TYPES):
+        if _has_token(pr_trigger, event):
+            findings.append(
+                f"pull_request trigger must not include merge-queue state churn: {event}"
+            )
 
     review_trigger = _block(text, "pull_request_review", 2)
     for event in ("submitted", "edited"):
