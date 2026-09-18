@@ -223,6 +223,40 @@ def test_missing_skill_file_raises(tmp_path: Path):
 
 
 
+def test_load_skill_rejects_symlinked_bank_entry(tmp_path: Path):
+    bank = _bank(tmp_path)
+    victim = tmp_path / "victim.json"
+    victim.write_text(
+        json.dumps({"skill_id": "safe", "instructions": "outside-bank"}),
+        encoding="utf-8",
+    )
+    target = bank.skill_path("safe")
+    try:
+        target.symlink_to(victim)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    with pytest.raises(SkillsFilesError, match="failed to read"):
+        bank.load_skill("safe")
+
+
+def test_load_task_rejects_symlinked_bank_entry(tmp_path: Path):
+    bank = _bank(tmp_path)
+    victim = tmp_path / "victim-task.json"
+    victim.write_text(
+        json.dumps({"task_id": "t1", "skill_id": "s1"}),
+        encoding="utf-8",
+    )
+    target = bank.task_path("t1")
+    try:
+        target.symlink_to(victim)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    with pytest.raises(SkillsFilesError, match="failed to read"):
+        bank.load_task("t1")
+
+
 def test_atomic_write_does_not_follow_predictable_legacy_temp_symlink(tmp_path: Path):
     bank = _bank(tmp_path)
     target = bank.skill_path("safe")
