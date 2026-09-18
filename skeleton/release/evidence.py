@@ -390,6 +390,24 @@ def evaluate_release_ready(
         document = parse_evidence(evidence)
 
     reasons: list[str] = []
+    if (
+        isinstance(document.schema_version, bool)
+        or not isinstance(document.schema_version, int)
+        or document.schema_version != SCHEMA_VERSION
+    ):
+        reasons.append(
+            f"incompatible release evidence schema: {document.schema_version!r}"
+        )
+    if (
+        isinstance(document.source_date_epoch, bool)
+        or not isinstance(document.source_date_epoch, int)
+        or document.source_date_epoch < 0
+    ):
+        reasons.append("source_date_epoch must be a non-negative integer")
+    if not isinstance(document.source_commit, str) or not _COMMIT_RE.fullmatch(
+        document.source_commit
+    ):
+        reasons.append("source commit must be a lowercase Git object ID")
     payload = document.to_payload()
     reasons.extend(_reasons_unreproducible_time(payload, document.source_date_epoch))
     reasons.extend(_reasons_inlined_content(payload))
