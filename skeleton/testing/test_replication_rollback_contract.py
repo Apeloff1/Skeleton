@@ -624,6 +624,42 @@ def test_malformed_buffered_delta_does_not_advance_received_watermark() -> None:
     assert replica.acknowledge().payload["last_received_sequence"] == snapshot.sequence
 
 
+def test_failed_buffer_drain_rolls_back_direct_predecessor_atomically() -> None:
+    authority = Authority()
+    snapshot = authority.snapshot(0, _hero(0, 0))
+    predecessor = authority.mutate(1, _move(1, 0))
+    successor = authority.mutate(2, _move(2, 0))
+
+    replica = Replica("client-a")
+    replica.ingest(snapshot)
+
+    forged_payload = dict(successor.payload)
+    original_base = str(forged_payload["base_digest"])
+    forged_payload["base_digest"] = (
+        ("0" if original_base[0] != "0" else "1") + original_base[1:]
+    )
+    forged_successor = replication_mod._wrap_packet(
+        "delta",
+        successor.sequence,
+        forged_payload,
+    )
+    buffered = replica.ingest(forged_successor)
+    assert buffered.outcome is DeliveryOutcome.BUFFERED
+
+    before_sequence = replica.sequence
+    before_entities = replica.entities
+    before_digest = replica.digest
+    before_ack = replica.acknowledge().payload
+
+    with pytest.raises(ReplicationError, match="base digest"):
+        replica.ingest(predecessor)
+
+    assert replica.sequence == before_sequence
+    assert replica.entities == before_entities
+    assert replica.digest == before_digest
+    assert replica.acknowledge().payload == before_ack
+
+
 def test_module_has_no_socket_or_server_surface():
     tree = ast.parse(inspect.getsource(replication_mod))
     imported: list[str] = []
