@@ -821,6 +821,10 @@ def verify_evidence(payload: Mapping[str, Any]) -> EvidenceReport:
         trace_digests = tuple(
             _sha256_hex(item, "trace_digest") for item in trace_raw
         )
+        if len(trace_digests) != runs:
+            raise QualityEvidenceError("trace_digests count must equal runs")
+        if (verdict is Verdict.PASS) != (len(reasons_raw) == 0):
+            raise QualityEvidenceError("verdict and reasons are inconsistent")
         baseline_raw = body["baseline_digest"]
         if baseline_raw != "":
             baseline_digest = _sha256_hex(baseline_raw, "baseline_digest")
@@ -831,6 +835,13 @@ def verify_evidence(payload: Mapping[str, Any]) -> EvidenceReport:
             value = body[name]
             if value is not None and not isinstance(value, Mapping):
                 raise QualityEvidenceError(f"{name} must be an object or null")
+        if verdict is Verdict.QUARANTINE:
+            if body["quarantine"] is None:
+                raise QualityEvidenceError("quarantine verdict requires quarantine evidence")
+        elif body["quarantine"] is not None:
+            raise QualityEvidenceError("quarantine evidence requires quarantine verdict")
+        if body["envelope"] is not None and kind != "performance":
+            raise QualityEvidenceError("performance envelope requires performance kind")
         seed = _bounded_int(body["seed"], "seed", minimum=0, maximum=2**32 - 1)
     except (QualityEvidenceError, KeyError, TypeError) as exc:
         return _corrupt_report(
