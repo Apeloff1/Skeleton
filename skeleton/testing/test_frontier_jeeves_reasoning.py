@@ -13,7 +13,11 @@ from skeleton.jeeves.agent.deliberation import (
 )
 from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
 from skeleton.jeeves.agent.evaluation import EvalResult
-from skeleton.jeeves.agent.frontier_feedback import FrontierEvalFeedback, FrontierReasoningFeedback
+from skeleton.jeeves.agent.frontier_feedback import (
+    FrontierEvalFeedback,
+    FrontierFeedbackRecommendation,
+    FrontierReasoningFeedback,
+)
 from skeleton.jeeves.agent.frontier_policy_tuning import FrontierPolicyTuner
 from skeleton.jeeves.agent.frontier_trials import FrontierTrialEvaluator
 from skeleton.jeeves.agent.frontier_reasoning import (
@@ -932,3 +936,49 @@ def test_repeated_trial_pass_at_k_measures_frontier_best_of_n_gain() -> None:
     assert comparison.incremental_estimated_tokens == 2000.0
     assert comparison.regressed_cases == 0
     assert gate.passed is True
+
+
+
+def test_policy_tuner_rejects_unbound_fabricated_recommendation() -> None:
+    eval_feedback = FrontierEvalFeedback()
+    eval_feedback.observe(
+        EvalResult(
+            case_id="case:fabricated-policy",
+            run_id="run:fabricated-baseline",
+            score=0.70,
+            passed=True,
+            checks=(),
+            result_fingerprint=stable_fingerprint("fabricated-baseline"),
+        ),
+        EvalResult(
+            case_id="case:fabricated-policy",
+            run_id="run:fabricated-frontier",
+            score=0.90,
+            passed=True,
+            checks=(),
+            result_fingerprint=stable_fingerprint("fabricated-frontier"),
+        ),
+    )
+    gate = eval_feedback.promotion_gate(
+        minimum_cases=1,
+        minimum_mean_delta=0.05,
+        maximum_loss_rate=0.0,
+        allow_pass_losses=0,
+    )
+    fabricated = FrontierFeedbackRecommendation(
+        minimum_quality_delta=0.04,
+        minimum_choice_probability_delta=0.03,
+        maximum_entropy_delta=-0.04,
+        reasons=("fabricated recommendation",),
+        fingerprint=stable_fingerprint("fabricated-recommendation"),
+        sample_count=0,
+    )
+    baseline = FrontierReasoningPolicy()
+
+    proposal = FrontierPolicyTuner().propose(baseline, fabricated, gate)
+
+    assert gate.passed is True
+    assert proposal.approved_for_trial is False
+    assert proposal.proposed_policy == baseline
+    assert proposal.changed_fields == {}
+    assert any("insufficient bound feedback" in reason for reason in proposal.reasons)
