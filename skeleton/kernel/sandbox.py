@@ -21,6 +21,7 @@ Zero dependencies, thread-safe enough for a single-process kernel
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -57,7 +58,8 @@ class Grant:
     expires_at: Optional[float] = None
 
     def expired(self, now: Optional[float] = None) -> bool:
-        return self.expires_at is not None and (now or time.time()) >= self.expires_at
+        current = time.time() if now is None else now
+        return self.expires_at is not None and current >= self.expires_at
 
     def covers(self, scope: str) -> bool:
         if self.scope == "*":
@@ -90,13 +92,23 @@ class Sandbox:
 
     def grant(self, holder: str, capability: Capability,
               scope: str = "*", ttl_seconds: Optional[float] = None) -> Grant:
+        if ttl_seconds is not None:
+            if (
+                isinstance(ttl_seconds, bool)
+                or not isinstance(ttl_seconds, (int, float))
+                or not math.isfinite(float(ttl_seconds))
+                or ttl_seconds <= 0
+            ):
+                raise ValueError("ttl_seconds must be a finite positive number or None")
+            ttl_seconds = float(ttl_seconds)
+
         now = time.time()
         grant = Grant(
             holder=holder,
             capability=capability,
             scope=scope,
             granted_at=now,
-            expires_at=now + ttl_seconds if ttl_seconds else None,
+            expires_at=now + ttl_seconds if ttl_seconds is not None else None,
         )
         key = (holder, capability)
         self._grants.setdefault(key, []).append(grant)
@@ -159,14 +171,20 @@ class Sandbox:
     # ------------------------------------------------------------------
 
     def grants_for(self, holder: str) -> Tuple[Grant, ...]:
+        now = time.time()
         out: List[Grant] = []
         for (h, _), grants in self._grants.items():
             if h == holder:
-                out.extend(g for g in grants if not g.expired())
+                out.extend(g for g in grants if not g.expired(now))
         return tuple(out)
 
     def holders(self) -> Set[str]:
-        return {h for (h, _) in self._grants}
+        now = time.time()
+        return {
+            holder
+            for (holder, _), grants in self._grants.items()
+            if any(not grant.expired(now) for grant in grants)
+        }
 
     def audit_trail(self, limit: Optional[int] = None) -> Tuple[AuditRecord, ...]:
         return tuple(self._audit[-limit:] if limit else self._audit)

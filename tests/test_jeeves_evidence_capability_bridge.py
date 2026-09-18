@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
@@ -313,3 +314,17 @@ def test_removed_registry_capability_fails_closed_before_invoker():
     assert result["tool_errors"] == [{"name": "lookup", "error": "capability_unavailable"}]
     assert result["evidence"] == []
     assert core.stats()["evidence_policy_failures"] == 1
+
+
+
+def test_capability_evidence_workflow_installs_root_import_dependencies():
+    workflow = (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "jeeves-capability-evidence.yml"
+    ).read_text(encoding="utf-8")
+
+    assert '"pytest>=8,<9"' in workflow
+    assert '"pydantic>=2.13.5,<3"' in workflow
+    assert '"pydantic-settings>=2.15.0,<3"' in workflow

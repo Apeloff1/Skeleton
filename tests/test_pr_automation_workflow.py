@@ -20,19 +20,20 @@ def test_pr_automation_reacts_only_to_terminal_workflow_state() -> None:
 def test_pr_automation_keeps_required_trigger_coverage() -> None:
     text = _workflow_text()
 
-    for workflow_name in (
-        "Merge Readiness",
-        "CI/CD",
-        "Backend Quality",
-        "Dependency Review",
-        "Dependency Security",
-        "CodeQL",
+    assert "workflows:\n      - Merge Readiness" in text
+    for redundant_event_source in (
+        "      - CI/CD",
+        "      - Backend Quality",
+        "      - Dependency Review",
+        "      - Dependency Security",
+        "      - CodeQL",
     ):
-        assert f"- {workflow_name}" in text
+        assert redundant_event_source not in text
 
     assert "schedule:" in text
     assert "workflow_dispatch:" in text
-    assert 'branches:\n      - "*"\n      - "**"' in text
+    assert "branches-ignore:\n      - main" in text
+    assert 'branches:\n      - "*"\n      - "**"' not in text
     assert "--head-sha" in text
     assert "--pr-hints-json" in text
     assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
