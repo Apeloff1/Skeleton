@@ -170,6 +170,22 @@ def test_changed_inputs_invalidate_only_dependent_nodes() -> None:
     assert original.fingerprint != changed.fingerprint
 
 
+def test_invalidation_seed_iterable_is_hard_bounded() -> None:
+    graph = build_incremental_graph(
+        [
+            {"id": "a"},
+            {"id": "b", "dependencies": ["a"]},
+        ]
+    )
+
+    def endless_duplicates():
+        while True:
+            yield "a"
+
+    with pytest.raises(IncrementalGraphError, match="changed node input exceeds graph bound"):
+        graph.invalidate(endless_duplicates())
+
+
 def test_critical_path_uses_longest_cost_chain_and_is_stable() -> None:
     graph = build_incremental_graph(
         [
