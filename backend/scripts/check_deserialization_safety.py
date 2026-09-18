@@ -179,6 +179,39 @@ def _assignment_value(node: ast.AST) -> ast.AST | None:
     return None
 
 
+def stable_module_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
+    """Resolve stable local aliases of tracked deserialization modules."""
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    assignments: list[tuple[str, ast.AST]] = []
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, (ast.Name, ast.Attribute)):
+            continue
+        assignments.extend((name, value) for name in _assigned_names(node))
+
+    resolved = dict(import_map)
+    inferred: dict[str, str] = {}
+    changed = True
+    while changed:
+        changed = False
+        for name, value in assignments:
+            if stores[name] != 1 or name in parameters:
+                continue
+            source = canonical_name(value, resolved)
+            if source not in TRACKED_MODULES or resolved.get(name) == source:
+                continue
+            resolved[name] = source
+            inferred[name] = source
+            changed = True
+    return inferred
+
+
 def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
     """Resolve unambiguous local callable aliases to tracked deserializers.
 
@@ -293,7 +326,8 @@ def violations(path: Path) -> list[str]:
     findings = star_import_violations(tree, label)
     scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
     for scope in scopes:
-        aliases = {**import_map, **stable_deserializer_aliases(scope, import_map)}
+        base_aliases = {**import_map, **stable_module_aliases(scope, import_map)}
+        aliases = {**base_aliases, **stable_deserializer_aliases(scope, base_aliases)}
         for node in _scope_nodes(scope):
             if not isinstance(node, ast.Call):
                 continue
