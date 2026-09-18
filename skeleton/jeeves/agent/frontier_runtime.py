@@ -54,6 +54,7 @@ from .runtime_guard import (
     RuntimeGuardRequest,
     RuntimeGuardSignals,
 )
+from .semantic_frontier import LensInteractionKind
 from .semantic_lenses import SemanticFinding, SemanticObservation
 from .semantic_plane import (
     SemanticLensPlane,
