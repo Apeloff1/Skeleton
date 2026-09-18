@@ -194,9 +194,22 @@ class ProductControlPlane:
         evidence = derive_lifecycle(operation_id, pending_operations=pending, receipts=receipts, audit_entries=audit)
         p = next((x for x in pending if x["operation_id"] == operation_id), None); r = next((x for x in receipts if x["operation_id"] == operation_id), None)
         binding = self.executors.resolve(p["capability_id"], p["action"]) if p else None
-        return {**asdict(evidence), "pending_operation": p,
-                "executor": ({"name": binding.name, "version": binding.version, "effect_class": binding.effect_class, "replay_safe": binding.replay_safe} if binding else None),
-                "receipt": r}
+        projection = asdict(evidence)
+        projection["pending_present"] = evidence.pending
+        projection["pending"] = p
+        projection["pending_operation"] = p
+        projection["executor"] = (
+            {
+                "name": binding.name,
+                "version": binding.version,
+                "effect_class": binding.effect_class,
+                "replay_safe": binding.replay_safe,
+            }
+            if binding
+            else None
+        )
+        projection["receipt"] = r
+        return projection
 
     def execution_ledger(self) -> list[dict[str, Any]]:
         return [asdict(x) for x in derive_ledger(pending_operations=self.pending(), receipts=self.receipt_history(limit=500), audit_entries=self.audit_history(limit=500))]
