@@ -1484,24 +1484,41 @@ class JeevesAgentRuntime:
                 if kind is MemoryKind.EPISODIC
                 else CardKind.FACT_CUE
             )
-            card = self.context_fabric.index.index_source(
-                namespace_key=namespace.key,
-                source_tier=SourceTier.MEMORY_STORE,
-                source_ref=record.memory_id,
-                source_fingerprint=record.fingerprint,
-                cue=content[:2048],
-                preview=content[:8192],
-                kind=card_kind,
-                salience=record.salience,
-                trust=record.trust,
-                confidence=record.trust,
-                tags=tuple(record.tags) + ("fast-index", source),
-                metadata={
-                    "canonical_source_required": True,
-                    "memory_kind": record.kind.value,
-                    "memory_source": record.source,
-                },
-            )
+            if card_kind is CardKind.INTERACTION:
+                card = self.context_fabric.index.remember_interaction(
+                    namespace_key=namespace.key,
+                    turn_id=record.memory_id,
+                    text=content,
+                    source_ref=record.memory_id,
+                    source_fingerprint=record.fingerprint,
+                    sequence=0,
+                    source_tier=SourceTier.MEMORY_STORE,
+                    source_provider=f"memory-store:{namespace.key}",
+                    role="user",
+                    salience=record.salience,
+                    trust=record.trust,
+                    tags=tuple(record.tags) + ("fast-index", source),
+                )
+            else:
+                card = self.context_fabric.index.index_source(
+                    namespace_key=namespace.key,
+                    source_tier=SourceTier.MEMORY_STORE,
+                    source_ref=record.memory_id,
+                    source_fingerprint=record.fingerprint,
+                    source_provider=f"memory-store:{namespace.key}",
+                    cue=content[:2048],
+                    preview=content[:8192],
+                    kind=card_kind,
+                    salience=record.salience,
+                    trust=record.trust,
+                    confidence=record.trust,
+                    tags=tuple(record.tags) + ("fast-index", source),
+                    metadata={
+                        "canonical_source_required": True,
+                        "memory_kind": record.kind.value,
+                        "memory_source": record.source,
+                    },
+                )
             stream_kind = "dialogue" if card_kind is CardKind.INTERACTION else "runtime"
             self.predictive_memory.observe(
                 card.card_id,
