@@ -242,6 +242,33 @@ class StoredExecutionAttempt:
         }
 
 
+@dataclass(frozen=True)
+class ExecutionAttemptSessionHead:
+    """Discoverable binding from one AI session to its execution attempt."""
+
+    session_id: str
+    attempt_id: str
+    authority_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.session_id or len(self.session_id) > 256:
+            raise ValueError("invalid execution attempt session head session_id")
+        if not self.attempt_id or len(self.attempt_id) > 256:
+            raise ValueError("invalid execution attempt session head attempt_id")
+        object.__setattr__(
+            self,
+            "authority_digest",
+            _digest("authority_digest", self.authority_digest),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "session_id": self.session_id,
+            "attempt_id": self.attempt_id,
+            "authority_digest": self.authority_digest,
+        }
+
+
 class ExecutionAttemptConflict(RuntimeError):
     pass
 
@@ -275,6 +302,49 @@ class AIExecutionAttemptStore:
         if not attempt_id or len(attempt_id) > 256:
             raise ValueError("invalid execution attempt id")
         return "attempt:" + hashlib.sha256(attempt_id.encode()).hexdigest()
+
+    @staticmethod
+    def session_key(session_id: str) -> str:
+        if not session_id or len(session_id) > 256:
+            raise ValueError("invalid execution attempt session_id")
+        return "session:" + hashlib.sha256(session_id.encode()).hexdigest()
+
+    def _bind_session_head(
+        self,
+        attempt: AIExecutionAttempt,
+    ) -> ExecutionAttemptSessionHead:
+        head = ExecutionAttemptSessionHead(
+            attempt.session_id,
+            attempt.attempt_id,
+            attempt.authority_digest,
+        )
+        key = self.session_key(attempt.session_id)
+        try:
+            self.backend.put_if_absent(
+                self.namespace,
+                key,
+                head,
+            )
+            return head
+        except DistributedStateConflict as exc:
+            current = self.backend.get(self.namespace, key)
+            if current is None:
+                raise ExecutionAttemptConflict(
+                    "execution attempt session-head race lost without winner"
+                ) from exc
+            if not isinstance(current.value, ExecutionAttemptSessionHead):
+                raise RuntimeError(
+                    "execution attempt session head type mismatch"
+                ) from exc
+            existing = current.value
+            if (
+                existing.attempt_id == attempt.attempt_id
+                and existing.authority_digest == attempt.authority_digest
+            ):
+                return existing
+            raise ExecutionAttemptConflict(
+                "AI session already binds a different execution attempt"
+            ) from exc
 
     def reserve(
         self,
@@ -316,16 +386,36 @@ class AIExecutionAttemptStore:
                 key,
                 attempt,
             )
-            return StoredExecutionAttempt(record.revision, attempt)
+            stored = StoredExecutionAttempt(record.revision, attempt)
         except DistributedStateConflict as exc:
             current = self.current(attempt_id)
             if current is not None and (
                 current.attempt.authority_digest == attempt.authority_digest
             ):
-                return current
-            raise ExecutionAttemptConflict(
-                "execution attempt id already binds different authority"
-            ) from exc
+                stored = current
+            else:
+                raise ExecutionAttemptConflict(
+                    "execution attempt id already binds different authority"
+                ) from exc
+
+        try:
+            self._bind_session_head(stored.attempt)
+        except ExecutionAttemptConflict:
+            # A competing attempt may have won the session pointer after this
+            # immutable attempt record was created. It never crossed the
+            # backend boundary, so make that orphan terminal when possible.
+            try:
+                current = self.current(attempt_id)
+                if (
+                    current is not None
+                    and current.attempt.state
+                    is ExecutionAttemptState.AUTHORIZED
+                ):
+                    self.abandon(current.attempt)
+            except Exception:
+                pass
+            raise
+        return stored
 
     def current(self, attempt_id: str) -> StoredExecutionAttempt | None:
         record = self.backend.get(self.namespace, self.key(attempt_id))
@@ -334,6 +424,44 @@ class AIExecutionAttemptStore:
         if not isinstance(record.value, AIExecutionAttempt):
             raise RuntimeError("execution attempt backend value type mismatch")
         return StoredExecutionAttempt(record.revision, record.value)
+
+    def session_head(
+        self,
+        session_id: str,
+    ) -> ExecutionAttemptSessionHead | None:
+        record = self.backend.get(
+            self.namespace,
+            self.session_key(session_id),
+        )
+        if record is None:
+            return None
+        if not isinstance(record.value, ExecutionAttemptSessionHead):
+            raise RuntimeError("execution attempt session head type mismatch")
+        if record.value.session_id != session_id:
+            raise RuntimeError("execution attempt session head identity mismatch")
+        return record.value
+
+    def current_for_session(
+        self,
+        session_id: str,
+    ) -> StoredExecutionAttempt | None:
+        head = self.session_head(session_id)
+        if head is None:
+            return None
+        current = self.current(head.attempt_id)
+        if current is None:
+            raise ExecutionAttemptConflict(
+                "execution attempt session head references missing attempt"
+            )
+        if current.attempt.session_id != session_id:
+            raise ExecutionAttemptConflict(
+                "execution attempt session head references wrong session"
+            )
+        if current.attempt.authority_digest != head.authority_digest:
+            raise ExecutionAttemptConflict(
+                "execution attempt session head authority mismatch"
+            )
+        return current
 
     @staticmethod
     def _same_authority(
