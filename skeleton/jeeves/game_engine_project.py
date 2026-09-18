@@ -83,7 +83,6 @@ class GameProjectSandbox:
     audio: AudioSceneSource
     animation: AnimationSceneSource
     navigation: NavigationSource
-    navigation: NavigationSource
 
     @property
     def era(self) -> EngineEra:
@@ -653,6 +652,7 @@ class ProjectEvolutionSession:
     physics: PhysicsSceneSource
     audio: AudioSceneSource
     animation: AnimationSceneSource
+    navigation: NavigationSource
 
     @classmethod
     def start(
