@@ -48,6 +48,7 @@ from .research_synthesis import (
     SynthesisReport,
 )
 from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
+from .semantic_topology_learning import SemanticTopologyLearningLab
 from .types import AgentContractError, json_safe, stable_fingerprint
 from .unknown_unknowns import (
     SurpriseScoutPolicy,
@@ -138,6 +139,39 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             dependencies=dependencies,
         )
         return snapshot
+
+    def map_semantic_topology_frontier(
+        self,
+        topology_learning: SemanticTopologyLearningLab,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+        dependencies: Mapping[str, Sequence[str]] | None = None,
+    ) -> FrontierSnapshot:
+        """Promote unresolved semantic topology questions into research debt.
+
+        The bridge candidates remain non-executable unless the topology-learning
+        lab independently promotes them. This method only feeds their unresolved
+        knowledge obligations into the existing epistemic frontier and agenda.
+        """
+
+        if not isinstance(
+            topology_learning,
+            SemanticTopologyLearningLab,
+        ):
+            raise TypeError(
+                "topology_learning must be SemanticTopologyLearningLab"
+            )
+        obligations = topology_learning.research_obligations(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
+        )
+        return self.map_epistemic_frontier(
+            obligations,
+            dependencies=dependencies,
+        )
 
     def start_hypothesis_tournament(
         self,
