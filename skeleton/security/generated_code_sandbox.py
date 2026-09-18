@@ -81,7 +81,7 @@ _UNSAFE_MODULES = frozenset({
 })
 
 _FS_CALLS = frozenset({
-    "open", "os.open", "os.remove", "os.unlink", "os.rename", "os.replace",
+    "open", "builtins.open", "__builtins__.open", "os.open", "os.remove", "os.unlink", "os.rename", "os.replace",
     "os.mkdir", "os.makedirs", "os.rmdir", "os.removedirs", "os.listdir",
     "os.scandir", "os.walk", "os.chmod", "os.chown", "os.link", "os.symlink",
     "os.readlink", "os.truncate", "pathlib.Path", "shutil.copy", "shutil.copy2",
@@ -103,7 +103,11 @@ _PROC_CALLS = frozenset({
     "multiprocessing.Process", "multiprocessing.Pool",
     "pty.spawn", "ctypes.CDLL", "ctypes.PyDLL",
 })
-_EVAL_CALLS = frozenset({"eval", "exec", "compile", "__import__", "builtins.eval", "builtins.exec"})
+_EVAL_CALLS = frozenset({
+    "eval", "exec", "compile", "__import__",
+    "builtins.eval", "builtins.exec", "builtins.compile", "builtins.__import__",
+    "__builtins__.eval", "__builtins__.exec", "__builtins__.compile", "__builtins__.__import__",
+})
 _TRACKED_CALLABLES = frozenset().union(
     _FS_CALLS,
     _NET_CALLS,
@@ -706,6 +710,16 @@ def _import_operations(name: str) -> list[Operation]:
 def _call_operations(node: ast.Call, aliases: Mapping[str, str]) -> list[Operation]:
     name = _dotted_name(node.func, aliases)
     operations: list[Operation] = []
+    if not name or name == "<dynamic>":
+        operations.append(
+            Operation(
+                OperationKind.UNSAFE_EVAL,
+                "<dynamic-callable>",
+                None,
+                "callable provenance cannot be proven",
+            )
+        )
+        return operations
     if name in _EVAL_CALLS or name in {"getattr", "builtins.getattr"}:
         operations.append(Operation(OperationKind.UNSAFE_EVAL, name or "<dynamic>", None, "eval/getattr"))
         return operations
