@@ -22,7 +22,9 @@ permissions:
 jobs:
   bot:
     permissions:
+      actions: read
       contents: write
+      issues: read
       pull-requests: write
     name: ${{ matrix.bot }}
     runs-on: ubuntu-latest
