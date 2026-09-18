@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from .body import BodyType, RigidBody
 from .convex import convex_time_of_impact
 from .errors import PhysicsValidationError
-from .math3d import EPSILON, Quat, Transform, Vec3
+from .math3d import EPSILON, Transform, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
 from .shapes import (
     BoxShape,
@@ -155,13 +155,17 @@ class ContinuousCollisionDetector:
     @staticmethod
     def _predicted_transform(body: RigidBody, time: float) -> Transform:
         position = body.position + body.linear_velocity * time
-        angular_speed = body.angular_velocity.length()
-        if time <= 0.0 or angular_speed <= 1.0e-12:
+        if time <= 0.0 or body.angular_velocity.length_squared() <= 1.0e-24:
             rotation = body.orientation
         else:
-            axis = body.angular_velocity / angular_speed
-            delta = Quat.from_axis_angle(axis, angular_speed * time)
-            rotation = (delta * body.orientation).normalized()
+            # CCD prediction must follow the exact authoritative integrator used
+            # by RigidBody.integrate_orientation(). An exact axis-angle rotation
+            # diverges from the engine's normalized first-order quaternion step,
+            # which can report a TOI at a pose the world never actually reaches.
+            rotation = body.orientation.integrate_world_angular_velocity(
+                body.angular_velocity,
+                time,
+            )
         return Transform(position, rotation)
 
     @staticmethod
