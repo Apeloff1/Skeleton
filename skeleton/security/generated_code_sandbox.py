@@ -411,9 +411,16 @@ class GeneratedCodeSandbox:
         return True
 
     def _contained_path(self, target: str) -> Path:
-        if not isinstance(target, str) or not target or "\x00" in target:
+        if (
+            not isinstance(target, str)
+            or not target
+            or target == "<dynamic>"
+            or "\x00" in target
+        ):
             raise SandboxPolicyError("filesystem target is invalid", context={"target": repr(target)})
         decoded = unquote(target)
+        if "\x00" in decoded:
+            raise SandboxPolicyError("filesystem target is invalid", context={"target": repr(target)})
         candidate = Path(decoded)
         if candidate.is_absolute():
             resolved = candidate
