@@ -142,3 +142,9 @@ def test_cortex_can_be_explicitly_disabled_for_compatibility() -> None:
     assert runtime.cortex is None
     assert state.scratch.get(runtime._CORTEX_ASSESSMENT_KEY) is None
     assert runtime.cortex_summary() == {"enabled": False, "required": False}
+
+
+def test_required_cortex_cannot_be_disabled() -> None:
+    clock = TickClock()
+    with pytest.raises(ValueError, match="cortex_required"):
+        _runtime(clock, cortex_enabled=False, cortex_required=True)
