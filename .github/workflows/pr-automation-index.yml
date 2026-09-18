@@ -10,11 +10,12 @@ on:
     # Evaluate terminal workflow state only. Requested/in-progress transitions
     # multiplied Actions load without adding merge-readiness information.
     types: [completed]
-    # Main completions already fan out through the watched workflows.
-    # Keep PR/feature heads event-driven and reconcile default-branch state on
-    # the existing schedule/manual paths instead of multiplying privileged runs.
-    branches-ignore:
-      - main
+    # Consume every completing head. Trusted code still comes from the default
+    # branch checkout below; the runner uses head SHA/ref only as untrusted
+    # identity evidence and fails closed when that identity is incomplete.
+    branches:
+      - "*"
+      - "**"
   schedule:
     - cron: "17,47 * * * *"
   workflow_dispatch:
