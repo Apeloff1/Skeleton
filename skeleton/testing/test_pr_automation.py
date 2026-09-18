@@ -14,6 +14,7 @@ from skeleton.pr_automation.runner import (
     count_changes_requested,
     execute_actions,
     policy_from_env,
+    queued_actions_count,
 )
 
 
@@ -332,13 +333,16 @@ def test_event_index_exports_jsonl(tmp_path):
 
 
 class FakeClient:
-    def __init__(self, *, protected=True):
+    def __init__(self, *, protected=True, queued=0):
         self.protected = protected
+        self.queued = queued
         self.merges = 0
         self.statuses = []
         self.last_merge_body = None
 
     def get(self, path):
+        if "/actions/runs?status=queued&per_page=1" in path:
+            return {"total_count": self.queued, "workflow_runs": []}
         if "/branches/" in path:
             return {"protected": self.protected}
         raise AssertionError(f"unexpected GET {path}")
@@ -448,6 +452,47 @@ def test_exhausted_run_budget_never_mutates_but_preserves_readiness(tmp_path):
     assert outcome.mutations == 0
     assert outcome.evaluation.decision is Decision.MERGE
     assert client.merges == 0
+
+
+def test_queue_pressure_holds_ready_auto_merge(tmp_path):
+    snapshot = ready_snapshot()
+    policy = Policy(merge_when_ready=True)
+    evaluation = evaluate(snapshot, policy)
+    client = FakeClient(queued=40)
+    index = EventIndex(tmp_path / "index.sqlite3")
+
+    outcome = execute_actions(
+        client,
+        index,
+        snapshot,
+        evaluation,
+        policy=policy,
+        required_checks={"unit"},
+        mode=Mode.APPLY,
+        max_mutations=1,
+        delivery_id="run:42",
+        merge_method="squash",
+        refresh_snapshot=lambda: snapshot,
+    )
+
+    assert outcome.mutations == 0
+    assert outcome.evaluation.decision is Decision.HOLD
+    assert "queue pressure" in outcome.evaluation.reasons[0]
+    assert client.merges == 0
+    assert client.statuses[-1]["state"] == "pending"
+    events = list(index.iter_events(snapshot.repository, snapshot.number))
+    assert events[-1]["event_type"] == "actions_queue_pressure"
+
+
+@pytest.mark.parametrize("value", [-1, True, "40", None])
+def test_queued_actions_count_fails_closed_on_invalid_total(value):
+    class InvalidQueueClient:
+        def get(self, path):
+            assert "/actions/runs?status=queued&per_page=1" in path
+            return {"total_count": value}
+
+    with pytest.raises(Exception, match="invalid queued Actions count"):
+        queued_actions_count(InvalidQueueClient(), "Apeloff1/Skeleton")
 
 
 def test_merge_request_uses_expected_head_sha(tmp_path):
