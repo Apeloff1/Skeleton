@@ -65,6 +65,7 @@ class LensInteractionRule:
     predictive_effect: str
     symmetric: bool = True
     tangent_axis_hint: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "left_key", str(self.left_key).strip().casefold())
@@ -77,7 +78,16 @@ class LensInteractionRule:
         object.__setattr__(self, "question", bounded_text("interaction question", self.question, maximum=4096))
         object.__setattr__(self, "predictive_effect", bounded_text("predictive effect", self.predictive_effect, maximum=4096))
         if self.tangent_axis_hint is not None:
-            object.__setattr__(self, "tangent_axis_hint", str(self.tangent_axis_hint).strip().casefold())
+            object.__setattr__(
+                self,
+                "tangent_axis_hint",
+                str(self.tangent_axis_hint).strip().casefold(),
+            )
+        object.__setattr__(
+            self,
+            "metadata",
+            json_safe(dict(self.metadata)),
+        )
 
     @property
     def key(self) -> tuple[str, str]:
@@ -113,18 +123,20 @@ class LensInteraction:
 
     @property
     def fingerprint(self) -> str:
-        return stable_fingerprint(
-            {
-                "rule": self.rule.key,
-                "kind": self.rule.kind.value,
-                "left": self.left_finding_id,
-                "right": self.right_finding_id,
-                "observations": self.observation_ids,
-                "evidence": self.evidence_ids,
-                "hypothesis": self.hypothesis,
-                "counter": self.counter_hypothesis,
-            }
-        )
+        payload: dict[str, Any] = {
+            "rule": self.rule.key,
+            "kind": self.rule.kind.value,
+            "left": self.left_finding_id,
+            "right": self.right_finding_id,
+            "observations": self.observation_ids,
+            "evidence": self.evidence_ids,
+            "hypothesis": self.hypothesis,
+            "counter": self.counter_hypothesis,
+        }
+        rule_provenance = self.metadata.get("rule_provenance")
+        if rule_provenance:
+            payload["rule_provenance"] = rule_provenance
+        return stable_fingerprint(payload)
 
 
 @dataclass(frozen=True, slots=True)
@@ -812,6 +824,11 @@ class LensCompositionEngine:
                         "may_promote_to_evidence": False,
                         "left_status": left.status.value,
                         "right_status": right.status.value,
+                        **(
+                            {"rule_provenance": dict(rule.metadata)}
+                            if rule.metadata
+                            else {}
+                        ),
                     },
                 )
                 interactions.append(interaction)
