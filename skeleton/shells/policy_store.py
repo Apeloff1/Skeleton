@@ -24,7 +24,21 @@ class PolicyConflict(RuntimeError):pass
 
 class PolicyStore:
     def __init__(self,initial:ShellPolicy)->None:
-        self._current=PolicyRevision(1,policy_fingerprint(initial),initial)
+        self._current=PolicyRevision(1,policy_fingerprint(
+            initial.executables,
+            initial.cwd_roots,
+            allowed_env=tuple(initial.allowed_env),
+            inherited_env=tuple(initial.inherited_env),
+            limits={
+                "default_timeout": initial.default_timeout,
+                "max_timeout": initial.max_timeout,
+                "max_output_bytes": initial.max_output_bytes,
+                "max_input_bytes": initial.max_input_bytes,
+                "max_env_bytes": initial.max_env_bytes,
+                "max_args": initial.max_args,
+                "max_arg_bytes": initial.max_arg_bytes,
+            },
+        ),initial)
         self._history=[self._current]
         self._lock=threading.RLock()
 
@@ -37,7 +51,21 @@ class PolicyStore:
                 raise PolicyConflict("shell policy revision conflict")
             replacement=PolicyRevision(
                 self._current.revision+1,
-                policy_fingerprint(policy),
+                policy_fingerprint(
+                policy.executables,
+                policy.cwd_roots,
+                allowed_env=tuple(policy.allowed_env),
+                inherited_env=tuple(policy.inherited_env),
+                limits={
+                    "default_timeout": policy.default_timeout,
+                    "max_timeout": policy.max_timeout,
+                    "max_output_bytes": policy.max_output_bytes,
+                    "max_input_bytes": policy.max_input_bytes,
+                    "max_env_bytes": policy.max_env_bytes,
+                    "max_args": policy.max_args,
+                    "max_arg_bytes": policy.max_arg_bytes,
+                },
+            ),
                 policy,
             )
             self._current=replacement
