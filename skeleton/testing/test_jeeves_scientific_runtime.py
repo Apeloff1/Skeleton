@@ -15,7 +15,10 @@ from skeleton.jeeves.agent.nuance_runtime import (
 )
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import RunInputs
-from skeleton.jeeves.agent.scientific_runtime import ScientificJeevesRuntime
+from skeleton.jeeves.agent.scientific_runtime import (
+    MaximalScientificJeevesRuntime,
+    ScientificJeevesRuntime,
+)
 from skeleton.jeeves.agent.types import Goal
 
 
@@ -90,7 +93,16 @@ def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_wor
     assert payload["contract"]["interpretive_only"] is True
     assert payload["contract"]["semantic_readings_are_not_evidence"] is True
     assert payload["contract"]["relations_change_retrieval_priority_not_factual_trust"] is True
+    assert payload["contract"]["lens_predictive_influence_is_empirically_gated"] is True
+    assert payload["contract"]["lens_hypergraphs_never_create_evidence"] is True
+    assert payload["semantic_domain"] == "narrative-game-analysis"
     assert any(row["family"] == "film" for row in payload["lenses"])
+    assert all("scientific_status" in row for row in payload["lenses"])
+    assert all("global_predictive_weight" in row for row in payload["lenses"])
+    assert all("predictive_weight" in row for row in payload["lenses"])
+    assert all("domain_status" in row for row in payload["lenses"])
+    assert all(row["factual_assertion_authorized"] is False for row in payload["lenses"])
+    assert all(row["causal_assertion_authorized"] is False for row in payload["lenses"])
     assert prior.card_id in {
         source_id
         for section in packet.sections
@@ -267,6 +279,45 @@ def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     assert runtime.nuance_runtime.resolver is runtime.context_resolver
     assert runtime.context_resolver.cards is runtime.memory_cards
     assert runtime.context_resolver.relations is runtime.relational_memory
+    summary = runtime.scientific_summary()
+    assert "lens_science" in summary
+    assert summary["maximal_semantics_enabled"] is False
+    assert summary["semantic_lens_count"] >= 1
+    assert summary["lens_science"]["invariants"]["semantic_lenses_remain_interpretive"] is True
+    assert summary["lens_science"]["invariants"]["hypergraph_never_creates_evidence"] is True
+
+
+def test_maximal_scientific_runtime_routes_extreme_rare_lenses() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(("unused",))
+    runtime = MaximalScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    namespace = _namespace()
+    runtime.nuance_runtime.prepare(
+        namespace,
+        "A shot reverse shot establishes a look across a dialogue cut.",
+    )
+    frame = runtime.nuance_runtime.prepare(
+        namespace,
+        "The reverse shot repeats the look and dialogue cut from a second viewpoint.",
+        requested_lenses=("shot_reverse_shot_suture",),
+        capture_interaction=False,
+    )
+
+    assert runtime.scientific_summary()["maximal_semantics_enabled"] is True
+    assert runtime.nuance_runtime.semantic_registry.get(
+        "shot_reverse_shot_suture"
+    ).key == "shot_reverse_shot_suture"
+    assert "shot_reverse_shot_suture" in {
+        lens.key for lens in frame.lens_selection.lenses
+    }
+    governed = frame.lens_governance.record_for("shot_reverse_shot_suture")
+    assert governed is not None
+    assert governed.decision.factual_assertion_authorized is False
+    assert governed.decision.causal_assertion_authorized is False
 
 
 def test_scientific_runtime_rebinds_relations_to_supplied_resolver_cards() -> None:
