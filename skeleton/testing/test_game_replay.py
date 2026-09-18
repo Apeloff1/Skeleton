@@ -174,35 +174,13 @@ def test_time_regression_fail_closed() -> None:
     assert caught.value.context["reason"] == "time_regression"
 
 
-@pytest.mark.parametrize(
-    ("field", "expected_context_field"),
-    [
-        ("spec_digest", "spec_digest"),
-        ("state_digest", "state_digest"),
-        ("result_digest", "result_digest"),
-        ("step_digests", "step_digests"),
-    ],
-)
-def test_replay_rejects_tampered_digest_chain(
-    field: str,
-    expected_context_field: str,
-) -> None:
+def test_replay_rejects_tampered_result_digest() -> None:
     recorded = _record()
     tampered = dict(recorded.to_canonical())
-    if field == "step_digests":
-        digests = list(tampered[field])
-        original = digests[0]
-        digests[0] = ("0" if original[0] != "0" else "1") + original[1:]
-        tampered[field] = digests
-    else:
-        original = str(tampered[field])
-        tampered[field] = ("0" if original[0] != "0" else "1") + original[1:]
-
+    tampered["result_digest"] = "a" * 64
     with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
         _replay().replay(tampered)
-
     assert caught.value.context["reason"] == "divergence"
-    assert caught.value.context["field"] == expected_context_field
 
 
 def test_version_and_schema_mismatch_fail_closed() -> None:
@@ -312,6 +290,157 @@ def test_canonical_serialization_is_key_order_invariant() -> None:
     assert engine.replay(shuffled).result_digest == recorded.result_digest
 
 
+def test_replay_rejects_each_tampered_derived_digest_plane() -> None:
+    engine = _replay()
+    baseline = _record().to_canonical()
+
+    for field in ("spec_digest", "state_digest"):
+        tampered = json.loads(json.dumps(baseline))
+        tampered[field] = "0" * 64
+        with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
+            engine.replay(tampered)
+        assert caught.value.context["field"] == field
+
+    tampered_steps = json.loads(json.dumps(baseline))
+    tampered_steps["step_digests"][0] = "0" * 64
+    with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
+        engine.replay(tampered_steps)
+    assert caught.value.context["field"] == "step_digests"
+
+
+def test_compare_includes_normalized_inputs_not_only_stored_digests() -> None:
+    baseline = _record().to_canonical()
+    altered = json.loads(json.dumps(baseline))
+    altered["inputs"]["combat"]["party_based"] = True
+    report = _replay().compare(baseline, altered)
+    assert report.identical is False
+    assert "inputs" in {item.field for item in report.mismatches}
+
+
+def test_trace_parser_rejects_invalid_utf8_and_unencodable_text() -> None:
+    with pytest.raises(GameReplayError) as caught:
+        parse_trace(b"\xff\xfe")
+    assert caught.value.context["error"] == "utf8"
+
+    with pytest.raises(GameReplayError) as caught:
+        parse_trace("\ud800")
+    assert caught.value.context["error"] == "utf8"
+
+
+def test_trace_parser_rejects_duplicate_json_keys() -> None:
+    raw = '{"schema":"game.mechanics.replay","schema":"game.mechanics.replay"}'
+    with pytest.raises(GameReplayError) as caught:
+        parse_trace(raw)
+    assert caught.value.context["error"] == "duplicate_key"
+
+
+def test_mapping_trace_cannot_bypass_serialized_size_bound() -> None:
+    payload = _record().to_canonical()
+    payload["padding"] = "x" * 70_000
+    with pytest.raises(GameReplayError):
+        parse_trace(payload)
+
+
+def test_canonical_replay_values_have_depth_and_container_bounds() -> None:
+    value: object = 1
+    for _ in range(20):
+        value = [value]
+    with pytest.raises(GameReplayError) as caught:
+        canonical_dumps(value)
+    assert caught.value.context["error"] == "nesting"
+
+    with pytest.raises(GameReplayError) as caught:
+        canonical_dumps(list(range(300)))
+    assert caught.value.context["error"] == "list_bound"
+
+    with pytest.raises(GameReplayError) as caught:
+        canonical_dumps({str(index): index for index in range(300)})
+    assert caught.value.context["error"] == "object_bound"
+
+
+def test_canonical_replay_mapping_keys_must_be_strings() -> None:
+    with pytest.raises(GameReplayError) as caught:
+        canonical_dumps({1: "one"})  # type: ignore[dict-item]
+    assert caught.value.context["error"] == "non_string_key"
+
+
+@pytest.mark.parametrize(
+    ("system", "payload"),
+    [
+        ("combat", {"style": "turn_based", "execute": "shell"}),
+        ("progression", {"style": "linear", "execute": "shell"}),
+        ("economy", {"currencies": ["gold"], "execute": "shell"}),
+        ("ai_behavior", {"entity_type": "guard", "execute": "shell"}),
+    ],
+)
+def test_system_specs_reject_unknown_fields(system: str, payload: dict[str, object]) -> None:
+    kwargs = {"seed": 1, "tick": 0, "steps": (), system: payload}
+    with pytest.raises(GameReplayError) as caught:
+        _replay().record(**kwargs)  # type: ignore[arg-type]
+    assert caught.value.context["reason"] == "malformed_trace"
+    assert "unknown_keys" in caught.value.context
+
+
+@pytest.mark.parametrize(
+    ("system", "payload"),
+    [
+        ("economy", {"currencies": "gold"}),
+        ("ai_behavior", {"entity_type": "guard", "behaviors": "patrol"}),
+    ],
+)
+def test_sequence_like_strings_cannot_expand_into_spec_tokens(
+    system: str, payload: dict[str, object]
+) -> None:
+    kwargs = {"seed": 1, "tick": 0, "steps": (), system: payload}
+    with pytest.raises(GameReplayError):
+        _replay().record(**kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("system", "payload"),
+    [
+        ("combat", {"style": "not-a-style"}),
+        ("progression", {"style": "linear", "max_level": 0}),
+        ("economy", {"currencies": []}),
+        ("ai_behavior", {"entity_type": "guard", "aggression_level": 2.0}),
+    ],
+)
+def test_mechanics_validation_errors_are_wrapped_as_replay_errors(
+    system: str, payload: dict[str, object]
+) -> None:
+    kwargs = {"seed": 1, "tick": 0, "steps": (), system: payload}
+    with pytest.raises(GameReplayError) as caught:
+        _replay().record(**kwargs)  # type: ignore[arg-type]
+    assert caught.value.context["reason"] == "malformed_trace"
+
+
+@pytest.mark.parametrize(
+    "bad_token",
+    ["hero\nadmin", "gold\tcoin", "guard\rstate", "x\x00y"],
+)
+def test_replay_tokens_reject_control_characters(bad_token: str) -> None:
+    step = ReplayStep(
+        kind="economy",
+        action="transact",
+        at_tick=0,
+        payload={"currency": bad_token, "delta": 1},
+    )
+    with pytest.raises(GameReplayError, match="control"):
+        _record(steps=(step,))
+
+
+def test_step_digest_list_is_bounded_before_digest_validation() -> None:
+    payload = _record().to_canonical()
+    payload["step_digests"] = ["0" * 64] * 65
+    with pytest.raises(GameReplayError, match="step bound"):
+        parse_trace(payload)
+
+
+def test_replay_steps_require_materialized_bounded_containers() -> None:
+    with pytest.raises(GameReplayError, match="steps must be a list"):
+        _record(steps=(step for step in _steps()))  # type: ignore[arg-type]
+
+
 def test_module_stays_credential_free_and_offline() -> None:
     import skeleton.game.replay as replay_mod
 
@@ -320,3 +449,25 @@ def test_module_stays_credential_free_and_offline() -> None:
     assert imported == set()
     assert "time" not in replay_mod.__dict__
     assert "random" not in replay_mod.__dict__
+
+
+def test_replay_rejects_tampered_digest_chain(
+    field: str,
+    expected_context_field: str,
+) -> None:
+    recorded = _record()
+    tampered = dict(recorded.to_canonical())
+    if field == "step_digests":
+        digests = list(tampered[field])
+        original = digests[0]
+        digests[0] = ("0" if original[0] != "0" else "1") + original[1:]
+        tampered[field] = digests
+    else:
+        original = str(tampered[field])
+        tampered[field] = ("0" if original[0] != "0" else "1") + original[1:]
+
+    with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
+        _replay().replay(tampered)
+
+    assert caught.value.context["reason"] == "divergence"
+    assert caught.value.context["field"] == expected_context_field
