@@ -702,11 +702,11 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
                     "code_blocks": code_blocks,
                     "timestamp": agent_msg["timestamp"],
                 })
-        except Exception as e:
+        except Exception:
             responses.append({
                 "agent_id": agent_id,
                 "agent_name": agent.get("name", agent_id),
-                "content": f"[Agent temporarily unavailable: {str(e)[:100]}]",
+                "content": "[Agent temporarily unavailable]",
                 "code_blocks": [],
                 "timestamp": datetime.utcnow().isoformat(),
             })

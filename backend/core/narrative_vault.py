@@ -492,4 +492,5 @@ async def check_originality(db, proposed_synopsis: str, genre: str,
             "genre": genre,
         }
     except Exception as e:
-        return {"error": str(e)[:200], "must_mutate": False}
+        logger.warning("originality check failed: %s", type(e).__name__)
+        return {"error": "originality_check_failed", "must_mutate": False}

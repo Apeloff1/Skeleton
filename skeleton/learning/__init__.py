@@ -15,6 +15,23 @@ from skeleton.jeeves.assessment import (
 )
 from skeleton.jeeves.curriculum import Curriculum, CurriculumError, Lesson
 
+from .evidence import (
+    Calibration,
+    EvidenceProvenance,
+    Feature,
+    Hypothesis,
+    LearningEvidenceError,
+    LearningEvidenceStore,
+    Observation,
+    Outcome,
+    Prediction,
+    RecordPlane,
+    UpdateKind,
+    UpdateRecord,
+    canonical_fingerprint,
+    empty_calibration,
+    make_provenance,
+)
 from .service import LearningService, LearningSnapshot
 
 __all__ = [
@@ -22,11 +39,26 @@ __all__ = [
     "AssessmentEngine",
     "AssessmentError",
     "BloomLevel",
+    "Calibration",
     "Curriculum",
     "CurriculumError",
+    "EvidenceProvenance",
+    "Feature",
+    "Hypothesis",
     "InteractionEvidence",
+    "LearningEvidenceError",
+    "LearningEvidenceStore",
     "LearningService",
     "LearningSnapshot",
     "Lesson",
+    "Observation",
+    "Outcome",
+    "Prediction",
+    "RecordPlane",
     "SkillModel",
+    "UpdateKind",
+    "UpdateRecord",
+    "canonical_fingerprint",
+    "empty_calibration",
+    "make_provenance",
 ]

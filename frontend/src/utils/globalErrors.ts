@@ -7,6 +7,7 @@
  */
 import { Platform } from 'react-native';
 import { trail } from './breadcrumbs';
+import { redactSecrets } from '../../utils/safeError';
 
 let _installed = false;
 
@@ -25,8 +26,8 @@ export function installGlobalErrorHandlers(): boolean {
     if (eu?.setGlobalHandler && eu?.getGlobalHandler) {
       const prev = eu.getGlobalHandler();
       eu.setGlobalHandler((err: Error, isFatal?: boolean) => {
-        _record('js_error', String(err?.message || err), {
-          stack: String(err?.stack || '').slice(0, 1024),
+        _record('js_error', redactSecrets(String(err?.message || err)), {
+          stack: redactSecrets(String(err?.stack || '')).slice(0, 1024),
           fatal: !!isFatal,
         });
         try { prev?.(err, isFatal); } catch {}
@@ -39,11 +40,11 @@ export function installGlobalErrorHandlers(): boolean {
     try {
       window.addEventListener('unhandledrejection', (e: any) => {
         _record('unhandled_rejection',
-          String(e?.reason?.message || e?.reason || 'unknown'),
-          { stack: String(e?.reason?.stack || '').slice(0, 1024) });
+          redactSecrets(String(e?.reason?.message || e?.reason || 'unknown')),
+          { stack: redactSecrets(String(e?.reason?.stack || '')).slice(0, 1024) });
       });
       window.addEventListener('error', (e: any) => {
-        _record('window_error', String(e?.message || 'unknown'), {
+        _record('window_error', redactSecrets(String(e?.message || 'unknown')), {
           src: String(e?.filename || ''), line: e?.lineno,
         });
       });

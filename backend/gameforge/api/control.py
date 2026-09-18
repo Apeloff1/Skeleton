@@ -168,8 +168,8 @@ async def failover_precheck(principal: Principal = Depends(get_principal)):
                     "ready": r.status_code,
                     "ok": h.status_code == 200 and r.status_code == 200,
                 }
-        except Exception as e:
-            result["secondary"] = {"ok": False, "error": str(e)}
+        except Exception:
+            result["secondary"] = {"ok": False, "error": "failover_probe_failed"}
     return result
 
 

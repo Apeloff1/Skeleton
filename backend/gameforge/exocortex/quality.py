@@ -241,13 +241,13 @@ def score_project(exocortex=None) -> Dict[str, Any]:
                     ],
                 )
             )
-        except Exception as e:
+        except Exception:
             dims.append(
                 QualityDimension(
                     name="live_runtime_probe",
                     score=40.0,
                     target=90.0,
-                    gaps=[str(e)],
+                    gaps=["probe_failed"],
                 )
             )
 

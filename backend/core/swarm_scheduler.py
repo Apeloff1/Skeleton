@@ -424,8 +424,8 @@ def start_async(kind: str, **kwargs) -> str:
             _set_job(job_id, status="done", finished_at=time.time(),
                      result={k: res[k] for k in ("plan_hash", "coverage", "verification",
                                                  "execution", "participation")})
-        except Exception as ex:
-            _set_job(job_id, status="error", finished_at=time.time(), error=str(ex))
+        except Exception:
+            _set_job(job_id, status="error", finished_at=time.time(), error="schedule_failed")
 
     threading.Thread(target=_worker, daemon=True).start()
     return job_id

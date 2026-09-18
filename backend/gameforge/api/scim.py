@@ -64,9 +64,9 @@ async def scim_webhook(
         actor = "scim-webhook" if secret_mode else principal.user_id
         try:
             results.append(await processor.apply(event, actor_user_id=actor))
-        except Exception as e:
+        except Exception:
             results.append(
-                {"op": event.op.value, "user_id": event.user_id, "status": "error", "error": str(e)}
+                {"op": event.op.value, "user_id": event.user_id, "status": "error", "error": "scim_apply_failed"}
             )
     return {"processed": len(results), "results": results}
 

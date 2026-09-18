@@ -160,7 +160,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             ms = (time.time() - t0) * 1000.0
             LATENCY.observe(request.url.path, ms)
-            ERRORS.record(path=request.url.path, status=500, rid=rid, err=str(e)[:300])
+            ERRORS.record(path=request.url.path, status=500, rid=rid, err=type(e).__name__)
             raise
 
 __all__ = [

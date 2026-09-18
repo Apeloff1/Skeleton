@@ -75,8 +75,8 @@ async def watchdog_health() -> dict:
     try:
         from core import build_watchdog as _wd
         snap = await _wd.health_snapshot()
-    except Exception as e:
-        snap = {"ok": False, "error": str(e)}
+    except Exception:
+        snap = {"ok": False, "error": "watchdog_health_unavailable"}
     try:
         snap["active_runners"] = list(_active_runners)[:50]
         snap["in_memory_builds"] = len(_builds)
@@ -148,8 +148,8 @@ async def force_advance(build_id: str, batches: int = 1) -> dict:
         try:
             await advance_build(build_id)
             advanced += 1
-        except Exception as e:
-            return {"ok": False, "advanced": advanced, "error": str(e)[:200]}
+        except Exception:
+            return {"ok": False, "advanced": advanced, "error": "force_advance_failed"}
     await save_build(build)
     return {
         "ok": True, "build_id": build_id, "advanced": advanced,

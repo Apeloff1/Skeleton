@@ -551,8 +551,8 @@ def apply_alternative(build_id: str, gid: str, run_id: str, variant_id: str) -> 
         unbulk.compress_field(to_store, "brief")
         get_sync_db()["galaxy_text_gamefiles"].replace_one(
             {"_id": f"{build_id}:{gid}"}, to_store, upsert=True)
-    except Exception as e:
-        return {"error": f"persist_failed: {e}"}
+    except Exception:
+        return {"error": "persist_failed"}
     try:
         from core import build_ledger as bl
         bl.log(build_id, "churn_applied",
@@ -644,8 +644,8 @@ def start_churn_job(build_id: str, gid: str | None = None, deficit: str | None =
                 res = run_churn_build(build_id, top_n=top_n, n=n, model=model, on_progress=_prog)
                 _put_job(jid, {"progress": res.get("churned", 0), "total": res.get("churned", 0) or 1,
                                "result": res, "status": "done"})
-        except Exception as e:
-            _put_job(jid, {"status": "error", "error": str(e)})
+        except Exception:
+            _put_job(jid, {"status": "error", "error": "churn_failed"})
 
     threading.Thread(target=_worker, daemon=True, name=f"churn-{jid}").start()
     return jid
@@ -680,8 +680,8 @@ def _daemon_loop(stop_evt: threading.Event):
             _DAEMON["runs"] += 1
             _DAEMON["scanned_builds"] = scanned
             _DAEMON["last_scan"] = time.time()
-        except Exception as e:
-            _DAEMON["log"].appendleft({"ts": time.time(), "error": str(e)})
+        except Exception:
+            _DAEMON["log"].appendleft({"ts": time.time(), "error": "churn_failed"})
         stop_evt.wait(_DAEMON["interval_s"])
 
 

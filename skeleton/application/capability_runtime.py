@@ -8,11 +8,11 @@ turning a user supplied string into an arbitrary Python import.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from importlib import import_module
+from importlib import import_module, util as importlib_util
 from threading import RLock
 from types import ModuleType
 
-from .capability_manifest import CAPABILITIES, get_capability
+from .capability_manifest import CAPABILITIES, CAPABILITY_MANIFEST_VERSION, get_capability
 
 
 class CapabilityLoadError(RuntimeError):
@@ -102,3 +102,31 @@ def capability_runtime_status() -> tuple[CapabilityRuntimeStatus, ...]:
     """Return the shared loader's side-effect-free capability status."""
 
     return CAPABILITY_LOADER.status()
+
+
+def capability_lifecycle_snapshot() -> dict[str, object]:
+    """Return manifest rows plus resolvable/loaded lifecycle flags.
+
+    The identity manifest stays a three-field contract. Lifecycle is an additive
+    snapshot so CLI/API consumers can inspect runtime readiness without changing
+    ``schema_version`` or importing every plane.
+    """
+
+    statuses = {status.id: status for status in capability_runtime_status()}
+    rows: list[dict[str, object]] = []
+    for capability in CAPABILITIES:
+        status = statuses[capability.id]
+        rows.append(
+            {
+                "id": capability.id,
+                "module": capability.module,
+                "description": capability.description,
+                "resolvable": importlib_util.find_spec(capability.module) is not None,
+                "loaded": status.loaded,
+            }
+        )
+    return {
+        "schema_version": CAPABILITY_MANIFEST_VERSION,
+        "kind": "lifecycle",
+        "capabilities": rows,
+    }

@@ -18,6 +18,11 @@ _LOCK = threading.RLock()
 _live_cortex: Optional[JeevesCortex] = None
 _live_control: Optional[ControlSurface] = None
 _JEEVES = None
+_LAST_LOAD: dict[str, Any] = {"ok": True, "loaded": False, "reason": "uninitialized"}
+
+
+class CortexPersistenceError(RuntimeError):
+    """Raised when configured durable cortex state cannot be restored."""
 
 
 def configured_own_path() -> Optional[Path]:
@@ -51,18 +56,48 @@ def own_path() -> Path:
 
 
 def get_live(bus: Optional[EventBus] = None) -> JeevesCortex:
-    """Get or create the process-lived cortex singleton (API wiring name)."""
-    global _live_cortex, _live_control
+    """Get or create the process-lived cortex singleton (API wiring name).
+
+    Disk restore is opt-in. Only an explicit ``SKELETON_OWN`` path is loaded,
+    so unconfigured genesis twins stay fresh. Configured restore is fail-closed:
+    a corrupt or unreadable snapshot does not boot a silent empty organism.
+    """
+    global _live_cortex, _live_control, _LAST_LOAD
     with _LOCK:
         if _live_cortex is None:
-            _live_cortex = JeevesCortex(bus=bus or EventBus())
-            _live_control = ControlSurface(_live_cortex, bus=bus)
-            path = own_path()
-            if path.exists():
-                try:
-                    _live_cortex.load(path)
-                except Exception:
-                    pass
+            cortex = JeevesCortex(bus=bus or EventBus())
+            control = ControlSurface(cortex, bus=bus)
+            if persistence_configured():
+                path = own_path()
+                if path.exists():
+                    try:
+                        cortex.load(path)
+                    except Exception as exc:
+                        _LAST_LOAD = {
+                            "ok": False,
+                            "loaded": False,
+                            "path": str(path),
+                            "reason": "restore_failed",
+                        }
+                        raise CortexPersistenceError(
+                            "failed to restore configured cortex state"
+                        ) from exc
+                    _LAST_LOAD = {"ok": True, "loaded": True, "path": str(path)}
+                else:
+                    _LAST_LOAD = {
+                        "ok": True,
+                        "loaded": False,
+                        "path": str(path),
+                        "reason": "missing_snapshot",
+                    }
+            else:
+                _LAST_LOAD = {
+                    "ok": True,
+                    "loaded": False,
+                    "reason": "persistence_not_configured",
+                }
+            _live_cortex = cortex
+            _live_control = control
         return _live_cortex
 
 
@@ -91,9 +126,19 @@ def attach(bus: EventBus) -> JeevesCortex:
 
 
 def status() -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "persistence_configured": persistence_configured(),
+        "last_load": dict(_LAST_LOAD),
+    }
     if _live_cortex is None:
-        return {"live": False, "events_captured": 0}
-    stats = _live_cortex.stats()
+        payload.update({"live": False, "events_captured": 0})
+        return payload
+    stats = _live_cortex.status()
+    if _live_control is not None:
+        control_stats = getattr(_live_control, "stats", None)
+        if callable(control_stats):
+            stats["control"] = control_stats()
+    stats.update(payload)
     stats["live"] = True
     return stats
 
@@ -117,11 +162,14 @@ def persist() -> dict:
         return {"saved": False, "reason": "cortex_stub"}
     path = own_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    return saver(path)
+    saved = saver(path)
+    saved["saved"] = True
+    saved["configured"] = persistence_configured()
+    return saved
 
 
 def reset_live(*, wipe_disk: bool = False) -> None:
-    global _live_cortex, _live_control, _JEEVES
+    global _live_cortex, _live_control, _JEEVES, _LAST_LOAD
     with _LOCK:
         path = own_path()
         if wipe_disk and path.exists():
@@ -129,3 +177,4 @@ def reset_live(*, wipe_disk: bool = False) -> None:
         _live_cortex = None
         _live_control = None
         _JEEVES = None
+        _LAST_LOAD = {"ok": True, "loaded": False, "reason": "reset"}

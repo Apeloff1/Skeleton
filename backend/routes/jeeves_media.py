@@ -102,9 +102,9 @@ async def _run_job(job_id: str, game_name: str, vtype: str):
         result = await asyncio.to_thread(produce_video, world, vtype, job_id, prog)
         prog.update(result)
         prog["status"] = "done"
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         prog["status"] = "error"
-        prog["error"] = str(e)[:300]
+        prog["error"] = "media_failed"
 
 
 @router.post("/video")
@@ -148,8 +148,8 @@ async def _run_presskit(job_id: str, game_name: str):
         world = _world(game_name)
         result = await asyncio.to_thread(produce_presskit, world, job_id, prog)
         prog.update(result); prog["status"] = "done"
-    except Exception as e:  # noqa: BLE001
-        prog["status"] = "error"; prog["error"] = str(e)[:300]
+    except Exception:  # noqa: BLE001
+        prog["status"] = "error"; prog["error"] = "media_failed"
 
 
 @router.post("/presskit")

@@ -178,11 +178,12 @@ async def jeeves_speak(req: SpeakRequest):
     except HTTPException:
         raise
     except Exception as e:
+        logger.warning("persona TTS failed: %s", type(e).__name__)
         return {
             "status":      "fallback_text_only",
             "context":     ctx,
             "voice":       voice,
             "speed":       speed,
             "spoken_text": spoken_text,
-            "error":       str(e)[:200],
+            "error":       "tts_failed",
         }

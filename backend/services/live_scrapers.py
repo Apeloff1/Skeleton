@@ -64,6 +64,57 @@ def _literal_ip(host: str):
     return ip_address(packed)
 
 
+def _is_public_unicast(address) -> bool:
+    """Accept only globally routable unicast addresses for outbound scraping."""
+    return bool(
+        address.is_global
+        and not address.is_multicast
+        and not address.is_unspecified
+        and not address.is_loopback
+        and not address.is_link_local
+        and not address.is_reserved
+        and not getattr(address, "is_site_local", False)
+    )
+
+
+async def _host_resolves_public(host: str) -> bool:
+    """Fail closed unless every current DNS answer is a globally routable IP.
+
+    This blocks hostnames that resolve directly to loopback/private/link-local
+    space. It is a pre-connect guard, not DNS pinning: the HTTP transport still
+    performs its own resolution, so callers must not treat this as complete
+    DNS-rebinding protection.
+    """
+    literal = _literal_ip(host)
+    if literal is not None:
+        return _is_public_unicast(literal)
+
+    try:
+        answers = await asyncio.to_thread(
+            socket.getaddrinfo,
+            host,
+            443,
+            type=socket.SOCK_STREAM,
+        )
+    except (OSError, UnicodeError):
+        return False
+
+    if not answers:
+        return False
+
+    seen: set[str] = set()
+    for answer in answers:
+        try:
+            raw = answer[4][0]
+            resolved = ip_address(raw.split("%", 1)[0])
+        except (IndexError, TypeError, ValueError):
+            return False
+        if not _is_public_unicast(resolved):
+            return False
+        seen.add(str(resolved))
+    return bool(seen)
+
+
 def _validated_scrape_url(url: str) -> tuple[str, str]:
     """Return normalized public HTTPS URL and hostname, or fail closed."""
     value = url.strip()
@@ -91,7 +142,7 @@ def _validated_scrape_url(url: str) -> tuple[str, str]:
     if normalized_host in _BLOCKED_SCRAPE_HOSTS or normalized_host.endswith(".localhost"):
         raise ValueError("scrape URL targets a blocked local endpoint")
     literal = _literal_ip(normalized_host)
-    if literal is not None and not literal.is_global:
+    if literal is not None and not _is_public_unicast(literal):
         raise ValueError("scrape URL targets a non-public IP address")
     return value, normalized_host
 
@@ -112,6 +163,10 @@ async def _polite_get(client: httpx.AsyncClient, url: str) -> str | None:
             current, host = _validated_scrape_url(current)
         except ValueError:
             log.warning("scrape URL rejected by outbound network policy")
+            return None
+
+        if not await _host_resolves_public(host):
+            log.warning("scrape hostname rejected by outbound DNS policy")
             return None
 
         await _respect_host_delay(host)

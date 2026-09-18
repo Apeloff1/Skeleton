@@ -119,14 +119,14 @@ class ReliableTriggerExecutor:
             return exc.error
         msg = str(exc)
         if "lock" in msg.lower():
-            return TriggerError(TriggerErrorCode.LOCKED, msg, retryable=False)
+            return TriggerError(TriggerErrorCode.LOCKED, "locked", retryable=False)
         if "timeout" in msg.lower():
-            return TriggerError(TriggerErrorCode.TIMEOUT, msg, retryable=True)
+            return TriggerError(TriggerErrorCode.TIMEOUT, "timeout", retryable=True)
         if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
-            return TriggerError(TriggerErrorCode.TRANSIENT, msg, retryable=True)
+            return TriggerError(TriggerErrorCode.TRANSIENT, "transient", retryable=True)
         if isinstance(exc, (ValueError, TypeError, KeyError)):
-            return TriggerError(TriggerErrorCode.VALIDATION, msg, retryable=False)
-        return TriggerError(TriggerErrorCode.UNKNOWN, msg, retryable=True)
+            return TriggerError(TriggerErrorCode.VALIDATION, "validation", retryable=False)
+        return TriggerError(TriggerErrorCode.UNKNOWN, "unknown", retryable=True)
 
     def run_sync(
         self,

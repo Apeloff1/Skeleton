@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -491,4 +492,4 @@ async def ai_generate_optimization_profile(request: AIOptimizationRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI optimization profile generation failed: {str(e)}")
+        raise internal_http_error("AI optimization profile generation failed", e) from None
