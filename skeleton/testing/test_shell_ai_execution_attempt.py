@@ -16,6 +16,7 @@ from skeleton.shells.ai.execution_attempt import (
     AttemptTrackingExecutionBackend,
     ExecutionAttemptConflict,
     ExecutionAttemptRecovery,
+    ExecutionAttemptSessionHead,
     ExecutionAttemptState,
 )
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
@@ -843,3 +844,262 @@ def test_stored_attempt_to_dict_includes_revision():
     data = stored.to_dict()
     assert data["revision"] == 1
     assert data["attempt"]["attempt_id"] == "seal-1"
+
+
+def test_attempt_reserve_creates_session_head():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    stored = reserve(store)
+    head = store.session_head(stored.attempt.session_id)
+    assert head is not None
+    assert head.session_id == stored.attempt.session_id
+    assert head.attempt_id == stored.attempt.attempt_id
+    assert head.authority_digest == stored.attempt.authority_digest
+
+
+def test_attempt_current_for_session_resolves_canonical_attempt():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    stored = reserve(store)
+    current = store.current_for_session(stored.attempt.session_id)
+    assert current == stored
+
+
+def test_attempt_current_for_unknown_session_is_none():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    assert store.current_for_session("missing") is None
+    assert store.session_head("missing") is None
+
+
+def test_attempt_session_head_survives_store_reconstruction():
+    backend = InMemoryFencedStore()
+    first = AIExecutionAttemptStore(backend)
+    stored = reserve(first)
+    second = AIExecutionAttemptStore(backend)
+    assert second.current_for_session("session") == stored
+    assert second.session_head("session").authority_digest == (
+        stored.attempt.authority_digest
+    )
+
+
+def test_attempt_identical_reserve_keeps_same_session_head():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    first = reserve(store)
+    head_before = store.session_head("session")
+    second = reserve(store)
+    head_after = store.session_head("session")
+    assert second == first
+    assert head_after == head_before
+
+
+def test_attempt_competing_attempt_for_same_session_is_rejected_and_abandoned():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    winner = reserve(
+        store,
+        attempt_id="winner",
+        execution_seal_id="winner",
+    )
+    with pytest.raises(
+        ExecutionAttemptConflict,
+        match="session already binds",
+    ):
+        reserve(
+            store,
+            attempt_id="loser",
+            execution_seal_id="loser",
+        )
+    assert store.current_for_session("session") == winner
+    loser = store.current("loser")
+    assert loser is not None
+    assert loser.attempt.state is ExecutionAttemptState.ABANDONED
+    assert loser.attempt.recovery is ExecutionAttemptRecovery.ABANDONED
+
+
+def test_attempt_different_sessions_can_reserve_independently():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    first = reserve(
+        store,
+        attempt_id="one",
+        execution_seal_id="one",
+        session_id="session-one",
+    )
+    second = reserve(
+        store,
+        attempt_id="two",
+        execution_seal_id="two",
+        session_id="session-two",
+    )
+    assert store.current_for_session("session-one") == first
+    assert store.current_for_session("session-two") == second
+
+
+def test_attempt_session_head_authority_tamper_is_detected():
+    backend = InMemoryFencedStore()
+    store = AIExecutionAttemptStore(backend)
+    stored = reserve(store)
+    key = store.session_key("session")
+    record = backend.get(store.namespace, key)
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=ExecutionAttemptSessionHead(
+            "session",
+            stored.attempt.attempt_id,
+            fp("x"),
+        ),
+    )
+    with pytest.raises(
+        ExecutionAttemptConflict,
+        match="authority mismatch",
+    ):
+        store.current_for_session("session")
+
+
+def test_attempt_session_head_missing_attempt_is_detected():
+    backend = InMemoryFencedStore()
+    store = AIExecutionAttemptStore(backend)
+    stored = reserve(store)
+    attempt_key = store.key(stored.attempt.attempt_id)
+    record = backend.get(store.namespace, attempt_key)
+    backend.delete(
+        store.namespace,
+        attempt_key,
+        expected_revision=record.revision,
+    )
+    with pytest.raises(
+        ExecutionAttemptConflict,
+        match="missing attempt",
+    ):
+        store.current_for_session("session")
+
+
+def test_attempt_session_head_wrong_session_is_detected():
+    backend = InMemoryFencedStore()
+    store = AIExecutionAttemptStore(backend)
+    stored = reserve(store)
+    key = store.session_key("session")
+    record = backend.get(store.namespace, key)
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=ExecutionAttemptSessionHead(
+            "other-session",
+            stored.attempt.attempt_id,
+            stored.attempt.authority_digest,
+        ),
+    )
+    with pytest.raises(RuntimeError, match="identity mismatch"):
+        store.session_head("session")
+
+
+def test_attempt_session_head_wrong_type_is_detected():
+    backend = InMemoryFencedStore()
+    store = AIExecutionAttemptStore(backend)
+    reserve(store)
+    key = store.session_key("session")
+    record = backend.get(store.namespace, key)
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value={"bad": "head"},
+    )
+    with pytest.raises(RuntimeError, match="type mismatch"):
+        store.session_head("session")
+
+
+def test_attempt_session_head_to_dict():
+    head = ExecutionAttemptSessionHead(
+        "session",
+        "attempt",
+        fp("a"),
+    )
+    assert head.to_dict() == {
+        "session_id": "session",
+        "attempt_id": "attempt",
+        "authority_digest": fp("a"),
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"session_id": ""},
+        {"attempt_id": ""},
+        {"authority_digest": "bad"},
+        {"session_id": "x" * 257},
+        {"attempt_id": "x" * 257},
+    ],
+)
+def test_attempt_session_head_validation(kwargs):
+    values = {
+        "session_id": "session",
+        "attempt_id": "attempt",
+        "authority_digest": fp("a"),
+    }
+    values.update(kwargs)
+    with pytest.raises(ValueError):
+        ExecutionAttemptSessionHead(**values)
+
+
+def test_attempt_session_key_is_stable_and_distinct():
+    assert (
+        AIExecutionAttemptStore.session_key("session")
+        == AIExecutionAttemptStore.session_key("session")
+    )
+    assert (
+        AIExecutionAttemptStore.session_key("session-a")
+        != AIExecutionAttemptStore.session_key("session-b")
+    )
+    assert AIExecutionAttemptStore.session_key("session").startswith(
+        "session:"
+    )
+
+
+@pytest.mark.parametrize("session_id", ["", "x" * 257])
+def test_attempt_session_key_validation(session_id):
+    with pytest.raises(ValueError, match="session_id"):
+        AIExecutionAttemptStore.session_key(session_id)
+
+
+def test_attempt_session_head_prevents_second_worker_authority_for_same_session():
+    backend = InMemoryFencedStore()
+    worker_one = AIExecutionAttemptStore(backend)
+    worker_two = AIExecutionAttemptStore(backend)
+    first = reserve(
+        worker_one,
+        attempt_id="worker-one-seal",
+        execution_seal_id="worker-one-seal",
+        worker_id="worker-one",
+    )
+    with pytest.raises(ExecutionAttemptConflict):
+        reserve(
+            worker_two,
+            attempt_id="worker-two-seal",
+            execution_seal_id="worker-two-seal",
+            worker_id="worker-two",
+        )
+    assert worker_two.current_for_session("session") == first
+
+
+def test_attempt_session_head_remains_after_terminal_success():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    stored = reserve(store)
+    boundary = store.enter_boundary(stored.attempt)
+    done = store.succeed(
+        boundary.attempt,
+        terminal_evidence_digest=fp("e"),
+    )
+    assert store.current_for_session("session") == done
+    assert store.session_head("session").attempt_id == "seal-1"
+
+
+def test_attempt_session_head_remains_after_abandon():
+    store = AIExecutionAttemptStore(InMemoryFencedStore())
+    stored = reserve(store)
+    abandoned = store.abandon(stored.attempt)
+    assert store.current_for_session("session") == abandoned
+    assert (
+        store.current_for_session("session").attempt.state
+        is ExecutionAttemptState.ABANDONED
+    )
