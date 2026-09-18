@@ -534,6 +534,7 @@ def test_live_external_force_prevents_sleep_before_accumulator_clear() -> None:
 
 def test_failed_solver_rolls_back_entire_tick_atomically() -> None:
     world = _zero_gravity_world()
+    world.add_body(RigidBody.static("ground", PlaneShape()))
     body = RigidBody.dynamic(
         "body",
         SphereShape(1.0),
@@ -680,12 +681,22 @@ def test_failure_after_contact_solver_restores_warm_cache_atomically() -> None:
             angular_damping=0.0,
         )
     )
+    world.add_body(
+        RigidBody.dynamic(
+            "anchor",
+            SphereShape(0.5),
+            position=Vec3(2.0, 0.5, 0.0),
+            linear_damping=0.0,
+            angular_damping=0.0,
+        )
+    )
+    world.add_joint(DistanceJoint("failing-joint", "ball", "anchor", rest_length=2.0))
     before_digest = world.state_digest
     before_cache = world.contact_cache_size()
     before_tick = world.tick
 
     class _FailingConstraintSolver:
-        def solve(self, bodies, joints, *, dt):
+        def solve(self, bodies, joints, *, dt, cache=None, tick=0):
             raise RuntimeError("constraint stage failure")
 
     world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
