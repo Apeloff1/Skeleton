@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from skeleton.jeeves.agent.epistemic_frontier import EpistemicFrontierEngine
 from skeleton.jeeves.agent.semantic_frontier import (
     LensCompositionEngine,
     LensInteractionKind,
@@ -582,6 +583,162 @@ def test_semantic_plane_activates_bridge_only_after_empirical_promotion() -> Non
     }
     assert after.factual_assertion_authorized is False
     assert after.causal_assertion_authorized is False
+
+
+def test_unvalidated_topology_candidate_becomes_research_obligation() -> None:
+    _, _, candidate, lab = _system()
+
+    obligations = lab.research_obligations(
+        limit=8,
+        minimum_candidate_score=0.0,
+    )
+    obligation = next(
+        item
+        for item in obligations
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+
+    assert obligation.metadata["status"] == "shadow"
+    assert obligation.evidence_coverage == 0.0
+    assert obligation.assumption_load == pytest.approx(0.85)
+    assert obligation.metadata["semantic_topology"] is True
+    assert "shared cues do not establish" in obligation.assumptions[0]
+
+    frontier = EpistemicFrontierEngine().discover((obligation,))
+    assert frontier.gaps
+    assert any(
+        gap.obligation_id == obligation.obligation_id
+        for gap in frontier.gaps
+    )
+
+
+def test_promoted_topology_bridge_leaves_research_debt_queue() -> None:
+    _, _, candidate, lab = _system()
+    _promote(lab, candidate)
+
+    obligations = lab.research_obligations(
+        limit=10_000,
+        minimum_candidate_score=0.0,
+    )
+
+    assert candidate.candidate_id not in {
+        item.metadata["candidate_id"] for item in obligations
+    }
+
+
+def test_ambiguous_active_bridge_surfaces_as_high_disagreement_obligation() -> None:
+    _, _, candidate, lab = _system()
+    _promote(
+        lab,
+        candidate,
+        kind=LensInteractionKind.REINFORCES,
+    )
+    for index, domain, run in (
+        (201, "film", "ambiguity-a"),
+        (202, "film", "ambiguity-b"),
+        (203, "game", "ambiguity-c"),
+        (204, "game", "ambiguity-d"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                kind=LensInteractionKind.CONFLICTS,
+                domain=domain,
+                run=run,
+            )
+        )
+    for index, domain, run in (
+        (301, "film", "ambiguity-control-a"),
+        (302, "game", "ambiguity-control-b"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                kind=LensInteractionKind.CONFLICTS,
+                probability=0.05,
+                outcome=False,
+                domain=domain,
+                run=run,
+                negative_control=True,
+            )
+        )
+
+    obligation = next(
+        item
+        for item in lab.research_obligations(
+            limit=10_000,
+            minimum_candidate_score=0.0,
+        )
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+
+    assert obligation.metadata["status"] == "ambiguous_active"
+    assert obligation.model_disagreement == 1.0
+    assert obligation.contradiction_strength == 1.0
+    assert set(obligation.metadata["active_kinds"]) == {
+        LensInteractionKind.REINFORCES.value,
+        LensInteractionKind.CONFLICTS.value,
+    }
+
+
+def test_rejected_bridge_is_suppressed_unless_researcher_requests_it() -> None:
+    _, _, candidate, lab = _system()
+    for index, domain, run in (
+        (1, "film", "reject-a"),
+        (2, "film", "reject-b"),
+        (3, "game", "reject-c"),
+        (4, "game", "reject-d"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=False,
+                domain=domain,
+                run=run,
+            )
+        )
+    for index, domain in ((101, "film"), (102, "game")):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.05,
+                outcome=False,
+                domain=domain,
+                run=f"reject-control-{index}",
+                negative_control=True,
+            )
+        )
+
+    default_ids = {
+        item.metadata["candidate_id"]
+        for item in lab.research_obligations(
+            limit=10_000,
+            minimum_candidate_score=0.0,
+        )
+    }
+    requested = lab.research_obligations(
+        limit=10_000,
+        minimum_candidate_score=0.0,
+        include_rejected=True,
+    )
+    rejected = next(
+        item
+        for item in requested
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+
+    assert candidate.candidate_id not in default_ids
+    assert rejected.metadata["status"] == "rejected"
+    assert rejected.contradiction_strength >= 0.65
 
 
 def test_topology_learning_state_round_trip_preserves_promoted_rules() -> None:
