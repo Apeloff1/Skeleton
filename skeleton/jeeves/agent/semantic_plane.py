@@ -37,6 +37,7 @@ from .semantic_frontier import (
     LensCompositionEngine,
     LensInteractionKind,
     SemanticComposition,
+    default_interaction_rules,
 )
 from .semantic_governance_bridge import (
     SemanticGovernanceBridge,
@@ -302,7 +303,13 @@ class SemanticLensPlane:
         self.router = router or MaximalLensRouter(self.registry)
         self.governance = governance or SemanticGovernanceBridge()
         self.perpendicular = perpendicular or PerpendicularExpansionPlanner(self.registry)
-        self.composition = composition or LensCompositionEngine((*plane_interaction_rules(), *depth_interaction_rules()))
+        self.composition = composition or LensCompositionEngine(
+            (
+                *default_interaction_rules(),
+                *plane_interaction_rules(),
+                *depth_interaction_rules(),
+            )
+        )
         self.hypergraph = hypergraph or SemanticLensHypergraph()
         self.predictive = predictive or SemanticPredictiveModel()
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
@@ -1474,7 +1481,11 @@ class SemanticLensPlane:
                         rule.symmetric,
                         rule.tangent_axis_hint,
                     )
-                    for rule in (*plane_interaction_rules(), *depth_interaction_rules())
+                    for rule in (
+                        *default_interaction_rules(),
+                        *plane_interaction_rules(),
+                        *depth_interaction_rules(),
+                    )
                 ],
                 "policy": {
                     "max_lenses": self.policy.max_lenses,
