@@ -34,3 +34,10 @@ def test_event_drains_remain_scoped_per_pr_branch() -> None:
     assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
     assert "WORKFLOW_RUN_PR_HINTS" in text
     assert "pull_requests[0]" not in text
+
+
+def test_pr_drain_recovery_uses_general_runner_capacity() -> None:
+    text = PR_DRAIN.read_text(encoding="utf-8")
+
+    assert text.count("runs-on: ubuntu-latest") == 2
+    assert "runs-on: ubuntu-24.04-arm" not in text

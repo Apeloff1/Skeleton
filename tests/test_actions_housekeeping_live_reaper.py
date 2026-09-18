@@ -56,19 +56,28 @@ def test_live_reaper_preserves_security_and_unlinked_runs() -> None:
     assert 'pull_request) ;;' in workflow
 
 
-def test_live_reaper_fails_closed_on_api_or_cancel_errors() -> None:
+def test_live_reaper_preserves_ambiguous_targets_without_aborting_housekeeping() -> None:
     workflow = _workflow()
 
-    assert 'failed=$((failed + 1))' in workflow
-    assert 'if (( failed > 0 )); then' in workflow
-    assert 'exit 1' in workflow
-    assert '[[ "$id" != "$GITHUB_RUN_ID" ]] || continue' in workflow
-    assert '[[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]' in workflow
+    live_reaper = workflow.split(
+        "      - name: Cancel obsolete live PR runs\n", 1
+    )[1].split(
+        "      - name: Prune only cold Actions caches\n", 1
+    )[0]
+
+    assert 'preserved_errors=$((preserved_errors + 1))' in live_reaper
+    assert 'if (( preserved_errors > 0 )); then' in live_reaper
+    assert '::warning::Live-run reaper preserved' in live_reaper
+    assert 'exit 1' not in live_reaper
+    assert '[[ "$id" != "$GITHUB_RUN_ID" ]] || continue' in live_reaper
+    assert '[[ ! "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]' in live_reaper
+    assert "return \"$status\"" in live_reaper
 
 
-def test_housekeeping_drain_uses_independent_arm_pool_and_supersedes_itself() -> None:
+def test_housekeeping_drain_uses_general_recovery_pool_and_supersedes_itself() -> None:
     workflow = _workflow()
 
-    assert "runs-on: ubuntu-24.04-arm" in workflow
+    assert "runs-on: ubuntu-latest" in workflow
+    assert "ubuntu-24.04-arm" not in workflow
     assert "group: actions-housekeeping-cli-${{ github.repository }}" in workflow
     assert "cancel-in-progress: true" in workflow

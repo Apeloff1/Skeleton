@@ -9,6 +9,7 @@ quality gate.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from collections.abc import Iterable
 import os
 from pathlib import Path
@@ -166,6 +167,53 @@ def _assignment_pairs(scope: ast.AST) -> Iterable[tuple[set[str], ast.AST]]:
                 yield names, node.value
 
 
+def _parameter_names(scope: ast.AST) -> set[str]:
+    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        return set()
+    args = scope.args
+    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
+    if args.vararg is not None:
+        names.add(args.vararg.arg)
+    if args.kwarg is not None:
+        names.add(args.kwarg.arg)
+    return names
+
+
+def _stable_tarfile_module_aliases(
+    scope: ast.AST,
+    aliases: dict[str, str],
+) -> dict[str, str]:
+    """Resolve stable local aliases of the tarfile module without guessing."""
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    current = dict(aliases)
+    inferred: dict[str, str] = {}
+
+    for _ in range(4):
+        changed = False
+        for names, value in _assignment_pairs(scope):
+            if not isinstance(value, (ast.Name, ast.Attribute)):
+                continue
+            if canonical_name(value, current) != "tarfile":
+                continue
+            for name in names:
+                if "." in name or stores.get(name, 0) != 1 or name in parameters:
+                    continue
+                if current.get(name) == "tarfile":
+                    continue
+                current[name] = "tarfile"
+                inferred[name] = "tarfile"
+                changed = True
+        if not changed:
+            break
+    return inferred
+
+
 def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
     """Infer simple aliases to tarfile constructors, extraction methods, and data_filter."""
     inferred: dict[str, str] = {}
@@ -217,6 +265,7 @@ def _tarfile_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]
 
 def _scope_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
     aliases = dict(import_map)
+    aliases.update(_stable_tarfile_module_aliases(scope, aliases))
     for _ in range(4):
         before = dict(aliases)
         aliases.update(_callable_aliases(scope, aliases))
