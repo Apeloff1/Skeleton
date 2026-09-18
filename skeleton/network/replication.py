@@ -991,7 +991,15 @@ class Authority:
                 },
             )
         retained = self._core._frame(ack.last_applied_sequence)
-        if retained is not None and ack.last_applied_digest != retained.digest:
+        if retained is None:
+            raise HistoryExhaustedError(
+                "ack applied sequence is outside retained authority history",
+                context={
+                    "sequence": ack.last_applied_sequence,
+                    "retained": self._core._retained_sequences(),
+                },
+            )
+        if ack.last_applied_digest != retained.digest:
             raise ReplicationError(
                 "ack applied digest does not match retained authority history",
                 context={"sequence": ack.last_applied_sequence},
@@ -1391,8 +1399,12 @@ def _require_int(name: str, value: Any, *, minimum: int, maximum: int | None = N
 
 
 def _require_digest(value: Any) -> str:
-    if not isinstance(value, str) or len(value) != 64:
-        raise SerializationError("digest must be a 64-character hex digest")
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        raise SerializationError("digest must be a 64-character lowercase hex digest")
     return value
 
 
