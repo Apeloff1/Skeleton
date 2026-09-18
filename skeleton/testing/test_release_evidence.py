@@ -160,6 +160,18 @@ def valid_observed() -> dict[str, bytes]:
     return {"wheel": WHEEL}
 
 
+def test_non_string_artifact_and_evidence_ids_fail_closed() -> None:
+    bad_artifact = _artifact("wheel", "skeleton-16.0.0-py3-none-any.whl", WHEEL)
+    bad_artifact["artifact_id"] = 7
+    with pytest.raises(EvidenceSchemaError, match="artifact_id"):
+        build_evidence(**valid_kwargs(artifacts=[bad_artifact]))
+
+    bad_test = _test()
+    bad_test["evidence_id"] = 7
+    with pytest.raises(EvidenceSchemaError, match="test evidence id"):
+        build_evidence(**valid_kwargs(test_evidence=[bad_test]))
+
+
 def test_schema_version_is_stable_and_canonical() -> None:
     evidence = valid_evidence()
     payload = json.loads(serialize_evidence(evidence))
