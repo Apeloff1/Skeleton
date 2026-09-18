@@ -8,6 +8,11 @@ from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
 from .ccd import ContinuousCollisionDetector, TOIEvent
+from .character import (
+    CharacterGroundState,
+    CharacterMoveResult,
+    KinematicCapsuleController,
+)
 from .collision import (
     ContactManifold,
     SweepAndPruneBroadPhase,
@@ -432,6 +437,52 @@ class PhysicsWorld:
             if (hit := sphere_cast_body(ray, radius, body)) is not None
         ]
         return sort_hits(hits)
+
+    def move_character(
+        self,
+        controller: KinematicCapsuleController,
+        displacement: Vec3,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterMoveResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.move(
+            displacement,
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+        )
+
+    def probe_character_ground(
+        self,
+        controller: KinematicCapsuleController,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+        distance: float | None = None,
+    ) -> CharacterGroundState:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.ground_probe(
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+            distance=distance,
+        )
 
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
         shape = body.shape
