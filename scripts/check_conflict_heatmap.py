@@ -275,9 +275,8 @@ def classify_heatmap(document: object) -> HeatmapReport:
 
     buckets: dict[str, list[SurfaceRow]] = {}
     for row in rows:
-        if row.cell is None:
-            continue
-        buckets.setdefault(row.cell, []).append(row)
+        key = row.cell if row.cell is not None else "(unclassified)"
+        buckets.setdefault(key, []).append(row)
 
     cells: list[HeatCell] = []
     for key in sorted(buckets):
@@ -334,11 +333,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("path", type=Path, help="conflict-heatmap JSON fixture of {path, pr, updated}")
     args = parser.parse_args(argv)
     report = classify_heatmap(load_document(args.path))
-    counts = report.counts
+    cell_counts = report.counts
+    surface_counts = {name: 0 for name in CLASSES}
+    for row in report.surfaces:
+        surface_counts[row.classification] += 1
     print(
-        "Conflict heatmap: "
-        + ", ".join(f"{name}={counts[name]}" for name in CLASSES)
-        + f" cells={len(report.cells)}"
+        "Conflict heatmap: surfaces "
+        + ", ".join(f"{name}={surface_counts[name]}" for name in CLASSES)
+        + "; cells "
+        + ", ".join(f"{name}={cell_counts[name]}" for name in CLASSES)
     )
     for cell in report.cells:
         prs = ",".join(str(item) for item in cell.prs) or "-"

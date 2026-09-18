@@ -102,6 +102,7 @@ def test_unknown_rows_and_cells_fail_closed() -> None:
         )
     )
     assert all(row.classification == "unknown" for row in report.surfaces)
+    assert any(cell.key == "(unclassified)" and cell.classification == "unknown" for cell in report.cells)
     assert report.errors
     assert any("conflict-heatmap unknown path" in item for item in report.errors)
     assert any("conflict-heatmap unknown pr" in item for item in report.errors)
@@ -235,9 +236,8 @@ def test_cli_accepts_idle_and_busy_fixture(tmp_path: Path, capsys) -> None:
     assert main([str(path)]) == 0
     out = capsys.readouterr().out
     assert "Conflict heatmap:" in out
-    assert "busy=1" in out
-    assert "idle=1" in out
-    assert "unknown=0" in out
+    assert "surfaces busy=1, idle=1, unknown=0" in out
+    assert "cells busy=1, idle=1, unknown=0" in out
     assert "skeleton/api  busy" in out
 
 
