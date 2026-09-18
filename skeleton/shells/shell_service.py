@@ -58,6 +58,11 @@ class ShellService:
         self.executor = executor
         self.clock = clock
         self.receipts = receipts or executor.receipt_chain or ReceiptChain()
+        # Keep service evidence and executor evidence on the same chain. This is
+        # safe because ShellExecutor intentionally exposes receipt_chain as its
+        # configurable evidence sink and construction starts no background work.
+        if executor.receipt_chain is None:
+            executor.receipt_chain = self.receipts
         self.cancellations = CancellationRegistry(clock=clock)
         self.concurrency = WeightedConcurrency(concurrency_capacity, clock=clock)
         self.budgets = CommandBudgets(clock=clock)
