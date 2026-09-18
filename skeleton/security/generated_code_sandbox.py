@@ -66,7 +66,7 @@ _SECRET_PATH_MARKERS = (
     "authorized_keys",
 )
 
-_FS_MODULES = frozenset({"os", "pathlib", "shutil", "tempfile", "aiofiles"})
+_FS_MODULES = frozenset({"os", "pathlib", "shutil", "tempfile", "aiofiles", "io"})
 _NET_MODULES = frozenset({
     "socket", "ssl", "http", "urllib", "requests", "httpx", "aiohttp",
     "ftplib", "smtplib", "telnetlib", "webbrowser",
@@ -81,7 +81,7 @@ _UNSAFE_MODULES = frozenset({
 })
 
 _FS_CALLS = frozenset({
-    "open", "os.open", "os.remove", "os.unlink", "os.rename", "os.replace",
+    "open", "builtins.open", "__builtins__.open", "io.open", "io.FileIO", "os.open", "os.fdopen", "os.remove", "os.unlink", "os.rename", "os.replace",
     "os.mkdir", "os.makedirs", "os.rmdir", "os.removedirs", "os.listdir",
     "os.scandir", "os.walk", "os.chmod", "os.chown", "os.link", "os.symlink",
     "os.readlink", "os.truncate", "pathlib.Path", "shutil.copy", "shutil.copy2",
@@ -103,7 +103,11 @@ _PROC_CALLS = frozenset({
     "multiprocessing.Process", "multiprocessing.Pool",
     "pty.spawn", "ctypes.CDLL", "ctypes.PyDLL",
 })
-_EVAL_CALLS = frozenset({"eval", "exec", "compile", "__import__", "builtins.eval", "builtins.exec"})
+_EVAL_CALLS = frozenset({
+    "eval", "exec", "compile", "__import__",
+    "builtins.eval", "builtins.exec", "builtins.compile", "builtins.__import__",
+    "__builtins__.eval", "__builtins__.exec", "__builtins__.compile", "__builtins__.__import__",
+})
 _TRACKED_CALLABLES = frozenset().union(
     _FS_CALLS,
     _NET_CALLS,
@@ -605,19 +609,21 @@ def _stable_callable_aliases(
 def _inspect_tool_json(text: str) -> list[Operation]:
     try:
         payload = json.loads(text)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
+        message = exc.msg if isinstance(exc, json.JSONDecodeError) else "nesting too deep"
         raise SandboxPolicyError(
             "tool payload failed to parse",
-            context={"msg": exc.msg},
+            context={"msg": message},
         ) from exc
     if not isinstance(payload, Mapping):
         raise SandboxPolicyError("tool payload must be an object")
     operations: list[Operation] = []
-    if "capabilities" in payload or "grants" in payload or "policy" in payload:
+    policy_path = _nested_policy_key(payload)
+    if policy_path is not None:
         operations.append(
             Operation(
                 OperationKind.POLICY_MUTATE,
-                "self-grant",
+                policy_path,
                 None,
                 "tool payload attempted policy mutation",
             )
@@ -631,6 +637,45 @@ def _inspect_tool_json(text: str) -> list[Operation]:
             Operation(OperationKind.PROCESS, name, SandboxCapability.PROCESS, "sensitive tool name")
         )
     return operations
+
+
+def _nested_policy_key(payload: object) -> Optional[str]:
+    """Return the first nested policy/grant key, while bounding JSON traversal."""
+    sensitive = frozenset(
+        {
+            "capability",
+            "capabilities",
+            "grant",
+            "grants",
+            "permission",
+            "permissions",
+            "policy",
+            "scope",
+            "scopes",
+        }
+    )
+    stack: list[tuple[str, object]] = [("$", payload)]
+    visits = 0
+    limit = MAX_OPERATIONS * 8
+    while stack:
+        path, value = stack.pop()
+        visits += 1
+        if visits > limit:
+            raise SandboxPolicyError(
+                "tool payload structure exceeds bound",
+                context={"visits": visits, "limit": limit},
+            )
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                key_text = str(key)
+                child_path = f"{path}.{key_text}"
+                if key_text.strip().lower() in sensitive:
+                    return child_path
+                stack.append((child_path, child))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                stack.append((f"{path}[{index}]", child))
+    return None
 
 
 def _inspect_prompt(text: str) -> list[Operation]:
@@ -705,7 +750,25 @@ def _import_operations(name: str) -> list[Operation]:
 
 def _call_operations(node: ast.Call, aliases: Mapping[str, str]) -> list[Operation]:
     name = _dotted_name(node.func, aliases)
+    if name.endswith(".__call__"):
+        base_name = name[: -len(".__call__")]
+        if base_name in _TRACKED_CALLABLES:
+            name = base_name
     operations: list[Operation] = []
+    for argument in (*node.args, *(item.value for item in node.keywords)):
+        reference = _sensitive_callable_reference(argument, aliases)
+        if reference is not None:
+            operations.append(reference)
+    if not name or name == "<dynamic>":
+        operations.append(
+            Operation(
+                OperationKind.UNSAFE_EVAL,
+                "<dynamic-callable>",
+                None,
+                "callable provenance cannot be proven",
+            )
+        )
+        return operations
     if name in _EVAL_CALLS or name in {"getattr", "builtins.getattr"}:
         operations.append(Operation(OperationKind.UNSAFE_EVAL, name or "<dynamic>", None, "eval/getattr"))
         return operations
@@ -739,6 +802,56 @@ def _call_operations(node: ast.Call, aliases: Mapping[str, str]) -> list[Operati
     if name in {"sandbox.grant", "GeneratedCodeSandbox.grant"}:
         operations.append(Operation(OperationKind.POLICY_MUTATE, name, None, "grant call"))
     return operations
+
+
+def _sensitive_callable_reference(
+    node: ast.AST,
+    aliases: Mapping[str, str],
+) -> Optional[Operation]:
+    """Fail closed when a sensitive callable is handed to higher-order code."""
+    name = _dotted_name(node, aliases)
+    if name in _FS_CALLS:
+        return Operation(
+            OperationKind.FS_READ,
+            "<dynamic>",
+            SandboxCapability.FILESYSTEM,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _NET_CALLS:
+        return Operation(
+            OperationKind.NETWORK,
+            "<dynamic>",
+            SandboxCapability.NETWORK,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _PROC_CALLS:
+        return Operation(
+            OperationKind.PROCESS,
+            "<dynamic>",
+            SandboxCapability.PROCESS,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _EVAL_CALLS or name in {
+        "getattr",
+        "builtins.getattr",
+        "importlib.import_module",
+        "sandbox.grant",
+        "GeneratedCodeSandbox.grant",
+    }:
+        return Operation(
+            OperationKind.UNSAFE_EVAL,
+            name or "<dynamic>",
+            None,
+            "sensitive callable reference",
+        )
+    if name in {"os.getenv", "os.environ.get", "os.environ.__getitem__"}:
+        return Operation(
+            OperationKind.SECRET_READ,
+            "<dynamic>",
+            SandboxCapability.SECRETS,
+            f"sensitive callable reference: {name}",
+        )
+    return None
 
 
 def _dotted_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
