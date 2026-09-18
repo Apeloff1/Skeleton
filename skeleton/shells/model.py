@@ -170,15 +170,27 @@ class ResourceRequest:
     concurrency_weight: int = 1
 
     def __post_init__(self) -> None:
-        if self.timeout_seconds is not None and self.timeout_seconds <= 0:
-            raise ShellModelError("timeout_seconds must be positive")
-        if self.max_output_bytes is not None and self.max_output_bytes <= 0:
-            raise ShellModelError("max_output_bytes must be positive")
-        if self.max_input_bytes is not None and self.max_input_bytes < 0:
-            raise ShellModelError("max_input_bytes may not be negative")
-        if not isinstance(self.cpu_weight, int) or self.cpu_weight <= 0 or self.cpu_weight > 1024:
+        if self.timeout_seconds is not None and (
+            isinstance(self.timeout_seconds, bool)
+            or not isinstance(self.timeout_seconds, (int, float))
+            or self.timeout_seconds <= 0
+        ):
+            raise ShellModelError("timeout_seconds must be a positive number")
+        if self.max_output_bytes is not None and (
+            isinstance(self.max_output_bytes, bool)
+            or not isinstance(self.max_output_bytes, int)
+            or self.max_output_bytes <= 0
+        ):
+            raise ShellModelError("max_output_bytes must be a positive integer")
+        if self.max_input_bytes is not None and (
+            isinstance(self.max_input_bytes, bool)
+            or not isinstance(self.max_input_bytes, int)
+            or self.max_input_bytes < 0
+        ):
+            raise ShellModelError("max_input_bytes must be a non-negative integer")
+        if isinstance(self.cpu_weight, bool) or not isinstance(self.cpu_weight, int) or self.cpu_weight <= 0 or self.cpu_weight > 1024:
             raise ShellModelError("cpu_weight outside supported bounds")
-        if not isinstance(self.concurrency_weight, int) or self.concurrency_weight <= 0 or self.concurrency_weight > 1024:
+        if isinstance(self.concurrency_weight, bool) or not isinstance(self.concurrency_weight, int) or self.concurrency_weight <= 0 or self.concurrency_weight > 1024:
             raise ShellModelError("concurrency_weight outside supported bounds")
 
     def to_dict(self) -> dict[str, Any]:
@@ -253,6 +265,20 @@ class ShellInvocation:
         return replace(self, intent=replace(self.intent, **updates))
 
     def public_shape(self) -> dict[str, Any]:
+        """Return a deterministic, secret-minimized identity shape.
+
+        Argument, environment, stdin, reason, and metadata values are represented
+        by byte counts/digests rather than raw values.  The shape can therefore be
+        persisted in receipts without becoming a second credential store.
+        """
+
+        argument_shape = [
+            {
+                "bytes": len(value.encode("utf-8")),
+                "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+            }
+            for value in self.arguments
+        ]
         env_shape = {
             key: {
                 "bytes": len(value.encode("utf-8")),
@@ -266,14 +292,31 @@ class ShellInvocation:
                 "bytes": len(self.stdin),
                 "sha256": hashlib.sha256(self.stdin).hexdigest(),
             }
+        reason_bytes = self.intent.reason.encode("utf-8")
+        metadata_json = canonical_json(dict(self.intent.metadata)).encode("utf-8")
+        intent_shape = {
+            "execution_class": self.intent.execution_class.value,
+            "correlation_id": self.intent.correlation_id,
+            "actor": self.intent.actor,
+            "tags": sorted(self.intent.tags),
+            "reason": {
+                "bytes": len(reason_bytes),
+                "sha256": hashlib.sha256(reason_bytes).hexdigest(),
+            },
+            "metadata": {
+                "bytes": len(metadata_json),
+                "sha256": hashlib.sha256(metadata_json).hexdigest(),
+            },
+        }
         return {
             "identity": self.identity.key,
-            "arguments": list(self.arguments),
+            "argument_count": len(self.arguments),
+            "arguments": argument_shape,
             "cwd": self.cwd,
             "environment": env_shape,
             "stdin": stdin_shape,
             "resources": self.resources.to_dict(),
-            "intent": self.intent.to_dict(),
+            "intent": intent_shape,
             "allowed_returncodes": sorted(self.allowed_returncodes),
             "stdout": self.stdout.value,
             "stderr": self.stderr.value,
@@ -352,6 +395,13 @@ class ExecutionSummary:
 def invocation_from_dict(payload: Mapping[str, Any]) -> ShellInvocation:
     if not isinstance(payload, Mapping):
         raise ShellModelError("invocation payload must be an object")
+    allowed_fields = {
+        "command", "arguments", "cwd", "environment", "resources", "intent",
+        "allowed_returncodes", "stdout", "stderr", "stdin",
+    }
+    unknown = sorted(str(key) for key in payload if key not in allowed_fields)
+    if unknown:
+        raise ShellModelError(f"unknown invocation field: {unknown[0]}")
     identity = CommandIdentity.parse(str(payload.get("command", "")))
     args = payload.get("arguments", ())
     if not isinstance(args, Sequence) or isinstance(args, (str, bytes, bytearray)):
