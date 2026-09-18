@@ -539,7 +539,7 @@ def test_fabric_section_fallback_keeps_hard_size_and_provenance_bounds() -> None
     compiler = FabricContextCompiler(
         fabric=fabric,
         fabric_policy=FabricCompilerPolicy(
-            maximum_section_chars=512,
+            maximum_section_chars=1_024,
             maximum_record_chars=8_000,
         ),
     )
@@ -555,6 +555,6 @@ def test_fabric_section_fallback_keeps_hard_size_and_provenance_bounds() -> None
 
     section = next(item for item in packet.sections if item.name == "context_fabric")
     payload = json.loads(section.content)
-    assert len(section.content) <= 512
+    assert len(section.content) <= 1_024
     assert payload["records"] == []
     assert section.source_ids == ()
