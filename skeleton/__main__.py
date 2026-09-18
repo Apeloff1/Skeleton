@@ -46,6 +46,10 @@ Commands:
                 Use `capabilities --authz-audit` for mutating vs auth_required
                 Use `capabilities --dev-audit` for opt-in public-dev HMAC prefixes
                 Use `capabilities --token-audit` for SKELETON_PUBLIC_DEV_SURFACES tokens
+                Use `capabilities --mode-audit` for SessionMode core vs llm_core identity
+                Use `capabilities --codename-audit` for advertised codename identity
+                Use `capabilities --cver-audit` for command CONTRACT_VERSION identity
+                Use `capabilities --ttl-audit` for HMAC/idempotency TTL identity
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -100,6 +104,10 @@ def _cmd_capabilities(rest: List[str]) -> int:
         authz_audit_snapshot,
         open_dev_audit_snapshot,
         dev_token_audit_snapshot,
+        session_mode_audit_snapshot,
+        codename_audit_snapshot,
+        contract_version_audit_snapshot,
+        ttl_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -135,6 +143,10 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "authz_audit": {"--authz-audit", "authz-audit", "--authz_audit", "authz_audit"},
         "dev_audit": {"--dev-audit", "dev-audit", "--dev_audit", "dev_audit"},
         "token_audit": {"--token-audit", "token-audit", "--token_audit", "token_audit"},
+        "mode_audit": {"--mode-audit", "mode-audit", "--mode_audit", "mode_audit"},
+        "codename_audit": {"--codename-audit", "codename-audit", "--codename_audit", "codename_audit"},
+        "cver_audit": {"--cver-audit", "cver-audit", "--cver_audit", "cver_audit"},
+        "ttl_audit": {"--ttl-audit", "ttl-audit", "--ttl_audit", "ttl_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -146,7 +158,15 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "token_audit":
+    if view == "ttl_audit":
+        payload = ttl_audit_snapshot()
+    elif view == "cver_audit":
+        payload = contract_version_audit_snapshot()
+    elif view == "codename_audit":
+        payload = codename_audit_snapshot()
+    elif view == "mode_audit":
+        payload = session_mode_audit_snapshot()
+    elif view == "token_audit":
         payload = dev_token_audit_snapshot()
     elif view == "dev_audit":
         payload = open_dev_audit_snapshot()

@@ -179,6 +179,7 @@ def test_idempotency_guard_replays_recorded_response():
     assert guard.replay(headers) == payload
     assert guard.replay({}) is None     # no header → never replays
     assert guard.replay({IDEMPOTENCY_HEADER: "other"}) is None
+    assert guard.replay({"x-idempotency-key": "client-key-1"}) == payload
 
 
 # ── quad retriever (bus event shape fix + genesis wiring) ────────────────

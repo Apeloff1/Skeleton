@@ -4,6 +4,21 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-60..F-67 idempotency headers, bool TTL/rate, era allow-list, identity audits
+
+- IdempotencyGuard header lookup is case-insensitive so Starlette-lowercased
+  `x-idempotency-key` matches; `IDEMPOTENCY_HEADER` is the canonical name.
+- `mint_seal` rejects bool/non-int `ttl_secs` so `True` cannot mint a 1-second seal.
+- API `RateLimiter` rejects bool capacity, refill, and token costs; `float(True)`
+  is no longer a 1.0 bucket.
+- HTTP `jeeves/bind-era` allow-lists `list_eras()` so free-text eras 422.
+- Additive `session_mode_audit` locks core vs llm_core SessionMode string values.
+- Additive `codename_audit` locks advertised `Skeleton` identity.
+- Additive `contract_version_audit` locks command `CONTRACT_VERSION` `1.0`.
+- Additive `ttl_audit` locks HMAC/idempotency default TTL at 300 seconds.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
 ## 2026-09-18 — F-52..F-59 header bounds, actor weight, and identity audits
 
 - `install_gate` now mounts `HeaderBoundMiddleware` outermost so oversized

@@ -1658,3 +1658,226 @@ def public_dev_surface_tokens() -> list[str]:
     return []
 
 
+def enum_str_assignments(module: str, class_name: str) -> list[dict[str, str]]:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, str]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != class_name:
+            continue
+        for child in node.body:
+            member = ""
+            value: ast.AST | None = None
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name):
+                        member = target.id
+                        value = child.value
+            elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name):
+                member = child.target.id
+                value = child.value
+            if member and isinstance(value, ast.Constant) and isinstance(value.value, str):
+                rows.append({"member": member, "value": value.value})
+        break
+    return rows
+
+
+def session_mode_identity_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for module in ("skeleton.jeeves.core", "skeleton.jeeves.llm_core"):
+        for item in enum_str_assignments(module, "SessionMode"):
+            rows.append(
+                {
+                    "source": f"{module}:SessionMode.{item['member']}",
+                    "member": item["member"],
+                    "value": item["value"],
+                }
+            )
+    return rows
+
+
+AUDITED_CODENAME_NAMES = (
+    ("skeleton", "__codename__"),
+    ("skeleton.architecture", "CODENAME"),
+    ("skeleton.setup_config", "CODENAME"),
+)
+
+
+def nested_handler_return_str(module: str, outer: str, key: str) -> str | None:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != outer:
+            continue
+        for child in node.body:
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for stmt in child.body:
+                if not isinstance(stmt, ast.Return) or not isinstance(stmt.value, ast.Dict):
+                    continue
+                for dict_key, dict_value in zip(stmt.value.keys, stmt.value.values):
+                    if not isinstance(dict_key, ast.Constant) or dict_key.value != key:
+                        continue
+                    if isinstance(dict_value, ast.Constant) and isinstance(dict_value.value, str):
+                        return dict_value.value
+                break
+        break
+    return None
+
+
+def codename_identity_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for module, name in AUDITED_CODENAME_NAMES:
+        rows.append(
+            {
+                "source": f"{module}:{name}",
+                "value": assigned_str_constant(parse_module_tree(module), name) or "",
+            }
+        )
+    application = nested_handler_return_str(
+        "skeleton.application.runtime_commands",
+        "_configuration_handler",
+        "application",
+    )
+    rows.append(
+        {
+            "source": "skeleton.application.runtime_commands:configuration.application",
+            "value": application or "",
+        }
+    )
+    return rows
+
+
+AUDITED_CONTRACT_VERSION_NAMES = (
+    ("skeleton.application.command_contracts", "CONTRACT_VERSION"),
+)
+
+
+def contract_version_identity_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for module, name in AUDITED_CONTRACT_VERSION_NAMES:
+        rows.append(
+            {
+                "source": f"{module}:{name}",
+                "value": assigned_str_constant(parse_module_tree(module), name) or "",
+            }
+        )
+    advertised = nested_handler_return_str(
+        "skeleton.application.runtime_commands",
+        "_configuration_handler",
+        "command_contract_version",
+    )
+    if advertised is not None:
+        rows.append(
+            {
+                "source": "skeleton.application.runtime_commands:configuration.command_contract_version",
+                "value": advertised,
+            }
+        )
+    return rows
+
+
+def _numeric_constant(node: ast.AST | None) -> int | float | None:
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        inner = _numeric_constant(node.operand)
+        return None if inner is None else -inner
+    if (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, (int, float))
+        and not isinstance(node.value, bool)
+    ):
+        return node.value
+    return None
+
+
+def assigned_numeric_constant(tree: ast.AST | None, name: str) -> int | float | None:
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        value: ast.AST | None = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            value = node.value
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    value = node.value
+        number = _numeric_constant(value)
+        if number is not None:
+            return number
+    return None
+
+
+def class_field_numeric_default(module: str, class_name: str, attr: str) -> int | float | None:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != class_name:
+            continue
+        for child in node.body:
+            value: ast.AST | None = None
+            if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and child.target.id == attr:
+                value = child.value
+            elif isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name) and target.id == attr:
+                        value = child.value
+            number = _numeric_constant(value)
+            if number is not None:
+                return number
+        break
+    return None
+
+
+def function_arg_numeric_default(
+    module: str,
+    func_name: str,
+    arg_name: str,
+    *,
+    class_name: str | None = None,
+) -> int | float | None:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    bodies: list[ast.stmt] = list(tree.body)
+    if class_name is not None:
+        bodies = []
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                bodies = list(node.body)
+                break
+    for node in bodies:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != func_name:
+            continue
+        args = node.args
+        defaults = list(args.defaults)
+        positional = list(args.posonlyargs) + list(args.args)
+        bound = positional[len(positional) - len(defaults) :] if defaults else []
+        for arg, default in zip(bound, defaults):
+            if arg.arg == arg_name:
+                return _numeric_constant(default)
+        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+            if arg.arg == arg_name:
+                return _numeric_constant(default)
+        break
+    return None
+
+
+def ttl_identity_rows() -> list[dict[str, object]]:
+    hmac = assigned_numeric_constant(parse_module_tree("skeleton.api.hmac_seal"), "DEFAULT_TTL_SECS")
+    entry = class_field_numeric_default("skeleton.api.idempotency", "IdempotencyEntry", "ttl_seconds")
+    guard = function_arg_numeric_default(
+        "skeleton.api.idempotency",
+        "__init__",
+        "default_ttl",
+        class_name="IdempotencyGuard",
+    )
+    return [
+        {"source": "skeleton.api.hmac_seal:DEFAULT_TTL_SECS", "value": hmac},
+        {"source": "skeleton.api.idempotency:IdempotencyEntry.ttl_seconds", "value": entry},
+        {"source": "skeleton.api.idempotency:IdempotencyGuard.default_ttl", "value": guard},
+    ]
+
+

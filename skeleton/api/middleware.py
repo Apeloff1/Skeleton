@@ -55,18 +55,24 @@ class BearerAuth:
         return payload
 
 
+def _positive_finite(value: object, name: str) -> float:
+    """Reject bools; ``float(True)`` must not become a 1.0 capacity/refill."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a positive finite number")
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{name} must be a positive finite number")
+    return number
+
+
 class RateLimiter:
     """Thread-safe token bucket keyed by arbitrary string (IP, user-id, API key)."""
 
     _MIN_SWEEP_INTERVAL_S = 1.0
 
     def __init__(self, *, capacity: float = 100.0, refill_per_sec: float = 10.0) -> None:
-        if not math.isfinite(capacity) or capacity <= 0:
-            raise ValueError("capacity must be a positive finite number")
-        if not math.isfinite(refill_per_sec) or refill_per_sec <= 0:
-            raise ValueError("refill_per_sec must be a positive finite number")
-        self.capacity = float(capacity)
-        self.refill_per_sec = float(refill_per_sec)
+        self.capacity = _positive_finite(capacity, "capacity")
+        self.refill_per_sec = _positive_finite(refill_per_sec, "refill_per_sec")
         self._buckets: Dict[str, Tuple[float, float]] = {}
         self._lock = threading.Lock()
         self._last_sweep: Optional[float] = None
@@ -92,8 +98,12 @@ class RateLimiter:
         self._last_sweep = now
 
     def check(self, key: str, tokens: float = 1.0) -> None:
-        if not math.isfinite(tokens) or not 0 < tokens <= self.capacity:
+        if isinstance(tokens, bool) or not isinstance(tokens, (int, float)):
             raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        amount = float(tokens)
+        if not math.isfinite(amount) or not 0 < amount <= self.capacity:
+            raise ValueError("tokens must be finite, positive, and no greater than capacity")
+        tokens = amount
         now = time.monotonic()
         with self._lock:
             self._sweep(now)

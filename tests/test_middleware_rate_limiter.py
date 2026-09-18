@@ -12,11 +12,11 @@ from skeleton.api.middleware import RateLimitError, RateLimiter
 
 
 def test_rate_limiter_rejects_invalid_configuration():
-    for capacity in (0, -1, float("nan"), float("inf")):
+    for capacity in (0, -1, float("nan"), float("inf"), True, False, "8"):
         with pytest.raises(ValueError):
             RateLimiter(capacity=capacity)
 
-    for refill in (0, -1, float("nan"), float("inf")):
+    for refill in (0, -1, float("nan"), float("inf"), True, False, "1"):
         with pytest.raises(ValueError):
             RateLimiter(refill_per_sec=refill)
 
@@ -24,7 +24,7 @@ def test_rate_limiter_rejects_invalid_configuration():
 def test_rate_limiter_rejects_invalid_token_costs():
     limiter = RateLimiter(capacity=2, refill_per_sec=1)
 
-    for tokens in (0, -1, 3, float("nan"), float("inf")):
+    for tokens in (0, -1, 3, float("nan"), float("inf"), True, False, "1"):
         with pytest.raises(ValueError):
             limiter.check("client", tokens=tokens)
 

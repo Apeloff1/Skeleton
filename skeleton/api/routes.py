@@ -832,6 +832,90 @@ async def application_dev_token_audit() -> Dict[str, Any]:
     return dev_token_audit_snapshot()
 
 
+@router.get("/application/mode/audit/{source_id}")
+async def application_session_mode_audit_row(source_id: str) -> Dict[str, Any]:
+    """Return one SessionMode identity audit row."""
+    from skeleton.application import get_session_mode_audit_row
+
+    try:
+        return get_session_mode_audit_row(source_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/mode/audit")
+async def application_session_mode_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --mode-audit``."""
+    from skeleton.application import session_mode_audit_snapshot
+
+    return session_mode_audit_snapshot()
+
+
+@router.get("/application/codename/audit/{source_id}")
+async def application_codename_audit_row(source_id: str) -> Dict[str, Any]:
+    """Return one advertised-codename audit row."""
+    from skeleton.application import get_codename_audit_row
+
+    try:
+        return get_codename_audit_row(source_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/codename/audit")
+async def application_codename_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --codename-audit``."""
+    from skeleton.application import codename_audit_snapshot
+
+    return codename_audit_snapshot()
+
+
+@router.get("/application/cver/audit/{source_id}")
+async def application_contract_version_audit_row(source_id: str) -> Dict[str, Any]:
+    """Return one command-contract-version identity audit row."""
+    from skeleton.application import get_contract_version_audit_row
+
+    try:
+        return get_contract_version_audit_row(source_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/cver/audit")
+async def application_contract_version_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --cver-audit``."""
+    from skeleton.application import contract_version_audit_snapshot
+
+    return contract_version_audit_snapshot()
+
+
+@router.get("/application/ttl/audit/{source_id}")
+async def application_ttl_audit_row(source_id: str) -> Dict[str, Any]:
+    """Return one HMAC/idempotency TTL identity audit row."""
+    from skeleton.application import get_ttl_audit_row
+
+    try:
+        return get_ttl_audit_row(source_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/ttl/audit")
+async def application_ttl_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --ttl-audit``."""
+    from skeleton.application import ttl_audit_snapshot
+
+    return ttl_audit_snapshot()
+
+
 @router.get("/application/planes/audit/{plane_id}")
 async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
     """Return one F-15 plane audit row by stable ID."""
@@ -957,7 +1041,11 @@ async def jeeves_review(request: Dict[str, Any], state=Depends(_state)) -> Dict[
 
 @router.post("/jeeves/bind-era")
 async def jeeves_bind_era(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    pack = _require(state.jeeves, "Jeeves").bind_era(_text_field(request, "era", "extraction_now"))
+    from skeleton.forge.eras import list_eras
+
+    pack = _require(state.jeeves, "Jeeves").bind_era(
+        _text_field(request, "era", "extraction_now", allowed=tuple(list_eras()))
+    )
     return {"era": pack["era"], "primary_dps": pack["primary_dps"], "status": "bound"}
 
 
