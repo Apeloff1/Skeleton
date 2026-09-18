@@ -256,7 +256,7 @@ class AssetRecord:
             content=_build_content(kind, digest, len(payload), media_type),
             source=source or SourceMetadata(),
             license=license or LicenseMetadata(),
-            lineage=tuple(lineage),
+            lineage=_bounded_lineage_steps(lineage),
             targets=targets or TargetConstraints(),
             release_marked=release_marked,
             fingerprint=content_fingerprint(payload),
@@ -531,7 +531,31 @@ def verify_content(record: AssetRecord, data: bytes) -> None:
         )
 
 
+def _bounded_lineage_steps(steps: Iterable[LineageStep]) -> tuple[LineageStep, ...]:
+    if isinstance(steps, (str, bytes, bytearray)):
+        raise LineageError("lineage must be an iterable of LineageStep values")
+    bounded: list[LineageStep] = []
+    try:
+        iterator = iter(steps)
+    except TypeError as exc:
+        raise LineageError("lineage must be iterable") from exc
+    for step in iterator:
+        if len(bounded) >= MAX_LINEAGE_STEPS:
+            raise LineageError(
+                "lineage exceeds step bound",
+                context={"max_steps": MAX_LINEAGE_STEPS},
+            )
+        if not isinstance(step, LineageStep):
+            raise LineageError("lineage entries must be LineageStep values")
+        bounded.append(step)
+    return tuple(bounded)
+
+
 def validate_lineage(steps: Sequence[LineageStep], content_sha256: str) -> None:
+    if isinstance(steps, (str, bytes, bytearray)) or not isinstance(steps, Sequence):
+        raise LineageError("lineage must be a sequence of LineageStep values")
+    if any(not isinstance(step, LineageStep) for step in steps):
+        raise LineageError("lineage entries must be LineageStep values")
     digest = _require_digest(content_sha256)
     if len(steps) > MAX_LINEAGE_STEPS:
         raise LineageError(
