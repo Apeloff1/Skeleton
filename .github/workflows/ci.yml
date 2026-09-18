@@ -160,8 +160,49 @@ jobs:
           uv venv
           uv pip install -r requirements.txt
           uv pip install "pytest>=8,<9" pytest-asyncio pytest-cov pytest-xdist
-      - env: {MONGO_URL: mongodb://localhost:27017/test}
-        run: uv run pytest tests/ -v --cov=. --cov-report=xml
+      - name: Run backend suite with live API
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          SKIP_HEAVY_SEED: "true"
+          RATE_LIMIT_EXEMPT: "testclient,127.0.0.1,::1,localhost"
+        run: |
+          set -euo pipefail
+          uv run python -m uvicorn server:app --host 127.0.0.1 --port 8001 > /tmp/backend-ci-server.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            status=$?
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            if [ "$status" -ne 0 ]; then
+              echo "----- backend server log -----"
+              tail -n 300 /tmp/backend-ci-server.log || true
+            fi
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if uv run python - <<'PY'
+import urllib.request
+try:
+    with urllib.request.urlopen("http://127.0.0.1:8001/api/health", timeout=1) as response:
+        raise SystemExit(0 if response.status == 200 else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+            then
+              ready=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "backend server failed readiness"
+            exit 1
+          fi
+
+          uv run pytest tests/ -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   backend-import-smoke:
