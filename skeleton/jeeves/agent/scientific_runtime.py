@@ -126,17 +126,28 @@ class _ScientificRuntimeMixin:
             else:
                 relations = resolver.relations
 
-        if semantic_plane is None:
-            if lens_lab is None:
-                plane = SemanticLensPlane()
-            else:
-                plane = SemanticLensPlane(
-                    governance=SemanticGovernanceBridge(
-                        LensScienceRegistry(lab=lens_lab)
-                    )
-                )
-        else:
+        if semantic_plane is not None:
             plane = semantic_plane
+        elif (
+            scientific_context is not None
+            and scientific_context.semantic_plane is not None
+        ):
+            plane = scientific_context.semantic_plane
+        elif lens_lab is None:
+            plane = SemanticLensPlane()
+        else:
+            plane = SemanticLensPlane(
+                governance=SemanticGovernanceBridge(
+                    LensScienceRegistry(lab=lens_lab)
+                )
+            )
+        if (
+            lens_lab is not None
+            and plane.governance.registry.lab is not lens_lab
+        ):
+            raise ValueError(
+                "semantic plane and lens_lab must share one ScientificLensLab"
+            )
 
         if scientific_context is None:
             nuance = nuance_runtime or ScientificNuanceRuntime(resolver)
