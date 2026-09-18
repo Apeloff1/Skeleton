@@ -201,6 +201,9 @@ class SessionEvidenceStore:
                 value=evidence,
             )
         except Exception as exc:
+            latest = self.backend.get(self.namespace, evidence.session_id)
+            if latest is None or latest.revision == current.revision:
+                raise
             raise SessionEvidenceConflict("session evidence CAS conflict") from exc
         return StoredSessionEvidence(record.revision, evidence)
 
