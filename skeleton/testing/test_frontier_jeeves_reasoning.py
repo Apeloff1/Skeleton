@@ -8,6 +8,8 @@ from skeleton.jeeves.agent.deliberation import (
     SearchResult,
     SpecialistRole,
 )
+from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
+from skeleton.jeeves.agent.frontier_feedback import FrontierReasoningFeedback
 from skeleton.jeeves.agent.frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
@@ -482,3 +484,84 @@ def test_empty_search_abstains() -> None:
     assert decision.disposition is InferenceDisposition.ABSTAIN
     assert decision.leading_candidate is None
     assert EscalationCause.NO_CANDIDATE in decision.causes
+
+
+
+def test_best_of_n_consensus_can_override_single_high_score_outlier() -> None:
+    outlier = _candidate(
+        "outlier",
+        confidence=0.97,
+        action="rewrite the subsystem immediately",
+        outcome="the subsystem is replaced",
+        evidence=(_evidence("outlier"),),
+    )
+    agree_a = _candidate(
+        "agree-a",
+        confidence=0.86,
+        action="preserve the subsystem and add a guarded adapter",
+        outcome="compatibility is preserved while the adapter is introduced",
+        evidence=(_evidence("agree-a"),),
+    )
+    agree_b = _candidate(
+        "agree-b",
+        confidence=0.84,
+        action="preserve the subsystem and add a guarded adapter",
+        outcome="compatibility is preserved while the adapter is introduced",
+        evidence=(_evidence("agree-b"),),
+    )
+    search = _search(
+        (outlier, _score(outlier, total=0.96, evidence_quality=0.92, verifier=0.92)),
+        (agree_a, _score(agree_a, total=0.78, evidence_quality=0.86, verifier=0.88)),
+        (agree_b, _score(agree_b, total=0.76, evidence_quality=0.84, verifier=0.86)),
+    )
+
+    consensus = ConsensusSelector().select(search)
+    decision = FrontierReasoningCoordinator().decide(search)
+
+    assert consensus.selected_candidate_id in {"candidate:agree-a", "candidate:agree-b"}
+    assert decision.leading_candidate is not None
+    assert decision.leading_candidate.candidate_id in {"candidate:agree-a", "candidate:agree-b"}
+    assert decision.consensus is not None
+    assert decision.consensus.agreement > 0.5
+
+
+def test_feedback_tracks_verified_direct_and_escalated_outcomes() -> None:
+    coordinator = FrontierReasoningCoordinator()
+    feedback = FrontierReasoningFeedback()
+    direct = coordinator.decide(_strong_search())
+    escalated = coordinator.decide(_strong_search(trace="escalated-search"))
+
+    feedback.observe(
+        direct,
+        verified_success=False,
+        escalation_rounds=0,
+        model_calls=2,
+        estimated_tokens=1000,
+    )
+    feedback.observe(
+        escalated,
+        verified_success=True,
+        escalation_rounds=1,
+        model_calls=5,
+        estimated_tokens=3000,
+    )
+    report = feedback.report()
+
+    assert report.count == 2
+    assert report.direct_success_rate == 0.0
+    assert report.escalated_success_rate == 1.0
+    assert report.observed_escalation_delta == 1.0
+    assert report.mean_model_calls == 3.5
+    assert report.fingerprint
+
+
+def test_consensus_is_deterministic_for_identical_search() -> None:
+    selector = ConsensusSelector()
+    search = _strong_search()
+
+    first = selector.select(search)
+    second = selector.select(search)
+
+    assert first.fingerprint == second.fingerprint
+    assert first.selected_candidate_id == second.selected_candidate_id
+    assert first.clusters == second.clusters
