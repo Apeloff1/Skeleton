@@ -9,6 +9,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 ALL_BRANCH_GLOBS = 'branches:\n      - "*"\n      - "**"'
 WORKFLOW_RUN_TRIGGER_RE = re.compile(r"(?m)^  workflow_run:\s*(?:#.*)?$")
+QUEUE_WORKFLOW_RUN_JOB_IF_RE = re.compile(
+    r"(?ms)^    if:\s*>-\s*\n(?P<body>(?:      .*\n)+)"
+)
 HINT_ARRAY_EXPR = "toJSON(github.event.workflow_run.pull_requests.*.number)"
 COMMIT_OID_PATTERN = r"^[0-9a-f]{40}$"
 AUTOMATION_WORKFLOW = "pr-automation-index.yml"
@@ -68,11 +71,22 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
+    queue_workflow_run_conditions = [
+        match.group("body")
+        for match in QUEUE_WORKFLOW_RUN_JOB_IF_RE.finditer(text)
+        if "github.event_name != 'workflow_run'" in match.group("body")
+    ]
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
-        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
-        in text
+        and bool(queue_workflow_run_conditions)
+        and all(
+            "github.event.workflow_run.head_repository.full_name == github.repository"
+            in condition
+            and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+            in condition
+            for condition in queue_workflow_run_conditions
+        )
     )
 
     if (
