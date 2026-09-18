@@ -74,6 +74,38 @@ def _repack_replay_payload(
         "utf-8"
     )
 
+
+
+def _combined_snapshot_digest(
+    snapshot,
+) -> str:
+    payload = {
+        "schema_version":
+            snapshot.schema_version,
+        "engine_era":
+            snapshot.era.value,
+        "tree_digest":
+            snapshot.tree_digest,
+        "machine_digest":
+            snapshot.machine_snapshot.digest,
+        "clock_digest":
+            snapshot.clock_snapshot.digest,
+        "history_size":
+            snapshot.history_size,
+        "chain_digest":
+            snapshot.chain_digest,
+    }
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
 def _one_step_delta(
     loop: DeterministicGameLoop,
 ) -> int:
@@ -1279,3 +1311,79 @@ def test_game_loop_rejects_non_raw_input_sample_values() -> None:
     assert loop.machine.tick == 0
     assert loop.clock.simulation_tick == 0
     assert loop.history == ()
+
+
+
+def test_rehashed_combined_snapshot_cannot_claim_later_state_on_earlier_lineage() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    delta = _one_step_delta(
+        loop
+    )
+    loop.advance(
+        delta,
+        (
+            RawInputSample(
+                tick=0,
+                player=0,
+                device=InputDevice.DUAL_ANALOG_PAD,
+                move_x=0.7,
+            ),
+        ),
+    )
+    earlier = loop.snapshot()
+
+    loop.advance(
+        delta,
+        (
+            RawInputSample(
+                tick=1,
+                player=0,
+                device=InputDevice.DUAL_ANALOG_PAD,
+                move_y=0.7,
+            ),
+        ),
+    )
+    later = loop.snapshot()
+    before_machine = (
+        loop.machine.fingerprint()
+    )
+    before_clock = (
+        loop.clock.fingerprint()
+    )
+    forged = replace(
+        earlier,
+        machine_snapshot=
+            later.machine_snapshot,
+        clock_snapshot=
+            later.clock_snapshot,
+    )
+    forged = replace(
+        forged,
+        digest=
+            _combined_snapshot_digest(
+                forged
+            ),
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="state does not match replay lineage",
+    ):
+        loop.restore(
+            forged
+        )
+
+    assert (
+        loop.machine.fingerprint()
+        == before_machine
+    )
+    assert (
+        loop.clock.fingerprint()
+        == before_clock
+    )
+    assert len(loop.history) == 2
