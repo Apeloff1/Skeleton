@@ -682,6 +682,7 @@ class AIShellService:
         approval=None,
         execution_backend: AIPlanExecutionBackend | None = None,
         sealed: bool,
+        execution_fenced: bool = False,
         preconditions_verified: bool = False,
         human_approved: bool = False,
         quorum_approved: bool = False,
