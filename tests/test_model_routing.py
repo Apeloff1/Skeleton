@@ -108,7 +108,7 @@ def _request(
     budget: RouteBudget | None = None,
     metadata: dict | None = None,
     estimated_input_tokens: int = 10,
-    max_output_tokens: int = 20,
+    max_output_tokens: int | None = 20,
     retry_attempts: int = 2,
 ) -> ModelRouteRequest:
     return ModelRouteRequest(
@@ -266,6 +266,87 @@ def test_budget_exhaustion_fails_closed_without_calling_unaffordable_providers()
     assert result.selected_provider_id is None
     assert expensive.calls == []
     assert also_expensive.calls == []
+
+
+def test_unaffordable_high_priority_provider_does_not_block_affordable_fallback() -> None:
+    expensive = FakeAdapter("expensive")
+    affordable = FakeAdapter("affordable", text="within-budget")
+    router = _router_with(
+        (
+            _metadata(
+                "expensive",
+                priority=0,
+                input_cost=1_000_000.0,
+                output_cost=1_000_000.0,
+            ),
+            expensive,
+        ),
+        (
+            _metadata(
+                "affordable",
+                priority=1,
+                input_cost=1.0,
+                output_cost=1.0,
+            ),
+            affordable,
+        ),
+    )
+    request = _request(
+        budget=RouteBudget(max_cost=0.01, max_provider_attempts=2),
+        estimated_input_tokens=100,
+        max_output_tokens=100,
+    )
+
+    plan = router.plan(request)
+    assert plan.provider_ids == ("affordable",)
+    assert "estimated cost exceeds route budget" in plan.rejected["expensive"]
+
+    result = asyncio.run(router.invoke(request))
+    assert result.ok
+    assert result.selected_provider_id == "affordable"
+    assert expensive.calls == []
+    assert affordable.calls
+
+
+def test_none_output_limit_uses_provider_limit_in_plan_and_invoke() -> None:
+    too_wide = FakeAdapter("too-wide")
+    affordable = FakeAdapter("bounded", text="bounded-ok")
+    router = _router_with(
+        (
+            _metadata(
+                "too-wide",
+                priority=0,
+                output_cost=1_000.0,
+                max_output_tokens=1_000,
+            ),
+            too_wide,
+        ),
+        (
+            _metadata(
+                "bounded",
+                priority=1,
+                output_cost=1.0,
+                max_output_tokens=10,
+            ),
+            affordable,
+        ),
+    )
+    request = _request(
+        budget=RouteBudget(max_cost=0.05, max_provider_attempts=2),
+        estimated_input_tokens=1,
+        max_output_tokens=None,
+    )
+
+    plan = router.plan(request)
+    assert plan.provider_ids == ("bounded",)
+    assert "estimated cost exceeds route budget" in plan.rejected["too-wide"]
+
+    result = asyncio.run(router.invoke(request))
+    assert result.ok
+    assert result.selected_provider_id == "bounded"
+    assert too_wide.calls == []
+    assert affordable.calls
+    assert affordable.calls[0].max_output_tokens == 10
 
 
 def test_actual_usage_over_budget_is_not_reported_as_success() -> None:
