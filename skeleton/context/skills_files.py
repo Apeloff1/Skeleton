@@ -15,7 +15,9 @@ organism ``context_loop`` (rot-compaction), or NSOG CLI shims.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,13 +48,27 @@ def _safe_id(value: str, *, label: str = "id") -> str:
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    """Atomically replace JSON without a predictable temporary-file race."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
-        encoding="utf-8",
+    rendered = json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n"
+    fd, raw_tmp = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+        text=True,
     )
-    tmp.replace(path)
+    tmp = Path(raw_tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(rendered)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink(missing_ok=True)
+        finally:
+            raise
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
