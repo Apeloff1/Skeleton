@@ -512,7 +512,6 @@ def classify_prs(prs: Sequence[object]) -> tuple[list[ClassifiedPR], list[str]]:
             forest.union(first, other)
 
     components: dict[int, list[ParsedPR]] = {}
-    lookup = {int(item.number): item for item in clusterable}
     for item in clusterable:
         number = int(item.number)
         components.setdefault(forest.find(number), []).append(item)
