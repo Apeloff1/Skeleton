@@ -646,7 +646,7 @@ def generate_all_capabilities(build: dict, title: str, genre: str) -> Dict[str, 
         try:
             files.update(generate_capability_files(spec, title, genre))
         except Exception as e:  # one bad capability never sinks the rest
-            print(f"[GALAXY capabilities] {spec['id']} failed: {e}")
+            print(f"[GALAXY capabilities] {spec['id']} failed ({type(e).__name__})")
     files["capabilities/CapabilityRegistry.ts"] = _gen_capability_registry(title, genre)
     if isinstance(build, dict):
         build["capability_count"] = len(CAPABILITY_SPECS)
