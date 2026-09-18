@@ -22,12 +22,15 @@ from .adaptive_runtime import AdaptiveJeevesRuntime
 from .relational_memory import RelationalMemoryIndex
 from .context_pipeline import ContextSourceAdapter, LayeredContextResolver, ResolutionPolicy
 from .context_repository import ContextRepository
+from .interpretive_science import ScientificLensLab
 from .memory import MemoryManager, MemoryNamespace
 from .memory_game import InteractionCard, MemoryGameIndex, MemoryGamePolicy
 from .nuance_runtime import (
+    NuanceRuntimePolicy,
     ScientificContextCompiler,
     ScientificNuanceRuntime,
 )
+from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .runtime import JeevesAgentRuntime, RunCheckpoint, RunInputs, _RunState
 from .types import EvidenceRef, MemoryKind
 
@@ -48,6 +51,8 @@ class _ScientificRuntimeMixin:
         context_adapters: Sequence[ContextSourceAdapter] = (),
         scientific_context: ScientificContextCompiler | None = None,
         nuance_runtime: ScientificNuanceRuntime | None = None,
+        lens_lab: ScientificLensLab | None = None,
+        maximal_semantics: bool = False,
         memory_game_policy: MemoryGamePolicy | None = None,
         resolution_policy: ResolutionPolicy | None = None,
         wall_clock: Callable[[], float] = time.time,
@@ -56,6 +61,21 @@ class _ScientificRuntimeMixin:
         if "context_compiler" in kwargs:
             raise TypeError(
                 "scientific runtimes own context_compiler; pass scientific_context instead"
+            )
+        if not isinstance(maximal_semantics, bool):
+            raise TypeError("maximal_semantics must be boolean")
+        if maximal_semantics and (scientific_context is not None or nuance_runtime is not None):
+            raise ValueError(
+                "maximal_semantics owns semantic runtime construction; "
+                "do not combine it with scientific_context or nuance_runtime"
+            )
+        if (
+            lens_lab is not None
+            and nuance_runtime is not None
+            and nuance_runtime.lens_lab is not lens_lab
+        ):
+            raise ValueError(
+                "lens_lab and nuance_runtime must share one ScientificLensLab"
             )
         shared_memory = memory or MemoryManager(clock=wall_clock)
         cards = memory_cards or MemoryGameIndex(
@@ -107,7 +127,23 @@ class _ScientificRuntimeMixin:
                 relations = resolver.relations
 
         if scientific_context is None:
-            nuance = nuance_runtime or ScientificNuanceRuntime(resolver)
+            if nuance_runtime is not None:
+                nuance = nuance_runtime
+            elif maximal_semantics:
+                registry = MaximalSemanticRegistry()
+                nuance = ScientificNuanceRuntime(
+                    resolver,
+                    semantic_registry=registry,
+                    semantic_router=MaximalLensRouter(registry),
+                    lens_lab=lens_lab,
+                    policy=NuanceRuntimePolicy(
+                        max_lenses=28,
+                        max_lenses_per_family=5,
+                        minimum_rare_lenses_when_supported=3,
+                    ),
+                )
+            else:
+                nuance = ScientificNuanceRuntime(resolver, lens_lab=lens_lab)
             compiler = ScientificContextCompiler(resolver, nuance=nuance)
         else:
             compiler = scientific_context
@@ -119,12 +155,17 @@ class _ScientificRuntimeMixin:
                 raise ValueError(
                     "scientific_context and nuance_runtime refer to different nuance planes"
                 )
+            if lens_lab is not None and compiler.nuance.lens_lab is not lens_lab:
+                raise ValueError(
+                    "scientific_context and lens_lab refer to different lens-science planes"
+                )
 
         self.memory_cards = cards
         self.relational_memory = relations
         self.context_resolver = resolver
         self.scientific_context = compiler
         self.nuance_runtime = compiler.nuance
+        self.lens_lab = compiler.nuance.lens_lab
         self._scientific_capture_lock = threading.RLock()
         self._scientific_captured_runs: set[str] = set()
 
@@ -246,6 +287,12 @@ class _ScientificRuntimeMixin:
             "nuance_runtime_fingerprint": self.nuance_runtime.fingerprint,
             "relational_memory_count": self.relational_memory.store.count(),
             "captured_runs": tuple(sorted(self._scientific_captured_runs)),
+            "lens_science": self.nuance_runtime.lens_science_summary(),
+            "maximal_semantics_enabled": isinstance(
+                self.nuance_runtime.semantic_registry,
+                MaximalSemanticRegistry,
+            ),
+            "semantic_lens_count": len(self.nuance_runtime.semantic_registry.all()),
             "invariants": {
                 "run_goal_memory_deferred_until_after_first_retrieval": True,
                 "capture_after_initial_resolution": True,
@@ -262,3 +309,23 @@ class ScientificJeevesRuntime(_ScientificRuntimeMixin, JeevesAgentRuntime):
 
 class ScientificAdaptiveJeevesRuntime(_ScientificRuntimeMixin, AdaptiveJeevesRuntime):
     """Adaptive Jeeves runtime with the same evidence-safe scientific context."""
+
+
+class MaximalScientificJeevesRuntime(ScientificJeevesRuntime):
+    """Deterministic scientific runtime with the complete rare-lens catalog."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        if "maximal_semantics" in kwargs:
+            raise TypeError("MaximalScientificJeevesRuntime owns maximal_semantics")
+        super().__init__(maximal_semantics=True, **kwargs)
+
+
+class MaximalScientificAdaptiveJeevesRuntime(ScientificAdaptiveJeevesRuntime):
+    """Adaptive scientific runtime with the complete rare-lens catalog."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        if "maximal_semantics" in kwargs:
+            raise TypeError(
+                "MaximalScientificAdaptiveJeevesRuntime owns maximal_semantics"
+            )
+        super().__init__(maximal_semantics=True, **kwargs)
