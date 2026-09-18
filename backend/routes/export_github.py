@@ -17,11 +17,14 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from core.outcall_manager import outcalls
-from core.http_errors import internal_http_error
+from core.http_errors import internal_http_error, public_http_error
 import uuid
 import os
 import base64
 import httpx
+import logging
+
+log = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
@@ -197,6 +200,14 @@ async def export_to_markdown(
     }
 
 
+def _github_request_failed(status_code: int) -> HTTPException:
+    """Stable public envelope for GitHub upstream failures. Logs status, never the body."""
+    log.warning("github_request_failed status=%s", status_code)
+    if status_code >= 500:
+        return internal_http_error("github_request_failed")
+    return public_http_error(status_code, "github_request_failed", None)
+
+
 # ============================================================================
 # GITHUB INTEGRATION ENDPOINTS
 # ============================================================================
@@ -261,8 +272,7 @@ async def push_to_github(request: GitHubPushRequest):
                     "updated": existing_sha is not None
                 }
             else:
-                error_msg = res.json().get("message", "Unknown error")
-                raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
+                raise _github_request_failed(res.status_code)
                 
         except httpx.HTTPError as e:
             raise internal_http_error("Failed to connect to GitHub", e) from None
@@ -313,8 +323,7 @@ async def pull_from_github(request: GitHubPullRequest):
             elif res.status_code == 404:
                 raise HTTPException(status_code=404, detail="File not found in repository")
             else:
-                error_msg = res.json().get("message", "Unknown error")
-                raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
+                raise _github_request_failed(res.status_code)
                 
         except httpx.HTTPError as e:
             raise internal_http_error("Failed to connect to GitHub", e) from None
@@ -361,8 +370,7 @@ async def create_github_repo(request: GitHubRepoRequest):
                     "private": data.get("private")
                 }
             else:
-                error_msg = res.json().get("message", "Unknown error")
-                raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
+                raise _github_request_failed(res.status_code)
                 
         except httpx.HTTPError as e:
             raise internal_http_error("Failed to connect to GitHub", e) from None
@@ -405,8 +413,7 @@ async def list_github_repos(token: str, per_page: int = 30, page: int = 1):
                     ]
                 }
             else:
-                error_msg = res.json().get("message", "Unknown error")
-                raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
+                raise _github_request_failed(res.status_code)
                 
         except httpx.HTTPError as e:
             raise internal_http_error("Failed to connect to GitHub", e) from None
