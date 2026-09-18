@@ -942,12 +942,24 @@ def _load_payload(raw: bytes | str | Mapping[str, Any]) -> dict[str, Any]:
     else:
         raise EvidenceSchemaError("evidence must be bytes, text, or an object")
     try:
-        loaded = json.loads(text)
+        loaded = json.loads(text, object_pairs_hook=_json_object_no_duplicates)
     except json.JSONDecodeError as exc:
         raise EvidenceSchemaError("malformed evidence JSON") from exc
     if not isinstance(loaded, dict):
         raise EvidenceSchemaError("evidence must be an object")
     return loaded
+
+
+def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise EvidenceSchemaError(
+                "evidence JSON contains duplicate object keys",
+                context={"key": key},
+            )
+        result[key] = value
+    return result
 
 
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
