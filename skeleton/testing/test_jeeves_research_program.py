@@ -29,6 +29,7 @@ from skeleton.jeeves.agent.research_synthesis import (
     HypothesisSynthesisGate,
 )
 from skeleton.jeeves.agent.types import AgentContractError, RiskTier
+from skeleton.jeeves.agent.unknown_unknowns import UnknownUnknownScout
 
 
 def _hypothesis(
@@ -616,3 +617,110 @@ def test_forecast_commitment_tampering_is_rejected_during_program_restore() -> N
     restored = FrontierCognitiveControlPlane(clock=lambda: 7000.0)
     with pytest.raises(AgentContractError):
         restored.restore_research_state(tampered)
+
+
+
+def test_unknown_unknown_scout_requires_recurrent_cross_context_surprise() -> None:
+    scout = UnknownUnknownScout(clock=lambda: 8000.0)
+    scout.observe(
+        channel="deployment-outcome",
+        context_key="region-a",
+        expected_probability=0.01,
+        decision_impact=0.90,
+        evidence_ref="ev-a",
+        outcome="unexpected-failure",
+        observation_id="surprise-a",
+    )
+    assert scout.candidates() == ()
+
+    scout.observe(
+        channel="deployment-outcome",
+        context_key="region-b",
+        expected_probability=0.01,
+        decision_impact=0.90,
+        evidence_ref="ev-b",
+        outcome="unexpected-failure",
+        observation_id="surprise-b",
+    )
+
+    candidates = scout.candidates()
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.distinct_context_count == 2
+    assert candidate.recurrence_count == 2
+    assert candidate.maximum_surprise_bits > 6.0
+
+    obligation = scout.promote(candidate.candidate_id)
+    assert obligation.novelty >= 0.60
+    assert obligation.assumption_load > 0.0
+    assert set(obligation.evidence_refs) == {"ev-a", "ev-b"}
+
+    frontier = EpistemicFrontierEngine().discover((obligation,))
+    assert frontier.gaps
+    assert any(gap.obligation_id == obligation.obligation_id for gap in frontier.gaps)
+
+
+def test_unknown_unknown_scout_state_replays_and_detects_tampering() -> None:
+    scout = UnknownUnknownScout(clock=lambda: 8100.0)
+    for index, context in enumerate(("ctx-a", "ctx-b"), start=1):
+        scout.observe(
+            channel="runtime-anomaly",
+            context_key=context,
+            expected_probability=0.005,
+            decision_impact=0.80,
+            evidence_ref=f"ev-{index}",
+            outcome="anomaly",
+            observation_id=f"obs-{index}",
+        )
+    state = scout.dump_state()
+    restored = UnknownUnknownScout.from_state(state, clock=lambda: 8100.0)
+
+    assert restored.snapshot().fingerprint == scout.snapshot().fingerprint
+    assert [item.candidate_id for item in restored.candidates()] == [
+        item.candidate_id for item in scout.candidates()
+    ]
+
+    tampered = copy.deepcopy(state)
+    tampered["observations"][0]["expected_probability"] = 0.9
+    with pytest.raises(AgentContractError):
+        UnknownUnknownScout.from_state(tampered, clock=lambda: 8100.0)
+
+
+def test_control_plane_turns_repeated_forecast_misses_into_new_research_question() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 8200.0)
+    control.map_epistemic_frontier(
+        (
+            KnowledgeObligation(
+                obligation_id="deploy-safety",
+                question="Is deployment safe?",
+                decision_impact=0.95,
+                confidence=0.70,
+                evidence_coverage=0.70,
+            ),
+        )
+    )
+
+    control.precommit_research_forecast(
+        "deploy-safety",
+        {"safe": 0.99, "unsafe": 0.01},
+        forecast_id="miss-1",
+    )
+    control.settle_research_forecast("miss-1", "unsafe")
+    assert control.unknown_unknown_scout.candidates() == ()
+
+    control.precommit_research_forecast(
+        "deploy-safety",
+        {"safe": 0.99, "unsafe": 0.01},
+        forecast_id="miss-2",
+    )
+    control.settle_research_forecast("miss-2", "unsafe")
+
+    obligations = control.surface_unknown_unknowns()
+    assert len(obligations) == 1
+    derived = obligations[0]
+    assert derived.metadata["source_channel"] == "deploy-safety"
+    assert derived.decision_impact == 0.95
+
+    frontier = control.map_epistemic_frontier(obligations)
+    assert frontier.gaps
+    assert control.research_agenda.items_for_obligation(derived.obligation_id)
