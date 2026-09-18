@@ -103,6 +103,13 @@ class CortexConfig:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise AgentContractError(f"{name} must be positive integer")
+        for name in (
+            "learn_from_failed_runs",
+            "learn_read_only_actions",
+            "preserve_run_worlds",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise AgentContractError(f"{name} must be boolean")
         stale = float(self.stale_evidence_seconds)
         if stale <= 0:
             raise AgentContractError("stale_evidence_seconds must be positive")
@@ -419,8 +426,16 @@ class JeevesCortex:
             action_risks=action_risks or {},
         )
         self._link_action_outcome_beliefs(state, result)
-        top_hypotheses = state.world.hypotheses(refresh=True)[:5]
-        unresolved = state.world.ranked_probes(limit=self.config.max_probe_count, minimum_entropy_bits=0.10)
+        visible_hypotheses = tuple(
+            hypothesis
+            for hypothesis in state.world.hypotheses(refresh=True)
+            if hypothesis.posterior >= self.config.minimum_hypothesis_probability
+        )
+        top_hypotheses = visible_hypotheses[:5]
+        unresolved = state.world.ranked_probes(
+            limit=self.config.max_probe_count,
+            minimum_entropy_bits=0.10,
+        )
         anomalies = self._result_anomalies(state, result)
         decisions = self.meta.history(run_id=result.run_id)
         world_fingerprint = state.world.snapshot(persist=False).fingerprint
@@ -440,7 +455,7 @@ class JeevesCortex:
             result_reason=result.reason.value,
             world_fingerprint=world_fingerprint,
             belief_count=len(state.world.beliefs()),
-            hypothesis_count=len(state.world.hypotheses(refresh=False)),
+            hypothesis_count=len(visible_hypotheses),
             world_entropy_bits=state.world.world_entropy_bits(),
             decisions=decisions,
             top_hypotheses=top_hypotheses,
@@ -696,6 +711,8 @@ class JeevesCortex:
             verified = score >= 0.6 and observation.ok
             raw_risk = action_risks.get(observation.call_id, RiskTier.READ_ONLY)
             risk = raw_risk if isinstance(raw_risk, RiskTier) else RiskTier(str(raw_risk))
+            if risk is RiskTier.READ_ONLY and not self.config.learn_read_only_actions:
+                continue
             profile = self.skills.record_tool_observation(
                 run_id=result.run_id,
                 tool_name=observation.tool_name,
