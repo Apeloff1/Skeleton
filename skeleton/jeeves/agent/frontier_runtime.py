@@ -58,6 +58,10 @@ from .semantic_plane import (
     SemanticPlaneLearningUpdate,
     SemanticPlaneSnapshot,
 )
+from .semantic_topology_learning import (
+    TopologyBridgeReport,
+    TopologyBridgeTrial,
+)
 from .strict_runtime import StrictJeevesAgentRuntime
 from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
 
@@ -346,6 +350,19 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             observation_id=observation_id,
             negative_control=negative_control,
         )
+
+    def record_semantic_topology_trial(
+        self,
+        trial: TopologyBridgeTrial,
+    ) -> TopologyBridgeReport:
+        """Record a governed topology-bridge validation trial."""
+
+        return self.semantic_plane.record_topology_bridge_trial(trial)
+
+    def semantic_topology_learning_summary(self) -> Mapping[str, Any]:
+        """Return bounded bridge-learning state without promoting it to evidence."""
+
+        return self.semantic_plane.topology_learning_summary()
 
     def _state_from_checkpoint(
         self,
