@@ -16,7 +16,7 @@ from skeleton.quality.property_inventory import (
     SCHEMA_VERSION,
     SEED,
     SubsystemInvariant,
-    TASK_KEY,
+    TASK_ID,
     classify_coverage,
     default_catalog,
     detect_property_evidence,
@@ -54,7 +54,7 @@ def test_schema_and_task_identity_are_stable() -> None:
     payload = report.to_payload()
     assert report.schema == SCHEMA == "quality.property_inventory.v1"
     assert report.schema_version == SCHEMA_VERSION == 1
-    assert report.task_key == TASK_KEY == "reserve-S081-property-test-inventory"
+    assert report.task_id == TASK_ID == "reserve-S081-property-test-inventory"
     assert report.conflict_domain == CONFLICT_DOMAIN == "quality.readonly.property_inventory"
     assert payload["issue"] == ISSUE == "#969"
     assert payload["seed"] == SEED == 17

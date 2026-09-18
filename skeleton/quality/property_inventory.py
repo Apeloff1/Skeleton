@@ -1,7 +1,7 @@
 """Fail-closed inventory of subsystem invariants versus property-test evidence.
 
 SHIFT-PROMOTION-SEED #969 Seed 17
-task_key: ``reserve-S081-property-test-inventory``
+task_id: ``reserve-S081-property-test-inventory``
 conflict_domain: ``quality.readonly.property_inventory``
 
 This module inventories invariants; it does not author a property-test suite
@@ -26,7 +26,7 @@ from typing import Iterable, Mapping, Sequence
 
 SCHEMA = "quality.property_inventory.v1"
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S081-property-test-inventory"
+TASK_ID = "reserve-S081-property-test-inventory"
 CONFLICT_DOMAIN = "quality.readonly.property_inventory"
 ISSUE = "#969"
 SEED = 17
@@ -159,7 +159,7 @@ class CoverageRow:
 class InventoryReport:
     schema: str
     schema_version: int
-    task_key: str
+    task_id: str
     conflict_domain: str
     rows: tuple[CoverageRow, ...]
     evidence: tuple[PropertyEvidence, ...]
@@ -169,7 +169,7 @@ class InventoryReport:
         return {
             "schema": self.schema,
             "schema_version": self.schema_version,
-            "task_key": self.task_key,
+            "task_id": self.task_id,
             "conflict_domain": self.conflict_domain,
             "issue": ISSUE,
             "seed": SEED,
@@ -483,7 +483,7 @@ def inventory_property_coverage(
     return InventoryReport(
         schema=SCHEMA,
         schema_version=SCHEMA_VERSION,
-        task_key=TASK_KEY,
+        task_id=TASK_ID,
         conflict_domain=CONFLICT_DOMAIN,
         rows=rows,
         evidence=scanned,
