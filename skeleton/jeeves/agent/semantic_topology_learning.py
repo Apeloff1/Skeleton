@@ -2127,6 +2127,7 @@ __all__ = [
     "SemanticTopologyLearningLab",
     "SemanticTopologyLearningSnapshot",
     "SemanticTopologyLearningState",
+    "TopologyBridgeDomainReport",
     "TopologyBridgePolicy",
     "TopologyBridgePrediction",
     "TopologyBridgeReport",
