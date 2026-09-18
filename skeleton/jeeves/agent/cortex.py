@@ -212,6 +212,9 @@ class JeevesCortex:
         )
         self._runs: dict[str, RunCognitiveState] = {}
         self._checkpoint_cache: dict[str, deque[RunCheckpoint]] = {}
+        self._checkpoint_assessments: dict[
+            str, dict[str, CortexCheckpointAssessment]
+        ] = {}
         self._result_reports: dict[str, CortexRunReport] = {}
         self._lock = threading.RLock()
 
@@ -291,6 +294,12 @@ class JeevesCortex:
         state = self.state(checkpoint.run_id) or self.begin(inputs, run_id=checkpoint.run_id)
         if checkpoint.goal_id != inputs.goal.goal_id:
             raise CortexError("checkpoint goal does not match cortex run goal")
+        with self._lock:
+            cached = self._checkpoint_assessments.get(
+                checkpoint.run_id, {}
+            ).get(checkpoint.fingerprint)
+        if cached is not None:
+            return cached
         self._cache_checkpoint(checkpoint)
         self._ingest_checkpoint_evidence(state, checkpoint)
         self._ingest_plan_structure(state, checkpoint.plan)
@@ -368,8 +377,11 @@ class JeevesCortex:
         )
         with self._lock:
             self._runs[state.run_id] = updated_state
-        probes = updated_state.world.ranked_probes(limit=self.config.max_probe_count, minimum_entropy_bits=0.05)
-        return CortexCheckpointAssessment(
+        probes = updated_state.world.ranked_probes(
+            limit=self.config.max_probe_count,
+            minimum_entropy_bits=0.05,
+        )
+        assessment = CortexCheckpointAssessment(
             run_id=state.run_id,
             checkpoint_sequence=checkpoint.sequence,
             decision=decision,
@@ -380,6 +392,11 @@ class JeevesCortex:
             recommended_skill_id=recommended_skill_id,
             notes=tuple(notes),
         )
+        with self._lock:
+            self._checkpoint_assessments.setdefault(
+                state.run_id, {}
+            )[checkpoint.fingerprint] = assessment
+        return assessment
 
     def observe_result(
         self,
