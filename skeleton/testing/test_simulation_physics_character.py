@@ -9,7 +9,9 @@ from skeleton.simulation.physics import (
     BoxShape,
     CharacterControllerSettings,
     KinematicCapsuleController,
+    PhysicsSettings,
     PhysicsValidationError,
+    PhysicsWorld,
     PlaneShape,
     Quat,
     RigidBody,
@@ -340,3 +342,60 @@ def test_move_result_applied_displacement_matches_position_delta() -> None:
     assert result.applied_displacement == (
         result.position - result.start_position
     )
+
+
+
+def test_world_move_character_uses_authoritative_world_bodies() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=1.0 / 60.0,
+        )
+    )
+    world.add_body(RigidBody.static("ground", PlaneShape()))
+    world.add_body(
+        RigidBody.static(
+            "wall",
+            BoxShape(Vec3(0.25, 2.0, 2.0)),
+            position=Vec3(2.0, 1.0, 0.0),
+        )
+    )
+    controller = _controller()
+
+    result = world.move_character(
+        controller,
+        Vec3(3.0, 0.0, 0.5),
+    )
+
+    assert result.hits
+    assert result.position.x < 1.4
+    assert result.position.z > 0.4
+    assert controller.position == result.position
+
+
+def test_world_ground_probe_wrapper_uses_default_fixed_dt() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=1.0 / 120.0,
+        )
+    )
+    world.add_body(RigidBody.static("ground", PlaneShape()))
+    controller = _controller(position=Vec3(0.0, 1.05, 0.0))
+
+    ground = world.probe_character_ground(controller)
+
+    assert ground.grounded
+    assert ground.body_id == "ground"
+
+
+def test_world_character_wrappers_reject_wrong_controller_type() -> None:
+    world = PhysicsWorld(PhysicsSettings(gravity=Vec3.zero()))
+
+    with pytest.raises(PhysicsValidationError, match="controller"):
+        world.move_character(  # type: ignore[arg-type]
+            object(),
+            Vec3.zero(),
+        )
+    with pytest.raises(PhysicsValidationError, match="controller"):
+        world.probe_character_ground(object())  # type: ignore[arg-type]
