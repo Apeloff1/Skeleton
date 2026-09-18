@@ -628,11 +628,11 @@ class PhysicsWorld:
             return
         if body_a.inverse_mass > 0.0:
             weight_a = body_a.inverse_mass / inverse_mass_sum
-            body_a.position = body_a.position + event.normal * (slop * weight_a)
+            body_a.position = body_a.position - event.normal * (slop * weight_a)
             body_a.wake()
         if body_b.inverse_mass > 0.0:
             weight_b = body_b.inverse_mass / inverse_mass_sum
-            body_b.position = body_b.position - event.normal * (slop * weight_b)
+            body_b.position = body_b.position + event.normal * (slop * weight_b)
             body_b.wake()
 
     def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
