@@ -354,6 +354,132 @@ def test_prediction_resolution_is_single_assignment_and_idempotent() -> None:
         )
 
 
+def test_unresolved_prediction_capacity_fails_closed_without_mutation() -> None:
+    _, topology, candidate, base = _system()
+    lab = SemanticTopologyLearningLab(
+        topology,
+        policy=replace(
+            base.policy,
+            maximum_predictions=3,
+            maximum_trials=3,
+            maximum_unresolved_predictions=1,
+        ),
+    )
+    first = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="capacity-a",
+        predicted_at=1.0,
+    )
+    before = lab.fingerprint
+
+    with pytest.raises(
+        AgentContractError,
+        match="unresolved prediction capacity exhausted",
+    ):
+        lab.declare_candidate_prediction(
+            candidate.candidate_id,
+            kind=LensInteractionKind.REINFORCES,
+            predicted_probability=0.72,
+            domain="film",
+            independent_run="capacity-b",
+            predicted_at=2.0,
+        )
+
+    assert lab.fingerprint == before
+    assert lab.unresolved_predictions() == (first,)
+
+
+def test_total_prediction_capacity_survives_resolution_but_stays_bounded() -> None:
+    _, topology, candidate, base = _system()
+    lab = SemanticTopologyLearningLab(
+        topology,
+        policy=replace(
+            base.policy,
+            maximum_predictions=2,
+            maximum_trials=3,
+            maximum_unresolved_predictions=2,
+        ),
+    )
+    first = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="total-a",
+        predicted_at=1.0,
+    )
+    lab.resolve(first.prediction_id, outcome=True, observed_at=2.0)
+    second = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.72,
+        domain="game",
+        independent_run="total-b",
+        predicted_at=3.0,
+    )
+    lab.resolve(second.prediction_id, outcome=True, observed_at=4.0)
+    before = lab.fingerprint
+
+    with pytest.raises(
+        AgentContractError,
+        match="prediction capacity exhausted",
+    ):
+        lab.declare_candidate_prediction(
+            candidate.candidate_id,
+            kind=LensInteractionKind.REINFORCES,
+            predicted_probability=0.74,
+            domain="literature",
+            independent_run="total-c",
+            predicted_at=5.0,
+        )
+
+    assert lab.fingerprint == before
+    assert lab.snapshot().prediction_count == 2
+    assert lab.snapshot().trial_count == 2
+
+
+def test_trial_capacity_leaves_declared_prediction_unresolved() -> None:
+    _, topology, candidate, base = _system()
+    lab = SemanticTopologyLearningLab(
+        topology,
+        policy=replace(
+            base.policy,
+            maximum_predictions=3,
+            maximum_trials=1,
+            maximum_unresolved_predictions=3,
+        ),
+    )
+    first = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="trial-a",
+        predicted_at=1.0,
+    )
+    lab.resolve(first.prediction_id, outcome=True, observed_at=2.0)
+    second = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="game",
+        independent_run="trial-b",
+        predicted_at=3.0,
+    )
+
+    with pytest.raises(
+        AgentContractError,
+        match="trial capacity exhausted",
+    ):
+        lab.resolve(second.prediction_id, outcome=True, observed_at=4.0)
+
+    assert lab.unresolved_predictions() == (second,)
+    assert lab.snapshot().trial_count == 1
+
+
 def test_replicated_bridge_promotes_to_active_learned_rule() -> None:
     _, _, candidate, lab = _system()
     _promote(lab, candidate)
