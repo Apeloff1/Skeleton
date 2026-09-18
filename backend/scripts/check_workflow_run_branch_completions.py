@@ -12,6 +12,9 @@ WORKFLOW_RUN_TRIGGER_RE = re.compile(r"(?m)^  workflow_run:\s*(?:#.*)?$")
 HINT_ARRAY_EXPR = "toJSON(github.event.workflow_run.pull_requests.*.number)"
 COMMIT_OID_PATTERN = r"^[0-9a-f]{40}$"
 AUTOMATION_WORKFLOW = "pr-automation-index.yml"
+AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
+    r'(?m)^    branches-ignore:\\s*\\n(?P<items>(?:      - .+\\n)+)'
+)
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
@@ -42,10 +45,23 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
         return findings
 
-    if ALL_BRANCH_GLOBS not in text:
+    has_all_branch_globs = ALL_BRANCH_GLOBS in text
+    automation_main_only_exclusion = False
+    if _is_named(path_name, AUTOMATION_WORKFLOW):
+        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(text)
+        if match is not None:
+            ignored = [
+                line.removeprefix("      - ").strip().strip("'\\\"")
+                for line in match.group("items").splitlines()
+                if line.strip()
+            ]
+            automation_main_only_exclusion = ignored == ["main"]
+
+    if not has_all_branch_globs and not automation_main_only_exclusion:
         findings.append(
             f"{path_name}: workflow_run consumers must match every completing head "
-            'with branches: ["*", "**"]'
+            'with branches: ["*", "**"]; PR Automation may exclude only main '
+            "because scheduled reconciliation covers the default branch"
         )
     if "pull_requests[0]" in text:
         findings.append(
