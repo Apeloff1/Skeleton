@@ -35,6 +35,12 @@ from .research_agenda import (
     ResearchAgenda,
     ResearchAgendaPolicy,
 )
+from .research_assurance import (
+    CompletionCertificate,
+    ResearchAssuranceGate,
+    ResearchEvidenceSummary,
+    ResearchStopPolicy,
+)
 from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
 
 
@@ -50,6 +56,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         epistemic_policy: EpistemicFrontierPolicy | None = None,
         agenda_policy: ResearchAgendaPolicy | None = None,
         tournament_policy: TournamentPolicy | None = None,
+        research_stop_policy: ResearchStopPolicy | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         super().__init__(baseline, policy=policy, clock=clock)
@@ -72,11 +79,18 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             policy=epistemic_policy,
             clock=clock,
         )
+        effective_agenda_policy = agenda_policy or ResearchAgendaPolicy(
+            require_assurance_for_resolution=True,
+        )
         self.research_agenda = ResearchAgenda(
-            policy=agenda_policy,
+            policy=effective_agenda_policy,
             clock=clock,
         )
         self.tournament_policy = tournament_policy or TournamentPolicy()
+        self.research_assurance = ResearchAssuranceGate(
+            policy=research_stop_policy,
+        )
+        self._completion_certificates: dict[str, CompletionCertificate] = {}
         self._last_frontier_snapshot: FrontierSnapshot | None = None
         self._last_agenda_snapshot: AgendaSnapshot | None = None
         self._tournaments: dict[str, HypothesisTournament] = {}
@@ -154,6 +168,40 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             )
             self._last_agenda_snapshot = self.research_agenda.snapshot()
         return update, attempt
+
+    def certify_research_completion(
+        self,
+        summary: ResearchEvidenceSummary,
+        *,
+        resolution_note: str = "",
+    ) -> CompletionCertificate:
+        """Apply the fail-closed research stop gate to one obligation."""
+
+        certificate = self.research_assurance.evaluate(summary)
+        self._completion_certificates[certificate.certificate_id] = certificate
+        if certificate.accepted:
+            for item in self.research_agenda.items_for_obligation(
+                certificate.obligation_id
+            ):
+                self.research_agenda.apply_completion_certificate(
+                    item.agenda_id,
+                    certificate_id=certificate.certificate_id,
+                    accepted=True,
+                    resolution_note=resolution_note,
+                )
+            self._last_agenda_snapshot = self.research_agenda.snapshot()
+        return certificate
+
+    def completion_certificate(
+        self,
+        certificate_id: str,
+    ) -> CompletionCertificate:
+        try:
+            return self._completion_certificates[certificate_id]
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown research completion certificate {certificate_id}"
+            ) from exc
 
     def precommit_research_forecast(
         self,
@@ -248,6 +296,8 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             "deferred": current.deferred_count,
             "unresolved_priority": current.unresolved_priority,
             "snapshot_fingerprint": current.fingerprint,
+            "assurance_required": self.research_agenda.policy.require_assurance_for_resolution,
+            "completion_certificates": len(self._completion_certificates),
         }
 
     def tournament_summary(self) -> dict[str, Any]:
