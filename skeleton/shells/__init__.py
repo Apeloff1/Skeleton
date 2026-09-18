@@ -13,6 +13,8 @@ from skeleton.shells.circuit import CircuitBreaker, CircuitPolicy, CircuitRegist
 from skeleton.shells.commands import CommandCatalog, CommandDefinition
 from skeleton.shells.control_plane import ControlPlaneDecision, ShellControlPlane
 from skeleton.shells.dedupe import DedupeConflict, DedupeRecord, DedupeRegistry
+from skeleton.shells.durable_receipts import DistributedReceiptChain
+from skeleton.shells.evidence_chain import ContentAddressedEvidenceChain, EvidenceConflict, EvidenceCorruption, EvidenceHead, EvidenceNode, EvidenceStateBackend, GENESIS_HASH
 from skeleton.shells.environment import EnvironmentPolicy, EnvironmentValueRule
 from skeleton.shells.errors import (
     ArgumentRejected,
@@ -101,6 +103,14 @@ from skeleton.shells.worker import (
 )
 
 __all__ = [
+    "DistributedReceiptChain",
+    "ContentAddressedEvidenceChain",
+    "EvidenceConflict",
+    "EvidenceCorruption",
+    "EvidenceHead",
+    "EvidenceNode",
+    "EvidenceStateBackend",
+    "GENESIS_HASH",
     "AdmissionDecision", "ArgumentPolicy", "ArgumentPolicySet", "ArgumentRejected", "AuditEvent",
     "BatchExecutor", "BatchItem", "BatchResult", "CapabilityDenied", "CapabilityGrant", "ChainedReceipt",
     "CircuitBreaker", "CircuitOpen", "CircuitPolicy", "CircuitRegistry", "CircuitSnapshot", "CircuitState",
