@@ -74,6 +74,19 @@ class ContextKind(str, Enum):
     TOOL = "tool"
     SCRATCH = "scratch"
 
+    # Canonical storage classes.  These are explicit because the fast
+    # memory-game index must be able to rehydrate the exact durable source
+    # rather than flattening every long-form record into generic semantic or
+    # episodic memory.
+    JOURNAL = "journal"
+    LOG = "log"
+    DIARY = "diary"
+    ANNAL = "annal"
+    CHRONICLE = "chronicle"
+    DATABASE = "database"
+    CACHE = "cache"
+    FILE = "file"
+
 
 class PatchOperation(str, Enum):
     UPSERT = "upsert"
