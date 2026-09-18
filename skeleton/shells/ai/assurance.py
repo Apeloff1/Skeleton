@@ -69,10 +69,11 @@ class AIExecutionAssuranceInspector:
         band: RiskBand,
         *,
         sealed: bool,
-        backend_id: str,
+        sandbox_verified: bool,
+        backend_id: str = "",
     ) -> AssuranceDecision:
         required = self.policy.for_band(band)
-        sandboxed = backend_id.startswith("sandbox:")
+        sandboxed = bool(sandbox_verified)
         reasons = []
         if required is AssuranceLevel.DENIED:
             reasons.append("risk band is denied by execution assurance policy")
@@ -96,11 +97,13 @@ class AIExecutionAssuranceInspector:
         band: RiskBand,
         *,
         sealed: bool,
-        backend_id: str,
+        sandbox_verified: bool,
+        backend_id: str = "",
     ) -> AssuranceDecision:
         decision = self.inspect(
             band,
             sealed=sealed,
+            sandbox_verified=sandbox_verified,
             backend_id=backend_id,
         )
         if not decision.allowed:
