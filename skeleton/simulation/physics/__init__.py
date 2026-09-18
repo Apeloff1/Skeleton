@@ -2,6 +2,13 @@
 
 from .body import BodyType, RigidBody
 from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
+from .character import (
+    CharacterControllerSettings,
+    CharacterGroundState,
+    CharacterMoveResult,
+    CharacterSweepHit,
+    KinematicCapsuleController,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -136,6 +143,10 @@ __all__ = [
     "AABB",
     "BodyNotFoundError",
     "CCDHit",
+    "CharacterControllerSettings",
+    "CharacterGroundState",
+    "CharacterMoveResult",
+    "CharacterSweepHit",
     "CommandCorrectionReceipt",
     "ConstraintColorBatch",
     "ConstraintColorSchedule",
@@ -178,6 +189,7 @@ __all__ = [
     "IslandGraphStats",
     "IslandSolveReceipt",
     "JumpTuning",
+    "KinematicCapsuleController",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
