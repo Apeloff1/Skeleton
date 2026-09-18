@@ -65,6 +65,7 @@ from .world_model import (
     Hypothesis,
     Proposition,
     WorldModel,
+    WorldModelError,
 )
 
 
@@ -239,29 +240,11 @@ class JeevesCortex:
                     raise CortexError("existing cortex run scope does not match inputs")
                 if prior.metadata.get("goal_id") != inputs.goal.goal_id:
                     raise CortexError("existing cortex run goal does not match inputs")
-                if (
-                    evidence_ledger is not None
-                    and prior.world.evidence_ledger is not evidence_ledger
-                ):
-                    referenced = {
-                        evidence_id
-                        for belief in prior.world.beliefs()
-                        for evidence_id in (
-                            *belief.supporting_evidence_ids,
-                            *belief.refuting_evidence_ids,
-                        )
-                    }
-                    missing = sorted(
-                        evidence_id
-                        for evidence_id in referenced
-                        if evidence_ledger.get(evidence_id) is None
-                    )
-                    if missing:
-                        raise CortexError(
-                            "replacement evidence ledger is missing referenced evidence: "
-                            + ", ".join(missing[:8])
-                        )
-                    prior.world.evidence_ledger = evidence_ledger
+                if evidence_ledger is not None:
+                    try:
+                        prior.world.bind_evidence_ledger(evidence_ledger)
+                    except WorldModelError as exc:
+                        raise CortexError(str(exc)) from exc
                 return prior
             world = self.world_model.graph(scope, evidence_ledger=evidence_ledger)
             state = RunCognitiveState(
