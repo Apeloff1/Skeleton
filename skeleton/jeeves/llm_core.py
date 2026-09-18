@@ -43,14 +43,15 @@ _PROVIDER_ERROR_CONTENT = "[provider unavailable]"
 
 
 def _bounded_identifier(name: str, value: Any, *, maximum: int = _MAX_IDENTIFIER_CHARS) -> str:
-    """Validate public identity-like strings without coercing attacker objects."""
+    """Validate and canonicalize public identity-like strings."""
     if not isinstance(value, str):
         raise ValueError(f"{name} must be a string")
-    if not value.strip():
+    normalized = value.strip()
+    if not normalized:
         raise ValueError(f"{name} must be non-empty")
-    if len(value) > maximum:
+    if len(normalized) > maximum:
         raise ValueError(f"{name} too large")
-    return value
+    return normalized
 
 
 def _positive_limit(name: str, value: Any, *, maximum: int = 10_000) -> int:
