@@ -401,6 +401,35 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 "semantic advisory snapshot cannot carry factual/causal authority"
             )
 
+        if (
+            snapshot.runtime_state_fingerprint
+            != semantic_plane.runtime_state_fingerprint
+        ):
+            raise AdaptiveRuntimeError(
+                "semantic advisory runtime state revision is stale"
+            )
+        if (
+            snapshot.runtime_state_fingerprint
+            != semantic_plane.runtime_state_fingerprint
+        ):
+            with self._adaptive_lock:
+                self._semantic_reasoning_snapshots.pop(
+                    state.run_id,
+                    None,
+                )
+            self.metrics.increment(
+                "agent.frontier.semantic_advisory_stale"
+            )
+            state.trace.emit(
+                "frontier.semantic_advisory_stale",
+                {
+                    "run_id": state.run_id,
+                    "snapshot": snapshot.fingerprint,
+                    "reason": "semantic_runtime_state_changed",
+                },
+            )
+            return ()
+
         current_learning = semantic_plane.topology_learning.snapshot()
         if (
             snapshot.topology_learning.fingerprint
