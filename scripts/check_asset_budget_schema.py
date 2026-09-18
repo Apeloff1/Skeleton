@@ -20,7 +20,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S070-asset-budget-schema"
+TASK_ID = "reserve-S070-asset-budget-schema"
 CONFLICT_DOMAIN = "assets.spec.budget_evidence"
 AXES: tuple[str, ...] = ("memory", "disk", "dimension", "duration", "complexity")
 KINDS: tuple[str, ...] = (

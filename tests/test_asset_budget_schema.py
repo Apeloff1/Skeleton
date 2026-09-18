@@ -11,7 +11,7 @@ from scripts.check_asset_budget_schema import (
     DOCUMENT_FIELDS,
     KINDS,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     main,
     validate_asset_budget,
 )
@@ -100,7 +100,7 @@ def _doc(**overrides):
 
 
 def test_schema_identity_is_stable() -> None:
-    assert TASK_KEY == "reserve-S070-asset-budget-schema"
+    assert TASK_ID == "reserve-S070-asset-budget-schema"
     assert CONFLICT_DOMAIN == "assets.spec.budget_evidence"
     assert SCHEMA_VERSION == 1
     assert AXES == ("memory", "disk", "dimension", "duration", "complexity")
