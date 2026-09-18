@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from skeleton.jeeves.agent.semantic_frontier import (
@@ -20,6 +22,7 @@ from skeleton.jeeves.agent.semantic_plane import (
 from skeleton.jeeves.agent.semantic_topology_learning import (
     SemanticTopologyLearningLab,
     TopologyBridgePolicy,
+    TopologyBridgePrediction,
     TopologyBridgeStatus,
     TopologyBridgeTrial,
 )
@@ -62,23 +65,33 @@ def _trial(
     run: str | None = None,
     negative_control: bool = False,
 ) -> TopologyBridgeTrial:
-    return TopologyBridgeTrial(
-        trial_id=f"bridge-trial:{index}",
+    prediction = TopologyBridgePrediction(
+        prediction_id=(
+            f"bridge-prediction:{kind.value}:{index}"
+        ),
         candidate_id=candidate.candidate_id,
         candidate_fingerprint=lab.candidate_fingerprint(candidate),
         left_key=candidate.left_key,
         right_key=candidate.right_key,
         kind=kind,
         predicted_probability=probability,
-        outcome=outcome,
         domain=domain,
         independent_run=run or f"run-{index}",
         predicted_at=float(index * 2),
-        observed_at=float(index * 2 + 1),
         negative_control=negative_control,
-        source_finding_ids=(f"finding:{index}:left", f"finding:{index}:right"),
+        source_finding_ids=(
+            f"finding:{index}:left",
+            f"finding:{index}:right",
+        ),
         source_forecast_ids=(f"forecast:{index}",),
         metadata={"predeclared": True},
+    )
+    lab.declare(prediction)
+    return TopologyBridgeTrial.from_prediction(
+        prediction,
+        trial_id=f"bridge-trial:{kind.value}:{index}",
+        outcome=outcome,
+        observed_at=float(index * 2 + 1),
     )
 
 
@@ -127,19 +140,9 @@ def _promote(
 def test_bridge_trial_is_bound_to_exact_candidate_fingerprint() -> None:
     _, _, candidate, lab = _system()
     trial = _trial(lab, candidate, 1)
-    mutated = TopologyBridgeTrial(
-        trial_id=trial.trial_id,
-        candidate_id=trial.candidate_id,
+    mutated = replace(
+        trial,
         candidate_fingerprint="0" * 64,
-        left_key=trial.left_key,
-        right_key=trial.right_key,
-        kind=trial.kind,
-        predicted_probability=trial.predicted_probability,
-        outcome=trial.outcome,
-        domain=trial.domain,
-        independent_run=trial.independent_run,
-        predicted_at=trial.predicted_at,
-        observed_at=trial.observed_at,
     )
 
     with pytest.raises(
@@ -151,23 +154,27 @@ def test_bridge_trial_is_bound_to_exact_candidate_fingerprint() -> None:
 
 def test_bridge_trial_rejects_post_outcome_prediction() -> None:
     _, _, candidate, lab = _system()
+    prediction = TopologyBridgePrediction(
+        prediction_id="bridge-prediction:time",
+        candidate_id=candidate.candidate_id,
+        candidate_fingerprint=lab.candidate_fingerprint(candidate),
+        left_key=candidate.left_key,
+        right_key=candidate.right_key,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.8,
+        domain="film",
+        independent_run="run-time",
+        predicted_at=20.0,
+    )
+    lab.declare(prediction)
 
     with pytest.raises(
         AgentContractError,
         match="outcome cannot predate",
     ):
-        TopologyBridgeTrial(
-            trial_id="bridge-trial:time",
-            candidate_id=candidate.candidate_id,
-            candidate_fingerprint=lab.candidate_fingerprint(candidate),
-            left_key=candidate.left_key,
-            right_key=candidate.right_key,
-            kind=LensInteractionKind.REINFORCES,
-            predicted_probability=0.8,
+        lab.resolve(
+            prediction.prediction_id,
             outcome=True,
-            domain="film",
-            independent_run="run-time",
-            predicted_at=20.0,
             observed_at=19.0,
         )
 
