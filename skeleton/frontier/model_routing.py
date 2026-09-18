@@ -124,14 +124,12 @@ def _normalize_capabilities(
             value = capability.value
         elif isinstance(capability, str):
             value = capability.strip().lower()
+            if value != capability:
+                raise ValueError(f"{field_name} entries must be normalized")
         else:
             raise TypeError(f"{field_name} entries must be strings")
         if not value:
             raise ValueError(f"{field_name} entries must not be empty")
-        if value != str(capability).strip().lower() and not isinstance(
-            capability, ModelCapability
-        ):
-            raise ValueError(f"{field_name} entries must be normalized")
         normalized.add(value)
     if not normalized and not allow_empty:
         raise ValueError(f"{field_name} must not be empty")
@@ -909,10 +907,16 @@ class ModelRouter:
             actual_cost = _usage_cost(metadata, response.usage)
             spent_cost += actual_cost
             spent_output += response.usage.output_tokens
-            if (
+            cost_exhausted = (
                 request.budget.max_cost is not None
                 and spent_cost > request.budget.max_cost
-            ):
+            )
+            output_exhausted = (
+                request.budget.max_output_tokens is not None
+                and spent_output > request.budget.max_output_tokens
+            )
+            provider_output_exhausted = response.usage.output_tokens > planned_output
+            if cost_exhausted or output_exhausted or provider_output_exhausted:
                 attempts.append(
                     AttemptRecord(
                         provider_id=metadata.provider_id,
@@ -970,10 +974,10 @@ class ModelRouter:
             request,
             remaining_output=request.budget.max_output_tokens,
         )
-        total_tokens = request.estimated_input_tokens + planned_output
-        if total_tokens > metadata.max_input_tokens:
+        if request.estimated_input_tokens > metadata.max_input_tokens:
             reasons.append(
-                f"context {total_tokens} exceeds {metadata.max_input_tokens}"
+                "input tokens "
+                f"{request.estimated_input_tokens} exceeds {metadata.max_input_tokens}"
             )
         if (
             request.max_output_tokens is not None
