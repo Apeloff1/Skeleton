@@ -101,17 +101,41 @@ jobs:
               except urllib.error.URLError:
                   return 0, None
 
-          def cancel(run_id):
+          def post_with_retry(path):
               status = 0
               for attempt in range(3):
-                  status, _ = request(
-                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
-                      method='POST',
-                  )
+                  status, _ = request(path, method='POST')
                   if status not in retryable:
                       return status
                   if attempt < 2:
                       time.sleep(2 ** attempt)
+              return status
+
+          def run_completed(run_id):
+              status, payload = request(f'/repos/{repo}/actions/runs/{run_id}')
+              return (
+                  status == 200
+                  and isinstance(payload, dict)
+                  and payload.get('status') == 'completed'
+              )
+
+          def cancel(run_id):
+              status = post_with_retry(
+                  f'/repos/{repo}/actions/runs/{run_id}/cancel'
+              )
+              if status in {200, 202, 404}:
+                  return status
+              if status in {409, 422} and run_completed(run_id):
+                  return status
+              if status in {409, 422} or status in retryable:
+                  forced = post_with_retry(
+                      f'/repos/{repo}/actions/runs/{run_id}/force-cancel'
+                  )
+                  if forced in {200, 202, 404}:
+                      return forced
+                  if forced in {409, 422} and run_completed(run_id):
+                      return forced
+                  return forced
               return status
 
           def main_sha():
