@@ -170,6 +170,21 @@ from .execution_audit import (
     ReplayReport,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .frontier_consensus import (
+    ConsensusCluster,
+    ConsensusMember,
+    ConsensusPolicy,
+    ConsensusResult,
+    ConsensusSelector,
+    merge_search_results,
+    promote_consensus,
+)
+from .frontier_feedback import (
+    FrontierFeedbackRecommendation,
+    FrontierFeedbackReport,
+    FrontierFeedbackSample,
+    FrontierReasoningFeedback,
+)
 from .frontier_reasoning import (
     CandidateAssessment as FrontierCandidateAssessment,
     EscalationCause as FrontierEscalationCause,
