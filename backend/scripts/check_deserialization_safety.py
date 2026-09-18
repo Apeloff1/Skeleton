@@ -213,7 +213,7 @@ def stable_module_aliases(
             if name in resolved:
                 continue
             source = canonical_name(value, working)
-            if source not in TRACKED_MODULES:
+            if source is None or source.split(".", 1)[0] not in TRACKED_MODULES:
                 continue
             resolved[name] = source
             working[name] = source
