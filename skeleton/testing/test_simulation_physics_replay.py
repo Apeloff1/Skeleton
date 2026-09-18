@@ -587,11 +587,14 @@ def test_failed_late_input_correction_restores_world_commands_and_history() -> N
     before_ticks = session.history.ticks()
     original_frame = session.commands.frame(1)
 
-    class _FailingConstraintSolver:
-        def solve(self, bodies, joints, *, dt):
+    class _FailingBroadPhase:
+        def compute_pairs(self, bodies):
             raise RuntimeError("synthetic correction failure")
 
-    world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
+    # Island solving legitimately skips the constraint solver when no joints
+    # exist. The broad phase is unconditional, so this still proves failed
+    # late-input resimulation restores world, command tape, and history exactly.
+    world._broad_phase = _FailingBroadPhase()  # type: ignore[assignment]
 
     with pytest.raises(RuntimeError, match="synthetic correction failure"):
         session.correct_and_resimulate(
