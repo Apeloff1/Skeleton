@@ -18,7 +18,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S400-saturation-metrics"
+TASK_ID = "reserve-S400-saturation-metrics"
 CONFLICT_DOMAIN = "ops.spec.saturation_metrics"
 INT_FIELDS: tuple[str, ...] = (
     "runnable_depth",
