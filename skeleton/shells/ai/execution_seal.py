@@ -72,12 +72,20 @@ class ExecutionSealAuthority:
         self,
         key: bytes,
         *,
-        clock: Callable[[], float] = time.monotonic,
+        clock: Callable[[], float] = time.time,
+        max_ttl_seconds: float = 300.0,
+        max_clock_skew_seconds: float = 5.0,
     ) -> None:
         if not isinstance(key, bytes) or len(key) < 32:
             raise ValueError("execution seal key must be at least 32 bytes")
+        if max_ttl_seconds <= 0:
+            raise ValueError("execution seal maximum TTL must be positive")
+        if max_clock_skew_seconds < 0:
+            raise ValueError("execution seal clock skew may not be negative")
         self._key = key
         self._clock = clock
+        self.max_ttl_seconds = max_ttl_seconds
+        self.max_clock_skew_seconds = max_clock_skew_seconds
 
     def _signature(self, payload: dict[str, object]) -> str:
         raw = json.dumps(
@@ -99,6 +107,8 @@ class ExecutionSealAuthority:
     ) -> ExecutionSeal:
         if ttl_seconds <= 0:
             raise ValueError("execution seal TTL must be positive")
+        if ttl_seconds > self.max_ttl_seconds:
+            raise ValueError("execution seal TTL exceeds authority maximum")
         now = self._clock()
         nonce = secrets.token_hex(16)
         seed = f"{principal}:{session_id}:{nonce}:{now}".encode()
@@ -137,7 +147,12 @@ class ExecutionSealAuthority:
         preconditions_digest: str = "",
         approval_id: str = "",
     ) -> None:
-        if seal.expires_at <= self._clock():
+        now = self._clock()
+        if seal.issued_at > now + self.max_clock_skew_seconds:
+            raise ExecutionSealError("execution seal issue time is too far in the future")
+        if seal.expires_at - seal.issued_at > self.max_ttl_seconds:
+            raise ExecutionSealError("execution seal TTL exceeds authority maximum")
+        if seal.expires_at <= now:
             raise ExecutionSealError("execution seal expired")
         if seal.principal != principal:
             raise ExecutionSealError("execution seal principal mismatch")
