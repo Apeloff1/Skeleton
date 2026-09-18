@@ -442,11 +442,14 @@ def evaluate_release_ready(
     seen_ids: set[str] = set()
     asset_digests = _asset_digests(document.asset_provenance)
     for artifact in document.artifacts:
-        if artifact.artifact_id in seen_ids:
+        if not isinstance(artifact.artifact_id, str):
+            reasons.append("artifact id must be a string")
+        elif artifact.artifact_id in seen_ids:
             reasons.append(f"duplicate artifact id: {artifact.artifact_id}")
         elif not _TOKEN_RE.fullmatch(artifact.artifact_id):
             reasons.append(f"artifact id is not a canonical token: {artifact.artifact_id}")
-        seen_ids.add(artifact.artifact_id)
+        if isinstance(artifact.artifact_id, str):
+            seen_ids.add(artifact.artifact_id)
         reasons.extend(
             _reasons_file_ref("artifact", artifact.name, artifact.sha256, artifact.size)
         )
@@ -698,8 +701,9 @@ def _reasons_locator(label: str, locator: ArtifactLocator, size: int, name: str)
 
 def _reasons_file_ref(label: str, name: str, digest: str, size: int) -> list[str]:
     reasons: list[str] = []
-    if not isinstance(name, str) or not name.strip() or name != name.strip():
-        reasons.append(f"{label} name must be a non-empty canonical path")
+    name_error = _canonical_name_error(name)
+    if name_error is not None:
+        reasons.append(f"{label} name {name_error}")
     if not isinstance(digest, str) or not _SHA256_RE.fullmatch(digest):
         reasons.append(f"{label} digest must be a lowercase SHA-256")
     if isinstance(size, bool) or not isinstance(size, int) or size < 0:
@@ -716,17 +720,24 @@ def _reasons_test_records(
     reasons: list[str] = []
     seen: set[str] = set()
     for item in records:
-        if item.evidence_id in seen:
-            reasons.append(f"duplicate {label} id: {item.evidence_id}")
-        seen.add(item.evidence_id)
-        if not _TOKEN_RE.fullmatch(item.evidence_id):
-            reasons.append(f"{label} id is not a canonical token: {item.evidence_id}")
-        if not item.name.strip():
-            reasons.append(f"{label} {item.evidence_id} is missing a name")
-        if not _SHA256_RE.fullmatch(item.sha256):
-            reasons.append(f"{label} {item.evidence_id} digest must be a lowercase SHA-256")
-        if require_pass and item.result not in _PASS_RESULTS:
-            reasons.append(f"{label} {item.evidence_id} result is not passing")
+        evidence_id = item.evidence_id
+        if not isinstance(evidence_id, str):
+            reasons.append(f"{label} id must be a string")
+        else:
+            if evidence_id in seen:
+                reasons.append(f"duplicate {label} id: {evidence_id}")
+            seen.add(evidence_id)
+            if not _TOKEN_RE.fullmatch(evidence_id):
+                reasons.append(f"{label} id is not a canonical token: {evidence_id}")
+        name_error = _canonical_name_error(item.name)
+        if name_error is not None:
+            reasons.append(f"{label} {evidence_id} name {name_error}")
+        if not isinstance(item.sha256, str) or not _SHA256_RE.fullmatch(item.sha256):
+            reasons.append(f"{label} {evidence_id} digest must be a lowercase SHA-256")
+        if not isinstance(item.result, str) or (
+            require_pass and item.result not in _PASS_RESULTS
+        ):
+            reasons.append(f"{label} {evidence_id} result is not passing")
     return reasons
 
 
@@ -963,9 +974,25 @@ def _require_digest(value: Any) -> str:
     return value
 
 
+def _canonical_name_error(value: Any) -> str | None:
+    if not isinstance(value, str) or not value or value != value.strip():
+        return "must be a non-empty canonical path"
+    if value.startswith("/") or "\\" in value:
+        return "must be a repository-relative POSIX path"
+    if any(ord(char) < 32 for char in value):
+        return "must not contain control characters"
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return "must not contain empty, dot, or parent path segments"
+    if re.fullmatch(r"[A-Za-z]:", parts[0]):
+        return "must not contain a Windows drive prefix"
+    return None
+
+
 def _require_name(value: Any) -> str:
-    if not isinstance(value, str) or not value.strip() or value != value.strip():
-        raise EvidenceSchemaError("name must be a non-empty canonical path")
+    error = _canonical_name_error(value)
+    if error is not None:
+        raise EvidenceSchemaError(f"name {error}")
     return value
 
 
