@@ -430,6 +430,7 @@ from .semantic_plane import (
     SemanticFindingAudit,
     SemanticLensPlane,
     SemanticPlaneCoverage,
+    SemanticPlaneLearningUpdate,
     SemanticPlanePolicy,
     SemanticPlaneSnapshot,
 )
