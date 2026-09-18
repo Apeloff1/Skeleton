@@ -11,7 +11,10 @@ from skeleton.shells.ai.catalog import AIToolCatalog
 from skeleton.shells.ai.compiler import AIPlanCompiler
 from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
-from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.distributed_state import (
+    DistributedStateConflict,
+    InMemoryFencedStore,
+)
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttemptStore,
