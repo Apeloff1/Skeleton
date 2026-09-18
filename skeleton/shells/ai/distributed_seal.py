@@ -42,6 +42,7 @@ class DistributedExecutionSealRegistry:
         plan_pin,
         preconditions_digest: str = "",
         approval_id: str = "",
+        release_evidence_digest: str = "",
     ) -> SealUse:
         self.authority.verify(
             seal,
@@ -50,6 +51,7 @@ class DistributedExecutionSealRegistry:
             plan_pin=plan_pin,
             preconditions_digest=preconditions_digest,
             approval_id=approval_id,
+            release_evidence_digest=release_evidence_digest,
         )
         use = SealUse(
             seal.seal_id,
