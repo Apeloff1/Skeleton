@@ -952,6 +952,50 @@ class Authority:
         if packet.checksum != expected_checksum:
             raise ReplicationError("packet checksum mismatch", context={"kind": "ack"})
         ack = _ack_from_payload(packet.payload)
+        if packet.sequence != ack.last_applied_sequence:
+            raise SequenceError(
+                "ack packet sequence does not match applied sequence",
+                context={
+                    "packet_sequence": packet.sequence,
+                    "last_applied_sequence": ack.last_applied_sequence,
+                },
+            )
+        if ack.last_applied_sequence > self.sequence:
+            raise SequenceError(
+                "ack claims a future applied sequence",
+                context={
+                    "authority_sequence": self.sequence,
+                    "last_applied_sequence": ack.last_applied_sequence,
+                },
+            )
+        if ack.last_received_sequence < ack.last_applied_sequence:
+            raise SequenceError(
+                "ack received sequence is behind applied sequence",
+                context={
+                    "last_applied_sequence": ack.last_applied_sequence,
+                    "last_received_sequence": ack.last_received_sequence,
+                },
+            )
+        if tuple(sorted(set(ack.missing_sequences))) != ack.missing_sequences:
+            raise ReplicationError("ack missing_sequences must be sorted and unique")
+        if any(
+            sequence <= ack.last_applied_sequence
+            or sequence > ack.last_received_sequence
+            for sequence in ack.missing_sequences
+        ):
+            raise SequenceError(
+                "ack missing sequence lies outside the reported gap",
+                context={
+                    "last_applied_sequence": ack.last_applied_sequence,
+                    "last_received_sequence": ack.last_received_sequence,
+                },
+            )
+        retained = self._core._frame(ack.last_applied_sequence)
+        if retained is not None and ack.last_applied_digest != retained.digest:
+            raise ReplicationError(
+                "ack applied digest does not match retained authority history",
+                context={"sequence": ack.last_applied_sequence},
+            )
         self._acks[ack.peer_id] = ack
         return ack
 
