@@ -332,9 +332,15 @@ class EvidenceJeevesCore(JeevesCore):
                 raise _EvidencePolicyError("provenance_not_registered")
             return raw
 
-        now = float(self._evidence_clock())
+        raw_now = self._evidence_clock()
+        if isinstance(raw_now, bool):
+            raise _EvidencePolicyError("invalid_clock")
+        try:
+            now = float(raw_now)
+        except (TypeError, ValueError) as exc:
+            raise _EvidencePolicyError("invalid_clock") from exc
         if not math.isfinite(now) or now < 0.0:
-            raise RuntimeError("evidence_clock returned an invalid timestamp")
+            raise _EvidencePolicyError("invalid_clock")
 
         if isinstance(raw, EvidenceResult):
             data = raw.data
