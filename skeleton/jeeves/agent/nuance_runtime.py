@@ -27,15 +27,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .context_pipeline import ContextResolution, LayeredContextResolver
+from .associative_memory import AssociationKind, SequencePrediction
+from .context_pipeline import ContextResolution, ContextTier, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
-from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
+from .semantic_lenses import (
+    JuxtapositionAnalyzer,
+    JuxtapositionSignal,
+    LensFamily,
+    LensSelection,
+    SemanticFinding,
+    SemanticObservation,
+    TangentSeed,
+)
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
 from .semantic_tangent_bridge import SemanticRestartPacket, SemanticTangentBridge
-from .tangent_graph import TangentNode
-from .types import AgentContractError, bounded_text, json_safe, positive_int, stable_fingerprint, stable_id
+from .tangent_graph import ExplorationAxis, TangentNode
+from .types import AgentContractError, bounded_text, json_safe, positive_int, probability, stable_fingerprint, stable_id
 from .uncertainty_frontier import FrontierLens, FrontierLensContract, FrontierLensRegistry
 
 
@@ -70,6 +79,8 @@ class NuanceFrame:
     uncertainty_recommendations: tuple[UncertaintyRecommendation, ...]
     captured_card_id: str | None
     fingerprint: str
+    juxtaposition_signals: tuple[JuxtapositionSignal, ...] = ()
+    sequence_prediction: SequencePrediction | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +99,11 @@ class NuanceRuntimePolicy:
     max_lenses_per_family: int = 4
     minimum_rare_lenses_when_supported: int = 2
     maximum_uncertainty_recommendations: int = 8
+    link_recent_cards: int = 2
+    max_perpendicular_tangents: int = 8
+    minimum_perpendicular_activation: float = 0.34
     capture_interactions: bool = True
+    preserve_perpendicular_before_restart: bool = True
     require_selected_lens_for_findings: bool = False
     require_observation_provenance: bool = True
 
@@ -98,8 +113,30 @@ class NuanceRuntimePolicy:
             "max_lenses_per_family",
             "minimum_rare_lenses_when_supported",
             "maximum_uncertainty_recommendations",
+            "link_recent_cards",
+            "max_perpendicular_tangents",
         ):
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1000))
+        object.__setattr__(
+            self,
+            "minimum_perpendicular_activation",
+            probability("minimum_perpendicular_activation", self.minimum_perpendicular_activation),
+        )
+
+
+
+_FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
+    LensFamily.FILM: ExplorationAxis.CINEMATIC,
+    LensFamily.LITERATURE: ExplorationAxis.LITERARY,
+    LensFamily.GAME: ExplorationAxis.LUDIC,
+    LensFamily.NARRATIVE: ExplorationAxis.SEMANTIC,
+    LensFamily.SEMIOTIC: ExplorationAxis.SEMANTIC,
+    LensFamily.COGNITIVE: ExplorationAxis.MEMORY,
+    LensFamily.RHETORIC: ExplorationAxis.SEMANTIC,
+    LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
+    LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
+    LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
+}
 
 
 class FrontierUncertaintyRouter:
@@ -247,6 +284,9 @@ class ScientificNuanceRuntime:
         query = bounded_text("nuance query", query, maximum=32_000)
 
         # Correctness boundary: resolve before capturing the current interaction.
+        # Snapshot recent cards first so the newly captured prompt cannot become
+        # its own predecessor in temporal/sequence memory.
+        recent_preexisting = self.resolver.cards.store.namespace_cards(namespace)[: self.policy.link_recent_cards]
         context = self.resolver.resolve(namespace, query, context_tags=context_tags)
         query_observation_id = stable_id(
             "semantic-current-input",
@@ -268,6 +308,14 @@ class ScientificNuanceRuntime:
             self._observation_from_context(item, position)
             for position, item in enumerate(context.items, start=1)
         )
+        # Structural juxtaposition is measured before any model-generated
+        # interpretation.  It identifies where context/contrast lenses deserve
+        # attention without claiming what the juxtaposition means.
+        juxtaposition_signals = tuple(
+            JuxtapositionAnalyzer.compare(left, right)
+            for left, right in zip(observations, observations[1:])
+        )
+
         selection = self.semantic_router.select_frontier(
             observations,
             requested=requested_lenses,
@@ -279,6 +327,15 @@ class ScientificNuanceRuntime:
             " ".join([query, *(item.content for item in context.items[:8])]),
             limit=self.policy.maximum_uncertainty_recommendations,
         )
+
+        # Sequence prediction is read from pre-existing traces only.  The
+        # current input cannot leak into a prediction about itself.
+        sequence_prediction: SequencePrediction | None = None
+        if self.resolver.associations is not None and recent_preexisting:
+            prefix = tuple(card.card_id for card in reversed(recent_preexisting))
+            candidate_prediction = self.resolver.associations.predict_next(namespace, prefix, limit=8)
+            if candidate_prediction.evidence_count > 0:
+                sequence_prediction = candidate_prediction
 
         should_capture = self.policy.capture_interactions if capture_interaction is None else bool(capture_interaction)
         captured: InteractionCard | None = None
@@ -297,6 +354,56 @@ class ScientificNuanceRuntime:
                     **dict(interaction_metadata or {}),
                 },
             )
+            if self.resolver.associations is not None and recent_preexisting:
+                previous_ids = tuple(card.card_id for card in reversed(recent_preexisting))
+                self.resolver.associations.observe_sequence(
+                    namespace,
+                    (*previous_ids, captured.card_id),
+                    kind=AssociationKind.TEMPORAL_FORWARD,
+                    evidence_ids=interaction_provenance,
+                    tags=context_tags,
+                )
+
+                # A structural context shift can be indexed as a candidate
+                # relation, but never as proof that interpretation changed.
+                previous = recent_preexisting[0]
+                structural = JuxtapositionAnalyzer.compare(
+                    SemanticObservation(
+                        observation_id=previous.card_id,
+                        content=previous.content,
+                        position=0,
+                        source=previous.source,
+                        tags=previous.context_tags,
+                        evidence_ids=previous.provenance,
+                    ),
+                    SemanticObservation(
+                        observation_id=captured.card_id,
+                        content=captured.content,
+                        position=1,
+                        source=captured.source,
+                        tags=captured.context_tags,
+                        evidence_ids=captured.provenance,
+                    ),
+                )
+                if structural.changed_context or structural.contrast_signal >= 0.35:
+                    self.resolver.associations.observe(
+                        namespace,
+                        previous.card_id,
+                        captured.card_id,
+                        kind=AssociationKind.CONTEXT_SHIFT,
+                        strength=min(1.0, 0.35 + 0.45 * structural.contrast_signal + 0.20 * structural.novelty_signal),
+                        success=None,
+                        surprise=structural.novelty_signal,
+                        direction_confidence=0.55,
+                        evidence_ids=interaction_provenance,
+                        tags=(*tuple(context_tags), "structural-context-shift"),
+                        metadata={
+                            "structural_probe": True,
+                            "interpretation_change_not_asserted": True,
+                            "juxtaposition_left": structural.left_id,
+                            "juxtaposition_right": structural.right_id,
+                        },
+                    )
 
         frame_id = stable_id(
             "nuance-frame",
@@ -316,6 +423,17 @@ class ScientificNuanceRuntime:
                 "observations": [item.fingerprint for item in observations],
                 "lenses": [item.key for item in selection.lenses],
                 "uncertainty": [item.lens.value for item in uncertainty],
+                "juxtaposition": [
+                    (
+                        item.left_id,
+                        item.right_id,
+                        round(item.contrast_signal, 10),
+                        round(item.novelty_signal, 10),
+                        item.changed_context,
+                    )
+                    for item in juxtaposition_signals
+                ],
+                "sequence_prediction": sequence_prediction.fingerprint if sequence_prediction is not None else None,
                 "captured_card": captured.card_id if captured else None,
             }
         )
@@ -329,6 +447,8 @@ class ScientificNuanceRuntime:
             uncertainty_recommendations=uncertainty,
             captured_card_id=captured.card_id if captured else None,
             fingerprint=fingerprint,
+            juxtaposition_signals=juxtaposition_signals,
+            sequence_prediction=sequence_prediction,
         )
         self._frames[frame_id] = frame
         return frame
@@ -415,11 +535,69 @@ class ScientificNuanceRuntime:
         self._updates[frame.frame_id] = update
         return update
 
+    def _preserve_perpendicular_lens_tangents(self, frame: NuanceFrame, *, sequence: int) -> tuple[TangentNode, ...]:
+        """Persist one active research direction per lens family before restart.
+
+        Lens activation is not a semantic finding.  These nodes therefore carry
+        no evidence and remain high-evidence-gap research directions.
+        """
+        if not self.policy.preserve_perpendicular_before_restart:
+            return ()
+        scores = frame.lens_selection.activation_scores
+        best_by_family: dict[LensFamily, Any] = {}
+        for spec in frame.lens_selection.lenses:
+            score = float(scores.get(spec.key, 0.0))
+            if score < self.policy.minimum_perpendicular_activation:
+                continue
+            current = best_by_family.get(spec.family)
+            if current is None or (score, spec.key) > (float(scores.get(current.key, 0.0)), current.key):
+                best_by_family[spec.family] = spec
+
+        ranked = sorted(
+            best_by_family.values(),
+            key=lambda spec: (-float(scores.get(spec.key, 0.0)), spec.family.value, spec.key),
+        )[: self.policy.max_perpendicular_tangents]
+        nodes: list[TangentNode] = []
+        for spec in ranked:
+            score = float(scores.get(spec.key, 0.0))
+            direction = spec.asks[0] if spec.asks else spec.predicts
+            seed = TangentSeed(
+                seed_id=stable_id(
+                    "nuance-pre-restart",
+                    {"frame": frame.fingerprint, "lens": spec.key, "family": spec.family.value},
+                    length=28,
+                ),
+                parent_fingerprint=frame.fingerprint,
+                lens_key=spec.key,
+                direction=direction,
+                rationale=(
+                    "Perpendicular lens direction preserved before restart/replan. "
+                    "Activation is a routing signal, not evidence or a semantic finding."
+                ),
+                novelty=min(1.0, 0.55 + (0.20 if spec.rare else 0.0) + 0.25 * score),
+                expected_value=min(1.0, 0.35 + 0.55 * score),
+                evidence_ids=(),
+                tags=("nuance-runtime", "pre-restart", "interpretive-only", spec.family.value),
+            )
+            nodes.append(
+                self.tangent_bridge.graph.add_seed(
+                    seed,
+                    axis=_FAMILY_AXIS.get(spec.family, ExplorationAxis.SEMANTIC),
+                    family=spec.family,
+                    sequence=sequence,
+                    trigger_terms=(spec.key, *spec.activation_cues[:8]),
+                    risk=0.05,
+                    evidence_gap=0.90,
+                )
+            )
+        return tuple(nodes)
+
     def checkpoint_before_restart(self, frame_id: str, *, sequence: int, notes: str = "nuance checkpoint before restart") -> SemanticRestartPacket:
         frame = self._frames.get(str(frame_id))
         if frame is None:
             raise NuanceRuntimeError("unknown nuance frame")
         update = self._updates.get(frame.frame_id)
+        self._preserve_perpendicular_lens_tangents(frame, sequence=sequence)
         return self.tangent_bridge.restart_packet(
             root_fingerprint=frame.fingerprint,
             sequence=sequence,
