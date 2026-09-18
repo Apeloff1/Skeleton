@@ -2765,12 +2765,12 @@ def canonical_navigation_source(
                 NavEdge(
                     "n0_0",
                     "n2_2",
-                    29,
+                    30,
                 ),
                 NavEdge(
                     "n2_2",
                     "n4_4",
-                    29,
+                    30,
                 ),
             )
         )
