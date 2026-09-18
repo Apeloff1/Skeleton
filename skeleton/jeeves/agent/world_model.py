@@ -1300,6 +1300,13 @@ class WorldModel:
                 graph.bind_evidence_ledger(evidence_ledger)
             return graph
 
+    def discard(self, scope: str) -> bool:
+        """Release a scoped graph from the model registry."""
+
+        scope = require_id("scope", scope)
+        with self._lock:
+            return self._graphs.pop(scope, None) is not None
+
     def scopes(self) -> tuple[str, ...]:
         with self._lock:
             return tuple(sorted(self._graphs))
