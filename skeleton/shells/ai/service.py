@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import uuid
 
+from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
@@ -55,6 +56,7 @@ class AIShellService:
         release_guard: AIStartupReleaseGuard | None = None,
         release_expectation: RuntimeReleaseExpectation | None = None,
         assurance: AIExecutionAssuranceInspector | None = None,
+        approval_quorum: AIApprovalQuorumStore | None = None,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -64,6 +66,7 @@ class AIShellService:
         self.release_guard = release_guard
         self.release_expectation = release_expectation
         self.assurance = assurance
+        self.approval_quorum = approval_quorum
         self._release_report: StartupReleaseReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
@@ -142,6 +145,27 @@ class AIShellService:
                 self.governance.current_policy(),
             )
         return bundle, view
+
+    def _quorum_digest(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        quorum_approval: QuorumApproval | None,
+    ) -> str:
+        if quorum_approval is None:
+            return ""
+        if self.approval_quorum is None:
+            raise RuntimeError("quorum approval store is not configured")
+        proposal = review.planning.response.proposal
+        current = self.approval_quorum.require(
+            quorum_approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+        return current.digest
 
     def seal_review(
         self,
