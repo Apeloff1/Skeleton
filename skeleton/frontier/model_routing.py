@@ -770,7 +770,16 @@ class ModelRouter:
         attempts: list[AttemptRecord] = []
         selected_id: str | None = None
         response: ChatResponse | None = None
-        status = "no_capable_provider" if not plan.provider_ids else "provider_failed"
+        budget_rejected = any(
+            "estimated cost exceeds route budget" in reason
+            for reasons in plan.rejected.values()
+            for reason in reasons
+        )
+        status = (
+            "budget_exhausted"
+            if not plan.provider_ids and budget_rejected
+            else ("no_capable_provider" if not plan.provider_ids else "provider_failed")
+        )
 
         for provider_id in plan.provider_ids:
             remaining_time = deadline - loop.time()
@@ -801,7 +810,7 @@ class ModelRouter:
             )
             if remaining_cost is not None and estimated > remaining_cost:
                 status = "budget_exhausted"
-                break
+                continue
 
             started = loop.time()
             try:
@@ -946,6 +955,17 @@ class ModelRouter:
             and request.max_output_tokens > metadata.max_output_tokens
         ):
             reasons.append("output tokens exceed provider maximum")
+        planned_output = request.max_output_tokens or metadata.max_output_tokens
+        if request.budget.max_output_tokens is not None:
+            planned_output = min(planned_output, request.budget.max_output_tokens)
+        if request.budget.max_cost is not None:
+            estimated_cost = _estimate_cost(
+                metadata,
+                input_tokens=request.estimated_input_tokens,
+                output_tokens=planned_output,
+            )
+            if estimated_cost > request.budget.max_cost:
+                reasons.append("estimated cost exceeds route budget")
         return reasons
 
     def _result(
