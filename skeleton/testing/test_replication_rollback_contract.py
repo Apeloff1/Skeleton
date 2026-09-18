@@ -169,6 +169,12 @@ def test_acknowledgement_evidence_rejects_impossible_or_forged_state():
     with pytest.raises(ReplicationError, match="retained authority history"):
         authority.record_ack(wrong_digest)
 
+    non_hex_payload = dict(valid.payload)
+    non_hex_payload["last_applied_digest"] = "z" * 64
+    non_hex = replication_mod._wrap_packet("ack", valid.sequence, non_hex_payload)
+    with pytest.raises(SerializationError, match="lowercase hex"):
+        authority.record_ack(non_hex)
+
     impossible_gap_payload = dict(valid.payload)
     impossible_gap_payload["last_received_sequence"] = 3
     impossible_gap_payload["missing_sequences"] = [1, 2]
@@ -280,14 +286,18 @@ def test_history_exhaustion_fails_closed():
     authority = Authority(history_limit=3)
     replica = Replica("client-b", history_limit=3)
     packets = [authority.snapshot(0, _hero(0, 0))]
+    replica.ingest(packets[0])
+    stale_ack = replica.acknowledge()
     for tick in range(1, 5):
         packets.append(authority.mutate(tick, _move(tick)))
-    for packet in packets:
+    for packet in packets[1:]:
         replica.ingest(packet)
     with pytest.raises(HistoryExhaustedError):
         replica.rollback_to(1)
     with pytest.raises(HistoryExhaustedError):
         authority.retransmit(1)
+    with pytest.raises(HistoryExhaustedError, match="ack applied sequence"):
+        authority.record_ack(stale_ack)
 
 
 def test_incompatible_schema_fails_closed():
