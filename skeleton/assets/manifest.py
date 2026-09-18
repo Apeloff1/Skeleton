@@ -926,12 +926,24 @@ def _load_payload(raw: bytes | str | Mapping[str, Any]) -> dict[str, Any]:
     else:
         raise SerializationError("manifest must be bytes, text, or an object")
     try:
-        loaded = json.loads(text)
+        loaded = json.loads(text, object_pairs_hook=_json_object_no_duplicates)
     except json.JSONDecodeError as exc:
         raise SerializationError("malformed manifest JSON") from exc
     if not isinstance(loaded, dict):
         raise SerializationError("manifest must be an object")
     return loaded
+
+
+def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise SerializationError(
+                "manifest JSON contains duplicate keys",
+                context={"key": key},
+            )
+        payload[key] = value
+    return payload
 
 
 def _require_release_rights(record: AssetRecord) -> None:
