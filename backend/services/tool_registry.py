@@ -19,7 +19,7 @@ This registry is consumed by agents.py (each agent step can declare a list
 of tool calls to run before producing its output).
 """
 from __future__ import annotations
-import os, asyncio, json, subprocess, tempfile
+import os, asyncio, json, subprocess, sys, tempfile
 from typing import Any, Callable, Coroutine
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
@@ -102,8 +102,7 @@ async def _tool_compile_code(params: dict) -> dict:
 
 
 async def _tool_run_code(params: dict) -> dict:
-    """Reuse the playground's run pipeline via local Python eval for python only;
-    other langs go through the existing route."""
+    """Run Python through a bounded child process instead of in-process exec."""
     if not code_execution_enabled():
         return {
             "ok": False,
@@ -116,14 +115,31 @@ async def _tool_run_code(params: dict) -> dict:
     lang = params.get("language", "python")
     if lang != "python":
         return {"ok": False, "error": f"inline run only supports python; for {lang} call /api/playground/run"}
-    import io, contextlib, builtins
-    buf_out, buf_err = io.StringIO(), io.StringIO()
+    if not isinstance(code, str):
+        return {"ok": False, "error": "code must be a string", "exit_code": 1}
+
     try:
-        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            builtins.exec(builtins.compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
-        return {"ok": True, "stdout": buf_out.getvalue()[-4000:], "stderr": buf_err.getvalue()[-4000:], "exit_code": 0}
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "tool_run.py")
+            with open(src, "w", encoding="utf-8") as fh:
+                fh.write(code)
+            proc = subprocess.run(
+                [sys.executable, "-I", src],
+                cwd=td,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        return {
+            "ok": proc.returncode == 0,
+            "stdout": proc.stdout[-4000:],
+            "stderr": proc.stderr[-4000:],
+            "exit_code": proc.returncode,
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "execution timed out", "exit_code": 1}
     except Exception:
-        return {"ok": False, "stdout": buf_out.getvalue()[-4000:], "stderr": (buf_err.getvalue() or "execution_failed")[-4000:], "exit_code": 1}
+        return {"ok": False, "error": "execution_failed", "exit_code": 1}
 
 
 async def _tool_package_build(params: dict) -> dict:
