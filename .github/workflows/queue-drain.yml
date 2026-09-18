@@ -535,3 +535,99 @@ jobs:
                   f'queue drain had {totals["failed"]} terminal cancellation failure(s)'
               )
           PY
+
+      - name: Wake exact stale-PR housekeeping when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml
+          HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cutoff=$(date -u -d "${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes ago" +%s)
+          stale_candidate=''
+          scan_complete=false
+
+          for page in $(seq 1 10); do
+            page_json="$RUNNER_TEMP/housekeeping-wake-queued-${page}.json"
+            gh api "/repos/${REPO}/actions/runs?status=queued&per_page=100&page=${page}" > "$page_json"
+            count=$(jq -r '.workflow_runs | length' "$page_json")
+            [[ "$count" =~ ^[0-9]+$ ]] || {
+              echo '::error::Housekeeping wake received malformed queued-run inventory.'
+              exit 1
+            }
+
+            while IFS=$'\t' read -r id name event created; do
+              [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+              [[ "$event" == 'pull_request' ]] || continue
+              case "$name" in
+                *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency*|*Repository\ Hygiene*|*Workflow\ Input\ Security*)
+                  continue
+                  ;;
+              esac
+              created_epoch=$(date -u -d "$created" +%s)
+              if (( created_epoch < cutoff )); then
+                stale_candidate="$id"
+                break
+              fi
+            done < <(jq -r '.workflow_runs[] | [.id, .name, .event, .created_at] | @tsv' "$page_json")
+
+            [[ -n "$stale_candidate" ]] && {
+              scan_complete=true
+              break
+            }
+            if (( count < 100 )); then
+              scan_complete=true
+              break
+            fi
+          done
+
+          if [[ "$scan_complete" != 'true' ]]; then
+            echo '::error::Housekeeping wake exceeded its bounded 1,000-run queued inventory scan.'
+            exit 1
+          fi
+
+          if [[ -z "$stale_candidate" ]]; then
+            {
+              echo '## Housekeeping wake'
+              echo '- Dispatch: no'
+              echo "- Reason: no eligible queued pull_request run older than ${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          housekeeping_live=0
+          housekeeping_status=''
+          for status_name in requested waiting pending queued in_progress; do
+            status_count=$(gh api "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1" --jq '.total_count')
+            if ! [[ "$status_count" =~ ^[0-9]+$ ]]; then
+              echo "::error::Housekeeping wake received invalid ${status_name} run count."
+              exit 1
+            fi
+            if (( status_count > 0 )); then
+              housekeeping_live=1
+              housekeeping_status="$status_name"
+              break
+            fi
+          done
+
+          if (( housekeeping_live > 0 )); then
+            {
+              echo '## Housekeeping wake'
+              echo '- Dispatch: no'
+              echo "- Reason: existing Housekeeping run is ${housekeeping_status}"
+              echo "- Old queued candidate observed: ${stale_candidate}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          gh workflow run "$HOUSEKEEPING_WORKFLOW" --repo "$REPO" --ref main
+          {
+            echo '## Housekeeping wake'
+            echo '- Dispatch: yes'
+            echo "- Old queued candidate observed: ${stale_candidate}"
+            echo "- Stale threshold: ${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes"
+            echo '- Safety: dispatch only; Housekeeping independently re-proves PR/run identity before any cancellation.'
+          } >> "$GITHUB_STEP_SUMMARY"
