@@ -8,10 +8,13 @@ import pytest
 from skeleton.simulation.physics import (
     BoxShape,
     CapsuleShape,
+    ContinuousCollisionDetector,
     ConvexDistanceResult,
     ConvexTOIResult,
     CylinderShape,
+    PhysicsSettings,
     PhysicsValidationError,
+    PhysicsWorld,
     Quat,
     RigidBody,
     SphereShape,
@@ -306,3 +309,197 @@ def test_convex_distance_and_toi_validate_bounds() -> None:
         convex_time_of_impact(a, b, 1.0, max_iterations=0)
     with pytest.raises(PhysicsValidationError, match="distance_iterations"):
         convex_time_of_impact(a, b, 1.0, distance_iterations=0)
+
+
+
+def test_global_ccd_emits_moving_box_toi() -> None:
+    moving = _dynamic(
+        "moving",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-3.0, 0.0, 0.0),
+    )
+    target = _static(
+        "target",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3.zero(),
+    )
+    moving.linear_velocity = Vec3(10.0, 0.0, 0.0)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    event = detector.earliest_event((target, moving), 0.5)
+
+    assert event is not None
+    assert (event.body_a, event.body_b) == ("moving", "target")
+    assert event.time == pytest.approx(0.2, abs=2.0e-6)
+    assert event.normal.x > 0.999999
+
+
+def test_global_ccd_handles_continuous_box_against_moving_discrete_box() -> None:
+    left = _dynamic(
+        "a",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-3.0, 0.0, 0.0),
+    )
+    right = _dynamic(
+        "b",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(3.0, 0.0, 0.0),
+    )
+    right.continuous = False
+    left.linear_velocity = Vec3(10.0, 0.0, 0.0)
+    right.linear_velocity = Vec3(-5.0, 0.0, 0.0)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    event = detector.earliest_event((right, left), 0.5)
+
+    assert event is not None
+    assert (event.body_a, event.body_b) == ("a", "b")
+    assert event.time == pytest.approx(1.0 / 3.0, abs=3.0e-6)
+
+
+def test_global_ccd_detects_rotation_only_continuous_box() -> None:
+    rotating = _dynamic(
+        "a",
+        BoxShape(Vec3(2.0, 0.1, 0.1)),
+        Vec3.zero(),
+    )
+    target = _static(
+        "b",
+        SphereShape(0.2),
+        Vec3(0.0, 1.8, 0.0),
+    )
+    rotating.angular_velocity = Vec3(0.0, 0.0, math.pi * 0.5)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    event = detector.earliest_event((target, rotating), 1.0)
+
+    assert event is not None
+    assert 0.0 < event.time < 1.0
+    assert (event.body_a, event.body_b) == ("a", "b")
+
+
+def test_noncontinuous_fast_box_does_not_enter_general_ccd() -> None:
+    moving = _dynamic(
+        "moving",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-3.0, 0.0, 0.0),
+    )
+    moving.continuous = False
+    moving.linear_velocity = Vec3(20.0, 0.0, 0.0)
+    target = _static(
+        "target",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3.zero(),
+    )
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    assert detector.earliest_event((moving, target), 0.5) is None
+
+
+def test_zero_time_separating_convex_overlap_is_left_to_discrete_solver() -> None:
+    moving = _dynamic(
+        "a",
+        BoxShape(Vec3.one()),
+        Vec3.zero(),
+    )
+    target = _static(
+        "b",
+        BoxShape(Vec3.one()),
+        Vec3(0.5, 0.0, 0.0),
+    )
+    moving.linear_velocity = Vec3(-5.0, 0.0, 0.0)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    assert detector.earliest_event((moving, target), 0.25) is None
+
+
+def test_world_ccd_prevents_fast_box_tunneling_through_static_box() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.5,
+            ccd_motion_threshold=0.1,
+            ccd_contact_slop=1.0e-6,
+            ccd_max_substeps=8,
+            sleep_after_seconds=10.0,
+        )
+    )
+    moving = _dynamic(
+        "moving",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-3.0, 0.0, 0.0),
+    )
+    moving.linear_velocity = Vec3(10.0, 0.0, 0.0)
+    target = _static(
+        "target",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3.zero(),
+    )
+    world.add_body(moving)
+    world.add_body(target)
+
+    receipt = world.step()[0]
+
+    assert receipt.ccd_clamps >= 1
+    assert moving.position.x < target.position.x
+    assert moving.position.x < -0.8
+    assert moving.linear_velocity.x < 10.0
+
+
+def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.5,
+            ccd_motion_threshold=0.1,
+            ccd_contact_slop=1.0e-6,
+            ccd_max_substeps=8,
+            sleep_after_seconds=10.0,
+        )
+    )
+    moving = _dynamic(
+        "capsule",
+        CapsuleShape(0.4, 0.7),
+        Vec3(-3.0, 0.0, 0.0),
+        Quat.from_axis_angle(Vec3.axis(2), 0.1),
+    )
+    moving.linear_velocity = Vec3(9.0, 0.0, 0.0)
+    target = _static(
+        "cylinder",
+        CylinderShape(0.5, 0.8),
+        Vec3.zero(),
+        Quat.from_axis_angle(Vec3.axis(0), -0.1),
+    )
+    world.add_body(moving)
+    world.add_body(target)
+
+    receipt = world.step()[0]
+
+    assert receipt.ccd_clamps >= 1
+    assert moving.position.x < target.position.x
+    assert moving.linear_velocity.x < 9.0
+
+
+def test_general_convex_toi_tie_break_is_canonical() -> None:
+    moving = _dynamic(
+        "m",
+        BoxShape(Vec3(0.25, 0.25, 0.25)),
+        Vec3(-2.0, 0.0, 0.0),
+    )
+    moving.linear_velocity = Vec3(10.0, 0.0, 0.0)
+    target_a = _static(
+        "a",
+        BoxShape(Vec3(0.25, 0.25, 0.25)),
+        Vec3.zero(),
+    )
+    target_b = _static(
+        "b",
+        BoxShape(Vec3(0.25, 0.25, 0.25)),
+        Vec3.zero(),
+    )
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    event = detector.earliest_event((target_b, moving, target_a), 0.5)
+
+    assert event is not None
+    assert {event.body_a, event.body_b} == {"a", "m"}
