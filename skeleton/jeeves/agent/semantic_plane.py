@@ -1222,11 +1222,15 @@ class SemanticLensPlane:
         selection = self.select(observations, requested=requested)
         (
             selection,
-            learned_companion_keys,
+            learned_companion_activations,
         ) = self._augment_with_learned_companions(
             selection,
             observations,
             learned_topology_rules,
+        )
+        learned_companion_keys = tuple(
+            item.lens_key
+            for item in learned_companion_activations
         )
         governance = self.governance.assess(
             selection,
@@ -1346,6 +1350,9 @@ class SemanticLensPlane:
             topology_learning=topology_learning,
             learned_topology_rules=learned_topology_rules,
             learned_companion_keys=learned_companion_keys,
+            learned_companion_activations=(
+                learned_companion_activations
+            ),
             topology_bridge_candidates=topology_bridge_candidates,
         )
         fingerprint = stable_fingerprint(
@@ -1373,6 +1380,10 @@ class SemanticLensPlane:
                     item.fingerprint for item in learned_topology_rules
                 ],
                 "learned_companion_keys": learned_companion_keys,
+                "learned_companion_activations": [
+                    item.fingerprint
+                    for item in learned_companion_activations
+                ],
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
@@ -1706,6 +1717,9 @@ class SemanticLensPlane:
                     "max_learned_companions": self.policy.max_learned_companions,
                     "minimum_learned_companion_cue_support": (
                         self.policy.minimum_learned_companion_cue_support
+                    ),
+                    "minimum_learned_companion_bridge_quality": (
+                        self.policy.minimum_learned_companion_bridge_quality
                     ),
                     "require_selected": self.policy.require_selected_findings,
                     "require_overlap": self.policy.require_observation_overlap,
