@@ -14,6 +14,7 @@ class AIRecoveryCheckpoint:
     schema_version: int
     session: AISessionCheckpoint
     session_evidence_digest: str = ""
+    session_journal_digest: str = ""
     release_evidence_digest: str = ""
     sandbox_binding_digest: str = ""
 
@@ -22,6 +23,7 @@ class AIRecoveryCheckpoint:
             raise ValueError("unsupported AI recovery checkpoint schema")
         for name in (
             "session_evidence_digest",
+            "session_journal_digest",
             "release_evidence_digest",
             "sandbox_binding_digest",
         ):
@@ -34,6 +36,7 @@ class AIRecoveryCheckpoint:
             "schema_version": self.schema_version,
             "session": self.session.to_dict(),
             "session_evidence_digest": self.session_evidence_digest,
+            "session_journal_digest": self.session_journal_digest,
             "release_evidence_digest": self.release_evidence_digest,
             "sandbox_binding_digest": self.sandbox_binding_digest,
         }
@@ -53,6 +56,7 @@ class AIRecoveryCheckpoint:
         session: AISessionCheckpoint,
         *,
         session_evidence_digest: str = "",
+        session_journal_digest: str = "",
         release_evidence_digest: str = "",
         sandbox_binding_digest: str = "",
     ) -> "AIRecoveryCheckpoint":
@@ -60,6 +64,7 @@ class AIRecoveryCheckpoint:
             2,
             session,
             session_evidence_digest,
+            session_journal_digest,
             release_evidence_digest,
             sandbox_binding_digest,
         )
