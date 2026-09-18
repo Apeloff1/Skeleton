@@ -18,6 +18,7 @@ def test_workflow_run_adapter_is_directly_executable_from_repo_root() -> None:
         "REPO",
         "CURRENT_RUN_ID",
         "PR_NUMBER",
+        "WORKFLOW_RUN_PR_HINTS",
         "EVENT_HEAD_REPO",
         "EVENT_HEAD_REF",
         "EVENT_HEAD_SHA",
@@ -46,3 +47,7 @@ def test_privileged_drainer_starts_when_lifecycle_signal_is_requested() -> None:
     assert 'workflows: ["PR Lifecycle Signal"]' in text
     assert "types: [requested]" in text
     assert "types: [completed]" not in text
+    assert 'branches:\n      - "*"\n      - "**"' in text
+    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
+    assert "WORKFLOW_RUN_PR_HINTS" in text
+    assert "pull_requests[0]" not in text

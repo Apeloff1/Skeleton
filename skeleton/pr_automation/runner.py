@@ -12,11 +12,12 @@ import argparse
 from dataclasses import dataclass
 import json
 import os
+import re
 import sys
 import time
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .core import CIState, Decision, Evaluation, Mode, PRSnapshot, Policy, evaluate
@@ -35,6 +36,7 @@ TERMINAL_FAILURES = {
     "stale",
 }
 PENDING_STATES = {"queued", "in_progress", "pending", "requested", "waiting"}
+COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
 _STATE_SEVERITY = {"passing": 0, "unknown": 1, "pending": 2, "failing": 3}
 SENSITIVE_PREFIXES = (
     ".github/workflows/",
@@ -240,8 +242,12 @@ def count_approvals(reviews: list[dict[str, Any]], head_sha: str | None = None) 
         if str(review.get("state") or "").upper() != "APPROVED":
             continue
         if head_sha is not None:
-            reviewed_sha = str(review.get("commit_id") or "")
-            if not reviewed_sha or reviewed_sha.casefold() != head_sha.casefold():
+            try:
+                expected = canonical_commit_oid(head_sha)
+                reviewed_sha = canonical_commit_oid(str(review.get("commit_id") or ""))
+            except GitHubError:
+                continue
+            if reviewed_sha != expected:
                 continue
         count += 1
     return count
@@ -302,7 +308,9 @@ def _paged_check_runs(
     items: list[dict[str, Any]] = []
     total: int | None = None
     for page in range(1, max_pages + 1):
-        payload = client.get(f"/repos/{owner}/{name}/commits/{sha}/check-runs?per_page=100&page={page}")
+        payload = client.get(
+            f"/repos/{owner}/{name}/commits/{quote(sha, safe='')}/check-runs?per_page=100&page={page}"
+        )
         if not isinstance(payload, dict):
             raise GitHubError("invalid check-runs response")
         batch = payload.get("check_runs", [])
@@ -336,12 +344,14 @@ def fetch_snapshot(
     pr = client.get(f"/repos/{owner}/{name}/pulls/{number}")
     if not isinstance(pr, dict):
         raise GitHubError("invalid pull request response")
-    head_sha = str((pr.get("head") or {}).get("sha") or "")
+    head_sha = canonical_commit_oid(str((pr.get("head") or {}).get("sha") or ""))
+    base_sha = canonical_commit_oid(str((pr.get("base") or {}).get("sha") or ""))
+    quoted_sha = quote(head_sha, safe="")
 
     check_runs, checks_complete = _paged_check_runs(client, owner, name, head_sha)
     statuses, statuses_complete = _paged_list(
         client,
-        f"/repos/{owner}/{name}/commits/{head_sha}/statuses",
+        f"/repos/{owner}/{name}/commits/{quoted_sha}/statuses",
     )
     reviews, reviews_complete = _paged_list(
         client,
@@ -375,7 +385,7 @@ def fetch_snapshot(
         repository=repository,
         number=number,
         head_sha=head_sha,
-        base_sha=str((pr.get("base") or {}).get("sha") or ""),
+        base_sha=base_sha,
         base_ref=str((pr.get("base") or {}).get("ref") or ""),
         head_ref=str((pr.get("head") or {}).get("ref") or ""),
         state=str(pr.get("state") or "unknown"),
@@ -402,7 +412,8 @@ def fetch_snapshot(
 
 def _status_url(repository: str, sha: str) -> str:
     owner, name = repository.split("/", 1)
-    return f"{API}/repos/{owner}/{name}/statuses/{sha}"
+    quoted_sha = quote(canonical_commit_oid(sha), safe="")
+    return f"{API}/repos/{owner}/{name}/statuses/{quoted_sha}"
 
 
 def publish_gate_status(
@@ -637,6 +648,21 @@ def required_checks_from_env() -> set[str]:
     return checks
 
 
+def canonical_commit_oid(value: str) -> str:
+    """Return a lowercase 40-hex Git commit OID, or fail closed.
+
+    Privileged workflow_run identity must be an immutable full SHA. Whitespace,
+    abbreviations, and non-hex values are rejected so they cannot degrade into
+    an ambiguous commits/history lookup.
+    """
+    if not isinstance(value, str):
+        raise GitHubError("workflow_run head SHA must be a 40-character hex commit OID")
+    oid = value.casefold()
+    if COMMIT_OID_RE.fullmatch(oid) is None:
+        raise GitHubError("workflow_run head SHA must be a 40-character hex commit OID")
+    return oid
+
+
 def list_open_prs(client: GitHubClient, repository: str, limit: int) -> list[int]:
     owner, name = repository.split("/", 1)
     limit = min(max(1, limit), 1000)
@@ -646,6 +672,162 @@ def list_open_prs(client: GitHubClient, repository: str, limit: int) -> list[int
         max_pages=max(1, (limit + 99) // 100),
     )
     return [int(pr["number"]) for pr in payload[:limit]]
+
+
+def _pr_number(item: Any) -> int:
+    try:
+        return int((item or {}).get("number") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def parse_pr_hints_json(raw: str) -> list[int]:
+    """Parse GitHub's workflow_run.pull_requests numbers from env JSON.
+
+    The event array is capped and often empty; hints never replace SHA/branch
+    identity. Fail closed on malformed payloads so a truncated expression cannot
+    silently evaluate the wrong PR.
+    """
+    text = (raw or "").strip()
+    if not text or text in {"null", "[]"}:
+        return []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise GitHubError("invalid workflow_run PR hint JSON") from exc
+    if not isinstance(payload, list):
+        raise GitHubError("workflow_run PR hints must be a JSON array")
+    numbers: dict[int, None] = {}
+    for item in payload:
+        if isinstance(item, bool) or not isinstance(item, int) or item <= 0:
+            raise GitHubError(f"invalid workflow_run PR hint: {item!r}")
+        numbers[item] = None
+    return list(numbers)
+
+
+def _same_repo_head(pr: dict[str, Any], repository: str, head_ref: str) -> bool:
+    head = pr.get("head") or {}
+    head_repo = str(((head.get("repo") or {}).get("full_name") or ""))
+    return (
+        bool(head_repo)
+        and head_repo.casefold() == repository.casefold()
+        and str(head.get("ref") or "") == head_ref
+    )
+
+
+def resolve_branch_completion_prs(
+    client: GitHubClient,
+    *,
+    repository: str,
+    head_sha: str,
+    head_ref: str,
+    allowed_bases: tuple[str, ...],
+    hinted_numbers: list[int] | None = None,
+) -> list[int]:
+    """Return every trusted PR associated with a completed workflow branch.
+
+    GitHub's ``workflow_run.pull_requests`` array is often empty, capped at ten
+    entries, and only populated for some triggering events. Completions on
+    feature branches must therefore be resolved from the immutable head SHA
+    plus branch name so every associated same-repository PR is evaluated.
+    """
+    if not repository or repository.count("/") != 1:
+        raise GitHubError("incomplete repository identity for branch completion")
+    if not head_sha or not head_ref:
+        raise GitHubError("workflow_run completions require both head SHA and branch")
+    head_sha = canonical_commit_oid(head_sha)
+    allowed = {base.casefold() for base in allowed_bases if base}
+    if not allowed:
+        raise GitHubError("allowed bases are required to resolve branch completions")
+
+    owner, name = repository.split("/", 1)
+    ordered: dict[int, None] = {}
+
+    def consider(pr: Any) -> None:
+        if not isinstance(pr, dict):
+            return
+        number = _pr_number(pr)
+        if number <= 0 or not _same_repo_head(pr, repository, head_ref):
+            return
+        base_ref = str((pr.get("base") or {}).get("ref") or "")
+        if base_ref.casefold() not in allowed:
+            return
+        ordered[number] = None
+
+    for hinted in hinted_numbers or []:
+        if hinted <= 0:
+            raise GitHubError(f"invalid hinted PR number: {hinted}")
+        payload = client.get(f"/repos/{owner}/{name}/pulls/{hinted}")
+        if not isinstance(payload, dict):
+            raise GitHubError(f"invalid hinted PR #{hinted} response")
+        consider(payload)
+
+    quoted_sha = quote(head_sha, safe="")
+    associated, associated_complete = _paged_list(
+        client,
+        f"/repos/{owner}/{name}/commits/{quoted_sha}/pulls",
+    )
+    if not associated_complete:
+        raise GitHubError("commit PR association exceeded bounded identity scan")
+    for item in associated:
+        consider(item)
+
+    if not ordered:
+        query = urlencode(
+            {
+                "state": "all",
+                "head": f"{owner}:{head_ref}",
+                "sort": "updated",
+                "direction": "desc",
+            }
+        )
+        history, history_complete = _paged_list(
+            client,
+            f"/repos/{owner}/{name}/pulls?{query}",
+        )
+        if not history_complete:
+            raise GitHubError("workflow_run branch history exceeded bounded identity scan")
+        for item in history:
+            recorded_sha = str(((item or {}).get("head") or {}).get("sha") or "")
+            try:
+                if canonical_commit_oid(recorded_sha) == head_sha:
+                    consider(item)
+            except GitHubError:
+                continue
+
+    return list(ordered)
+
+
+def select_evaluation_targets(
+    client: GitHubClient,
+    *,
+    repository: str,
+    explicit_pr: int | None,
+    head_sha: str,
+    head_ref: str,
+    default_branch: str,
+    allowed_bases: tuple[str, ...],
+    hinted_numbers: list[int],
+    limit: int,
+) -> list[int]:
+    """Choose PRs for one automation run from explicit, completion, or sweep input."""
+    if explicit_pr is not None:
+        return [explicit_pr]
+    if head_sha or head_ref:
+        if not head_sha or not head_ref:
+            raise GitHubError("workflow_run completions require both head SHA and branch")
+        head_sha = canonical_commit_oid(head_sha)
+        if default_branch and head_ref == default_branch:
+            return list_open_prs(client, repository, limit)
+        return resolve_branch_completion_prs(
+            client,
+            repository=repository,
+            head_sha=head_sha,
+            head_ref=head_ref,
+            allowed_bases=allowed_bases,
+            hinted_numbers=hinted_numbers,
+        )
+    return list_open_prs(client, repository, limit)
 
 
 def run_one(
@@ -694,14 +876,15 @@ def _publish_run_error(client: GitHubClient, repository: str, number: int, messa
     try:
         owner, name = repository.split("/", 1)
         pr = client.get(f"/repos/{owner}/{name}/pulls/{number}")
-        head_sha = str((pr.get("head") or {}).get("sha") or "") if isinstance(pr, dict) else ""
-        if not head_sha:
+        raw_sha = str((pr.get("head") or {}).get("sha") or "") if isinstance(pr, dict) else ""
+        if not raw_sha:
             return
+        head_sha = canonical_commit_oid(raw_sha)
         snapshot = PRSnapshot(
             repository=repository,
             number=number,
             head_sha=head_sha,
-            base_sha="unknown00",
+            base_sha="0" * 40,
             base_ref="unknown",
             head_ref="unknown",
         )
@@ -720,6 +903,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate and safely automate pull requests.")
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--pr", type=int)
+    parser.add_argument(
+        "--pr-hint",
+        dest="pr_hints",
+        type=int,
+        action="append",
+        default=[],
+        help="workflow_run pull_requests[] hint; never the sole identity source",
+    )
+    parser.add_argument(
+        "--pr-hints-json",
+        default=os.getenv("WORKFLOW_RUN_PR_HINTS", ""),
+        help="JSON array of workflow_run.pull_requests[].number hints",
+    )
+    parser.add_argument("--head-sha", default=os.getenv("WORKFLOW_RUN_HEAD_SHA", ""))
+    parser.add_argument("--head-ref", default=os.getenv("WORKFLOW_RUN_HEAD_REF", ""))
+    parser.add_argument(
+        "--default-branch",
+        default=os.getenv("DEFAULT_BRANCH", "") or os.getenv("GITHUB_REF_NAME", ""),
+    )
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument("--index", default=os.getenv("PR_AUTOMATION_INDEX", ".pr-automation/index.sqlite3"))
     parser.add_argument("--export", default=os.getenv("PR_AUTOMATION_EXPORT", ".pr-automation/index.jsonl"))
@@ -729,8 +931,17 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--repo or GITHUB_REPOSITORY must be owner/name")
     if args.pr is not None and args.pr <= 0:
         parser.error("--pr must be positive")
+    if any(hint <= 0 for hint in args.pr_hints):
+        parser.error("--pr-hint must be positive")
+    try:
+        json_hints = parse_pr_hints_json(str(args.pr_hints_json or ""))
+    except GitHubError as exc:
+        parser.error(str(exc))
+    hinted_numbers = list(dict.fromkeys([*json_hints, *args.pr_hints]))
     if not 1 <= args.limit <= 1000:
         parser.error("--limit must be between 1 and 1000")
+    if bool(args.head_sha) != bool(args.head_ref) and args.pr is None:
+        parser.error("workflow_run completions require both --head-sha and --head-ref")
 
     token = os.getenv("GITHUB_TOKEN", "")
     mode = Mode(os.getenv("PR_AUTOMATION_MODE", "observe").casefold())
@@ -751,7 +962,22 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("apply+merge requires checks and explicit PR_AUTOMATION_REQUIRED_CHECKS")
 
     base_delivery = os.getenv("GITHUB_RUN_ID") or os.getenv("GITHUB_DELIVERY_ID")
-    numbers = [args.pr] if args.pr else list_open_prs(client, args.repo, args.limit)
+    numbers = select_evaluation_targets(
+        client,
+        repository=args.repo,
+        explicit_pr=args.pr,
+        head_sha=str(args.head_sha or ""),
+        head_ref=str(args.head_ref or ""),
+        default_branch=str(args.default_branch or ""),
+        allowed_bases=policy.allowed_bases,
+        hinted_numbers=hinted_numbers,
+        limit=args.limit,
+    )
+    if not numbers:
+        print(
+            "no trusted pull requests associated with the completing branch",
+            file=sys.stderr,
+        )
     failures = 0
     remaining_mutations = max_mutations
 

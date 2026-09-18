@@ -190,6 +190,7 @@ jobs:
           skeleton/testing/test_pr_automation_ruleset.py
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
+          skeleton/testing/test_pr_automation_branch_completions.py
 
   readiness:
     name: Merge Readiness
