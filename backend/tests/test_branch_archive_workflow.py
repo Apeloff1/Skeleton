@@ -68,3 +68,14 @@ def test_branch_archive_tags_exact_tip_before_lease_delete() -> None:
 
     assert exact_live_tip < tag_push < tag_verify < delete
     assert "No branch is deleted until its exact commit is confirmed reachable through the archive tag." in text
+
+
+def test_branch_archive_shell_body_is_single_and_well_formed() -> None:
+    text = _source()
+
+    assert text.count("load_open_refs() {") == 1
+    assert text.count("load_archive_candidates() {") == 1
+    assert text.count("          archived=0") == 1
+    assert "while IFS=\n" not in text
+    assert "while IFS=$'\\t' read -r branch tip pr; do" in text
+    assert text.count("while read -r tip branch; do") == 1
