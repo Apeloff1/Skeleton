@@ -56,9 +56,9 @@ def _target(*, window: str = "scene-window-v1") -> PredictiveTarget:
 def _expert(ledger: SemanticPredictionLedger) -> SemanticForecastExpert:
     identity = ExpertIdentity(
         expert_id="semantic-bayesian-adapter-v1",
-        technique_id="bayes_inverse_1763",
+        technique_id="semantic_adapter_2026",
         model_version="semantic-adapter-v1",
-        family=ForecastFamily.BAYESIAN,
+        family=ForecastFamily.PROBABILISTIC,
         code_fingerprint="code-v1",
         configuration_fingerprint="config-v1",
         training_data_fingerprint="no-training-data",
@@ -157,3 +157,26 @@ def test_semantic_exchange_refuses_continuous_target_binding() -> None:
 
     with pytest.raises(AgentContractError, match="only to binary targets"):
         expert.bind(semantic, continuous)
+
+
+def test_semantic_exchange_uses_dedicated_current_lineage() -> None:
+    ledger = SemanticPredictionLedger()
+    expert = _expert(ledger)
+    registry = ForecastExpertRegistry(default_prediction_lineage())
+    registry.register(expert)
+
+    assert expert not in registry.eligible(2025, kind=PredictiveTargetKind.BINARY)
+    assert expert in registry.eligible(2026, kind=PredictiveTargetKind.BINARY)
+
+    borrowed = ExpertIdentity(
+        expert_id="semantic-masquerading-as-bayes",
+        technique_id="bayes_inverse_1763",
+        model_version="semantic-adapter-v1",
+        family=ForecastFamily.BAYESIAN,
+        code_fingerprint="code-v1",
+        configuration_fingerprint="config-v1",
+        training_data_fingerprint="no-training-data",
+        metadata={"semantic_interpretive_adapter": True},
+    )
+    with pytest.raises(AgentContractError, match="dedicated semantic_adapter_2026"):
+        SemanticForecastExpert(borrowed, ledger)
