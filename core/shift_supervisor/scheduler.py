@@ -13,6 +13,14 @@ from .models import WorkerState
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
 
+_GITHUB_ACTIONS_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def github_actions_forbids_unbounded_loop(environ: Mapping[str, str] | None = None) -> bool:
+    """GitHub-hosted jobs must use ``run_once``; an unbounded loop would hang the workflow."""
+    env = os.environ if environ is None else environ
+    return str(env.get("GITHUB_ACTIONS", "")).strip().lower() in _GITHUB_ACTIONS_TRUTHY
+
 
 @dataclass(slots=True)
 class SupervisorCadence:
@@ -91,6 +99,10 @@ class SupervisorScheduler:
         }
 
     def run_forever(self) -> None:
+        if github_actions_forbids_unbounded_loop():
+            raise RuntimeError(
+                "unbounded supervisor loops are forbidden in GitHub Actions; use run_once"
+            )
         next_secretary = time.monotonic()
         next_manager = time.monotonic()
         while not self._stop.is_set():

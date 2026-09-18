@@ -16,6 +16,7 @@ if __package__:
     from .pr_obsolete_run_drain import (
         LIVE_STATUSES,
         PR_RUN_EVENTS,
+        CancelResult,
         GitHubApi,
         cancel_run,
         list_runs,
@@ -24,6 +25,7 @@ else:
     from pr_obsolete_run_drain import (
         LIVE_STATUSES,
         PR_RUN_EVENTS,
+        CancelResult,
         GitHubApi,
         cancel_run,
         list_runs,
@@ -164,6 +166,14 @@ def _fresh_candidates(
             default_branch=default_branch,
         )
     ]
+
+
+def _cancel_for_sweep(api: GitHubApi, repo: str, run_id: int) -> CancelResult:
+    """Treat provider-stuck cancel conflicts as retryable only in the sweep."""
+    result = cancel_run(api, repo, run_id)
+    if result.outcome == "failed" and result.status in {409, 422}:
+        return CancelResult("deferred", result.status)
+    return result
 
 
 def sweep(
@@ -307,7 +317,7 @@ def sweep(
                 counts["race_preserved"] += 1
                 continue
 
-            result = cancel_run(api, repo, run_id)
+            result = _cancel_for_sweep(api, repo, run_id)
             counts[result.outcome] += 1
             if result.outcome == "failed":
                 print(f"sweep cancel failed: run={run_id} status={result.status}")
@@ -361,7 +371,7 @@ def main() -> int:
         return 1
 
     _write_summary(summary)
-    if summary["failed"] or summary["deferred"]:
+    if summary["failed"]:
         return 1
     return 0
 

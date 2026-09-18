@@ -89,8 +89,8 @@ async def run_code(req: CodeRequest):
         return {"output": result.stdout, "error": result.stderr if result.stderr else None, "exit_code": result.returncode, "language": lang, "xp_awarded": 15 if result.returncode == 0 else 10}
     except subprocess.TimeoutExpired:
         return {"output": "", "error": "Execution timed out (10s limit)", "exit_code": -1}
-    except Exception as e:
-        return {"output": "", "error": str(e), "exit_code": -1}
+    except Exception:
+        return {"output": "", "error": "execution_failed", "exit_code": -1}
 
 @router.get("/languages")
 async def get_supported_languages():

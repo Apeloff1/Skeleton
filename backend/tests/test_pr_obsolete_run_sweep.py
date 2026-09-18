@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts import pr_obsolete_run_sweep as sweep_module
 from scripts.pr_obsolete_run_sweep import sweep
 
 REPO = "Apeloff1/Skeleton"
@@ -263,6 +264,62 @@ def test_sweep_cap_bounds_mutation_per_run() -> None:
     assert summary["obsolete"] == 2
     assert summary["accepted"] == 1
     assert summary["over_cap"] == 1
+
+
+def test_periodic_sweep_defers_provider_stuck_409_after_force_cancel() -> None:
+    """A live run rejected by both cancel endpoints is retried next sweep."""
+
+    def handler(method: str, path: str):
+        if method == "GET" and "/actions/runs?" in path:
+            payload = [run(60, "stuck")] if "status=queued" in path else []
+            return 200, {"workflow_runs": payload}, {}
+        if method == "GET" and "/commits/stuck/pulls" in path:
+            return 200, [{"number": 900}], {}
+        if method == "GET" and path.endswith("/pulls/900"):
+            return 200, pr(900, state="closed", head_sha="stuck"), {}
+        if method == "POST" and (
+            path.endswith("/cancel") or path.endswith("/force-cancel")
+        ):
+            return 409, {"message": "Conflict"}, {}
+        if method == "GET" and path.endswith("/actions/runs/60"):
+            return 200, {"status": "queued"}, {}
+        raise AssertionError(f"unexpected network call: {method} {path}")
+
+    api = FakeApi(handler)
+    summary = sweep(
+        api,
+        repo=REPO,
+        current_run_id=999,
+        default_branch=DEFAULT_BRANCH,
+    )
+
+    assert summary["obsolete"] == 1
+    assert summary["deferred"] == 1
+    assert summary["failed"] == 0
+    assert ("POST", f"/repos/{REPO}/actions/runs/60/cancel") in api.calls
+    assert ("POST", f"/repos/{REPO}/actions/runs/60/force-cancel") in api.calls
+
+
+def test_main_keeps_deferred_sweep_green_but_terminal_failure_red(monkeypatch) -> None:
+    monkeypatch.setenv("GH_TOKEN", "test-token")
+    monkeypatch.setenv("REPO", REPO)
+    monkeypatch.setenv("CURRENT_RUN_ID", "999")
+    monkeypatch.setenv("DEFAULT_BRANCH", DEFAULT_BRANCH)
+    monkeypatch.setattr(sweep_module, "GitHubApi", lambda _token: object())
+    monkeypatch.setattr(sweep_module, "_write_summary", lambda _summary: None)
+    monkeypatch.setattr(
+        sweep_module,
+        "sweep",
+        lambda *_args, **_kwargs: {"failed": 0, "deferred": 1},
+    )
+    assert sweep_module.main() == 0
+
+    monkeypatch.setattr(
+        sweep_module,
+        "sweep",
+        lambda *_args, **_kwargs: {"failed": 1, "deferred": 0},
+    )
+    assert sweep_module.main() == 1
 
 
 def test_workflow_has_periodic_and_rollout_backlog_reconciliation() -> None:

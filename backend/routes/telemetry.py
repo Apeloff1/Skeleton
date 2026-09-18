@@ -21,6 +21,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.http_errors import redact_client_payload, redact_client_text
 from middleware.security import AuditMiddleware, RateLimitMiddleware
 from routes.gameforge_auth import require_role
 
@@ -114,7 +115,7 @@ def _norm(event: TelemetryEvent) -> dict:
         "severity": event.severity[:16],
         "ts_client": event.ts_client,
         "duration_ms": event.duration_ms,
-        "detail": event.detail,
+        "detail": redact_client_payload(event.detail),
     }
 
 
@@ -148,26 +149,31 @@ async def post_batch(batch: TelemetryBatch):
     return {"ok": True, "ingested": len(rows)}
 
 
-@router.post(
-    "/telemetry/last-crash",
-    dependencies=[Depends(require_role("viewer"))],
-)
-async def post_crash(report: CrashReport):
-    row = {
+def crash_row(report: CrashReport) -> dict:
+    """Build a secret-stripped crash record for the ring and durable store."""
+    return {
         "ts": time.time(),
         "modal_id": "__app__",
         "session_id": (report.session_id or "anon")[:40],
         "event": "crash",
         "severity": "fatal",
         "detail": {
-            "source": report.source,
-            "component": report.component,
-            "message": report.message,
-            "stack": (report.stack or "")[:8000],
-            "info": report.info,
-            "app_version": report.app_version,
+            "source": redact_client_text(report.source, max_len=80),
+            "component": redact_client_text(report.component or "", max_len=120),
+            "message": redact_client_text(report.message, max_len=500),
+            "stack": redact_client_text(report.stack or "", max_len=2000),
+            "info": redact_client_payload(report.info),
+            "app_version": redact_client_text(report.app_version or "", max_len=40),
         },
     }
+
+
+@router.post(
+    "/telemetry/last-crash",
+    dependencies=[Depends(require_role("viewer"))],
+)
+async def post_crash(report: CrashReport):
+    row = crash_row(report)
     async with _get_ring_lock():
         _EVENT_RING.append(row)
     await _persist_critical(row)

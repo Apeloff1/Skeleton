@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 
 # Sub-router — NO prefix so the parent's "/api/galaxy-studio" prefix applies.
 router = APIRouter(tags=["galaxy-studio"])
@@ -45,7 +46,7 @@ async def admin_vault_stats():
             "keep_target": int(os.environ.get("GALAXY_VAULT_KEEP", 12)),
         }
     except Exception as e:
-        raise HTTPException(500, f"vault stats unavailable: {e}")
+        raise internal_http_error("vault stats unavailable", e) from None
 
 
 @router.post("/admin/vault/prune")
@@ -67,7 +68,7 @@ async def admin_vault_prune(keep: int = 12):
             "reclaimed_mb": round(reclaimed / (1024 * 1024), 1),
         }
     except Exception as e:
-        raise HTTPException(500, f"vault prune failed: {e}")
+        raise internal_http_error("vault prune failed", e) from None
 
 
 __all__ = ["router", "admin_vault_stats", "admin_vault_prune"]

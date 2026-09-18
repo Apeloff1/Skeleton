@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from core.outcall_manager import outcalls
+from core.http_errors import internal_http_error
 import uuid
 import os
 import base64
@@ -264,7 +265,7 @@ async def push_to_github(request: GitHubPushRequest):
                 raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
                 
         except httpx.HTTPError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to connect to GitHub: {str(e)}")
+            raise internal_http_error("Failed to connect to GitHub", e) from None
 
 
 @router.post("/github/pull")
@@ -316,7 +317,7 @@ async def pull_from_github(request: GitHubPullRequest):
                 raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
                 
         except httpx.HTTPError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to connect to GitHub: {str(e)}")
+            raise internal_http_error("Failed to connect to GitHub", e) from None
 
 
 @router.post("/github/create-repo")
@@ -364,7 +365,7 @@ async def create_github_repo(request: GitHubRepoRequest):
                 raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
                 
         except httpx.HTTPError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to connect to GitHub: {str(e)}")
+            raise internal_http_error("Failed to connect to GitHub", e) from None
 
 
 @router.get("/github/repos")
@@ -408,7 +409,7 @@ async def list_github_repos(token: str, per_page: int = 30, page: int = 1):
                 raise HTTPException(status_code=res.status_code, detail=f"GitHub API error: {error_msg}")
                 
         except httpx.HTTPError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to connect to GitHub: {str(e)}")
+            raise internal_http_error("Failed to connect to GitHub", e) from None
 
 
 # ============================================================================

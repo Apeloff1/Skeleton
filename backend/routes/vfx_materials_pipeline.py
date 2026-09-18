@@ -12,6 +12,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal, Tuple
 from enum import Enum
@@ -845,7 +846,7 @@ async def ai_generate_vfx_system(request: AIVFXSystemRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI VFX generation failed: {str(e)}")
+        raise internal_http_error("AI VFX generation failed", e) from None
 
 
 @router.post("/ai/material/generate")
@@ -898,4 +899,4 @@ Generate JSON with:
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI material generation failed: {str(e)}")
+        raise internal_http_error("AI material generation failed", e) from None

@@ -1,6 +1,6 @@
 from core.shift_supervisor.models import PlanItem, PlanRevision, utcnow
 from core.shift_supervisor.plan_store import InMemoryPlanStore
-from core.shift_supervisor.scheduler import SupervisorScheduler
+from core.shift_supervisor.scheduler import SupervisorCadence, SupervisorScheduler, github_actions_forbids_unbounded_loop
 
 
 class _Store:
@@ -289,3 +289,54 @@ def test_new_accounting_day_archives_previous_overtime(monkeypatch):
             "task_ids": ["task-overtime"],
         }
     ]
+
+
+def test_github_actions_env_forbids_unbounded_scheduler_loop():
+    assert github_actions_forbids_unbounded_loop({"GITHUB_ACTIONS": "true"}) is True
+    assert github_actions_forbids_unbounded_loop({"GITHUB_ACTIONS": "1"}) is True
+    assert github_actions_forbids_unbounded_loop({"GITHUB_ACTIONS": "false"}) is False
+    assert github_actions_forbids_unbounded_loop({}) is False
+
+
+def test_run_forever_fails_closed_in_github_actions(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    scheduler = SupervisorScheduler(
+        manager=_Manager(),
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+    try:
+        scheduler.run_forever()
+    except RuntimeError as exc:
+        assert "run_once" in str(exc)
+        assert "GitHub Actions" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+
+def test_run_forever_runs_due_actors_until_stopped(monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    secretary = _Secretary()
+    manager = _Manager()
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=secretary,
+        project_context_supplier=lambda: {"cycle": "local"},
+        research_supplier=lambda: [{"source": "local"}],
+        cadence=SupervisorCadence(secretary_seconds=60, manager_seconds=60, heartbeat_seconds=1),
+    )
+
+    import threading
+    import time
+
+    thread = threading.Thread(target=scheduler.run_forever, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not (secretary.calls and manager.calls):
+        time.sleep(0.01)
+    scheduler.stop()
+    thread.join(timeout=2.0)
+
+    assert secretary.calls == [{"cycle": "local"}]
+    assert manager.calls == [({"cycle": "local"}, [{"source": "local"}])]
+    assert thread.is_alive() is False

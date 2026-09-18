@@ -68,8 +68,8 @@ async def code_library_stats() -> dict:
             "per_language": await _axis("language"),
             "collection": "game_code_library",
         }
-    except Exception as e:
-        return {"status": "error", "error": str(e)[:200], "total_snippets": 0, "virtual_line_count": 0}
+    except Exception:
+        return {"status": "error", "error": "code_library_unavailable", "total_snippets": 0, "virtual_line_count": 0}
 
 
 @router.post("/code-library/search")
@@ -102,8 +102,8 @@ async def code_library_search(req: dict) -> dict:
             "limit": limit,
             "snippets": docs,
         }
-    except Exception as e:
-        return {"query": req, "total": 0, "returned": 0, "error": str(e)[:200], "snippets": []}
+    except Exception:
+        return {"query": req, "total": 0, "returned": 0, "error": "code_library_search_failed", "snippets": []}
 
 
 __all__ = ["router"]

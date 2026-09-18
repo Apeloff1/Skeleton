@@ -358,8 +358,8 @@ async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, An
             "knowledge_used":        bool(knowledge_block),
             "quote_included":        bool(quote_block),
         }
-    except Exception as e:
-        return {"agent": agent_id, "error": str(e), "output": ""}
+    except Exception:
+        return {"agent": agent_id, "error": "agent_request_failed", "output": ""}
 
 async def run_agent_system(system_id: str, task: str, code: str = "", language: str = "python", max_iterations: int = 3) -> Dict[str, Any]:
     """Run a complete multi-agent system"""

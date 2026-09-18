@@ -454,9 +454,9 @@ async def _run_job(job_id: str, coro):
         out["job_id"] = job_id
         out["job_status"] = "done"
         await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out}, upsert=True)
-    except Exception as e:
+    except Exception:
         await _db.playable_jobs.update_one(
-            {"job_id": job_id}, {"$set": {"job_status": "error", "error": str(e)}}, upsert=True)
+            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}}, upsert=True)
 
 
 @router.post("/generate/async")

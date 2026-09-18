@@ -179,8 +179,8 @@ def _single_worker(job_id: str, kind: str, desc: str, prompt: str, meta: dict):
             "status": "done", "kind": kind, "desc": desc, "prompt": prompt, "mime": mime,
             "b64": b64, "meta": meta, "elapsed": round(time.time() - t0, 1), "persisted": False,
         }
-    except Exception as e:  # pragma: no cover
-        _GEN_JOBS[job_id] = {"status": "error", "error": str(e), "elapsed": round(time.time() - t0, 1)}
+    except Exception:  # pragma: no cover
+        _GEN_JOBS[job_id] = {"status": "error", "error": "asset generation failed", "elapsed": round(time.time() - t0, 1)}
 
 
 def _pack_worker(job_id: str, kinds: list[str], desc: str, guide: str, meta: dict):
@@ -200,8 +200,8 @@ def _pack_worker(job_id: str, kinds: list[str], desc: str, guide: str, meta: dic
             "done": len(items), "total": len(kinds), "elapsed": round(time.time() - t0, 1),
             "persisted": False, "error": None if ok else "all generations failed",
         }
-    except Exception as e:  # pragma: no cover
-        _GEN_JOBS[job_id] = {"status": "error", "error": str(e), "items": items,
+    except Exception:  # pragma: no cover
+        _GEN_JOBS[job_id] = {"status": "error", "error": "asset generation failed", "items": items,
                              "elapsed": round(time.time() - t0, 1)}
 
 
@@ -359,8 +359,8 @@ async def genesis_job(job_id: str):
                 await _persist_pack(job_id, j)
             else:
                 await _persist_single(job_id, j)
-        except Exception as e:  # pragma: no cover
-            return {"job_id": job_id, "status": "error", "error": f"persist failed: {e}"}
+        except Exception:  # pragma: no cover
+            return {"job_id": job_id, "status": "error", "error": "persist failed"}
 
     if "items" in j:  # pack
         assets = j.get("assets", [])
