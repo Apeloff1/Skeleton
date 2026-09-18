@@ -41,6 +41,15 @@ def _is_named(path_name: str, expected: str) -> bool:
     return path_name == expected or path_name.endswith(expected)
 
 
+
+def _workflow_run_trigger_block(text: str) -> str:
+    match = WORKFLOW_RUN_TRIGGER_RE.search(text)
+    if match is None:
+        return ""
+    tail = text[match.end():]
+    next_trigger = re.search(r"(?m)^  [A-Za-z0-9_-]+:\\s*(?:#.*)?$", tail)
+    return tail if next_trigger is None else tail[: next_trigger.start()]
+
 def violations_for_text(path_name: str, text: str) -> list[str]:
     findings: list[str] = []
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
@@ -58,9 +67,10 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
+    workflow_run_block = _workflow_run_trigger_block(text)
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
-        and "branches: [main]" in text
+        and "branches: [main]" in workflow_run_block
         and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
         in text
     )
