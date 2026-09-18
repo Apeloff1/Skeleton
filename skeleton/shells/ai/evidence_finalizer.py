@@ -16,6 +16,11 @@ from skeleton.shells.ai.execution_attempt import (
 )
 from skeleton.shells.ai.orchestrator import AIExecutionBundle
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
+from skeleton.shells.ai.finalization_state import (
+    AIExecutionFinalization,
+    AIExecutionFinalizationStore,
+    FinalizationPhase,
+)
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.session_evidence import (
@@ -34,6 +39,7 @@ class FinalizedAIExecutionEvidence:
     audit_anchor: SignedAIAuditAnchor
     audit_witness: SignedAIAuditWitness | None = None
     execution_evidence: SignedAIExecutionEvidence | None = None
+    finalization: AIExecutionFinalization | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -56,6 +62,11 @@ class FinalizedAIExecutionEvidence:
                 if self.execution_evidence is None
                 else self.execution_evidence.to_dict()
             ),
+            "finalization": (
+                None
+                if self.finalization is None
+                else self.finalization.to_dict()
+            ),
         }
 
 
@@ -76,6 +87,7 @@ class AIExecutionEvidenceFinalizer:
         audit_witnesses: AIAuditWitnessStore | None = None,
         execution_evidence: AIExecutionEvidenceStore | None = None,
         execution_evidence_builder: AIExecutionEvidenceBuilder | None = None,
+        finalizations: AIExecutionFinalizationStore | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -86,6 +98,7 @@ class AIExecutionEvidenceFinalizer:
         self.execution_evidence_builder = (
             execution_evidence_builder or AIExecutionEvidenceBuilder()
         )
+        self.finalizations = finalizations
 
     def finalize(
         self,
@@ -220,6 +233,20 @@ class AIExecutionEvidenceFinalizer:
             )
             execution_attempt_state = execution_attempt.state.value
 
+        finalization = None
+        if self.finalizations is not None:
+            stored_finalization = self.finalizations.reserve(
+                session_id=session.session_id,
+                provenance_digest=execution.provenance.digest,
+                execution_attempt_id=execution_attempt_id,
+                execution_attempt_authority_digest=(
+                    execution_attempt_authority_digest
+                ),
+                runtime_trust_digest=runtime_trust_digest,
+                release_evidence_digest=release_evidence_digest,
+            )
+            finalization = stored_finalization.finalization
+
         if not self.journal.verify():
             raise RuntimeError("AI decision journal failed integrity verification")
         if not self.receipt_chain.verify():
@@ -232,6 +259,12 @@ class AIExecutionEvidenceFinalizer:
         stored = self.session_evidence.put(evidence)
         if stored.evidence.digest != evidence.digest:
             raise RuntimeError("stored session execution evidence differs from final evidence")
+        if self.finalizations is not None and finalization is not None:
+            finalization = self.finalizations.advance(
+                finalization,
+                FinalizationPhase.SESSION_EVIDENCE,
+                session_evidence_digest=evidence.digest,
+            ).finalization
 
         session_journal = SessionJournalEvidence.from_journal(
             self.journal,
@@ -258,29 +291,54 @@ class AIExecutionEvidenceFinalizer:
                 execution_attempt_authority_digest
             ),
         )
-        anchor = self.audit_anchors.append(
-            session_id=session.session_id,
-            checkpoint_digest=recovery.digest,
-            provenance_digest=execution.provenance.digest,
-            journal_root=checkpoint.journal_root,
-            receipt_root=checkpoint.receipt_root,
-            session_evidence_digest=evidence.digest,
-            release_evidence_digest=release_evidence_digest,
-            sandbox_binding_digest=sandbox_binding_digest,
-            runtime_trust_digest=runtime_trust_digest,
-            authority_health_policy_digest=authority_health_policy_digest,
-            execution_attempt_id=execution_attempt_id,
-            execution_attempt_authority_digest=(
+        if self.finalizations is not None and finalization is not None:
+            finalization = self.finalizations.advance(
+                finalization,
+                FinalizationPhase.CHECKPOINTED,
+                session_evidence_digest=evidence.digest,
+                recovery_checkpoint_digest=recovery.digest,
+            ).finalization
+        anchor_args = {
+            "session_id": session.session_id,
+            "checkpoint_digest": recovery.digest,
+            "provenance_digest": execution.provenance.digest,
+            "journal_root": checkpoint.journal_root,
+            "receipt_root": checkpoint.receipt_root,
+            "session_evidence_digest": evidence.digest,
+            "release_evidence_digest": release_evidence_digest,
+            "sandbox_binding_digest": sandbox_binding_digest,
+            "runtime_trust_digest": runtime_trust_digest,
+            "authority_health_policy_digest": (
+                authority_health_policy_digest
+            ),
+            "execution_attempt_id": execution_attempt_id,
+            "execution_attempt_authority_digest": (
                 execution_attempt_authority_digest
             ),
-        )
+        }
+        if self.finalizations is not None and finalization is not None:
+            anchor = self.audit_anchors.append_once(
+                finalization_id=finalization.finalization_id,
+                **anchor_args,
+            )
+        else:
+            anchor = self.audit_anchors.append(**anchor_args)
         if not self.audit_anchors.verify():
             raise RuntimeError("AI audit anchor chain failed verification after append")
+        if self.finalizations is not None and finalization is not None:
+            finalization = self.finalizations.advance(
+                finalization,
+                FinalizationPhase.ANCHORED,
+                session_evidence_digest=evidence.digest,
+                recovery_checkpoint_digest=recovery.digest,
+                audit_anchor_digest=anchor.anchor.digest,
+                audit_chain_node_hash=anchor.chain_node_hash,
+            ).finalization
 
         audit_witness = None
         if self.audit_witnesses is not None:
             audit_root = self.audit_anchors.root_hash()
-            audit_witness = self.audit_witnesses.publish(
+            audit_witness = self.audit_witnesses.publish_once(
                 audit_root,
                 runtime_trust_digest=runtime_trust_digest,
                 release_evidence_digest=release_evidence_digest,
@@ -295,6 +353,17 @@ class AIExecutionEvidenceFinalizer:
                 runtime_trust_digest=runtime_trust_digest,
                 release_evidence_digest=release_evidence_digest,
             )
+            if self.finalizations is not None and finalization is not None:
+                finalization = self.finalizations.advance(
+                    finalization,
+                    FinalizationPhase.WITNESSED,
+                    session_evidence_digest=evidence.digest,
+                    recovery_checkpoint_digest=recovery.digest,
+                    audit_anchor_digest=anchor.anchor.digest,
+                    audit_chain_node_hash=anchor.chain_node_hash,
+                    audit_witness_digest=audit_witness.witness.digest,
+                    audit_witness_sequence=audit_witness.witness.sequence,
+                ).finalization
 
         signed_execution_evidence = None
         if self.execution_evidence is not None:
@@ -333,13 +402,65 @@ class AIExecutionEvidenceFinalizer:
                 ),
                 execution_attempt_state=execution_attempt_state,
             )
-            signed_execution_evidence = self.execution_evidence.append(
+            signed_execution_evidence = self.execution_evidence.append_once(
                 final_bundle
             )
             if not self.execution_evidence.verify():
                 raise RuntimeError(
                     "AI execution evidence chain failed verification after append"
                 )
+            if self.finalizations is not None and finalization is not None:
+                finalization = self.finalizations.advance(
+                    finalization,
+                    FinalizationPhase.SIGNED,
+                    session_evidence_digest=evidence.digest,
+                    recovery_checkpoint_digest=recovery.digest,
+                    audit_anchor_digest=anchor.anchor.digest,
+                    audit_chain_node_hash=anchor.chain_node_hash,
+                    audit_witness_digest=(
+                        ""
+                        if audit_witness is None
+                        else audit_witness.witness.digest
+                    ),
+                    audit_witness_sequence=(
+                        None
+                        if audit_witness is None
+                        else audit_witness.witness.sequence
+                    ),
+                    execution_evidence_digest=final_bundle.digest,
+                    execution_evidence_chain_node_hash=(
+                        signed_execution_evidence.chain_node_hash
+                    ),
+                ).finalization
+        if self.finalizations is not None and finalization is not None:
+            finalization = self.finalizations.advance(
+                finalization,
+                FinalizationPhase.COMPLETE,
+                session_evidence_digest=evidence.digest,
+                recovery_checkpoint_digest=recovery.digest,
+                audit_anchor_digest=anchor.anchor.digest,
+                audit_chain_node_hash=anchor.chain_node_hash,
+                audit_witness_digest=(
+                    ""
+                    if audit_witness is None
+                    else audit_witness.witness.digest
+                ),
+                audit_witness_sequence=(
+                    None
+                    if audit_witness is None
+                    else audit_witness.witness.sequence
+                ),
+                execution_evidence_digest=(
+                    ""
+                    if signed_execution_evidence is None
+                    else signed_execution_evidence.evidence.digest
+                ),
+                execution_evidence_chain_node_hash=(
+                    ""
+                    if signed_execution_evidence is None
+                    else signed_execution_evidence.chain_node_hash
+                ),
+            ).finalization
         return FinalizedAIExecutionEvidence(
             checkpoint,
             recovery,
@@ -348,4 +469,5 @@ class AIExecutionEvidenceFinalizer:
             anchor,
             audit_witness,
             signed_execution_evidence,
+            finalization,
         )
