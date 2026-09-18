@@ -15,11 +15,15 @@ from skeleton.jeeves.agent.semantic_frontier import (
 )
 from skeleton.jeeves.agent.semantic_lens_topology import SemanticLensTopology
 from skeleton.jeeves.agent.semantic_lenses import (
+    LensSelection,
     SemanticFinding,
     SemanticObservation,
     SemanticRole,
 )
-from skeleton.jeeves.agent.semantic_maximal import MaximalSemanticRegistry
+from skeleton.jeeves.agent.semantic_maximal import (
+    MaximalLensRouter,
+    MaximalSemanticRegistry,
+)
 from skeleton.jeeves.agent.semantic_plane import (
     SemanticLensPlane,
     SemanticPlanePolicy,
@@ -44,6 +48,23 @@ def test_system_role_is_available_to_system_oriented_lenses() -> None:
         spec.role is SemanticRole.SYSTEM
         for spec in registry.all()
     )
+
+
+class _FixedRouter(MaximalLensRouter):
+    def __init__(
+        self,
+        registry: MaximalSemanticRegistry,
+        selection: LensSelection,
+    ) -> None:
+        super().__init__(registry)
+        self._selection = selection
+
+    def select_maximal(
+        self,
+        observations,
+        **kwargs,
+    ) -> LensSelection:
+        return self._selection
 
 
 def _system():
@@ -775,6 +796,157 @@ def test_restricted_bridge_can_recover_after_new_replication() -> None:
     )
     assert recovered.status is TopologyBridgeStatus.ACTIVE
     assert len(lab.learned_rules()) == 1
+
+
+def _companion_fixture():
+    registry, topology, candidate, lab = _system()
+    _promote(lab, candidate)
+    left = registry.get(candidate.left_key)
+    right = registry.get(candidate.right_key)
+    selection = LensSelection(
+        lenses=(left,),
+        activation_scores={left.key: 0.90},
+        families=(left.family,),
+        perpendicular=True,
+    )
+    cue_text = " ".join(right.activation_cues)
+    observation_count = max(3, right.minimum_observations)
+    supported = tuple(
+        SemanticObservation(
+            f"companion-supported:{index}",
+            cue_text,
+            index,
+        )
+        for index in range(observation_count)
+    )
+    unsupported = tuple(
+        SemanticObservation(
+            f"companion-unsupported:{index}",
+            "unrelated qzjx token with no registered companion cues",
+            index,
+        )
+        for index in range(observation_count)
+    )
+    return (
+        registry,
+        topology,
+        candidate,
+        lab,
+        left,
+        right,
+        selection,
+        supported,
+        unsupported,
+    )
+
+
+def test_active_learned_bridge_can_add_freshly_supported_companion_lens() -> None:
+    (
+        registry,
+        topology,
+        _candidate,
+        lab,
+        _left,
+        right,
+        selection,
+        supported,
+        _unsupported,
+    ) = _companion_fixture()
+    plane = SemanticLensPlane(
+        registry=registry,
+        router=_FixedRouter(registry, selection),
+        topology=topology,
+        topology_learning=lab,
+        policy=SemanticPlanePolicy(
+            require_selected_findings=False,
+            max_lenses=8,
+            max_per_family=6,
+            enable_learned_companions=True,
+            max_learned_companions=2,
+            minimum_learned_companion_cue_support=0.20,
+        ),
+    )
+
+    snapshot = plane.analyze(supported)
+
+    assert right.key in {
+        item.key for item in snapshot.selection.lenses
+    }
+    assert snapshot.learned_companion_keys == (right.key,)
+    assert snapshot.coverage.learned_companion_lenses == 1
+    assert snapshot.factual_assertion_authorized is False
+    assert snapshot.causal_assertion_authorized is False
+
+
+def test_learned_bridge_never_adds_companion_without_fresh_cue_support() -> None:
+    (
+        registry,
+        topology,
+        _candidate,
+        lab,
+        _left,
+        right,
+        selection,
+        _supported,
+        unsupported,
+    ) = _companion_fixture()
+    plane = SemanticLensPlane(
+        registry=registry,
+        router=_FixedRouter(registry, selection),
+        topology=topology,
+        topology_learning=lab,
+        policy=SemanticPlanePolicy(
+            require_selected_findings=False,
+            max_lenses=8,
+            max_per_family=6,
+            enable_learned_companions=True,
+            minimum_learned_companion_cue_support=0.20,
+        ),
+    )
+
+    snapshot = plane.analyze(unsupported)
+
+    assert right.key not in {
+        item.key for item in snapshot.selection.lenses
+    }
+    assert snapshot.learned_companion_keys == ()
+    assert snapshot.coverage.learned_companion_lenses == 0
+
+
+def test_learned_companion_policy_can_be_disabled_without_changing_router_selection() -> None:
+    (
+        registry,
+        topology,
+        _candidate,
+        lab,
+        _left,
+        right,
+        selection,
+        supported,
+        _unsupported,
+    ) = _companion_fixture()
+    plane = SemanticLensPlane(
+        registry=registry,
+        router=_FixedRouter(registry, selection),
+        topology=topology,
+        topology_learning=lab,
+        policy=SemanticPlanePolicy(
+            require_selected_findings=False,
+            max_lenses=8,
+            max_per_family=6,
+            enable_learned_companions=False,
+        ),
+    )
+
+    snapshot = plane.analyze(supported)
+
+    assert tuple(item.key for item in snapshot.selection.lenses) == (
+        tuple(item.key for item in selection.lenses)
+    )
+    assert right.key not in {
+        item.key for item in snapshot.selection.lenses
+    }
+    assert snapshot.learned_companion_keys == ()
 
 
 def test_competing_active_relation_kinds_fail_closed() -> None:
