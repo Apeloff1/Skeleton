@@ -56,6 +56,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_middleware_rate_limiter.py \
   tests/test_api_gateway_payload_reliability.py \
   tests/test_api_gateway_error_redaction.py \
+  tests/test_webhook_destination_security.py \
   skeleton/testing/test_tiered_cache.py \
   skeleton/testing/test_retrieval_hot_path.py \
   skeleton/testing/test_orchestration_reliability_profiles.py \
@@ -152,6 +153,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
   backend/tests/test_live_scraper_network_security.py \
+  backend/tests/test_free_api_network_security.py \
   backend/tests/test_ai_reader_error_redaction.py \
   backend/tests/test_sast_security_gate.py \
   backend/tests/test_repository_python_sast_scope.py \
