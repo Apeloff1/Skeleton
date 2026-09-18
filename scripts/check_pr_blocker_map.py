@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S001-current-pr-blocker-map"
+TASK_ID = "reserve-S001-current-pr-blocker-map"
 CONFLICT_DOMAIN = "ci.readonly.blocker_map"
 ROLLUP_PRIORITY: tuple[str, ...] = ("blocking", "queued", "stale", "success")
 CLASSES: tuple[str, ...] = (*ROLLUP_PRIORITY, "unknown")
@@ -29,7 +29,7 @@ _FINDING_PREFIX = "pr-blocker-map"
 DOCUMENT_FIELDS = frozenset(
     {
         "schema_version",
-        "task_key",
+        "task_id",
         "conflict_domain",
         "pull_request",
         "required_checks",
@@ -215,7 +215,7 @@ def classify_document(document: object) -> tuple[dict[str, object], list[str]]:
 
     errors: list[str] = []
     empty: dict[str, object] = {
-        "task_key": TASK_KEY,
+        "task_id": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "schema_version": SCHEMA_VERSION,
         "pr_number": None,
@@ -251,9 +251,9 @@ def classify_document(document: object) -> tuple[dict[str, object], list[str]]:
     if not _is_int(version) or version != SCHEMA_VERSION:
         errors.append(_error("unknown schema_version", f"schema_version must be exactly {SCHEMA_VERSION}"))
 
-    task_key = document.get("task_key")
-    if task_key != TASK_KEY:
-        errors.append(_error("unknown task_key", f"task_key must be exactly {TASK_KEY}"))
+    task_id = document.get("task_id")
+    if task_id != TASK_ID:
+        errors.append(_error("unknown task_id", f"task_id must be exactly {TASK_ID}"))
 
     conflict_domain = document.get("conflict_domain")
     if conflict_domain != CONFLICT_DOMAIN:
@@ -377,7 +377,7 @@ def classify_document(document: object) -> tuple[dict[str, object], list[str]]:
     if errors:
         rollup = "unknown"
     report: dict[str, object] = {
-        "task_key": TASK_KEY,
+        "task_id": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "schema_version": SCHEMA_VERSION,
         "pr_number": pr_number,

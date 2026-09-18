@@ -12,7 +12,7 @@ from scripts.check_pr_blocker_map import (
     QUEUED_STATUSES,
     ROLLUP_PRIORITY,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     classify_check,
     classify_document,
     first_rollup,
@@ -48,7 +48,7 @@ def _check(name: str, *, status: str = "completed", conclusion: object = "succes
 def _doc(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
-        "task_key": TASK_KEY,
+        "task_id": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "pull_request": _pr(),
         "required_checks": ["Merge Readiness"],
@@ -59,7 +59,7 @@ def _doc(**overrides: object) -> dict[str, object]:
 
 
 def test_task_identity_and_closed_class_set() -> None:
-    assert TASK_KEY == "reserve-S001-current-pr-blocker-map"
+    assert TASK_ID == "reserve-S001-current-pr-blocker-map"
     assert CONFLICT_DOMAIN == "ci.readonly.blocker_map"
     assert SCHEMA_VERSION == 1
     assert ROLLUP_PRIORITY == ("blocking", "queued", "stale", "success")
