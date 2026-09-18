@@ -258,6 +258,11 @@ class AIShellService:
                 context=context,
                 approval=approval,
                 execution_backend=execution_backend,
+                release_evidence_digest=(
+                    ""
+                    if self._release_report is None
+                    else self._release_report.evidence_digest
+                ),
             )
         finally:
             if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
