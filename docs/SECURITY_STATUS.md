@@ -45,7 +45,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | Control | Enforcement | Regression / evidence | Status | Remaining risk |
 | --- | --- | --- | --- | --- |
 | Full-history credential scanning | `.github/workflows/merge-readiness.yml` Gitleaks step plus `.gitleaks.toml` | canonical `quality_security` job | Canonical | A green current-main run is still required as execution evidence; branch protection is still admin-only. |
-| Repository secret hygiene | `backend/scripts/check_secret_hygiene.py` | `backend/tests/test_secret_hygiene_gate.py` | Canonical | #540 still tracks realistic fixture/example/high-entropy false-negative audit. |
+| Repository secret hygiene | `backend/scripts/check_secret_hygiene.py` | `backend/tests/test_secret_hygiene_gate.py` | Canonical | Known provider formats plus provider-neutral high-entropy secret-shaped assignments are covered; provider vocabulary and realistic fixtures still require periodic review. |
 | Credential rotation/revocation procedure | `docs/SECURITY_CI_POLICY.md` | `backend/tests/test_security_policy_docs.py` | Implemented | Provider-side revocation and audit-log review necessarily happen outside source control. |
 | Malware / IOC policy | `backend/scripts/check_malware_iocs.py`; `.github/workflows/malware-gate.yml` | `backend/tests/test_malware_ioc_gate.py` | Canonical + supplemental | Signatures/IOCs need maintenance as threats evolve. |
 | Sensitive telemetry redaction | shared observability/redaction contracts | `tests/test_orchestration_error_redaction.py`, `tests/test_api_gateway_error_redaction.py`, observability tests | Canonical | Continue auditing workflow/runtime diagnostics for raw headers, URLs, exception payloads, and environment dumps. |
@@ -91,7 +91,7 @@ Issue #540 remains open for the following high-value work:
 - semantic least-privilege audit of workflow/job token grants;
 - complete network/SSRF and API boundary audit;
 - fail-closed scanner self-failure regressions across the security suite;
-- realistic secret-fixture/high-entropy false-negative audit;
+- continue realistic secret-fixture/provider-vocabulary review as credential formats evolve;
 - dependency/container vulnerability and controlled digest-refresh verification;
 - read-only-filesystem/writable-mount minimization and runtime-secret hardening;
 - release provenance/attestation refusal behavior;
