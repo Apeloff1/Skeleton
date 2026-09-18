@@ -461,6 +461,35 @@ class AIExecutionFinalizationStore:
                     current,
                 )
 
+            supplied = {
+                "session_evidence_digest": session_evidence_digest,
+                "recovery_checkpoint_digest": recovery_checkpoint_digest,
+                "audit_anchor_digest": audit_anchor_digest,
+                "audit_chain_node_hash": audit_chain_node_hash,
+                "audit_witness_digest": audit_witness_digest,
+                "audit_witness_sequence": audit_witness_sequence,
+                "execution_evidence_digest": execution_evidence_digest,
+                "execution_evidence_chain_node_hash": (
+                    execution_evidence_chain_node_hash
+                ),
+            }
+            if phase is current.phase:
+                conflict = False
+                for name, value in supplied.items():
+                    if value in {"", None}:
+                        continue
+                    if getattr(current, name) != value:
+                        conflict = True
+                        break
+                if conflict:
+                    raise ExecutionFinalizationConflict(
+                        "same finalization phase carries different evidence"
+                    )
+                return StoredExecutionFinalization(
+                    record.revision,
+                    current,
+                )
+
             updates = {
                 "session_evidence_digest": (
                     session_evidence_digest
