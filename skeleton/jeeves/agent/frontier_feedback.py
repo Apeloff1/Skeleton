@@ -296,15 +296,19 @@ class FrontierReasoningFeedback:
             reasons.append("observed frontier confidence is materially over-calibrated")
         if report.escalated_count >= 6 and report.direct_count >= 6:
             if report.observed_escalation_delta > 0.08:
-                entropy_delta += 0.04
+                entropy_delta -= 0.04
                 reasons.append(
-                    "extra inference is associated with higher verified success "
+                    "extra inference is associated with higher verified success; "
+                    "lower the entropy ceiling to escalate earlier "
                     f"(gain/call={efficiency.success_gain_per_extra_model_call:.4f}, "
                     f"gain/1k_tokens={efficiency.success_gain_per_1k_extra_tokens:.4f})"
                 )
             elif report.observed_escalation_delta < -0.08:
-                entropy_delta -= 0.04
-                reasons.append("extra inference is associated with lower verified success")
+                entropy_delta += 0.04
+                reasons.append(
+                    "extra inference is associated with lower verified success; "
+                    "raise the entropy ceiling to escalate less often"
+                )
         quality_delta = finite_number("minimum_quality_delta", quality_delta)
         choice_delta = finite_number("minimum_choice_probability_delta", choice_delta)
         entropy_delta = finite_number("maximum_entropy_delta", entropy_delta)
