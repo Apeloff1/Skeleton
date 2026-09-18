@@ -14,22 +14,18 @@ jobs:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}
     strategy:
       fail-fast: false
-      max-parallel: 13
+      max-parallel: 9
       matrix:
         sha:
-          - 364b2d60f9639d310ededeabf4d7ac89aa6cb841
-          - 871ee27ef1f31d5b6b1fa813505d78f79b93121f
-          - 8e63a5675f1a8c086f4249886d76372706f2955c
-          - 1109e37e96455412e888feb4ccbfa9faf79e9bb4
-          - 3bf0545ad4753b0545c290acc66d987427899765
-          - 65393b38c8a9081b573a61efbadb67b9e8f637f1
-          - 080c7d22121433f4536b4e77fc74eb979b6853ae
-          - 42cd700a93f5f99b9934f82638e8ff1d622bfbce
-          - df5a010e930d0a8156d3dbe3ddc6e7591656862d
-          - a8f2c026ddc18cfab63588bd63b14204372b2fef
-          - 5f6454b199f8f643fe432b0321a07ebb97f52b04
-          - 6ade49789bcfaf87c903cda21c996aa018ca9e45
-          - 7ac507d90a146f09ee26b011269e3b0c183c70b3
+          - 7b681ba1805c52c2f35d9462c4ec9a92f0053d0b
+          - b784b18cb2f7b8088601f673820f052db54da11b
+          - baaf5f8eab1f3c82e2b24cbb9bb8ea27dcbe13c9
+          - 85d21bafc755d4111e3396737c70254b7cf2dbec
+          - bcef1bc9c5caa00b7e1ee8a36bb64db493b6856e
+          - 70302a63f3addf97a1615c52e2f46269048dfde3
+          - 9790135c12f22b4064ff6e4addd8f981a6ee5499
+          - a5a9168f02d91203825a36588d03431796d9c355
+          - 0d639993c9c88caa8e7b64c748df6b0be66fe733
     concurrency:
       # Intentionally matches the pre-#1203 SHA-scoped Merge Readiness group.
       # The current ref-scoped group is not present in this matrix.
@@ -41,7 +37,7 @@ jobs:
       - name: Confirm bounded tombstone identity
         env:
           LEGACY_SHA: ${{ matrix.sha }}
-          CURRENT_MAIN_SHA: 7572a9dd3a0c4658e0425d5e379cbb9c5bd653b7
+          CURRENT_MAIN_SHA: 03b175d3ffbb2c32cee230ec90c5d12a32bdfa59
         shell: bash
         run: |
           set -euo pipefail
