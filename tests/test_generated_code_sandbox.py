@@ -434,6 +434,18 @@ def test_sensitive_callable_aliases_cannot_bypass_python_inspection(
     }
 
 
+def test_sensitive_alias_provenance_survives_reassignment_noise(tmp_path: Path) -> None:
+    source = (
+        'reader = open\n'
+        'reader = print\n'
+        'reader("/etc/passwd")\n'
+    )
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind is OperationKind.FS_READ
+
+
 def test_aliased_open_still_enforces_workspace_containment_with_filesystem_grant(
     tmp_path: Path,
 ) -> None:
