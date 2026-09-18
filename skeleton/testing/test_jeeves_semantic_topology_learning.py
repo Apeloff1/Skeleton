@@ -348,6 +348,83 @@ def test_persistently_wrong_bridge_is_rejected() -> None:
     assert lab.learned_rules() == ()
 
 
+def test_pooled_metrics_cannot_hide_bad_transfer_domain() -> None:
+    _, _, candidate, lab = _system()
+    primary_rows = (
+        (1, "film", "film-a", True),
+        (2, "film", "film-b", True),
+        (3, "game", "game-a", True),
+        (4, "game", "game-b", False),
+    )
+    for index, domain, run, outcome in primary_rows:
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=outcome,
+                domain=domain,
+                run=run,
+            )
+        )
+    for index, domain, run in (
+        (101, "film", "film-control"),
+        (102, "game", "game-control"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.05,
+                outcome=False,
+                domain=domain,
+                run=run,
+                negative_control=True,
+            )
+        )
+
+    report = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+
+    assert report.empirical_rate == pytest.approx(0.75)
+    assert report.brier is not None
+    assert report.brier < lab.policy.maximum_brier
+    assert report.qualified_domain_count == 2
+    assert report.qualified_control_domain_count == 2
+    assert report.worst_domain_brier is not None
+    assert report.worst_domain_brier > lab.policy.maximum_domain_brier
+    assert report.minimum_domain_empirical_rate == pytest.approx(0.5)
+    assert report.status is TopologyBridgeStatus.RESTRICTED
+    assert "domain_transfer_failure" in report.reasons
+    assert lab.learned_rules() == ()
+
+
+def test_domain_reports_expose_transfer_and_control_quality() -> None:
+    _, _, candidate, lab = _system()
+    _promote(lab, candidate)
+
+    report = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+    domains = {item.domain: item for item in report.domain_reports}
+
+    assert set(domains) == {"film", "game"}
+    assert all(item.qualified_primary for item in domains.values())
+    assert all(item.qualified_control for item in domains.values())
+    assert all(item.trial_count == 2 for item in domains.values())
+    assert all(item.negative_control_count == 1 for item in domains.values())
+    assert all(
+        item.brier is not None and item.brier < 0.02
+        for item in domains.values()
+    )
+    assert report.worst_domain_control_positive_rate == 0.0
+
+
 def test_negative_control_failure_blocks_promotion() -> None:
     _, _, candidate, lab = _system()
     for index, domain, run in (
