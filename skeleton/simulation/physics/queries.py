@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .body import RigidBody
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
+from .mesh import TriangleMeshShape
 from .shapes import (
     BoxShape,
     CapsuleShape,
@@ -341,6 +342,20 @@ def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
         return _capsule_intersection(ray, body, shape)
     if isinstance(shape, CylinderShape):
         return _cylinder_intersection(ray, body, shape)
+    if isinstance(shape, TriangleMeshShape):
+        local_hit = shape.raycast_local(
+            body.transform.inverse_transform_point(ray.origin),
+            body.transform.inverse_transform_vector(ray.direction),
+            ray.max_distance,
+        )
+        if local_hit is None:
+            return None
+        return RayHit(
+            body.body_id,
+            local_hit.distance,
+            body.transform.transform_point(local_hit.point),
+            body.transform.transform_vector(local_hit.normal).normalized(),
+        )
     raise PhysicsValidationError("unsupported raycast shape")
 
 
