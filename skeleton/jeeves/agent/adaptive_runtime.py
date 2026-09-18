@@ -55,6 +55,7 @@ from .evidence import EvidenceLedger
 from .frontier_adjudication import HostCandidateAdjudicator
 from .frontier_consensus import merge_search_results
 from .frontier_feedback import FrontierReasoningFeedback
+from .frontier_probe_planning import FrontierProbePlanner
 from .frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
@@ -204,6 +205,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         adaptive_config: AdaptiveConfig | None = None,
         frontier_reasoning: FrontierReasoningCoordinator | None = None,
         frontier_feedback: FrontierReasoningFeedback | None = None,
+        frontier_probe_planner: FrontierProbePlanner | None = None,
         context_repository_factory: Callable[[ContextNamespace], ContextRepository] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -216,6 +218,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self.adaptive_config = adaptive_config or AdaptiveConfig()
         self.frontier_reasoning = frontier_reasoning or FrontierReasoningCoordinator()
         self.frontier_feedback = frontier_feedback or FrontierReasoningFeedback()
+        self.frontier_probe_planner = frontier_probe_planner or FrontierProbePlanner()
         self._context_factory = context_repository_factory or (lambda namespace: ContextRepository(namespace, clock=self._wall_clock))
         self._context_repositories: dict[str, ContextRepository] = {}
         self._adaptive: dict[str, _AdaptiveState] = {}
@@ -438,6 +441,38 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             InferenceDisposition.VERIFY,
         }:
             reason = self._frontier_block_reason(decision)
+            probe_plan = None
+            try:
+                probe_plan = self.frontier_probe_planner.plan(decision)
+            except Exception as exc:
+                state.trace.emit(
+                    "frontier.probe_planning_failed",
+                    {
+                        "step_id": step.step_id,
+                        "decision": decision.fingerprint,
+                        "error": f"{type(exc).__name__}: {str(exc)[:512]}",
+                    },
+                )
+                self.metrics.increment("agent.frontier.probe_planning_failures")
+            if probe_plan is not None:
+                selected_probe = probe_plan.selected_probe
+                state.trace.emit(
+                    "frontier.probes_planned",
+                    {
+                        "step_id": step.step_id,
+                        "decision": decision.fingerprint,
+                        "plan": probe_plan.fingerprint,
+                        "gaps": [gap.gap_id for gap in probe_plan.gaps],
+                        "probes": [probe.probe_id for probe in probe_plan.probes],
+                        "selected_probe": (
+                            selected_probe.probe_id if selected_probe is not None else None
+                        ),
+                        "selected_kind": (
+                            selected_probe.kind.value if selected_probe is not None else None
+                        ),
+                    },
+                )
+                self.metrics.increment("agent.frontier.probes_planned")
             state.scratch.set(
                 f"frontier:block:{step.step_id}",
                 {
@@ -446,6 +481,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     "causes": [cause.value for cause in decision.causes],
                     "consensus": decision.consensus.fingerprint if decision.consensus else None,
                     "reason": reason,
+                    "probe_plan": probe_plan.as_json() if probe_plan is not None else None,
                 },
                 importance=0.95,
             )
