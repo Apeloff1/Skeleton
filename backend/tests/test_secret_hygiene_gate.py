@@ -53,24 +53,32 @@ def test_stat_failure_does_not_drop_secret_candidate(tmp_path: Path, monkeypatch
     assert path in list(secret_hygiene.candidate_files())
 
 
-def test_bounded_reader_fails_closed_on_oversized_candidate(tmp_path: Path) -> None:
+def test_bounded_reader_fails_closed_on_oversized_candidate(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    bound = 256
+    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
     path = tmp_path / "large.env"
-    path.write_bytes(b"A" * (secret_hygiene.MAX_FILE_BYTES + 1))
+    path.write_bytes(b"A" * (bound + 1))
 
     findings = violations(path)
 
     assert len(findings) == 1
     assert "scan failure: exceeds" in findings[0]
-    assert str(secret_hygiene.MAX_FILE_BYTES) in findings[0]
+    assert str(bound) in findings[0]
 
 
-def test_oversized_multiline_candidate_is_scanned_through_eof(tmp_path: Path) -> None:
+def test_oversized_multiline_candidate_is_scanned_through_eof(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    bound = 256
+    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
     path = tmp_path / "large.env"
-    filler = ("# harmless filler\n" * ((secret_hygiene.MAX_FILE_BYTES // 18) + 1))
+    filler = "# harmless filler\n" * 20
     token = "ghp_" + ("A" * 40)
     path.write_text(filler + f"TOKEN={token}\n", encoding="utf-8")
 
-    assert path.stat().st_size > secret_hygiene.MAX_FILE_BYTES
+    assert path.stat().st_size > bound
     findings = violations(path)
 
     assert any("GitHub token" in finding for finding in findings)
@@ -79,8 +87,10 @@ def test_oversized_multiline_candidate_is_scanned_through_eof(tmp_path: Path) ->
 def test_candidate_discovery_does_not_skip_oversized_text_files(
     tmp_path: Path, monkeypatch,
 ) -> None:
+    bound = 256
+    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
     path = tmp_path / "large.env"
-    path.write_bytes(b"A" * (secret_hygiene.MAX_FILE_BYTES + 1))
+    path.write_bytes(b"A" * (bound + 1))
     monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
 
     assert path in list(secret_hygiene.candidate_files())
