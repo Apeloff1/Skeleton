@@ -155,6 +155,18 @@ def test_learning_queries_reject_malformed_known_sets():
 
 
 
+def test_skill_ids_are_canonicalized_before_identity_and_capacity_checks():
+    engine = AssessmentEngine(clock=lambda: 1.0, max_skills=1)
+
+    first = engine.register(" python ")
+    observed = engine.observe(InteractionEvidence("python", correct=True))
+
+    assert first is observed
+    assert observed.skill_id == "python"
+    assert observed.attempts == 1
+    assert engine.mastery(" python ") == engine.mastery("python")
+
+
 def test_first_observation_samples_clock_once():
     ticks = iter([10.0])
     engine = AssessmentEngine(clock=lambda: next(ticks))
