@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
 
+from .epistemic_frontier import KnowledgeObligation
 from .probability_lenses import (
     brier_score,
     expected_calibration_error,
@@ -1365,6 +1366,289 @@ class SemanticTopologyLearningLab:
             ambiguous_active_candidate_ids=ambiguous,
             learned_rule_keys=tuple(item.rule.key for item in learned),
             fingerprint=fingerprint,
+        )
+
+    def research_obligations(
+        self,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+    ) -> tuple[KnowledgeObligation, ...]:
+        """Convert unresolved topology gaps into epistemic-frontier obligations.
+
+        This does not promote a topology bridge. It only gives the research
+        control plane a typed, rankable question about what would need to be
+        learned before the bridge could become executable.
+        """
+
+        maximum = positive_int("limit", limit, maximum=10_000)
+        threshold = probability(
+            "minimum_candidate_score",
+            minimum_candidate_score,
+        )
+        if not isinstance(include_rejected, bool):
+            raise AgentContractError("include_rejected must be boolean")
+
+        with self._lock:
+            reports = self.reports()
+            learned = self._learned_rules_from_reports(reports)
+            learned_candidate_ids = {
+                item.candidate_id for item in learned
+            }
+            reports_by_candidate: dict[
+                str,
+                list[TopologyBridgeReport],
+            ] = {}
+            for report in reports:
+                reports_by_candidate.setdefault(
+                    report.candidate_id,
+                    [],
+                ).append(report)
+
+            obligations: list[tuple[float, KnowledgeObligation]] = []
+            for candidate in self._candidates.values():
+                if candidate.score < threshold:
+                    continue
+                if candidate.candidate_id in learned_candidate_ids:
+                    continue
+
+                candidate_reports = reports_by_candidate.get(
+                    candidate.candidate_id,
+                    [],
+                )
+                active_reports = [
+                    item
+                    for item in candidate_reports
+                    if item.status is TopologyBridgeStatus.ACTIVE
+                ]
+                ambiguous = len(active_reports) > 1
+                rejected_only = (
+                    bool(candidate_reports)
+                    and all(
+                        item.status is TopologyBridgeStatus.REJECTED
+                        for item in candidate_reports
+                    )
+                )
+                if rejected_only and not include_rejected:
+                    continue
+
+                candidate_trials = [
+                    item
+                    for item in self._trials.values()
+                    if item.candidate_id == candidate.candidate_id
+                ]
+                primary = [
+                    item
+                    for item in candidate_trials
+                    if not item.negative_control
+                ]
+                controls = [
+                    item
+                    for item in candidate_trials
+                    if item.negative_control
+                ]
+                run_count = len(
+                    {item.independent_run for item in primary}
+                )
+                domain_count = len({item.domain for item in primary})
+                trial_coverage = min(
+                    1.0,
+                    len(primary) / self.policy.minimum_trials,
+                )
+                run_coverage = min(
+                    1.0,
+                    run_count / self.policy.minimum_independent_runs,
+                )
+                domain_coverage = min(
+                    1.0,
+                    domain_count / self.policy.minimum_domains,
+                )
+                control_coverage = min(
+                    1.0,
+                    len(controls) / self.policy.minimum_negative_controls,
+                )
+                evidence_coverage = min(
+                    1.0,
+                    0.45 * trial_coverage
+                    + 0.20 * run_coverage
+                    + 0.20 * domain_coverage
+                    + 0.15 * control_coverage,
+                )
+
+                best_report = None
+                if candidate_reports:
+                    status_order = {
+                        TopologyBridgeStatus.ACTIVE: 4,
+                        TopologyBridgeStatus.RESTRICTED: 3,
+                        TopologyBridgeStatus.CANDIDATE: 2,
+                        TopologyBridgeStatus.REJECTED: 1,
+                        TopologyBridgeStatus.SHADOW: 0,
+                    }
+                    best_report = max(
+                        candidate_reports,
+                        key=lambda item: (
+                            status_order[item.status],
+                            item.trial_count,
+                            item.domain_count,
+                            item.independent_run_count,
+                            -(
+                                item.brier
+                                if item.brier is not None
+                                else 1.0
+                            ),
+                        ),
+                    )
+
+                empirical_rate = (
+                    best_report.empirical_rate
+                    if best_report is not None
+                    and best_report.empirical_rate is not None
+                    else 0.5
+                )
+                confidence = min(
+                    1.0,
+                    max(
+                        0.0,
+                        0.5
+                        + (empirical_rate - 0.5)
+                        * evidence_coverage,
+                    ),
+                )
+                if ambiguous:
+                    confidence = 0.5
+
+                unresolved_status = (
+                    "ambiguous_active"
+                    if ambiguous
+                    else (
+                        best_report.status.value
+                        if best_report is not None
+                        else TopologyBridgeStatus.SHADOW.value
+                    )
+                )
+                kind_text = (
+                    best_report.kind.value
+                    if best_report is not None and not ambiguous
+                    else "interaction"
+                )
+                question = (
+                    (
+                        "Which interaction kind is reproducibly supported "
+                        f"between {candidate.left_key} and "
+                        f"{candidate.right_key}, given competing active "
+                        "bridge hypotheses?"
+                    )
+                    if ambiguous
+                    else (
+                        f"Does a reproducible {kind_text} relation exist "
+                        f"between {candidate.left_key} and "
+                        f"{candidate.right_key} across independent runs "
+                        "and domains?"
+                    )
+                )
+                decision_impact = min(
+                    1.0,
+                    0.55 * candidate.score
+                    + 0.20 * float(candidate.cross_family)
+                    + 0.15 * candidate.role_novelty
+                    + 0.10 * candidate.cue_overlap,
+                )
+                contradiction_strength = (
+                    1.0
+                    if ambiguous
+                    else (
+                        0.65
+                        if best_report is not None
+                        and best_report.status
+                        in {
+                            TopologyBridgeStatus.RESTRICTED,
+                            TopologyBridgeStatus.REJECTED,
+                        }
+                        else 0.0
+                    )
+                )
+                model_disagreement = (
+                    1.0
+                    if ambiguous
+                    else min(
+                        1.0,
+                        max(0, len(candidate_reports) - 1) / 3.0,
+                    )
+                )
+                obligation = KnowledgeObligation(
+                    obligation_id=stable_id(
+                        "semantic-topology-obligation",
+                        {
+                            "candidate": candidate.candidate_id,
+                        },
+                        length=28,
+                    ),
+                    question=question,
+                    decision_impact=decision_impact,
+                    confidence=confidence,
+                    evidence_coverage=evidence_coverage,
+                    freshness=1.0,
+                    contradiction_strength=contradiction_strength,
+                    model_disagreement=model_disagreement,
+                    assumption_load=0.85,
+                    novelty=max(
+                        candidate.role_novelty,
+                        0.75 if candidate.cross_family else 0.45,
+                    ),
+                    assumptions=(
+                        "shared cues do not establish an interaction",
+                        "semantic topology relations remain interpretive",
+                        "promotion requires predeclared independent outcomes",
+                    ),
+                    metadata={
+                        "semantic_topology": True,
+                        "candidate_id": candidate.candidate_id,
+                        "candidate_fingerprint": (
+                            self.candidate_fingerprint(candidate)
+                        ),
+                        "left_key": candidate.left_key,
+                        "right_key": candidate.right_key,
+                        "left_family": candidate.left_family.value,
+                        "right_family": candidate.right_family.value,
+                        "candidate_score": candidate.score,
+                        "cross_family": candidate.cross_family,
+                        "shared_cues": list(candidate.shared_cues),
+                        "status": unresolved_status,
+                        "report_ids": [
+                            item.report_id
+                            for item in candidate_reports
+                        ],
+                        "active_kinds": [
+                            item.kind.value for item in active_reports
+                        ],
+                        "primary_trial_count": len(primary),
+                        "negative_control_count": len(controls),
+                        "independent_run_count": run_count,
+                        "domain_count": domain_count,
+                        "topology_learning_contract": (
+                            self.contract_fingerprint
+                        ),
+                    },
+                )
+                obligations.append(
+                    (
+                        decision_impact
+                        * (1.0 - 0.5 * evidence_coverage)
+                        + 0.25 * contradiction_strength
+                        + 0.20 * model_disagreement,
+                        obligation,
+                    )
+                )
+
+        obligations.sort(
+            key=lambda item: (
+                -item[0],
+                item[1].obligation_id,
+            )
+        )
+        return tuple(
+            item[1] for item in obligations[:maximum]
         )
 
     def export_state(self) -> SemanticTopologyLearningState:
