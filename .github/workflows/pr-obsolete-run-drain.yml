@@ -62,11 +62,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Reconcile obsolete live PR-linked runs
+      - name: Drain obsolete runs for the lifecycle signal
         shell: bash
         run: |
           set -euo pipefail
-          python backend/scripts/pr_obsolete_run_sweep.py
+          python backend/scripts/pr_obsolete_run_from_workflow_run.py
 
   sweep:
     if: github.event_name == 'schedule' || github.event_name == 'push'
