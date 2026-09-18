@@ -49,14 +49,42 @@ def test_new_branch_baseline_resolution_fails_closed() -> None:
     push_case = _push_case(_workflow_text())
 
     assert '[[ -n "$DEFAULT_BRANCH" ]] || {' in push_case
-    assert "Unable to resolve default-branch baseline for new-branch secret scan" in push_case
-    assert "Invalid default-branch baseline for new-branch secret scan" in push_case
-    assert "Unable to resolve merge base for new-branch secret scan" in push_case
-    assert "Invalid merge base for new-branch secret scan" in push_case
+    assert "Unable to resolve default-branch baseline for branch secret scan" in push_case
+    assert "Invalid default-branch baseline for branch secret scan" in push_case
+    assert "Unable to resolve merge base for branch secret scan" in push_case
+    assert "Invalid merge base for branch secret scan" in push_case
 
 
-def test_existing_push_and_pull_request_ranges_remain_incremental() -> None:
+def test_default_branch_push_and_pull_request_ranges_remain_incremental() -> None:
     text = _workflow_text()
 
     assert 'scan_range="${PR_BASE_SHA}..${PR_HEAD_SHA}"' in text
     assert 'scan_range="${PUSH_BEFORE_SHA}..${CURRENT_SHA}"' in text
+
+
+def test_feature_pushes_are_branch_cumulative_and_safely_supersedable() -> None:
+    text = _workflow_text()
+    push_case = _push_case(text)
+
+    assert "REF_NAME: ${{ github.ref_name }}" in text
+    assert '"$REF_NAME" != "$DEFAULT_BRANCH"' in push_case
+    assert 'scan_range="${merge_base}..${CURRENT_SHA}"' in push_case
+    assert (
+        "github.event_name == 'push' && "
+        "github.ref_name != github.event.repository.default_branch && github.ref_name"
+    ) in text
+    assert (
+        "github.event_name == 'push' && "
+        "github.ref_name != github.event.repository.default_branch"
+    ) in text
+
+
+def test_default_branch_pushes_remain_sha_keyed_and_non_preemptive() -> None:
+    text = _workflow_text()
+
+    assert "|| github.sha }}" in text
+    assert (
+        "cancel-in-progress: ${{ github.event_name == 'pull_request' || "
+        "(github.event_name == 'push' && "
+        "github.ref_name != github.event.repository.default_branch) }}"
+    ) in text
