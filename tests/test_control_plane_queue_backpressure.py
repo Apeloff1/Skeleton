@@ -53,3 +53,19 @@ def test_pressure_guards_fail_closed_on_invalid_counts() -> None:
         assert 'queued_count' in workflow
         assert 'if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then' in workflow
         assert 'exit 1' in workflow
+
+
+def test_control_plane_triggers_are_bounded() -> None:
+    supervisor = _read('shift-supervisor-control.yml')
+    watchdog = _read('shift-supervisor-watchdog.yml')
+
+    supervisor_trigger = supervisor.split('concurrency:', 1)[0]
+    watchdog_trigger = watchdog.split('concurrency:', 1)[0]
+
+    assert 'push:' not in supervisor_trigger
+    assert 'workflow_dispatch:' in supervisor_trigger
+    assert supervisor_trigger.count('cron:') == 2
+
+    assert 'workflow_run:' not in watchdog_trigger
+    assert "cron: '12,42 * * * *'" in watchdog_trigger
+    assert 'workflow_dispatch:' in watchdog_trigger

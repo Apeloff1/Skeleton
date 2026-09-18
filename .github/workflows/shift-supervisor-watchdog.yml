@@ -1,13 +1,10 @@
 name: Shift Supervisor Watchdog
 
 on:
-  # Event-driven fallback for periods where GitHub delays or omits cron events.
-  # PR Automation Index is a trusted default-branch workflow and completes from
-  # normal repository activity, so this gives the supervisor a second wake path
-  # without creating a Supervisor -> Watchdog -> Supervisor loop.
-  workflow_run:
-    workflows: ['PR Automation Index']
-    types: [completed]
+  # Low-frequency recovery check. Event-driven PR Automation Index completion
+  # used to create dozens of watchdog workflow runs during CI churn.
+  schedule:
+    - cron: '12,42 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -18,9 +15,7 @@ permissions: {}
 
 jobs:
   recover:
-    if: >-
-      github.repository == 'Apeloff1/Skeleton' &&
-      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    if: github.repository == 'Apeloff1/Skeleton'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -41,7 +36,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EVENT_NAME: ${{ github.event_name }}
-          SOURCE_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         shell: bash
         run: |
           set -euo pipefail
@@ -53,14 +47,6 @@ jobs:
           # secret. The value is intentionally never printed or persisted.
           if [[ -z "${OPENAI_API_KEY:-}" ]]; then
             reason='missing-openai-api-key'
-            echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
-            echo "reason=$reason" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # workflow_run events must originate from the trusted default branch.
-          if [[ "$EVENT_NAME" == 'workflow_run' && "$SOURCE_HEAD_BRANCH" != 'main' ]]; then
-            reason='untrusted-source-branch'
             echo "dispatch=$dispatch" >> "$GITHUB_OUTPUT"
             echo "reason=$reason" >> "$GITHUB_OUTPUT"
             exit 0
