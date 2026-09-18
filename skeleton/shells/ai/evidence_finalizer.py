@@ -98,6 +98,7 @@ class AIExecutionEvidenceFinalizer:
         quorum_approval_digest: str = "",
         runtime_trust_digest: str = "",
         authority_health_policy_digest: str = "",
+        execution_attempt_authority_digest: str = "",
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
             raise RuntimeError("AI execution evidence may only finalize a completed attempt")
@@ -140,6 +141,18 @@ class AIExecutionEvidenceFinalizer:
             raise RuntimeError(
                 "execution provenance authority health policy differs from finalizer"
             )
+        if execution_attempt_authority_digest:
+            if not execution_seal_id:
+                raise RuntimeError(
+                    "execution attempt authority requires execution seal ID"
+                )
+            if len(execution_attempt_authority_digest) != 64:
+                raise ValueError(
+                    "execution_attempt_authority_digest must be SHA-256 hex"
+                )
+        execution_attempt_id = (
+            execution_seal_id if execution_attempt_authority_digest else ""
+        )
         if not self.journal.verify():
             raise RuntimeError("AI decision journal failed integrity verification")
         if not self.receipt_chain.verify():
@@ -173,6 +186,10 @@ class AIExecutionEvidenceFinalizer:
             sandbox_binding_digest=sandbox_binding_digest,
             runtime_trust_digest=runtime_trust_digest,
             authority_health_policy_digest=authority_health_policy_digest,
+            execution_attempt_id=execution_attempt_id,
+            execution_attempt_authority_digest=(
+                execution_attempt_authority_digest
+            ),
         )
         anchor = self.audit_anchors.append(
             session_id=session.session_id,
@@ -185,6 +202,10 @@ class AIExecutionEvidenceFinalizer:
             sandbox_binding_digest=sandbox_binding_digest,
             runtime_trust_digest=runtime_trust_digest,
             authority_health_policy_digest=authority_health_policy_digest,
+            execution_attempt_id=execution_attempt_id,
+            execution_attempt_authority_digest=(
+                execution_attempt_authority_digest
+            ),
         )
         if not self.audit_anchors.verify():
             raise RuntimeError("AI audit anchor chain failed verification after append")
@@ -228,6 +249,10 @@ class AIExecutionEvidenceFinalizer:
                 runtime_trust_digest=runtime_trust_digest,
                 authority_health_policy_digest=(
                     authority_health_policy_digest
+                ),
+                execution_attempt_id=execution_attempt_id,
+                execution_attempt_authority_digest=(
+                    execution_attempt_authority_digest
                 ),
                 audit_witness_digest=(
                     ""
