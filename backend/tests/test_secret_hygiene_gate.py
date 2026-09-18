@@ -64,6 +64,18 @@ def test_bounded_reader_fails_closed_on_oversized_candidate(tmp_path: Path) -> N
     assert str(secret_hygiene.MAX_FILE_BYTES) in findings[0]
 
 
+def test_oversized_multiline_candidate_is_scanned_through_eof(tmp_path: Path) -> None:
+    path = tmp_path / "large.env"
+    filler = ("# harmless filler\n" * ((secret_hygiene.MAX_FILE_BYTES // 18) + 1))
+    token = "ghp_" + ("A" * 40)
+    path.write_text(filler + f"TOKEN={token}\n", encoding="utf-8")
+
+    assert path.stat().st_size > secret_hygiene.MAX_FILE_BYTES
+    findings = violations(path)
+
+    assert any("GitHub token" in finding for finding in findings)
+
+
 def test_candidate_discovery_does_not_skip_oversized_text_files(
     tmp_path: Path, monkeypatch,
 ) -> None:
