@@ -36,10 +36,16 @@ SKIP_DIRS = {
 
 
 def python_files() -> Iterable[Path]:
-    """Yield repository Python files not already covered by the backend gate."""
+    """Yield repository Python files not already covered by the backend gate.
+
+    Required scan roots are part of the security contract. Missing or symlinked
+    roots are configuration/integrity failures, not empty optional surfaces.
+    """
     for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
+        if root.is_symlink():
+            raise OSError(f"required scan root must not be a symlink: {root}")
+        if not root.is_dir():
+            raise OSError(f"required scan root is unavailable: {root}")
         for path in root.rglob("*.py"):
             if any(part in SKIP_DIRS for part in path.parts):
                 continue
@@ -65,9 +71,23 @@ def main() -> int:
 
     findings: list[str] = []
     count = 0
-    for path in python_files():
-        count += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            count += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(
+            f"Repository Python SAST scan failed: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return 2
+
+    if count == 0:
+        print(
+            "Repository Python SAST scan failed: zero core/tooling Python files scanned.",
+            file=sys.stderr,
+        )
+        return 2
 
     if findings:
         print("High-confidence repository Python SAST violations detected:", file=sys.stderr)
