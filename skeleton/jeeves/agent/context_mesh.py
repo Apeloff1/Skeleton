@@ -78,8 +78,19 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
             return self._repositories.pop(str(namespace_key), None) is not None
 
     def repository(self, namespace_key: str) -> ContextRepository | None:
+        key = str(namespace_key)
         with self._lock:
-            return self._repositories.get(str(namespace_key))
+            exact = self._repositories.get(key)
+            if exact is not None:
+                return exact
+            # Runtime MemoryNamespace may add a fourth session component while
+            # ContextRepository deliberately persists at workspace scope.
+            # Sessions inherit their own workspace's durable repository; no
+            # parent may ever resolve into a child/session repository.
+            parts = key.split("/")
+            if len(parts) == 4:
+                return self._repositories.get("/".join(parts[:3]))
+            return None
 
     def namespaces(self) -> tuple[str, ...]:
         with self._lock:
