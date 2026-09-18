@@ -461,8 +461,21 @@ class ContextCompiler:
                 "authority": activation.lens.authority.value,
                 "score": round(activation.score, 6),
                 "matched_cues": list(activation.matched_cues[:8]),
+                "scientific_grade": (
+                    decision.grade.value if decision is not None else "unknown"
+                ),
                 "scientific_status": (
                     decision.scientific_status.value if decision is not None else "shadow"
+                ),
+                "permissions": (
+                    [item.value for item in decision.permissions]
+                    if decision is not None
+                    else []
+                ),
+                "evidence_ceiling": (
+                    decision.evidence_ceiling
+                    if decision is not None
+                    else "lens_never_evidence"
                 ),
                 "predictive_weight": (
                     round(decision.predictive_weight, 6)
