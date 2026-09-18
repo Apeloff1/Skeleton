@@ -132,6 +132,67 @@ class TopologyBridgePrediction:
             json_safe(dict(self.metadata)),
         )
 
+    def as_json(self) -> dict[str, Any]:
+        payload = {
+            "prediction_id": self.prediction_id,
+            "candidate_id": self.candidate_id,
+            "candidate_fingerprint": self.candidate_fingerprint,
+            "left_key": self.left_key,
+            "right_key": self.right_key,
+            "kind": self.kind.value,
+            "predicted_probability": self.predicted_probability,
+            "domain": self.domain,
+            "independent_run": self.independent_run,
+            "predicted_at": self.predicted_at,
+            "negative_control": self.negative_control,
+            "source_finding_ids": list(self.source_finding_ids),
+            "source_forecast_ids": list(self.source_forecast_ids),
+            "evidence_ids": list(self.evidence_ids),
+            "metadata": dict(self.metadata),
+        }
+        payload["fingerprint"] = self.fingerprint
+        return json_safe(payload)
+
+    @classmethod
+    def from_json(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "TopologyBridgePrediction":
+        if not isinstance(payload, Mapping):
+            raise TypeError("prediction payload must be a mapping")
+        value = cls(
+            prediction_id=str(payload.get("prediction_id", "")),
+            candidate_id=str(payload.get("candidate_id", "")),
+            candidate_fingerprint=str(
+                payload.get("candidate_fingerprint", "")
+            ),
+            left_key=str(payload.get("left_key", "")),
+            right_key=str(payload.get("right_key", "")),
+            kind=LensInteractionKind(str(payload.get("kind", ""))),
+            predicted_probability=payload.get(
+                "predicted_probability",
+                -1.0,
+            ),
+            domain=str(payload.get("domain", "")),
+            independent_run=str(payload.get("independent_run", "")),
+            predicted_at=payload.get("predicted_at", -1.0),
+            negative_control=payload.get("negative_control", False),
+            source_finding_ids=tuple(
+                payload.get("source_finding_ids", ())
+            ),
+            source_forecast_ids=tuple(
+                payload.get("source_forecast_ids", ())
+            ),
+            evidence_ids=tuple(payload.get("evidence_ids", ())),
+            metadata=dict(payload.get("metadata", {})),
+        )
+        supplied = payload.get("fingerprint")
+        if supplied is not None and str(supplied) != value.fingerprint:
+            raise AgentContractError(
+                "topology bridge prediction payload fingerprint mismatch"
+            )
+        return value
+
     @property
     def bridge_key(self) -> tuple[str, str]:
         return tuple(sorted((self.left_key, self.right_key)))
@@ -259,6 +320,81 @@ class TopologyBridgeTrial:
             "metadata",
             json_safe(dict(self.metadata)),
         )
+
+    def as_json(self) -> dict[str, Any]:
+        payload = {
+            "trial_id": self.trial_id,
+            "prediction_id": self.prediction_id,
+            "prediction_fingerprint": self.prediction_fingerprint,
+            "candidate_id": self.candidate_id,
+            "candidate_fingerprint": self.candidate_fingerprint,
+            "left_key": self.left_key,
+            "right_key": self.right_key,
+            "kind": self.kind.value,
+            "predicted_probability": self.predicted_probability,
+            "outcome": self.outcome,
+            "domain": self.domain,
+            "independent_run": self.independent_run,
+            "predicted_at": self.predicted_at,
+            "observed_at": self.observed_at,
+            "negative_control": self.negative_control,
+            "source_finding_ids": list(self.source_finding_ids),
+            "source_forecast_ids": list(self.source_forecast_ids),
+            "evidence_ids": list(self.evidence_ids),
+            "outcome_evidence_ids": list(self.outcome_evidence_ids),
+            "metadata": dict(self.metadata),
+        }
+        payload["fingerprint"] = self.fingerprint
+        return json_safe(payload)
+
+    @classmethod
+    def from_json(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "TopologyBridgeTrial":
+        if not isinstance(payload, Mapping):
+            raise TypeError("trial payload must be a mapping")
+        value = cls(
+            trial_id=str(payload.get("trial_id", "")),
+            prediction_id=str(payload.get("prediction_id", "")),
+            prediction_fingerprint=str(
+                payload.get("prediction_fingerprint", "")
+            ),
+            candidate_id=str(payload.get("candidate_id", "")),
+            candidate_fingerprint=str(
+                payload.get("candidate_fingerprint", "")
+            ),
+            left_key=str(payload.get("left_key", "")),
+            right_key=str(payload.get("right_key", "")),
+            kind=LensInteractionKind(str(payload.get("kind", ""))),
+            predicted_probability=payload.get(
+                "predicted_probability",
+                -1.0,
+            ),
+            outcome=payload.get("outcome"),
+            domain=str(payload.get("domain", "")),
+            independent_run=str(payload.get("independent_run", "")),
+            predicted_at=payload.get("predicted_at", -1.0),
+            observed_at=payload.get("observed_at", -1.0),
+            negative_control=payload.get("negative_control", False),
+            source_finding_ids=tuple(
+                payload.get("source_finding_ids", ())
+            ),
+            source_forecast_ids=tuple(
+                payload.get("source_forecast_ids", ())
+            ),
+            evidence_ids=tuple(payload.get("evidence_ids", ())),
+            outcome_evidence_ids=tuple(
+                payload.get("outcome_evidence_ids", ())
+            ),
+            metadata=dict(payload.get("metadata", {})),
+        )
+        supplied = payload.get("fingerprint")
+        if supplied is not None and str(supplied) != value.fingerprint:
+            raise AgentContractError(
+                "topology bridge trial payload fingerprint mismatch"
+            )
+        return value
 
     @classmethod
     def from_prediction(
