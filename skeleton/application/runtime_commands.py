@@ -1,4 +1,9 @@
-"""Runtime handlers for the shared API/CLI command contracts."""
+"""Runtime handlers for the shared API/CLI command contracts.
+
+New retrieve/plan/evidence handlers are thin adapters over canonical
+subsystems. They do not reimplement retrieval fusion, GameForge planning, or
+learning evidence updates.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,11 @@ from .command_contracts import (
     require_mapping,
     require_text,
 )
+
+_MAX_RETRIEVE_K = 32
+_MAX_EVIDENCE_ITEMS = 32
+_MAX_VISION_CHARS = 4_096
+_MAX_SKILL_ID_CHARS = 256
 
 APP_VERSION = "16.0.0"
 
@@ -359,6 +369,172 @@ def _run_handler(state: Any):
     return handle
 
 
+def _require_bounded_int(payload: Mapping[str, Any], name: str, default: int, *, lo: int, hi: int) -> int:
+    raw = payload.get(name, default)
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise CommandError("invalid_argument", f"{name} must be an integer")
+    if raw < lo or raw > hi:
+        raise CommandError("invalid_argument", f"{name} must be between {lo} and {hi}")
+    return raw
+
+
+def _serialize_retrieval_hit(fragment: Any) -> Dict[str, Any]:
+    fragment_id = getattr(fragment, "fragment_id", None) or getattr(fragment, "id", "")
+    score = getattr(fragment, "score", 0.0)
+    try:
+        numeric = round(float(score), 6)
+    except (TypeError, ValueError):
+        numeric = 0.0
+    return {
+        "id": str(fragment_id),
+        "plane": str(getattr(fragment, "plane", "")),
+        "content": str(getattr(fragment, "content", "")),
+        "score": numeric,
+        "provenance": str(getattr(fragment, "provenance", "")),
+    }
+
+
+def _retrieve_handler(state: Any):
+    def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        genesis = getattr(state, "genesis", None)
+        handles = getattr(genesis, "handles", None) or {}
+        retriever = getattr(state, "retriever", None) or (handles.get("quad") if isinstance(handles, Mapping) else None)
+        if retriever is None or not hasattr(retriever, "retrieve"):
+            raise CommandError("unavailable", "retrieval subsystem is not initialized")
+        query = str(payload.get("query", "")).strip()
+        if not query:
+            raise CommandError("invalid_argument", "query is required")
+        k = _require_bounded_int(payload, "k", 8, lo=1, hi=_MAX_RETRIEVE_K)
+        use_cache = payload.get("use_cache", True)
+        if not isinstance(use_cache, bool):
+            raise CommandError("invalid_argument", "use_cache must be a boolean")
+        try:
+            hits = retriever.retrieve(query, k=k, use_cache=use_cache)
+        except TypeError:
+            hits = retriever.retrieve(query, k=k)
+        except Exception as exc:
+            raise CommandError(
+                "unavailable",
+                "retrieval subsystem failed",
+                details={"exception": type(exc).__name__},
+            ) from exc
+        if not isinstance(hits, (list, tuple)):
+            raise CommandError("internal_error", "retrieval adapter returned a non-list result")
+        results = [_serialize_retrieval_hit(fragment) for fragment in list(hits)[:k]]
+        return {"query": query, "k": k, "results": results, "count": len(results)}
+
+    return handle
+
+
+def _plan_handler(state: Any):
+    def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        planner = getattr(state, "jeeves", None)
+        if planner is None or not hasattr(planner, "plan_build"):
+            raise CommandError("unavailable", "game planner is not initialized")
+        vision = str(payload.get("vision", "")).strip()
+        if not vision:
+            raise CommandError("invalid_argument", "vision is required")
+        if len(vision) > _MAX_VISION_CHARS:
+            raise CommandError("payload_too_large", "vision exceeds the bounded argument size")
+        try:
+            plan = planner.plan_build(vision=vision)
+        except Exception as exc:
+            raise CommandError(
+                "unavailable",
+                "game planner failed",
+                details={"exception": type(exc).__name__},
+            ) from exc
+        if hasattr(plan, "to_dict"):
+            plan = plan.to_dict()
+        if not isinstance(plan, Mapping):
+            raise CommandError("internal_error", "planner adapter returned a non-object result")
+        return {"vision": vision, "plan": dict(plan)}
+
+    return handle
+
+
+def _evidence_handler(state: Any):
+    def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        action = str(payload.get("action", "snapshot")).strip().lower() or "snapshot"
+        if action == "snapshot":
+            learning = getattr(state, "learning", None)
+            if learning is None or not hasattr(learning, "snapshot"):
+                raise CommandError("unavailable", "learning evidence service is not initialized")
+            weakest = _require_bounded_int(payload, "weakest", 3, lo=1, hi=_MAX_EVIDENCE_ITEMS)
+            try:
+                snapshot = learning.snapshot(weakest=weakest)
+            except TypeError:
+                snapshot = learning.snapshot()
+            except Exception as exc:
+                raise CommandError(
+                    "unavailable",
+                    "learning evidence query failed",
+                    details={"exception": type(exc).__name__},
+                ) from exc
+            ready = list(getattr(snapshot, "ready_lesson_ids", ()) or ())
+            weakest_ids = list(getattr(snapshot, "weakest_skill_ids", ()) or ())
+            if isinstance(snapshot, Mapping):
+                ready = list(snapshot.get("ready_lesson_ids") or ready)
+                weakest_ids = list(snapshot.get("weakest_skill_ids") or weakest_ids)
+            return {
+                "action": "snapshot",
+                "ready_lesson_ids": [str(item) for item in ready[:_MAX_EVIDENCE_ITEMS]],
+                "weakest_skill_ids": [str(item) for item in weakest_ids[:_MAX_EVIDENCE_ITEMS]],
+            }
+        if action == "mastery":
+            learning = getattr(state, "learning", None)
+            if learning is None or not hasattr(learning, "mastery"):
+                raise CommandError("unavailable", "learning evidence service is not initialized")
+            skill_id = str(payload.get("skill_id", "")).strip()
+            if not skill_id:
+                raise CommandError("invalid_argument", "skill_id is required")
+            if len(skill_id) > _MAX_SKILL_ID_CHARS:
+                raise CommandError("invalid_argument", "skill_id is too long")
+            try:
+                mastery = learning.mastery(skill_id)
+            except Exception as exc:
+                raise CommandError(
+                    "unavailable",
+                    "learning mastery query failed",
+                    details={"exception": type(exc).__name__},
+                ) from exc
+            return {"action": "mastery", "skill_id": skill_id, "mastery": mastery}
+        if action == "provenance":
+            ledger = getattr(state, "ledger", None)
+            if ledger is None:
+                raise CommandError("unavailable", "provenance ledger is not initialized")
+            entry_id = str(payload.get("entry_id", "")).strip()
+            if not entry_id:
+                stats = ledger.stats() if hasattr(ledger, "stats") else {}
+                if not isinstance(stats, Mapping):
+                    raise CommandError("internal_error", "provenance adapter returned a non-object result")
+                return {"action": "provenance", "stats": dict(stats)}
+            if not hasattr(ledger, "trace"):
+                raise CommandError("unsupported_operation", "provenance ledger cannot trace entries")
+            try:
+                entries = ledger.trace(entry_id)
+            except Exception as exc:
+                raise CommandError(
+                    "unavailable",
+                    "provenance query failed",
+                    details={"exception": type(exc).__name__},
+                ) from exc
+            serialized = []
+            for entry in list(entries or [])[:_MAX_EVIDENCE_ITEMS]:
+                if hasattr(entry, "to_dict"):
+                    serialized.append(dict(entry.to_dict()))
+                elif isinstance(entry, Mapping):
+                    serialized.append(dict(entry))
+            return {"action": "provenance", "entry_id": entry_id, "entries": serialized, "count": len(serialized)}
+        raise CommandError(
+            "unsupported_operation",
+            "evidence contract supports action=snapshot|mastery|provenance",
+            details={"action": action},
+        )
+
+    return handle
+
+
 def build_runtime_command_service(state: Any) -> CommandService:
     """Build the shared command dispatcher bound to one runtime state object."""
 
@@ -370,4 +546,7 @@ def build_runtime_command_service(state: Any) -> CommandService:
     service.register("tool", _tool_handler(state))
     service.register("admin", _admin_handler(state))
     service.register("run", _run_handler(state))
+    service.register("retrieve", _retrieve_handler(state))
+    service.register("plan", _plan_handler(state))
+    service.register("evidence", _evidence_handler(state))
     return service

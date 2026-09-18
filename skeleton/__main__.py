@@ -50,6 +50,7 @@ Commands:
                 Use `capabilities --codename-audit` for advertised codename identity
                 Use `capabilities --cver-audit` for command CONTRACT_VERSION identity
                 Use `capabilities --ttl-audit` for HMAC/idempotency TTL identity
+    invoke      Execute the versioned unified request envelope
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -60,7 +61,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 def _cmd_contracts(_rest: List[str]) -> int:
@@ -234,18 +235,83 @@ def _cmd_capabilities(rest: List[str]) -> int:
     return 0
 
 
-def _cmd_shared_command(rest: List[str]) -> int:
+def _boot_runtime_if_needed(state: Any, command: str) -> None:
+    if command in {"run", "tool", "memory", "admin", "retrieve", "plan", "evidence"} and state.genesis is None:
+        from skeleton.genesis import Genesis
+
+        state.wire_from_genesis(Genesis(seed=42).boot())
+
+
+def _print_contract_error(*, command: str, code: str, message: str, exit_code: int, correlation_id: str = "") -> int:
+    from skeleton.application import CONTRACT_VERSION, SCHEMA_VERSION, SUPPORTED_MODE
+
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "contract_version": CONTRACT_VERSION,
+        "command": command,
+        "ok": False,
+        "mode": SUPPORTED_MODE,
+        "correlation_id": correlation_id,
+        "error": {"code": code, "message": message},
+    }
+    print(json.dumps(payload, indent=2))
+    return exit_code
+
+
+def _cmd_invoke(rest: List[str]) -> int:
     from skeleton.api.server import get_state
-    from skeleton.application import CONTRACT_VERSION, build_runtime_command_service
+    from skeleton.application import CommandError, invoke_unified, normalize_request
 
     if not rest:
-        print(json.dumps({
-            "contract_version": CONTRACT_VERSION,
-            "command": "",
-            "ok": False,
-            "error": {"code": "invalid_command", "message": "command name is required"},
-        }, indent=2))
-        return 2
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invoke envelope JSON is required",
+            exit_code=2,
+        )
+    raw_payload = " ".join(rest).strip()
+    try:
+        decoded = json.loads(raw_payload)
+    except json.JSONDecodeError:
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invalid JSON payload",
+            exit_code=2,
+        )
+    if not isinstance(decoded, dict):
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invoke envelope must be a JSON object",
+            exit_code=2,
+        )
+
+    try:
+        request = normalize_request(decoded)
+    except CommandError:
+        result = invoke_unified(None, decoded)
+        print(json.dumps(result.to_payload(), indent=2, default=str))
+        return result.exit_code
+
+    state = get_state()
+    _boot_runtime_if_needed(state, request.command)
+    result = invoke_unified(state, decoded)
+    print(json.dumps(result.to_payload(), indent=2, default=str))
+    return result.exit_code
+
+
+def _cmd_shared_command(rest: List[str]) -> int:
+    from skeleton.api.server import get_state
+    from skeleton.application import build_runtime_command_service
+
+    if not rest:
+        return _print_contract_error(
+            command="",
+            code="invalid_command",
+            message="command name is required",
+            exit_code=2,
+        )
 
     command = rest[0].strip().lower()
     payload = {}
@@ -253,29 +319,24 @@ def _cmd_shared_command(rest: List[str]) -> int:
         raw_payload = " ".join(rest[1:]).strip()
         try:
             decoded = json.loads(raw_payload)
-        except json.JSONDecodeError as exc:
-            print(json.dumps({
-                "contract_version": CONTRACT_VERSION,
-                "command": command,
-                "ok": False,
-                "error": {"code": "invalid_argument", "message": f"invalid JSON payload: {exc.msg}"},
-            }, indent=2))
-            return 2
+        except json.JSONDecodeError:
+            return _print_contract_error(
+                command=command,
+                code="invalid_argument",
+                message="invalid JSON payload",
+                exit_code=2,
+            )
         if not isinstance(decoded, dict):
-            print(json.dumps({
-                "contract_version": CONTRACT_VERSION,
-                "command": command,
-                "ok": False,
-                "error": {"code": "invalid_argument", "message": "command payload must be a JSON object"},
-            }, indent=2))
-            return 2
+            return _print_contract_error(
+                command=command,
+                code="invalid_argument",
+                message="command payload must be a JSON object",
+                exit_code=2,
+            )
         payload = decoded
 
     state = get_state()
-    if command in {"run", "tool", "memory", "admin"} and state.genesis is None:
-        from skeleton.genesis import Genesis
-
-        state.wire_from_genesis(Genesis(seed=42).boot())
+    _boot_runtime_if_needed(state, command)
 
     result = build_runtime_command_service(state).execute(command, payload)
     print(json.dumps(result.to_payload(), indent=2, default=str))
@@ -456,6 +517,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
+    if cmd == "invoke": return _cmd_invoke(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])

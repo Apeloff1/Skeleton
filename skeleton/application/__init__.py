@@ -19,6 +19,8 @@ from .capability_runtime import (
 )
 from .command_contracts import (
     CONTRACT_VERSION,
+    SCHEMA_VERSION,
+    SUPPORTED_MODE,
     CommandError,
     CommandResult,
     CommandService,
@@ -134,6 +136,7 @@ from .plane_audit import (
     plane_audit_snapshot,
 )
 from .runtime_commands import build_runtime_command_service
+from .unified_invoke import UnifiedRequest, invoke_unified, normalize_request
 
 __all__ = [
     "ALLOW_LIST_AUDIT_KIND",
@@ -184,6 +187,7 @@ __all__ = [
     "CommandResult",
     "CommandService",
     "CommandSpec",
+    "UnifiedRequest",
     "admit_write_audit_snapshot",
     "allow_list_audit_snapshot",
     "api_route_audit_snapshot",
@@ -245,11 +249,13 @@ __all__ = [
     "get_ttl_audit_row",
     "get_version_audit_row",
     "hmac_open_audit_snapshot",
+    "invoke_unified",
     "idempotency_audit_snapshot",
     "live_hmac_audit_snapshot",
     "load_capability",
     "main_cli_audit_snapshot",
     "mounted_route_audit_snapshot",
+    "normalize_request",
     "nested_router_audit_snapshot",
     "open_dev_audit_snapshot",
     "parity_matrix",
