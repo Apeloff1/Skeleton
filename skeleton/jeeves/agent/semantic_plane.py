@@ -47,6 +47,7 @@ from .semantic_lenses import (
     TangentSeed,
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
+from .semantic_lens_topology import SemanticLensTopology, SemanticTopologySnapshot
 from .semantic_plane_interactions import plane_interaction_rules
 from .semantic_depth_interactions import depth_interaction_rules
 from .semantic_prediction import (
@@ -183,6 +184,9 @@ class SemanticPlaneCoverage:
     fused_effective_lens_count: float
     tangent_count: int
     frontier_tangent_count: int
+    topology_components: int
+    topology_isolated_lenses: int
+    topology_bridge_lenses: int
     fingerprint: str
 
 
@@ -209,6 +213,7 @@ class SemanticPlaneSnapshot:
     coverage: SemanticPlaneCoverage
     tangent_ids: tuple[str, ...]
     frontier: FrontierSelection
+    topology: SemanticTopologySnapshot
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
@@ -231,6 +236,7 @@ class SemanticLensPlane:
         prediction_ledger: SemanticPredictionLedger | None = None,
         fusion: LensFusionEngine | None = None,
         tangent_graph: TangentGraph | None = None,
+        topology: SemanticLensTopology | None = None,
         policy: SemanticPlanePolicy | None = None,
     ) -> None:
         self.registry = registry or MaximalSemanticRegistry()
@@ -243,6 +249,7 @@ class SemanticLensPlane:
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.fusion = fusion or LensFusionEngine()
         self.tangent_graph = tangent_graph or TangentGraph()
+        self.topology = topology or SemanticLensTopology(self.registry)
         self.policy = policy or SemanticPlanePolicy()
 
     def select(
@@ -670,6 +677,7 @@ class SemanticLensPlane:
         fusion: LensFusionResult,
         tangent_ids: Sequence[str],
         frontier: FrontierSelection,
+        topology: SemanticTopologySnapshot,
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
             sorted({spec.family for spec in selection.lenses}, key=lambda item: item.value)
@@ -716,6 +724,7 @@ class SemanticLensPlane:
                 "effective_lenses": fusion.effective_lens_count,
                 "tangents": sorted(tangent_ids),
                 "frontier": frontier.fingerprint,
+                "topology": topology.fingerprint,
             }
         )
         return SemanticPlaneCoverage(
@@ -738,6 +747,9 @@ class SemanticLensPlane:
             fused_effective_lens_count=fusion.effective_lens_count,
             tangent_count=len(tuple(tangent_ids)),
             frontier_tangent_count=len(frontier.tangent_ids),
+            topology_components=topology.component_count,
+            topology_isolated_lenses=len(topology.isolated_lens_keys),
+            topology_bridge_lenses=len(topology.bridge_lens_keys),
             fingerprint=fingerprint,
         )
 
@@ -845,6 +857,7 @@ class SemanticLensPlane:
             composition=composition,
             fusion=fusion,
         ) and not bool(audit.rejected)
+        topology = self.topology.snapshot
         coverage = self._coverage(
             selection=selection,
             audit=audit,
@@ -855,6 +868,7 @@ class SemanticLensPlane:
             fusion=fusion,
             tangent_ids=tangent_ids,
             frontier=frontier,
+            topology=topology,
         )
         fingerprint = stable_fingerprint(
             {
@@ -875,6 +889,7 @@ class SemanticLensPlane:
                 "fusion": fusion.fingerprint,
                 "tangents": tangent_ids,
                 "frontier": frontier.fingerprint,
+                "topology": topology.fingerprint,
                 "coverage": coverage.fingerprint,
                 "decision_feature_authorized": decision_feature_authorized,
                 "factual": False,
@@ -894,6 +909,7 @@ class SemanticLensPlane:
             coverage=coverage,
             tangent_ids=tangent_ids,
             frontier=frontier,
+            topology=topology,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
@@ -1013,6 +1029,7 @@ class SemanticLensPlane:
                     )
                     for spec in self.registry.all()
                 ],
+                "topology": self.topology.fingerprint,
                 "interaction_rules": [
                     (
                         rule.key,
