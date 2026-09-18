@@ -6,10 +6,13 @@ from dataclasses import dataclass
 import uuid
 
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
 from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
+from skeleton.shells.ai.preconditions import Preconditions, PreconditionChecker, PreconditionReport
 from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
+from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
 from skeleton.shells.ai.types import AIIntent
@@ -94,6 +97,105 @@ class AIShellService:
                 self.governance.current_policy(),
             )
         return bundle, view
+
+    def seal_review(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        authority: ExecutionSealAuthority,
+        preconditions: Preconditions | None = None,
+        approval=None,
+        ttl_seconds: float = 60.0,
+    ) -> ExecutionSeal:
+        """Issue short-lived signed authority for one exact reviewed plan.
+
+        Issuance performs no execution. Approval is validated but not consumed;
+        normal execution consumes it after the seal is consumed.
+        """
+
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        proposal = review.planning.response.proposal
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
+        approval_id = ""
+        if review.critique.policy.requires_approval:
+            if approval is None:
+                raise RuntimeError("human approval is required before execution sealing")
+            self.orchestrator.approvals.require(
+                approval,
+                principal=principal,
+                intent_fingerprint=session.intent.fingerprint,
+                proposal_fingerprint=proposal.fingerprint,
+            )
+            approval_id = approval.approval_id
+        return authority.issue(
+            principal=principal,
+            session_id=session.session_id,
+            plan_pin=pin,
+            preconditions_digest="" if preconditions is None else preconditions.digest,
+            approval_id=approval_id,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def execute_sealed(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        seal: ExecutionSeal,
+        seal_registry: ExecutionSealRegistry,
+        preconditions: Preconditions | None = None,
+        precondition_checker: PreconditionChecker | None = None,
+        approval=None,
+    ) -> tuple[AIExecutionBundle, PreconditionReport | None, SealUse]:
+        """Execute only after preconditions and a single-use signed seal pass."""
+
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        precondition_report = None
+        precondition_digest = ""
+        if preconditions is not None:
+            if precondition_checker is None:
+                raise RuntimeError("precondition checker is required")
+            precondition_report = precondition_checker.require(preconditions)
+            precondition_digest = preconditions.digest
+        approval_id = "" if approval is None else approval.approval_id
+        use = seal_registry.consume(
+            seal,
+            principal=context.principal,
+            session_id=session.session_id,
+            plan_pin=pin,
+            preconditions_digest=precondition_digest,
+            approval_id=approval_id,
+        )
+        result = self.execute(
+            session,
+            review,
+            context=context,
+            approval=approval,
+        )
+        return result, precondition_report, use
 
     def execute(
         self,
