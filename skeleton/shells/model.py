@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
 _NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
+_ENV_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 _TAG_RE = re.compile(r"^[A-Za-z0-9_.:/+-]{1,128}$")
 _CORRELATION_RE = re.compile(r"^[A-Za-z0-9_.:/+-]{0,160}$")
 _MAX_METADATA_ITEMS = 64
@@ -90,7 +91,7 @@ def _json_safe_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
                 raise ShellModelError("metadata sequence too large")
             if not all(isinstance(item, (str, int, float, bool)) or item is None for item in value):
                 raise ShellModelError("metadata sequence must contain scalar values")
-            clean[key] = list(value)
+            clean[key] = tuple(value)
         else:
             raise ShellModelError("metadata values must be JSON scalar values or scalar sequences")
     return clean
@@ -236,7 +237,7 @@ class ShellInvocation:
         if len(env) > 512:
             raise ShellModelError("environment has too many keys")
         for key, value in env.items():
-            if not isinstance(key, str) or not _NAME_RE.fullmatch(key):
+            if not isinstance(key, str) or not _ENV_RE.fullmatch(key):
                 raise ShellModelError("invalid environment key")
             if not isinstance(value, str) or "\x00" in value:
                 raise ShellModelError("environment values must be NUL-free strings")
@@ -402,44 +403,87 @@ def invocation_from_dict(payload: Mapping[str, Any]) -> ShellInvocation:
     unknown = sorted(str(key) for key in payload if key not in allowed_fields)
     if unknown:
         raise ShellModelError(f"unknown invocation field: {unknown[0]}")
-    identity = CommandIdentity.parse(str(payload.get("command", "")))
+    command_value = payload.get("command", "")
+    if not isinstance(command_value, str):
+        raise ShellModelError("command must be a string identity")
+    identity = CommandIdentity.parse(command_value)
+
     args = payload.get("arguments", ())
     if not isinstance(args, Sequence) or isinstance(args, (str, bytes, bytearray)):
         raise ShellModelError("arguments must be a sequence")
+    if any(not isinstance(item, str) for item in args):
+        raise ShellModelError("every argument must be a string")
+
     env = payload.get("environment", {})
     if not isinstance(env, Mapping):
         raise ShellModelError("environment must be an object")
+    if any(not isinstance(key, str) or not isinstance(value, str) for key, value in env.items()):
+        raise ShellModelError("environment must map string keys to string values")
+
     resources_payload = payload.get("resources", {})
     if not isinstance(resources_payload, Mapping):
         raise ShellModelError("resources must be an object")
-    intent_payload = payload.get("intent", {})
-    if not isinstance(intent_payload, Mapping):
-        raise ShellModelError("intent must be an object")
+    resource_fields = {
+        "timeout_seconds", "max_output_bytes", "max_input_bytes",
+        "cpu_weight", "concurrency_weight",
+    }
+    unknown_resources = sorted(str(key) for key in resources_payload if key not in resource_fields)
+    if unknown_resources:
+        raise ShellModelError(f"unknown resource field: {unknown_resources[0]}")
     resources = ResourceRequest(
         timeout_seconds=resources_payload.get("timeout_seconds"),
         max_output_bytes=resources_payload.get("max_output_bytes"),
         max_input_bytes=resources_payload.get("max_input_bytes"),
-        cpu_weight=int(resources_payload.get("cpu_weight", 1)),
-        concurrency_weight=int(resources_payload.get("concurrency_weight", 1)),
+        cpu_weight=resources_payload.get("cpu_weight", 1),
+        concurrency_weight=resources_payload.get("concurrency_weight", 1),
     )
+
+    intent_payload = payload.get("intent", {})
+    if not isinstance(intent_payload, Mapping):
+        raise ShellModelError("intent must be an object")
+    intent_fields = {"execution_class", "correlation_id", "actor", "reason", "tags", "metadata"}
+    unknown_intent = sorted(str(key) for key in intent_payload if key not in intent_fields)
+    if unknown_intent:
+        raise ShellModelError(f"unknown intent field: {unknown_intent[0]}")
+    for field_name in ("correlation_id", "actor", "reason"):
+        if field_name in intent_payload and not isinstance(intent_payload[field_name], str):
+            raise ShellModelError(f"intent {field_name} must be a string")
+    tags = intent_payload.get("tags", ())
+    if not isinstance(tags, (list, tuple, set, frozenset)) or any(not isinstance(tag, str) for tag in tags):
+        raise ShellModelError("intent tags must be a string sequence")
+    metadata = intent_payload.get("metadata", {})
+    if not isinstance(metadata, Mapping):
+        raise ShellModelError("intent metadata must be an object")
     intent = CommandIntent(
         execution_class=ExecutionClass(intent_payload.get("execution_class", "custom")),
-        correlation_id=str(intent_payload.get("correlation_id", "")),
-        actor=str(intent_payload.get("actor", "unknown")),
-        reason=str(intent_payload.get("reason", "")),
-        tags=frozenset(intent_payload.get("tags", ())),
-        metadata=intent_payload.get("metadata", {}),
+        correlation_id=intent_payload.get("correlation_id", ""),
+        actor=intent_payload.get("actor", "unknown"),
+        reason=intent_payload.get("reason", ""),
+        tags=frozenset(tags),
+        metadata=metadata,
     )
+
     if payload.get("stdin") is not None:
         raise ShellModelError("raw stdin is not accepted by JSON invocation parsing")
+
+    returncodes = payload.get("allowed_returncodes", (0,))
+    if not isinstance(returncodes, (list, tuple, set, frozenset)):
+        raise ShellModelError("allowed_returncodes must be an integer sequence")
+    if any(isinstance(code, bool) or not isinstance(code, int) for code in returncodes):
+        raise ShellModelError("allowed_returncodes must contain integers")
+
+    cwd = payload.get("cwd")
+    if cwd is not None and not isinstance(cwd, str):
+        raise ShellModelError("cwd must be a string")
+
     return ShellInvocation(
         identity=identity,
-        arguments=tuple(str(item) for item in args),
-        cwd=payload.get("cwd"),
-        environment={str(k): str(v) for k, v in env.items()},
+        arguments=tuple(args),
+        cwd=cwd,
+        environment=dict(env),
         resources=resources,
         intent=intent,
-        allowed_returncodes=frozenset(int(code) for code in payload.get("allowed_returncodes", (0,))),
+        allowed_returncodes=frozenset(returncodes),
         stdout=StreamDisposition(payload.get("stdout", "capture")),
         stderr=StreamDisposition(payload.get("stderr", "capture")),
     )
