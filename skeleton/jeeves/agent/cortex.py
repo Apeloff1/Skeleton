@@ -378,6 +378,7 @@ class JeevesCortex:
         *,
         verification_scores: Mapping[str, float] | None = None,
         action_costs: Mapping[str, float] | None = None,
+        action_risks: Mapping[str, RiskTier | str] | None = None,
     ) -> CortexRunReport:
         if not isinstance(result, AgentResult):
             raise TypeError("result must be AgentResult")
@@ -388,6 +389,7 @@ class JeevesCortex:
             result,
             verification_scores=verification_scores or {},
             action_costs=action_costs or {},
+            action_risks=action_risks or {},
         )
         self._link_action_outcome_beliefs(state, result)
         top_hypotheses = state.world.hypotheses(refresh=True)[:5]
@@ -645,6 +647,7 @@ class JeevesCortex:
         *,
         verification_scores: Mapping[str, float],
         action_costs: Mapping[str, float],
+        action_risks: Mapping[str, RiskTier | str],
     ) -> set[str]:
         learned: set[str] = set()
         if not result.success and not self.config.learn_from_failed_runs:
@@ -656,8 +659,16 @@ class JeevesCortex:
             feature_buckets={"goal": result.goal_id[:32]},
         )
         for observation in result.observations:
-            score = probability("verification_score", verification_scores.get(observation.call_id, 1.0 if observation.ok and result.success else 0.5))
+            score = probability(
+                "verification_score",
+                verification_scores.get(
+                    observation.call_id,
+                    1.0 if observation.ok and result.success else 0.5,
+                ),
+            )
             verified = score >= 0.6 and observation.ok
+            raw_risk = action_risks.get(observation.call_id, RiskTier.READ_ONLY)
+            risk = raw_risk if isinstance(raw_risk, RiskTier) else RiskTier(str(raw_risk))
             profile = self.skills.record_tool_observation(
                 run_id=result.run_id,
                 tool_name=observation.tool_name,
@@ -667,6 +678,7 @@ class JeevesCortex:
                 verification_score=score,
                 cost=max(0.0, float(action_costs.get(observation.call_id, 0.0))),
                 failure_mode=observation.error,
+                risk=risk,
             )
             learned.add(profile.spec.skill_id)
         return learned
