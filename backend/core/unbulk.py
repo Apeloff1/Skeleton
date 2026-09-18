@@ -313,6 +313,8 @@ def savings() -> dict:
     # 4) live codec (doc-field compression since boot)
     with _LOCK:
         st = dict(_STATS)
+        cache_size = len(_CACHE)
+        cache_bytes = _CACHE_BYTES
     if st["raw_bytes_in"]:
         total_raw += st["raw_bytes_in"]
         total_stored += st["packed_bytes_out"]
@@ -336,9 +338,9 @@ def savings() -> dict:
         "namespaces": namespaces,
         "codec": st,
         "cache": {
-            "size": len(_CACHE),
+            "size": cache_size,
             "max": _CACHE_MAX,
-            "raw_bytes": _CACHE_BYTES,
+            "raw_bytes": cache_bytes,
             "max_raw_bytes": _CACHE_MAX_BYTES,
             "hits": st["cache_hits"],
             "misses": st["cache_misses"],
