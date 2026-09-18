@@ -41,7 +41,12 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "types: [requested, in_progress, completed]" not in text
     assert "types: [requested]" not in text
     assert "types: [in_progress]" not in text
-    assert "- Merge Readiness" in text
+    assert "workflows:\n      - Merge Readiness" in text
+    assert "      - CI/CD" not in text
+    assert "      - Backend Quality" not in text
+    assert "      - Dependency Review" not in text
+    assert "      - Dependency Security" not in text
+    assert "      - CodeQL" not in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
     assert "branches-ignore:\n      - main" in text
@@ -71,6 +76,7 @@ def test_workflow_defaults_are_fail_closed_and_bounded():
     assert "PR_AUTOMATION_ALLOW_FORK_MERGE: ${{ vars.PR_AUTOMATION_ALLOW_FORK_MERGE || 'false' }}" in text
     assert "PR_AUTOMATION_MERGE_WHEN_READY: ${{ vars.PR_AUTOMATION_MERGE_WHEN_READY || 'false' }}" in text
     assert 'PR_AUTOMATION_MAX_MUTATIONS: "1"' in text
+    assert 'PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"' in text
 
 
 def test_workflow_elevates_only_the_evaluate_job_for_status_and_merge_control():

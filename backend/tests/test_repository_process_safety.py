@@ -108,3 +108,39 @@ def test_metacharacters_are_literal_runtime_arguments() -> None:
         text=True,
     )
     assert result.stdout.strip() == payload
+
+
+
+def test_rejects_str_constructor_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncommand = ['python', '--version']\n"
+        "subprocess.run(str(command), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_literal_strip_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(' python --version '.strip(), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_repr_and_ascii_string_commands(tmp_path: Path) -> None:
+    for builder in ("repr", "ascii"):
+        findings = _scan(
+            tmp_path,
+            "import subprocess\ncommand = ['python', '--version']\n"
+            f"subprocess.run({builder}(command), shell=False)\n",
+        )
+        assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_unknown_strip_receiver_is_not_classified_as_string(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(builder.strip(), shell=False)\n",
+    )
+    assert findings == []

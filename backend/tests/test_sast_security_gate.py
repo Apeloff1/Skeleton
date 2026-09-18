@@ -28,6 +28,65 @@ def test_rejects_exec(tmp_path: Path) -> None:
     assert any("exec() is forbidden" in finding for finding in findings)
 
 
+def test_rejects_direct_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "runner = eval\nrunner(user_input)\n")
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_imported_builtins_eval_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "from builtins import eval as runner\nrunner(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_direct_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nfetch = requests.get\nfetch(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_alias_of_jwt_decode_signature_disable(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import jwt\ndecode = jwt.decode\n"
+        "decode(token, options={\"verify_signature\": False})\n",
+    )
+    assert any("must not disable signature verification" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_of_eval(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "if (runner := eval):\n    runner(user_input)\n",
+    )
+    assert any("eval() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_walrus_alias_of_requests_get_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "if (fetch := requests.get):\n"
+        "    fetch(url, verify=False)\n",
+    )
+    assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_allows_reassigned_sensitive_alias_to_avoid_unsafe_inference(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "fetch = requests.get\n"
+        "fetch = custom_fetch\n"
+        "fetch(url, verify=False)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_tempfile_mktemp(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import tempfile\npath = tempfile.mktemp()\n")
     assert any("mktemp() is race-prone" in finding for finding in findings)

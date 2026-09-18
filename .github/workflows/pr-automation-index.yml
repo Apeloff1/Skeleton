@@ -2,13 +2,11 @@ name: PR Automation Index
 
 on:
   workflow_run:
+    # Merge Readiness is the canonical event-driven convergence point.
+    # Extra configured checks are still inspected fail-closed by the runner;
+    # if they complete later, the scheduled reconciliation observes them.
     workflows:
       - Merge Readiness
-      - CI/CD
-      - Backend Quality
-      - Dependency Review
-      - Dependency Security
-      - CodeQL
     # Evaluate terminal workflow state only. Requested/in-progress transitions
     # multiplied Actions load without adding merge-readiness information.
     types: [completed]
@@ -67,6 +65,7 @@ jobs:
       PR_AUTOMATION_MAX_CHANGED_FILES: ${{ vars.PR_AUTOMATION_MAX_CHANGED_FILES || '250' }}
       PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
       PR_AUTOMATION_MAX_MUTATIONS: "1"
+      PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
 
     steps:
       - name: Checkout trusted default branch
