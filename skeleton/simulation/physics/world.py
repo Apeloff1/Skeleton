@@ -898,6 +898,7 @@ class PhysicsWorld:
 
         remaining = dt
         events: list[TOIEvent] = []
+        settled_pairs: set[tuple[str, str]] = set()
         minimum_advance = dt * self.settings.ccd_min_advance_fraction
 
         for _ in range(self.settings.ccd_max_substeps):
@@ -905,7 +906,11 @@ class PhysicsWorld:
                 remaining = 0.0
                 break
 
-            event = self._ccd.earliest_event(self.bodies(), remaining)
+            event = self._ccd.earliest_event(
+                self.bodies(),
+                remaining,
+                ignore_pairs=frozenset(settled_pairs),
+            )
             if event is None:
                 self._advance_all_bodies(remaining)
                 remaining = 0.0
@@ -924,12 +929,23 @@ class PhysicsWorld:
                 break
 
             if advance <= minimum_advance:
+                # A pair that immediately re-enters TOI after an impact is a
+                # persistent contact, not a new useful sweep event. Resolve it
+                # once, then delegate that pair to the final discrete contact
+                # solve for the rest of this fixed step. Other pairs remain
+                # eligible for CCD, preventing one smooth contact from
+                # exhausting the global substep budget.
+                settled_pairs.add((event.body_a, event.body_b))
                 escape = min(remaining, minimum_advance)
                 self._advance_all_bodies(escape)
                 remaining = max(0.0, remaining - escape)
 
         if remaining > EPSILON:
-            pending = self._ccd.earliest_event(self.bodies(), remaining)
+            pending = self._ccd.earliest_event(
+                self.bodies(),
+                remaining,
+                ignore_pairs=frozenset(settled_pairs),
+            )
             if pending is not None:
                 raise PhysicsValidationError("CCD substep bound exceeded")
             self._advance_all_bodies(remaining)
