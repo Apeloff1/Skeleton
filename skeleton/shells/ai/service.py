@@ -402,12 +402,6 @@ class AIShellService:
                 intent_fingerprint=session.intent.fingerprint,
                 proposal_fingerprint=review.planning.response.proposal.fingerprint,
             )
-        self._consume_assurance_only_approval(
-            session,
-            review,
-            principal=context.principal,
-            approval=approval,
-        )
         result = self._execute_reviewed(
             session,
             review,
@@ -468,12 +462,6 @@ class AIShellService:
             principal=context.principal,
             approval=approval,
         )
-        self._consume_assurance_only_approval(
-            session,
-            review,
-            principal=context.principal,
-            approval=approval,
-        )
         return self._execute_reviewed(
             session,
             review,
@@ -528,6 +516,12 @@ class AIShellService:
             model_id=proposal.model_id or self.orchestrator.planner.model.model_id,
             proposal_fingerprint=proposal.fingerprint,
             commands=tuple(action.command for action in proposal.actions),
+        )
+        self._consume_assurance_only_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
         )
         try:
             return self.orchestrator.execute(
