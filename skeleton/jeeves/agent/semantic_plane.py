@@ -483,6 +483,163 @@ class SemanticLensPlane:
             )
         return tuple(signals)
 
+    def _seed_family(self, seed: TangentSeed) -> LensFamily | None:
+        key = seed.lens_key.strip().casefold()
+        try:
+            return self.registry.get(key).family
+        except KeyError:
+            pass
+        if key.startswith("perpendicular:"):
+            family_name = key.partition(":")[2]
+            try:
+                return LensFamily(family_name)
+            except ValueError:
+                return None
+        component_families: set[LensFamily] = set()
+        for component in key.split("+"):
+            try:
+                component_families.add(self.registry.get(component).family)
+            except KeyError:
+                continue
+        if len(component_families) == 1:
+            return next(iter(component_families))
+        return None
+
+    @staticmethod
+    def _seed_axis(
+        seed: TangentSeed,
+        family: LensFamily | None,
+    ) -> ExplorationAxis:
+        for tag in seed.tags:
+            try:
+                return ExplorationAxis(tag)
+            except ValueError:
+                continue
+        if family is not None:
+            return _FAMILY_AXIS[family]
+        return ExplorationAxis.SEMANTIC
+
+    def _seed_tangent_frontier(
+        self,
+        *,
+        observations: Sequence[SemanticObservation],
+        audit: SemanticFindingAudit,
+        perpendicular: PerpendicularExpansionPlan,
+        composition: SemanticComposition,
+        hypergraph: SemanticHypergraphSnapshot,
+        sequence: int,
+    ) -> tuple[tuple[str, ...], FrontierSelection]:
+        parent_fingerprint = stable_fingerprint(
+            {
+                "observations": [item.fingerprint for item in observations],
+                "findings": [item.fingerprint for item in audit.accepted],
+            }
+        )
+        evidence_ids = tuple(
+            sorted(
+                {
+                    evidence_id
+                    for finding in audit.accepted
+                    for evidence_id in finding.evidence_ids
+                }
+            )
+        )
+        inserted: list[str] = []
+
+        for candidate in perpendicular.candidates:
+            seed = TangentSeed(
+                seed_id=stable_id(
+                    "semantic-plane-perpendicular",
+                    {
+                        "parent": parent_fingerprint,
+                        "lens": candidate.lens_key,
+                        "direction": candidate.direction,
+                    },
+                    length=28,
+                ),
+                parent_fingerprint=parent_fingerprint,
+                lens_key=candidate.lens_key,
+                direction=candidate.direction,
+                rationale=candidate.rationale,
+                novelty=max(candidate.family_novelty, candidate.role_novelty),
+                expected_value=candidate.expected_value,
+                evidence_ids=evidence_ids,
+                tags=(
+                    "semantic-plane",
+                    "perpendicular",
+                    candidate.family.value,
+                    candidate.role.value,
+                ),
+            )
+            node = self.tangent_graph.add_seed(
+                seed,
+                axis=_FAMILY_AXIS[candidate.family],
+                family=candidate.family,
+                sequence=sequence,
+                trigger_terms=candidate.trigger_terms,
+                evidence_gap=candidate.evidence_gap,
+            )
+            inserted.append(node.tangent_id)
+
+        existing_seed_ids: set[str] = set()
+        for seed in (
+            *composition.tangent_seeds,
+            *hypergraph.restart.tangent_seeds,
+        ):
+            if seed.seed_id in existing_seed_ids:
+                continue
+            existing_seed_ids.add(seed.seed_id)
+            family = self._seed_family(seed)
+            node = self.tangent_graph.add_seed(
+                seed,
+                axis=self._seed_axis(seed, family),
+                family=family,
+                sequence=sequence,
+                trigger_terms=seed.tags,
+                evidence_gap=(
+                    0.85
+                    if family is not None
+                    and family in hypergraph.restart.missing_families
+                    else 0.65
+                ),
+            )
+            inserted.append(node.tangent_id)
+
+        frontier = self.tangent_graph.frontier(
+            limit=self.policy.frontier_limit,
+            max_per_axis=self.policy.frontier_max_per_axis,
+            max_per_family=self.policy.frontier_max_per_family,
+        )
+        return tuple(sorted(set(inserted))), frontier
+
+    @staticmethod
+    def _decision_feature_authorized(
+        *,
+        forecasts: Sequence[SemanticForecast],
+        governance: SemanticGovernanceSnapshot,
+        composition: SemanticComposition,
+        fusion: LensFusionResult,
+    ) -> bool:
+        if (
+            not forecasts
+            or fusion.abstain
+            or composition.unresolved_conflicts
+        ):
+            return False
+        decision_by_key = {
+            item.lens_id: item.decision_feature_authorized
+            for item in governance.decisions
+        }
+        source_keys = {
+            key
+            for forecast in forecasts
+            for key in forecast.source_lens_keys
+        }
+        return bool(source_keys) and all(
+            decision_by_key.get(key, False)
+            for key in source_keys
+        )
+
     def _coverage(
         self,
         *,
