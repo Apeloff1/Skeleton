@@ -21,6 +21,7 @@ class ExecutionSeal:
     plan_pin: PlanPin
     preconditions_digest: str
     approval_id: str
+    release_evidence_digest: str
     issued_at: float
     expires_at: float
     nonce: str
@@ -33,6 +34,8 @@ class ExecutionSeal:
             raise ValueError("execution seal identity fields required")
         if self.preconditions_digest and len(self.preconditions_digest) != 64:
             raise ValueError("preconditions_digest must be SHA-256 hex")
+        if self.release_evidence_digest and len(self.release_evidence_digest) != 64:
+            raise ValueError("release_evidence_digest must be SHA-256 hex")
         if self.expires_at <= self.issued_at:
             raise ValueError("execution seal expiry must follow issue time")
         if len(self.signature) != 64:
@@ -46,6 +49,7 @@ class ExecutionSeal:
             "plan_pin": self.plan_pin.to_dict(),
             "preconditions_digest": self.preconditions_digest,
             "approval_id": self.approval_id,
+            "release_evidence_digest": self.release_evidence_digest,
             "issued_at": self.issued_at,
             "expires_at": self.expires_at,
             "nonce": self.nonce,
@@ -103,6 +107,7 @@ class ExecutionSealAuthority:
         plan_pin: PlanPin,
         preconditions_digest: str = "",
         approval_id: str = "",
+        release_evidence_digest: str = "",
         ttl_seconds: float = 60.0,
     ) -> ExecutionSeal:
         if ttl_seconds <= 0:
@@ -120,6 +125,7 @@ class ExecutionSealAuthority:
             "plan_pin": plan_pin.to_dict(),
             "preconditions_digest": preconditions_digest,
             "approval_id": approval_id,
+            "release_evidence_digest": release_evidence_digest,
             "issued_at": now,
             "expires_at": now + ttl_seconds,
             "nonce": nonce,
@@ -131,6 +137,7 @@ class ExecutionSealAuthority:
             plan_pin,
             preconditions_digest,
             approval_id,
+            release_evidence_digest,
             now,
             now + ttl_seconds,
             nonce,
@@ -146,6 +153,7 @@ class ExecutionSealAuthority:
         plan_pin: PlanPin,
         preconditions_digest: str = "",
         approval_id: str = "",
+        release_evidence_digest: str = "",
     ) -> None:
         now = self._clock()
         if seal.issued_at > now + self.max_clock_skew_seconds:
@@ -164,6 +172,8 @@ class ExecutionSealAuthority:
             raise ExecutionSealError("execution seal preconditions mismatch")
         if seal.approval_id != approval_id:
             raise ExecutionSealError("execution seal approval mismatch")
+        if seal.release_evidence_digest != release_evidence_digest:
+            raise ExecutionSealError("execution seal release evidence mismatch")
         expected = self._signature(seal.unsigned_dict())
         if not hmac.compare_digest(expected, seal.signature):
             raise ExecutionSealError("execution seal signature mismatch")
