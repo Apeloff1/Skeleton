@@ -11,8 +11,14 @@ from skeleton.shells.ai.catalog import AIToolCatalog
 from skeleton.shells.ai.compiler import AIPlanCompiler
 from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
+from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
 from skeleton.shells.ai.execution_seal import ExecutionSealAuthority, ExecutionSealError
+from skeleton.shells.ai.execution_fence import (
+    AIExecutionFenceError,
+    AIExecutionFenceManager,
+    AIExecutionFencePolicy,
+)
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.isolation_compiler import AIIsolationCompiler
 from skeleton.shells.ai.model_port import CallableAIModelPort
@@ -47,6 +53,8 @@ def build_service(
     auto_band,
     runtime_trust=None,
     authority_health=None,
+    execution_fences=None,
+    worker_id="",
 ):
     command_catalog = CommandCatalog(
         (
@@ -126,6 +134,8 @@ def build_service(
         assurance=AIExecutionAssuranceInspector(),
         runtime_trust=runtime_trust,
         authority_health=authority_health,
+        execution_fences=execution_fences,
+        worker_id=worker_id,
     )
     service.start()
     return service, effects
@@ -137,8 +147,21 @@ class _ToggleReport:
     def __init__(self, kind):
         self.kind = kind
 
+    @property
+    def epoch_digest(self):
+        return "t" * 64
+
+    @property
+    def policy_digest(self):
+        return "h" * 64
+
     def to_dict(self):
-        return {"ok": True, "kind": self.kind}
+        return {
+            "ok": True,
+            "kind": self.kind,
+            "epoch_digest": self.epoch_digest,
+            "policy_digest": self.policy_digest,
+        }
 
 
 class _ToggleRuntimeTrust:
@@ -833,3 +856,480 @@ def test_runtime_trust_is_rechecked_across_session_review_and_execution(tmp_path
     assert after_session >= 1
     assert after_review > after_session
     assert trust.require_calls > after_review
+
+
+def _fence_manager(
+    *,
+    backend=None,
+    default_timeout=2.0,
+    maximum_ttl=30.0,
+):
+    return AIExecutionFenceManager(
+        backend or InMemoryFencedStore(),
+        policy=AIExecutionFencePolicy(
+            default_step_timeout_seconds=default_timeout,
+            per_step_overhead_seconds=0.1,
+            safety_margin_seconds=0.5,
+            minimum_ttl_seconds=1.0,
+            maximum_ttl_seconds=maximum_ttl,
+            max_plan_steps=16,
+        ),
+    )
+
+
+def test_execution_fencing_requires_assurance_inspector(tmp_path):
+    base, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+    )
+    with pytest.raises(ValueError, match="assurance"):
+        AIShellService(
+            base.orchestrator,
+            base.diagnostics,
+            base.governance,
+            execution_fences=_fence_manager(),
+            worker_id="worker-1",
+        )
+
+
+def test_execution_fencing_requires_worker_identity(tmp_path):
+    base, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+    )
+    with pytest.raises(ValueError, match="worker_id"):
+        AIShellService(
+            base.orchestrator,
+            base.diagnostics,
+            base.governance,
+            assurance=AIExecutionAssuranceInspector(),
+            execution_fences=_fence_manager(),
+        )
+
+
+def test_fenced_medium_risk_real_child_execution_succeeds(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-success")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    result, _, use = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("fenced", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        execution_fence=fence,
+    )
+    assert result.ok
+    assert use.seal_id == seal.seal_id
+    assert registry.used(seal.seal_id)
+    assert fences.backend.leases() == ()
+    receipts = service.orchestrator.shell_service.receipts.snapshot()
+    assert len(receipts) == 1
+
+
+def test_configured_fencing_blocks_direct_execute(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        low_contract(),
+        auto_band=RiskBand.LOW,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-direct")
+    review, _ = service.review(session)
+    with pytest.raises(RuntimeError, match="requires execute_sealed"):
+        service.execute(
+            session,
+            review,
+            context=ExecutionContext("direct", principal="alice"),
+        )
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_configured_fencing_blocks_seal_without_fence(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-seal")
+    review, _ = service.review(session)
+    with pytest.raises(RuntimeError, match="execution fence"):
+        service.seal_review(
+            session,
+            review,
+            principal="alice",
+            authority=ExecutionSealAuthority(b"k" * 32),
+        )
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_configured_fencing_blocks_execute_without_fence_before_seal_consumption(
+    tmp_path,
+):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-missing")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    with pytest.raises(RuntimeError, match="execution fence"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("missing", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+    # The valid fence remains owned because it was never passed into an
+    # execution attempt and therefore must not be silently released.
+    assert len(fences.backend.leases()) == 1
+    assert fences.release(fence)
+
+
+def test_fence_principal_substitution_rejected_before_seal_consumption(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-principal")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    with pytest.raises(AIExecutionFenceError, match="binding"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("wrong", principal="bob"),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=fence,
+        )
+    assert not registry.used(seal.seal_id)
+    assert service.orchestrator.shell_service.receipts.snapshot() == ()
+    assert fences.release(fence)
+
+
+def test_fence_reacquire_invalidates_sealed_old_fence(tmp_path):
+    backend = InMemoryFencedStore()
+    fences = _fence_manager(backend=backend)
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-stale")
+    review, _ = service.review(session)
+    first = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=first,
+    )
+    assert fences.release(first)
+    second = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    with pytest.raises(AIExecutionFenceError, match="stale"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("stale", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=first,
+        )
+    assert not registry.used(seal.seal_id)
+    assert fences.release(second)
+
+
+def test_fence_substitution_after_sealing_invalidates_assurance_digest(tmp_path):
+    backend = InMemoryFencedStore()
+    fences = _fence_manager(backend=backend)
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-substitute")
+    review, _ = service.review(session)
+    first = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=first,
+    )
+    assert fences.release(first)
+    second = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    with pytest.raises(ExecutionSealError, match="assurance"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("substitute", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=second,
+        )
+    assert not registry.used(seal.seal_id)
+    # execute_sealed owns a supplied fence for the duration of its attempt and
+    # releases it even when seal verification rejects the substituted fence.
+    assert fences.backend.leases() == ()
+
+
+def test_authority_health_failure_blocks_fenced_execute_before_seal_consumption(
+    tmp_path,
+):
+    health = _ToggleAuthorityHealth()
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        authority_health=health,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-health")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    health.allowed = False
+    with pytest.raises(RuntimeError, match="authority dependency health"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("health", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=fence,
+        )
+    assert not registry.used(seal.seal_id)
+    # Health failure occurs before the execution-attempt ownership block, so
+    # the caller still owns and can explicitly release its valid fence.
+    assert len(fences.backend.leases()) == 1
+    assert fences.release(fence)
+
+
+def test_runtime_trust_drift_blocks_fenced_execute_before_seal_consumption(
+    tmp_path,
+):
+    trust = _ToggleRuntimeTrust()
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        runtime_trust=trust,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-trust")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    trust.allowed = False
+    with pytest.raises(RuntimeError, match="runtime trust"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("trust", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_fence=fence,
+        )
+    assert not registry.used(seal.seal_id)
+    assert len(fences.backend.leases()) == 1
+    assert fences.release(fence)
+
+
+def test_fenced_plan_failure_releases_execution_fence(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-failure")
+    review, _ = service.review(session)
+
+    class FailingBackend:
+        backend_id = "failing"
+
+        def execute_plan(self, plan, *, context):
+            raise RuntimeError("synthetic backend failure")
+
+        def receipt_root(self):
+            return "a" * 64
+
+    backend = FailingBackend()
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_backend=backend,
+        execution_fence=fence,
+    )
+    with pytest.raises(RuntimeError, match="synthetic backend"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("fail", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            execution_backend=backend,
+            execution_fence=fence,
+        )
+    assert registry.used(seal.seal_id)
+    assert fences.backend.leases() == ()
+
+
+def test_execution_fence_is_bound_into_assurance_seal(tmp_path):
+    fences = _fence_manager()
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+        execution_fences=fences,
+        worker_id="worker-1",
+    )
+    session = service.new_session(intent(), session_id="fenced-assurance")
+    review, _ = service.review(session)
+    fence = service.acquire_execution_fence(
+        session,
+        review,
+        principal="alice",
+    )
+    authority = ExecutionSealAuthority(b"k" * 32)
+    first = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        execution_fence=fence,
+    )
+    assert first.assurance_digest
+    assert len(first.assurance_digest) == 64
+    assert fences.release(fence)
