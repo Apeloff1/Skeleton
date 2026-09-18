@@ -9,6 +9,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: merge-readiness-legacy-concurrency-drain
+  cancel-in-progress: true
+
 jobs:
   tombstone:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}
