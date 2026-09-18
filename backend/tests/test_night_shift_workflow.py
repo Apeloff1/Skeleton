@@ -38,3 +38,15 @@ def test_night_shift_script_starts_as_a_standalone_stdlib_entrypoint() -> None:
 
     assert completed.returncode == 0, completed.stderr
     assert "--repo" in completed.stdout
+
+
+def test_night_shift_report_reuses_closed_machine_ledger() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert '"--state", "all"' in text
+    assert '"--search", f"{title} in:title"' in text
+    assert 'str(item.get("title", "")) == title' in text
+    assert '"api", "--method", "PATCH"' in text
+    assert '"-f", "state=closed"' in text
+    assert "updated the closed report ledger" in text
+    assert "created and closed the report ledger" in text
