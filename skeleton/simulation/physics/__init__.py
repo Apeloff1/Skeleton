@@ -9,6 +9,11 @@ from .character import (
     CharacterSweepHit,
     KinematicCapsuleController,
 )
+from .character_motor import (
+    CharacterMotorResult,
+    CharacterMotorSettings,
+    KinematicCharacterMotor,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -146,6 +151,8 @@ __all__ = [
     "CharacterControllerSettings",
     "CharacterGroundState",
     "CharacterMoveResult",
+    "CharacterMotorResult",
+    "CharacterMotorSettings",
     "CharacterSweepHit",
     "CommandCorrectionReceipt",
     "ConstraintColorBatch",
@@ -190,6 +197,7 @@ __all__ = [
     "IslandSolveReceipt",
     "JumpTuning",
     "KinematicCapsuleController",
+    "KinematicCharacterMotor",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
