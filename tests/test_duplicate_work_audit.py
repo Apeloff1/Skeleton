@@ -11,7 +11,7 @@ from scripts.check_duplicate_work_audit import (
     CONFLICT_DOMAIN,
     DEFAULT_FIXTURE,
     MUTATION_ACTIONS,
-    TASK_KEY,
+    TASK_ID,
     basename_overlap_is_not_a_cluster,
     classify_document,
     classify_prs,
@@ -46,9 +46,9 @@ def _classes(rows: list) -> dict[int, str]:
 
 
 def test_task_identity_is_stable_and_distinct_from_s097() -> None:
-    assert TASK_KEY == "reserve-S009-duplicate-work-audit"
+    assert TASK_ID == "reserve-S009-duplicate-work-audit"
     assert CONFLICT_DOMAIN == "repo.readonly.duplicate_work"
-    assert TASK_KEY != "reserve-S097-legacy-duplicate-inventory"
+    assert TASK_ID != "reserve-S097-legacy-duplicate-inventory"
     assert CONFLICT_DOMAIN != "consolidation.readonly.duplicate_inventory"
     assert CLASSES == ("unique", "duplicate", "superseded", "unknown")
     assert len(CLASSES) == len(set(CLASSES))
@@ -294,7 +294,7 @@ def test_cli_accepts_shipped_fixture(capsys) -> None:
     assert "superseded=" in output
     assert "unknown=0" in output
     assert "auto_close=false" in output
-    assert TASK_KEY in output
+    assert TASK_ID in output
 
 
 def test_cli_accepts_valid_fixture(tmp_path: Path, capsys) -> None:
@@ -327,7 +327,7 @@ def test_cli_json_report_keeps_auto_close_false(tmp_path: Path, capsys) -> None:
     payload = json.loads(stdout[stdout.index("{") :])
     assert payload["auto_close"] is False
     assert payload["mutations"] == []
-    assert payload["task_key"] == TASK_KEY
+    assert payload["task_key"] == TASK_ID
     assert payload["conflict_domain"] == CONFLICT_DOMAIN
     assert payload["unknown_count"] == 0
 
@@ -341,5 +341,5 @@ def test_checker_does_not_auto_close_or_mutate() -> None:
     assert "urllib" not in source
     assert "never closes" in lowered
     assert "auto_close = false" in lowered
-    assert TASK_KEY in source
+    assert TASK_ID in source
     assert "reserve-S097-legacy-duplicate-inventory" in source

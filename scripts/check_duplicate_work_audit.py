@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 
-TASK_KEY = "reserve-S009-duplicate-work-audit"
+TASK_ID = "reserve-S009-duplicate-work-audit"
 CONFLICT_DOMAIN = "repo.readonly.duplicate_work"
 INVENTORY_VERSION = 1
 SCHEMA_VERSION = 1
@@ -616,7 +616,7 @@ def report_from_rows(rows: Sequence[ClassifiedPR]) -> dict[str, object]:
     if not rows:
         raise DuplicateWorkAuditError(_error("unknown coverage", "zero PRs classified"))
     return {
-        "task_key": TASK_KEY,
+        "task_key": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "inventory_version": INVENTORY_VERSION,
         "schema_version": SCHEMA_VERSION,
@@ -677,7 +677,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(
         "duplicate-work-audit: "
         + ", ".join(f"{name}={counts[name]}" for name in CLASSES)
-        + f" auto_close={str(AUTO_CLOSE).lower()} task={TASK_KEY}"
+        + f" auto_close={str(AUTO_CLOSE).lower()} task={TASK_ID}"
     )
     if args.json and report is not None:
         print(json.dumps(report, sort_keys=True, indent=2, separators=(",", ": ")))
