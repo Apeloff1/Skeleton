@@ -165,6 +165,67 @@ class ShellWorkQueue:
             self._items[item_id] = updated
             return updated
 
+    def claimed(self, *, owner: str | None = None) -> tuple[QueueItem, ...]:
+        """Return a stable snapshot of currently claimed items."""
+        with self._lock:
+            items = (
+                item
+                for item in self._items.values()
+                if item.state is QueueState.CLAIMED and (owner is None or item.owner == owner)
+            )
+            return tuple(sorted(items, key=lambda item: item.sequence))
+
+    def requeue_stale_claims(
+        self,
+        *,
+        max_age_seconds: float,
+        owner: str | None = None,
+        priority_delta: int = 0,
+    ) -> tuple[QueueItem, ...]:
+        """Recover claims whose ownership heartbeat has gone stale.
+
+        Recovery always issues a fresh sequence number and clears the claim ID.
+        Any stale worker retaining the old QueueItem will therefore fail the
+        claim-token check if it later tries to complete or fail the item.
+        """
+        if max_age_seconds <= 0:
+            raise ValueError("max_age_seconds must be positive")
+        if not isinstance(priority_delta, int):
+            raise ValueError("priority_delta must be an integer")
+
+        with self._lock:
+            now = self._clock()
+            stale = [
+                item
+                for item in self._items.values()
+                if item.state is QueueState.CLAIMED
+                and (owner is None or item.owner == owner)
+                and now - item.updated_at >= max_age_seconds
+            ]
+            recovered: list[QueueItem] = []
+            for current in sorted(stale, key=lambda item: item.sequence):
+                # Re-check against the authoritative table while holding the
+                # lock so a concurrently transitioned item is never recovered.
+                live = self._items.get(current.item_id)
+                if live is None or live.state is not QueueState.CLAIMED or live.claim_id != current.claim_id:
+                    continue
+                self._sequence += 1
+                updated = QueueItem(
+                    live.item_id,
+                    live.command,
+                    live.priority + priority_delta,
+                    live.created_at,
+                    self._sequence,
+                    state=QueueState.QUEUED,
+                    owner=None,
+                    claim_id=None,
+                    updated_at=now,
+                )
+                self._items[live.item_id] = updated
+                heapq.heappush(self._heap, (updated.priority, updated.sequence, updated.item_id))
+                recovered.append(updated)
+            return tuple(recovered)
+
     def get(self, item_id: str) -> QueueItem:
         return self._items[item_id]
 
