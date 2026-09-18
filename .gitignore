@@ -10,7 +10,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+/build/
 # Keep the additive skeleton.build package tracked; setuptools still writes ./build/.
 !skeleton/build/
 !skeleton/build/*.py
