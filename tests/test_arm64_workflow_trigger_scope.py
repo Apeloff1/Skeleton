@@ -7,11 +7,11 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "arm64.yml"
 
 
-def test_arm64_trigger_excludes_test_only_backend_and_skeleton_changes() -> None:
+def test_arm64_trigger_excludes_backend_test_only_changes_but_keeps_skeleton_tests() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert text.count('- "!backend/tests/**"') == 2
-    assert text.count('- "!skeleton/testing/**"') == 2
+    assert '- "!skeleton/testing/**"' not in text
     assert text.count('- "backend/**"') == 2
     assert text.count('- "skeleton/**"') == 2
 
@@ -31,3 +31,12 @@ def test_arm64_runtime_and_workflow_changes_still_trigger() -> None:
         assert text.count(f"- {path}") == 2
 
     assert "runs-on: ubuntu-24.04-arm" in text
+
+
+def test_arm64_trigger_keeps_test_modules_executed_by_legacy_runner() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    runner = (ROOT / "tests" / "run_unit.py").read_text(encoding="utf-8")
+
+    assert "skeleton.testing.test_simulation_physics_" in runner
+    assert '- "skeleton/**"' in workflow
+    assert '- "!skeleton/testing/**"' not in workflow
