@@ -22,12 +22,63 @@ concurrency:
 permissions: {}
 
 jobs:
-  studio:
+  pressure:
     if: >-
       github.repository == 'Apeloff1/Skeleton' &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_run' ||
-       github.event.workflow_run.head_repository.full_name == github.repository)
+       (github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'))
+    name: Gate idle work on Actions pressure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    env:
+      REPO: ${{ github.repository }}
+      MAX_QUEUED_ACTIONS_RUNS: '40'
+    outputs:
+      proceed: ${{ steps.guard.outputs.proceed }}
+    steps:
+      - name: Read queued Actions pressure
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          queued_count=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count')
+          threshold="$MAX_QUEUED_ACTIONS_RUNS"
+          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+            echo '::error::Idle Studio queue guard received invalid queue evidence.'
+            exit 1
+          fi
+          if (( queued_count >= threshold )); then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## Idle Studio queue guard'
+              echo
+              echo 'Status: **safe no-op due to Actions queue pressure**.'
+              echo
+              echo "- Queued Actions runs: $queued_count"
+              echo "- Backpressure threshold: $threshold"
+              echo '- Model calls, branch publication, and PR publication: skipped'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  studio:
+    needs: pressure
+    if: >-
+      needs.pressure.outputs.proceed == 'true' &&
+      github.repository == 'Apeloff1/Skeleton' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'))
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
     timeout-minutes: 35
