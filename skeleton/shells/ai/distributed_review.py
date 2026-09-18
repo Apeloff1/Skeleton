@@ -52,7 +52,7 @@ class DistributedAIReviewQueue:
         backend: DistributedAIBackend,
         *,
         namespace: str = "shell-ai-review",
-        clock: Callable[[], float] = time.monotonic,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self.backend = backend
         self.namespace = namespace
