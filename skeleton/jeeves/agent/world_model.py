@@ -452,6 +452,34 @@ class BeliefGraph:
         with self._lock:
             return self._version
 
+    def bind_evidence_ledger(self, evidence_ledger: EvidenceLedger) -> None:
+        """Rebind evidence custody only when the replacement can satisfy prior references."""
+
+        if not isinstance(evidence_ledger, EvidenceLedger):
+            raise TypeError("evidence_ledger must be EvidenceLedger")
+        with self._lock:
+            if self.evidence_ledger is evidence_ledger:
+                return
+            referenced = {
+                evidence_id
+                for belief in self._beliefs.values()
+                for evidence_id in (
+                    *belief.supporting_evidence_ids,
+                    *belief.refuting_evidence_ids,
+                )
+            }
+            missing = sorted(
+                evidence_id
+                for evidence_id in referenced
+                if evidence_ledger.get(evidence_id) is None
+            )
+            if missing:
+                raise WorldModelError(
+                    "replacement evidence ledger is missing referenced evidence: "
+                    + ", ".join(missing[:8])
+                )
+            self.evidence_ledger = evidence_ledger
+
     def upsert_proposition(self, proposition: Proposition, *, prior: float = 0.5, locked: bool = False) -> BeliefState:
         if not isinstance(proposition, Proposition):
             raise TypeError("proposition must be Proposition")
@@ -1268,11 +1296,16 @@ class WorldModel:
             if graph is None:
                 graph = BeliefGraph(evidence_ledger=evidence_ledger, clock=self._clock)
                 self._graphs[scope] = graph
-            elif evidence_ledger is not None and graph.evidence_ledger is None:
-                graph.evidence_ledger = evidence_ledger
-            elif evidence_ledger is not None and graph.evidence_ledger is not evidence_ledger:
-                raise WorldModelError("scope already bound to a different evidence ledger")
+            elif evidence_ledger is not None:
+                graph.bind_evidence_ledger(evidence_ledger)
             return graph
+
+    def discard(self, scope: str) -> bool:
+        """Release a scoped graph from the model registry."""
+
+        scope = require_id("scope", scope)
+        with self._lock:
+            return self._graphs.pop(scope, None) is not None
 
     def scopes(self) -> tuple[str, ...]:
         with self._lock:
