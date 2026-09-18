@@ -380,4 +380,3 @@ def test_directory_sync_failure_reports_failure_without_claiming_rollback(
     assert target.exists()
     assert json.loads(target.read_text(encoding="utf-8"))["skill_id"] == "safe"
     assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
-
