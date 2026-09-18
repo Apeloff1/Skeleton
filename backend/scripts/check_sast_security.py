@@ -276,6 +276,49 @@ def _sensitive_callable_bindings(
     }
 
 
+def _tracked_module_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Resolve stable local aliases of security-sensitive modules.
+
+    A name must have exactly one store in its lexical scope and must not be a
+    parameter. Resolution is iterative so stable alias chains remain visible,
+    while reassigned locals are deliberately ignored.
+    """
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    assignments: list[tuple[str, ast.AST]] = []
+
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, (ast.Name, ast.Attribute)):
+            continue
+        for name in _assigned_names(node):
+            assignments.append((name, value))
+
+    resolved = dict(aliases)
+    changed = True
+    while changed:
+        changed = False
+        for name, value in assignments:
+            if stores[name] != 1 or name in parameters:
+                continue
+            target = canonical_name(value, resolved)
+            if target not in TRACKED_MODULES or resolved.get(name) == target:
+                continue
+            resolved[name] = target
+            changed = True
+
+    return {
+        name: target
+        for name, target in resolved.items()
+        if name not in aliases and target in TRACKED_MODULES
+    }
+
+
 def _requests_session_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
     """Infer only unambiguous, single-assignment Session variables in a scope.
 
@@ -370,7 +413,8 @@ def violations(path: Path) -> list[str]:
     findings: list[str] = []
     scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
     for scope in scopes:
-        aliases = {**import_map, **_requests_session_bindings(scope, import_map)}
+        aliases = {**import_map, **_tracked_module_bindings(scope, import_map)}
+        aliases.update(_requests_session_bindings(scope, aliases))
         aliases.update(_sensitive_callable_bindings(scope, aliases))
         for node in _scope_nodes(scope):
             if not isinstance(node, ast.Call):
