@@ -21,7 +21,11 @@ import time
 from typing import Callable
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
+from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.store_protocol import VersionedStateBackend
+from skeleton.shells.execution_context import ExecutionContext
+from skeleton.shells.execution_plan import ExecutionPlan
+from skeleton.shells.plan_executor import PlanExecutionReport
 
 
 class ExecutionAttemptState(str, Enum):
@@ -469,3 +473,66 @@ class AIExecutionAttemptStore:
         if current is None:
             raise ExecutionAttemptConflict("execution attempt is missing")
         return current.attempt.recovery
+
+
+class AttemptTrackingExecutionBackend:
+    """Transparent backend wrapper recording the process-boundary transition.
+
+    The wrapper keeps the delegate backend ID and exposes the delegate through
+    assurance_backend so service assurance evaluates the real sandbox/host
+    backend instead of this evidence adapter.
+    """
+
+    def __init__(
+        self,
+        store: AIExecutionAttemptStore,
+        attempt: AIExecutionAttempt,
+        delegate: AIPlanExecutionBackend,
+    ) -> None:
+        if not isinstance(store, AIExecutionAttemptStore):
+            raise TypeError("store must be AIExecutionAttemptStore")
+        if not isinstance(attempt, AIExecutionAttempt):
+            raise TypeError("attempt must be AIExecutionAttempt")
+        if not isinstance(delegate, AIPlanExecutionBackend):
+            raise TypeError("delegate must satisfy AIPlanExecutionBackend")
+        if attempt.state is not ExecutionAttemptState.AUTHORIZED:
+            raise ValueError(
+                "tracking backend requires an authorized execution attempt"
+            )
+        self.store = store
+        self._attempt = attempt
+        self.delegate = delegate
+        self.boundary_entered = False
+
+    @property
+    def backend_id(self) -> str:
+        return self.delegate.backend_id
+
+    @property
+    def assurance_backend(self) -> AIPlanExecutionBackend:
+        return self.delegate
+
+    @property
+    def attempt(self) -> AIExecutionAttempt:
+        return self._attempt
+
+    def execute_plan(
+        self,
+        plan: ExecutionPlan,
+        *,
+        context: ExecutionContext,
+    ) -> PlanExecutionReport:
+        if self.boundary_entered:
+            raise ExecutionAttemptConflict(
+                "tracking backend may cross the execution boundary only once"
+            )
+        stored = self.store.enter_boundary(self._attempt)
+        self._attempt = stored.attempt
+        self.boundary_entered = True
+        return self.delegate.execute_plan(
+            plan,
+            context=context,
+        )
+
+    def receipt_root(self) -> str:
+        return self.delegate.receipt_root()
