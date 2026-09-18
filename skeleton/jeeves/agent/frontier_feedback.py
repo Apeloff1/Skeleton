@@ -91,6 +91,38 @@ class FrontierFeedbackRecommendation:
     maximum_entropy_delta: float
     reasons: tuple[str, ...]
     fingerprint: str
+    feedback_report_fingerprint: str = ""
+    sample_count: int = 0
+    direct_count: int = 0
+    escalated_count: int = 0
+
+    def __post_init__(self) -> None:
+        for name in (
+            "minimum_quality_delta",
+            "minimum_choice_probability_delta",
+            "maximum_entropy_delta",
+        ):
+            object.__setattr__(self, name, finite_number(name, getattr(self, name)))
+        for name in ("sample_count", "direct_count", "escalated_count"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise AgentContractError(f"{name} must be a non-negative integer")
+        if self.direct_count + self.escalated_count > self.sample_count:
+            raise AgentContractError("feedback subgroup counts exceed sample_count")
+        object.__setattr__(
+            self,
+            "feedback_report_fingerprint",
+            str(self.feedback_report_fingerprint).strip(),
+        )
+        object.__setattr__(
+            self,
+            "reasons",
+            tuple(
+                str(reason).strip()[:2048]
+                for reason in self.reasons
+                if str(reason).strip()
+            ),
+        )
 
 
 class FrontierReasoningFeedback:
@@ -328,6 +360,10 @@ class FrontierReasoningFeedback:
             maximum_entropy_delta=entropy_delta,
             reasons=tuple(reasons),
             fingerprint=fingerprint,
+            feedback_report_fingerprint=report.fingerprint,
+            sample_count=report.count,
+            direct_count=report.direct_count,
+            escalated_count=report.escalated_count,
         )
 
 
