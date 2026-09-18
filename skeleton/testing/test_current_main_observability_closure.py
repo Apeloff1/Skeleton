@@ -200,7 +200,7 @@ def test_api_runtime_tool_state_and_retrieval_rag_provenance_paths() -> None:
     matrix = _read(ROOT / "tests/test_cross_subsystem_integration.py")
     retrieval = _read(ROOT / "tests/test_frontier_runtime_memory_retrieval.py")
     correlation = _read(ROOT / "skeleton/testing/test_frontier_observability_correlation.py")
-    combined = "\n".join((matrix, retrieval, correlation))
+    combined = f"{matrix}\n{retrieval}\n{correlation}"
     missing = _missing_markers(
         combined,
         API_RUNTIME_TOOL_STATE_MARKERS + API_RETRIEVAL_RAG_PROVENANCE_MARKERS,
@@ -218,7 +218,7 @@ def test_correlation_survives_boundaries_and_redaction_is_enforced() -> None:
     bridge = _read(ROOT / "tests/test_runtime_observability_bridge.py")
     correlation = _read(ROOT / "skeleton/testing/test_frontier_observability_correlation.py")
     redaction = _read(ROOT / "skeleton/observability/redaction.py")
-    combined = "\n".join((observability, bridge, correlation, redaction))
+    combined = f"{observability}\n{bridge}\n{correlation}\n{redaction}"
     missing = _missing_markers(
         combined,
         REDACTION_MARKERS
@@ -279,7 +279,7 @@ def test_provider_storage_and_tool_failure_fixtures_remain_deterministic() -> No
     model_runtime = _read(ROOT / "tests/test_model_runtime.py")
     memory = _read(ROOT / "tests/test_frontier_runtime_memory_retrieval.py")
     correlation = _read(ROOT / "skeleton/testing/test_frontier_observability_correlation.py")
-    combined = "\n".join((model_runtime, memory, correlation))
+    combined = f"{model_runtime}\n{memory}\n{correlation}"
     missing = _missing_markers(
         combined,
         PROVIDER_STORAGE_TOOL_FAILURE_MARKERS,
