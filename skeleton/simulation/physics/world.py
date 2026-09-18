@@ -13,6 +13,10 @@ from .character import (
     CharacterMoveResult,
     KinematicCapsuleController,
 )
+from .character_motor import (
+    CharacterMotorResult,
+    KinematicCharacterMotor,
+)
 from .collision import (
     ContactManifold,
     SweepAndPruneBroadPhase,
@@ -482,6 +486,37 @@ class PhysicsWorld:
             dt=step_dt,
             ignore=ignore,
             distance=distance,
+        )
+
+    def step_character_motor(
+        self,
+        controller: KinematicCapsuleController,
+        motor: KinematicCharacterMotor,
+        desired_velocity: Vec3,
+        *,
+        jump: bool = False,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterMotorResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        if not isinstance(motor, KinematicCharacterMotor):
+            raise PhysicsValidationError(
+                "motor must be KinematicCharacterMotor"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character motor dt",
+        )
+        return motor.step(
+            controller,
+            desired_velocity,
+            self.bodies(),
+            dt=step_dt,
+            jump=jump,
+            ignore=ignore,
         )
 
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
