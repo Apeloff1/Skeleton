@@ -49,6 +49,11 @@ from .research_synthesis import (
 )
 from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
 from .types import AgentContractError, json_safe, stable_fingerprint
+from .unknown_unknowns import (
+    SurpriseScoutPolicy,
+    SurpriseScoutSnapshot,
+    UnknownUnknownScout,
+)
 
 
 class FrontierCognitiveControlPlane(CognitiveControlPlane):
@@ -65,6 +70,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         tournament_policy: TournamentPolicy | None = None,
         synthesis_policy: HypothesisSynthesisPolicy | None = None,
         research_stop_policy: ResearchStopPolicy | None = None,
+        surprise_scout_policy: SurpriseScoutPolicy | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         super().__init__(baseline, policy=policy, clock=clock)
@@ -100,6 +106,10 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         )
         self.research_assurance = ResearchAssuranceGate(
             policy=research_stop_policy,
+        )
+        self.unknown_unknown_scout = UnknownUnknownScout(
+            policy=surprise_scout_policy,
+            clock=clock,
         )
         self._completion_certificates: dict[str, CompletionCertificate] = {}
         self._forecast_settlements: list[ForecastSettlement] = []
@@ -268,13 +278,54 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         if reopened:
             self._last_agenda_snapshot = self.research_agenda.snapshot()
         self._forecast_settlements.append(settlement)
+        decision_impact = 0.50
+        if self._last_frontier_snapshot is not None:
+            for obligation in self._last_frontier_snapshot.obligations:
+                if obligation.obligation_id == contract.obligation_id:
+                    decision_impact = obligation.decision_impact
+                    break
+        self.unknown_unknown_scout.observe(
+            channel=contract.obligation_id,
+            context_key=contract.forecast_id,
+            expected_probability=settlement.probability_assigned,
+            decision_impact=decision_impact,
+            evidence_ref=contract.forecast_id,
+            outcome=settlement.observed_outcome,
+            explanation_coverage=0.0,
+            metadata={
+                "settlement_fingerprint": settlement.settlement_fingerprint,
+                "source": "precommitted-forecast",
+            },
+        )
         return settlement
+
+    def surface_unknown_unknowns(self) -> tuple[KnowledgeObligation, ...]:
+        """Promote recurrent predictive residuals into new research questions."""
+
+        return self.unknown_unknown_scout.promote_all()
+
+    def map_unknown_unknowns_into_frontier(self) -> FrontierSnapshot:
+        """Promote anomaly clusters and immediately feed them into the frontier."""
+
+        obligations = self.surface_unknown_unknowns()
+        return self.map_epistemic_frontier(obligations)
+
+    def unknown_unknown_summary(self) -> dict[str, Any]:
+        snapshot = self.unknown_unknown_scout.snapshot()
+        return {
+            "engine": "unknown-unknown-scout",
+            "observations": len(snapshot.observations),
+            "candidates": len(snapshot.candidates),
+            "promoted_channels": len(snapshot.promoted_channels),
+            "snapshot_fingerprint": snapshot.fingerprint,
+        }
 
     def dump_research_state(self) -> dict[str, Any]:
         """Checkpoint the full epistemic research program with an integrity hash."""
 
         agenda_state = self.research_agenda.dump_state()
         forecast_state = self.epistemic_frontier.dump_forecasts()
+        scout_state = self.unknown_unknown_scout.dump_state()
         tournaments = [
             item.dump_state()
             for item in sorted(
@@ -309,6 +360,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             {
                 "agenda": agenda_state["fingerprint"],
                 "forecasts": forecast_state["fingerprint"],
+                "unknown_unknown_scout": scout_state["fingerprint"],
                 "tournaments": [
                     stable_fingerprint(item) for item in tournaments
                 ],
@@ -329,6 +381,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             "version": 2,
             "agenda": agenda_state,
             "forecasts": forecast_state,
+            "unknown_unknown_scout": scout_state,
             "tournaments": tournaments,
             "certificates": certificates,
             "settlements": settlements,
@@ -350,6 +403,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             self._tournaments = {}
             self._completion_certificates = {}
             self._forecast_settlements = []
+            self.unknown_unknown_scout = UnknownUnknownScout(clock=self._clock)
             self._restored_frontier_audit = None
             self._last_frontier_snapshot = None
             self._last_agenda_snapshot = self.research_agenda.snapshot()
@@ -364,6 +418,10 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         self.epistemic_frontier.restore_forecasts(
             dict(payload["forecasts"]),
             replace_existing=True,
+        )
+        self.unknown_unknown_scout = UnknownUnknownScout.from_state(
+            dict(payload["unknown_unknown_scout"]),
+            clock=self._clock,
         )
 
         tournaments: dict[str, HypothesisTournament] = {}
@@ -509,4 +567,5 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         value["epistemic_frontier"] = self.epistemic_summary()
         value["research_agenda"] = self.agenda_summary()
         value["hypothesis_tournaments"] = self.tournament_summary()
+        value["unknown_unknowns"] = self.unknown_unknown_summary()
         return value
