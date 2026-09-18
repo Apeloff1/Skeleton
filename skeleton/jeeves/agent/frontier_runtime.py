@@ -707,7 +707,11 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             if isinstance(self.runtime_guard, ScopedGeneralizingRuntimeEpistemicGuard)
             else None
         )
-        world_fingerprint = self.runtime_guard.world.snapshot(persist=False).fingerprint
+        world_fingerprint = self.runtime_guard.world.snapshot(
+            persist=False
+        ).fingerprint
+        semantic_scope = self.semantic_learning_scope(state.inputs)
+        semantic_plane = self.semantic_plane_for(state.inputs)
         state.checkpoint_sequence += 1
         scratch = {
             entry.key: {
@@ -730,9 +734,13 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "execution_audit_checkpoint": audit.checkpoint_fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
-            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_scoping_enabled": self.semantic_scoping_enabled,
+            "semantic_learning_scope_fingerprint": (
+                semantic_scope.fingerprint
+            ),
+            "semantic_plane_fingerprint": semantic_plane.fingerprint,
             "semantic_topology_learning_fingerprint": (
-                self.semantic_plane.topology_learning.fingerprint
+                semantic_plane.topology_learning.fingerprint
             ),
         }
         if lineage is not None:
@@ -761,7 +769,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             metadata=metadata,
         )
         binding_payload = {
-            "frontier_binding_version": 3,
+            "frontier_binding_version": 4,
             "checkpoint_sequence": checkpoint.sequence,
             "checkpoint_fingerprint": checkpoint.fingerprint,
             "audit_head_before": audit.head_hash,
@@ -770,9 +778,13 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "runtime_guard_policy": self.runtime_guard.policy.fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
-            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_scoping_enabled": self.semantic_scoping_enabled,
+            "semantic_learning_scope_fingerprint": (
+                semantic_scope.fingerprint
+            ),
+            "semantic_plane_fingerprint": semantic_plane.fingerprint,
             "semantic_topology_learning_fingerprint": (
-                self.semantic_plane.topology_learning.fingerprint
+                semantic_plane.topology_learning.fingerprint
             ),
         }
         if lineage is not None:
@@ -1110,10 +1122,47 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         if expected_world != current_world:
             raise ExecutionAuditError("world model fingerprint changed on resume")
 
-        expected_semantic_plane = checkpoint.metadata.get("semantic_plane_fingerprint")
+        checkpoint_scoping = checkpoint.metadata.get(
+            "semantic_scoping_enabled"
+        )
+        if checkpoint_scoping is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic scoping mode"
+            )
+        if bool(checkpoint_scoping) != self.semantic_scoping_enabled:
+            raise ExecutionAuditError(
+                "semantic scoping mode changed on resume"
+            )
+
+        try:
+            semantic_scope = SemanticLearningScope(
+                tenant_id=str(checkpoint.metadata["tenant_id"]),
+                user_id=str(checkpoint.metadata["user_id"]),
+                workspace_id=str(checkpoint.metadata["workspace_id"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic learning scope metadata"
+            ) from exc
+        expected_scope = checkpoint.metadata.get(
+            "semantic_learning_scope_fingerprint"
+        )
+        if expected_scope != semantic_scope.fingerprint:
+            raise ExecutionAuditError(
+                "semantic learning scope fingerprint mismatch"
+            )
+        semantic_plane = self.semantic_plane_for_scope(
+            semantic_scope.tenant_id,
+            semantic_scope.user_id,
+            semantic_scope.workspace_id,
+        )
+
+        expected_semantic_plane = checkpoint.metadata.get(
+            "semantic_plane_fingerprint"
+        )
         if (
-            expected_semantic_plane is not None
-            and expected_semantic_plane != self.semantic_plane.fingerprint
+            expected_semantic_plane is None
+            or expected_semantic_plane != semantic_plane.fingerprint
         ):
             raise ExecutionAuditError(
                 "semantic plane contract fingerprint changed on resume"
@@ -1127,7 +1176,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "checkpoint is missing semantic topology learning root"
             )
         current_topology_learning = (
-            self.semantic_plane.topology_learning.fingerprint
+            semantic_plane.topology_learning.fingerprint
         )
         if expected_topology_learning != current_topology_learning:
             raise ExecutionAuditError(
@@ -1212,6 +1261,16 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 continue
             if payload.get("world_model_fingerprint") != checkpoint.metadata.get(
                 "world_model_fingerprint"
+            ):
+                continue
+            if payload.get(
+                "semantic_scoping_enabled"
+            ) != checkpoint.metadata.get("semantic_scoping_enabled"):
+                continue
+            if payload.get(
+                "semantic_learning_scope_fingerprint"
+            ) != checkpoint.metadata.get(
+                "semantic_learning_scope_fingerprint"
             ):
                 continue
             checkpoint_semantic_plane = checkpoint.metadata.get(
