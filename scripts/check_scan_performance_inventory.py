@@ -57,7 +57,6 @@ SKIP_DIRS = frozenset(
 )
 TRACKED_MODULES = frozenset({"os", "pathlib", "glob", "subprocess", "pathlib.Path"})
 SUBPROCESS_CALLS = frozenset({"run", "call", "check_call", "check_output", "Popen"})
-WALK_ATTRS = frozenset({"walk", "fwalk", "rglob"})
 SCANDIR_NAMES = frozenset({"os.scandir"})
 GIT_LITERAL = "git"
 
@@ -68,7 +67,7 @@ class ScanPerformanceInventoryError(RuntimeError):
     """Raised when the inventory cannot classify a scanner fail-closed."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ScannerRecord:
     """One classified gate-scanner Python file."""
 
@@ -339,6 +338,17 @@ def _is_trivial_iter(
     return False
 
 
+def _in_scope(
+    node: ast.AST,
+    scope: ast.FunctionDef | ast.AsyncFunctionDef | ast.Module,
+    parents: dict[ast.AST, ast.AST],
+) -> bool:
+    enclosing = _enclosing_function(node, parents)
+    if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return enclosing is scope
+    return enclosing is None
+
+
 def _is_under(node: ast.AST, root: ast.AST, parents: dict[ast.AST, ast.AST]) -> bool:
     current: ast.AST | None = node
     while current is not None:
@@ -495,6 +505,40 @@ class _ModuleAnalysis:
             return True
         return False
 
+    def call_is_l0_walk(self, call: ast.Call) -> bool:
+        if _call_is_walk(call, self.aliases):
+            return True
+        return isinstance(call.func, ast.Name) and call.func.id in self.custom_walkers
+
+    def direct_l0_sites(
+        self,
+        function: ast.FunctionDef | ast.AsyncFunctionDef | ast.Module,
+        nested_walks: set[ast.Call],
+    ) -> list[tuple[int, str]]:
+        sites: list[tuple[int, str]] = []
+        for child in ast.walk(function):
+            if not isinstance(child, ast.Call) or child in nested_walks:
+                continue
+            if not _in_scope(child, function, self.parents):
+                continue
+            if not self.call_is_l0_walk(child):
+                continue
+            if _call_is_walk(child, self.aliases):
+                key = _root_key(_walk_root_expr(child))
+            else:
+                arg_key = _root_key(child.args[0]) if child.args else "()"
+                key = f"fn:{child.func.id}:{arg_key}"  # type: ignore[union-attr]
+            sites.append((getattr(child, "lineno", 0), key))
+        return sites
+
+    def l0_functions(self, nested_walks: set[ast.Call]) -> dict[str, list[tuple[int, str]]]:
+        mapping: dict[str, list[tuple[int, str]]] = {}
+        for name, function in self.functions.items():
+            sites = self.direct_l0_sites(function, nested_walks)
+            if sites:
+                mapping[name] = sites
+        return mapping
+
     def name_bound_to_walk(
         self,
         name: str,
@@ -604,54 +648,37 @@ def classify_source(source: str, filename: str = "<scanner>") -> ScannerRecord:
                     f"nested iteration at line {inner.lineno} inside walk loop at line {node.lineno}"
                 )
 
-    non_nested_walks = [call for call in walk_calls if call not in nested_walk_calls]
-    root_keys: list[str] = []
-    for call in non_nested_walks:
-        if _call_is_walk(call, analysis.aliases):
-            root_keys.append(_root_key(_walk_root_expr(call)))
-        elif isinstance(call.func, ast.Name):
-            arg_key = _root_key(call.args[0]) if call.args else "()"
-            root_keys.append(f"fn:{call.func.id}:{arg_key}")
-        else:
-            root_keys.append(ast.dump(call.func, include_attributes=False))
-
+    nested_walk_set = set(nested_walk_calls)
+    l0_by_function = analysis.l0_functions(nested_walk_set)
     repeated_evidence: list[str] = []
-    counts: dict[str, list[int]] = {}
-    for call, key in zip(non_nested_walks, root_keys):
-        counts.setdefault(key, []).append(getattr(call, "lineno", 0))
-    for key, lines in counts.items():
-        unique_sites = sorted(set(lines))
-        if len(unique_sites) >= 2 and not key.startswith("fn:"):
-            repeated_evidence.append(
-                "repeated full-tree walks of "
-                f"{key} at lines {', '.join(str(line) for line in unique_sites)}"
-            )
-        elif len(unique_sites) >= 2 and key.startswith("fn:"):
-            # Same walker invoked twice is a repeated traversal unless the
-            # enclosing loops are trivial constant roots, which are ignored
-            # because those call sites sit inside trivial iters.
-            trivial = False
-            matching = [call for call, item in zip(non_nested_walks, root_keys) if item == key]
-            if matching:
-                function = _enclosing_function(matching[0], analysis.parents)
-                loops = _loop_ancestors(matching[0], analysis.parents)
-                trivial = any(
-                    _is_trivial_iter(
-                        _iter_node(loop),  # type: ignore[arg-type]
-                        analysis.aliases,
-                        function,
-                        tree,
-                    )
-                    for loop in loops
-                    if _iter_node(loop) is not None
+    scopes: list[ast.FunctionDef | ast.AsyncFunctionDef | ast.Module] = [
+        *analysis.functions.values(),
+        tree,
+    ]
+    for scope in scopes:
+        sites = list(analysis.direct_l0_sites(scope, nested_walk_set))
+        for child in ast.walk(scope):
+            if not isinstance(child, ast.Call) or not isinstance(child.func, ast.Name):
+                continue
+            if not _in_scope(child, scope, analysis.parents):
+                continue
+            callee = child.func.id
+            if callee not in l0_by_function:
+                continue
+            for _lineno, key in l0_by_function[callee]:
+                sites.append((getattr(child, "lineno", 0), key))
+        counts: dict[str, list[int]] = {}
+        for lineno, key in sites:
+            counts.setdefault(key, []).append(lineno)
+        for key, lines in counts.items():
+            unique_sites = sorted(set(lines))
+            if len(unique_sites) >= 2:
+                repeated_evidence.append(
+                    "repeated full-tree walks of "
+                    f"{key} at lines {', '.join(str(line) for line in unique_sites)}"
                 )
-            if not trivial and len(matching) >= 2:
-                # Two sequential calls to the same walker from one function.
-                caller_lines = sorted({getattr(call, "lineno", 0) for call in matching})
-                if len(caller_lines) >= 2:
-                    repeated_evidence.append(
-                        f"repeated walker {key} at lines {', '.join(str(line) for line in caller_lines)}"
-                    )
+
+    non_nested_walks = [call for call in walk_calls if call not in nested_walk_calls]
 
     evidence: list[str] = []
     classification = LINEAR_CLASS

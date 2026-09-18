@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "check_scan_performan
 SPEC = importlib.util.spec_from_file_location("check_scan_performance_inventory", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 inventory = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = inventory
 SPEC.loader.exec_module(inventory)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +73,20 @@ def tracked():
 def inspect():
     for path in tracked().split(b'\\0'):
         print(path)
+"""
+
+REPEATED_VIA_HELPERS = """
+from pathlib import Path
+ROOT = Path('.')
+def scan_py():
+    for path in ROOT.rglob('*.py'):
+        print(path)
+def scan_md():
+    for path in ROOT.rglob('*.md'):
+        print(path)
+def main():
+    scan_py()
+    scan_md()
 """
 
 OPAQUE_DYNAMIC = """
@@ -142,6 +158,11 @@ def test_fixture_linear_single_pass() -> None:
 def test_one_shot_git_listing_is_not_per_file() -> None:
     record = inventory.classify_source(LINEAR_GIT_ONCE, filename="scripts/git_once.py")
     assert record.classification == "linear_single_pass"
+
+
+def test_repeated_walks_via_helpers_in_one_entry_point() -> None:
+    record = inventory.classify_source(REPEATED_VIA_HELPERS, filename="scripts/helpers.py")
+    assert record.classification == "repeated_full_tree_walk"
 
 
 def test_syntax_error_is_unknown_fail_closed() -> None:
