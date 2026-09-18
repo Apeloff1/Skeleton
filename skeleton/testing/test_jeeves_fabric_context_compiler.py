@@ -490,6 +490,48 @@ def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> Non
     assert {record.source_provider for record in packed} == {"provider-a", "provider-b"}
 
 
+def test_child_fabric_can_rehydrate_indexed_parent_memory_without_broad_search() -> None:
+    clock = TickClock()
+    child = _namespace()
+    parent = child.parent()
+    memory = MemoryManager(clock=clock)
+    durable = memory.remember(
+        parent,
+        "durable alpha workspace memory",
+        trust=0.95,
+        salience=0.9,
+        source="parent-fixture",
+    )
+    adapter = MemoryManagerAdapter(memory, child)
+    deep_record = adapter.fetch_refs(
+        child.key,
+        (durable.memory_id,),
+        max_records=4,
+        max_tokens=1_000,
+    )[0]
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=4,
+            maximum_tokens=1_000,
+            minimum_deep_trust=0.0,
+            minimum_fast_hits_before_skip_deep=1,
+            broad_search_on_fast_fallback=False,
+            broad_search_on_conflict=False,
+        )
+    )
+    fabric.index_record(child.key, deep_record, cue="durable alpha workspace memory")
+
+    result = fabric.retrieve(
+        child.key,
+        "durable alpha workspace memory",
+        call_adapters=(adapter,),
+    )
+
+    assert result.broad_search_used is False
+    assert any(record.source_ref == durable.memory_id for record in result.records)
+    assert result.unresolved_source_refs == ()
+
+
 def test_memory_adapter_parent_scope_cannot_read_session_private_records() -> None:
     clock = TickClock()
     child = _namespace()
