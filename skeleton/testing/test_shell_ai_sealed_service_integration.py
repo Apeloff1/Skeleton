@@ -6,10 +6,12 @@ import sys
 
 import pytest
 
+from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApprovalPolicy, QuorumApprovalError
 from skeleton.shells.ai.catalog import AIToolCatalog
 from skeleton.shells.ai.compiler import AIPlanCompiler
 from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
+from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
 from skeleton.shells.ai.execution_seal import ExecutionSealAuthority, ExecutionSealError
 from skeleton.shells.ai.governance import AIShellGovernance
@@ -102,7 +104,12 @@ def intent():
     )
 
 
-def build_service(tmp_path, *, autonomy=AutonomyMode.LOW_RISK_AUTONOMOUS):
+def build_service(
+    tmp_path,
+    *,
+    autonomy=AutonomyMode.LOW_RISK_AUTONOMOUS,
+    approval_quorum=None,
+):
     policy = AIShellPolicy(
         autonomy=autonomy,
         min_confidence=0.5,
@@ -152,6 +159,7 @@ def build_service(tmp_path, *, autonomy=AutonomyMode.LOW_RISK_AUTONOMOUS):
             model(),
         ),
         AIShellGovernance(AIPolicyStore(policy)),
+        approval_quorum=approval_quorum,
     )
     service.start()
     return service
@@ -441,4 +449,193 @@ def test_missing_checker_for_bound_preconditions_is_error(tmp_path):
             seal=seal,
             seal_registry=ExecutionSealRegistry(authority),
             preconditions=conditions,
+        )
+
+
+
+def make_complete_quorum(service, session, review, *, max_votes=3):
+    store = service.approval_quorum
+    assert store is not None
+    opened = store.open(
+        principal="alice",
+        intent_fingerprint=session.intent.fingerprint,
+        proposal_fingerprint=review.planning.response.proposal.fingerprint,
+    )
+    store.vote(
+        opened.approval.approval_id,
+        approver="reviewer-1",
+    )
+    completed = store.vote(
+        opened.approval.approval_id,
+        approver="reviewer-2",
+    )
+    return completed.approval
+
+
+def test_service_seal_binds_and_consumes_quorum(tmp_path):
+    quorum = AIApprovalQuorumStore(
+        InMemoryFencedStore(),
+        policy=QuorumApprovalPolicy(max_votes=3),
+    )
+    service = build_service(
+        tmp_path,
+        approval_quorum=quorum,
+    )
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    approval = make_complete_quorum(service, session, review)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        quorum_approval=approval,
+    )
+    assert seal.assurance_digest == approval.digest
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("c", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        quorum_approval=approval,
+    )
+    assert result.ok
+    assert registry.used(seal.seal_id)
+    current = quorum.current(approval.approval_id)
+    assert current is not None
+    assert current.approval.consumed
+
+
+def test_service_quorum_requires_configured_store(tmp_path):
+    service = build_service(tmp_path)
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    foreign = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = foreign.open(
+        principal="alice",
+        intent_fingerprint=session.intent.fingerprint,
+        proposal_fingerprint=review.planning.response.proposal.fingerprint,
+    )
+    foreign.vote(opened.approval.approval_id, approver="one")
+    completed = foreign.vote(
+        opened.approval.approval_id,
+        approver="two",
+    )
+    with pytest.raises(RuntimeError, match="not configured"):
+        service.seal_review(
+            session,
+            review,
+            principal="alice",
+            authority=ExecutionSealAuthority(b"k" * 32),
+            quorum_approval=completed.approval,
+        )
+
+
+def test_service_incomplete_quorum_cannot_be_sealed(tmp_path):
+    quorum = AIApprovalQuorumStore(InMemoryFencedStore())
+    service = build_service(tmp_path, approval_quorum=quorum)
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    opened = quorum.open(
+        principal="alice",
+        intent_fingerprint=session.intent.fingerprint,
+        proposal_fingerprint=review.planning.response.proposal.fingerprint,
+    )
+    one_vote = quorum.vote(
+        opened.approval.approval_id,
+        approver="reviewer-1",
+    )
+    with pytest.raises(QuorumApprovalError, match="enough votes"):
+        service.seal_review(
+            session,
+            review,
+            principal="alice",
+            authority=ExecutionSealAuthority(b"k" * 32),
+            quorum_approval=one_vote.approval,
+        )
+
+
+def test_service_cannot_swap_quorum_after_seal(tmp_path):
+    quorum = AIApprovalQuorumStore(InMemoryFencedStore())
+    service = build_service(tmp_path, approval_quorum=quorum)
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    first = make_complete_quorum(service, session, review)
+    second = make_complete_quorum(service, session, review)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        quorum_approval=first,
+    )
+    with pytest.raises(ExecutionSealError, match="assurance"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            quorum_approval=second,
+        )
+    assert not registry.used(seal.seal_id)
+    assert not quorum.current(first.approval_id).approval.consumed
+    assert not quorum.current(second.approval_id).approval.consumed
+
+
+def test_service_stale_quorum_blocks_before_seal_consumption(tmp_path):
+    quorum = AIApprovalQuorumStore(
+        InMemoryFencedStore(),
+        policy=QuorumApprovalPolicy(
+            required_votes=2,
+            max_votes=3,
+        ),
+    )
+    service = build_service(tmp_path, approval_quorum=quorum)
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    approved = make_complete_quorum(service, session, review)
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        quorum_approval=approved,
+    )
+    quorum.vote(
+        approved.approval_id,
+        approver="reviewer-3",
+    )
+    with pytest.raises(QuorumApprovalError, match="stale"):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext("c", principal="alice"),
+            seal=seal,
+            seal_registry=registry,
+            quorum_approval=approved,
+        )
+    assert not registry.used(seal.seal_id)
+
+
+def test_service_foreign_principal_quorum_rejected(tmp_path):
+    quorum = AIApprovalQuorumStore(InMemoryFencedStore())
+    service = build_service(tmp_path, approval_quorum=quorum)
+    session = service.new_session(intent(), session_id="s")
+    review, _ = service.review(session)
+    approved = make_complete_quorum(service, session, review)
+    with pytest.raises(QuorumApprovalError, match="principal"):
+        service.seal_review(
+            session,
+            review,
+            principal="bob",
+            authority=ExecutionSealAuthority(b"k" * 32),
+            quorum_approval=approved,
         )
