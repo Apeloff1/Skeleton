@@ -296,3 +296,20 @@ def test_main_fails_closed_when_no_workflows_exist() -> None:
     with tempfile.TemporaryDirectory() as directory:
         with mock.patch.object(concurrency, "WORKFLOW_DIR", Path(directory)):
             assert concurrency.main() == 1
+
+
+def test_malware_gate_preserves_per_push_evidence() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (
+        root / ".github" / "workflows" / "malware-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+        in workflow
+    )
+    assert (
+        "MALWARE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}"
+        in workflow
+    )
+    assert 'python scripts/check_malware_policy.py --base "$MALWARE_BASE"' in workflow
