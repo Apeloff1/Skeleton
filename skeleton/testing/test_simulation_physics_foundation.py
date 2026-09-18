@@ -697,7 +697,8 @@ def test_failure_after_contact_solver_restores_warm_cache_atomically() -> None:
     before_tick = world.tick
 
     class _FailingConstraintSolver:
-        def solve(self, bodies, joints, *, dt):
+        def solve(self, bodies, joints, *, dt, **kwargs):
+            del bodies, joints, dt, kwargs
             raise RuntimeError("constraint stage failure")
 
     world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
@@ -946,7 +947,7 @@ def test_matrix_invertibility_is_relative_not_absolute_determinant() -> None:
 def test_vec3_normalization_accepts_small_well_resolved_vector() -> None:
     vector = Vec3(5.0e-10, 0.0, 0.0)
     normalized = vector.normalized()
-    assert normalized == Vec3.axis(0)
+    assert normalized.almost_equal(Vec3.axis(0), tolerance=1.0e-12)
     assert normalized.length() == pytest.approx(1.0)
 
 
