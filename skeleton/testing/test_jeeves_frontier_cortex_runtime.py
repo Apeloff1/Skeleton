@@ -4,6 +4,7 @@ import pytest
 
 from skeleton.jeeves.agent.action_model import SkillSpec
 from skeleton.jeeves.agent.cortex import CortexError, JeevesCortex
+from skeleton.jeeves.agent.evidence import EvidenceLedger
 from skeleton.jeeves.agent.execution_audit import AuditEventKind
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
@@ -300,3 +301,30 @@ def test_cortex_rejects_reusing_run_id_across_scope_boundaries() -> None:
             run_id=state.run_id,
             evidence_ledger=state.ledger,
         )
+
+
+def test_fresh_cortex_can_rebind_shared_world_model_to_restored_ledger() -> None:
+    clock = TickClock()
+    first = JeevesCortex(clock=clock, monotonic=clock)
+    inputs = _inputs("run-cortex-shared-world")
+    first_ledger = EvidenceLedger(clock=clock)
+    first_state = first.begin(
+        inputs,
+        run_id=inputs.run_id,
+        evidence_ledger=first_ledger,
+    )
+    restored_ledger = EvidenceLedger(clock=clock)
+
+    second = JeevesCortex(
+        world_model=first.world_model,
+        clock=clock,
+        monotonic=clock,
+    )
+    restored_state = second.begin(
+        inputs,
+        run_id=inputs.run_id,
+        evidence_ledger=restored_ledger,
+    )
+
+    assert restored_state.world is first_state.world
+    assert restored_state.world.evidence_ledger is restored_ledger
