@@ -200,6 +200,29 @@ def test_filesystem_network_process_attempts_outside_grant_fail_closed(tmp_path:
         box.attempt(Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS))
 
 
+@pytest.mark.parametrize(
+    ("target", "allowed_host"),
+    [
+        ("http://100.64.0.1/", "100.64.0.1"),
+        ("http://[fec0::1]/", "fec0::1"),
+    ],
+)
+def test_non_public_ip_literal_cannot_be_authorized_even_when_allowlisted(
+    tmp_path: Path,
+    target: str,
+    allowed_host: str,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.NETWORK},
+        network_allowlist=(allowed_host,),
+    )
+    box.seal()
+
+    with pytest.raises(SandboxPolicyError, match="network target"):
+        box.attempt(Operation(OperationKind.NETWORK, target, SandboxCapability.NETWORK))
+
+
 def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path: Path) -> None:
     box = GeneratedCodeSandbox(
         workspace_root=tmp_path,
