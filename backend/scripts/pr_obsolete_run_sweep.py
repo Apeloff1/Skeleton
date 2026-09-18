@@ -9,7 +9,6 @@ with a PR unambiguously enough to prove it obsolete.
 from __future__ import annotations
 
 import os
-import urllib.parse
 from typing import Any
 
 if __package__:
@@ -19,6 +18,8 @@ if __package__:
         CancelResult,
         GitHubApi,
         cancel_run,
+        canonical_commit_oid,
+        list_commit_associated_pulls,
         list_runs,
     )
 else:
@@ -28,6 +29,8 @@ else:
         CancelResult,
         GitHubApi,
         cancel_run,
+        canonical_commit_oid,
+        list_commit_associated_pulls,
         list_runs,
     )
 
@@ -54,16 +57,13 @@ def _commit_pr_numbers(
     sha: str,
     cache: dict[str, set[int]],
 ) -> set[int]:
+    sha = canonical_commit_oid(sha)
     if sha in cache:
         return cache[sha]
-    quoted_sha = urllib.parse.quote(sha, safe="")
-    status, payload, _ = api.request(f"/repos/{repo}/commits/{quoted_sha}/pulls")
-    if status != 200 or not isinstance(payload, list):
-        raise RuntimeError(f"failed to resolve PR associations for {sha}: HTTP {status}")
     numbers = {
         int(item.get("number") or 0)
-        for item in payload
-        if isinstance(item, dict) and int(item.get("number") or 0) > 0
+        for item in list_commit_associated_pulls(api, repo, sha)
+        if int(item.get("number") or 0) > 0
     }
     cache[sha] = numbers
     return numbers
@@ -116,7 +116,12 @@ def _candidate_state(
             if not head_sha:
                 unknown = True
                 break
-            if head_sha == run_sha:
+            try:
+                live_sha = canonical_commit_oid(head_sha)
+            except RuntimeError:
+                unknown = True
+                break
+            if live_sha == run_sha:
                 authoritative = True
                 break
         elif state != "closed":
@@ -219,14 +224,18 @@ def sweep(
             if run_id == current_run_id or run.get("event") not in PR_RUN_EVENTS:
                 continue
             branch = str(run.get("head_branch") or "")
-            sha = str(run.get("head_sha") or "")
+            raw_sha = str(run.get("head_sha") or "")
             run_repo = _repo_full_name(run.get("head_repository"))
             if (
                 not branch
-                or not sha
+                or not raw_sha
                 or branch == default_branch
                 or run_repo != repo
             ):
+                continue
+            try:
+                sha = canonical_commit_oid(raw_sha)
+            except RuntimeError:
                 continue
             counts["eligible"] += 1
 
@@ -248,6 +257,8 @@ def sweep(
                     for number in sorted(numbers)
                 ]
             except RuntimeError as exc:
+                if "bounded identity scan" in str(exc):
+                    raise
                 counts["resolution_failed"] += 1
                 print(f"sweep preserve: run={run_id} reason={exc}")
                 continue
@@ -298,6 +309,8 @@ def sweep(
                     default_branch=default_branch,
                 )
             except RuntimeError as exc:
+                if "bounded identity scan" in str(exc):
+                    raise
                 counts["resolution_failed"] += 1
                 counts["race_preserved"] += 1
                 print(f"sweep preserve before cancel: run={run_id} reason={exc}")

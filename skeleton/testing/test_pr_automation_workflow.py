@@ -44,6 +44,20 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "- Merge Readiness" in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
+    assert 'branches:\n      - "*"\n      - "**"' in text
+
+
+def test_workflow_resolves_all_branch_completions_from_head_identity():
+    text = _workflow()
+    assert "github.event.workflow_run.head_sha" in text
+    assert "github.event.workflow_run.head_branch" in text
+    assert "--head-sha" in text
+    assert "--head-ref" in text
+    assert "--pr-hints-json" in text
+    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
+    assert "pull_requests[0]" not in text
+    assert 'pr="${INPUT_PR:-${WORKFLOW_RUN_PR:-}}"' not in text
+    assert "workflow_run completion is missing head SHA or branch" in text
 
 
 def test_workflow_defaults_are_fail_closed_and_bounded():

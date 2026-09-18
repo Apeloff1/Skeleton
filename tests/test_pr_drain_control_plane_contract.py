@@ -27,5 +27,10 @@ def test_event_drains_remain_scoped_per_pr_branch() -> None:
     text = PR_DRAIN.read_text(encoding="utf-8")
 
     assert "github.event.workflow_run.head_branch" in text
+    assert "github.event.workflow_run.head_sha" in text
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in text
     assert "github.event.workflow_run.head_branch != github.event.repository.default_branch" in text
+    assert 'branches:\n      - "*"\n      - "**"' in text
+    assert "toJSON(github.event.workflow_run.pull_requests.*.number)" in text
+    assert "WORKFLOW_RUN_PR_HINTS" in text
+    assert "pull_requests[0]" not in text

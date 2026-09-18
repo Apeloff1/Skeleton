@@ -252,6 +252,7 @@ def test_approval_must_target_current_head_when_head_is_supplied():
     ]
     assert count_approvals(reviews, head_sha="a" * 40) == 0
     assert count_approvals(reviews, head_sha="b" * 40) == 1
+    assert count_approvals(reviews, head_sha="B" * 40) == 1
 
 
 def test_event_index_deduplicates_identical_state_and_builds_chain(tmp_path):

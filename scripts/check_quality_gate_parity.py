@@ -42,6 +42,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("workflow trigger regression", "test_workflow_trigger_security.py"),
     ("workflow concurrency", "check_workflow_concurrency.py"),
     ("workflow concurrency regression", "test_workflow_concurrency_gate.py"),
+    ("workflow_run branch completions", "check_workflow_run_branch_completions.py"),
+    ("workflow_run branch completions regression", "test_workflow_run_branch_completions_contract.py"),
     ("authentication security regression", "test_auth_security.py"),
     ("developer tooling security regression", "test_developer_tooling_security.py"),
     ("API middleware adversarial regression", "test_api_middleware_adversarial.py"),
