@@ -35,9 +35,9 @@ class BackupScheduler:
                 self.last_error = None
                 METRICS.inc("backup_scheduled_success_total")
             except Exception as e:
-                self.last_error = str(e)
+                self.last_error = "backup_failed"
                 METRICS.inc("backup_scheduled_error_total")
-                logger.exception("Scheduled backup failed")
+                logger.exception("Scheduled backup failed: %s", type(e).__name__)
             await asyncio.sleep(self.interval_seconds)
 
     async def stop(self):

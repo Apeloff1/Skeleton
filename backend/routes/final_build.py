@@ -82,12 +82,12 @@ def _run_job(job_id: str, req: BuildReq) -> None:
                 j["status"] = "done"
                 j["result"] = result
                 j["finished_at"] = time.time()
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         with _JOBS_LOCK:
             j = _JOBS.get(job_id)
             if j:
                 j["status"] = "error"
-                j["error"] = str(e)[:300]
+                j["error"] = "build_failed"
                 j["finished_at"] = time.time()
 
 

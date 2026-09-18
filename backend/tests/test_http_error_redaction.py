@@ -140,6 +140,16 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "gameforge" / "prood" / "event_bus.py",
     REPO_ROOT / "backend" / "gameforge" / "persistence" / "chronoback.py",
     REPO_ROOT / "backend" / "routes" / "gameforge_build.py",
+    REPO_ROOT / "backend" / "core" / "idle_curiosity_runtime.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_persona.py",
+    REPO_ROOT / "backend" / "routes" / "playable_derive.py",
+    REPO_ROOT / "backend" / "core" / "reliability.py",
+    REPO_ROOT / "backend" / "core" / "cold_storage.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "backup_scheduler.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_media.py",
+    REPO_ROOT / "backend" / "routes" / "final_build.py",
+    REPO_ROOT / "backend" / "core" / "swarm_scheduler.py",
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 SERVER = REPO_ROOT / "backend" / "server.py"
@@ -254,6 +264,12 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "engine run error:" not in source
     assert "manifest_corrupt:" not in source
     assert "type(exc).__name__}: {exc}" not in source
+    assert '"error": str(r)' not in source
+    assert '"error": str(ex)' not in source
+    assert '"error": str(error)' not in source
+    assert "self.last_error = str(e)" not in source
+    assert '"error": str(e)[:300]' not in source
+    assert '"error":       str(e)[:200]' not in source
 
 
 
