@@ -19,6 +19,9 @@ def test_bound_admission_transitions_from_pending_to_confirmed(tmp_path):
     assert pending["state"] == "pending_bound"
     assert pending["confidence"] == "high"
     assert pending["receipt_present"] is False
+    assert pending["pending"] is True
+    assert pending["pending_present"] is True
+    assert pending["pending_operation"]["operation_id"] == admitted.id
 
     assert asyncio.run(plane.execute_registered(admitted.outbox_seq)) is True
     confirmed = plane.operation_lifecycle(admitted.id)
@@ -26,6 +29,8 @@ def test_bound_admission_transitions_from_pending_to_confirmed(tmp_path):
     assert confirmed["receipt_present"] is True
     assert confirmed["executed_audit_present"] is True
     assert confirmed["pending"] is False
+    assert confirmed["pending_present"] is False
+    assert confirmed["pending_operation"] is None
 
 
 def test_unbound_operation_is_visible_as_unbound_evidence(tmp_path):
