@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-TASK_KEY = "reserve-S271-deployable-surface-inventory"
+TASK_ID = "reserve-S271-deployable-surface-inventory"
 CONFLICT_DOMAIN = "deployment.readonly.surface_inventory"
 INVENTORY_VERSION = 1
 
@@ -598,7 +598,7 @@ def scan_deployable_surfaces(root: Path) -> SurfaceInventory:
             )
 
     return SurfaceInventory(
-        task_key=TASK_KEY,
+        task_key=TASK_ID,
         conflict_domain=CONFLICT_DOMAIN,
         schema_version=INVENTORY_VERSION,
         items=tuple(items),

@@ -148,7 +148,7 @@ class DeployableSurfaceInventoryTests(unittest.TestCase):
 
     def test_task_identity_is_stable(self) -> None:
         self.assertEqual(
-            inventory.TASK_KEY, "reserve-S271-deployable-surface-inventory"
+            inventory.TASK_ID, "reserve-S271-deployable-surface-inventory"
         )
         self.assertEqual(
             inventory.CONFLICT_DOMAIN, "deployment.readonly.surface_inventory"
@@ -327,7 +327,7 @@ class DeployableSurfaceInventoryTests(unittest.TestCase):
         first = inventory.scan_deployable_surfaces(REPO_ROOT)
         second = inventory.scan_deployable_surfaces(REPO_ROOT)
         self.assertEqual(first, second)
-        self.assertEqual(first.task_key, inventory.TASK_KEY)
+        self.assertEqual(first.task_key, inventory.TASK_ID)
         self.assertEqual(first.conflict_domain, inventory.CONFLICT_DOMAIN)
         self.assertEqual(
             tuple(item.name for item in first.items), inventory.CLOSED_SURFACES
@@ -345,7 +345,7 @@ class DeployableSurfaceInventoryTests(unittest.TestCase):
         _closed_fixture(self.root)
         scanned = self.scan()
         payload = scanned.to_dict()
-        self.assertEqual(payload["task_key"], inventory.TASK_KEY)
+        self.assertEqual(payload["task_key"], inventory.TASK_ID)
         self.assertEqual(payload["conflict_domain"], inventory.CONFLICT_DOMAIN)
         self.assertTrue(payload["closed"])
         encoded = json.dumps(payload, sort_keys=True)
