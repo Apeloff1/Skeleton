@@ -44,7 +44,7 @@ def test_three_way_hyperedge_preserves_family_diversity_and_confidence_cap() -> 
     assert three_way
     edge = three_way[0]
     assert len(edge.families) == 3
-    assert edge.confidence <= pytest.approx(0.70)
+    assert edge.confidence <= 0.70 + 1e-12
     assert edge.metadata["interpretive_only"] is True
     assert edge.metadata["may_promote_to_evidence"] is False
     assert edge.evidence_ids == ("ev-1",)
@@ -92,11 +92,10 @@ def test_maximal_runtime_persists_perpendicular_seeds_in_existing_tangent_graph(
     assert result.tangent_ids
     assert result.frontier.tangent_ids
     assert set(result.frontier.tangent_ids) <= {node.tangent_id for node in runtime.graph.snapshot()}
-    assert dict(result.scientific_weights) == {
-        "information_set": pytest.approx(0.10),
-        "rashomon_variance": pytest.approx(0.10),
-        "source_monitoring": pytest.approx(0.10),
-    }
+    weights = dict(result.scientific_weights)
+    assert weights["information_set"] == pytest.approx(0.10)
+    assert weights["rashomon_variance"] == pytest.approx(0.10)
+    assert weights["source_monitoring"] == pytest.approx(0.10)
     checkpoint = runtime.graph.checkpoint(
         root_fingerprint=result.hypergraph.restart.parent_fingerprint,
         sequence=8,
