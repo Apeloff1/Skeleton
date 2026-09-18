@@ -28,7 +28,9 @@ SKIP_DIRS = {
     ".expo",
     "__pycache__",
 }
-MAX_FILE_BYTES = 2 * 1024 * 1024
+# Large checked-in curriculum/snapshot sources exceed 2 MiB. Keep the reader
+# bounded while scanning those tracked text corpora in full.
+MAX_FILE_BYTES = 16 * 1024 * 1024
 TEXT_SUFFIXES = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".yml", ".yaml",
     ".toml", ".ini", ".cfg", ".conf", ".env", ".example", ".md",
@@ -222,49 +224,55 @@ def violations(path: Path) -> list[str]:
     except ValueError:
         label = path
 
+    findings: list[str] = []
     try:
-        # Bound the actual read as well as discovery-time metadata. This keeps a
-        # stat failure or size-change race from turning secret scanning into an
-        # unbounded memory read.
+        # Stream the whole candidate while bounding each individual read. A
+        # repository can legitimately contain multi-megabyte generated/source
+        # text; rejecting it by total size creates a padding-shaped coverage
+        # failure. A single pathological line still fails closed so memory use
+        # remains bounded.
         with path.open("rb") as handle:
-            raw = handle.read(MAX_FILE_BYTES + 1)
+            number = 0
+            while True:
+                raw = handle.readline(MAX_FILE_BYTES + 1)
+                if not raw:
+                    break
+                number += 1
+                if len(raw) > MAX_FILE_BYTES:
+                    return [
+                        f"{label}:{number}: scan failure: exceeds "
+                        f"{MAX_FILE_BYTES}-byte secret-scan line limit"
+                    ]
+                try:
+                    line = raw.decode("utf-8")
+                except UnicodeError as exc:
+                    # Never echo raw decoder text/bytes into CI logs.
+                    return [f"{label}: read failure: {type(exc).__name__}"]
+
+                specific_finding = False
+                for name, pattern in PATTERNS:
+                    for match in pattern.finditer(line):
+                        # Suppress only an explicitly placeholder-shaped credential,
+                        # never an entire source line. Otherwise a real credential can
+                        # evade scanning simply by appending "# example" or similar.
+                        if _is_placeholder(match.group(0)):
+                            continue
+                        findings.append(f"{label}:{number}: possible {name}")
+                        specific_finding = True
+                        break
+                if specific_finding:
+                    continue
+
+                for match in SECRET_ASSIGNMENT_RE.finditer(line):
+                    candidate = match.group("value")
+                    if _looks_like_high_entropy_secret(candidate):
+                        findings.append(
+                            f"{label}:{number}: possible high-entropy secret-like assignment"
+                        )
+                        break
     except OSError as exc:
         return [f"{label}: read failure: {type(exc).__name__}"]
 
-    if len(raw) > MAX_FILE_BYTES:
-        return [
-            f"{label}: scan failure: exceeds {MAX_FILE_BYTES}-byte secret-scan limit"
-        ]
-
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeError as exc:
-        # Never echo raw decoder text/bytes into CI logs.
-        return [f"{label}: read failure: {type(exc).__name__}"]
-
-    findings: list[str] = []
-    for number, line in enumerate(text.splitlines(), 1):
-        specific_finding = False
-        for name, pattern in PATTERNS:
-            for match in pattern.finditer(line):
-                # Suppress only an explicitly placeholder-shaped credential,
-                # never an entire source line. Otherwise a real credential can
-                # evade scanning simply by appending "# example" or similar.
-                if _is_placeholder(match.group(0)):
-                    continue
-                findings.append(f"{label}:{number}: possible {name}")
-                specific_finding = True
-                break
-        if specific_finding:
-            continue
-
-        for match in SECRET_ASSIGNMENT_RE.finditer(line):
-            candidate = match.group("value")
-            if _looks_like_high_entropy_secret(candidate):
-                findings.append(
-                    f"{label}:{number}: possible high-entropy secret-like assignment"
-                )
-                break
     return findings
 
 
