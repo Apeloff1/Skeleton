@@ -13,7 +13,7 @@ HINT_ARRAY_EXPR = "toJSON(github.event.workflow_run.pull_requests.*.number)"
 COMMIT_OID_PATTERN = r"^[0-9a-f]{40}$"
 AUTOMATION_WORKFLOW = "pr-automation-index.yml"
 AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
-    r'(?m)^    branches-ignore:\\s*\\n(?P<items>(?:      - .+\\n)+)'
+    r'(?m)^    branches-ignore:\s*\n(?P<items>(?:      - .+\n)+)'
 )
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 REPAIR_WORKFLOW = "repair-intake.yml"
