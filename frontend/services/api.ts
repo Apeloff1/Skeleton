@@ -525,21 +525,30 @@ export default API;
 // BACKWARD COMPATIBILITY UTILITIES
 // ============================================================================
 
+const PUBLIC_ERROR_CODE_RE = /^[a-z0-9_]+$/;
+const KNOWN_HTTP_DETAILS = new Set([
+  'internal server error',
+]);
+
+function publicApiErrorMessage(value: unknown): string {
+  if (typeof value !== 'string') return 'request_failed';
+  const message = value.trim();
+  if (PUBLIC_ERROR_CODE_RE.test(message) || KNOWN_HTTP_DETAILS.has(message)) {
+    return message;
+  }
+  return 'request_failed';
+}
+
 /**
- * Parse and normalize API errors
+ * Parse and normalize API errors. Fail-closed: never pass raw exception/stack
+ * text into UI. Keep only stable public codes or known HTTP detail constants.
  */
 export function parseError(error: any): { message: string; code?: string; retry?: boolean } {
-  if (error?.message) {
-    return {
-      message: error.message,
-      code: error.code || 'UNKNOWN',
-      retry: error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT',
-    };
-  }
+  const rawMessage = typeof error === 'string' ? error : error?.message;
   return {
-    message: typeof error === 'string' ? error : 'An unknown error occurred',
-    code: 'UNKNOWN',
-    retry: true,
+    message: publicApiErrorMessage(rawMessage),
+    code: error?.code || 'UNKNOWN',
+    retry: error?.code === 'NETWORK_ERROR' || error?.code === 'TIMEOUT' || !error?.message,
   };
 }
 

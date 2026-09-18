@@ -190,7 +190,7 @@ async function apiRequest<T = any>(
         } else if (error.message?.includes('Network')) {
           lastError = 'Network error. Please check your connection.';
         } else {
-          lastError = error.message || 'Unknown error occurred';
+          lastError = 'request_failed';
         }
         
         retries = attempt;

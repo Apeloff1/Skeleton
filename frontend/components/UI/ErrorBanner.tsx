@@ -7,6 +7,18 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeColors } from '../../constants/themes';
 import { AppError } from '../../types';
+import { safeErrorMessage } from '../../utils/safeError';
+
+const PUBLIC_ERROR_CODE_RE = /^[a-z0-9_]+$/;
+const KNOWN_HTTP_DETAILS = new Set(['internal server error']);
+
+function publicBannerMessage(error: AppError): string {
+  const message = typeof error.message === 'string' ? error.message.trim() : '';
+  if (PUBLIC_ERROR_CODE_RE.test(message) || KNOWN_HTTP_DETAILS.has(message)) {
+    return message;
+  }
+  return safeErrorMessage(error);
+}
 
 interface ErrorBannerProps {
   error: AppError | null;
@@ -22,7 +34,7 @@ export const ErrorBanner: React.FC<ErrorBannerProps> = ({ error, onRetry, onDism
     <Animated.View style={[styles.container, { backgroundColor: colors.error + '15', borderColor: colors.error }]}>
       <View style={styles.content}>
         <Ionicons name="alert-circle" size={18} color={colors.error} />
-        <Text style={[styles.message, { color: colors.error }]}>{error.message}</Text>
+        <Text style={[styles.message, { color: colors.error }]}>{publicBannerMessage(error)}</Text>
       </View>
       <View style={styles.actions}>
         {error.retry && (

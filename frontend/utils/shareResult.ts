@@ -29,8 +29,8 @@ export async function shareResult(text: string, title = 'CodeDock result') {
   }
   try {
     await Share.share({ message: text, title });
-  } catch (e: any) {
-    toast.error(`Share failed: ${e?.message || 'unknown error'}`);
+  } catch {
+    toast.error('Share failed');
   }
 }
 
