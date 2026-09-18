@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 import hashlib
 import json
-import os
 
 from skeleton.kernel.errors import SkeletonError
 
@@ -143,11 +142,18 @@ class IncrementalBuildGraph:
         return {node_id: tuple(sorted(children)) for node_id, children in reverse.items()}
 
     def invalidate(self, changed: Iterable[str]) -> frozenset[str]:
-        """Return ``changed`` plus every transitive dependent. Unknown ids fail closed."""
+        """Return changed nodes plus every transitive dependent. Unknown ids fail closed."""
         known = self.node_map()
         seeds: list[str] = []
         seen_seed: set[str] = set()
+        consumed = 0
         for raw in changed:
+            consumed += 1
+            if consumed > len(known):
+                raise IncrementalGraphError(
+                    "changed node input exceeds graph bound",
+                    context={"max_items": len(known)},
+                )
             node_id = _require_id(raw, field="changed")
             if node_id not in known:
                 raise IncrementalGraphError(
