@@ -442,12 +442,45 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         self._observe_cortex_checkpoint(state, checkpoint)
         return checkpoint
 
+    def _ensure_cortex_run(
+        self,
+        state: _RunState,
+        checkpoint_sequence: int,
+    ) -> bool:
+        if self.cortex is None:
+            return False
+        try:
+            self.cortex.begin(
+                state.inputs,
+                run_id=state.run_id,
+                evidence_ledger=state.ledger,
+            )
+            return True
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.checkpoint_errors")
+            error = {
+                "stage": "bind_run",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+                "checkpoint_sequence": checkpoint_sequence,
+                "authority": "advisory_only",
+            }
+            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
+            state.trace.emit("cortex.error", error)
+            if self.cortex_required:
+                raise
+            return False
+
     def _restore_cortex_advisory(
         self,
         state: _RunState,
         checkpoint: RunCheckpoint,
     ) -> None:
         if self.cortex is None:
+            return
+        if not self._ensure_cortex_run(state, checkpoint.sequence):
             return
         with self._cortex_lock:
             cached = self._cortex_assessments.get(state.run_id)
@@ -468,12 +501,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
     ) -> Mapping[str, Any] | None:
         if self.cortex is None:
             return None
+        if not self._ensure_cortex_run(state, checkpoint.sequence):
+            return None
         try:
-            self.cortex.begin(
-                state.inputs,
-                run_id=state.run_id,
-                evidence_ledger=state.ledger,
-            )
             assessment = self.cortex.observe_checkpoint(
                 state.inputs,
                 checkpoint,
