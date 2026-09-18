@@ -7,6 +7,7 @@ rotation after a confirmed exposure.
 """
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 import re
@@ -108,6 +109,67 @@ PLACEHOLDER_MARKERS = (
     "username:password@",
 )
 
+# Provider-specific regexes catch known token formats above. This second layer
+# catches unknown/provider-neutral credentials only when both the assignment
+# name and the value are strongly secret-shaped, keeping the gate low-noise.
+SECRET_ASSIGNMENT_RE = re.compile(
+    r"""(?ix)
+    ["']?
+    (?P<name>
+        api[_-]?key
+        | access[_-]?token
+        | auth[_-]?token
+        | client[_-]?secret
+        | private[_-]?token
+        | secret[_-]?key
+        | password
+        | passwd
+    )
+    ["']?
+    \s*[:=]\s*
+    ["']?
+    (?P<value>[A-Za-z0-9][A-Za-z0-9._~+/=!@#$%^&*-]{27,})
+    ["']?
+    """,
+)
+HIGH_ENTROPY_MIN_BITS_PER_CHAR = 4.2
+HIGH_ENTROPY_MIN_UNIQUE_RATIO = 0.35
+
+
+def _shannon_entropy(value: str) -> float:
+    if not value:
+        return 0.0
+    length = len(value)
+    counts: dict[str, int] = {}
+    for character in value:
+        counts[character] = counts.get(character, 0) + 1
+    return -sum(
+        (count / length) * math.log2(count / length)
+        for count in counts.values()
+    )
+
+
+def _looks_like_high_entropy_secret(value: str) -> bool:
+    if _is_placeholder(value):
+        return False
+    if len(set(value)) / len(value) < HIGH_ENTROPY_MIN_UNIQUE_RATIO:
+        return False
+    character_classes = sum(
+        (
+            any(character.islower() for character in value),
+            any(character.isupper() for character in value),
+            any(character.isdigit() for character in value),
+            any(not character.isalnum() for character in value),
+        )
+    )
+    # Long hexadecimal/base-N credentials may legitimately use only two
+    # character classes; shorter generic values need three to stay low-noise.
+    minimum_classes = 2 if len(value) >= 40 else 3
+    return (
+        character_classes >= minimum_classes
+        and _shannon_entropy(value) >= HIGH_ENTROPY_MIN_BITS_PER_CHAR
+    )
+
 
 def _is_text_candidate(path: Path) -> bool:
     return path.name.startswith(".env") or path.suffix.lower() in TEXT_SUFFIXES
@@ -179,6 +241,7 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     for number, line in enumerate(text.splitlines(), 1):
+        specific_finding = False
         for name, pattern in PATTERNS:
             for match in pattern.finditer(line):
                 # Suppress only an explicitly placeholder-shaped credential,
@@ -187,6 +250,17 @@ def violations(path: Path) -> list[str]:
                 if _is_placeholder(match.group(0)):
                     continue
                 findings.append(f"{label}:{number}: possible {name}")
+                specific_finding = True
+                break
+        if specific_finding:
+            continue
+
+        for match in SECRET_ASSIGNMENT_RE.finditer(line):
+            candidate = match.group("value")
+            if _looks_like_high_entropy_secret(candidate):
+                findings.append(
+                    f"{label}:{number}: possible high-entropy secret-like assignment"
+                )
                 break
     return findings
 
