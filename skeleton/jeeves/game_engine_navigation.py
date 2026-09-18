@@ -1781,6 +1781,7 @@ class NavigationRuntime:
         self,
         path: tuple[str, ...],
     ) -> tuple[str, ...]:
+        """Collapse collinear waypoint runs without changing path cost authority."""
         if (
             not self.policy.smoothing
             or len(path) <= 2
@@ -1789,45 +1790,73 @@ class NavigationRuntime:
         result = [
             path[0]
         ]
-        index = 0
-        adjacency_sets = {
-            node_id: {
-                neighbor
-                for neighbor, _
-                in rows
-            }
-            for node_id, rows
-            in self.adjacency.items()
-        }
-        while index < (
-            len(path) - 1
+        for index in range(
+            1,
+            len(path) - 1,
         ):
-            next_index = (
-                index + 1
+            left = self.nodes[
+                result[-1]
+            ]
+            current = self.nodes[
+                path[index]
+            ]
+            right = self.nodes[
+                path[index + 1]
+            ]
+            ax = (
+                current.x
+                - left.x
             )
-            for candidate in range(
-                len(path) - 1,
-                index,
-                -1,
+            ay = (
+                current.y
+                - left.y
+            )
+            az = (
+                current.z
+                - left.z
+            )
+            bx = (
+                right.x
+                - current.x
+            )
+            by = (
+                right.y
+                - current.y
+            )
+            bz = (
+                right.z
+                - current.z
+            )
+            cross = (
+                ay * bz
+                - az * by,
+                az * bx
+                - ax * bz,
+                ax * by
+                - ay * bx,
+            )
+            same_direction = (
+                ax * bx
+                + ay * by
+                + az * bz
+                > 0
+            )
+            if (
+                cross
+                == (
+                    0,
+                    0,
+                    0,
+                )
+                and same_direction
             ):
-                if (
-                    path[
-                        candidate
-                    ]
-                    in adjacency_sets[
-                        path[index]
-                    ]
-                ):
-                    next_index = (
-                        candidate
-                    )
-                    break
+                continue
             result.append(
-                path[
-                    next_index
-                ]
+                path[index]
             )
-            index = next_index
+        result.append(
+            path[-1]
+        )
         return tuple(
             result
         )
@@ -2759,21 +2788,6 @@ def canonical_navigation_source(
                     )
                 )
 
-    if policy.smoothing:
-        edges.extend(
-            (
-                NavEdge(
-                    "n0_0",
-                    "n2_2",
-                    30,
-                ),
-                NavEdge(
-                    "n2_2",
-                    "n4_4",
-                    30,
-                ),
-            )
-        )
     return NavigationSource(
         tuple(
             nodes
