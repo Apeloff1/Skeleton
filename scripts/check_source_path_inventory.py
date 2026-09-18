@@ -183,7 +183,14 @@ def classify_path(path: object) -> str:
         return "vendor"
     if (
         _has_prefix(normalized, GENERATED_PREFIXES)
-        or any(part in GENERATED_PARTS or part.endswith(".egg-info") for part in parts)
+        or any(
+            (
+                part in GENERATED_PARTS
+                and not (part == "build" and normalized.startswith("skeleton/build/"))
+            )
+            or part.endswith(".egg-info")
+            for part in parts
+        )
         or suffix in GENERATED_SUFFIXES
         or name in GENERATED_FILENAMES
     ):
