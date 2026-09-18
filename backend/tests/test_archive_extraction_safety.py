@@ -279,3 +279,49 @@ def test_discovery_does_not_follow_symlink_directories(tmp_path: Path) -> None:
         pytest.skip("directory symlinks are unavailable on this platform")
 
     assert list(scanner.production_python_files(root)) == [root / "safe.py"]
+
+
+
+def test_rejects_assigned_tarfile_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archives = tarfile\n"
+        "with archives.open('bundle.tar') as archive:\n"
+        "    archive.extractall('/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
+def test_rejects_assigned_tarfile_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "first = tarfile\n"
+        "second = first\n"
+        "archive = second.open('bundle.tar')\n"
+        "archive.extract('item', '/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
+def test_allows_assigned_tarfile_module_alias_with_data_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archives = tarfile\n"
+        "with archives.open('bundle.tar') as archive:\n"
+        "    archive.extractall('/tmp/out', filter=archives.data_filter)\n",
+    )
+    assert findings == []
+
+
+def test_reassigned_tarfile_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archives = tarfile\n"
+        "archives = custom_archives\n"
+        "archives.open('bundle.tar').extractall('/tmp/out')\n",
+    )
+    assert findings == []
