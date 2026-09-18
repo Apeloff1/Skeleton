@@ -829,5 +829,14 @@ def default_prediction_lineage() -> TechniqueRegistry:
             survives_as=("deployment-efficiency gate", "model-family arbitration criterion"),
             sources=("Guibert et al., PMLR 2026 accuracy/energy TSFM benchmark",),
         ),
+        ForecastTechnique(
+            "semantic_adapter_2026", 2026, "Semantic interpretive probability adapter", ForecastFamily.PROBABILISTIC,
+            "Bridge pre-existing semantic forecasts into the predictive exchange without treating interpretation as evidence or historical method identity.",
+            complexity_rank=2, predecessors=("prequential_1984",),
+            assumptions=("semantic probability was created before the request cutoff", "supporting evidence is already in request custody"),
+            failure_modes=("interpretive probability is not empirical evidence", "target or forecast identity drift invalidates the binding"),
+            survives_as=("interpretive forecast adapter", "prequential semantic calibration bridge"),
+            sources=("Skeleton semantic prediction and predictive exchange contract, 2026",),
+        ),
     )
     return TechniqueRegistry(records)
