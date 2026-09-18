@@ -539,7 +539,32 @@ class DistributedReceiptChain:
             key,
         )
         if record is None:
-            return None
+            # A worker can crash after the head CAS and before the secondary
+            # receipt-id index is written. Recover that narrow window by
+            # scanning only the committed chain, then rebuild the immutable
+            # index. This prevents a restart from appending the same receipt
+            # a second time.
+            matches = tuple(
+                item
+                for item in self.snapshot()
+                if item.receipt.receipt_id
+                == receipt_id
+            )
+            if not matches:
+                return None
+            if len(matches) != 1:
+                raise DistributedReceiptCorruption(
+                    "receipt id appears multiple times in committed chain"
+                )
+            self._put_index(matches[0])
+            record = self.backend.get(
+                self.namespace,
+                key,
+            )
+            if record is None:
+                raise DistributedReceiptCorruption(
+                    "receipt index repair did not persist"
+                )
         if not isinstance(
             record.value,
             ReceiptIndexEntry,
