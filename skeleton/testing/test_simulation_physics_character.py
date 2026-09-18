@@ -10,6 +10,7 @@ from skeleton.simulation.physics import (
     CharacterControllerSettings,
     KinematicCharacterController,
     PhysicsSettings,
+    PhysicsValidationError,
     PhysicsWorld,
     PlaneShape,
     RigidBody,
