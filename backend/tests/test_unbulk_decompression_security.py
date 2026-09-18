@@ -59,3 +59,32 @@ def test_manifest_writer_refuses_oversized_source(monkeypatch, tmp_path) -> None
 def test_normal_payload_round_trip_still_works() -> None:
     value = {"hello": ["world", 1, True]}
     assert unbulk.unpack(unbulk.pack(value)) == value
+
+
+def test_unpack_cache_respects_aggregate_decoded_byte_budget(monkeypatch) -> None:
+    unbulk.purge_cache()
+    monkeypatch.setattr(unbulk, "_CACHE_MAX", 10)
+    monkeypatch.setattr(unbulk, "_CACHE_MAX_BYTES", 96)
+
+    first = _packed_json({"data": "a" * 48})
+    second = _packed_json({"data": "b" * 48})
+    assert unbulk.unpack(first)["data"].startswith("a")
+    assert unbulk.unpack(second)["data"].startswith("b")
+
+    assert unbulk._CACHE_BYTES <= 96
+    assert sum(unbulk._CACHE_SIZES.values()) == unbulk._CACHE_BYTES
+    assert len(unbulk._CACHE) <= 1
+    unbulk.purge_cache()
+
+
+def test_unpack_does_not_cache_single_object_larger_than_cache_budget(monkeypatch) -> None:
+    unbulk.purge_cache()
+    monkeypatch.setattr(unbulk, "_CACHE_MAX", 10)
+    monkeypatch.setattr(unbulk, "_CACHE_MAX_BYTES", 32)
+
+    blob = _packed_json({"data": "x" * 256})
+    assert unbulk.unpack(blob)["data"] == "x" * 256
+
+    assert len(unbulk._CACHE) == 0
+    assert unbulk._CACHE_BYTES == 0
+    assert unbulk._CACHE_SIZES == {}
