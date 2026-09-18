@@ -281,6 +281,16 @@ def test_rejects_literal_encode_command(tmp_path: Path) -> None:
     assert any("argument vector, not a string-shaped command" in finding for finding in findings)
 
 
+@pytest.mark.parametrize("builder", ["repr", "ascii"])
+def test_rejects_builtin_text_renderer_command(tmp_path: Path, builder: str) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncommand = ['python', '--version']\n"
+        f"subprocess.run({builder}(command), shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
 def test_unknown_string_like_method_receiver_is_not_guessed(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
