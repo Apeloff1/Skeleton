@@ -2066,6 +2066,135 @@ class SemanticTopologyLearningLab:
             fingerprint=fingerprint,
         )
 
+    def diagnostics(
+        self,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        """Return bounded operational diagnostics for bridge-learning state."""
+
+        maximum = positive_int("limit", limit, maximum=10_000)
+        candidate_key = (
+            str(candidate_id).strip()
+            if candidate_id is not None
+            else None
+        )
+        if candidate_key is not None and candidate_key not in self._candidates:
+            raise AgentContractError(
+                "unknown semantic topology bridge candidate"
+            )
+        kind_value = (
+            kind
+            if kind is None or isinstance(kind, LensInteractionKind)
+            else LensInteractionKind(str(kind))
+        )
+
+        with self._lock:
+            reports = [
+                item
+                for item in self.reports()
+                if (
+                    candidate_key is None
+                    or item.candidate_id == candidate_key
+                )
+                and (
+                    kind_value is None
+                    or item.kind is kind_value
+                )
+            ]
+            reports.sort(
+                key=lambda item: (
+                    item.candidate_id,
+                    item.kind.value,
+                )
+            )
+            learned, snapshot = self.evaluate()
+            learned_filtered = [
+                item
+                for item in learned
+                if (
+                    candidate_key is None
+                    or item.candidate_id == candidate_key
+                )
+                and (
+                    kind_value is None
+                    or item.rule.kind is kind_value
+                )
+            ]
+            unresolved = [
+                item
+                for item in self.unresolved_predictions(
+                    candidate_id=candidate_key,
+                )
+                if (
+                    kind_value is None
+                    or item.kind is kind_value
+                )
+            ]
+            candidate_payloads = []
+            candidate_values = (
+                [self._candidates[candidate_key]]
+                if candidate_key is not None
+                else sorted(
+                    self._candidates.values(),
+                    key=lambda item: (
+                        -item.score,
+                        item.candidate_id,
+                    ),
+                )
+            )
+            for candidate in candidate_values[:maximum]:
+                candidate_payloads.append(
+                    {
+                        "candidate_id": candidate.candidate_id,
+                        "candidate_fingerprint": (
+                            self.candidate_fingerprint(candidate)
+                        ),
+                        "left_key": candidate.left_key,
+                        "right_key": candidate.right_key,
+                        "left_family": candidate.left_family.value,
+                        "right_family": candidate.right_family.value,
+                        "score": candidate.score,
+                        "cue_overlap": candidate.cue_overlap,
+                        "role_novelty": candidate.role_novelty,
+                        "cross_family": candidate.cross_family,
+                        "shared_cues": list(candidate.shared_cues),
+                        "rationale": candidate.rationale,
+                    }
+                )
+
+            payload = {
+                "contract_fingerprint": self.contract_fingerprint,
+                "state_fingerprint": self.fingerprint,
+                "snapshot": snapshot.as_json(),
+                "candidates": candidate_payloads,
+                "reports": [
+                    item.as_json() for item in reports[:maximum]
+                ],
+                "learned_rules": [
+                    item.as_json()
+                    for item in learned_filtered[:maximum]
+                ],
+                "unresolved_predictions": [
+                    item.as_json() for item in unresolved[:maximum]
+                ],
+                "truncated": {
+                    "candidates": len(candidate_values) > maximum,
+                    "reports": len(reports) > maximum,
+                    "learned_rules": len(learned_filtered) > maximum,
+                    "unresolved_predictions": len(unresolved) > maximum,
+                },
+                "invariants": {
+                    "diagnostics_are_not_evidence": True,
+                    "learned_rules_remain_interpretive": True,
+                    "static_topology_contract_is_immutable": True,
+                    "outcomes_require_predeclared_predictions": True,
+                },
+            }
+        return json_safe(payload)
+
     def research_obligations(
         self,
         *,
