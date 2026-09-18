@@ -289,7 +289,8 @@ class QueueWorker:
         """Claim at most one item and execute it."""
 
         if self._stop.is_set():
-            self._set_state(WorkerState.STOPPED)
+            if self.snapshot().state is not WorkerState.FAILED:
+                self._set_state(WorkerState.STOPPED)
             return None
 
         item = self.queue.claim(self.owner)
@@ -302,6 +303,8 @@ class QueueWorker:
         retry = self.retry_factory(item)
         if not isinstance(retry, RetryPolicy):
             self._transition_failed(item)
+            self._record_failure(WorkDisposition.EXECUTOR_ERROR)
+            self._stop.set()
             self._set_state(WorkerState.FAILED)
             raise TypeError("retry_factory must return RetryPolicy")
 
@@ -314,16 +317,16 @@ class QueueWorker:
                 circuit_key=item.command.command,
             )
         except Exception as exc:
-            try:
-                terminal = self._transition_failed(item)
-            finally:
-                self._set_state(
-                    WorkerState.FAILED if self.policy.stop_on_executor_error else WorkerState.IDLE
-                )
-                if self.policy.stop_on_executor_error:
-                    self._stop.set()
-            if self.snapshot().counters.consecutive_failures < self.policy.max_consecutive_failures:
-                self._record_failure(WorkDisposition.EXECUTOR_ERROR)
+            # First prove ownership can make the claimed item terminal.  If that
+            # transition is stale, _transition_failed records the stronger
+            # transition failure and raises without this handler overwriting it.
+            terminal = self._transition_failed(item)
+            self._record_failure(WorkDisposition.EXECUTOR_ERROR)
+            if self.policy.stop_on_executor_error:
+                self._stop.set()
+                self._set_state(WorkerState.FAILED)
+            elif self.snapshot().state is not WorkerState.FAILED:
+                self._set_state(WorkerState.IDLE)
             return WorkResult(
                 item_id=item.item_id,
                 claim_id=item.claim_id or "",
