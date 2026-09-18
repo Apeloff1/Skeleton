@@ -12,6 +12,7 @@ from skeleton.simulation.physics import (
     PhysicsWorld,
     RigidBody,
     SphereShape,
+    TOIEvent,
     Vec3,
 )
 
@@ -266,3 +267,43 @@ def test_ccd_settings_are_bound_into_world_identity() -> None:
     right = PhysicsWorld(PhysicsSettings(ccd_max_substeps=8))
     assert left.settings.fingerprint != right.settings.fingerprint
     assert left.state_digest != right.state_digest
+
+
+
+def test_toi_contact_slop_moves_pair_apart_along_canonical_normal() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            ccd_contact_slop=0.02,
+            sleep_after_seconds=10.0,
+        )
+    )
+    left = _sphere(
+        "a",
+        position=Vec3(-0.1, 0.0, 0.0),
+        velocity=Vec3.zero(),
+        continuous=True,
+    )
+    right = _sphere(
+        "b",
+        position=Vec3(0.1, 0.0, 0.0),
+        velocity=Vec3.zero(),
+        continuous=True,
+    )
+    world.add_body(left)
+    world.add_body(right)
+    before = right.position.x - left.position.x
+
+    world._nudge_toi_pair(  # type: ignore[attr-defined]
+        TOIEvent(
+            body_a="a",
+            body_b="b",
+            fraction=0.0,
+            time=0.0,
+            normal=Vec3.axis(0),
+        )
+    )
+
+    assert left.position.x == pytest.approx(-0.11)
+    assert right.position.x == pytest.approx(0.11)
+    assert right.position.x - left.position.x == pytest.approx(before + 0.02)
