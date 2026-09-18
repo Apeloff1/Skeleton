@@ -11,6 +11,7 @@ from skeleton.shells.ai.recovery import (
 )
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
 from skeleton.shells.ai.session_evidence import SessionEvidenceStore
+from skeleton.shells.ai.session_journal import SessionJournalEvidence
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class StrictRecoveryReport:
     reasons: tuple[str, ...]
     base: AIRecoveryReport
     journal_root_matches: bool
+    session_journal_matches: bool
     global_receipt_chain_valid: bool
     session_evidence_matches: bool
     release_evidence_matches: bool
@@ -35,6 +37,7 @@ class StrictRecoveryReport:
             "safe_to_resume": self.safe_to_resume,
             "base": self.base.to_dict(),
             "journal_root_matches": self.journal_root_matches,
+            "session_journal_matches": self.session_journal_matches,
             "global_receipt_chain_valid": self.global_receipt_chain_valid,
             "session_evidence_matches": self.session_evidence_matches,
             "release_evidence_matches": self.release_evidence_matches,
@@ -68,6 +71,17 @@ class StrictAIRecoveryManager:
         journal_root_matches = (
             journal.root_hash() == session.journal_root
         )
+        current_session_journal = SessionJournalEvidence.from_journal(
+            journal,
+            session.session_id,
+        )
+        if checkpoint.session_journal_digest:
+            session_journal_matches = (
+                current_session_journal.digest
+                == checkpoint.session_journal_digest
+            )
+        else:
+            session_journal_matches = journal_root_matches
         receipt_valid = receipt_chain.verify()
         stored = session_evidence.current(session.session_id)
         if checkpoint.session_evidence_digest:
@@ -107,9 +121,9 @@ class StrictAIRecoveryManager:
             action = RecoveryAction.MANUAL_REVIEW
             if "AI decision journal integrity failure" not in reasons:
                 reasons.append("AI decision journal integrity failure")
-        elif not journal_root_matches:
+        elif not session_journal_matches:
             action = RecoveryAction.MANUAL_REVIEW
-            reasons.append("AI decision journal root differs from checkpoint")
+            reasons.append("AI session journal commitment differs from checkpoint")
         if not receipt_valid:
             action = RecoveryAction.MANUAL_REVIEW
             reasons.append("global shell receipt chain integrity failure")
@@ -134,6 +148,7 @@ class StrictAIRecoveryManager:
             tuple(reasons),
             base,
             journal_root_matches,
+            session_journal_matches,
             receipt_valid,
             session_evidence_matches,
             release_matches,
