@@ -712,6 +712,10 @@ class ModelRouter:
                 "adapter lacks claimed execution capabilities: "
                 + ", ".join(sorted(missing_execution))
             )
+        if parsed.provider_id in self._providers and not replace:
+            raise ProviderMetadataError(
+                f"provider already registered: {parsed.provider_id}"
+            )
         existing_runtime = None
         try:
             existing_runtime = self._runtime.resolve(adapter_name)
@@ -722,10 +726,6 @@ class ModelRouter:
         elif existing_runtime is not adapter:
             raise ProviderMetadataError(
                 f"adapter name already registered with a different adapter: {adapter_name}"
-            )
-        if parsed.provider_id in self._providers and not replace:
-            raise ProviderMetadataError(
-                f"provider already registered: {parsed.provider_id}"
             )
         self._providers[parsed.provider_id] = parsed
         return parsed
