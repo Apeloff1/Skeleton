@@ -483,6 +483,11 @@ from .semantic_lens_topology import (
     SemanticTopologySnapshot,
 )
 
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
+)
+
 from .semantic_topology_learning import (
     LearnedTopologyRule,
     SemanticTopologyLearningLab,
