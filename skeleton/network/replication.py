@@ -35,6 +35,9 @@ MAX_STRING_CHARS = 256
 MAX_LIST_ITEMS = 64
 MAX_PEER_ID_CHARS = 64
 MAX_MISSING_REPORT = 16
+MAX_PACKET_BYTES = 262_144
+MAX_CHANNEL_PACKETS = 256
+MAX_CANONICAL_DEPTH = 16
 
 _PACKET_KEYS = ("kind", "schema_version", "sequence", "payload", "checksum")
 _SNAPSHOT_KEYS = ("tick", "entities", "digest", "state_digest")
@@ -132,7 +135,22 @@ class Packet:
     checksum: str
 
     def encode(self) -> bytes:
-        return _encode_packet(self.kind, self.schema_version, self.sequence, self.payload)
+        _validate_packet_envelope(self)
+        expected = _packet_checksum(self.kind, self.schema_version, self.sequence, self.payload)
+        if self.checksum != expected:
+            raise ReplicationError(
+                "packet checksum mismatch",
+                context={"sequence": self.sequence, "kind": self.kind},
+            )
+        return canonical_dumps(
+            {
+                "kind": self.kind,
+                "schema_version": self.schema_version,
+                "sequence": self.sequence,
+                "payload": self.payload,
+                "checksum": self.checksum,
+            }
+        ).encode("utf-8")
 
     @classmethod
     def decode(cls, raw: bytes) -> "Packet":
@@ -248,6 +266,11 @@ def frame_digest(
 def decode_packet(raw: bytes) -> Packet:
     if not isinstance(raw, (bytes, bytearray)):
         raise SerializationError("packet must be bytes")
+    if len(raw) > MAX_PACKET_BYTES:
+        raise SerializationError(
+            "packet exceeds byte bound",
+            context={"max_bytes": MAX_PACKET_BYTES, "actual": len(raw)},
+        )
     try:
         data = json.loads(bytes(raw).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -256,7 +279,7 @@ def decode_packet(raw: bytes) -> Packet:
         raise SerializationError("packet must be an object")
     _require_exact_keys(data, _PACKET_KEYS, "packet")
     kind = data["kind"]
-    if kind not in {"snapshot", "delta", "ack"}:
+    if not isinstance(kind, str) or kind not in {"snapshot", "delta", "ack"}:
         raise SerializationError("unknown packet kind", context={"kind": kind})
     schema_version = _require_int("schema_version", data["schema_version"], minimum=1)
     if schema_version != SCHEMA_VERSION:
@@ -268,9 +291,7 @@ def decode_packet(raw: bytes) -> Packet:
     payload = data["payload"]
     if not isinstance(payload, dict):
         raise SerializationError("payload must be an object")
-    checksum = data["checksum"]
-    if not isinstance(checksum, str) or len(checksum) != 64:
-        raise SerializationError("checksum must be a 64-character hex digest")
+    checksum = _require_digest(data["checksum"])
     expected = _packet_checksum(kind, schema_version, sequence, payload)
     if checksum != expected:
         raise ReplicationError(
@@ -296,19 +317,39 @@ class OfflineChannel:
         return len(self._queue)
 
     def submit(self, packet: Packet) -> None:
+        if not isinstance(packet, Packet):
+            raise SerializationError("channel submit requires a Packet")
+        if len(self._queue) >= MAX_CHANNEL_PACKETS:
+            raise ReplicationError(
+                "offline channel exceeds packet bound",
+                context={"max_packets": MAX_CHANNEL_PACKETS},
+            )
         self._queue.append(packet.encode())
 
     def drop_index(self, index: int) -> bytes:
-        if not 0 <= index < len(self._queue):
+        index = _require_int("index", index, minimum=0)
+        if index >= len(self._queue):
             raise ReplicationError("drop index out of range", context={"index": index})
         return self._queue.pop(index)
 
     def duplicate_index(self, index: int) -> None:
-        if not 0 <= index < len(self._queue):
+        index = _require_int("index", index, minimum=0)
+        if index >= len(self._queue):
             raise ReplicationError("duplicate index out of range", context={"index": index})
+        if len(self._queue) >= MAX_CHANNEL_PACKETS:
+            raise ReplicationError(
+                "offline channel exceeds packet bound",
+                context={"max_packets": MAX_CHANNEL_PACKETS},
+            )
         self._queue.insert(index + 1, self._queue[index])
 
     def reorder(self, permutation: Sequence[int]) -> None:
+        if isinstance(permutation, (str, bytes, bytearray)) or not isinstance(
+            permutation, Sequence
+        ):
+            raise SerializationError("reorder permutation must be a sequence of integers")
+        if any(isinstance(item, bool) or not isinstance(item, int) for item in permutation):
+            raise SerializationError("reorder permutation must contain integers")
         if sorted(permutation) != list(range(len(self._queue))):
             raise ReplicationError(
                 "reorder permutation must list each queued index once",
@@ -510,6 +551,7 @@ class _ReplicationCore:
     def ingest(self, packet: Packet, *, predictions: list[_Prediction] | None = None) -> IngestResult:
         if not isinstance(packet, Packet):
             raise SerializationError("ingest requires a decoded Packet")
+        _validate_packet_envelope(packet)
         if packet.schema_version != SCHEMA_VERSION:
             raise SchemaCompatibilityError(
                 "incompatible replication schema",
@@ -757,8 +799,10 @@ class _ReplicationCore:
     def _drain_buffer(self) -> list[int]:
         applied: list[int] = []
         while self._sequence + 1 in self._buffer:
-            packet = self._buffer.pop(self._sequence + 1)
+            next_sequence = self._sequence + 1
+            packet = self._buffer[next_sequence]
             self._apply_delta_packet(packet)
+            self._buffer.pop(next_sequence, None)
             applied.append(self._sequence)
         return applied
 
@@ -939,6 +983,9 @@ class Authority:
         return packet
 
     def record_ack(self, packet: Packet) -> Ack:
+        if not isinstance(packet, Packet):
+            raise SerializationError("record_ack requires a decoded Packet")
+        _validate_packet_envelope(packet)
         if packet.kind != "ack":
             raise ReplicationError("expected acknowledgement packet")
         if packet.schema_version != SCHEMA_VERSION:
@@ -952,6 +999,38 @@ class Authority:
         if packet.checksum != expected_checksum:
             raise ReplicationError("packet checksum mismatch", context={"kind": "ack"})
         ack = _ack_from_payload(packet.payload)
+        if packet.sequence != ack.last_applied_sequence:
+            raise SequenceError(
+                "ack packet sequence does not match last applied sequence",
+                context={"packet_sequence": packet.sequence, "last_applied": ack.last_applied_sequence},
+            )
+        if ack.last_applied_sequence > self.sequence or ack.last_received_sequence > self.sequence:
+            raise SequenceError(
+                "acknowledgement refers to future authority sequence",
+                context={
+                    "authority_sequence": self.sequence,
+                    "last_applied": ack.last_applied_sequence,
+                    "last_received": ack.last_received_sequence,
+                },
+            )
+        previous = self._acks.get(ack.peer_id)
+        if previous is not None and (
+            ack.last_applied_sequence < previous.last_applied_sequence
+            or ack.last_received_sequence < previous.last_received_sequence
+            or ack.tick < previous.tick
+        ):
+            raise SequenceError(
+                "acknowledgement regressed peer state",
+                context={"peer_id": ack.peer_id},
+            )
+        frame = self._core._frame(ack.last_applied_sequence)
+        if frame is not None and (
+            ack.last_applied_digest != frame.digest or ack.tick != frame.tick
+        ):
+            raise ReplicationError(
+                "acknowledgement does not match retained authority frame",
+                context={"peer_id": ack.peer_id, "sequence": ack.last_applied_sequence},
+            )
         self._acks[ack.peer_id] = ack
         return ack
 
@@ -1176,22 +1255,40 @@ def _packet_checksum(kind: str, schema_version: int, sequence: int, payload: Map
 
 
 def _ack_from_payload(payload: Mapping[str, Any]) -> Ack:
+    if not isinstance(payload, Mapping):
+        raise SerializationError("ack payload must be an object")
     data = dict(payload)
     _require_exact_keys(data, _ACK_KEYS, "ack")
     missing = data["missing_sequences"]
-    if not isinstance(missing, list) or any(not isinstance(item, int) or isinstance(item, bool) for item in missing):
-        raise SerializationError("missing_sequences must be a list of integers")
+    if not isinstance(missing, list) or any(
+        isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in missing
+    ):
+        raise SerializationError("missing_sequences must be a list of non-negative integers")
     if len(missing) > MAX_MISSING_REPORT:
         raise ReplicationError("ack missing_sequences exceeds bound")
+    if missing != sorted(missing) or len(set(missing)) != len(missing):
+        raise SerializationError("missing_sequences must be sorted and unique")
+    last_applied = _require_int(
+        "last_applied_sequence", data["last_applied_sequence"], minimum=0
+    )
+    last_received = _require_int(
+        "last_received_sequence", data["last_received_sequence"], minimum=0
+    )
+    if last_received < last_applied:
+        raise SequenceError(
+            "last_received_sequence cannot precede last_applied_sequence",
+            context={"last_applied": last_applied, "last_received": last_received},
+        )
+    if any(item <= last_applied or item > last_received for item in missing):
+        raise SequenceError(
+            "missing_sequences must fall strictly after applied and at or before received",
+            context={"last_applied": last_applied, "last_received": last_received},
+        )
     return Ack(
         peer_id=_bounded_token("peer_id", data["peer_id"], maximum=MAX_PEER_ID_CHARS),
-        last_applied_sequence=_require_int(
-            "last_applied_sequence", data["last_applied_sequence"], minimum=0
-        ),
+        last_applied_sequence=last_applied,
         last_applied_digest=_require_digest(data["last_applied_digest"]),
-        last_received_sequence=_require_int(
-            "last_received_sequence", data["last_received_sequence"], minimum=0
-        ),
+        last_received_sequence=last_received,
         tick=_require_int("tick", data["tick"], minimum=0),
         missing_sequences=tuple(missing),
     )
@@ -1209,7 +1306,7 @@ def _decode_patches(raw: Any) -> tuple[Patch, ...]:
         _require_exact_keys(item, ("entity_id", "op", "fields"), "patch")
         try:
             op = PatchOp(item["op"])
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise ReplicationError("unknown patch op", context={"op": item["op"]}) from exc
         fields = item["fields"]
         if not isinstance(fields, dict):
@@ -1261,7 +1358,12 @@ def _canonicalize_entities(entities: Mapping[str, Any] | None) -> dict[str, Any]
     return canonical
 
 
-def _canonicalize(value: Any) -> Any:
+def _canonicalize(value: Any, *, depth: int = 0) -> Any:
+    if depth > MAX_CANONICAL_DEPTH:
+        raise SerializationError(
+            "canonical value exceeds nesting bound",
+            context={"max_depth": MAX_CANONICAL_DEPTH},
+        )
     if value is None or isinstance(value, bool):
         return value
     if isinstance(value, int) and not isinstance(value, bool):
@@ -1283,7 +1385,7 @@ def _canonicalize(value: Any) -> Any:
                 "list exceeds bound",
                 context={"max_items": MAX_LIST_ITEMS},
             )
-        return [_canonicalize(item) for item in value]
+        return [_canonicalize(item, depth=depth + 1) for item in value]
     if isinstance(value, dict):
         if len(value) > MAX_FIELDS:
             raise SerializationError(
@@ -1295,7 +1397,7 @@ def _canonicalize(value: Any) -> Any:
             if not isinstance(key, str):
                 raise SerializationError("object keys must be strings")
             _bounded_token("key", key)
-            canonical[key] = _canonicalize(item)
+            canonical[key] = _canonicalize(item, depth=depth + 1)
         return canonical
     raise SerializationError(
         "non-canonical value type",
@@ -1306,6 +1408,11 @@ def _canonicalize(value: Any) -> Any:
 def _frozen_fields(fields: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     if not isinstance(fields, Mapping):
         raise SerializationError("patch fields must be an object")
+    if len(fields) > MAX_FIELDS:
+        raise ReplicationError(
+            "patch fields exceed field bound",
+            context={"max_fields": MAX_FIELDS},
+        )
     canonical: dict[str, Any] = {}
     for key, value in fields.items():
         if not isinstance(key, str):
@@ -1324,9 +1431,11 @@ def _sha256(text: str) -> str:
 
 
 def _bounded_token(name: str, value: Any, *, maximum: int = MAX_TOKEN_CHARS) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise SerializationError(f"{name} must be a non-empty string")
-    token = value.strip()
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise SerializationError(f"{name} must be a non-empty trimmed string")
+    token = value
+    if any(ord(char) < 32 for char in token):
+        raise SerializationError(f"{name} contains control characters")
     if len(token) > maximum:
         raise SerializationError(
             f"{name} exceeds bound",
@@ -1347,9 +1456,23 @@ def _require_int(name: str, value: Any, *, minimum: int, maximum: int | None = N
 
 
 def _require_digest(value: Any) -> str:
-    if not isinstance(value, str) or len(value) != 64:
-        raise SerializationError("digest must be a 64-character hex digest")
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(char not in "0123456789abcdef" for char in value)
+    ):
+        raise SerializationError("digest must be a 64-character lowercase hex digest")
     return value
+
+
+def _validate_packet_envelope(packet: Packet) -> None:
+    if not isinstance(packet.kind, str) or packet.kind not in {"snapshot", "delta", "ack"}:
+        raise SerializationError("unknown packet kind", context={"kind": packet.kind})
+    _require_int("schema_version", packet.schema_version, minimum=1)
+    _require_int("sequence", packet.sequence, minimum=0)
+    if not isinstance(packet.payload, dict):
+        raise SerializationError("payload must be an object")
+    _require_digest(packet.checksum)
 
 
 def _require_exact_keys(data: Mapping[str, Any], keys: Iterable[str], label: str) -> None:
