@@ -176,6 +176,7 @@ class AIShellService:
         authority: ExecutionSealAuthority,
         preconditions: Preconditions | None = None,
         approval=None,
+        quorum_approval: QuorumApproval | None = None,
         ttl_seconds: float = 60.0,
     ) -> ExecutionSeal:
         """Issue short-lived signed authority for one exact reviewed plan.
@@ -213,6 +214,12 @@ class AIShellService:
                 proposal_fingerprint=proposal.fingerprint,
             )
             approval_id = approval.approval_id
+        quorum_digest = self._quorum_digest(
+            session,
+            review,
+            principal=principal,
+            quorum_approval=quorum_approval,
+        )
         return authority.issue(
             principal=principal,
             session_id=session.session_id,
@@ -220,6 +227,7 @@ class AIShellService:
             preconditions_digest="" if preconditions is None else preconditions.digest,
             approval_id=approval_id,
             release_evidence_digest=self._release_digest(),
+            assurance_digest=quorum_digest,
             ttl_seconds=ttl_seconds,
         )
 
