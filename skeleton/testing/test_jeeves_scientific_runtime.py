@@ -7,6 +7,7 @@ import pytest
 from skeleton.jeeves.agent.relational_memory import RelationalMemoryIndex
 from skeleton.jeeves.agent.context_pipeline import LayeredContextResolver, ResolutionPolicy
 from skeleton.jeeves.agent.evidence import EvidenceLedger
+from skeleton.jeeves.agent.interpretive_science import ScientificLensLab
 from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game import MemoryGameIndex, MemoryGamePolicy
 from skeleton.jeeves.agent.nuance_runtime import (
@@ -16,7 +17,18 @@ from skeleton.jeeves.agent.nuance_runtime import (
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import RunInputs
 from skeleton.jeeves.agent.scientific_runtime import ScientificJeevesRuntime
-from skeleton.jeeves.agent.types import Goal
+from skeleton.jeeves.agent.semantic_lenses import (
+    LensFamily,
+    SemanticFinding,
+    SemanticObservation,
+)
+from skeleton.jeeves.agent.semantic_plane import SemanticLensPlane
+from skeleton.jeeves.agent.types import (
+    AgentResult,
+    Goal,
+    TerminationReason,
+    Usage,
+)
 
 
 class TickClock:
@@ -56,7 +68,17 @@ def _compiler(clock: TickClock):
             maximum_tier=1,
         ),
     )
-    return memory, cards, relations, resolver, ScientificContextCompiler(resolver)
+    semantic_plane = SemanticLensPlane()
+    return (
+        memory,
+        cards,
+        relations,
+        resolver,
+        ScientificContextCompiler(
+            resolver,
+            semantic_plane=semantic_plane,
+        ),
+    )
 
 
 def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_workbench() -> None:
@@ -90,7 +112,20 @@ def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_wor
     assert payload["contract"]["interpretive_only"] is True
     assert payload["contract"]["semantic_readings_are_not_evidence"] is True
     assert payload["contract"]["relations_change_retrieval_priority_not_factual_trust"] is True
+    assert payload["contract"]["governed_semantic_plane"] is True
+    assert payload["contract"]["semantic_lens_weights_are_domain_scoped"] is True
+    assert payload["semantic_domain"] == "narrative-game-analysis"
+    assert payload["semantic_governance_fingerprint"]
     assert any(row["family"] == "film" for row in payload["lenses"])
+    assert payload["governed_semantic_lenses"]
+    assert all(
+        row["factual_assertion_authorized"] is False
+        for row in payload["governed_semantic_lenses"]
+    )
+    assert all(
+        row["causal_assertion_authorized"] is False
+        for row in payload["governed_semantic_lenses"]
+    )
     assert prior.card_id in {
         source_id
         for section in packet.sections
@@ -170,6 +205,7 @@ def test_scientific_runtime_resolves_first_then_captures_current_goal() -> None:
     assert card.content == inputs.goal.objective
     assert card.metadata["captured_run_id"] == "run-1"
     assert card.metadata["capture_boundary"] == "after_initial_plan_resolution"
+    assert card.metadata["domain"] == "narrative-game-analysis"
     assert card.metadata["is_evidence"] is False
 
     assert provider.requests
@@ -265,8 +301,94 @@ def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     assert runtime.context_resolver.memory is runtime.memory
     assert runtime.scientific_context.resolver is runtime.context_resolver
     assert runtime.nuance_runtime.resolver is runtime.context_resolver
+    assert runtime.scientific_context.semantic_plane is runtime.semantic_plane
+    assert runtime.lens_lab is runtime.semantic_plane.governance.registry.lab
     assert runtime.context_resolver.cards is runtime.memory_cards
     assert runtime.context_resolver.relations is runtime.relational_memory
+    summary = runtime.scientific_summary()
+    assert summary["semantic_plane_fingerprint"] == runtime.semantic_plane.fingerprint
+    assert summary["semantic_lens_count"] >= 100
+    assert summary["invariants"]["semantic_plane_is_governed"] is True
+
+
+def test_scientific_runtime_exposes_governed_semantic_analysis() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    observations = (
+        SemanticObservation(
+            "runtime-semantic-1",
+            "The deployment shows concept drift after a regime switch.",
+            0,
+            evidence_ids=("ev-runtime",),
+            tags=("concept drift", "regime"),
+        ),
+    )
+    finding = SemanticFinding(
+        finding_id="runtime-drift",
+        lens_key="concept_drift",
+        family=LensFamily.PREDICTIVE,
+        observation_ids=("runtime-semantic-1",),
+        interpretation="Concept drift is a candidate explanation.",
+        prediction="The held-out deployment window will preserve the drift.",
+        confidence=0.80,
+        ambiguity=0.20,
+        novelty=0.60,
+        evidence_ids=("ev-runtime",),
+    )
+
+    snapshot = runtime.analyze_semantics(
+        observations,
+        findings=(finding,),
+        requested=("concept_drift",),
+        domain="narrative-game-analysis",
+    )
+
+    assert snapshot.semantic_domain == "narrative-game-analysis"
+    assert snapshot.governance.domain == "narrative-game-analysis"
+    assert snapshot.forecasts
+    assert snapshot.target_fusions
+    assert snapshot.factual_assertion_authorized is False
+    assert snapshot.causal_assertion_authorized is False
+
+
+def test_scientific_runtime_can_share_lens_lab_and_preserves_result_metadata() -> None:
+    clock = TickClock()
+    lab = ScientificLensLab()
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        lens_lab=lab,
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    result = AgentResult(
+        run_id="run-science-result",
+        goal_id="goal-1",
+        success=True,
+        reason=TerminationReason.GOAL_REACHED,
+        answer="done",
+        usage=Usage(),
+        metadata={
+            "scientific": {"caller_owned": True},
+            "existing": 7,
+        },
+    )
+
+    decorated = runtime._decorate_scientific_result(result)
+
+    assert runtime.lens_lab is lab
+    assert runtime.semantic_plane.governance.registry.lab is lab
+    assert decorated.metadata["scientific"] == {"caller_owned": True}
+    assert decorated.metadata["existing"] == 7
+    assert "jeeves_scientific" in decorated.metadata
+    summary = decorated.metadata["jeeves_scientific"]
+    assert summary["semantic_plane_fingerprint"] == runtime.semantic_plane.fingerprint
+    assert summary["invariants"]["semantic_calibration_retains_forecast_custody"] is True
 
 
 def test_scientific_runtime_rebinds_relations_to_supplied_resolver_cards() -> None:
