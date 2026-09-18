@@ -77,6 +77,49 @@ def test_repository_python_sast_requires_every_configured_root(
     assert str(empty) in error
 
 
+def test_repository_python_sast_scans_live_skeleton_build_package(
+    tmp_path: Path, monkeypatch
+) -> None:
+    namespace = _scanner_namespace()
+    python_files = namespace["python_files"]
+    skeleton = tmp_path / "skeleton"
+    scripts = tmp_path / "scripts"
+    live_build = skeleton / "build"
+    generated_build = scripts / "build"
+    live_build.mkdir(parents=True)
+    generated_build.mkdir(parents=True)
+    scripts.mkdir(exist_ok=True)
+    (live_build / "incremental_graph.py").write_text("value = 1\n", encoding="utf-8")
+    (generated_build / "generated.py").write_text("value = 1\n", encoding="utf-8")
+    (scripts / "tool.py").write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setitem(python_files.__globals__, "REPO_ROOT", tmp_path)
+    monkeypatch.setitem(python_files.__globals__, "SCAN_ROOTS", (skeleton, scripts))
+
+    scanned = {path.relative_to(tmp_path).as_posix() for path in python_files()}
+
+    assert "skeleton/build/incremental_graph.py" in scanned
+    assert "scripts/tool.py" in scanned
+    assert "scripts/build/generated.py" not in scanned
+
+
+def test_repository_python_sast_redacts_unexpected_traversal_details(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    namespace = _scanner_namespace()
+    main = namespace["main"]
+
+    def broken_files():
+        raise OSError("sensitive mount detail")
+        yield  # pragma: no cover
+
+    monkeypatch.setitem(main.__globals__, "python_files", broken_files)
+
+    assert main() == 1
+    error = capsys.readouterr().err
+    assert "Repository Python SAST scan failed: OSError" in error
+    assert "sensitive mount detail" not in error
+
+
 def test_repository_python_sast_accepts_nonempty_clean_required_roots(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
