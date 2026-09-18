@@ -813,7 +813,7 @@ def test_strict_recovery_boundary_ambiguity_dominates_runtime_replan():
     assert not result.runtime_trust_matches
 
 
-def test_strict_recovery_terminal_failure_marks_failed():
+def test_strict_recovery_failed_attempt_without_terminal_evidence_requires_verification():
     backend, journal, receipts, store, recovery = recovery_environment("review")
     attempts = AIExecutionAttemptStore(backend)
     recovery, _ = _attempt_checkpoint(
@@ -829,9 +829,53 @@ def test_strict_recovery_terminal_failure_marks_failed():
         store,
         execution_attempts=attempts,
     )
+    assert result.action is RecoveryAction.REQUIRE_VERIFICATION
+    assert result.execution_attempt_recovery == "terminal_failure"
+    assert any(
+        "without terminal evidence" in reason
+        for reason in result.reasons
+    )
+
+
+def test_strict_recovery_failed_attempt_with_terminal_evidence_marks_failed():
+    backend, journal, receipts, store, recovery = recovery_environment("review")
+    attempts = AIExecutionAttemptStore(backend)
+    stored = attempts.reserve(
+        attempt_id="seal-failed-evidence",
+        session_id="session",
+        principal="alice",
+        worker_id="worker-1",
+        plan_fingerprint=fp("p"),
+        execution_seal_id="seal-failed-evidence",
+        runtime_trust_digest=fp("u"),
+        release_evidence_digest=fp("l"),
+        execution_backend_id="shell-service-host",
+    )
+    attempt = attempts.enter_boundary(stored.attempt).attempt
+    attempt = attempts.fail(
+        attempt,
+        error_type="ExecutionOrVerificationFailed",
+        terminal_evidence_digest=fp("z"),
+    ).attempt
+    recovery = replace(
+        recovery,
+        execution_attempt_id=attempt.attempt_id,
+        execution_attempt_authority_digest=attempt.authority_digest,
+    )
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        execution_attempts=attempts,
+    )
     assert result.action is RecoveryAction.MARK_FAILED
     assert result.execution_attempt_recovery == "terminal_failure"
-    assert any("terminal failure" in reason for reason in result.reasons)
+    assert any(
+        "terminal failure with terminal evidence" in reason
+        for reason in result.reasons
+    )
 
 
 def test_strict_recovery_abandoned_attempt_requires_replan():
@@ -955,3 +999,71 @@ def test_strict_recovery_report_exposes_attempt_evidence_fields():
     data = result.to_dict()
     assert data["execution_attempt_matches"] is True
     assert data["execution_attempt_recovery"] == "not_started"
+
+
+def test_strict_recovery_terminal_success_with_matching_evidence_does_not_strengthen_action():
+    backend, journal, receipts, store, recovery = recovery_environment("review")
+    attempts = AIExecutionAttemptStore(backend)
+    recovery, attempt = _attempt_checkpoint(
+        recovery,
+        attempts,
+        state=ExecutionAttemptState.SUCCEEDED,
+    )
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        execution_attempts=attempts,
+    )
+    assert result.action is RecoveryAction.RESUME_REVIEW
+    assert result.execution_attempt_matches
+    assert result.execution_attempt_recovery == "terminal_success"
+
+
+def test_strict_recovery_terminal_success_authority_tamper_is_manual_review():
+    backend, journal, receipts, store, recovery = recovery_environment("review")
+    attempts = AIExecutionAttemptStore(backend)
+    recovery, _ = _attempt_checkpoint(
+        recovery,
+        attempts,
+        state=ExecutionAttemptState.SUCCEEDED,
+    )
+    recovery = replace(
+        recovery,
+        execution_attempt_authority_digest=fp("x"),
+    )
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        receipts,
+        store,
+        execution_attempts=attempts,
+    )
+    assert result.action is RecoveryAction.MANUAL_REVIEW
+
+
+def test_strict_recovery_attempt_state_cannot_weaken_integrity_failure():
+    backend, journal, receipts, store, recovery = recovery_environment("review")
+    attempts = AIExecutionAttemptStore(backend)
+    recovery, _ = _attempt_checkpoint(
+        recovery,
+        attempts,
+        state=ExecutionAttemptState.SUCCEEDED,
+    )
+
+    class CorruptReceipts:
+        def verify(self):
+            return False
+
+    result = inspect(
+        StrictAIRecoveryManager(),
+        recovery,
+        journal,
+        CorruptReceipts(),
+        store,
+        execution_attempts=attempts,
+    )
+    assert result.action is RecoveryAction.MANUAL_REVIEW
