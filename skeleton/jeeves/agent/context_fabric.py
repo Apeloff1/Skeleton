@@ -60,7 +60,11 @@ class DeepContextRecord:
         )
         for name in ("trust", "confidence", "salience"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
-        object.__setattr__(self, "token_estimate", positive_int("token_estimate", max(1, self.token_estimate), maximum=10_000_000))
+        object.__setattr__(
+            self,
+            "token_estimate",
+            positive_int("token_estimate", self.token_estimate, maximum=10_000_000),
+        )
         object.__setattr__(self, "tags", tuple(sorted({str(value).casefold().strip() for value in self.tags if str(value).strip()})))
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
@@ -242,7 +246,7 @@ class MemoryManagerAdapter:
     ) -> tuple[DeepContextRecord, ...]:
         if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
             return ()
-        refs = {str(value) for value in source_refs}
+        refs = tuple(dict.fromkeys(str(value) for value in source_refs))
         records: list[DeepContextRecord] = []
         used = 0
         for source_ref in refs:
@@ -449,7 +453,7 @@ class CognitiveContextFabric:
         records: list[DeepContextRecord] = []
         stale: set[str] = set()
         resolved_refs: set[str] = set()
-        canonical_fingerprints: dict[tuple[SourceTier, str], set[str]] = {}
+        canonical_fingerprints: dict[tuple[SourceTier, str, str], set[str]] = {}
         budget_remaining = self.policy.maximum_tokens
 
         # Targeted canonical rehydration comes before any broad retrieval.
@@ -490,7 +494,7 @@ class CognitiveContextFabric:
                     for record in fetched:
                         if record.trust < self.policy.minimum_deep_trust:
                             continue
-                        if records and record.token_estimate > budget_remaining:
+                        if record.token_estimate > budget_remaining:
                             continue
                         records.append(record)
                         budget_remaining = max(0, budget_remaining - record.token_estimate)
@@ -549,7 +553,7 @@ class CognitiveContextFabric:
                 for record in found:
                     if record.trust < self.policy.minimum_deep_trust:
                         continue
-                    if records and record.token_estimate > budget_remaining:
+                    if record.token_estimate > budget_remaining:
                         continue
                     records.append(record)
                     budget_remaining = max(0, budget_remaining - record.token_estimate)
@@ -635,10 +639,10 @@ class CognitiveContextFabric:
 
     @staticmethod
     def _dedupe(records: Sequence[DeepContextRecord]) -> list[DeepContextRecord]:
-        by_key: dict[tuple[SourceTier, str], DeepContextRecord] = {}
+        by_key: dict[tuple[SourceTier, str, str], DeepContextRecord] = {}
         by_fingerprint: dict[str, DeepContextRecord] = {}
         for record in records:
-            key = (record.source_tier, record.source_ref)
+            key = (record.source_tier, record.source_provider, record.source_ref)
             prior = by_key.get(key)
             if prior is None or (
                 record.canonical,
