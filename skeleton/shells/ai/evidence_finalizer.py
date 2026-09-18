@@ -348,10 +348,8 @@ class AIExecutionEvidenceFinalizer:
                 raise RuntimeError(
                     "AI audit witness chain failed verification after publish"
                 )
-            self.audit_witnesses.require_current_root(
-                audit_root,
-                runtime_trust_digest=runtime_trust_digest,
-                release_evidence_digest=release_evidence_digest,
+            self.audit_witnesses.require_witness(
+                audit_witness,
             )
             if self.finalizations is not None and finalization is not None:
                 finalization = self.finalizations.advance(
