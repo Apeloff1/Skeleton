@@ -247,8 +247,9 @@ def _sensitive_callable_bindings(
 ) -> dict[str, str]:
     """Resolve unambiguous local aliases of callables already covered by policy.
 
-    Only direct single-assignment names are tracked. Reassigned names and
-    parameters are intentionally excluded to avoid guessing about dynamic state.
+    Only single-assignment names are tracked. Reassigned names and parameters
+    are intentionally excluded. Resolution is iterative so an alias of a proven
+    sensitive alias remains sensitive without guessing about dynamic state.
     """
     nodes = list(_scope_nodes(scope))
     stores = Counter(
@@ -257,23 +258,31 @@ def _sensitive_callable_bindings(
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
     )
     parameters = _parameter_names(scope)
-    candidates: dict[str, str] = {}
+    candidates: list[tuple[str, ast.AST]] = []
 
     for node in nodes:
         value = _assignment_value(node)
         if not isinstance(value, (ast.Name, ast.Attribute)):
             continue
-        target = canonical_name(value, aliases)
-        if target not in SENSITIVE_CALLABLES:
-            continue
         for name in _assigned_names(node):
-            candidates[name] = target
+            if stores[name] == 1 and name not in parameters:
+                candidates.append((name, value))
 
-    return {
-        name: target
-        for name, target in candidates.items()
-        if stores[name] == 1 and name not in parameters
-    }
+    resolved: dict[str, str] = {}
+    working = dict(aliases)
+    changed = True
+    while changed:
+        changed = False
+        for name, value in candidates:
+            if name in resolved:
+                continue
+            target = canonical_name(value, working)
+            if target not in SENSITIVE_CALLABLES:
+                continue
+            resolved[name] = target
+            working[name] = target
+            changed = True
+    return resolved
 
 
 def _requests_session_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
