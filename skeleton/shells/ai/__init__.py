@@ -36,6 +36,7 @@ from skeleton.shells.ai.distributed_session import DistributedAISessionStore, Di
 from skeleton.shells.ai.distributed_state import DistributedStateConflict, FencedLease, InMemoryFencedStore, LeaseConflict, VersionedValue
 from skeleton.shells.ai.diagnostics import AIDiagnosticFinding, AIDiagnosticsReport, AIDiagnosticSeverity, AIShellDiagnostics
 from skeleton.shells.ai.effects import EffectContract, EffectKind, EffectRegistry
+from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer, FinalizedAIExecutionEvidence
 from skeleton.shells.ai.eval_dataset import AIEvalCase, AIEvalDataset
 from skeleton.shells.ai.eval_runner import AIEvalCaseResult, AIEvalRun, AIEvalRunner
 from skeleton.shells.ai.evals import AIEvalScore, AIShellEvaluator
