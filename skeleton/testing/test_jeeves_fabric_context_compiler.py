@@ -419,6 +419,24 @@ def test_indexed_deep_result_is_used_by_next_fast_pass_without_tag_filtering() -
     assert compiler.last_fabric_snapshot()["ok"] is True
 
 
+def test_source_fingerprint_case_normalization_does_not_create_false_staleness() -> None:
+    namespace = _namespace()
+    record = _external_record(
+        content="case normalized canonical record",
+        fingerprint="ABCDEF" * 10 + "ABCD",
+        source_ref="case-normalized-ref",
+        provider="provider-a",
+    )
+    assert record.source_fingerprint == record.source_fingerprint.lower()
+
+    fabric = _external_fabric(record)
+    card = fabric.index_record(namespace.key, record, cue="case normalized canonical record")
+    result = fabric.retrieve(namespace.key, "case normalized canonical record")
+
+    assert card.card_id not in result.stale_card_ids
+    assert any(item.source_fingerprint == record.source_fingerprint for item in result.records)
+
+
 def test_deep_context_record_rejects_invalid_token_estimates() -> None:
     for value in (0, -1, True):
         with pytest.raises(AgentContractError, match="token_estimate"):
