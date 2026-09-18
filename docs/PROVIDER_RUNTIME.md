@@ -20,6 +20,23 @@ The contract covers:
 
 `ModelRuntime` is the registry and policy boundary. Adapters declare a `frozenset[ModelCapability]`; unsupported capabilities fail closed unless the caller explicitly opts into a documented fallback.
 
+## Routing and eval
+
+Issue #944 adds a product/runtime routing primitive on top of that execution boundary. `skeleton.frontier.model_routing.ModelRouter` selects among registered provider metadata by required capabilities, then executes through `ModelRuntime`. It is not a second planning plane and does not modify Supervisor, studio, or Jeeves model paths.
+
+The routing contract covers:
+
+- capability-based candidate filtering before any provider call;
+- deterministic fallback ordering (`priority`, estimated cost, timeout, then `provider_id`);
+- stable `ModelRouteRequest` / `ModelRouteResult` envelopes, including provenance;
+- bounded per-provider retries and an overall invocation deadline;
+- hard cost/output-token budgets that fail closed on exhaustion; and
+- redacted traces that must not retain secret material.
+
+Provider catalog entries are validated through `ProviderMetadata.from_mapping`. Missing keys, unknown keys, non-finite costs, empty identifiers, and adapters that lack claimed execution capabilities fail closed without mutating the catalog.
+
+`RouteEvalContract` judges routed results against expected status, selected provider, capabilities, provenance, and forbidden secret fragments. Offline fake-provider coverage lives in `tests/test_model_routing.py`.
+
 ## Adapters
 
 Two maintained dependency shapes are covered by the shared contract tests:
