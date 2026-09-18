@@ -36,10 +36,12 @@ SKIP_DIRS = {
 
 
 def python_files() -> Iterable[Path]:
-    """Yield repository Python files not already covered by the backend gate."""
+    """Yield required core/tooling Python files, failing closed on missing roots."""
     for root in SCAN_ROOTS:
         if not root.exists():
-            continue
+            raise OSError(f"required scan root missing: {root}")
+        if root.is_symlink():
+            raise OSError(f"required scan root must not be a symlink: {root}")
         for path in root.rglob("*.py"):
             if any(part in SKIP_DIRS for part in path.parts):
                 continue
@@ -63,11 +65,29 @@ def main() -> int:
         print(f"Repository Python SAST bootstrap failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
+    try:
+        files = list(python_files())
+    except OSError as exc:
+        print(f"Repository Python SAST scan failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+
     findings: list[str] = []
-    count = 0
-    for path in python_files():
-        count += 1
+    root_counts = {root: 0 for root in SCAN_ROOTS}
+    for path in files:
+        for root in SCAN_ROOTS:
+            try:
+                path.relative_to(root)
+            except ValueError:
+                continue
+            root_counts[root] += 1
+            break
         findings.extend(violations(path))
+
+    for root, count in root_counts.items():
+        if count == 0:
+            findings.append(
+                f"scanner coverage failure: no Python files scanned under {root.relative_to(REPO_ROOT)}"
+            )
 
     if findings:
         print("High-confidence repository Python SAST violations detected:", file=sys.stderr)
@@ -75,7 +95,14 @@ def main() -> int:
             print(f"  - {finding}", file=sys.stderr)
         return 1
 
-    print(f"Repository Python SAST gate passed ({count} core/tooling Python files).")
+    print(
+        f"Repository Python SAST gate passed ({len(files)} core/tooling Python files; "
+        + ", ".join(
+            f"{root.relative_to(REPO_ROOT)}={count}"
+            for root, count in root_counts.items()
+        )
+        + ")."
+    )
     return 0
 
 
