@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +14,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "check_security_prior
 SPEC = importlib.util.spec_from_file_location("check_security_priority_inventory", SCRIPT)
 assert SPEC and SPEC.loader
 inventory = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = inventory
 SPEC.loader.exec_module(inventory)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -154,10 +157,15 @@ class SecurityPriorityInventoryTests(unittest.TestCase):
         self.assertEqual(inventory.SEVERITY_POLICY, "unscored")
         self.assertEqual(inventory.INVENTORY_VERSION, 1)
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertNotIn("from skeleton", source)
-        self.assertNotIn("import skeleton", source)
-        self.assertNotIn("pydantic", source.lower())
-        self.assertNotIn("import pydantic", source)
+        tree = ast.parse(source)
+        imported: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.extend(alias.name.split(".", 1)[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.append(node.module.split(".", 1)[0])
+        self.assertNotIn("skeleton", imported)
+        self.assertNotIn("pydantic", imported)
 
     def test_scanner_load_does_not_pull_skeleton_or_pydantic(self) -> None:
         self.assertTrue(getattr(inventory, "__file__", "").endswith("check_security_priority_inventory.py"))
@@ -336,10 +344,15 @@ class SecurityPriorityInventoryTests(unittest.TestCase):
         self.assertEqual(len(duplicate_paths), len(set(duplicate_paths)))
 
     def test_main_json_exit_matches_violations(self) -> None:
-        code = inventory.main(["--root", str(self.root), "--json"])
+        from io import StringIO
+        from unittest import mock
+
+        with mock.patch("sys.stdout", new=StringIO()), mock.patch("sys.stderr", new=StringIO()):
+            code = inventory.main(["--root", str(self.root), "--json"])
         self.assertEqual(code, 0)
         _write(self.root, "skeleton/broken.py", b"\xff\xfe")
-        code = inventory.main(["--root", str(self.root)])
+        with mock.patch("sys.stdout", new=StringIO()), mock.patch("sys.stderr", new=StringIO()):
+            code = inventory.main(["--root", str(self.root)])
         self.assertEqual(code, 1)
 
 

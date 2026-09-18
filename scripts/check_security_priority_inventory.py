@@ -23,6 +23,7 @@ import os
 import re
 import stat
 import sys
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping, Sequence
@@ -422,7 +423,9 @@ def _collect_python_facts(path: Path, relative: str) -> _FileFacts:
             parse_error="UnicodeDecodeError",
         )
     try:
-        tree = ast.parse(text, filename=relative)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(text, filename=relative)
     except SyntaxError as exc:
         return _FileFacts(
             relative=relative,
