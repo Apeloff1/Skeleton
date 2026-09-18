@@ -196,7 +196,7 @@ class ProductControlPlane:
         binding = self.executors.resolve(p["capability_id"], p["action"]) if p else None
         projection = asdict(evidence)
         projection["pending_present"] = evidence.pending
-        projection["pending"] = p
+        projection["pending"] = evidence.pending
         projection["pending_operation"] = p
         projection["executor"] = (
             {
