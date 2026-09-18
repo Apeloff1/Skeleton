@@ -51,7 +51,6 @@ from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
 from .types import AgentContractError, json_safe, stable_fingerprint
 from .unknown_unknowns import (
     SurpriseScoutPolicy,
-    SurpriseScoutSnapshot,
     UnknownUnknownScout,
 )
 
