@@ -19,6 +19,7 @@ REPAIR = WORKFLOWS / "repair-intake.yml"
 AUTOMATION = WORKFLOWS / "pr-automation-index.yml"
 DRAIN = WORKFLOWS / "pr-obsolete-run-drain.yml"
 IDLE = WORKFLOWS / "idle-studio.yml"
+QUEUE_DRAIN = WORKFLOWS / "queue-drain.yml"
 
 
 def _replace_once(source: str, old: str, new: str) -> str:
@@ -49,6 +50,31 @@ def test_rejects_pr_automation_broader_branch_exclusion() -> None:
         "    branches-ignore:\n      - main\n      - release/**\n",
     )
     messages = "\n".join(violations_for_text(AUTOMATION.name, source))
+    assert "every completing head" in messages
+
+
+def test_queue_drain_may_wake_only_from_guarded_default_branch() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
+    assert "every completing head" not in messages
+    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in source
+
+
+def test_rejects_queue_drain_broader_or_unguarded_branch_filter() -> None:
+    source = _replace_once(
+        QUEUE_DRAIN.read_text(encoding="utf-8"),
+        "    branches: [main]\n",
+        "    branches: [release/**]\n",
+    )
+    messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
+    assert "every completing head" in messages
+
+    source = _replace_once(
+        QUEUE_DRAIN.read_text(encoding="utf-8"),
+        "github.event.workflow_run.head_branch == github.event.repository.default_branch",
+        "true",
+    )
+    messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
     assert "every completing head" in messages
 
 
