@@ -821,9 +821,68 @@ def test_eval_gated_policy_tuning_promotes_useful_extra_compute_safely() -> None
         allow_pass_losses=0,
     )
 
-    baseline = FrontierReasoningPolicy()
-    proposal = FrontierPolicyTuner().propose(baseline, recommendation, gate)
+    trial_evaluator = FrontierTrialEvaluator()
+    for case_index in range(2):
+        case_id = f"case:tune-passk-{case_index}"
+        for trial_index in range(2):
+            baseline_passed = trial_index == 0
+            trial_evaluator.observe(
+                EvalResult(
+                    case_id=case_id,
+                    run_id=f"run:tune-baseline-{case_index}-{trial_index}",
+                    score=0.80 if baseline_passed else 0.50,
+                    passed=baseline_passed,
+                    checks=(),
+                    result_fingerprint=stable_fingerprint(
+                        {"tune-baseline": case_index, "trial": trial_index}
+                    ),
+                ),
+                variant="baseline",
+                model_calls=2,
+                estimated_tokens=1000,
+            )
+            trial_evaluator.observe(
+                EvalResult(
+                    case_id=case_id,
+                    run_id=f"run:tune-frontier-{case_index}-{trial_index}",
+                    score=0.85,
+                    passed=True,
+                    checks=(),
+                    result_fingerprint=stable_fingerprint(
+                        {"tune-frontier": case_index, "trial": trial_index}
+                    ),
+                ),
+                variant="frontier",
+                model_calls=5,
+                estimated_tokens=3000,
+            )
+    trial_comparison = trial_evaluator.compare(k=1)
+    trial_gate = trial_evaluator.promotion_gate(
+        trial_comparison,
+        minimum_cases=2,
+        minimum_pass_at_k_delta=0.25,
+        minimum_mean_score_delta=0.0,
+        maximum_regression_rate=0.0,
+    )
 
+    baseline = FrontierReasoningPolicy()
+    blocked_without_trials = FrontierPolicyTuner().propose(
+        baseline,
+        recommendation,
+        gate,
+    )
+    proposal = FrontierPolicyTuner().propose(
+        baseline,
+        recommendation,
+        gate,
+        trial_gate=trial_gate,
+    )
+
+    assert blocked_without_trials.approved_for_trial is False
+    assert any(
+        "pass@k" in reason for reason in blocked_without_trials.reasons
+    )
+    assert trial_gate.passed is True
     assert proposal.approved_for_trial is True
     assert proposal.proposed_policy.maximum_normalized_entropy < baseline.maximum_normalized_entropy
     assert proposal.proposed_policy.verification_required_at is baseline.verification_required_at
