@@ -98,3 +98,19 @@ def test_queue_drain_reclaims_deleted_main_workflow_runs_only() -> None:
     ]
     assert "pull_request" not in helper
     assert "head_branch" in helper
+
+
+def test_queue_drain_force_cancels_provider_stuck_obsolete_runs() -> None:
+    workflow = _workflow_text()
+
+    assert "def post_with_retry(path):" in workflow
+    assert "def run_completed(run_id):" in workflow
+    assert "def cancel(run_id):" in workflow
+    assert "/actions/runs/{run_id}/force-cancel" in workflow
+    assert "status in {409, 422} and run_completed(run_id)" in workflow
+    assert "status in {409, 422} or status in retryable" in workflow
+    assert "forced in {409, 422} and run_completed(run_id)" in workflow
+
+    normal = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/cancel'")
+    force = workflow.index("f'/repos/{repo}/actions/runs/{run_id}/force-cancel'")
+    assert normal < force
