@@ -5,6 +5,9 @@ from dataclasses import replace
 import pytest
 
 from skeleton.jeeves.agent.epistemic_frontier import EpistemicFrontierEngine
+from skeleton.jeeves.agent.frontier_control_plane import (
+    FrontierCognitiveControlPlane,
+)
 from skeleton.jeeves.agent.semantic_frontier import (
     LensCompositionEngine,
     LensInteractionKind,
@@ -609,6 +612,32 @@ def test_unvalidated_topology_candidate_becomes_research_obligation() -> None:
     assert any(
         gap.obligation_id == obligation.obligation_id
         for gap in frontier.gaps
+    )
+
+
+def test_control_plane_ingests_topology_obligations_into_research_agenda() -> None:
+    _, _, candidate, lab = _system()
+    control = FrontierCognitiveControlPlane(clock=lambda: 1000.0)
+
+    frontier = control.map_semantic_topology_frontier(
+        lab,
+        limit=8,
+        minimum_candidate_score=0.0,
+    )
+
+    obligation = next(
+        item
+        for item in frontier.obligations
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+    assert frontier.gaps
+    agenda_items = control.research_agenda.items_for_obligation(
+        obligation.obligation_id
+    )
+    assert agenda_items
+    assert any(
+        item.obligation_id == obligation.obligation_id
+        for item in agenda_items
     )
 
 
