@@ -609,19 +609,21 @@ def _stable_callable_aliases(
 def _inspect_tool_json(text: str) -> list[Operation]:
     try:
         payload = json.loads(text)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
+        message = exc.msg if isinstance(exc, json.JSONDecodeError) else "nesting too deep"
         raise SandboxPolicyError(
             "tool payload failed to parse",
-            context={"msg": exc.msg},
+            context={"msg": message},
         ) from exc
     if not isinstance(payload, Mapping):
         raise SandboxPolicyError("tool payload must be an object")
     operations: list[Operation] = []
-    if "capabilities" in payload or "grants" in payload or "policy" in payload:
+    policy_path = _nested_policy_key(payload)
+    if policy_path is not None:
         operations.append(
             Operation(
                 OperationKind.POLICY_MUTATE,
-                "self-grant",
+                policy_path,
                 None,
                 "tool payload attempted policy mutation",
             )
@@ -635,6 +637,45 @@ def _inspect_tool_json(text: str) -> list[Operation]:
             Operation(OperationKind.PROCESS, name, SandboxCapability.PROCESS, "sensitive tool name")
         )
     return operations
+
+
+def _nested_policy_key(payload: object) -> Optional[str]:
+    """Return the first nested policy/grant key, while bounding JSON traversal."""
+    sensitive = frozenset(
+        {
+            "capability",
+            "capabilities",
+            "grant",
+            "grants",
+            "permission",
+            "permissions",
+            "policy",
+            "scope",
+            "scopes",
+        }
+    )
+    stack: list[tuple[str, object]] = [("$", payload)]
+    visits = 0
+    limit = MAX_OPERATIONS * 8
+    while stack:
+        path, value = stack.pop()
+        visits += 1
+        if visits > limit:
+            raise SandboxPolicyError(
+                "tool payload structure exceeds bound",
+                context={"visits": visits, "limit": limit},
+            )
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                key_text = str(key)
+                child_path = f"{path}.{key_text}"
+                if key_text.strip().lower() in sensitive:
+                    return child_path
+                stack.append((child_path, child))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                stack.append((f"{path}[{index}]", child))
+    return None
 
 
 def _inspect_prompt(text: str) -> list[Operation]:
