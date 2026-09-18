@@ -78,6 +78,9 @@ class AIExecutionFinalization:
     execution_attempt_authority_digest: str = ""
     runtime_trust_digest: str = ""
     release_evidence_digest: str = ""
+    require_recovery_checkpoint: bool = False
+    require_witness: bool = False
+    require_signed_evidence: bool = False
     session_evidence_digest: str = ""
     recovery_checkpoint_digest: str = ""
     audit_anchor_digest: str = ""
@@ -122,6 +125,13 @@ class AIExecutionFinalization:
                 name,
                 _digest(name, getattr(self, name), optional=True),
             )
+        for name in (
+            "require_recovery_checkpoint",
+            "require_witness",
+            "require_signed_evidence",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{name} must be bool")
         if len(self.execution_attempt_id) > 256:
             raise ValueError("execution_attempt_id too long")
         if bool(self.execution_attempt_id) != bool(
@@ -208,11 +218,26 @@ class AIExecutionFinalization:
                     "signed phase requires execution evidence chain node"
                 )
         if self.phase is FinalizationPhase.COMPLETE:
-            # Witness and signed bundle are optional capabilities.  The
-            # mandatory durable floor is session evidence + recovery checkpoint
-            # + signed audit anchor.
             if not self.audit_anchor_digest:
                 raise ValueError("complete finalization requires audit anchor")
+            if (
+                self.require_recovery_checkpoint
+                and not self.recovery_checkpoint_digest
+            ):
+                raise ValueError(
+                    "complete finalization requires recovery checkpoint"
+                )
+            if self.require_witness and not self.audit_witness_digest:
+                raise ValueError(
+                    "complete finalization requires audit witness"
+                )
+            if (
+                self.require_signed_evidence
+                and not self.execution_evidence_digest
+            ):
+                raise ValueError(
+                    "complete finalization requires signed execution evidence"
+                )
 
     @classmethod
     def derive_id(
@@ -251,6 +276,11 @@ class AIExecutionFinalization:
             ),
             "runtime_trust_digest": self.runtime_trust_digest,
             "release_evidence_digest": self.release_evidence_digest,
+            "require_recovery_checkpoint": (
+                self.require_recovery_checkpoint
+            ),
+            "require_witness": self.require_witness,
+            "require_signed_evidence": self.require_signed_evidence,
         }
 
     @property
@@ -365,6 +395,9 @@ class AIExecutionFinalizationStore:
         execution_attempt_authority_digest: str = "",
         runtime_trust_digest: str = "",
         release_evidence_digest: str = "",
+        require_recovery_checkpoint: bool = False,
+        require_witness: bool = False,
+        require_signed_evidence: bool = False,
         finalization_id: str = "",
     ) -> StoredExecutionFinalization:
         if not finalization_id:
@@ -386,6 +419,9 @@ class AIExecutionFinalizationStore:
             execution_attempt_authority_digest,
             runtime_trust_digest,
             release_evidence_digest,
+            require_recovery_checkpoint,
+            require_witness,
+            require_signed_evidence,
         )
         key = self.key(finalization_id)
         try:
