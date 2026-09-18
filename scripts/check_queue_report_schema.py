@@ -2,7 +2,7 @@
 """Versioned fail-closed queue-trend schema (#969 S010).
 
 Queue reports cover depth, age, cancellations, reruns, blockers, and avoided
-fanout for one window. This is ops queue *trends*, not morning-summary
+fanout for one window. This is ops queue *trends*, not morning item
 categories. Unknown fields, wrong types, negative counts, and missing evidence
 fail closed. Unique prefix: ``queue-report``.
 """

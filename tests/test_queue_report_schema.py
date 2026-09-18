@@ -50,11 +50,14 @@ def test_schema_contract_is_queue_trends_not_morning_categories() -> None:
         "blockers",
         "avoided_fanout",
     )
+    assert "items" not in DOCUMENT_FIELDS
+    assert "category" not in DOCUMENT_FIELDS
     source = (REPO_ROOT / "scripts" / "check_queue_report_schema.py").read_text(encoding="utf-8")
-    assert "morning-summary" not in source
     assert "CATEGORIES" not in source
     for category in ('"accepted"', '"rejected"', '"deferred"', '"flaky"', '"unlocked"'):
         assert category not in source
+    errors = validate_queue_report(["bad"])
+    assert errors and errors[0].startswith("queue-report ")
 
 
 def test_valid_document_has_no_violations() -> None:
