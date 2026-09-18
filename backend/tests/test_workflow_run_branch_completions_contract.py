@@ -78,6 +78,83 @@ def test_rejects_queue_drain_broader_or_unguarded_branch_filter() -> None:
     assert "every completing head" in messages
 
 
+
+
+def test_rejects_queue_drain_with_additional_unguarded_actions_writer() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    marker = "\n  wake-housekeeping:\n"
+    assert marker in source
+    injected = """
+  unsafe-extra-writer:
+    if: github.event_name == 'workflow_run'
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo unsafe
+
+"""
+    source = source.replace(marker, "\n" + injected + "  wake-housekeeping:\n", 1)
+    messages = "\n".join(
+        violations_for_text(QUEUE_DRAIN.name, source)
+    )
+    assert "every completing head" in messages
+
+
+def test_queue_drain_read_only_job_does_not_need_default_branch_guard() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    marker = "\n  wake-housekeeping:\n"
+    assert marker in source
+    injected = """
+  diagnostic-reader:
+    if: github.event_name == 'workflow_run'
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo diagnostic
+
+"""
+    source = source.replace(marker, "\n" + injected + "  wake-housekeeping:\n", 1)
+    messages = "\n".join(
+        violations_for_text(QUEUE_DRAIN.name, source)
+    )
+    assert "every completing head" not in messages
+
+
+def test_rejects_queue_drain_if_all_actions_write_jobs_lose_guard() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    guard = (
+        "github.event.workflow_run.head_branch == "
+        "github.event.repository.default_branch"
+    )
+    assert source.count(guard) >= 2
+    source = source.replace(guard, "true")
+    messages = "\n".join(
+        violations_for_text(QUEUE_DRAIN.name, source)
+    )
+    assert "every completing head" in messages
+
+
+def test_queue_drain_guard_contract_is_scoped_to_write_jobs() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    guard = (
+        "github.event.workflow_run.head_branch == "
+        "github.event.repository.default_branch"
+    )
+    assert source.count("actions: write") >= 2
+    assert source.count(guard) >= 2
+    messages = violations_for_text(
+        QUEUE_DRAIN.name,
+        source,
+    )
+    assert not any(
+        "every completing head" in message
+        for message in messages
+    )
+
 def test_rejects_automation_identity_from_first_pull_request_only() -> None:
     source = AUTOMATION.read_text(encoding="utf-8")
     source = _replace_once(
