@@ -10,6 +10,10 @@ from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.assurance_binding import AssuranceBinding
 from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttempt,
+    AIExecutionAttemptStore,
+)
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_fence import (
     AIExecutionFence,
@@ -73,6 +77,7 @@ class AIShellService:
         runtime_trust: AIRuntimeTrustGuard | None = None,
         authority_health: AIAuthorityHealthGuard | None = None,
         execution_fences: AIExecutionFenceManager | None = None,
+        execution_attempts: AIExecutionAttemptStore | None = None,
         worker_id: str = "",
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
@@ -81,11 +86,11 @@ class AIShellService:
             raise ValueError(
                 "execution fencing requires an assurance inspector"
             )
-        if execution_fences is not None and (
+        if (execution_fences is not None or execution_attempts is not None) and (
             not worker_id or len(worker_id) > 256
         ):
             raise ValueError(
-                "execution fencing requires a valid worker_id"
+                "distributed execution evidence requires a valid worker_id"
             )
         self.orchestrator = orchestrator
         self.diagnostics = diagnostics
@@ -97,6 +102,7 @@ class AIShellService:
         self.runtime_trust = runtime_trust
         self.authority_health = authority_health
         self.execution_fences = execution_fences
+        self.execution_attempts = execution_attempts
         self.worker_id = worker_id
         self._release_report: StartupReleaseReport | None = None
         self._runtime_trust_report: RuntimeTrustReport | None = None
