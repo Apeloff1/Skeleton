@@ -47,7 +47,11 @@ from .semantic_lenses import (
     TangentSeed,
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
-from .semantic_lens_topology import SemanticLensTopology, SemanticTopologySnapshot
+from .semantic_lens_topology import (
+    LensBridgeCandidate,
+    SemanticLensTopology,
+    SemanticTopologySnapshot,
+)
 from .semantic_plane_interactions import plane_interaction_rules
 from .semantic_depth_interactions import depth_interaction_rules
 from .semantic_prediction import (
@@ -117,6 +121,8 @@ class SemanticPlanePolicy:
     frontier_limit: int = 20
     frontier_max_per_axis: int = 3
     frontier_max_per_family: int = 3
+    topology_bridge_limit: int = 12
+    topology_bridge_minimum_score: float = 0.18
     require_selected_findings: bool = True
     require_observation_overlap: bool = True
     require_observation_subset: bool = True
@@ -133,12 +139,21 @@ class SemanticPlanePolicy:
             "frontier_limit",
             "frontier_max_per_axis",
             "frontier_max_per_family",
+            "topology_bridge_limit",
         ):
             object.__setattr__(
                 self,
                 name,
                 positive_int(name, getattr(self, name), maximum=10_000),
             )
+        object.__setattr__(
+            self,
+            "topology_bridge_minimum_score",
+            probability(
+                "topology_bridge_minimum_score",
+                self.topology_bridge_minimum_score,
+            ),
+        )
         object.__setattr__(self, "base_rate", probability("base_rate", self.base_rate))
 
 
@@ -187,6 +202,7 @@ class SemanticPlaneCoverage:
     topology_components: int
     topology_isolated_lenses: int
     topology_bridge_lenses: int
+    topology_candidate_bridges: int
     fingerprint: str
 
 
@@ -214,6 +230,7 @@ class SemanticPlaneSnapshot:
     tangent_ids: tuple[str, ...]
     frontier: FrontierSelection
     topology: SemanticTopologySnapshot
+    topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
@@ -678,6 +695,7 @@ class SemanticLensPlane:
         tangent_ids: Sequence[str],
         frontier: FrontierSelection,
         topology: SemanticTopologySnapshot,
+        topology_bridge_candidates: Sequence[LensBridgeCandidate],
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
             sorted({spec.family for spec in selection.lenses}, key=lambda item: item.value)
@@ -725,6 +743,9 @@ class SemanticLensPlane:
                 "tangents": sorted(tangent_ids),
                 "frontier": frontier.fingerprint,
                 "topology": topology.fingerprint,
+                "topology_bridge_candidates": [
+                    item.candidate_id for item in topology_bridge_candidates
+                ],
             }
         )
         return SemanticPlaneCoverage(
@@ -750,6 +771,7 @@ class SemanticLensPlane:
             topology_components=topology.component_count,
             topology_isolated_lenses=len(topology.isolated_lens_keys),
             topology_bridge_lenses=len(topology.bridge_lens_keys),
+            topology_candidate_bridges=len(topology_bridge_candidates),
             fingerprint=fingerprint,
         )
 
@@ -858,6 +880,11 @@ class SemanticLensPlane:
             fusion=fusion,
         ) and not bool(audit.rejected)
         topology = self.topology.snapshot
+        topology_bridge_candidates = self.topology.bridge_candidates(
+            limit=self.policy.topology_bridge_limit,
+            minimum_score=self.policy.topology_bridge_minimum_score,
+            focus_keys=tuple(spec.key for spec in selection.lenses),
+        )
         coverage = self._coverage(
             selection=selection,
             audit=audit,
@@ -869,6 +896,7 @@ class SemanticLensPlane:
             tangent_ids=tangent_ids,
             frontier=frontier,
             topology=topology,
+            topology_bridge_candidates=topology_bridge_candidates,
         )
         fingerprint = stable_fingerprint(
             {
@@ -890,6 +918,9 @@ class SemanticLensPlane:
                 "tangents": tangent_ids,
                 "frontier": frontier.fingerprint,
                 "topology": topology.fingerprint,
+                "topology_bridge_candidates": [
+                    item.candidate_id for item in topology_bridge_candidates
+                ],
                 "coverage": coverage.fingerprint,
                 "decision_feature_authorized": decision_feature_authorized,
                 "factual": False,
@@ -910,6 +941,7 @@ class SemanticLensPlane:
             tangent_ids=tangent_ids,
             frontier=frontier,
             topology=topology,
+            topology_bridge_candidates=topology_bridge_candidates,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
@@ -1047,6 +1079,8 @@ class SemanticLensPlane:
                     "frontier_limit": self.policy.frontier_limit,
                     "frontier_max_per_axis": self.policy.frontier_max_per_axis,
                     "frontier_max_per_family": self.policy.frontier_max_per_family,
+                    "topology_bridge_limit": self.policy.topology_bridge_limit,
+                    "topology_bridge_minimum_score": self.policy.topology_bridge_minimum_score,
                     "require_selected": self.policy.require_selected_findings,
                     "require_overlap": self.policy.require_observation_overlap,
                     "require_observation_subset": self.policy.require_observation_subset,
