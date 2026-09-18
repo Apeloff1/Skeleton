@@ -440,7 +440,7 @@ def evaluate_release_ready(
     if not document.artifacts:
         reasons.append("missing required artifacts")
     seen_ids: set[str] = set()
-    asset_ids = _asset_ids(document.asset_provenance)
+    asset_digests = _asset_digests(document.asset_provenance)
     for artifact in document.artifacts:
         if artifact.artifact_id in seen_ids:
             reasons.append(f"duplicate artifact id: {artifact.artifact_id}")
@@ -454,10 +454,16 @@ def evaluate_release_ready(
             _reasons_locator("artifact", artifact.locator, artifact.size, artifact.name)
         )
         reasons.extend(_reasons_upload(artifact))
-        if artifact.asset_id and artifact.asset_id not in asset_ids:
-            reasons.append(
-                f"artifact {artifact.artifact_id} references missing asset provenance {artifact.asset_id}"
-            )
+        if artifact.asset_id:
+            asset_digest = asset_digests.get(artifact.asset_id)
+            if asset_digest is None:
+                reasons.append(
+                    f"artifact {artifact.artifact_id} references missing asset provenance {artifact.asset_id}"
+                )
+            elif artifact.sha256 != asset_digest:
+                reasons.append(
+                    f"artifact {artifact.artifact_id} digest does not match asset provenance {artifact.asset_id}"
+                )
 
     reasons.extend(_consume_asset_provenance(document.asset_provenance, expected_commit=expected))
 
@@ -851,16 +857,18 @@ def _asset_manifest_validator():
     return _validate
 
 
-def _asset_ids(records: Sequence[Mapping[str, Any]]) -> set[str]:
-    ids: set[str] = set()
+def _asset_digests(records: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    digests: dict[str, str] = {}
     for record in records:
         if not isinstance(record, Mapping):
             continue
         identity = record.get("identity") if isinstance(record.get("identity"), Mapping) else record
+        content = record.get("content") if isinstance(record.get("content"), Mapping) else record
         asset_id = identity.get("asset_id") if isinstance(identity, Mapping) else None
-        if isinstance(asset_id, str):
-            ids.add(asset_id)
-    return ids
+        digest = content.get("sha256") if isinstance(content, Mapping) else None
+        if isinstance(asset_id, str) and isinstance(digest, str):
+            digests[asset_id] = digest
+    return digests
 
 
 def _sorted_asset_records(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
