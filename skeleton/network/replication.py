@@ -655,51 +655,31 @@ class _ReplicationCore:
                 "snapshot digest mismatch",
                 context={"sequence": packet.sequence},
             )
-        previous_sequence = self._sequence
-        self._entities = entities
-        self._sequence = packet.sequence
-        self._tick = tick
-        self._retain(
-            _HistoryFrame(
-                sequence=packet.sequence,
-                tick=tick,
-                kind="snapshot",
-                digest=expected_digest,
-                state_digest=expected_state,
-                entities=_clone(entities),
-                patches=(),
-                snapshot_entities=_clone(entities),
-                packet=packet,
+        prior = self._capture_ingest_state()
+        try:
+            previous_sequence = self._sequence
+            self._entities = entities
+            self._sequence = packet.sequence
+            self._tick = tick
+            self._retain(
+                _HistoryFrame(
+                    sequence=packet.sequence,
+                    tick=tick,
+                    kind="snapshot",
+                    digest=expected_digest,
+                    state_digest=expected_state,
+                    entities=_clone(entities),
+                    patches=(),
+                    snapshot_entities=_clone(entities),
+                    packet=packet,
+                )
             )
-        )
-        self._drop_buffer_through(packet.sequence)
-        applied = [packet.sequence]
-        applied.extend(self._drain_buffer())
-        outcome = (
-            DeliveryOutcome.INITIALIZED if previous_sequence == 0 else DeliveryOutcome.APPLIED
-        )
-        reconciliation = _reconcile_predictions(
-            predictions,
-            tick=self._tick,
-            sequence=self._sequence,
-            confirmed_entities=self._entities,
-        )
-        return self._result(
-            outcome,
-            packet.sequence,
-            tuple(applied),
-            self.digest,
-            "snapshot applied",
-            reconciliation,
-        )
-
-    def _ingest_delta(
-        self, packet: Packet, predictions: list[_Prediction] | None
-    ) -> IngestResult:
-        if packet.sequence == self._sequence + 1:
+            self._drop_buffer_through(packet.sequence)
             applied = [packet.sequence]
-            self._apply_delta_packet(packet)
             applied.extend(self._drain_buffer())
+            outcome = (
+                DeliveryOutcome.INITIALIZED if previous_sequence == 0 else DeliveryOutcome.APPLIED
+            )
             reconciliation = _reconcile_predictions(
                 predictions,
                 tick=self._tick,
@@ -707,13 +687,43 @@ class _ReplicationCore:
                 confirmed_entities=self._entities,
             )
             return self._result(
-                DeliveryOutcome.APPLIED,
+                outcome,
                 packet.sequence,
                 tuple(applied),
                 self.digest,
-                "delta applied",
+                "snapshot applied",
                 reconciliation,
             )
+        except BaseException:
+            self._restore_ingest_state(prior)
+            raise
+
+    def _ingest_delta(
+        self, packet: Packet, predictions: list[_Prediction] | None
+    ) -> IngestResult:
+        if packet.sequence == self._sequence + 1:
+            prior = self._capture_ingest_state()
+            try:
+                applied = [packet.sequence]
+                self._apply_delta_packet(packet)
+                applied.extend(self._drain_buffer())
+                reconciliation = _reconcile_predictions(
+                    predictions,
+                    tick=self._tick,
+                    sequence=self._sequence,
+                    confirmed_entities=self._entities,
+                )
+                return self._result(
+                    DeliveryOutcome.APPLIED,
+                    packet.sequence,
+                    tuple(applied),
+                    self.digest,
+                    "delta applied",
+                    reconciliation,
+                )
+            except BaseException:
+                self._restore_ingest_state(prior)
+                raise
         gap = packet.sequence - self._sequence - 1
         if gap <= 0:
             return self._result(
@@ -822,6 +832,49 @@ class _ReplicationCore:
 
     def _drop_buffer_through(self, sequence: int) -> None:
         self._buffer = {seq: packet for seq, packet in self._buffer.items() if seq > sequence}
+
+    def _capture_ingest_state(self) -> tuple[
+        dict[str, Any],
+        int,
+        int,
+        list[_HistoryFrame],
+        dict[int, Packet],
+        int,
+    ]:
+        return (
+            _clone(self._entities),
+            self._sequence,
+            self._tick,
+            list(self._history),
+            dict(self._buffer),
+            self._last_received,
+        )
+
+    def _restore_ingest_state(
+        self,
+        state: tuple[
+            dict[str, Any],
+            int,
+            int,
+            list[_HistoryFrame],
+            dict[int, Packet],
+            int,
+        ],
+    ) -> None:
+        (
+            entities,
+            sequence,
+            tick,
+            history,
+            buffer,
+            last_received,
+        ) = state
+        self._entities = _clone(entities)
+        self._sequence = sequence
+        self._tick = tick
+        self._history = list(history)
+        self._buffer = dict(buffer)
+        self._last_received = last_received
 
     def _retain(self, frame: _HistoryFrame) -> None:
         self._history.append(frame)
