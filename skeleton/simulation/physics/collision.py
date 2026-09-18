@@ -1,10 +1,10 @@
 """Deterministic broad-phase and analytic narrow-phase collision detection.
 
 The narrow phase emits bounded contact manifolds with stable geometric feature
-identity.  OBB-vs-OBB uses all 15 separating axes.  Face contacts use
-reference/incident face clipping and deterministic four-point reduction; edge
-contacts retain a single bounded fallback point until the later edge-edge closest
-segment solver lands.
+identity. OBB-vs-OBB uses all 15 separating axes. Face contacts use
+reference/incident face clipping and deterministic four-point reduction, while
+edge contacts use finite closest-segment geometry. Capsule/cylinder pairings use
+the bounded convex support-map kernel without replacing proven analytic paths.
 """
 from __future__ import annotations
 
@@ -13,10 +13,18 @@ import math
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
+from .convex import convex_penetration
 from .errors import PhysicsValidationError, UnsupportedCollisionError
 from .materials import ContactMaterial, combine_materials
 from .math3d import EPSILON, AABB, Vec3
-from .shapes import BoxShape, PlaneShape, ShapeKind, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    CylinderShape,
+    PlaneShape,
+    ShapeKind,
+    SphereShape,
+)
 
 _AXIS_EPSILON_SQ = 1.0e-16
 _CONTACT_POSITION_EPSILON_SQ = 1.0e-18
@@ -916,6 +924,73 @@ def _plane_box(plane: RigidBody, box: RigidBody) -> ContactManifold | None:
     )
 
 
+def _plane_support_convex(
+    plane: RigidBody,
+    convex: RigidBody,
+) -> ContactManifold | None:
+    plane_shape = plane.shape
+    assert isinstance(plane_shape, PlaneShape)
+    assert isinstance(convex.shape, (CapsuleShape, CylinderShape))
+
+    normal, offset = plane_shape.world_equation(plane.transform)
+    deepest = convex.shape.support(-normal, convex.transform)
+    signed_distance = normal.dot(deepest) - offset
+    if signed_distance > EPSILON:
+        return None
+
+    penetration = max(0.0, -signed_distance)
+    projected = deepest - normal * signed_distance
+    point = (deepest + projected) * 0.5
+    feature = f"plane-{convex.shape.kind.value}:support"
+    return ContactManifold(
+        plane.body_id,
+        convex.body_id,
+        normal,
+        (ContactPoint(point, penetration, feature),),
+        _contact_material(plane, convex),
+    )
+
+
+def _convex_convex(
+    a: RigidBody,
+    b: RigidBody,
+) -> ContactManifold | None:
+    penetration = convex_penetration(
+        a,
+        b,
+        gjk_iterations=64,
+        epa_iterations=96,
+        tolerance=1.0e-6,
+    )
+    if penetration is None:
+        return None
+
+    normal = penetration.normal
+    center_delta = b.position - a.position
+    if (
+        center_delta.length_squared() > _AXIS_EPSILON_SQ
+        and center_delta.dot(normal) < 0.0
+    ):
+        normal = -normal
+
+    feature = (
+        f"convex:{a.shape.kind.value}:{b.shape.kind.value}:primary"
+    )
+    return ContactManifold(
+        a.body_id,
+        b.body_id,
+        normal,
+        (
+            ContactPoint(
+                penetration.contact_point,
+                penetration.depth,
+                feature,
+            ),
+        ),
+        _contact_material(a, b),
+    )
+
+
 def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
     """Return one deterministic bounded manifold for a supported body pair."""
 
@@ -943,6 +1018,26 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
         return None if result is None else result.flipped()
     if kind_a is ShapeKind.PLANE and kind_b is ShapeKind.PLANE:
         return None
+
+    round_convex = {ShapeKind.CAPSULE, ShapeKind.CYLINDER}
+    if kind_a is ShapeKind.PLANE and kind_b in round_convex:
+        return _plane_support_convex(a, b)
+    if kind_b is ShapeKind.PLANE and kind_a in round_convex:
+        result = _plane_support_convex(b, a)
+        return None if result is None else result.flipped()
+
+    finite_convex = {
+        ShapeKind.SPHERE,
+        ShapeKind.BOX,
+        ShapeKind.CAPSULE,
+        ShapeKind.CYLINDER,
+    }
+    if (
+        kind_a in finite_convex
+        and kind_b in finite_convex
+        and (kind_a in round_convex or kind_b in round_convex)
+    ):
+        return _convex_convex(a, b)
 
     raise UnsupportedCollisionError(
         f"unsupported collision pair: {kind_a.value}/{kind_b.value}"
