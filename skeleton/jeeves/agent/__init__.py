@@ -190,6 +190,11 @@ from .frontier_feedback import (
     FrontierFeedbackSample,
     FrontierReasoningFeedback,
 )
+from .frontier_policy_tuning import (
+    FrontierPolicyBounds,
+    FrontierPolicyProposal,
+    FrontierPolicyTuner,
+)
 from .frontier_reasoning import (
     CandidateAssessment as FrontierCandidateAssessment,
     EscalationCause as FrontierEscalationCause,
