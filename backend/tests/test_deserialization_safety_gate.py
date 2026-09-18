@@ -88,6 +88,14 @@ def test_rejects_stable_deserializer_module_alias_chain(tmp_path: Path) -> None:
     assert any("weights_only=True" in finding for finding in findings)
 
 
+def test_rejects_stable_tracked_submodule_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import joblib.numpy_pickle as jp\ncodec = jp\nvalue = codec.load(path)\n",
+    )
+    assert any("joblib.numpy_pickle.load() is forbidden" in finding for finding in findings)
+
+
 def test_reassigned_deserializer_module_alias_is_not_inferred(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
