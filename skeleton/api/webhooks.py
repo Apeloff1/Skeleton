@@ -15,10 +15,12 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from skeleton.kernel.errors import KernelError
+from skeleton.security.outbound_url import validate_public_https_url
 
 
 class WebhookError(KernelError):
     code = "API.WEBHOOK"
+    http_status = 400
 
 
 @dataclass
@@ -46,6 +48,16 @@ class WebhookDispatcher:
         self._deliveries = 0
 
     def subscribe(self, subscription: Subscription) -> None:
+        try:
+            safe_endpoint, _ = validate_public_https_url(
+                subscription.endpoint,
+                purpose="webhook endpoint",
+            )
+        except ValueError as exc:
+            raise WebhookError("invalid webhook endpoint") from exc
+        if not isinstance(subscription.secret, bytes) or len(subscription.secret) < 16:
+            raise WebhookError("webhook secret must be at least 16 bytes")
+        subscription.endpoint = safe_endpoint
         self._subscriptions.append(subscription)
 
     def dispatch(self, event_type: str, payload: Dict[str, Any]) -> int:
