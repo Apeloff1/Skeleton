@@ -36,6 +36,7 @@ MAX_TICK: Final = 1_000_000
 MAX_TOKEN_CHARS: Final = 64
 MAX_PAYLOAD_KEYS: Final = 8
 MAX_CANONICAL_DEPTH: Final = 16
+MAX_CANONICAL_ITEMS: Final = 256
 MAX_DAMAGE: Final = 10_000
 MAX_XP: Final = 1_000_000
 MAX_DELTA: Final = 1_000_000
@@ -1197,7 +1198,14 @@ def _canonical_json_value(value: Any, *, depth: int = 0) -> Any:
             "replay payload is not canonical JSON",
             context={"reason": "non_canonical_json", "error": "nesting"},
         )
-    if value is None or isinstance(value, str):
+    if value is None:
+        return value
+    if isinstance(value, str):
+        if len(value) > MAX_TRACE_BYTES:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "string_bound"},
+            )
         return value
     if isinstance(value, bool):
         return value
@@ -1211,6 +1219,11 @@ def _canonical_json_value(value: Any, *, depth: int = 0) -> Any:
             )
         return value
     if isinstance(value, Mapping):
+        if len(value) > MAX_CANONICAL_ITEMS:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "object_bound"},
+            )
         canonical: dict[str, Any] = {}
         for key, item in value.items():
             if not isinstance(key, str):
@@ -1226,6 +1239,11 @@ def _canonical_json_value(value: Any, *, depth: int = 0) -> Any:
             canonical[key] = _canonical_json_value(item, depth=depth + 1)
         return canonical
     if isinstance(value, (list, tuple)):
+        if len(value) > MAX_CANONICAL_ITEMS:
+            raise GameReplayError(
+                "replay payload is not canonical JSON",
+                context={"reason": "non_canonical_json", "error": "list_bound"},
+            )
         return [_canonical_json_value(item, depth=depth + 1) for item in value]
     raise GameReplayError(
         "replay payload is not canonical JSON",
