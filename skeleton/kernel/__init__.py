@@ -29,6 +29,7 @@ from skeleton.kernel.primitives import (
     VectorClock,
 )
 from skeleton.kernel.causality import CausalGraph, CausalGraphError, CausalNode, CausalPath
+from skeleton.kernel.work_queue import SubmitterCapError
 
 __all__ = [
     "SkeletonError",
@@ -47,4 +48,5 @@ __all__ = [
     "Invariant",
     "InvariantLattice",
     "CapabilityRegistry",
+    "SubmitterCapError",
 ]

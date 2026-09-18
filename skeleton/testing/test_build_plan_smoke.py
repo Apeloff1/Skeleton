@@ -112,19 +112,19 @@ def test_pipeline_stages_optional_and_ordered():
         def execute(self, q, top_k=None):
             from skeleton.retrieval.fusion import ScoredResult
             return [
-                ScoredResult(item_id="a", score=1.0, source="x", metadata={"preview": "alpha"}),
-                ScoredResult(item_id="b", score=0.5, source="y", metadata={"preview": "beta"}),
+                ScoredResult(fragment_id="a", content="alpha", score=1.0, plane="x", metadata={"preview": "alpha"}),
+                ScoredResult(fragment_id="b", content="beta", score=0.5, plane="y", metadata={"preview": "beta"}),
             ]
 
     # no stages → planner output straight through (back-compat)
     plain = SearchPipeline(FakePlanner()).search("q")
-    assert [r.item_id for r in plain.results] == ["a", "b"]
+    assert [r.fragment_id for r in plain.results] == ["a", "b"]
 
     # rule-boost stage flips the order
     from skeleton.retrieval.rerank import Reranker, RerankRule
-    boost_b = Reranker([RerankRule("b", lambda it: it.item_id == "b", boost=10.0)])
+    boost_b = Reranker([RerankRule("b", lambda it: it.fragment_id == "b", boost=10.0)])
     staged = SearchPipeline(FakePlanner(), rule_reranker=boost_b).search("q")
-    assert staged.results[0].item_id == "b"
+    assert staged.results[0].fragment_id == "b"
 
 
 # ── memory (prefix renderer + warmer persistence, B2/B3/B4b) ─────────────
