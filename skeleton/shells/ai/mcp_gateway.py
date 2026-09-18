@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from skeleton.shells.ai.mcp import MCPRequestEnvelope, MCPResponseEnvelope, MCPToolSurface
 from skeleton.shells.ai.mcp_authz import MCPAuthorization
+from skeleton.shells.ai.mcp_replay import MCPReplayGuard
 from skeleton.shells.ai.types import AIAction
 
 
@@ -31,9 +32,12 @@ class MCPAIShellGateway:
         self,
         tools: MCPToolSurface,
         authorization: MCPAuthorization,
+        *,
+        replay_guard: MCPReplayGuard | None = None,
     ) -> None:
         self.tools = tools
         self.authorization = authorization
+        self.replay_guard = replay_guard
 
     def list_tools(self) -> MCPResponseEnvelope:
         listing = self.tools.list_tools()
@@ -80,4 +84,9 @@ class MCPAIShellGateway:
             timeout_seconds=timeout,
             purpose=str(args.get("purpose", "")),
         )
+        if self.replay_guard is not None:
+            self.replay_guard.admit(
+                request,
+                principal=principal,
+            )
         return MCPPreparedToolCall(request, principal, action)
