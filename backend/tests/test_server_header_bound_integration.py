@@ -34,6 +34,11 @@ def test_header_bound_guard_is_registered_once_at_final_middleware_boundary() ->
     assert guard < source.index("# SOTA 2026 Feature Routes")
 
 
+    trailing = source[guard + len(marker):]
+    assert "app.add_middleware(" not in trailing
+    assert '@app.middleware("http")' not in trailing
+
+
 def test_header_bound_guard_uses_canonical_security_primitive() -> None:
     source = _server_source()
     assert (
