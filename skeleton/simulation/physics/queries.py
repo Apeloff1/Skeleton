@@ -5,11 +5,13 @@ import math
 from dataclasses import dataclass
 
 from .body import RigidBody
+from .convex import convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
@@ -329,6 +331,75 @@ def _cylinder_intersection(
     )
 
 
+def _convex_hull_intersection(
+    ray: Ray,
+    body: RigidBody,
+    shape: ConvexHullShape,
+) -> RayHit | None:
+    """Clip a ray against the hull's exact oriented face half-spaces."""
+
+    local_origin = body.transform.inverse_transform_point(ray.origin)
+    local_direction = body.transform.inverse_transform_vector(
+        ray.direction
+    ).normalized()
+    interior = Vec3.zero()
+    for vertex in shape.vertices:
+        interior = interior + vertex
+    interior = interior / float(len(shape.vertices))
+
+    enter = 0.0
+    exit_distance = ray.max_distance
+    enter_normal: Vec3 | None = None
+    tolerance = max(1.0e-10, ray.max_distance * 1.0e-12)
+
+    for face_index, (i, j, k) in enumerate(shape.faces):
+        a = shape.vertices[i]
+        b = shape.vertices[j]
+        d = shape.vertices[k]
+        normal = (b - a).cross(d - a).normalized()
+        if normal.dot(interior - a) > 0.0:
+            normal = -normal
+
+        signed_origin = normal.dot(local_origin - a)
+        denominator = normal.dot(local_direction)
+
+        if abs(denominator) <= EPSILON:
+            if signed_origin > tolerance:
+                return None
+            continue
+
+        distance = -signed_origin / denominator
+        if denominator < 0.0:
+            if distance > enter:
+                enter = distance
+                enter_normal = normal
+        else:
+            exit_distance = min(exit_distance, distance)
+
+        if enter > exit_distance + tolerance:
+            return None
+
+    if exit_distance < -tolerance or enter > ray.max_distance + tolerance:
+        return None
+
+    distance = min(ray.max_distance, max(0.0, enter))
+    if enter_normal is None or distance <= tolerance:
+        # Origin is inside/on the hull. Follow existing box/capsule query
+        # semantics and return a normal opposing travel.
+        world_normal = -ray.direction
+    else:
+        world_normal = body.transform.transform_vector(
+            enter_normal
+        ).normalized()
+
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        world_normal,
+    )
+
+
 def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
     shape = body.shape
     if isinstance(shape, SphereShape):
@@ -341,6 +412,8 @@ def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
         return _capsule_intersection(ray, body, shape)
     if isinstance(shape, CylinderShape):
         return _cylinder_intersection(ray, body, shape)
+    if isinstance(shape, ConvexHullShape):
+        return _convex_hull_intersection(ray, body, shape)
     raise PhysicsValidationError("unsupported raycast shape")
 
 
@@ -550,6 +623,51 @@ def _sphere_cast_cylinder(
     return make_hit(high)
 
 
+def _sphere_cast_convex_hull(
+    ray: Ray,
+    radius: float,
+    body: RigidBody,
+    shape: ConvexHullShape,
+) -> RayHit | None:
+    """Exact support-map sphere cast against a hull at its current transform."""
+
+    query_sphere = RigidBody.kinematic(
+        "__query_sphere__",
+        SphereShape(radius),
+        position=ray.origin,
+        linear_velocity=ray.direction * ray.max_distance,
+    )
+    target = RigidBody.static(
+        "__query_hull__",
+        shape,
+        position=body.position,
+        orientation=body.orientation,
+    )
+    hit = convex_time_of_impact(
+        query_sphere,
+        target,
+        1.0,
+        max_iterations=128,
+        distance_iterations=64,
+        distance_tolerance=max(1.0e-8, radius * 1.0e-8),
+        time_tolerance=1.0e-10,
+    )
+    if hit is None:
+        return None
+
+    distance = min(
+        ray.max_distance,
+        max(0.0, ray.max_distance * hit.fraction),
+    )
+    normal = -hit.normal
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        normal,
+    )
+
+
 def sphere_cast_body(
     ray: Ray,
     radius: float,
@@ -580,6 +698,8 @@ def sphere_cast_body(
         return _capsule_intersection(ray, body, expanded)
     if isinstance(shape, CylinderShape):
         return _sphere_cast_cylinder(ray, radius, body, shape)
+    if isinstance(shape, ConvexHullShape):
+        return _sphere_cast_convex_hull(ray, radius, body, shape)
     if isinstance(shape, PlaneShape):
         normal, offset = shape.world_equation(body.transform)
         signed_origin = normal.dot(ray.origin) - offset
