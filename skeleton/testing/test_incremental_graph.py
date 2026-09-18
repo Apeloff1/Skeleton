@@ -163,6 +163,26 @@ def test_fanout_invalidates_every_dependent_and_not_unrelated_siblings() -> None
     assert "other" not in stale
 
 
+def test_invalidation_bounds_seed_ingestion_and_dependent_walk() -> None:
+    graph = build_incremental_graph(
+        [
+            {"id": "root"},
+            {"id": "mid", "dependencies": ["root"]},
+            {"id": "leaf", "dependencies": ["mid"]},
+        ]
+    )
+
+    with pytest.raises(IncrementalGraphError, match="visit bound"):
+        graph.invalidate(("root" for _ in range(4)), max_visits=3)
+
+    with pytest.raises(IncrementalGraphError, match="visit bound"):
+        graph.invalidate(["root"], max_visits=2)
+
+    assert graph.invalidate(["root"], max_visits=3) == frozenset(
+        {"root", "mid", "leaf"}
+    )
+
+
 def test_changed_inputs_invalidate_only_dependent_nodes() -> None:
     original = build_incremental_graph(
         [
