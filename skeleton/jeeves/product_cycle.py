@@ -371,10 +371,52 @@ def run_cycle(stimulus: str = "", *, host: Any | None = None, **kwargs: Any) -> 
     return ProductCycle(host).cycle(stimulus, **kwargs)
 
 
+def _cycle_method(name: str):
+    def _method(self, stimulus: str = "", **kwargs: Any) -> dict[str, Any]:
+        cycle = ProductCycle(self)
+        card = getattr(cycle, name)(stimulus, **kwargs)
+        bus = getattr(self, "_bus", None)
+        if bus is not None and hasattr(bus, "emit"):
+            bus.emit(f"jeeves.{name}", {
+                "kind": card.get("kind"),
+                "law": card.get("law"),
+                "hit": card.get("hit"),
+            })
+        return card
+    _method.__name__ = name
+    _method.__doc__ = f"Lazy GB-12 {name} on tutor Jeeves."
+    return _method
+
+
+def bind_product_cycle(cls: Any | None = None) -> Any:
+    """Attach doctor/nervous/product/cycle onto tutor Jeeves without rewriting organs."""
+    if cls is None:
+        from skeleton.jeeves.core import Jeeves as cls
+    if getattr(cls, "_product_cycle_bound", False):
+        return cls
+    def _parse(self, stimulus: str = "") -> dict[str, Any]:
+        card = parse_pointers(stimulus)
+        bus = getattr(self, "_bus", None)
+        if bus is not None and hasattr(bus, "emit"):
+            bus.emit("jeeves.parse.pointers", {
+                "n": card.get("n"), "hit": card.get("hit"), "law": card.get("law"),
+            })
+        return card
+    cls.parse_pointers = _parse
+    for name in ("doctor", "nervous", "product", "cycle"):
+        setattr(cls, name, _cycle_method(name))
+    cls._product_cycle_bound = True
+    return cls
+
+
+bind_product_cycle()
+
+
 __all__ = (
     "CYCLE_VERSION",
     "N_CAP",
     "ProductCycle",
+    "bind_product_cycle",
     "parse_pointers",
     "run_cycle",
 )
