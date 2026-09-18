@@ -59,6 +59,28 @@ def test_integration_webhook_rejects_private_endpoint() -> None:
         system.subscribe("build", "https://127.0.0.1/hook", "s" * 32)
 
 
+def test_integration_webhook_rejects_weak_explicit_secret() -> None:
+    system = WebhookSystem()
+
+    with pytest.raises(ValueError, match="at least 16 bytes"):
+        system.subscribe("build", "https://hooks.example.com/events", "short")
+
+
+def test_integration_webhook_revalidates_mutated_endpoint_before_delivery() -> None:
+    seen: list[str] = []
+    system = WebhookSystem(sender=lambda url, _payload, _sig: seen.append(url) or True)
+    subscription = system.subscribe(
+        "build",
+        "https://hooks.example.com/events",
+        "s" * 32,
+    )
+    system.publish("build", {"ok": True})
+    subscription.url = "https://127.0.0.1/internal"
+
+    assert system.process_pending() == 0
+    assert seen == []
+
+
 def test_api_dispatcher_rejects_private_endpoint() -> None:
     dispatcher = WebhookDispatcher()
 
@@ -81,6 +103,20 @@ def test_api_dispatcher_rejects_weak_secret() -> None:
                 secret=b"short",
             )
         )
+
+
+def test_api_dispatcher_revalidates_mutated_endpoint_before_delivery() -> None:
+    seen: list[str] = []
+    dispatcher = WebhookDispatcher(sender=lambda url, _payload: seen.append(url))
+    subscription = ApiSubscription(
+        endpoint="https://hooks.example.com/events",
+        secret=b"x" * 32,
+    )
+    dispatcher.subscribe(subscription)
+    subscription.endpoint = "https://127.0.0.1/internal"
+
+    assert dispatcher.dispatch("build", {"ok": True}) == 0
+    assert seen == []
 
 
 def test_api_dispatcher_accepts_public_endpoint_and_dispatches() -> None:
