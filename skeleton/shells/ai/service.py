@@ -255,6 +255,16 @@ class AIShellService:
         pin = self._pins.get(session.session_id)
         if pin is None:
             raise RuntimeError("AI shell reviewed plan has no execution pin")
+        proposal = review.planning.response.proposal
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
         precondition_report = None
         precondition_digest = ""
         if preconditions is not None:
