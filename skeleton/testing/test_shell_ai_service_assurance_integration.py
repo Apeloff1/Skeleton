@@ -498,3 +498,68 @@ def test_assurance_policy_change_after_sealing_invalidates_seal(tmp_path):
         )
     assert not registry.used(seal.seal_id)
     assert service.orchestrator.shell_service.receipts.snapshot() == ()
+
+
+def test_assurance_only_approval_not_burned_by_unsealed_denial(tmp_path):
+    service, _ = build_service(
+        tmp_path,
+        medium_contract(),
+        auto_band=RiskBand.MEDIUM,
+    )
+    service.assurance = AIExecutionAssuranceInspector(
+        AIExecutionAssurancePolicy(
+            require_human_approval_bands=frozenset({RiskBand.MEDIUM})
+        )
+    )
+    session = service.new_session(intent(), session_id="approval-ordering")
+    review, _ = service.review(session)
+    proposal = review.planning.response.proposal
+    approval = service.orchestrator.approvals.approve(
+        principal="alice",
+        intent_fingerprint=session.intent.fingerprint,
+        proposal_fingerprint=proposal.fingerprint,
+        approved_by="operator",
+    )
+
+    with pytest.raises(RuntimeError, match="sealed execution"):
+        service.execute(
+            session,
+            review,
+            context=ExecutionContext("c1", principal="alice"),
+            approval=approval,
+        )
+
+    # The denied pre-dispatch attempt must not burn one-use authority.
+    service.orchestrator.approvals.require(
+        approval,
+        principal="alice",
+        intent_fingerprint=session.intent.fingerprint,
+        proposal_fingerprint=proposal.fingerprint,
+    )
+
+    authority = ExecutionSealAuthority(b"k" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+        approval=approval,
+    )
+    result, _, _ = service.execute_sealed(
+        session,
+        review,
+        context=ExecutionContext("c2", principal="alice"),
+        seal=seal,
+        seal_registry=registry,
+        approval=approval,
+    )
+    assert result.ok
+
+    with pytest.raises(AIApprovalError):
+        service.orchestrator.approvals.require(
+            approval,
+            principal="alice",
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
