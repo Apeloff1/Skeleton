@@ -54,6 +54,7 @@ def _run_get(
         "https://[::1]/feed",
         "https://224.0.0.1/feed",
         "https://[ff02::1]/feed",
+        "https://[fec0::1]/feed",
         "https://metadata.google.internal/computeMetadata/v1/",
         "https://user:password@example.com/feed",
     ],
@@ -235,8 +236,8 @@ def test_dns_rejection_happens_before_http_request(
 
 
 
-@pytest.mark.parametrize("address", ["224.0.0.1", "ff02::1"])
-def test_dns_policy_rejects_multicast_answers(
+@pytest.mark.parametrize("address", ["224.0.0.1", "ff02::1", "fec0::1"])
+def test_dns_policy_rejects_non_public_answers(
     address: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
