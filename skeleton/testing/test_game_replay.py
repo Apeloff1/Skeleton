@@ -174,13 +174,35 @@ def test_time_regression_fail_closed() -> None:
     assert caught.value.context["reason"] == "time_regression"
 
 
-def test_replay_rejects_tampered_result_digest() -> None:
+@pytest.mark.parametrize(
+    ("field", "expected_context_field"),
+    [
+        ("spec_digest", "spec_digest"),
+        ("state_digest", "state_digest"),
+        ("result_digest", "result_digest"),
+        ("step_digests", "step_digests"),
+    ],
+)
+def test_replay_rejects_tampered_digest_chain(
+    field: str,
+    expected_context_field: str,
+) -> None:
     recorded = _record()
     tampered = dict(recorded.to_canonical())
-    tampered["result_digest"] = "a" * 64
+    if field == "step_digests":
+        digests = list(tampered[field])
+        original = digests[0]
+        digests[0] = ("0" if original[0] != "0" else "1") + original[1:]
+        tampered[field] = digests
+    else:
+        original = str(tampered[field])
+        tampered[field] = ("0" if original[0] != "0" else "1") + original[1:]
+
     with pytest.raises(GameReplayError, match="divergent mechanics execution") as caught:
         _replay().replay(tampered)
+
     assert caught.value.context["reason"] == "divergence"
+    assert caught.value.context["field"] == expected_context_field
 
 
 def test_version_and_schema_mismatch_fail_closed() -> None:
