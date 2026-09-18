@@ -185,6 +185,7 @@ class AIShellService:
         preconditions: Preconditions | None = None,
         precondition_checker: PreconditionChecker | None = None,
         approval=None,
+        execution_backend: AIPlanExecutionBackend | None = None,
     ) -> tuple[AIExecutionBundle, PreconditionReport | None, SealUse]:
         """Execute only after preconditions and a single-use signed seal pass."""
 
@@ -216,6 +217,7 @@ class AIShellService:
             review,
             context=context,
             approval=approval,
+            execution_backend=execution_backend,
         )
         return result, precondition_report, use
 
@@ -226,6 +228,7 @@ class AIShellService:
         *,
         context: ExecutionContext,
         approval=None,
+        execution_backend: AIPlanExecutionBackend | None = None,
     ) -> AIExecutionBundle:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
@@ -254,6 +257,7 @@ class AIShellService:
                 review,
                 context=context,
                 approval=approval,
+                execution_backend=execution_backend,
             )
         finally:
             if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
@@ -265,4 +269,5 @@ class AIShellService:
             self.diagnostics.inspect().to_dict(),
             self.governance.snapshot().to_dict(),
             self.orchestrator.shell_service.state.phase.value,
+            None if self._release_report is None else self._release_report.to_dict(),
         )
