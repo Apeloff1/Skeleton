@@ -7,6 +7,10 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+concurrency:
+  group: bot-manager-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   manager:
     runs-on: ubuntu-latest
