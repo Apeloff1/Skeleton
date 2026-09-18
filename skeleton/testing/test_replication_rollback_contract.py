@@ -547,6 +547,23 @@ def test_ack_cannot_claim_future_authority_progress() -> None:
         authority.record_ack(packet)
 
 
+def test_ack_outside_retained_authority_history_fails_closed() -> None:
+    authority = Authority(history_limit=2)
+    first = authority.snapshot(0, {})
+    authority.mutate(1, (Patch.set("hero", {"x": 1}),))
+    authority.mutate(2, (Patch.set("hero", {"x": 2}),))
+
+    old = _ack_packet(
+        authority,
+        applied=first.sequence,
+        received=first.sequence,
+        digest=first.payload["digest"],
+        tick=first.payload["tick"],
+    )
+    with pytest.raises(HistoryExhaustedError, match="outside retained authority history"):
+        authority.record_ack(old)
+
+
 def test_ack_cannot_regress_or_lie_about_retained_frame() -> None:
     authority = Authority()
     first = authority.snapshot(0, {})
