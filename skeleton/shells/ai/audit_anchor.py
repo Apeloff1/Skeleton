@@ -31,6 +31,7 @@ class AIAuditAnchor:
     authority_health_policy_digest: str = ""
     execution_attempt_id: str = ""
     execution_attempt_authority_digest: str = ""
+    finalization_id: str = ""
     observed_at: float = 0.0
 
     def __post_init__(self) -> None:
@@ -65,6 +66,8 @@ class AIAuditAnchor:
             raise ValueError(
                 "execution attempt id and authority digest must be configured together"
             )
+        if len(self.finalization_id) > 256:
+            raise ValueError("finalization_id too long")
         if self.observed_at < 0:
             raise ValueError("audit anchor observed_at may not be negative")
 
@@ -87,6 +90,7 @@ class AIAuditAnchor:
             "execution_attempt_authority_digest": (
                 self.execution_attempt_authority_digest
             ),
+            "finalization_id": self.finalization_id,
             "observed_at": self.observed_at,
         }
 
@@ -154,6 +158,7 @@ class AIAuditAnchorStore:
         authority_health_policy_digest: str = "",
         execution_attempt_id: str = "",
         execution_attempt_authority_digest: str = "",
+        finalization_id: str = "",
     ) -> SignedAIAuditAnchor:
         anchor = AIAuditAnchor(
             1,
@@ -169,6 +174,7 @@ class AIAuditAnchorStore:
             authority_health_policy_digest,
             execution_attempt_id,
             execution_attempt_authority_digest,
+            finalization_id,
             self._clock(),
         )
         signature = self.signer.sign(
@@ -189,6 +195,79 @@ class AIAuditAnchorStore:
             node.node_hash,
         )
 
+    def find_by_finalization_id(
+        self,
+        finalization_id: str,
+    ) -> SignedAIAuditAnchor | None:
+        if not finalization_id or len(finalization_id) > 256:
+            raise ValueError("invalid finalization_id")
+        for item in self.snapshot():
+            if item.anchor.finalization_id == finalization_id:
+                return item
+        return None
+
+    def append_once(
+        self,
+        *,
+        finalization_id: str,
+        session_id: str,
+        checkpoint_digest: str,
+        provenance_digest: str,
+        journal_root: str,
+        receipt_root: str,
+        session_evidence_digest: str,
+        release_evidence_digest: str = "",
+        sandbox_binding_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
+        execution_attempt_id: str = "",
+        execution_attempt_authority_digest: str = "",
+    ) -> SignedAIAuditAnchor:
+        if not finalization_id or len(finalization_id) > 256:
+            raise ValueError("invalid finalization_id")
+        existing = self.find_by_finalization_id(finalization_id)
+        if existing is not None:
+            anchor = existing.anchor
+            expected = {
+                "session_id": session_id,
+                "checkpoint_digest": checkpoint_digest,
+                "provenance_digest": provenance_digest,
+                "journal_root": journal_root,
+                "receipt_root": receipt_root,
+                "session_evidence_digest": session_evidence_digest,
+                "release_evidence_digest": release_evidence_digest,
+                "sandbox_binding_digest": sandbox_binding_digest,
+                "runtime_trust_digest": runtime_trust_digest,
+                "authority_health_policy_digest": authority_health_policy_digest,
+                "execution_attempt_id": execution_attempt_id,
+                "execution_attempt_authority_digest": (
+                    execution_attempt_authority_digest
+                ),
+            }
+            for name, value in expected.items():
+                if getattr(anchor, name) != value:
+                    raise RuntimeError(
+                        f"finalization_id already binds different audit anchor {name}"
+                    )
+            return existing
+        return self.append(
+            session_id=session_id,
+            checkpoint_digest=checkpoint_digest,
+            provenance_digest=provenance_digest,
+            journal_root=journal_root,
+            receipt_root=receipt_root,
+            session_evidence_digest=session_evidence_digest,
+            release_evidence_digest=release_evidence_digest,
+            sandbox_binding_digest=sandbox_binding_digest,
+            runtime_trust_digest=runtime_trust_digest,
+            authority_health_policy_digest=authority_health_policy_digest,
+            execution_attempt_id=execution_attempt_id,
+            execution_attempt_authority_digest=(
+                execution_attempt_authority_digest
+            ),
+            finalization_id=finalization_id,
+        )
+
     @staticmethod
     def _anchor(raw: dict[str, object]) -> AIAuditAnchor:
         return AIAuditAnchor(
@@ -205,6 +284,7 @@ class AIAuditAnchorStore:
             str(raw.get("authority_health_policy_digest", "")),
             str(raw.get("execution_attempt_id", "")),
             str(raw.get("execution_attempt_authority_digest", "")),
+            str(raw.get("finalization_id", "")),
             float(raw["observed_at"]),
         )
 
