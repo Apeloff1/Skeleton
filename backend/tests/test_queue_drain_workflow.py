@@ -32,7 +32,7 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     assert "control_plane_paths = frozenset" in workflow
     assert "'.github/workflows/queue-drain.yml'" in workflow
     assert "'.github/workflows/pr-obsolete-run-drain.yml'" in workflow
-    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" not in workflow
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
     assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
 
@@ -43,3 +43,13 @@ def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
     assert 'workflows: ["Merge Readiness"]' in workflow
     assert 'workflows: ["Drain obsolete PR Actions"]' not in workflow
     assert "branches: [main]" in workflow
+
+
+def test_queue_drain_recovery_does_not_require_upstream_success() -> None:
+    workflow = _workflow_text()
+
+    assert "types: [completed]" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" not in workflow
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
+    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
+    assert "Any trusted terminal main Merge Readiness completion may wake recovery." in workflow
