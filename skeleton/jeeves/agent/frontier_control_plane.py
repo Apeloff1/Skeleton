@@ -347,6 +347,11 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
                 payload,
                 clock=self._clock,
             )
+            self._tournaments = {}
+            self._completion_certificates = {}
+            self._forecast_settlements = []
+            self._restored_frontier_audit = None
+            self._last_frontier_snapshot = None
             self._last_agenda_snapshot = self.research_agenda.snapshot()
             return self._last_agenda_snapshot
         if payload.get("version") != 2:
@@ -408,6 +413,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
                 )
             settlements.append(settlement)
         self._forecast_settlements = settlements
+        self._last_frontier_snapshot = None
         self._restored_frontier_audit = payload.get("frontier_audit")
 
         rebuilt = self.dump_research_state()
