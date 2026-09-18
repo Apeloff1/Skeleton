@@ -676,6 +676,14 @@ class SemanticLensPlane:
                 "semantic reasoning signals cannot carry factual/causal authority"
             )
 
+        if (
+            snapshot.runtime_state_fingerprint
+            != self.runtime_state_fingerprint
+        ):
+            raise AgentContractError(
+                "semantic reasoning snapshot state revision is stale"
+            )
+
         open_forecasts: list[SemanticForecast] = []
         for forecast in snapshot.forecasts:
             stored = self.prediction_ledger.get(forecast.forecast_id)
@@ -736,6 +744,10 @@ class SemanticLensPlane:
         return (
             signal.metadata.get("forecast_fingerprint")
             == stored.fingerprint
+            and signal.metadata.get(
+                "semantic_runtime_state_fingerprint"
+            )
+            == self.runtime_state_fingerprint
         )
 
     def _seed_family(self, seed: TangentSeed) -> LensFamily | None:
