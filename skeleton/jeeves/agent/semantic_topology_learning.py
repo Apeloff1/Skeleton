@@ -1254,6 +1254,15 @@ class SemanticTopologyLearningLab:
                 ),
                 symmetric=True,
                 tangent_axis_hint=axis_hint,
+                metadata={
+                    "rule_source": "learned_topology",
+                    "candidate_id": candidate.candidate_id,
+                    "candidate_fingerprint": report.candidate_fingerprint,
+                    "report_id": report.report_id,
+                    "report_fingerprint": report.fingerprint,
+                    "evidence_ceiling": "interpretive_only",
+                    "may_promote_to_evidence": False,
+                },
             )
             fingerprint = stable_fingerprint(
                 {
@@ -1266,6 +1275,7 @@ class SemanticTopologyLearningLab:
                         "question": rule.question,
                         "predictive_effect": rule.predictive_effect,
                         "axis": rule.tangent_axis_hint,
+                        "metadata": dict(rule.metadata),
                     },
                 }
             )
