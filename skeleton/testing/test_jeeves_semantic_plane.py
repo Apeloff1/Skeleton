@@ -5,8 +5,15 @@ from skeleton.jeeves.agent.lens_fusion import (
     LensFusionEngine,
     LensSignal,
 )
+from skeleton.jeeves.agent.interpretive_science import (
+    LensOutcomeTrial,
+    ScientificLensLab,
+    ScientificLensPolicy,
+    ScientificLensStatus,
+)
 from skeleton.jeeves.agent.lens_governance import (
     LensPermission,
+    LensScienceRegistry,
     ScientificGrade,
 )
 from skeleton.jeeves.agent.lens_hypergraph import SemanticLensHypergraph
@@ -376,6 +383,9 @@ def test_semantic_plane_resolution_feeds_scientific_calibration_ledger() -> None
     assert report.lens_key == "concept_drift"
     assert report.trial_count == 1
     assert report.independent_runs == 1
+    trial = plane.governance.registry.lab.trials("concept_drift")[0]
+    assert trial.source_forecast_id == forecast.forecast_id
+    assert trial.source_forecast_fingerprint == forecast.fingerprint
     assert len(update.fingerprint) == 64
     assert plane.fingerprint == contract_before
 
@@ -393,6 +403,172 @@ def test_semantic_plane_resolution_feeds_scientific_calibration_ledger() -> None
     assert decision is not None
     assert decision.scientific_status == report.status
     assert 0.0 <= decision.predictive_weight <= 1.0
+
+
+def test_semantic_plane_domain_weight_caps_unseen_transfer() -> None:
+    lab = ScientificLensLab(
+        policy=ScientificLensPolicy(
+            minimum_trials=4,
+            minimum_independent_runs=2,
+            minimum_domains_for_transfer=2,
+            minimum_transfer_trials_per_domain=2,
+            maximum_brier=0.25,
+            maximum_ece=0.20,
+            minimum_brier_gain_over_base_rate=0.01,
+        )
+    )
+    for trial_id, p, outcome, domain, run in (
+        ("drift:prod:1", 0.90, True, "production", "r1"),
+        ("drift:prod:2", 0.10, False, "production", "r2"),
+        ("drift:sim:1", 0.85, True, "simulation", "r1"),
+        ("drift:sim:2", 0.15, False, "simulation", "r2"),
+    ):
+        lab.record(
+            LensOutcomeTrial(
+                trial_id=trial_id,
+                lens_key="concept_drift",
+                probability=p,
+                outcome=outcome,
+                domain=domain,
+                independent_run=run,
+                proposition="concept drift changes the predictive relation",
+            )
+        )
+    bridge = SemanticGovernanceBridge(
+        LensScienceRegistry(lab=lab)
+    )
+    plane = SemanticLensPlane(governance=bridge)
+    finding = _finding(
+        "domain-drift",
+        "concept_drift",
+        LensFamily.PREDICTIVE,
+    )
+
+    observed = plane.analyze(
+        _observations(),
+        findings=(finding,),
+        requested=("concept_drift",),
+        domain="production",
+    )
+    unseen = plane.analyze(
+        _observations(),
+        findings=(finding,),
+        requested=("concept_drift",),
+        domain="unseen-deployment",
+    )
+
+    observed_decision = observed.governance.decision_for("concept_drift")
+    unseen_decision = unseen.governance.decision_for("concept_drift")
+    assert observed_decision is not None
+    assert unseen_decision is not None
+    assert observed_decision.scientific_status is ScientificLensStatus.ACTIVE
+    assert observed.governance.domain == "production"
+    assert observed.governance.domain_status_for("concept_drift") == "observed"
+    assert (
+        observed.governance.weight_for("concept_drift")
+        == observed.governance.global_weight_for("concept_drift")
+    )
+    assert unseen.governance.domain == "unseen-deployment"
+    assert unseen.governance.domain_status_for("concept_drift") == "unseen"
+    assert unseen.governance.weight_for("concept_drift") <= 0.10
+    assert (
+        unseen.governance.global_weight_for("concept_drift")
+        == observed.governance.global_weight_for("concept_drift")
+    )
+    assert observed.governance.fingerprint != unseen.governance.fingerprint
+
+
+def test_semantic_plane_target_fusion_never_pools_distinct_propositions() -> None:
+    observations = _observations()
+    plane = SemanticLensPlane()
+    findings = (
+        _finding(
+            "target-causal",
+            "backdoor_confounding",
+            LensFamily.CAUSAL,
+        ),
+        _finding(
+            "target-shift",
+            "covariate_shift",
+            LensFamily.PREDICTIVE,
+        ),
+    )
+    snapshot = plane.analyze(
+        observations,
+        findings=findings,
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+    finding_forecasts = {
+        item.source_finding_ids[0]: item
+        for item in snapshot.forecasts
+        if len(item.source_finding_ids) == 1
+    }
+    left = finding_forecasts["target-causal"]
+    right = finding_forecasts["target-shift"]
+
+    assert plane._forecast_target_key(left) != plane._forecast_target_key(right)
+    assert not any(
+        {left.forecast_id, right.forecast_id}.issubset(
+            set(group.forecast_ids)
+        )
+        for group in snapshot.target_fusions
+    )
+
+
+def test_semantic_plane_target_fusion_groups_identical_targets() -> None:
+    observations = _observations()
+    plane = SemanticLensPlane()
+    shared_prediction = (
+        "The next held-out observation will exhibit the same regime shift."
+    )
+    findings = (
+        SemanticFinding(
+            finding_id="same-target-causal",
+            lens_key="backdoor_confounding",
+            family=LensFamily.CAUSAL,
+            observation_ids=("plane-o1", "plane-o2"),
+            interpretation="Confounding is a candidate explanation.",
+            prediction=shared_prediction,
+            confidence=0.82,
+            ambiguity=0.18,
+            novelty=0.65,
+            evidence_ids=("ev-1", "ev-2"),
+        ),
+        SemanticFinding(
+            finding_id="same-target-shift",
+            lens_key="covariate_shift",
+            family=LensFamily.PREDICTIVE,
+            observation_ids=("plane-o1", "plane-o2"),
+            interpretation="Covariate shift is a candidate explanation.",
+            prediction=shared_prediction,
+            confidence=0.80,
+            ambiguity=0.20,
+            novelty=0.62,
+            evidence_ids=("ev-1", "ev-2"),
+        ),
+    )
+    snapshot = plane.analyze(
+        observations,
+        findings=findings,
+        requested=("backdoor_confounding", "covariate_shift"),
+    )
+    ids = {
+        item.forecast_id
+        for item in snapshot.forecasts
+        if set(item.source_finding_ids)
+        & {"same-target-causal", "same-target-shift"}
+    }
+    grouped = [
+        item
+        for item in snapshot.target_fusions
+        if ids.issubset(set(item.forecast_ids))
+    ]
+
+    assert len(ids) == 2
+    assert len(grouped) == 1
+    assert grouped[0].result.dependencies
+    assert grouped[0].fingerprint
+    assert snapshot.semantic_domain is None
 
 
 def test_interaction_forecast_calibrates_composite_not_constituent_lenses_twice() -> None:
