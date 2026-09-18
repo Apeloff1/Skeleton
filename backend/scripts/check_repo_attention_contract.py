@@ -92,8 +92,15 @@ def violations_for_text(text: str) -> list[str]:
     concurrency = _block(text, "concurrency", 0)
     if "github.event.issue.number || github.event.pull_request.number || 'sweep'" not in concurrency:
         findings.append("concurrency must serialize all event families by issue/PR number")
-    if not re.search(r"(?m)^\s{2}cancel-in-progress:\s*false\s*$", concurrency):
-        findings.append("repository-attention must not cancel in-flight trusted clears")
+    trusted_pr_cancel = (
+        "${{ github.event_name == 'pull_request' && "
+        "github.event.pull_request.head.repo.full_name == github.repository }}"
+    )
+    if trusted_pr_cancel not in concurrency:
+        findings.append(
+            "only trusted same-repository PR lifecycle events may cancel older "
+            "repository-attention clears"
+        )
 
     issue_trigger = _block(text, "issues", 2)
     for event in sorted(REQUIRED_ISSUE_TYPES):
