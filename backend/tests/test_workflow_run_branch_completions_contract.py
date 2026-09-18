@@ -119,6 +119,25 @@ def test_rejects_repair_intake_without_commit_oid_canonicalization() -> None:
     assert "40-hex commit OID" in messages
 
 
+def test_idle_studio_single_sources_workflow_run_trust_boundary() -> None:
+    source = IDLE.read_text(encoding="utf-8")
+    guard = "github.event.workflow_run.head_repository.full_name == github.repository"
+
+    assert source.count(guard) == 1
+    assert "needs.pressure.result == 'success'" in source
+    assert "needs.pressure.outputs.proceed == 'true'" in source
+
+
+def test_rejects_idle_studio_without_pressure_gate_dependency() -> None:
+    source = _replace_once(
+        IDLE.read_text(encoding="utf-8"),
+        "needs.pressure.result == 'success'",
+        "true",
+    )
+    messages = "\n".join(violations_for_text(IDLE.name, source))
+    assert "successful pressure trust gate" in messages
+
+
 def test_rejects_idle_studio_without_same_repository_head() -> None:
     source = _replace_once(
         IDLE.read_text(encoding="utf-8"),
@@ -126,7 +145,7 @@ def test_rejects_idle_studio_without_same_repository_head() -> None:
         "true",
     )
     messages = "\n".join(violations_for_text(IDLE.name, source))
-    assert "cross-repository workflow_run heads" in messages
+    assert "cross-repository workflow_run trust boundary" in messages
 
 
 def test_rejects_idle_studio_without_fail_closed_snapshot_pagination() -> None:
