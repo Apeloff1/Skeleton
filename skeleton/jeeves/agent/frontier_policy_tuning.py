@@ -117,7 +117,24 @@ class FrontierPolicyTuner:
             raise TypeError("evaluation_gate must be FrontierEvalGate")
 
         reasons = list(recommendation.reasons)
-        if not evaluation_gate.passed:
+        requested_change = any(
+            abs(value) > 0.0
+            for value in (
+                recommendation.minimum_quality_delta,
+                recommendation.minimum_choice_probability_delta,
+                recommendation.maximum_entropy_delta,
+            )
+        )
+        feedback_sufficient = (
+            recommendation.sample_count >= 12
+            and bool(recommendation.feedback_report_fingerprint)
+        )
+        if requested_change and not feedback_sufficient:
+            reasons.append(
+                "insufficient bound feedback for policy change: "
+                f"samples={recommendation.sample_count}, required>=12"
+            )
+        if not evaluation_gate.passed or (requested_change and not feedback_sufficient):
             reasons.extend(evaluation_gate.reasons)
             fingerprint = stable_fingerprint(
                 {
