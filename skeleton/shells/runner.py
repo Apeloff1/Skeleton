@@ -9,6 +9,7 @@ explicitly choose which environment keys and working-directory roots are safe.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 import os
 from pathlib import Path
 import re
@@ -115,12 +116,32 @@ class ShellPolicy:
         roots = tuple(_resolved_directory(Path(root)) for root in self.cwd_roots)
         if not roots:
             raise ShellPolicyError("at least one working-directory root is required")
-        if self.default_timeout <= 0 or self.max_timeout <= 0 or self.default_timeout > self.max_timeout:
+        for name, value in (
+            ("default_timeout", self.default_timeout),
+            ("max_timeout", self.max_timeout),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) <= 0.0
+            ):
+                raise ShellPolicyError(f"{name} must be finite and positive")
+        if float(self.default_timeout) > float(self.max_timeout):
             raise ShellPolicyError("timeout bounds are invalid")
-        if self.max_output_bytes <= 0 or self.max_input_bytes < 0 or self.max_env_bytes <= 0:
-            raise ShellPolicyError("I/O bounds are invalid")
-        if self.max_args <= 0 or self.max_arg_bytes <= 0:
-            raise ShellPolicyError("argument bounds are invalid")
+        for name, value, allow_zero in (
+            ("max_output_bytes", self.max_output_bytes, False),
+            ("max_input_bytes", self.max_input_bytes, True),
+            ("max_env_bytes", self.max_env_bytes, False),
+            ("max_args", self.max_args, False),
+            ("max_arg_bytes", self.max_arg_bytes, False),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < (0 if allow_zero else 1)
+            ):
+                raise ShellPolicyError(f"{name} has invalid integer bound")
         allowed_env = frozenset(self.allowed_env)
         inherited_env = frozenset(self.inherited_env)
         for key in allowed_env | inherited_env:
@@ -238,8 +259,15 @@ class ShellRunner:
         return env
 
     def _timeout(self, command: ShellCommand) -> float:
-        timeout = self.policy.default_timeout if command.timeout is None else float(command.timeout)
-        if timeout <= 0 or timeout > self.policy.max_timeout:
+        raw_timeout = self.policy.default_timeout if command.timeout is None else command.timeout
+        if (
+            isinstance(raw_timeout, bool)
+            or not isinstance(raw_timeout, (int, float))
+            or not math.isfinite(float(raw_timeout))
+        ):
+            raise ShellPolicyError("command timeout must be a finite number")
+        timeout = float(raw_timeout)
+        if timeout <= 0.0 or timeout > float(self.policy.max_timeout):
             raise ShellPolicyError("command timeout is outside policy bounds")
         return timeout
 
