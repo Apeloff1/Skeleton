@@ -10,10 +10,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import secrets
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
+
+from skeleton.security.outbound_url import validate_public_https_url
 
 
 @dataclass
@@ -72,7 +75,18 @@ class WebhookSystem:
         self._replay_log: List[Dict[str, Any]] = []
 
     def subscribe(self, topic: str, url: str, secret: str = "") -> Subscription:
-        sub = Subscription(sub_id=uuid.uuid4().hex[:10], topic=topic, url=url, secret=secret or "whsec_default")
+        safe_url, _ = validate_public_https_url(url, purpose="webhook endpoint")
+        signing_secret = secret.strip() if isinstance(secret, str) else ""
+        if not signing_secret:
+            signing_secret = secrets.token_urlsafe(32)
+        elif len(signing_secret.encode("utf-8")) < 16:
+            raise ValueError("webhook secret must be at least 16 bytes")
+        sub = Subscription(
+            sub_id=uuid.uuid4().hex[:10],
+            topic=topic,
+            url=safe_url,
+            secret=signing_secret,
+        )
         self._subs[sub.sub_id] = sub
         return sub
 
@@ -109,7 +123,11 @@ class WebhookSystem:
             d.attempts += 1
             sig = d.signature(sub.secret)
             try:
-                ok = self._sender(sub.url, d.payload, sig)
+                safe_url, _ = validate_public_https_url(
+                    sub.url,
+                    purpose="webhook endpoint",
+                )
+                ok = self._sender(safe_url, d.payload, sig)
             except Exception:  # noqa: BLE001
                 ok = False
             if ok:
