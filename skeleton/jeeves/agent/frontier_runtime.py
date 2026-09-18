@@ -43,6 +43,7 @@ from .execution_audit import (
 )
 from .model_based_control import CompactState
 from .epistemic_frontier import KnowledgeObligation
+from .frontier_control_plane import FrontierCognitiveControlPlane
 from .runtime import RunCheckpoint, RunInputs, _RunState
 from .runtime_abstraction import (
     ArgumentAbstractor,
@@ -65,6 +66,10 @@ from .semantic_topology_learning import (
     TopologyBridgePrediction,
     TopologyBridgeReport,
     TopologyBridgeTrial,
+)
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
 )
 from .strict_runtime import StrictJeevesAgentRuntime
 from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
@@ -405,6 +410,28 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             limit=limit,
             minimum_candidate_score=minimum_candidate_score,
             include_rejected=include_rejected,
+        )
+
+    def map_semantic_topology_research(
+        self,
+        control_plane: FrontierCognitiveControlPlane,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+        dependencies: Mapping[str, Sequence[str]] | None = None,
+    ) -> SemanticTopologyResearchUpdate:
+        """Refresh topology research debt into Jeeves' durable research agenda."""
+
+        bridge = SemanticTopologyResearchBridge(
+            self.semantic_plane.topology_learning,
+            control_plane,
+        )
+        return bridge.refresh(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
+            dependencies=dependencies,
         )
 
     def export_semantic_topology_learning_state(
