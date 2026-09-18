@@ -1355,6 +1355,52 @@ class Jeeves:
         )
         return result
 
+    def benchmark_game_engines(
+        self,
+        *,
+        gameplay_dialect: str | None = None,
+        expectation=None,
+    ):
+        """Benchmark the complete Pong-to-next engine ladder against expectation."""
+        from skeleton.jeeves.game_engine_benchmark import GameEngineBenchmarkArena
+
+        arena = GameEngineBenchmarkArena(self.game_engines, expectation)
+        report = arena.benchmark_all(gameplay_dialect)
+        self._bus.emit(
+            "jeeves.game_engine.benchmark",
+            {
+                "engines": len(report.entries),
+                "minimum_score": report.minimum_score,
+                "all_meet_expectation": report.all_meet_expectation,
+                "digest": report.digest,
+            },
+        )
+        return report
+
+    def red_team_game_engine(
+        self,
+        era,
+        *,
+        gameplay_dialect: str | None = None,
+        expectation=None,
+    ):
+        """Attack and recover one era through the snapshot-backed tournament."""
+        from skeleton.jeeves.game_engine_benchmark import GameEngineBenchmarkArena
+
+        arena = GameEngineBenchmarkArena(self.game_engines, expectation)
+        report = arena.tournament(era, gameplay_dialect)
+        self._bus.emit(
+            "jeeves.game_engine.red_team",
+            {
+                "era": report.era.value,
+                "family": report.family.value,
+                "passed": report.passed,
+                "attacks": len(report.attacks),
+                "digest": report.digest,
+            },
+        )
+        return report
+
     def _brain_get(self):
         if self._brain is None:
             from skeleton.jeeves.tactical import TacticalBrain
