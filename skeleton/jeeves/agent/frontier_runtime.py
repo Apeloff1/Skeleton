@@ -51,7 +51,11 @@ from .runtime_guard import (
     RuntimeGuardSignals,
 )
 from .semantic_lenses import SemanticFinding, SemanticObservation
-from .semantic_plane import SemanticLensPlane, SemanticPlaneSnapshot
+from .semantic_plane import (
+    SemanticLensPlane,
+    SemanticPlaneLearningUpdate,
+    SemanticPlaneSnapshot,
+)
 from .strict_runtime import StrictJeevesAgentRuntime
 from .types import AgentResult, RiskTier, TerminationReason, stable_fingerprint
 
@@ -284,6 +288,28 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             findings=findings,
             requested=requested,
             base_rate=base_rate,
+        )
+
+    def resolve_semantic_forecast(
+        self,
+        forecast_id: str,
+        *,
+        outcome: bool,
+        domain: str,
+        independent_run: str,
+        observed_at: float | None = None,
+        observation_id: str | None = None,
+        negative_control: bool = False,
+    ) -> SemanticPlaneLearningUpdate:
+        """Resolve a plane forecast and feed the result into lens calibration."""
+        return self.semantic_plane.resolve_forecast(
+            forecast_id,
+            outcome=outcome,
+            domain=domain,
+            independent_run=independent_run,
+            observed_at=observed_at,
+            observation_id=observation_id,
+            negative_control=negative_control,
         )
 
     def _state_from_checkpoint(
