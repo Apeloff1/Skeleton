@@ -48,7 +48,11 @@ _CACHE_MAX = int(os.environ.get("UNBULK_CACHE_MAX", "512"))
 def pack(obj: Any) -> str:
     """gzip(JSON) → base64, prefixed with a magic header. Transparent on write."""
     raw = json.dumps(obj, separators=(",", ":"), default=str).encode("utf-8")
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("payload exceeds uncompressed size limit")
     comp = gzip.compress(raw, compresslevel=6)
+    if len(comp) > MAX_PACKED_BYTES:
+        raise ValueError("payload exceeds compressed size limit")
     out = _MAGIC + base64.b64encode(comp).decode("ascii")
     with _LOCK:
         _STATS["packed"] += 1
@@ -172,10 +176,17 @@ def read_manifest_json(path: str | Path) -> Any:
 
 def _gzip_file(p: Path) -> tuple[int, int]:
     """gzip a json file → .json.gz, remove original. Returns (raw, packed)."""
+    if p.stat().st_size > MAX_UNPACKED_BYTES:
+        raise ValueError("manifest exceeds uncompressed size limit")
     raw = p.read_bytes()
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("manifest exceeds uncompressed size limit")
+    compressed = gzip.compress(raw, compresslevel=6)
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("manifest exceeds compressed size limit")
     gz = p.with_suffix(p.suffix + ".gz")
-    gz.write_bytes(gzip.compress(raw, compresslevel=6))
-    packed = gz.stat().st_size
+    gz.write_bytes(compressed)
+    packed = len(compressed)
     p.unlink(missing_ok=True)
     return len(raw), packed
 
