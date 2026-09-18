@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import gzip
 import hashlib
+import io
 import json
 import os
 import threading
@@ -28,6 +29,9 @@ from pathlib import Path
 from typing import Any
 
 _MAGIC = "GZ1:"  # marks a packed payload so unpack() is back-compat safe
+MAX_PACKED_BYTES = 8 * 1024 * 1024
+MAX_UNPACKED_BYTES = 32 * 1024 * 1024
+_MAX_BASE64_BYTES = ((MAX_PACKED_BYTES + 2) // 3) * 4 + 4
 
 # ── codec stats (since boot) ─────────────────────────────────────────────────
 _STATS = {
@@ -38,13 +42,23 @@ _LOCK = threading.Lock()
 
 # ── decompress-on-demand LRU cache (hash → decoded object) ───────────────────
 _CACHE: "OrderedDict[str, Any]" = OrderedDict()
-_CACHE_MAX = int(os.environ.get("UNBULK_CACHE_MAX", "512"))
+_CACHE_SIZES: dict[str, int] = {}
+_CACHE_MAX = max(0, int(os.environ.get("UNBULK_CACHE_MAX", "512")))
+_CACHE_MAX_BYTES = max(
+    0,
+    int(os.environ.get("UNBULK_CACHE_MAX_BYTES", str(16 * 1024 * 1024))),
+)
+_CACHE_BYTES = 0
 
 
 def pack(obj: Any) -> str:
     """gzip(JSON) → base64, prefixed with a magic header. Transparent on write."""
     raw = json.dumps(obj, separators=(",", ":"), default=str).encode("utf-8")
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("payload exceeds uncompressed size limit")
     comp = gzip.compress(raw, compresslevel=6)
+    if len(comp) > MAX_PACKED_BYTES:
+        raise ValueError("payload exceeds compressed size limit")
     out = _MAGIC + base64.b64encode(comp).decode("ascii")
     with _LOCK:
         _STATS["packed"] += 1
@@ -57,24 +71,73 @@ def is_packed(blob: Any) -> bool:
     return isinstance(blob, str) and blob.startswith(_MAGIC)
 
 
+def _decode_packed_payload(blob: str) -> bytes:
+    """Decode a GZ1 payload without permitting unbounded expansion."""
+    encoded = blob[len(_MAGIC):]
+    if len(encoded) > _MAX_BASE64_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+    try:
+        compressed = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("invalid packed payload encoding") from exc
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+
+    with gzip.GzipFile(fileobj=io.BytesIO(compressed), mode="rb") as stream:
+        raw = stream.read(MAX_UNPACKED_BYTES + 1)
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("decompressed payload exceeds size limit")
+    return raw
+
+
+def _read_bounded_gzip_file(path: Path) -> bytes:
+    """Read and decompress a gzip file under the same expansion limits."""
+    with path.open("rb") as handle:
+        compressed = handle.read(MAX_PACKED_BYTES + 1)
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("compressed manifest exceeds size limit")
+    with gzip.GzipFile(fileobj=io.BytesIO(compressed), mode="rb") as stream:
+        raw = stream.read(MAX_UNPACKED_BYTES + 1)
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("decompressed manifest exceeds size limit")
+    return raw
+
+
 def unpack(blob: Any) -> Any:
     """Decompress on demand. Plain (unpacked) values pass straight through."""
     if not is_packed(blob):
         return blob
-    key = hashlib.blake2b(blob.encode("ascii"), digest_size=16).hexdigest()
+    if len(blob) - len(_MAGIC) > _MAX_BASE64_BYTES:
+        raise ValueError("compressed payload exceeds size limit")
+    try:
+        encoded_blob = blob.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ValueError("invalid packed payload encoding") from exc
+    key = hashlib.blake2b(encoded_blob, digest_size=16).hexdigest()
     with _LOCK:
         if key in _CACHE:
             _CACHE.move_to_end(key)
             _STATS["cache_hits"] += 1
             return _CACHE[key]
         _STATS["cache_misses"] += 1
-    raw = gzip.decompress(base64.b64decode(blob[len(_MAGIC):]))
+    raw = _decode_packed_payload(blob)
     obj = json.loads(raw)
     with _LOCK:
-        _CACHE[key] = obj
-        _CACHE.move_to_end(key)
-        while len(_CACHE) > _CACHE_MAX:
-            _CACHE.popitem(last=False)
+        global _CACHE_BYTES
+        raw_size = len(raw)
+        if _CACHE_MAX > 0 and _CACHE_MAX_BYTES > 0 and raw_size <= _CACHE_MAX_BYTES:
+            prior_size = _CACHE_SIZES.pop(key, 0)
+            _CACHE_BYTES = max(0, _CACHE_BYTES - prior_size)
+            _CACHE[key] = obj
+            _CACHE_SIZES[key] = raw_size
+            _CACHE_BYTES += raw_size
+            _CACHE.move_to_end(key)
+            while len(_CACHE) > _CACHE_MAX or _CACHE_BYTES > _CACHE_MAX_BYTES:
+                victim, _ = _CACHE.popitem(last=False)
+                _CACHE_BYTES = max(
+                    0,
+                    _CACHE_BYTES - _CACHE_SIZES.pop(victim, 0),
+                )
         _STATS["unpacked"] += 1
     return obj
 
@@ -122,7 +185,7 @@ def read_manifest_json(path: str | Path) -> Any:
     p = Path(path)
     gz = p.with_suffix(p.suffix + ".gz")
     if gz.exists():
-        return json.loads(gzip.decompress(gz.read_bytes()))
+        return json.loads(_read_bounded_gzip_file(gz))
     if p.exists():
         return json.loads(p.read_text())
     return {}
@@ -130,10 +193,17 @@ def read_manifest_json(path: str | Path) -> Any:
 
 def _gzip_file(p: Path) -> tuple[int, int]:
     """gzip a json file → .json.gz, remove original. Returns (raw, packed)."""
+    if p.stat().st_size > MAX_UNPACKED_BYTES:
+        raise ValueError("manifest exceeds uncompressed size limit")
     raw = p.read_bytes()
+    if len(raw) > MAX_UNPACKED_BYTES:
+        raise ValueError("manifest exceeds uncompressed size limit")
+    compressed = gzip.compress(raw, compresslevel=6)
+    if len(compressed) > MAX_PACKED_BYTES:
+        raise ValueError("manifest exceeds compressed size limit")
     gz = p.with_suffix(p.suffix + ".gz")
-    gz.write_bytes(gzip.compress(raw, compresslevel=6))
-    packed = gz.stat().st_size
+    gz.write_bytes(compressed)
+    packed = len(compressed)
     p.unlink(missing_ok=True)
     return len(raw), packed
 
@@ -243,6 +313,8 @@ def savings() -> dict:
     # 4) live codec (doc-field compression since boot)
     with _LOCK:
         st = dict(_STATS)
+        cache_size = len(_CACHE)
+        cache_bytes = _CACHE_BYTES
     if st["raw_bytes_in"]:
         total_raw += st["raw_bytes_in"]
         total_stored += st["packed_bytes_out"]
@@ -265,8 +337,14 @@ def savings() -> dict:
         },
         "namespaces": namespaces,
         "codec": st,
-        "cache": {"size": len(_CACHE), "max": _CACHE_MAX,
-                  "hits": st["cache_hits"], "misses": st["cache_misses"]},
+        "cache": {
+            "size": cache_size,
+            "max": _CACHE_MAX,
+            "raw_bytes": cache_bytes,
+            "max_raw_bytes": _CACHE_MAX_BYTES,
+            "hits": st["cache_hits"],
+            "misses": st["cache_misses"],
+        },
         "api_response_gzip": True,  # GZipMiddleware active (minimum_size=1000)
     }
 
@@ -309,7 +387,10 @@ def sweep(manifest_min_bytes: int = 50_000, freeze_cold: bool = True,
 
 
 def purge_cache() -> int:
+    global _CACHE_BYTES
     with _LOCK:
         n = len(_CACHE)
         _CACHE.clear()
+        _CACHE_SIZES.clear()
+        _CACHE_BYTES = 0
     return n
