@@ -516,6 +516,10 @@ class AttemptTrackingExecutionBackend:
     def attempt(self) -> AIExecutionAttempt:
         return self._attempt
 
+    @property
+    def binding(self):
+        return getattr(self.delegate, "binding", None)
+
     def execute_plan(
         self,
         plan: ExecutionPlan,
