@@ -11,6 +11,8 @@ from .command_contracts import (
     CommandService,
     require_bool,
     require_int,
+    require_list,
+    require_mapping,
     require_text,
 )
 
@@ -56,6 +58,32 @@ _CAPABILITY_VIEW_FLAGS = (
     "cli_audit",
     "template_audit",
     "sidecar_audit",
+    "domain_audit",
+    "cortex_audit",
+    "mounted_audit",
+    "main_cli_audit",
+    "app_audit",
+    "charter_audit",
+    "contract_audit",
+    "live_hmac_audit",
+    "nested_audit",
+    "env_audit",
+    "view_audit",
+    "idempotency_audit",
+    "seal_audit",
+    "admit_audit",
+    "limit_audit",
+    "shared_audit",
+    "stack_audit",
+    "allow_audit",
+    "version_audit",
+    "authz_audit",
+    "dev_audit",
+    "token_audit",
+    "mode_audit",
+    "codename_audit",
+    "cver_audit",
+    "ttl_audit",
 )
 
 
@@ -91,6 +119,118 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["ttl_audit"]:
+            from .ttl_audit import get_ttl_audit_row, ttl_audit_snapshot
+
+            return _lookup_row(payload, "source_id", get_ttl_audit_row, ttl_audit_snapshot)
+        if flags["cver_audit"]:
+            from .contract_version_audit import (
+                contract_version_audit_snapshot,
+                get_contract_version_audit_row,
+            )
+
+            return _lookup_row(
+                payload,
+                "source_id",
+                get_contract_version_audit_row,
+                contract_version_audit_snapshot,
+            )
+        if flags["codename_audit"]:
+            from .codename_audit import codename_audit_snapshot, get_codename_audit_row
+
+            return _lookup_row(payload, "source_id", get_codename_audit_row, codename_audit_snapshot)
+        if flags["mode_audit"]:
+            from .session_mode_audit import get_session_mode_audit_row, session_mode_audit_snapshot
+
+            return _lookup_row(payload, "source_id", get_session_mode_audit_row, session_mode_audit_snapshot)
+        if flags["token_audit"]:
+            from .dev_token_audit import dev_token_audit_snapshot, get_dev_token_audit_row
+
+            return _lookup_row(payload, "token_id", get_dev_token_audit_row, dev_token_audit_snapshot)
+        if flags["dev_audit"]:
+            from .open_dev_audit import get_open_dev_audit_row, open_dev_audit_snapshot
+
+            return _lookup_row(payload, "prefix_id", get_open_dev_audit_row, open_dev_audit_snapshot)
+        if flags["authz_audit"]:
+            from .authz_audit import authz_audit_snapshot, get_authz_audit_row
+
+            return _lookup_row(payload, "command_id", get_authz_audit_row, authz_audit_snapshot)
+        if flags["version_audit"]:
+            from .version_audit import get_version_audit_row, version_audit_snapshot
+
+            return _lookup_row(payload, "source_id", get_version_audit_row, version_audit_snapshot)
+        if flags["allow_audit"]:
+            from .allow_list_audit import allow_list_audit_snapshot, get_allow_list_audit_row
+
+            return _lookup_row(payload, "handler_id", get_allow_list_audit_row, allow_list_audit_snapshot)
+        if flags["stack_audit"]:
+            from .gate_stack_audit import gate_stack_audit_snapshot, get_gate_stack_audit_row
+
+            return _lookup_row(payload, "layer_id", get_gate_stack_audit_row, gate_stack_audit_snapshot)
+        if flags["shared_audit"]:
+            from .cli_shared_audit import cli_shared_audit_snapshot, get_cli_shared_audit_row
+
+            return _lookup_row(payload, "command_id", get_cli_shared_audit_row, cli_shared_audit_snapshot)
+        if flags["limit_audit"]:
+            from .gate_limit_audit import gate_limit_audit_snapshot, get_gate_limit_audit_row
+
+            return _lookup_row(payload, "flag_id", get_gate_limit_audit_row, gate_limit_audit_snapshot)
+        if flags["admit_audit"]:
+            from .admit_write_audit import admit_write_audit_snapshot, get_admit_write_audit_row
+
+            return _lookup_row(payload, "method_id", get_admit_write_audit_row, admit_write_audit_snapshot)
+        if flags["seal_audit"]:
+            from .seal_audit import get_seal_audit_row, seal_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_seal_audit_row, seal_audit_snapshot)
+        if flags["idempotency_audit"]:
+            from .idempotency_audit import get_idempotency_audit_row, idempotency_audit_snapshot
+
+            return _lookup_row(payload, "handler_id", get_idempotency_audit_row, idempotency_audit_snapshot)
+        if flags["view_audit"]:
+            from .capability_view_audit import capability_view_audit_snapshot, get_capability_view_audit_row
+
+            return _lookup_row(payload, "flag_id", get_capability_view_audit_row, capability_view_audit_snapshot)
+        if flags["env_audit"]:
+            from .env_flag_audit import env_flag_audit_snapshot, get_env_flag_audit_row
+
+            return _lookup_row(payload, "flag_id", get_env_flag_audit_row, env_flag_audit_snapshot)
+        if flags["nested_audit"]:
+            from .nested_router_audit import get_nested_router_audit_row, nested_router_audit_snapshot
+
+            return _lookup_row(payload, "include_id", get_nested_router_audit_row, nested_router_audit_snapshot)
+        if flags["live_hmac_audit"]:
+            from .live_hmac_audit import get_live_hmac_audit_row, live_hmac_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_live_hmac_audit_row, live_hmac_audit_snapshot)
+        if flags["contract_audit"]:
+            from .contract_audit import contract_audit_snapshot, get_contract_audit_row
+
+            return _lookup_row(payload, "command_id", get_contract_audit_row, contract_audit_snapshot)
+        if flags["charter_audit"]:
+            from .charter_audit import charter_audit_snapshot, get_charter_audit_row
+
+            return _lookup_row(payload, "route_id", get_charter_audit_row, charter_audit_snapshot)
+        if flags["app_audit"]:
+            from .app_route_audit import app_route_audit_snapshot, get_app_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_app_route_audit_row, app_route_audit_snapshot)
+        if flags["main_cli_audit"]:
+            from .main_cli_audit import get_main_cli_audit_row, main_cli_audit_snapshot
+
+            return _lookup_row(payload, "command_id", get_main_cli_audit_row, main_cli_audit_snapshot)
+        if flags["mounted_audit"]:
+            from .mounted_route_audit import get_mounted_route_audit_row, mounted_route_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_mounted_route_audit_row, mounted_route_audit_snapshot)
+        if flags["cortex_audit"]:
+            from .cortex_route_audit import cortex_route_audit_snapshot, get_cortex_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_cortex_route_audit_row, cortex_route_audit_snapshot)
+        if flags["domain_audit"]:
+            from .gate_domain_audit import gate_domain_audit_snapshot, get_gate_domain_audit_row
+
+            return _lookup_row(payload, "path", get_gate_domain_audit_row, gate_domain_audit_snapshot)
         if flags["sidecar_audit"]:
             from .sidecar_route_audit import get_sidecar_route_audit_row, sidecar_route_audit_snapshot
 
@@ -139,14 +279,14 @@ def _memory_handler(state: Any):
         memory = getattr(state, "memory_trinity", None)
         if memory is None:
             raise CommandError("unavailable", "memory service is not initialized")
-        query = str(payload.get("query", "")).strip()
+        query = require_text(payload, "query", "").strip()
         if not query:
             raise CommandError("invalid_argument", "query is required")
         top_k = require_int(payload, "top_k", 3, minimum=1)
         result = memory.query_unified(
             query,
             top_k_per_tier=top_k,
-            metadata_filter=payload.get("metadata_filter"),
+            metadata_filter=require_mapping(payload, "metadata_filter", None, optional=True),
         )
         return {
             "facts": [item.chunk.text for item in result.facts],
@@ -165,7 +305,7 @@ def _tool_handler(state: Any):
         registry = getattr(state, "registry", None)
         if registry is None:
             raise CommandError("unavailable", "tool registry is not initialized")
-        action = str(payload.get("action", "list")).strip().lower()
+        action = require_text(payload, "action", "list").strip().lower()
         if action != "list":
             raise CommandError(
                 "unsupported_operation",
@@ -182,7 +322,7 @@ def _tool_handler(state: Any):
 
 def _admin_handler(state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
-        action = str(payload.get("action", "summary")).strip().lower()
+        action = require_text(payload, "action", "summary").strip().lower()
         if action != "summary":
             raise CommandError(
                 "unsupported_operation",
@@ -206,11 +346,9 @@ def _run_handler(state: Any):
         gameforge = getattr(state, "gameforge", None)
         if gameforge is None:
             raise CommandError("unavailable", "GameForge runtime is not initialized")
-        answers = payload.get("answers", {})
-        if not isinstance(answers, Mapping):
-            raise CommandError("invalid_argument", "answers must be an object")
+        answers = require_mapping(payload, "answers", {}, optional=False)
         spec = gameforge.run(
-            dict(answers),
+            answers,
             title=require_text(payload, "title", None, optional=True),
             target=require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS),
             repair=require_bool(payload, "repair", False),

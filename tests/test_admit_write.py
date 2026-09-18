@@ -105,7 +105,8 @@ def test_create_app_installs_gate(monkeypatch):
     app = srv.create_app()
     with TestClient(app) as c:
         assert c.get("/").status_code == 200
-        assert c.get("/cortex/status").status_code in (200, 500)  # cortex live may miss bus
+        # /cortex/status is opt-in via SKELETON_PUBLIC_DEV_SURFACES, not a default HMAC open prefix.
+        assert c.get("/cortex/status").status_code == 401
         # Protected forge-ish path without seal → 401
         res = c.get("/api/v1/forge/kinds")
         assert res.status_code == 401, res.text

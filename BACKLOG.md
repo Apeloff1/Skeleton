@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-17 (F-18 pipeline RAG + F-19 route audit + F-17 boot/export audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-18 (F-60..F-67 idempotency headers, bool TTL/rate, era allow-list, identity audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,10 +31,19 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-17. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+Updated 2026-09-18. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
 F-13 economic/cascade reconciliation, F-14 speculative RAG, F-15
 organism/social/galaxy plane audit, F-16 capability discovery, F-17 genesis/export structural audits, F-18
-pipeline speculative RAG, and F-19 main-router API route audit are
+pipeline speculative RAG, F-19 main-router API route audit, F-20..F-21 payload/HMAC
+audits, F-22..F-27 text/CLI/template/sidecar audits, and F-28..F-35 mapping/list
+plus domain/cortex/mounted/main-CLI audits, F-36..F-43 sidecar intake /
+curve allow-list / live-surface audits, F-44..F-51 forge item types /
+body-limit fail-closed / view-flag / idempotency / seal / admit-write /
+gate-limit / CLI-shared audits, F-52..F-59 header bounds / actor-weight
+fail-closed / stack / allow-list / version / authz / open-dev / token audits, and
+F-60..F-67 idempotency header case-fold / mint_seal TTL / RateLimiter bool
+reject / bind-era allow-list / session-mode / codename / contract-version / TTL
+audits are
 **landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
@@ -59,6 +68,14 @@ pipeline speculative RAG, and F-19 main-router API route audit are
 | F-17 Genesis/export structural audits | #1019 | import-free boot-phase and manifest export-drift snapshots |
 | F-18 Pipeline speculative RAG | #1019 | NPC/logic/animation `.run()` planning prefetch; HTTP reuses the sidecar |
 | F-19 Main-router API route audit | #1019 | import-free API_ROUTES vs routes.py + charter/protected lock |
+| F-20 Fail-closed bool/int payloads | #1019 | require_bool/require_int on shared command + HTTP hot paths |
+| F-21 HMAC open-prefix audit | #1019 | DEFAULT_OPEN_PREFIXES vs API_ROUTES; probe-only open surface |
+| F-22..F-27 Float/text + CLI/template/sidecar | #1019 | require_float/require_text; developer CLI, templates, GameForge/command sidecars |
+| F-28..F-35 Mapping/list + domain/cortex/mounted/main-CLI | #1019 | require_mapping/require_list; SessionMode; gate domains; unmounted cortex; create_app mounts; main CLI |
+| F-36..F-43 Sidecar intake, curves, live-surface audits | #1019 | sidecar answers mapping; curve allow-list; create_app inline; charter pairs; contracts; live HMAC; nested include; env flags |
+| F-44..F-51 Forge items, body limits, gate/CLI audits | #1019 | component/wire mapping+text; BodyBound bool reject; view flags; idempotency; seal vs HMAC; WriteAdmit methods; GATE_* limits; config→configuration |
+| F-52..F-59 Header bounds, actor weight, identity audits | #1019 | HeaderBound outermost; actor-weight digits only; stack order; allow-lists; version 16.0.0; mutating⇒auth; dev prefixes; 1/true/yes/on |
+| F-60..F-67 Idempotency headers, bool TTL/rate, era, identity | #1019 | Case-insensitive Idempotency-Key; mint_seal/RateLimiter bool reject; bind-era ERA_IDS; SessionMode/codename/1.0/TTL 300 audits |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -97,6 +114,13 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
 reconciliation, F-12 cortex persistence, F-14 speculative RAG, F-15
 organism/social/galaxy plane audit, F-16 capability discovery, F-17
-genesis/export structural audits, F-18 pipeline speculative RAG, and F-19
-main-router API route audit are landed in code. The former CI-1..CI-3
+genesis/export structural audits, F-18 pipeline speculative RAG, F-19
+main-router API route audit, F-20..F-27 payload types and CLI/HMAC/sidecar
+audits, and F-28..F-35 mapping/list plus domain/cortex/mounted/main-CLI audits
+are landed in code, as are F-36..F-43 sidecar intake, curve allow-lists, and
+live-surface audits, F-44..F-51 forge item types, body-limit fail-closed,
+and gate/CLI audits, F-52..F-59 header bounds, actor-weight fail-closed,
+and identity audits, and F-60..F-67 idempotency headers, bool TTL/rate,
+bind-era allow-list, and SessionMode/codename/contract-version/TTL identity
+audits. The former CI-1..CI-3
 blockers are resolved on main; the remaining structural queue is F-11.

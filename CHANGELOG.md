@@ -4,6 +4,108 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-60..F-67 idempotency headers, bool TTL/rate, era allow-list, identity audits
+
+- IdempotencyGuard header lookup is case-insensitive so Starlette-lowercased
+  `x-idempotency-key` matches; `IDEMPOTENCY_HEADER` is the canonical name.
+- `mint_seal` rejects bool/non-int `ttl_secs` so `True` cannot mint a 1-second seal.
+- API `RateLimiter` rejects bool capacity, refill, and token costs; `float(True)`
+  is no longer a 1.0 bucket.
+- HTTP `jeeves/bind-era` allow-lists `list_eras()` so free-text eras 422.
+- Additive `session_mode_audit` locks core vs llm_core SessionMode string values.
+- Additive `codename_audit` locks advertised `Skeleton` identity.
+- Additive `contract_version_audit` locks command `CONTRACT_VERSION` `1.0`.
+- Additive `ttl_audit` locks HMAC/idempotency default TTL at 300 seconds.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
+## 2026-09-18 — F-52..F-59 header bounds, actor weight, and identity audits
+
+- `install_gate` now mounts `HeaderBoundMiddleware` outermost so oversized
+  header sets 431 before HMAC work. Actor-weight headers accept only optional
+  minus plus digits; 400 responses no longer echo the attacker value. Bool
+  `default_weight` fails closed.
+- Additive `gate_stack_audit` locks inner-first registration (PolicyGate →
+  HeaderBound) and outer-first runtime order.
+- Additive `allow_list_audit` locks `MATERIALISE_TARGETS` / `PROGRESSION_CURVES`
+  call sites on HTTP forge/GameForge plus the shared run handler.
+- Additive `version_audit` locks advertised `16.0.0` across package,
+  architecture, setup, Settings, and FastAPI constructors with zero drift.
+- Additive `authz_audit` locks mutating⇒auth; `memory` remains the sealed read.
+- Additive `open_dev_audit` locks opt-in `_DEV_OPEN_PREFIXES` so they do not
+  leak into HMAC defaults.
+- Additive `dev_token_audit` locks `1|true|yes|on` without reopening F-43 names.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
+## 2026-09-18 — F-44..F-51 forge item types, body limits, and gate/CLI audits
+
+- Forge HTTP component/wire items use `require_mapping` plus `require_text` for
+  `kind`/`instance_id`. Optional `config` is an object; `from`/`to` are string
+  arrays so `"ab"` no longer becomes `("a", "b")`.
+- `BodyBoundMiddleware` rejects bool/float constructor stand-ins via the same
+  `_positive_limit` primitive as header bounds.
+- Additive `capability_view_audit` locks runtime view flags against CLI aliases
+  and help text with zero drift.
+- Additive `idempotency_audit` locks the five replay/remember pairs on main
+  forge/GameForge plus the sidecar GameForge run handler.
+- Additive `seal_audit` reports live-union `Depends(require_seal)` as empty
+  (main charter handlers win the path), sidecar `gameforge_run` as the explicit
+  Depends site, and command execute as the in-body `require_seal` call.
+  HMAC-open routes stay unsealed.
+- Additive `admit_write_audit` locks WriteAdmit mutating methods. PATCH has no
+  live handler; POST/PUT/DELETE do.
+- Additive `gate_limit_audit` lists `SKELETON_GATE_MAX_HEADER_BYTES`,
+  `HEADER_COUNT`, and `BODY_BYTES` without reopening the F-43 env-flag names.
+- Additive `cli_shared_audit` locks `config` → `configuration` and the generic
+  `command` dispatcher.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
+## 2026-09-18 — F-36..F-43 sidecar intake, curves, and live-surface audits
+
+- Sidecar GameForge intake `answers` uses `require_mapping`; the whole request
+  body is no longer treated as answers. HTTP pipeline `curve` is allow-listed
+  to `linear|quadratic|exponential`.
+- Additive `app_route_audit` reports create_app inline `GET /` and
+  `GET /cortex/status`, both missing from `API_ROUTES`.
+- Additive `charter_audit` locks the six main-router `require_charter` pairs
+  (`swarm.submit` plus five forge actions). Sidecar GameForge stays unchartered.
+- Additive `contract_audit` locks CommandSpec names against runtime
+  `service.register` with zero drift.
+- Additive `live_hmac_audit` compares default HMAC prefixes to the live handler
+  union. Only `/health/live` and `/health/ready` are open; `/` and `/cortex/status`
+  stay sealed under default prefixes.
+- Additive `nested_router_audit` reports GameForge's nested command-router include.
+- Additive `env_flag_audit` lists `SKELETON_PUBLIC_DEV_SURFACES`, `GF_SEAL_SECRET`,
+  `GF_SEAL_KEYRING`, and `SKELETON_OWN` without importing those modules.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
+## 2026-09-18 — F-28..F-35 mapping/list payloads and domain/cortex/mounted/main-CLI audits
+
+- Shared `require_mapping` / `require_list` reject strings, tuples-as-objects,
+  and bool-as-int list items. Memory `metadata_filter` and run `answers` use
+  them. HTTP retrieval metadata, Jeeves context/telemetry, swarm payload/deps,
+  pipeline params/actions, forge components/wires, and GameForge answers fail
+  closed the same way.
+- Remaining hot strings (`forge` name/era, intelligence query, sanitise
+  input, swarm task id, intake `project_root`, memory turns) use `require_text`
+  / `require_list`. Jeeves `mode` is fail-closed against live `SessionMode`
+  values.
+- Additive `gate_domain_audit` reports `DEFAULT_DOMAIN_MAP` versus
+  `architecture.API_ROUTES`. Documented paths stay mapped; unused prefixes such
+  as `/cockpit` and `/cortex` stay visible.
+- Additive `cortex_route_audit` reports unmounted `register_routes` handlers.
+  They remain outside `create_app` and outside API_ROUTES.
+- Additive `mounted_route_audit` reports swarm-family and cockpit routers
+  mounted by `create_app`, skipping main-router and GameForge sidecars.
+- Additive `main_cli_audit` reports `python -m skeleton` help versus `main()`
+  dispatch. `-h`/`--help` stay aliases of `help`.
+- Identical payloads through `--domain-audit` / `--cortex-audit` /
+  `--mounted-audit` / `--main-cli-audit`, matching HTTP audit routes, and the
+  shared `capabilities` command.
+
 ## 2026-09-17 — F-22..F-27 fail-closed numbers/text and CLI/template/sidecar audits
 
 - Shared `require_float` / `require_text` reject bools, numeric strings, NaN/inf,
