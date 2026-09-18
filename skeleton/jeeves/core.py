@@ -267,6 +267,89 @@ class Jeeves:
             )
         return self._game_projects
 
+    def game_loop(
+        self,
+        sandbox,
+    ):
+        """Bind one engine sandbox to deterministic timing, input, and replay."""
+        from skeleton.jeeves.game_engine_session import (
+            build_game_loop,
+        )
+
+        loop = build_game_loop(
+            sandbox
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_created",
+            {
+                "era": loop.era.value,
+                "family": sandbox.family.value,
+                "tree_digest": sandbox.tree.digest,
+                "machine_digest": loop.machine.fingerprint(),
+                "clock_digest": loop.clock.fingerprint(),
+                "chain_digest": loop.chain_digest,
+            },
+        )
+        return loop
+
+    def advance_game_loop(
+        self,
+        loop,
+        delta_ns: int,
+        samples=(),
+    ):
+        """Advance one presentation interval through clock, input, and machine."""
+        result = loop.advance(
+            delta_ns,
+            samples,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_advanced",
+            {
+                "era": result.era.value,
+                "presentation_index": result.presentation_index,
+                "simulation_steps": result.timing.simulation_steps,
+                "dropped_simulation_steps":
+                    result.timing.dropped_simulation_steps,
+                "simulation_tick": result.timing.simulation_tick,
+                "input_records": sum(
+                    len(
+                        item.input_digests
+                    )
+                    for item
+                    in result.simulation
+                ),
+                "machine_digest": result.machine_digest,
+                "clock_digest": result.clock_digest,
+                "chain_digest": result.chain_digest,
+                "digest": result.digest,
+            },
+        )
+        return result
+
+    def verify_game_loop_replay(
+        self,
+        loop,
+    ):
+        """Replay a loop from fresh sandbox state and compare all authority."""
+        verification = (
+            loop.verify_replay()
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_verified",
+            {
+                "era": loop.era.value,
+                "passed": verification.passed,
+                "advances": verification.advances,
+                "failure_index": verification.failure_index,
+                "chain_digest": verification.chain_digest,
+                "machine_digest": verification.machine_digest,
+                "clock_digest": verification.clock_digest,
+                "detail": verification.detail,
+            },
+        )
+        return verification
+
     def game_clock(
         self,
         era,
