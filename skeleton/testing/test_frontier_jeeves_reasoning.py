@@ -559,6 +559,11 @@ def test_feedback_tracks_verified_direct_and_escalated_outcomes() -> None:
     assert report.escalated_success_rate == 1.0
     assert report.observed_escalation_delta == 1.0
     assert report.mean_model_calls == 3.5
+    efficiency = feedback.compute_efficiency()
+    assert efficiency.incremental_model_calls == 3.0
+    assert efficiency.incremental_estimated_tokens == 2000.0
+    assert efficiency.success_gain_per_extra_model_call == 1.0 / 3.0
+    assert efficiency.success_gain_per_1k_extra_tokens == 0.5
     assert report.fingerprint
 
 
