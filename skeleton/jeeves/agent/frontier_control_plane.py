@@ -16,6 +16,8 @@ from .cognitive_control_plane import CognitiveControlPlane, ControlPlanePolicy
 from .epistemic_frontier import (
     EpistemicFrontierEngine,
     EpistemicFrontierPolicy,
+    ForecastContract,
+    ForecastSettlement,
     FrontierSnapshot,
     KnowledgeObligation,
 )
@@ -24,10 +26,12 @@ from .hypothesis_tournament import (
     DiscriminatingProbe,
     HypothesisTournament,
     TournamentPolicy,
+    TournamentUpdate,
 )
 from .live_supervisor import LiveSupervisor
 from .research_agenda import (
     AgendaSnapshot,
+    AttemptResult,
     ResearchAgenda,
     ResearchAgendaPolicy,
 )
@@ -122,6 +126,69 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             return self._tournaments[tournament_id]
         except KeyError as exc:
             raise KeyError(f"unknown hypothesis tournament {tournament_id}") from exc
+
+    def observe_hypothesis_probe(
+        self,
+        tournament_id: str,
+        probe_id: str,
+        observed_outcome: str,
+        *,
+        agenda_id: str | None = None,
+        evidence_refs: Sequence[str] = (),
+        successful: bool = True,
+    ) -> tuple[TournamentUpdate, AttemptResult | None]:
+        """Update a tournament and feed measured learning back into the agenda."""
+
+        update = self.hypothesis_tournament(tournament_id).observe(
+            probe_id,
+            observed_outcome,
+        )
+        attempt: AttemptResult | None = None
+        if agenda_id is not None:
+            attempt = self.research_agenda.record_attempt(
+                agenda_id,
+                information_gain_bits=update.information_gain_bits,
+                surprise_bits=update.surprise_bits,
+                evidence_refs=evidence_refs,
+                successful=successful,
+            )
+            self._last_agenda_snapshot = self.research_agenda.snapshot()
+        return update, attempt
+
+    def precommit_research_forecast(
+        self,
+        obligation_id: str,
+        distribution: Mapping[str, float],
+        *,
+        forecast_id: str | None = None,
+    ) -> ForecastContract:
+        """Seal a prediction before the outcome is available."""
+
+        return self.epistemic_frontier.precommit_forecast(
+            obligation_id,
+            distribution,
+            forecast_id=forecast_id,
+        )
+
+    def settle_research_forecast(
+        self,
+        forecast_id: str,
+        observed_outcome: str,
+    ) -> ForecastSettlement:
+        """Score a sealed forecast and reopen agenda work after large surprise."""
+
+        contract = self.epistemic_frontier.forecast(forecast_id)
+        settlement = self.epistemic_frontier.settle_forecast(
+            forecast_id,
+            observed_outcome,
+        )
+        reopened = self.research_agenda.reopen_on_surprise(
+            contract.obligation_id,
+            surprise_bits=settlement.surprise_bits,
+        )
+        if reopened:
+            self._last_agenda_snapshot = self.research_agenda.snapshot()
+        return settlement
 
     def dump_research_state(self) -> dict[str, Any]:
         """Return JSON-safe agenda state suitable for context/database storage."""
