@@ -8,9 +8,10 @@ up direction; callers can therefore snapshot it alongside gameplay state.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .body import RigidBody
+from .collision import detect_collision
 from .convex import convex_plane_time_of_impact, convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Quat, Vec3
@@ -69,6 +70,8 @@ class CharacterControllerSettings:
     ground_probe_distance: float = 0.2
     max_slide_iterations: int = 5
     min_move_distance: float = 1.0e-6
+    max_recovery_iterations: int = 8
+    max_recovery_distance: float = 2.0
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -122,6 +125,22 @@ class CharacterControllerSettings:
             _finite_positive(
                 self.min_move_distance,
                 name="min_move_distance",
+            ),
+        )
+        if (
+            isinstance(self.max_recovery_iterations, bool)
+            or not isinstance(self.max_recovery_iterations, int)
+            or not 1 <= self.max_recovery_iterations <= 32
+        ):
+            raise PhysicsValidationError(
+                "max_recovery_iterations outside supported range"
+            )
+        object.__setattr__(
+            self,
+            "max_recovery_distance",
+            _finite_positive(
+                self.max_recovery_distance,
+                name="max_recovery_distance",
             ),
         )
 
@@ -224,6 +243,67 @@ class CharacterMoveResult:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class CharacterRecoveryResult:
+    start_position: Vec3
+    position: Vec3
+    displacement: Vec3
+    recovered: bool
+    iterations: int
+    body_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.recovered, bool):
+            raise PhysicsValidationError("recovered must be boolean")
+        if (
+            isinstance(self.iterations, bool)
+            or not isinstance(self.iterations, int)
+            or self.iterations < 0
+        ):
+            raise PhysicsValidationError(
+                "recovery iterations must be non-negative integer"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterResizeResult:
+    changed: bool
+    old_half_height: float
+    new_half_height: float
+    old_position: Vec3
+    position: Vec3
+    blocked_by: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.changed, bool):
+            raise PhysicsValidationError("resize changed must be boolean")
+        for name, value in (
+            ("old_half_height", self.old_half_height),
+            ("new_half_height", self.new_half_height),
+        ):
+            if not math.isfinite(value) or value <= 0.0:
+                raise PhysicsValidationError(
+                    f"{name} must be finite and positive"
+                )
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterRuntimeResult:
+    start_position: Vec3
+    position: Vec3
+    requested_velocity: Vec3
+    support_velocity: Vec3
+    carry_displacement: Vec3
+    input_displacement: Vec3
+    recovery: CharacterRecoveryResult
+    move: CharacterMoveResult
+    ground: CharacterGroundState
+
+    @property
+    def applied_displacement(self) -> Vec3:
+        return self.position - self.start_position
+
+
 class KinematicCapsuleController:
     """Stateful deterministic capsule controller backed by physics queries."""
 
@@ -258,6 +338,65 @@ class KinematicCapsuleController:
     def shape(self) -> CapsuleShape:
         return self.settings.capsule
 
+    def _query_body_with_shape(
+        self,
+        position: Vec3,
+        shape: CapsuleShape,
+        *,
+        displacement: Vec3 = Vec3.zero(),
+        dt: float = 1.0,
+    ) -> RigidBody:
+        if not isinstance(position, Vec3) or not isinstance(shape, CapsuleShape):
+            raise PhysicsValidationError(
+                "character query body requires Vec3 position and CapsuleShape"
+            )
+        dt = _finite_positive(dt, name="dt")
+        return RigidBody.kinematic(
+            self.body_id,
+            shape,
+            position=position,
+            orientation=self.orientation,
+            linear_velocity=displacement / dt,
+        )
+
+    @staticmethod
+    def _validate_bodies(bodies: tuple[RigidBody, ...]) -> None:
+        if not isinstance(bodies, tuple) or not all(
+            isinstance(body, RigidBody) for body in bodies
+        ):
+            raise PhysicsValidationError(
+                "character bodies must be tuple[RigidBody, ...]"
+            )
+
+    def _overlaps_for_shape(
+        self,
+        position: Vec3,
+        shape: CapsuleShape,
+        bodies: tuple[RigidBody, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> tuple[tuple[RigidBody, float, Vec3], ...]:
+        self._validate_bodies(bodies)
+        ignored = set(ignore)
+        ignored.add(self.body_id)
+        query = self._query_body_with_shape(position, shape)
+        overlaps: list[tuple[RigidBody, float, Vec3]] = []
+        for target in sorted(bodies, key=lambda row: row.body_id):
+            if target.body_id in ignored:
+                continue
+            manifold = detect_collision(query, target)
+            if manifold is None or manifold.penetration <= EPSILON:
+                continue
+            overlaps.append(
+                (target, manifold.penetration, manifold.normal)
+            )
+        return tuple(
+            sorted(
+                overlaps,
+                key=lambda row: (-row[1], row[0].body_id),
+            )
+        )
+
     def _query_body(
         self,
         position: Vec3,
@@ -269,12 +408,11 @@ class KinematicCapsuleController:
                 "character query position/displacement must be Vec3"
             )
         dt = _finite_positive(dt, name="dt")
-        return RigidBody.kinematic(
-            self.body_id,
+        return self._query_body_with_shape(
+            position,
             self.shape,
-            position=position,
-            orientation=self.orientation,
-            linear_velocity=displacement / dt,
+            displacement=displacement,
+            dt=dt,
         )
 
     def is_walkable(self, normal: Vec3) -> bool:
@@ -523,6 +661,208 @@ class KinematicCapsuleController:
         # intent remains available for a jump or ledge climb.
         residual_vertical = self.up * max(0.0, vertical_amount)
         return final_position, residual_vertical, landing
+
+    def recover_overlaps(
+        self,
+        bodies: tuple[RigidBody, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterRecoveryResult:
+        self._validate_bodies(bodies)
+        start = self.position
+        position = start
+        touched: list[str] = []
+        total = Vec3.zero()
+        iterations = 0
+
+        for iteration in range(1, self.settings.max_recovery_iterations + 1):
+            overlaps = self._overlaps_for_shape(
+                position,
+                self.shape,
+                bodies,
+                ignore=ignore,
+            )
+            if not overlaps:
+                break
+
+            iterations = iteration
+            target, penetration, normal = overlaps[0]
+            push_distance = penetration + self.settings.skin_width
+            push = -normal * push_distance
+            if total.length() + push.length() > self.settings.max_recovery_distance:
+                raise PhysicsValidationError(
+                    "character overlap recovery distance bound exceeded"
+                )
+            position = position + push
+            total = position - start
+            touched.append(target.body_id)
+
+        remaining = self._overlaps_for_shape(
+            position,
+            self.shape,
+            bodies,
+            ignore=ignore,
+        )
+        if remaining:
+            raise PhysicsValidationError(
+                "character overlap recovery iteration bound exceeded"
+            )
+
+        self.position = position
+        return CharacterRecoveryResult(
+            start_position=start,
+            position=position,
+            displacement=position - start,
+            recovered=(position - start).length_squared() > EPSILON * EPSILON,
+            iterations=iterations,
+            body_ids=tuple(touched),
+        )
+
+    def can_resize(
+        self,
+        new_half_height: float,
+        bodies: tuple[RigidBody, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+        preserve_foot: bool = True,
+    ) -> CharacterResizeResult:
+        new_half_height = _finite_positive(
+            new_half_height,
+            name="new_half_height",
+        )
+        if not isinstance(preserve_foot, bool):
+            raise PhysicsValidationError("preserve_foot must be boolean")
+        old_half_height = self.settings.half_height
+        delta = new_half_height - old_half_height
+        candidate_position = (
+            self.position + self.up * delta
+            if preserve_foot
+            else self.position
+        )
+        candidate_shape = CapsuleShape(
+            self.settings.radius,
+            new_half_height,
+        )
+        overlaps = self._overlaps_for_shape(
+            candidate_position,
+            candidate_shape,
+            bodies,
+            ignore=ignore,
+        )
+        return CharacterResizeResult(
+            changed=not overlaps and abs(delta) > EPSILON,
+            old_half_height=old_half_height,
+            new_half_height=new_half_height,
+            old_position=self.position,
+            position=candidate_position if not overlaps else self.position,
+            blocked_by=tuple(row[0].body_id for row in overlaps),
+        )
+
+    def resize(
+        self,
+        new_half_height: float,
+        bodies: tuple[RigidBody, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+        preserve_foot: bool = True,
+    ) -> CharacterResizeResult:
+        result = self.can_resize(
+            new_half_height,
+            bodies,
+            ignore=ignore,
+            preserve_foot=preserve_foot,
+        )
+        if result.blocked_by:
+            return result
+        self.position = result.position
+        self.settings = replace(
+            self.settings,
+            half_height=result.new_half_height,
+        )
+        return result
+
+    def support_velocity(
+        self,
+        ground: CharacterGroundState,
+        bodies: tuple[RigidBody, ...],
+    ) -> Vec3:
+        self._validate_bodies(bodies)
+        if not ground.grounded or ground.body_id is None:
+            return Vec3.zero()
+        for body in bodies:
+            if body.body_id == ground.body_id:
+                return body.velocity_at_world_point(ground.point)
+        return Vec3.zero()
+
+    def runtime_step(
+        self,
+        requested_velocity: Vec3,
+        bodies: tuple[RigidBody, ...],
+        *,
+        dt: float,
+        ignore: tuple[str, ...] = (),
+        recover_overlaps: bool = True,
+        carry_support: bool = True,
+    ) -> CharacterRuntimeResult:
+        if not isinstance(requested_velocity, Vec3):
+            raise PhysicsValidationError(
+                "requested_velocity must be Vec3"
+            )
+        if not isinstance(recover_overlaps, bool) or not isinstance(
+            carry_support,
+            bool,
+        ):
+            raise PhysicsValidationError(
+                "runtime flags must be boolean"
+            )
+        dt = _finite_positive(dt, name="dt")
+        self._validate_bodies(bodies)
+        start = self.position
+
+        if recover_overlaps:
+            recovery = self.recover_overlaps(
+                bodies,
+                ignore=ignore,
+            )
+        else:
+            recovery = CharacterRecoveryResult(
+                start_position=self.position,
+                position=self.position,
+                displacement=Vec3.zero(),
+                recovered=False,
+                iterations=0,
+                body_ids=(),
+            )
+
+        pre_ground = self.ground_probe(
+            bodies,
+            dt=dt,
+            ignore=ignore,
+        )
+        support_velocity = (
+            self.support_velocity(pre_ground, bodies)
+            if carry_support
+            else Vec3.zero()
+        )
+        carry = support_velocity * dt
+        input_displacement = requested_velocity * dt
+        move = self.move(
+            carry + input_displacement,
+            bodies,
+            dt=dt,
+            ignore=ignore,
+        )
+        return CharacterRuntimeResult(
+            start_position=start,
+            position=self.position,
+            requested_velocity=requested_velocity,
+            support_velocity=support_velocity,
+            carry_displacement=carry,
+            input_displacement=input_displacement,
+            recovery=recovery,
+            move=move,
+            ground=move.ground,
+        )
 
     def move(
         self,
