@@ -63,7 +63,13 @@ def test_queue_drain_may_wake_only_from_guarded_default_branch() -> None:
 def test_rejects_queue_drain_broader_or_unguarded_branch_filter() -> None:
     source = _replace_once(
         QUEUE_DRAIN.read_text(encoding="utf-8"),
+        "  workflow_run:\n"
+        "    workflows: [\"Merge Readiness\"]\n"
+        "    types: [completed]\n"
         "    branches: [main]\n",
+        "  workflow_run:\n"
+        "    workflows: [\"Merge Readiness\"]\n"
+        "    types: [completed]\n"
         "    branches: [release/**]\n",
     )
     messages = "\n".join(violations_for_text(QUEUE_DRAIN.name, source))
