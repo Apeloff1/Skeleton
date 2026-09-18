@@ -362,6 +362,19 @@ def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
     assert typed_graph.fingerprint == graph.fingerprint
 
 
+def test_missing_repo_index_contract_fields_fail_closed() -> None:
+    snapshot = _valid_repo_index()
+    missing_schema = dict(snapshot)
+    missing_schema.pop("schema")
+    with pytest.raises(IncrementalGraphError, match="missing required keys"):
+        build_incremental_graph(repo_index=missing_schema)
+
+    files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
+    files[1].pop("working_mode")
+    with pytest.raises(IncrementalGraphError, match="tracked file is missing required keys"):
+        build_incremental_graph(repo_index={**snapshot, "files": files})
+
+
 def test_repo_index_metadata_tampering_fails_closed() -> None:
     snapshot = _valid_repo_index()
 
@@ -488,7 +501,6 @@ def test_specs_and_dependencies_are_consumed_with_hard_bounds() -> None:
     with pytest.raises(IncrementalGraphError, match="dependencies count exceeds"):
         build_incremental_graph([{"id": "root", "dependencies": dependencies()}], max_edges=3)
 
-
 def test_deep_acyclic_graph_does_not_depend_on_python_recursion_limit() -> None:
     count = 1200
     specs = [{"id": "n0000"}]
@@ -506,7 +518,6 @@ def test_deep_acyclic_graph_does_not_depend_on_python_recursion_limit() -> None:
     assert graph.topological_order[0] == "n0000"
     assert graph.topological_order[-1] == f"n{count - 1:04d}"
 
-
 def test_topological_ready_set_is_globally_lexicographic() -> None:
     graph = build_incremental_graph(
         [
@@ -518,22 +529,18 @@ def test_topological_ready_set_is_globally_lexicographic() -> None:
     )
     assert graph.topological_order == ("a", "b", "aa", "z")
 
-
 def test_node_id_alias_is_not_ambiguous() -> None:
     with pytest.raises(IncrementalGraphError, match="both id and node_id"):
         build_incremental_graph([{"id": "a", "node_id": "b"}])
-
 
 def test_repo_index_file_count_respects_graph_bound_before_conversion() -> None:
     snapshot = _valid_repo_index()
     with pytest.raises(IncrementalGraphError, match="file count exceeds"):
         build_incremental_graph(repo_index=snapshot, max_nodes=2)
 
-
 def test_repo_index_object_requires_complete_contract() -> None:
     with pytest.raises(IncrementalGraphError, match="missing required fields"):
         build_incremental_graph(repo_index=SimpleNamespace(files=()))
-
 
 def test_repo_index_tracked_file_requires_complete_contract() -> None:
     snapshot = _valid_repo_index()
@@ -542,7 +549,6 @@ def test_repo_index_tracked_file_requires_complete_contract() -> None:
     bad = {**snapshot, "files": files}
     with pytest.raises(IncrementalGraphError, match="missing required keys"):
         build_incremental_graph(repo_index=bad)
-
 
 def test_module_does_not_import_scanner_or_execute_builds() -> None:
     source = inspect.getsource(graph_mod)
