@@ -51,6 +51,5 @@ def test_pressure_guards_fail_closed_on_invalid_counts() -> None:
     ):
         workflow = _read(name)
         assert 'queued_count' in workflow
-        assert '^[[0-9]' not in workflow
-        assert 'queued_count\" =~ ^[0-9]+$' in workflow or 'queued_count" =~ ^[0-9]+$' in workflow
+        assert 'if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then' in workflow
         assert 'exit 1' in workflow
