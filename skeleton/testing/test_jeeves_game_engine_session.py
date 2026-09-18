@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from dataclasses import replace
 
@@ -13,6 +15,7 @@ from skeleton.jeeves.game_engine_input import (
 from skeleton.jeeves.game_engine_lab import (
     EngineEra,
     GameEngineLabError,
+    SandboxPatch,
 )
 from skeleton.jeeves.game_engine_legacy import (
     InputButton,
@@ -22,10 +25,54 @@ from skeleton.jeeves.game_engine_runtime import (
     ExecutableGameEngineLab,
 )
 from skeleton.jeeves.game_engine_session import (
+    MAX_REPLAY_TAPE_BYTES,
     DeterministicGameLoop,
     build_game_loop,
+    build_replay_tape,
+    parse_replay_tape,
+    serialize_replay_tape,
+    verify_replay_tape,
 )
 
+
+
+
+def _repack_replay_payload(
+    payload: dict[str, object],
+) -> bytes:
+    identity = dict(
+        payload
+    )
+    identity.pop(
+        "digest",
+        None,
+    )
+    payload = dict(
+        payload
+    )
+    payload["digest"] = (
+        hashlib.sha256(
+            json.dumps(
+                identity,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+    )
+    return (
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        + "\n"
+    ).encode(
+        "utf-8"
+    )
 
 def _one_step_delta(
     loop: DeterministicGameLoop,
@@ -804,3 +851,343 @@ def test_malformed_clock_object_in_combined_snapshot_fails_closed() -> None:
         loop.restore(
             forged
         )
+
+
+
+def test_portable_replay_tape_is_byte_for_byte_deterministic() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    delta = _one_step_delta(
+        loop
+    )
+    for tick in range(8):
+        loop.advance(
+            delta,
+            (
+                RawInputSample(
+                    tick=tick,
+                    player=0,
+                    device=InputDevice.DUAL_ANALOG_PAD,
+                    move_x=0.6,
+                    aim_y=(
+                        0.5
+                        if tick % 2
+                        else -0.5
+                    ),
+                ),
+            ),
+        )
+
+    first_tape = build_replay_tape(
+        loop
+    )
+    second_tape = build_replay_tape(
+        loop
+    )
+    first_bytes = serialize_replay_tape(
+        first_tape
+    )
+    second_bytes = serialize_replay_tape(
+        second_tape
+    )
+    parsed = parse_replay_tape(
+        first_bytes
+    )
+
+    assert first_tape == second_tape
+    assert first_bytes == second_bytes
+    assert parsed == first_tape
+    assert len(first_tape.digest) == 64
+    assert (
+        verify_replay_tape(
+            loop.sandbox,
+            parsed,
+        ).passed
+    )
+
+
+def test_empty_genesis_replay_tape_verifies() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.PONG
+        )
+    )
+    tape = build_replay_tape(
+        loop
+    )
+
+    assert tape.advances == ()
+    verification = verify_replay_tape(
+        loop.sandbox,
+        tape,
+    )
+    assert verification.passed
+    assert verification.advances == 0
+
+
+def test_replay_tape_is_bound_to_exact_sandbox_tree() -> None:
+    sandbox = (
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    loop = build_game_loop(
+        sandbox
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        )
+    )
+    tape = build_replay_tape(
+        loop
+    )
+    different = sandbox.apply(
+        (
+            SandboxPatch(
+                "notes/replay-mismatch.txt",
+                "different authority",
+            ),
+        )
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="does not match sandbox authority",
+    ):
+        verify_replay_tape(
+            different,
+            tape,
+        )
+
+
+def test_replay_tape_top_level_digest_tamper_is_rejected() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.EIGHT_BIT
+        )
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        )
+    )
+    data = serialize_replay_tape(
+        build_replay_tape(
+            loop
+        )
+    )
+    payload = json.loads(
+        data
+    )
+    payload["digest"] = "0" * 64
+    forged = (
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode(
+        "utf-8"
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="tape digest mismatch",
+    ):
+        parse_replay_tape(
+            forged
+        )
+
+
+def test_rehashed_tape_with_forged_advance_evidence_fails_fresh_replay() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        ),
+        (
+            RawInputSample(
+                tick=0,
+                player=0,
+                device=InputDevice.DUAL_ANALOG_PAD,
+                move_x=0.8,
+            ),
+        ),
+    )
+    payload = json.loads(
+        serialize_replay_tape(
+            build_replay_tape(
+                loop
+            )
+        )
+    )
+    payload[
+        "advances"
+    ][0][
+        "result_digest"
+    ] = "0" * 64
+    forged_data = (
+        _repack_replay_payload(
+            payload
+        )
+    )
+    tape = parse_replay_tape(
+        forged_data
+    )
+
+    verification = verify_replay_tape(
+        loop.sandbox,
+        tape,
+    )
+
+    assert not verification.passed
+    assert verification.failure_index == 0
+    assert (
+        verification.detail
+        == "tape replay evidence diverged"
+    )
+
+
+def test_rehashed_tape_with_forged_final_fingerprint_fails_final_authority() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.SHADER
+        )
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        )
+    )
+    payload = json.loads(
+        serialize_replay_tape(
+            build_replay_tape(
+                loop
+            )
+        )
+    )
+    payload[
+        "final_machine_digest"
+    ] = "0" * 64
+    tape = parse_replay_tape(
+        _repack_replay_payload(
+            payload
+        )
+    )
+
+    verification = verify_replay_tape(
+        loop.sandbox,
+        tape,
+    )
+
+    assert not verification.passed
+    assert (
+        verification.failure_index
+        == len(tape.advances)
+    )
+    assert (
+        verification.detail
+        == "replay tape final authority diverged"
+    )
+
+
+def test_replay_parser_rejects_boolean_button_encoding() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        ),
+        (
+            RawInputSample(
+                tick=0,
+                player=0,
+                device=InputDevice.DUAL_ANALOG_PAD,
+            ),
+        ),
+    )
+    payload = json.loads(
+        serialize_replay_tape(
+            build_replay_tape(
+                loop
+            )
+        )
+    )
+    payload[
+        "advances"
+    ][0][
+        "samples"
+    ][0][
+        "buttons"
+    ] = True
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="enum encoding",
+    ):
+        parse_replay_tape(
+            _repack_replay_payload(
+                payload
+            )
+        )
+
+
+def test_replay_parser_rejects_oversized_bytes() -> None:
+    with pytest.raises(
+        GameEngineLabError,
+        match="bytes outside bounds",
+    ):
+        parse_replay_tape(
+            b"x"
+            * (
+                MAX_REPLAY_TAPE_BYTES
+                + 1
+            )
+        )
+
+
+def test_jeeves_exports_and_verifies_portable_game_loop_replay() -> None:
+    jeeves = Jeeves()
+    sandbox = jeeves.build_game_engine(
+        EngineEra.MODERN
+    )
+    loop = jeeves.game_loop(
+        sandbox
+    )
+    loop.advance(
+        _one_step_delta(
+            loop
+        )
+    )
+
+    data = jeeves.export_game_loop_replay(
+        loop
+    )
+    verification = (
+        jeeves.verify_game_loop_replay_tape(
+            sandbox,
+            data,
+        )
+    )
+
+    assert verification.passed
+    assert verification.advances == 1
