@@ -193,7 +193,15 @@ class SemanticLensHypergraph:
         if overlap < self.policy.minimum_observation_overlap:
             return None
         families = {item.family for item in items}
-        family_diversity = min(1.0, len(families) / max(1, total_family_count))
+        # Diversity must be intrinsic to this edge. Using the size of the
+        # global LensFamily enum made existing edges weaker whenever the
+        # catalog gained a new family. Normalize by the maximum diversity the
+        # current edge order can express instead.
+        family_diversity = (
+            1.0
+            if len(items) <= 1
+            else (len(families) - 1) / max(1, len(items) - 1)
+        )
         if family_diversity < self.policy.minimum_family_diversity:
             return None
         calibration = [
