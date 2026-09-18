@@ -195,6 +195,17 @@ class SemanticPlaneLearningUpdate:
 
 
 @dataclass(frozen=True, slots=True)
+class SemanticTargetFusion:
+    fusion_id: str
+    proposition: str
+    horizon: str
+    forecast_ids: tuple[str, ...]
+    lens_keys: tuple[str, ...]
+    result: LensFusionResult
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
 class SemanticPlaneSnapshot:
     observation_ids: tuple[str, ...]
     selection: LensSelection
@@ -212,6 +223,8 @@ class SemanticPlaneSnapshot:
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
     fingerprint: str
+    target_fusions: tuple[SemanticTargetFusion, ...] = ()
+    semantic_domain: str | None = None
 
 
 class SemanticLensPlane:
@@ -501,6 +514,81 @@ class SemanticLensPlane:
             )
         return tuple(signals)
 
+    @staticmethod
+    def _forecast_target_key(
+        forecast: SemanticForecast,
+    ) -> tuple[str, str]:
+        proposition = " ".join(forecast.proposition.split()).casefold()
+        horizon = " ".join(forecast.horizon.split()).casefold()
+        return proposition, horizon
+
+    def _target_fusions(
+        self,
+        forecasts: Sequence[SemanticForecast],
+        governance: SemanticGovernanceSnapshot,
+        *,
+        base_rate: float,
+    ) -> tuple[SemanticTargetFusion, ...]:
+        groups: dict[tuple[str, str], list[SemanticForecast]] = {}
+        for forecast in forecasts:
+            groups.setdefault(
+                self._forecast_target_key(forecast),
+                [],
+            ).append(forecast)
+
+        fused: list[SemanticTargetFusion] = []
+        for target_key, group in sorted(groups.items()):
+            ordered = tuple(
+                sorted(group, key=lambda item: item.forecast_id)
+            )
+            signals = self._signals(ordered, governance)
+            result = self.fusion.fuse(
+                signals,
+                base_rate=base_rate,
+            )
+            forecast_ids = tuple(
+                item.forecast_id for item in ordered
+            )
+            lens_keys = tuple(
+                sorted(
+                    {
+                        key
+                        for item in ordered
+                        for key in item.source_lens_keys
+                    }
+                )
+            )
+            fusion_id = stable_id(
+                "semantic-target-fusion",
+                {
+                    "target": target_key,
+                    "forecasts": forecast_ids,
+                    "fusion": result.fingerprint,
+                },
+                length=30,
+            )
+            fingerprint = stable_fingerprint(
+                {
+                    "fusion_id": fusion_id,
+                    "target": target_key,
+                    "forecast_ids": forecast_ids,
+                    "lens_keys": lens_keys,
+                    "fusion": result.fingerprint,
+                }
+            )
+            fused.append(
+                SemanticTargetFusion(
+                    fusion_id=fusion_id,
+                    proposition=ordered[0].proposition,
+                    horizon=ordered[0].horizon,
+                    forecast_ids=forecast_ids,
+                    lens_keys=lens_keys,
+                    result=result,
+                    fingerprint=fingerprint,
+                )
+            )
+        return tuple(fused)
+
     def _seed_family(self, seed: TangentSeed) -> LensFamily | None:
         key = seed.lens_key.strip().casefold()
         try:
@@ -748,6 +836,7 @@ class SemanticLensPlane:
         requested: Sequence[str] = (),
         base_rate: float | None = None,
         sequence: int = 0,
+        domain: str | None = None,
     ) -> SemanticPlaneSnapshot:
         if not observations:
             raise AgentContractError("semantic plane requires observations")
@@ -763,6 +852,7 @@ class SemanticLensPlane:
         governance = self.governance.assess(
             selection,
             observations=observations,
+            domain=domain,
         )
         if (
             governance.factual_assertion_authorized
@@ -829,6 +919,11 @@ class SemanticLensPlane:
             "base_rate", base_rate
         )
         fusion = self.fusion.fuse(signals, base_rate=rate)
+        target_fusions = self._target_fusions(
+            forecasts,
+            governance,
+            base_rate=rate,
+        )
 
         tangent_ids, frontier = self._seed_tangent_frontier(
             observations=observations,
@@ -872,6 +967,10 @@ class SemanticLensPlane:
                 "hypergraph": hypergraph.fingerprint,
                 "forecasts": [item.fingerprint for item in forecasts],
                 "fusion": fusion.fingerprint,
+                "target_fusions": [
+                    item.fingerprint for item in target_fusions
+                ],
+                "semantic_domain": governance.domain,
                 "tangents": tangent_ids,
                 "frontier": frontier.fingerprint,
                 "coverage": coverage.fingerprint,
@@ -897,6 +996,8 @@ class SemanticLensPlane:
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
             fingerprint=fingerprint,
+            target_fusions=target_fusions,
+            semantic_domain=governance.domain,
         )
 
     def resolve_forecast(
