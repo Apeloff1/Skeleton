@@ -138,6 +138,7 @@ EVIDENCE_PLANE_PREFIXES = (
     "physics/compiled/",
     "audio/compiled/",
     "animation/compiled/",
+    "navigation/compiled/",
 )
 
 
