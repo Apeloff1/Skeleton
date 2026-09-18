@@ -90,7 +90,6 @@ class CheckpointMigrator:
 
     def migration(self, from_version: int) -> Callable[[MigrationFn], MigrationFn]:
         """Decorator form of :meth:`register`."""
-
         def decorate(fn: MigrationFn) -> MigrationFn:
             self.register(from_version, fn)
             return fn
@@ -206,4 +205,6 @@ class CheckpointMigrator:
             raise MigrationValidationError(
                 f"{field} exceeds {self._max_payload_bytes} encoded bytes"
             )
+        # JSON round-trip guarantees the caller receives detached plain data,
+        # not an object graph that a migration function can later mutate.
         return json.loads(encoded)
