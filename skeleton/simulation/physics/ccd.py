@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
-from .convex import convex_time_of_impact
+from .convex import convex_plane_time_of_impact, convex_time_of_impact
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
@@ -422,6 +422,68 @@ class ContinuousCollisionDetector:
                     fraction=hit.fraction,
                     time=hit.time,
                     normal=hit.normal,
+                )
+                events[pair] = event
+
+        for convex in ordered:
+            if not self._eligible_continuous_body(convex, dt):
+                continue
+            if isinstance(convex.shape, PlaneShape):
+                continue
+
+            for plane in ordered:
+                if plane.body_id == convex.body_id:
+                    continue
+                if not isinstance(plane.shape, PlaneShape):
+                    continue
+
+                pair = tuple(
+                    sorted((convex.body_id, plane.body_id))
+                )
+                if pair in events:
+                    # Exact sphere/static-plane sweeps and any earlier
+                    # canonical event remain authoritative.
+                    continue
+
+                checks += 1
+                if checks > self.max_checks:
+                    raise PhysicsValidationError(
+                        "CCD check bound exceeded"
+                    )
+
+                hit = convex_plane_time_of_impact(
+                    convex,
+                    plane,
+                    dt,
+                    max_iterations=64,
+                    distance_tolerance=1.0e-6,
+                    time_tolerance=1.0e-9,
+                )
+                if hit is None:
+                    continue
+
+                if hit.time <= EPSILON:
+                    relative_velocity = (
+                        plane.velocity_at_world_point(hit.point_b)
+                        - convex.velocity_at_world_point(hit.point_a)
+                    )
+                    if (
+                        relative_velocity.dot(hit.normal)
+                        >= -EPSILON
+                    ):
+                        continue
+
+                if convex.body_id < plane.body_id:
+                    normal = hit.normal
+                else:
+                    normal = -hit.normal
+
+                event = TOIEvent(
+                    body_a=pair[0],
+                    body_b=pair[1],
+                    fraction=hit.fraction,
+                    time=hit.time,
+                    normal=normal,
                 )
                 events[pair] = event
 
