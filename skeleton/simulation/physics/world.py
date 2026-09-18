@@ -11,6 +11,9 @@ from .ccd import ContinuousCollisionDetector, TOIEvent
 from .character import (
     CharacterGroundState,
     CharacterMoveResult,
+    CharacterRecoveryResult,
+    CharacterResizeResult,
+    CharacterRuntimeResult,
     KinematicCapsuleController,
 )
 from .collision import (
@@ -482,6 +485,67 @@ class PhysicsWorld:
             dt=step_dt,
             ignore=ignore,
             distance=distance,
+        )
+
+    def recover_character_overlaps(
+        self,
+        controller: KinematicCapsuleController,
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> CharacterRecoveryResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        return controller.recover_overlaps(
+            self.bodies(),
+            ignore=ignore,
+        )
+
+    def resize_character(
+        self,
+        controller: KinematicCapsuleController,
+        new_half_height: float,
+        *,
+        ignore: tuple[str, ...] = (),
+        preserve_foot: bool = True,
+    ) -> CharacterResizeResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        return controller.resize(
+            new_half_height,
+            self.bodies(),
+            ignore=ignore,
+            preserve_foot=preserve_foot,
+        )
+
+    def step_character_runtime(
+        self,
+        controller: KinematicCapsuleController,
+        requested_velocity: Vec3,
+        *,
+        dt: float | None = None,
+        ignore: tuple[str, ...] = (),
+        recover_overlaps: bool = True,
+        carry_support: bool = True,
+    ) -> CharacterRuntimeResult:
+        if not isinstance(controller, KinematicCapsuleController):
+            raise PhysicsValidationError(
+                "controller must be KinematicCapsuleController"
+            )
+        step_dt = self.settings.fixed_dt if dt is None else _positive(
+            dt,
+            name="character dt",
+        )
+        return controller.runtime_step(
+            requested_velocity,
+            self.bodies(),
+            dt=step_dt,
+            ignore=ignore,
+            recover_overlaps=recover_overlaps,
+            carry_support=carry_support,
         )
 
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
