@@ -117,6 +117,241 @@ def _ray_aabb(
     return near, far
 
 
+@dataclass(frozen=True, slots=True)
+class SegmentTriangleClosest:
+    segment_point: Vec3
+    triangle_point: Vec3
+    segment_parameter: float
+    barycentric: tuple[float, float, float]
+
+    @property
+    def distance_squared(self) -> float:
+        return (
+            self.segment_point - self.triangle_point
+        ).length_squared()
+
+
+def closest_points_on_segments(
+    first_start: Vec3,
+    first_end: Vec3,
+    second_start: Vec3,
+    second_end: Vec3,
+) -> tuple[Vec3, Vec3, float, float]:
+    """Closest points on two finite segments with deterministic clamping."""
+
+    first_delta = first_end - first_start
+    second_delta = second_end - second_start
+    relative = first_start - second_start
+    first_length_sq = first_delta.length_squared()
+    second_length_sq = second_delta.length_squared()
+
+    if (
+        first_length_sq <= _GEOMETRY_EPSILON_SQ
+        and second_length_sq <= _GEOMETRY_EPSILON_SQ
+    ):
+        return first_start, second_start, 0.0, 0.0
+
+    if first_length_sq <= _GEOMETRY_EPSILON_SQ:
+        first_t = 0.0
+        second_t = min(
+            1.0,
+            max(
+                0.0,
+                second_delta.dot(first_start - second_start)
+                / second_length_sq,
+            ),
+        )
+    else:
+        first_dot = first_delta.dot(relative)
+        if second_length_sq <= _GEOMETRY_EPSILON_SQ:
+            second_t = 0.0
+            first_t = min(
+                1.0,
+                max(0.0, -first_dot / first_length_sq),
+            )
+        else:
+            cross_dot = first_delta.dot(second_delta)
+            second_dot = second_delta.dot(relative)
+            denominator = (
+                first_length_sq * second_length_sq
+                - cross_dot * cross_dot
+            )
+            if abs(denominator) > _GEOMETRY_EPSILON_SQ:
+                first_t = min(
+                    1.0,
+                    max(
+                        0.0,
+                        (
+                            cross_dot * second_dot
+                            - first_dot * second_length_sq
+                        )
+                        / denominator,
+                    ),
+                )
+            else:
+                first_t = 0.0
+
+            second_t = (
+                cross_dot * first_t + second_dot
+            ) / second_length_sq
+            if second_t < 0.0:
+                second_t = 0.0
+                first_t = min(
+                    1.0,
+                    max(0.0, -first_dot / first_length_sq),
+                )
+            elif second_t > 1.0:
+                second_t = 1.0
+                first_t = min(
+                    1.0,
+                    max(
+                        0.0,
+                        (cross_dot - first_dot) / first_length_sq,
+                    ),
+                )
+
+    first_point = first_start + first_delta * first_t
+    second_point = second_start + second_delta * second_t
+    return first_point, second_point, first_t, second_t
+
+
+def _segment_triangle_intersection(
+    start: Vec3,
+    end: Vec3,
+    a: Vec3,
+    b: Vec3,
+    c: Vec3,
+) -> SegmentTriangleClosest | None:
+    direction = end - start
+    edge1 = b - a
+    edge2 = c - a
+    p = direction.cross(edge2)
+    determinant = edge1.dot(p)
+    if abs(determinant) <= 1.0e-12:
+        return None
+
+    inverse = 1.0 / determinant
+    tvec = start - a
+    u = tvec.dot(p) * inverse
+    if u < -1.0e-10 or u > 1.0 + 1.0e-10:
+        return None
+
+    q = tvec.cross(edge1)
+    v = direction.dot(q) * inverse
+    if v < -1.0e-10 or u + v > 1.0 + 1.0e-10:
+        return None
+
+    segment_t = edge2.dot(q) * inverse
+    if segment_t < -1.0e-10 or segment_t > 1.0 + 1.0e-10:
+        return None
+    segment_t = min(1.0, max(0.0, segment_t))
+    point = start + direction * segment_t
+    return SegmentTriangleClosest(
+        segment_point=point,
+        triangle_point=point,
+        segment_parameter=segment_t,
+        barycentric=(1.0 - u - v, u, v),
+    )
+
+
+def closest_points_segment_triangle(
+    start: Vec3,
+    end: Vec3,
+    a: Vec3,
+    b: Vec3,
+    c: Vec3,
+) -> SegmentTriangleClosest:
+    """Exact closest pair between one finite segment and one triangle."""
+
+    intersection = _segment_triangle_intersection(
+        start,
+        end,
+        a,
+        b,
+        c,
+    )
+    if intersection is not None:
+        return intersection
+
+    candidates: list[tuple[float, int, SegmentTriangleClosest]] = []
+
+    start_triangle, start_weights = closest_point_on_triangle(
+        start,
+        a,
+        b,
+        c,
+    )
+    start_result = SegmentTriangleClosest(
+        segment_point=start,
+        triangle_point=start_triangle,
+        segment_parameter=0.0,
+        barycentric=start_weights,
+    )
+    candidates.append((start_result.distance_squared, 0, start_result))
+
+    end_triangle, end_weights = closest_point_on_triangle(
+        end,
+        a,
+        b,
+        c,
+    )
+    end_result = SegmentTriangleClosest(
+        segment_point=end,
+        triangle_point=end_triangle,
+        segment_parameter=1.0,
+        barycentric=end_weights,
+    )
+    candidates.append((end_result.distance_squared, 1, end_result))
+
+    edges = (
+        (a, b, (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+        (b, c, (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+        (c, a, (0.0, 0.0, 1.0), (1.0, 0.0, 0.0)),
+    )
+    for edge_index, (
+        edge_start,
+        edge_end,
+        start_weights,
+        end_weights,
+    ) in enumerate(edges):
+        segment_point, edge_point, segment_t, edge_t = (
+            closest_points_on_segments(
+                start,
+                end,
+                edge_start,
+                edge_end,
+            )
+        )
+        weights = tuple(
+            start_weights[index] * (1.0 - edge_t)
+            + end_weights[index] * edge_t
+            for index in range(3)
+        )
+        result = SegmentTriangleClosest(
+            segment_point=segment_point,
+            triangle_point=edge_point,
+            segment_parameter=segment_t,
+            barycentric=weights,  # type: ignore[arg-type]
+        )
+        candidates.append(
+            (
+                result.distance_squared,
+                2 + edge_index,
+                result,
+            )
+        )
+
+    return min(
+        candidates,
+        key=lambda row: (
+            row[0],
+            row[1],
+            row[2].segment_parameter,
+            row[2].barycentric,
+        ),
+    )[2]
+
+
 def closest_point_on_triangle(
     point: Vec3,
     a: Vec3,
