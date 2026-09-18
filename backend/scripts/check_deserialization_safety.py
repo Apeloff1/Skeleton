@@ -163,24 +163,32 @@ def _parameter_names(scope: ast.AST) -> set[str]:
     return names
 
 
-def _assigned_names(node: ast.AST) -> list[str]:
-    if isinstance(node, ast.Assign):
-        return [target.id for target in node.targets if isinstance(target, ast.Name)]
-    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-        return [node.target.id]
-    if isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
-        return [node.target.id]
+def _target_bindings(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
+    if isinstance(target, ast.Name):
+        return [(target.id, value)]
+    if (
+        isinstance(target, (ast.Tuple, ast.List))
+        and isinstance(value, (ast.Tuple, ast.List))
+        and len(target.elts) == len(value.elts)
+    ):
+        bindings: list[tuple[str, ast.AST]] = []
+        for child_target, child_value in zip(target.elts, value.elts):
+            bindings.extend(_target_bindings(child_target, child_value))
+        return bindings
     return []
 
 
-def _assignment_value(node: ast.AST) -> ast.AST | None:
+def _assignment_bindings(node: ast.AST) -> list[tuple[str, ast.AST]]:
     if isinstance(node, ast.Assign):
-        return node.value
-    if isinstance(node, ast.AnnAssign):
-        return node.value
+        bindings: list[tuple[str, ast.AST]] = []
+        for target in node.targets:
+            bindings.extend(_target_bindings(target, node.value))
+        return bindings
+    if isinstance(node, ast.AnnAssign) and node.value is not None:
+        return _target_bindings(node.target, node.value)
     if isinstance(node, ast.NamedExpr):
-        return node.value
-    return None
+        return _target_bindings(node.target, node.value)
+    return []
 
 
 def stable_module_aliases(
@@ -197,10 +205,9 @@ def stable_module_aliases(
     parameters = _parameter_names(scope)
     candidates: list[tuple[str, ast.AST]] = []
     for node in nodes:
-        value = _assignment_value(node)
-        if not isinstance(value, (ast.Name, ast.Attribute)):
-            continue
-        for name in _assigned_names(node):
+        for name, value in _assignment_bindings(node):
+            if not isinstance(value, (ast.Name, ast.Attribute)):
+                continue
             if stores[name] == 1 and name not in parameters:
                 candidates.append((name, value))
 
@@ -245,13 +252,10 @@ def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> d
         changed = False
         aliases = {**import_map, **resolved}
         for node in nodes:
-            value = _assignment_value(node)
-            if value is None:
-                continue
-            source = canonical_name(value, aliases)
-            if source not in TRACKED_DESERIALIZER_CALLABLES:
-                continue
-            for name in _assigned_names(node):
+            for name, value in _assignment_bindings(node):
+                source = canonical_name(value, aliases)
+                if source not in TRACKED_DESERIALIZER_CALLABLES:
+                    continue
                 if name in resolved or name in parameters or stores[name] != 1:
                     continue
                 resolved[name] = source
