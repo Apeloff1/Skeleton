@@ -267,6 +267,114 @@ class Jeeves:
             )
         return self._game_projects
 
+    def compile_game_navigation(
+        self,
+        sandbox,
+        source,
+    ):
+        """Compile one bounded historical navigation graph into a sandbox."""
+        from skeleton.jeeves.game_engine_navigation import (
+            attach_navigation_build,
+            compile_navigation_build,
+        )
+
+        build = compile_navigation_build(
+            sandbox.era,
+            source,
+        )
+        compiled = attach_navigation_build(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_compiled",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "source_digest": build.source_digest,
+                "policy_digest": build.policy_digest,
+                "manifest_digest": build.manifest_digest,
+                "node_count": len(source.nodes),
+                "edge_count": len(source.edges),
+                "tree_digest": compiled.tree.digest,
+            },
+        )
+        return compiled
+
+    def evaluate_game_navigation(
+        self,
+        sandbox,
+        source,
+    ):
+        """Attest compiled navigation, path optimality, hierarchy, and steering."""
+        from skeleton.jeeves.game_engine_navigation import NavigationAdversary
+
+        report = NavigationAdversary().evaluate(
+            sandbox,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_evaluated",
+            {
+                "era": sandbox.era.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def game_navigation(
+        self,
+        era,
+        source=None,
+    ):
+        """Create a deterministic historical navigation runtime."""
+        from skeleton.jeeves.game_engine_navigation import build_navigation_runtime
+
+        runtime = build_navigation_runtime(
+            era,
+            source,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_created",
+            {
+                "era": runtime.era.value,
+                "mode": runtime.policy.mode.value,
+                "nodes": len(runtime.source.nodes),
+                "edges": len(runtime.source.edges),
+                "dynamic_obstacles": runtime.policy.dynamic_obstacles,
+                "hierarchical": runtime.policy.hierarchical,
+                "crowd_steering": runtime.policy.crowd_steering,
+            },
+        )
+        return runtime
+
+    def query_game_navigation(
+        self,
+        runtime,
+        query,
+    ):
+        """Execute one deterministic navigation query."""
+        result = runtime.path(
+            query
+        )
+        self._bus.emit(
+            "jeeves.game_engine.navigation_queried",
+            {
+                "era": result.era.value,
+                "mode": result.mode.value,
+                "start": result.start,
+                "goal": result.goal,
+                "found": result.found,
+                "path_nodes": len(result.path),
+                "cost": result.total_cost,
+                "expanded_nodes": result.expanded_nodes,
+                "digest": result.digest,
+            },
+        )
+        return result
+
     def game_loop(
         self,
         sandbox,
