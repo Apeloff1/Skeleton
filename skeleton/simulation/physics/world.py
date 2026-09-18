@@ -864,12 +864,24 @@ class PhysicsWorld:
             raise PhysicsValidationError(
                 "CCD TOI failed to produce a resolvable contact manifold"
             )
+        # The sweep normal is the first-contact normal. Re-running penetration
+        # at the microscopic bias depth can select a different smooth-feature
+        # EPA normal, which leaves artificial through-target velocity. Keep the
+        # narrow phase's witnesses/material but solve the interim impact along
+        # the stable TOI normal.
+        impact_manifold = ContactManifold(
+            body_a=manifold.body_a,
+            body_b=manifold.body_b,
+            normal=event.normal,
+            points=manifold.points,
+            material=manifold.material,
+        )
         # Do not persist interim impulses into the frame cache. The final
         # discrete solve owns next-frame warm-start state; caching here would
         # re-apply the same impact impulse later in this tick.
         self._solver.solve(
             self._bodies,
-            (manifold,),
+            (impact_manifold,),
             cache=None,
             tick=tick,
         )
