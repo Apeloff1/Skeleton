@@ -724,3 +724,23 @@ def test_control_plane_turns_repeated_forecast_misses_into_new_research_question
     frontier = control.map_epistemic_frontier(obligations)
     assert frontier.gaps
     assert control.research_agenda.items_for_obligation(derived.obligation_id)
+
+
+
+def test_public_agent_namespace_exports_epistemic_research_control_plane() -> None:
+    import skeleton.jeeves.agent as agent
+
+    required = {
+        "EpistemicFrontierEngine",
+        "KnowledgeObligation",
+        "HypothesisTournament",
+        "HypothesisSynthesisGate",
+        "ResearchAgenda",
+        "ResearchAssuranceGate",
+        "CompletionCertificate",
+        "UnknownUnknownScout",
+        "FrontierCognitiveControlPlane",
+    }
+    assert required.issubset(set(agent.__all__))
+    for name in required:
+        assert getattr(agent, name) is not None
