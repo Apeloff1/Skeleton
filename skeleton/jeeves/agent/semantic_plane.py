@@ -1005,6 +1005,46 @@ class SemanticLensPlane:
             fingerprint=fingerprint,
         )
 
+    def declare_topology_candidate_prediction(
+        self,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        """Create and persist one canonical topology experiment prediction."""
+
+        return self.topology_learning.declare_candidate_prediction(
+            candidate_id,
+            kind=kind,
+            predicted_probability=predicted_probability,
+            domain=domain,
+            independent_run=independent_run,
+            predicted_at=predicted_at,
+            negative_control=negative_control,
+            source_finding_ids=source_finding_ids,
+            source_forecast_ids=source_forecast_ids,
+            evidence_ids=evidence_ids,
+            metadata=metadata,
+        )
+
+    def unresolved_topology_predictions(
+        self,
+        *,
+        candidate_id: str | None = None,
+    ) -> tuple[TopologyBridgePrediction, ...]:
+        return self.topology_learning.unresolved_predictions(
+            candidate_id=candidate_id,
+        )
+
     def declare_topology_bridge_prediction(
         self,
         prediction: TopologyBridgePrediction,
