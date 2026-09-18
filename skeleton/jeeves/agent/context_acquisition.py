@@ -1,1 +1,296 @@
-"""Interaction acquisition bridge for cue-first Jeeves context.\n\nThis module makes the memory-game layer operational rather than optional.\nEvery user interaction is captured as a namespace-scoped card, linked to recent\ncards through temporal/context/juxtaposition relations, and made available to\nthe existing LayeredContextResolver before any journal/log/archive lookup.\n\nAssociations affect retrieval order only. They never raise factual trust.\n"""\n\nfrom __future__ import annotations\n\nimport threading\nfrom collections import defaultdict, deque\nfrom dataclasses import dataclass, field\nfrom typing import Any, Mapping, Sequence\n\nfrom .associative_memory import (\n    AssociationKind,\n    AssociativeMemoryGameIndex,\n    MemoryAssociation,\n    SequencePrediction,\n)\nfrom .context_pipeline import ContextResolution, LayeredContextResolver\nfrom .memory import MemoryNamespace\nfrom .memory_game import CardHit, InteractionCard\nfrom .semantic_lenses import JuxtapositionAnalyzer, SemanticObservation\nfrom .types import AgentContractError, json_safe, positive_int, probability, stable_fingerprint, stable_id\n\n\n@dataclass(frozen=True, slots=True)\nclass InteractionAcquisitionPolicy:\n    recent_window: int = 12\n    juxtaposition_threshold: float = 0.48\n    context_shift_threshold: float = 0.50\n    correction_cues: tuple[str, ...] = ("correction", "correct", "actually", "instead", "no,", "not that")\n    predict_prefix: int = 3\n    recall_limit: int = 12\n\n    def __post_init__(self) -> None:\n        object.__setattr__(self, "recent_window", positive_int("recent_window", self.recent_window, maximum=256))\n        object.__setattr__(self, "predict_prefix", positive_int("predict_prefix", self.predict_prefix, maximum=5))\n        object.__setattr__(self, "recall_limit", positive_int("recall_limit", self.recall_limit, maximum=1000))\n        object.__setattr__(self, "juxtaposition_threshold", probability("juxtaposition_threshold", self.juxtaposition_threshold))\n        object.__setattr__(self, "context_shift_threshold", probability("context_shift_threshold", self.context_shift_threshold))\n        object.__setattr__(self, "correction_cues", tuple(str(x).casefold() for x in self.correction_cues if str(x).strip()))\n\n\n@dataclass(frozen=True, slots=True)\nclass AcquisitionTrace:\n    trace_id: str\n    namespace_key: str\n    card: InteractionCard\n    relation_ids: tuple[str, ...]\n    previous_card_ids: tuple[str, ...]\n    juxtaposition_score: float\n    context_shift_score: float\n    predicted_next: SequencePrediction | None\n    metadata: Mapping[str, Any] = field(default_factory=dict)\n\n    def __post_init__(self) -> None:\n        if not self.trace_id or not self.namespace_key:\n            raise AgentContractError("acquisition trace requires ids")\n        object.__setattr__(self, "juxtaposition_score", probability("juxtaposition_score", self.juxtaposition_score))\n        object.__setattr__(self, "context_shift_score", probability("context_shift_score", self.context_shift_score))\n        object.__setattr__(self, "relation_ids", tuple(sorted({str(x) for x in self.relation_ids if str(x)})))\n        object.__setattr__(self, "previous_card_ids", tuple(str(x) for x in self.previous_card_ids if str(x)))\n        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))\n\n    @property\n    def fingerprint(self) -> str:\n        return stable_fingerprint({\n            "trace": self.trace_id,\n            "namespace": self.namespace_key,\n            "card": self.card.content_fingerprint,\n            "relations": self.relation_ids,\n            "previous": self.previous_card_ids,\n            "juxtaposition": self.juxtaposition_score,\n            "context_shift": self.context_shift_score,\n            "prediction": None if self.predicted_next is None else self.predicted_next.fingerprint,\n        })\n\n\n@dataclass(frozen=True, slots=True)\nclass RecallTrace:\n    query: str\n    card_hits: tuple[CardHit, ...]\n    resolution: ContextResolution | None\n    used_deep_context: bool\n    fingerprint: str\n\n\nclass InteractionAcquisitionEngine:\n    """Store turns as cue cards and learn relational retrieval structure."""\n\n    def __init__(\n        self,\n        cards: AssociativeMemoryGameIndex | None = None,\n        *,\n        resolver: LayeredContextResolver | None = None,\n        policy: InteractionAcquisitionPolicy | None = None,\n    ) -> None:\n        self.cards = cards or AssociativeMemoryGameIndex()\n        if not isinstance(self.cards, AssociativeMemoryGameIndex):\n            raise TypeError("cards must be AssociativeMemoryGameIndex")\n        self.resolver = resolver\n        if resolver is not None:\n            same_index = resolver.cards is self.cards\n            same_store = getattr(resolver.cards, "store", None) is self.cards.store\n            if not (same_index or same_store):\n                raise AgentContractError("resolver must use the same L0 card store as acquisition engine")\n        self.policy = policy or InteractionAcquisitionPolicy()\n        self._recent: defaultdict[str, deque[str]] = defaultdict(lambda: deque(maxlen=self.policy.recent_window))\n        self._positions: defaultdict[str, int] = defaultdict(int)\n        self._lock = threading.RLock()\n\n    @staticmethod\n    def _tag_shift(left: Sequence[str], right: Sequence[str]) -> float:\n        a = {str(x).casefold() for x in left if str(x).strip()}\n        b = {str(x).casefold() for x in right if str(x).strip()}\n        if not a and not b:\n            return 0.0\n        return 1.0 - len(a & b) / max(1, len(a | b))\n\n    def _semantic_observation(self, card: InteractionCard, position: int) -> SemanticObservation:\n        return SemanticObservation(\n            observation_id=card.card_id,\n            content=card.content,\n            position=position,\n            source=card.source,\n            tags=card.context_tags,\n            evidence_ids=card.provenance,\n            metadata={"card_fingerprint": card.content_fingerprint},\n        )\n\n    def capture(\n        self,\n        namespace: MemoryNamespace,\n        content: str,\n        *,\n        context_tags: Sequence[str] = (),\n        source: str = "user-interaction",\n        trust: float = 0.65,\n        salience: float = 0.65,\n        surprise: float = 0.0,\n        provenance: Sequence[str] = (),\n        metadata: Mapping[str, Any] | None = None,\n    ) -> AcquisitionTrace:\n        """Capture one interaction and update temporal/semantic L0 edges."""\n        card = self.cards.capture_interaction(\n            namespace,\n            content,\n            context_tags=context_tags,\n            source=source,\n            trust=trust,\n            salience=salience,\n            surprise=surprise,\n            provenance=provenance,\n            metadata={**dict(metadata or {}), "l0_acquired": True},\n        )\n        with self._lock:\n            key = namespace.key\n            recent = self._recent[key]\n            previous_ids = tuple(recent)\n            position = self._positions[key]\n            self._positions[key] += 1\n            relations: list[MemoryAssociation] = []\n            juxtaposition_score = 0.0\n            context_shift_score = 0.0\n\n            if previous_ids:\n                previous = self.cards.store.get(previous_ids[-1])\n                if previous is not None and previous.card_id != card.card_id:\n                    relations.extend(\n                        self.cards.mesh.observe_sequence(\n                            namespace,\n                            (previous.card_id, card.card_id),\n                            kind=AssociationKind.TEMPORAL_FORWARD,\n                            evidence_ids=tuple(provenance),\n                            tags=tuple(context_tags),\n                        )\n                    )\n                    left = self._semantic_observation(previous, max(0, position - 1))\n                    right = self._semantic_observation(card, position)\n                    signal = JuxtapositionAnalyzer.compare(left, right)\n                    juxtaposition_score = max(signal.contrast_signal, signal.novelty_signal)\n                    context_shift_score = self._tag_shift(previous.context_tags, card.context_tags)\n                    if signal.changed_context and juxtaposition_score >= self.policy.juxtaposition_threshold:\n                        relations.extend(\n                            self.cards.mesh.observe_juxtaposition(\n                                namespace,\n                                previous.card_id,\n                                card.card_id,\n                                changed_interpretation=True,\n                                evidence_ids=tuple(provenance),\n                                tags=tuple(context_tags),\n                            )\n                        )\n                    if context_shift_score >= self.policy.context_shift_threshold:\n                        relations.append(\n                            self.cards.mesh.observe(\n                                namespace, previous.card_id, card.card_id,\n                                kind=AssociationKind.CONTEXT_SHIFT,\n                                strength=min(1.0, 0.45 + 0.45 * context_shift_score),\n                                surprise=max(surprise, context_shift_score),\n                                direction_confidence=0.80,\n                                evidence_ids=tuple(provenance),\n                                tags=tuple(context_tags),\n                                metadata={"context_shift": context_shift_score},\n                            )\n                        )\n                    lower = card.content.casefold()\n                    if any(cue in lower for cue in self.policy.correction_cues):\n                        relations.append(\n                            self.cards.mesh.observe(\n                                namespace, previous.card_id, card.card_id,\n                                kind=AssociationKind.CORRECTION,\n                                strength=0.82,\n                                surprise=max(0.55, surprise),\n                                direction_confidence=0.90,\n                                evidence_ids=tuple(provenance),\n                                tags=tuple(context_tags) + ("correction",),\n                                metadata={"revision_candidate": True, "authoritative": False},\n                            )\n                        )\n\n            if not recent or recent[-1] != card.card_id:\n                recent.append(card.card_id)\n            # Learn higher-order short sequences from the recent turn window.\n            prefix_ids = tuple(recent)[-min(len(recent), self.policy.predict_prefix + 1):]\n            if len(prefix_ids) >= 2:\n                self.cards.mesh.observe_sequence(namespace, prefix_ids, kind=AssociationKind.TASK_SEQUENCE)\n            prediction = None\n            if recent:\n                prefix = tuple(recent)[-min(len(recent), self.policy.predict_prefix):]\n                prediction = self.cards.mesh.predict_next(namespace, prefix, limit=8)\n\n        trace_id = stable_id("acquisition-trace", {\n            "namespace": namespace.key,\n            "card": card.card_id,\n            "previous": previous_ids,\n            "relations": sorted(edge.association_id for edge in relations),\n            "position": position,\n        }, length=32)\n        return AcquisitionTrace(\n            trace_id=trace_id,\n            namespace_key=namespace.key,\n            card=card,\n            relation_ids=tuple(edge.association_id for edge in relations),\n            previous_card_ids=previous_ids,\n            juxtaposition_score=juxtaposition_score,\n            context_shift_score=context_shift_score,\n            predicted_next=prediction,\n            metadata={\n                "position": position,\n                "association_count": len(relations),\n                "authoritative": False,\n                "retrieval_only": True,\n            },\n        )\n\n    def recall(\n        self,\n        namespace: MemoryNamespace,\n        query: str,\n        *,\n        context_tags: Sequence[str] = (),\n        allow_deep: bool = True,\n    ) -> RecallTrace:\n        """Recall L0 first; optionally continue through the configured deep resolver."""\n        hits = self.cards.search(\n            namespace, query, context_tags=context_tags, limit=self.policy.recall_limit\n        )\n        resolution = None\n        used_deep = False\n        if allow_deep and self.resolver is not None:\n            resolution = self.resolver.resolve(namespace, query, context_tags=context_tags)\n            used_deep = resolution.stopped_at.value > 0\n        fp = stable_fingerprint({\n            "query": query,\n            "cards": [(hit.card.card_id, round(hit.score, 10)) for hit in hits],\n            "resolution": None if resolution is None else resolution.fingerprint,\n        })\n        return RecallTrace(query, hits, resolution, used_deep, fp)\n\n    def recent_card_ids(self, namespace: MemoryNamespace) -> tuple[str, ...]:\n        with self._lock:\n            return tuple(self._recent.get(namespace.key, ()))\n\n    @property\n    def fingerprint(self) -> str:\n        with self._lock:\n            recent = {key: tuple(value) for key, value in sorted(self._recent.items())}\n        return stable_fingerprint({"cards": self.cards.associative_fingerprint, "recent": recent})
+"""Interaction acquisition bridge for cue-first Jeeves context.
+
+This module makes the memory-game layer operational rather than optional.
+Every user interaction is captured as a namespace-scoped card, linked to recent
+cards through temporal/context/juxtaposition relations, and made available to
+the existing LayeredContextResolver before any journal/log/archive lookup.
+
+Associations affect retrieval order only. They never raise factual trust.
+"""
+
+from __future__ import annotations
+
+import threading
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Sequence
+
+from .associative_memory import (
+    AssociationKind,
+    AssociativeMemoryGameIndex,
+    MemoryAssociation,
+    SequencePrediction,
+)
+from .context_pipeline import ContextResolution, LayeredContextResolver
+from .memory import MemoryNamespace
+from .memory_game import CardHit, InteractionCard
+from .semantic_lenses import JuxtapositionAnalyzer, SemanticObservation
+from .types import AgentContractError, json_safe, positive_int, probability, stable_fingerprint, stable_id
+
+
+@dataclass(frozen=True, slots=True)
+class InteractionAcquisitionPolicy:
+    recent_window: int = 12
+    juxtaposition_threshold: float = 0.48
+    context_shift_threshold: float = 0.50
+    correction_cues: tuple[str, ...] = ("correction", "correct", "actually", "instead", "no,", "not that")
+    predict_prefix: int = 3
+    recall_limit: int = 12
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "recent_window", positive_int("recent_window", self.recent_window, maximum=256))
+        object.__setattr__(self, "predict_prefix", positive_int("predict_prefix", self.predict_prefix, maximum=5))
+        object.__setattr__(self, "recall_limit", positive_int("recall_limit", self.recall_limit, maximum=1000))
+        object.__setattr__(self, "juxtaposition_threshold", probability("juxtaposition_threshold", self.juxtaposition_threshold))
+        object.__setattr__(self, "context_shift_threshold", probability("context_shift_threshold", self.context_shift_threshold))
+        object.__setattr__(self, "correction_cues", tuple(str(x).casefold() for x in self.correction_cues if str(x).strip()))
+
+
+@dataclass(frozen=True, slots=True)
+class AcquisitionTrace:
+    trace_id: str
+    namespace_key: str
+    card: InteractionCard
+    relation_ids: tuple[str, ...]
+    previous_card_ids: tuple[str, ...]
+    juxtaposition_score: float
+    context_shift_score: float
+    predicted_next: SequencePrediction | None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.trace_id or not self.namespace_key:
+            raise AgentContractError("acquisition trace requires ids")
+        object.__setattr__(self, "juxtaposition_score", probability("juxtaposition_score", self.juxtaposition_score))
+        object.__setattr__(self, "context_shift_score", probability("context_shift_score", self.context_shift_score))
+        object.__setattr__(self, "relation_ids", tuple(sorted({str(x) for x in self.relation_ids if str(x)})))
+        object.__setattr__(self, "previous_card_ids", tuple(str(x) for x in self.previous_card_ids if str(x)))
+        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint({
+            "trace": self.trace_id,
+            "namespace": self.namespace_key,
+            "card": self.card.content_fingerprint,
+            "relations": self.relation_ids,
+            "previous": self.previous_card_ids,
+            "juxtaposition": self.juxtaposition_score,
+            "context_shift": self.context_shift_score,
+            "prediction": None if self.predicted_next is None else self.predicted_next.fingerprint,
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class RecallTrace:
+    query: str
+    card_hits: tuple[CardHit, ...]
+    resolution: ContextResolution | None
+    used_deep_context: bool
+    fingerprint: str
+
+
+class InteractionAcquisitionEngine:
+    """Store turns as cue cards and learn relational retrieval structure."""
+
+    def __init__(
+        self,
+        cards: AssociativeMemoryGameIndex | None = None,
+        *,
+        resolver: LayeredContextResolver | None = None,
+        policy: InteractionAcquisitionPolicy | None = None,
+    ) -> None:
+        self.cards = cards or AssociativeMemoryGameIndex()
+        if not isinstance(self.cards, AssociativeMemoryGameIndex):
+            raise TypeError("cards must be AssociativeMemoryGameIndex")
+        self.resolver = resolver
+        if resolver is not None:
+            same_index = resolver.cards is self.cards
+            same_store = getattr(resolver.cards, "store", None) is self.cards.store
+            if not (same_index or same_store):
+                raise AgentContractError("resolver must use the same L0 card store as acquisition engine")
+        self.policy = policy or InteractionAcquisitionPolicy()
+        self._recent: defaultdict[str, deque[str]] = defaultdict(lambda: deque(maxlen=self.policy.recent_window))
+        self._positions: defaultdict[str, int] = defaultdict(int)
+        self._lock = threading.RLock()
+
+    @staticmethod
+    def _tag_shift(left: Sequence[str], right: Sequence[str]) -> float:
+        a = {str(x).casefold() for x in left if str(x).strip()}
+        b = {str(x).casefold() for x in right if str(x).strip()}
+        if not a and not b:
+            return 0.0
+        return 1.0 - len(a & b) / max(1, len(a | b))
+
+    def _semantic_observation(self, card: InteractionCard, position: int) -> SemanticObservation:
+        return SemanticObservation(
+            observation_id=card.card_id,
+            content=card.content,
+            position=position,
+            source=card.source,
+            tags=card.context_tags,
+            evidence_ids=card.provenance,
+            metadata={"card_fingerprint": card.content_fingerprint},
+        )
+
+    def capture(
+        self,
+        namespace: MemoryNamespace,
+        content: str,
+        *,
+        context_tags: Sequence[str] = (),
+        source: str = "user-interaction",
+        trust: float = 0.65,
+        salience: float = 0.65,
+        surprise: float = 0.0,
+        provenance: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> AcquisitionTrace:
+        """Capture one interaction and update temporal/semantic L0 edges."""
+        card = self.cards.capture_interaction(
+            namespace,
+            content,
+            context_tags=context_tags,
+            source=source,
+            trust=trust,
+            salience=salience,
+            surprise=surprise,
+            provenance=provenance,
+            metadata={**dict(metadata or {}), "l0_acquired": True},
+        )
+        with self._lock:
+            key = namespace.key
+            recent = self._recent[key]
+            previous_ids = tuple(recent)
+            position = self._positions[key]
+            self._positions[key] += 1
+            relations: list[MemoryAssociation] = []
+            juxtaposition_score = 0.0
+            context_shift_score = 0.0
+
+            if previous_ids:
+                previous = self.cards.store.get(previous_ids[-1])
+                if previous is not None and previous.card_id != card.card_id:
+                    relations.extend(
+                        self.cards.mesh.observe_sequence(
+                            namespace,
+                            (previous.card_id, card.card_id),
+                            kind=AssociationKind.TEMPORAL_FORWARD,
+                            evidence_ids=tuple(provenance),
+                            tags=tuple(context_tags),
+                        )
+                    )
+                    left = self._semantic_observation(previous, max(0, position - 1))
+                    right = self._semantic_observation(card, position)
+                    signal = JuxtapositionAnalyzer.compare(left, right)
+                    juxtaposition_score = max(signal.contrast_signal, signal.novelty_signal)
+                    context_shift_score = self._tag_shift(previous.context_tags, card.context_tags)
+                    if signal.changed_context and juxtaposition_score >= self.policy.juxtaposition_threshold:
+                        relations.extend(
+                            self.cards.mesh.observe_juxtaposition(
+                                namespace,
+                                previous.card_id,
+                                card.card_id,
+                                changed_interpretation=True,
+                                evidence_ids=tuple(provenance),
+                                tags=tuple(context_tags),
+                            )
+                        )
+                    if context_shift_score >= self.policy.context_shift_threshold:
+                        relations.append(
+                            self.cards.mesh.observe(
+                                namespace, previous.card_id, card.card_id,
+                                kind=AssociationKind.CONTEXT_SHIFT,
+                                strength=min(1.0, 0.45 + 0.45 * context_shift_score),
+                                surprise=max(surprise, context_shift_score),
+                                direction_confidence=0.80,
+                                evidence_ids=tuple(provenance),
+                                tags=tuple(context_tags),
+                                metadata={"context_shift": context_shift_score},
+                            )
+                        )
+                    lower = card.content.casefold()
+                    if any(cue in lower for cue in self.policy.correction_cues):
+                        relations.append(
+                            self.cards.mesh.observe(
+                                namespace, previous.card_id, card.card_id,
+                                kind=AssociationKind.CORRECTION,
+                                strength=0.82,
+                                surprise=max(0.55, surprise),
+                                direction_confidence=0.90,
+                                evidence_ids=tuple(provenance),
+                                tags=tuple(context_tags) + ("correction",),
+                                metadata={"revision_candidate": True, "authoritative": False},
+                            )
+                        )
+
+            if not recent or recent[-1] != card.card_id:
+                recent.append(card.card_id)
+            # Adjacent order-2 evidence was recorded exactly once above.
+            # Extend only order-3+ n-grams here so a rolling context window
+            # cannot multiply-count the same pair on every subsequent turn.
+            prefix_ids = tuple(recent)[-min(len(recent), self.policy.predict_prefix + 1):]
+            if len(prefix_ids) >= 3:
+                self.cards.mesh.observe_higher_order_sequence(namespace, prefix_ids, minimum_order=3)
+            prediction = None
+            if recent:
+                prefix = tuple(recent)[-min(len(recent), self.policy.predict_prefix):]
+                prediction = self.cards.mesh.predict_next(namespace, prefix, limit=8)
+
+        trace_id = stable_id("acquisition-trace", {
+            "namespace": namespace.key,
+            "card": card.card_id,
+            "previous": previous_ids,
+            "relations": sorted(edge.association_id for edge in relations),
+            "position": position,
+        }, length=32)
+        return AcquisitionTrace(
+            trace_id=trace_id,
+            namespace_key=namespace.key,
+            card=card,
+            relation_ids=tuple(edge.association_id for edge in relations),
+            previous_card_ids=previous_ids,
+            juxtaposition_score=juxtaposition_score,
+            context_shift_score=context_shift_score,
+            predicted_next=prediction,
+            metadata={
+                "position": position,
+                "association_count": len(relations),
+                "authoritative": False,
+                "retrieval_only": True,
+            },
+        )
+
+    def recall(
+        self,
+        namespace: MemoryNamespace,
+        query: str,
+        *,
+        context_tags: Sequence[str] = (),
+        allow_deep: bool = True,
+    ) -> RecallTrace:
+        """Recall L0 first; optionally continue through the configured deep resolver."""
+        hits = self.cards.search(
+            namespace, query, context_tags=context_tags, limit=self.policy.recall_limit
+        )
+        resolution = None
+        used_deep = False
+        if allow_deep and self.resolver is not None:
+            resolution = self.resolver.resolve(namespace, query, context_tags=context_tags)
+            used_deep = resolution.stopped_at.value > 0
+        fp = stable_fingerprint({
+            "query": query,
+            "cards": [(hit.card.card_id, round(hit.score, 10)) for hit in hits],
+            "resolution": None if resolution is None else resolution.fingerprint,
+        })
+        return RecallTrace(query, hits, resolution, used_deep, fp)
+
+    def recent_card_ids(self, namespace: MemoryNamespace) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(self._recent.get(namespace.key, ()))
+
+    @property
+    def fingerprint(self) -> str:
+        with self._lock:
+            recent = {key: tuple(value) for key, value in sorted(self._recent.items())}
+        return stable_fingerprint({"cards": self.cards.associative_fingerprint, "recent": recent})
