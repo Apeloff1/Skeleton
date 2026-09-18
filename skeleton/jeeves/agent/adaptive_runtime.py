@@ -42,6 +42,7 @@ from .context_repository import (
 from .deliberation import (
     CandidateProposal,
     ComputeAllocation,
+    ComputeBudget,
     ComputeSignals,
     DeliberationEngine,
     DeliberationMode,
@@ -50,9 +51,17 @@ from .deliberation import (
     proposal,
 )
 from .evidence import EvidenceLedger
+from .frontier_consensus import merge_search_results
+from .frontier_feedback import FrontierReasoningFeedback
+from .frontier_reasoning import (
+    EscalationCause,
+    FrontierReasoningCoordinator,
+    InferenceDisposition,
+)
+from .frontier_runtime import FrontierJeevesAgentRuntime
 from .runtime import (
     AgentResult,
-    JeevesAgentRuntime,
+    JeevesAgentRuntime as BaseJeevesAgentRuntime,
     RunCheckpoint,
     RunInputs,
     RuntimeErrorBase,
@@ -99,14 +108,20 @@ class AdaptiveConfig:
     context_retrieval_tokens: int = 3000
     minimum_experience_similarity: float = 0.30
     retain_adaptive_reports: int = 2048
+    enable_frontier_reasoning: bool = True
+    enable_self_consistency: bool = True
+    maximum_frontier_rounds: int = 2
+    frontier_escalation_min_budget: float = 0.15
+    fail_closed_on_evidence_gap: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "specialist_search_threshold", probability("specialist_search_threshold", self.specialist_search_threshold))
-        for name in ("maximum_specialist_width", "checkpoint_snapshot_limit", "context_retrieval_entries", "context_retrieval_tokens", "retain_adaptive_reports"):
+        for name in ("maximum_specialist_width", "checkpoint_snapshot_limit", "context_retrieval_entries", "context_retrieval_tokens", "retain_adaptive_reports", "maximum_frontier_rounds"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{name} must be positive integer")
         object.__setattr__(self, "minimum_experience_similarity", probability("minimum_experience_similarity", self.minimum_experience_similarity))
+        object.__setattr__(self, "frontier_escalation_min_budget", probability("frontier_escalation_min_budget", self.frontier_escalation_min_budget))
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +146,10 @@ class SpecialistSearchRecord:
     estimated_tokens: int
     stopped_reason: str
     trace_fingerprint: str
+    frontier_decision_fingerprint: str | None = None
+    frontier_disposition: str | None = None
+    consensus_fingerprint: str | None = None
+    escalation_rounds: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,9 +177,10 @@ class _AdaptiveState:
     searches: list[SpecialistSearchRecord] = field(default_factory=list)
     experience_matches: int = 0
     allocation_sequence: int = 0
+    frontier_decision_fingerprints: list[str] = field(default_factory=list)
 
 
-class AdaptiveJeevesRuntime(JeevesAgentRuntime):
+class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
     def __init__(
         self,
         *,
@@ -170,6 +190,8 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         credit_assigner: CausalCreditAssigner | None = None,
         verification_council: VerificationCouncil | None = None,
         adaptive_config: AdaptiveConfig | None = None,
+        frontier_reasoning: FrontierReasoningCoordinator | None = None,
+        frontier_feedback: FrontierReasoningFeedback | None = None,
         context_repository_factory: Callable[[ContextNamespace], ContextRepository] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -180,6 +202,8 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         self.credit_assigner = credit_assigner or CausalCreditAssigner()
         self.council = verification_council
         self.adaptive_config = adaptive_config or AdaptiveConfig()
+        self.frontier_reasoning = frontier_reasoning or FrontierReasoningCoordinator()
+        self.frontier_feedback = frontier_feedback or FrontierReasoningFeedback()
         self._context_factory = context_repository_factory or (lambda namespace: ContextRepository(namespace, clock=self._wall_clock))
         self._context_repositories: dict[str, ContextRepository] = {}
         self._adaptive: dict[str, _AdaptiveState] = {}
@@ -258,7 +282,10 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
 
     def _execute_reasoning_step(self, state: _RunState, step) -> AgentResult | None:
         signals = self._compute_signals(state, purpose="reasoning-step", step=step)
-        allocation = self.compute_allocator.allocate(signals, global_budget_fraction_remaining=self._global_budget_fraction_remaining(state))
+        allocation = self.compute_allocator.allocate(
+            signals,
+            global_budget_fraction_remaining=self._global_budget_fraction_remaining(state),
+        )
         if (
             not self.adaptive_config.enable_specialist_search
             or allocation.expected_value < self.adaptive_config.specialist_search_threshold
@@ -270,17 +297,60 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         generator = self._provider_specialist_generator(state)
         engine = DeliberationEngine(generator, clock=self._monotonic)
         search = engine.search(task, allocation)
+        decision = (
+            self.frontier_reasoning.decide(search, risk=step.risk)
+            if self.adaptive_config.enable_frontier_reasoning
+            else None
+        )
+        escalation_rounds = 0
+
+        while (
+            decision is not None
+            and self.adaptive_config.enable_self_consistency
+            and decision.disposition is InferenceDisposition.DELIBERATE
+            and escalation_rounds < self.adaptive_config.maximum_frontier_rounds
+        ):
+            escalated = self._frontier_escalation_allocation(
+                state,
+                allocation,
+                decision,
+                escalation_rounds,
+            )
+            if escalated is None:
+                break
+            extra = DeliberationEngine(
+                generator,
+                clock=self._monotonic,
+            ).search(task, escalated)
+            search = merge_search_results(search, extra)
+            escalation_rounds += 1
+            decision = self.frontier_reasoning.decide(search, risk=step.risk)
+
         adaptive = self._adaptive_state(state.run_id)
+        if decision is not None:
+            adaptive.frontier_decision_fingerprints.append(decision.fingerprint)
         adaptive.searches.append(
             SpecialistSearchRecord(
                 step_id=step.step_id,
                 mode=search.mode,
-                selected_candidate_id=search.best.candidate_id if search.best else None,
+                selected_candidate_id=(
+                    decision.leading_candidate.candidate_id
+                    if decision is not None and decision.leading_candidate is not None
+                    else search.best.candidate_id if search.best else None
+                ),
                 candidate_count=len(search.explored),
                 model_calls=int(search.ledger.get("model_calls", 0)),
                 estimated_tokens=int(search.ledger.get("estimated_tokens", 0)),
                 stopped_reason=search.stopped_reason,
                 trace_fingerprint=search.trace_fingerprint,
+                frontier_decision_fingerprint=decision.fingerprint if decision else None,
+                frontier_disposition=decision.disposition.value if decision else None,
+                consensus_fingerprint=(
+                    decision.consensus.fingerprint
+                    if decision is not None and decision.consensus is not None
+                    else None
+                ),
+                escalation_rounds=escalation_rounds,
             )
         )
         state.trace.emit(
@@ -289,14 +359,80 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
                 "step_id": step.step_id,
                 "mode": search.mode.value,
                 "candidate_count": len(search.explored),
-                "selected": search.best.candidate_id if search.best else None,
+                "selected": (
+                    decision.leading_candidate.candidate_id
+                    if decision is not None and decision.leading_candidate is not None
+                    else search.best.candidate_id if search.best else None
+                ),
                 "search_trace": search.trace_fingerprint,
+                "frontier_disposition": decision.disposition.value if decision else None,
+                "frontier_causes": [cause.value for cause in decision.causes] if decision else [],
+                "consensus_agreement": (
+                    decision.consensus.agreement
+                    if decision is not None and decision.consensus is not None
+                    else None
+                ),
+                "escalation_rounds": escalation_rounds,
             },
         )
+
         if search.best is None:
             return super()._execute_reasoning_step(state, step)
 
-        selected = search.best
+        if decision is not None and decision.disposition in {
+            InferenceDisposition.SEEK_EVIDENCE,
+            InferenceDisposition.ABSTAIN,
+            InferenceDisposition.DELIBERATE,
+        }:
+            reason = self._frontier_block_reason(decision)
+            state.scratch.set(
+                f"frontier:block:{step.step_id}",
+                {
+                    "decision": decision.fingerprint,
+                    "disposition": decision.disposition.value,
+                    "causes": [cause.value for cause in decision.causes],
+                    "consensus": decision.consensus.fingerprint if decision.consensus else None,
+                    "reason": reason,
+                },
+                importance=0.95,
+            )
+            if (
+                decision.disposition is InferenceDisposition.SEEK_EVIDENCE
+                and not self.adaptive_config.fail_closed_on_evidence_gap
+            ):
+                return super()._execute_reasoning_step(state, step)
+            assert state.plan is not None
+            state.plan = self.scheduler.fail(state.plan, step.step_id, retryable=False)
+            state.last_error = reason[:8192]
+            state.trace.emit(
+                "frontier.reasoning_blocked",
+                {
+                    "step_id": step.step_id,
+                    "decision": decision.fingerprint,
+                    "disposition": decision.disposition.value,
+                    "causes": [cause.value for cause in decision.causes],
+                },
+            )
+            self.metrics.increment("agent.frontier.reasoning_blocked")
+            if self._attempt_replan(state, reason, failed_step_id=step.step_id):
+                return None
+            return self._finish_failure(
+                state,
+                TerminationReason.VERIFICATION_FAILED,
+                reason,
+                metadata={
+                    "step_id": step.step_id,
+                    "frontier_decision": decision.fingerprint,
+                    "frontier_disposition": decision.disposition.value,
+                },
+            )
+
+        selected = (
+            decision.leading_candidate
+            if decision is not None and decision.leading_candidate is not None
+            else search.best
+        )
+        assert selected is not None
         state.scratch.set(
             f"analysis:{step.step_id}",
             {
@@ -308,8 +444,12 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
                 "assumptions": list(selected.assumptions),
                 "risks": list(selected.risks),
                 "search_trace": search.trace_fingerprint,
+                "frontier_decision": decision.fingerprint if decision else None,
+                "frontier_disposition": decision.disposition.value if decision else None,
+                "consensus": decision.consensus.fingerprint if decision and decision.consensus else None,
+                "escalation_rounds": escalation_rounds,
             },
-            importance=0.85,
+            importance=0.90,
         )
         self._remember_working(
             state.inputs.namespace,
@@ -320,18 +460,113 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
             salience=0.65,
             evidence=selected.evidence,
         )
-        verifier = StepVerifier(state.ledger, policy=self.verification_policy, clock=self._wall_clock)
+        verifier = StepVerifier(
+            state.ledger,
+            policy=self.verification_policy,
+            clock=self._wall_clock,
+        )
         self._transition(state, AgentPhase.VERIFYING)
         report = verifier.verify(step)
         state.last_verification = report
+        if decision is not None:
+            self.frontier_feedback.observe(
+                decision,
+                verified_success=report.passed,
+                escalation_rounds=escalation_rounds,
+                model_calls=int(search.ledger.get("model_calls", 0)),
+                estimated_tokens=int(search.ledger.get("estimated_tokens", 0)),
+            )
         if report.passed:
             assert state.plan is not None
             state.plan = self.scheduler.succeed(state.plan, step.step_id)
-            state.trace.emit("step.succeeded", self._verification_event(report))
+            state.trace.emit(
+                "step.succeeded",
+                {
+                    **self._verification_event(report),
+                    "frontier_decision": decision.fingerprint if decision else None,
+                    "frontier_feedback": self.frontier_feedback.report().fingerprint,
+                },
+            )
             self.metrics.increment("agent.steps.succeeded")
             self._checkpoint(state)
             return None
         return self._handle_step_failure(state, step, report, tool_failed=False)
+
+    def _frontier_escalation_allocation(
+        self,
+        state: _RunState,
+        allocation: ComputeAllocation,
+        decision,
+        round_index: int,
+    ) -> ComputeAllocation | None:
+        remaining_fraction = self._global_budget_fraction_remaining(state)
+        if remaining_fraction < self.adaptive_config.frontier_escalation_min_budget:
+            return None
+        budget = state.inputs.budget
+        elapsed = max(0.0, self._monotonic() - state.started_monotonic)
+        remaining_calls = max(0, budget.max_model_calls - state.usage.model_calls)
+        remaining_tokens = max(0, budget.max_tokens - state.usage.total_tokens)
+        remaining_wall = max(0.0, budget.max_wall_seconds - elapsed)
+        if remaining_calls < 1 or remaining_tokens < 512 or remaining_wall < 3.0:
+            return None
+
+        causes = set(decision.causes)
+        mode = (
+            DeliberationMode.COUNTERFACTUAL
+            if EscalationCause.OUTCOME_DISAGREEMENT in causes
+            else DeliberationMode.ADVERSARIAL
+        )
+        local = allocation.budget
+        search_budget = ComputeBudget(
+            max_model_calls=max(1, min(remaining_calls, max(2, min(8, local.max_model_calls + 2)))),
+            max_candidates=max(2, min(64, max(local.max_candidates, local.beam_width * 4))),
+            max_depth=max(2, min(6, local.max_depth + 1)),
+            max_tokens=max(512, min(remaining_tokens, max(2_048, local.max_tokens))),
+            max_wall_seconds=max(3.0, min(remaining_wall, max(10.0, local.max_wall_seconds))),
+            beam_width=max(2, min(self.adaptive_config.maximum_specialist_width, local.beam_width + 1)),
+            adversarial_rounds=max(1, min(4, local.adversarial_rounds + 1)),
+        )
+        expected_value = min(
+            1.0,
+            allocation.expected_value + 0.10 + 0.05 * round_index,
+        )
+        rationale = tuple(allocation.rationale) + (
+            f"frontier escalation round={round_index + 1}",
+            f"frontier disposition={decision.disposition.value}",
+            "frontier causes=" + ",".join(cause.value for cause in decision.causes),
+        )
+        return ComputeAllocation(
+            mode=mode,
+            budget=search_budget,
+            expected_value=expected_value,
+            rationale=rationale,
+            fingerprint=stable_fingerprint(
+                {
+                    "parent": allocation.fingerprint,
+                    "round": round_index + 1,
+                    "mode": mode.value,
+                    "decision": decision.fingerprint,
+                    "budget": {
+                        "calls": search_budget.max_model_calls,
+                        "candidates": search_budget.max_candidates,
+                        "depth": search_budget.max_depth,
+                        "tokens": search_budget.max_tokens,
+                        "wall": search_budget.max_wall_seconds,
+                        "beam": search_budget.beam_width,
+                        "adversarial_rounds": search_budget.adversarial_rounds,
+                    },
+                }
+            ),
+        )
+
+    @staticmethod
+    def _frontier_block_reason(decision) -> str:
+        causes = ", ".join(cause.value for cause in decision.causes) or "unresolved frontier uncertainty"
+        if decision.disposition is InferenceDisposition.SEEK_EVIDENCE:
+            return "Frontier reasoning requires additional factual evidence before this step can be accepted: " + causes
+        if decision.disposition is InferenceDisposition.ABSTAIN:
+            return "Frontier reasoning abstained because the candidate set could not be justified: " + causes
+        return "Frontier reasoning remained unresolved after bounded extra inference: " + causes
 
     def _checkpoint(self, state: _RunState) -> RunCheckpoint:
         checkpoint = super()._checkpoint(state)
@@ -505,7 +740,7 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
                 f"Specialist role: {role.value}. Number of candidates: {width}."
             )
             user_payload = json.dumps({"task": task, "parent": parent_context}, ensure_ascii=False, sort_keys=True)
-            response = JeevesAgentRuntime._model_call(
+            response = BaseJeevesAgentRuntime._model_call(
                 self,
                 state,
                 messages=(ModelMessage("system", instruction), ModelMessage("user", user_payload)),
