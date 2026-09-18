@@ -407,6 +407,10 @@ from .semantic_plane_interactions import (
     plane_interaction_keys,
     plane_interaction_rules,
 )
+from .semantic_depth_interactions import (
+    depth_interaction_keys,
+    depth_interaction_rules,
+)
 from .semantic_governance_bridge import (
     SemanticGovernanceBridge,
     SemanticGovernanceSnapshot,
