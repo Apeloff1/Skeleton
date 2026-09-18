@@ -106,15 +106,29 @@ class AIIsolationCompiler:
             reasons.append("write effect conflicts with intent and source remains read-only")
 
         roots = []
-        allowed_root_set = set(self.default_write_roots)
+        allowed_roots = tuple(Path(root) for root in self.default_write_roots)
         for raw in requested_write_roots:
             path = Path(raw).expanduser()
             if not path.is_absolute():
                 raise ValueError("requested AI isolation write roots must be absolute")
-            resolved = str(path.resolve(strict=False))
-            if allowed_root_set and resolved not in allowed_root_set:
-                raise ValueError("requested write root is not in configured AI root set")
-            roots.append(resolved)
+            resolved_path = path.resolve(strict=False)
+            if not allowed_roots:
+                raise ValueError("no AI isolation write roots are configured")
+            try:
+                permitted = any(
+                    resolved_path == allowed
+                    or resolved_path.is_relative_to(allowed)
+                    for allowed in allowed_roots
+                )
+            except AttributeError:
+                permitted = any(
+                    resolved_path == allowed
+                    or str(resolved_path).startswith(str(allowed) + "/")
+                    for allowed in allowed_roots
+                )
+            if not permitted:
+                raise ValueError("requested write root is outside configured AI root set")
+            roots.append(str(resolved_path))
 
         effective_write = has_write and intent.constraint.allow_writes
         requirement = IsolationRequirement(
