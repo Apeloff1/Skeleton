@@ -17,11 +17,13 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   bot:
+    permissions:
+      contents: write
+      pull-requests: write
     name: ${{ matrix.bot }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -29,12 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         bot: [triage, ci, security, cleanup]
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-      MODEL_NAME: ${{ vars.MODEL_NAME }}
-      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Checkout
         if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
@@ -48,4 +44,10 @@ jobs:
           python-version: "3.11.16"
       - name: Run bounded repository bot
         if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
         run: python -m skeleton.automation.repo_bots --mode "${{ matrix.bot }}"
