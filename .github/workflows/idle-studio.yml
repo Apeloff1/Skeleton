@@ -90,6 +90,9 @@ jobs:
       IDLE_STUDIO_TASKS_PER_RUN: ${{ vars.IDLE_STUDIO_TASKS_PER_RUN }}
       IDLE_STUDIO_MAX_MODEL_CALLS: ${{ vars.IDLE_STUDIO_MAX_MODEL_CALLS }}
       IDLE_STUDIO_MAX_OPEN_PRS: ${{ vars.IDLE_STUDIO_MAX_OPEN_PRS }}
+      SKELETON_AUTOMATION_PAUSED: ${{ vars.SKELETON_AUTOMATION_PAUSED }}
+      SKELETON_AUTOMATION_QUARANTINED: ${{ vars.SKELETON_AUTOMATION_QUARANTINED }}
+      SKELETON_AUTOMATION_HOLD_REASON: ${{ vars.SKELETON_AUTOMATION_HOLD_REASON }}
 
     steps:
       - name: Checkout trusted default-branch snapshot
@@ -117,6 +120,7 @@ jobs:
           skeleton.testing.test_idle_studio
           skeleton.testing.test_idle_studio_v2
           skeleton.testing.test_idle_studio_publisher
+          skeleton.testing.test_automation_safety
 
       - name: Snapshot live repository state
         env:

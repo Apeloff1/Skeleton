@@ -33,6 +33,19 @@ class RepairDecision:
     human_review_required: bool
     reasons: tuple[str, ...]
 
+    @property
+    def quarantined(self) -> bool:
+        """High-risk proposals are isolated from automated mutation/merge."""
+        return self.risk == "high"
+
+    @property
+    def disposition(self) -> str:
+        if self.quarantined:
+            return "quarantine"
+        if self.human_review_required:
+            return "human_review"
+        return "auto_merge"
+
 
 def _required_text(value: object, field_name: str) -> str:
     if not isinstance(value, str):

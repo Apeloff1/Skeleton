@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
 
+from .automation_safety import load_automation_safety
 from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
 from .idle_studio import (
     FLEET,
@@ -585,7 +586,18 @@ def propose(state_path: Path, package_path: Path, audit_path: Path, report_path:
             "plan_source": "shift-supervisor-canonical",
         }
     )
-    if not repository_is_idle(runs, current_run_id):
+    safety = load_automation_safety()
+    if safety.blocked:
+        status = safety.status
+        generation_id = ""
+        events.append(
+            {
+                "event": "operator-safety-hold",
+                "status": safety.status,
+                "reason": safety.reason,
+            }
+        )
+    elif not repository_is_idle(runs, current_run_id):
         status = "busy"
         generation_id = ""
     else:

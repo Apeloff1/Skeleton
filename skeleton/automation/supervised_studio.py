@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .automation_safety import AutomationSafetyError, load_automation_safety
 from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
 from .studio_director import (
     MAX_TOTAL_PATCH_CHARS,
@@ -168,6 +169,34 @@ def propose(
         plan_source="shift-supervisor-canonical",
         execution_unit="four-agent-squad",
     )
+
+    try:
+        safety = load_automation_safety()
+    except AutomationSafetyError as exc:
+        patch_path.parent.mkdir(parents=True, exist_ok=True)
+        patch_path.write_text("", encoding="utf-8")
+        audit.emit(
+            "run_failed_closed",
+            stage="automation_safety",
+            error=str(exc)[:500],
+            accepted_tasks=0,
+            emitted_patch_chars=0,
+            status="failed_closed",
+        )
+        raise
+    if safety.blocked:
+        patch_path.parent.mkdir(parents=True, exist_ok=True)
+        patch_path.write_text("", encoding="utf-8")
+        audit.emit(
+            "run_blocked_by_operator",
+            stage="automation_safety",
+            hold_status=safety.status,
+            reason=safety.reason,
+            accepted_tasks=0,
+            emitted_patch_chars=0,
+            status="safe_noop",
+        )
+        return 0
 
     try:
         items, generation_id = _canonical_items(repo_state_path, max_tasks)
