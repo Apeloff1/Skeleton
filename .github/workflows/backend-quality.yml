@@ -130,6 +130,9 @@ jobs:
       - name: GitHub Actions workflow security gate
         run: python scripts/check_workflow_security.py
 
+      - name: GitHub Actions trigger-fanout audit
+        run: python scripts/check_workflow_trigger_fanout.py
+
       - name: GitHub Actions concurrency collision audit
         run: python scripts/check_workflow_concurrency.py
 
@@ -176,6 +179,7 @@ jobs:
           tests/test_workflow_quoted_key_security.py
           tests/test_workflow_flow_uses_security.py
           tests/test_workflow_trigger_security.py
+          tests/test_workflow_trigger_fanout_gate.py
           tests/test_workflow_concurrency_gate.py
           tests/test_workflow_run_branch_completions_contract.py
           tests/test_pr_obsolete_run_from_workflow_run.py

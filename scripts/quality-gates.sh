@@ -105,6 +105,9 @@ python backend/scripts/check_workflow_action_allowlist.py
 printf '\n== GitHub Actions token permissions ==\n'
 python backend/scripts/check_workflow_permissions.py
 
+printf '\n== GitHub Actions trigger-fanout audit ==\n'
+python backend/scripts/check_workflow_trigger_fanout.py
+
 printf '\n== GitHub Actions concurrency collision audit ==\n'
 python backend/scripts/check_workflow_concurrency.py
 
@@ -146,6 +149,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_quoted_key_security.py \
   backend/tests/test_workflow_flow_uses_security.py \
   backend/tests/test_workflow_trigger_security.py \
+  backend/tests/test_workflow_trigger_fanout_gate.py \
   backend/tests/test_workflow_security_checkout_credentials.py \
   backend/tests/test_workflow_input_security_gate.py \
   backend/tests/test_workflow_event_shell_security.py \
