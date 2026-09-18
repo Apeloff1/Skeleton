@@ -18,6 +18,7 @@ from .frontier_feedback import (
     FrontierFeedbackRecommendation,
 )
 from .frontier_reasoning import FrontierReasoningPolicy
+from .frontier_trials import FrontierTrialGate
 from .types import AgentContractError, json_safe, probability, stable_fingerprint
 
 
@@ -108,6 +109,7 @@ class FrontierPolicyTuner:
         baseline: FrontierReasoningPolicy,
         recommendation: FrontierFeedbackRecommendation,
         evaluation_gate: FrontierEvalGate,
+        trial_gate: FrontierTrialGate | None = None,
     ) -> FrontierPolicyProposal:
         if not isinstance(baseline, FrontierReasoningPolicy):
             raise TypeError("baseline must be FrontierReasoningPolicy")
@@ -115,6 +117,8 @@ class FrontierPolicyTuner:
             raise TypeError("recommendation must be FrontierFeedbackRecommendation")
         if not isinstance(evaluation_gate, FrontierEvalGate):
             raise TypeError("evaluation_gate must be FrontierEvalGate")
+        if trial_gate is not None and not isinstance(trial_gate, FrontierTrialGate):
+            raise TypeError("trial_gate must be FrontierTrialGate or None")
 
         reasons = list(recommendation.reasons)
         requested_change = any(
@@ -129,18 +133,34 @@ class FrontierPolicyTuner:
             recommendation.sample_count >= 12
             and bool(recommendation.feedback_report_fingerprint)
         )
+        entropy_change_requested = abs(recommendation.maximum_entropy_delta) > 0.0
+        trial_gate_sufficient = (
+            not entropy_change_requested
+            or (trial_gate is not None and trial_gate.passed)
+        )
         if requested_change and not feedback_sufficient:
             reasons.append(
                 "insufficient bound feedback for policy change: "
                 f"samples={recommendation.sample_count}, required>=12"
             )
-        if not evaluation_gate.passed or (requested_change and not feedback_sufficient):
+        if entropy_change_requested and trial_gate is None:
+            reasons.append(
+                "entropy tuning requires a repeated-trial pass@k promotion gate"
+            )
+        elif entropy_change_requested and not trial_gate.passed:
+            reasons.extend(trial_gate.reasons)
+        if (
+            not evaluation_gate.passed
+            or (requested_change and not feedback_sufficient)
+            or not trial_gate_sufficient
+        ):
             reasons.extend(evaluation_gate.reasons)
             fingerprint = stable_fingerprint(
                 {
                     "baseline": self._policy_payload(baseline),
                     "recommendation": recommendation.fingerprint,
                     "eval_gate": evaluation_gate.fingerprint,
+                    "trial_gate": trial_gate.fingerprint if trial_gate else None,
                     "approved": False,
                     "changes": {},
                     "reasons": reasons,
@@ -212,6 +232,7 @@ class FrontierPolicyTuner:
                 "proposed": self._policy_payload(proposed),
                 "recommendation": recommendation.fingerprint,
                 "eval_gate": evaluation_gate.fingerprint,
+                "trial_gate": trial_gate.fingerprint if trial_gate else None,
                 "approved": approved,
                 "changes": changes,
                 "reasons": reasons,
