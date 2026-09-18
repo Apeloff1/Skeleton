@@ -244,14 +244,19 @@ class MemoryManagerAdapter:
         max_records: int,
         max_tokens: int,
     ) -> tuple[DeepContextRecord, ...]:
-        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+        parent = self.namespace.parent()
+        if namespace_key == self.namespace.key:
+            allowed_namespaces = {self.namespace.key, parent.key}
+        elif namespace_key == parent.key:
+            allowed_namespaces = {parent.key}
+        else:
             return ()
         refs = tuple(dict.fromkeys(str(value) for value in source_refs))
         records: list[DeepContextRecord] = []
         used = 0
         for source_ref in refs:
             record = self.manager.store.get(source_ref)
-            if record is None:
+            if record is None or record.namespace.key not in allowed_namespaces:
                 continue
             item = self._record(record)
             if used + item.token_estimate > max_tokens:
@@ -270,14 +275,21 @@ class MemoryManagerAdapter:
         max_records: int,
         max_tokens: int,
     ) -> tuple[DeepContextRecord, ...]:
-        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+        parent = self.namespace.parent()
+        if namespace_key == self.namespace.key:
+            search_namespace = self.namespace
+            include_parent = True
+        elif namespace_key == parent.key:
+            search_namespace = parent
+            include_parent = False
+        else:
             return ()
         hits = self.manager.retriever.search(
-            self.namespace,
+            search_namespace,
             query,
             limit=max_records,
             minimum_trust=0.0,
-            include_parent=True,
+            include_parent=include_parent,
         )
         records: list[DeepContextRecord] = []
         used = 0
