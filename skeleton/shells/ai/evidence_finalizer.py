@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from skeleton.shells.ai.audit_anchor import AIAuditAnchorStore, SignedAIAuditAnchor
+from skeleton.shells.ai.audit_witness import (
+    AIAuditWitnessStore,
+    SignedAIAuditWitness,
+)
 from skeleton.shells.ai.checkpoint import AISessionCheckpoint
 from skeleton.shells.ai.orchestrator import AIExecutionBundle
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceBuilder, AIExecutionEvidenceStore, SignedAIExecutionEvidence
@@ -24,6 +28,7 @@ class FinalizedAIExecutionEvidence:
     session_evidence: SessionExecutionEvidence
     session_journal: SessionJournalEvidence
     audit_anchor: SignedAIAuditAnchor
+    audit_witness: SignedAIAuditWitness | None = None
     execution_evidence: SignedAIExecutionEvidence | None = None
 
     def to_dict(self) -> dict[str, object]:
@@ -37,6 +42,11 @@ class FinalizedAIExecutionEvidence:
             "session_journal": self.session_journal.to_dict(),
             "session_journal_digest": self.session_journal.digest,
             "audit_anchor": self.audit_anchor.to_dict(),
+            "audit_witness": (
+                None
+                if self.audit_witness is None
+                else self.audit_witness.to_dict()
+            ),
             "execution_evidence": (
                 None
                 if self.execution_evidence is None
@@ -59,6 +69,7 @@ class AIExecutionEvidenceFinalizer:
         receipt_chain,
         session_evidence: SessionEvidenceStore,
         audit_anchors: AIAuditAnchorStore,
+        audit_witnesses: AIAuditWitnessStore | None = None,
         execution_evidence: AIExecutionEvidenceStore | None = None,
         execution_evidence_builder: AIExecutionEvidenceBuilder | None = None,
     ) -> None:
@@ -66,6 +77,7 @@ class AIExecutionEvidenceFinalizer:
         self.receipt_chain = receipt_chain
         self.session_evidence = session_evidence
         self.audit_anchors = audit_anchors
+        self.audit_witnesses = audit_witnesses
         self.execution_evidence = execution_evidence
         self.execution_evidence_builder = (
             execution_evidence_builder or AIExecutionEvidenceBuilder()
@@ -84,6 +96,8 @@ class AIExecutionEvidenceFinalizer:
         model_attestation_digest: str = "",
         execution_seal_id: str = "",
         quorum_approval_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
             raise RuntimeError("AI execution evidence may only finalize a completed attempt")
@@ -113,6 +127,19 @@ class AIExecutionEvidenceFinalizer:
             execution.provenance.sandbox_binding_digest != sandbox_binding_digest
         ):
             raise RuntimeError("execution provenance sandbox binding differs from finalizer")
+        if runtime_trust_digest and (
+            execution.provenance.runtime_trust_digest != runtime_trust_digest
+        ):
+            raise RuntimeError(
+                "execution provenance runtime trust differs from finalizer"
+            )
+        if authority_health_policy_digest and (
+            execution.provenance.authority_health_policy_digest
+            != authority_health_policy_digest
+        ):
+            raise RuntimeError(
+                "execution provenance authority health policy differs from finalizer"
+            )
         if not self.journal.verify():
             raise RuntimeError("AI decision journal failed integrity verification")
         if not self.receipt_chain.verify():
@@ -144,6 +171,8 @@ class AIExecutionEvidenceFinalizer:
             session_journal_digest=session_journal.digest,
             release_evidence_digest=release_evidence_digest,
             sandbox_binding_digest=sandbox_binding_digest,
+            runtime_trust_digest=runtime_trust_digest,
+            authority_health_policy_digest=authority_health_policy_digest,
         )
         anchor = self.audit_anchors.append(
             session_id=session.session_id,
@@ -154,9 +183,30 @@ class AIExecutionEvidenceFinalizer:
             session_evidence_digest=evidence.digest,
             release_evidence_digest=release_evidence_digest,
             sandbox_binding_digest=sandbox_binding_digest,
+            runtime_trust_digest=runtime_trust_digest,
+            authority_health_policy_digest=authority_health_policy_digest,
         )
         if not self.audit_anchors.verify():
             raise RuntimeError("AI audit anchor chain failed verification after append")
+
+        audit_witness = None
+        if self.audit_witnesses is not None:
+            audit_root = self.audit_anchors.root_hash()
+            audit_witness = self.audit_witnesses.publish(
+                audit_root,
+                runtime_trust_digest=runtime_trust_digest,
+                release_evidence_digest=release_evidence_digest,
+            )
+            witness_verification = self.audit_witnesses.verify()
+            if not witness_verification.ok:
+                raise RuntimeError(
+                    "AI audit witness chain failed verification after publish"
+                )
+            self.audit_witnesses.require_current_root(
+                audit_root,
+                runtime_trust_digest=runtime_trust_digest,
+                release_evidence_digest=release_evidence_digest,
+            )
 
         signed_execution_evidence = None
         if self.execution_evidence is not None:
@@ -175,6 +225,20 @@ class AIExecutionEvidenceFinalizer:
                 model_attestation_digest=model_attestation_digest,
                 execution_seal_id=execution_seal_id,
                 quorum_approval_digest=quorum_approval_digest,
+                runtime_trust_digest=runtime_trust_digest,
+                authority_health_policy_digest=(
+                    authority_health_policy_digest
+                ),
+                audit_witness_digest=(
+                    ""
+                    if audit_witness is None
+                    else audit_witness.witness.digest
+                ),
+                audit_witness_sequence=(
+                    None
+                    if audit_witness is None
+                    else audit_witness.witness.sequence
+                ),
             )
             signed_execution_evidence = self.execution_evidence.append(
                 final_bundle
@@ -189,5 +253,6 @@ class AIExecutionEvidenceFinalizer:
             evidence,
             session_journal,
             anchor,
+            audit_witness,
             signed_execution_evidence,
         )
