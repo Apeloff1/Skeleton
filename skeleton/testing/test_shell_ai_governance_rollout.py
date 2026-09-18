@@ -243,3 +243,50 @@ def test_governance_snapshot():
     snapshot = governance.snapshot()
     assert snapshot.policy_revision == 1
     assert len(snapshot.policy_fingerprint) == 64
+
+
+def test_policy_rollout_prepared_does_not_activate_target():
+    base = AIShellPolicy(max_actions=32)
+    target = AIShellPolicy(max_actions=31)
+    store = AIPolicyStore(base)
+    manager = AIPolicyRolloutManager(store)
+    rollout = manager.prepare("staged", target, canary_percent=100)
+    assert rollout.phase is AIPolicyRolloutPhase.PREPARED
+    assert rollout.target_revision == 0
+    assert store.current().policy == base
+    assert manager.policy_for("staged", "alice") == base
+
+
+def test_policy_rollout_canary_resolves_target_without_global_flip():
+    base = AIShellPolicy(max_actions=32)
+    target = AIShellPolicy(max_actions=31)
+    store = AIPolicyStore(base)
+    manager = AIPolicyRolloutManager(store)
+    manager.prepare("staged", target, canary_percent=100)
+    manager.advance("staged")
+    assert store.current().policy == base
+    assert manager.policy_for("staged", "alice") == target
+
+
+def test_policy_rollout_broad_activates_target_once():
+    base = AIShellPolicy(max_actions=32)
+    target = AIShellPolicy(max_actions=31)
+    store = AIPolicyStore(base)
+    manager = AIPolicyRolloutManager(store)
+    manager.prepare("staged", target, canary_percent=100)
+    manager.advance("staged")
+    broad = manager.advance("staged")
+    assert broad.phase is AIPolicyRolloutPhase.BROAD
+    assert broad.target_revision == 2
+    assert store.current().policy == target
+    assert manager.policy_for("staged", "bob") == target
+
+
+def test_policy_rollout_detects_concurrent_policy_change_before_broad():
+    store = AIPolicyStore(AIShellPolicy(max_actions=32))
+    manager = AIPolicyRolloutManager(store)
+    manager.prepare("staged", AIShellPolicy(max_actions=31))
+    manager.advance("staged")
+    store.replace(AIShellPolicy(max_actions=30))
+    with pytest.raises(RuntimeError, match="changed while rollout"):
+        manager.advance("staged")
