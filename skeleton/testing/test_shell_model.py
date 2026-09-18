@@ -108,6 +108,15 @@ def test_intent_rejects_large_metadata_sequence() -> None:
         CommandIntent(actor="ci", metadata={"items": list(range(65))})
 
 
+def test_intent_metadata_sequences_are_frozen() -> None:
+    source = ["one", "two"]
+    intent = CommandIntent(actor="ci", metadata={"items": source})
+    source.append("mutated")
+    assert intent.metadata["items"] == ("one", "two")
+    with pytest.raises(AttributeError):
+        intent.metadata["items"].append("three")  # type: ignore[union-attr]
+
+
 def test_intent_to_dict_is_json_serializable() -> None:
     intent = CommandIntent(
         execution_class=ExecutionClass.BUILD,
@@ -122,7 +131,7 @@ def test_intent_to_dict_is_json_serializable() -> None:
     assert '"correlation_id": "build:123"' in encoded
 
 
-@pytest.mark.parametrize("value", [0, -1, -0.5, True])
+@pytest.mark.parametrize("value", [0, -1, -0.5, True, float("nan"), float("inf"), float("-inf")])
 def test_resource_request_rejects_nonpositive_or_boolean_timeout(value: object) -> None:
     with pytest.raises(ShellModelError):
         ResourceRequest(timeout_seconds=value)  # type: ignore[arg-type]
@@ -155,6 +164,11 @@ def test_invocation_normalizes_arguments_environment_and_returncodes() -> None:
     assert invocation.arguments == ("-V",)
     assert invocation.environment == {"LANG": "C"}
     assert invocation.allowed_returncodes == frozenset({0, 2})
+
+
+def test_invocation_allows_conventional_underscore_environment_key() -> None:
+    invocation = ShellInvocation(CommandIdentity("core", "python"), environment={"_PRIVATE": "x"})
+    assert invocation.environment["_PRIVATE"] == "x"
 
 
 def test_invocation_environment_is_defensively_copied() -> None:
@@ -302,9 +316,10 @@ def test_with_intent_preserves_invocation_and_replaces_intent_field() -> None:
     assert changed.identity == invocation.identity
 
 
-def test_execution_timing_rejects_negative_values() -> None:
+@pytest.mark.parametrize("value", [-0.001, True, float("nan"), float("inf")])
+def test_execution_timing_rejects_invalid_values(value: object) -> None:
     with pytest.raises(ShellModelError):
-        ExecutionTiming(runtime_seconds=-0.001)
+        ExecutionTiming(runtime_seconds=value)  # type: ignore[arg-type]
 
 
 def test_execution_summary_normalizes_outcome() -> None:
@@ -381,6 +396,56 @@ def test_invocation_from_dict_builds_typed_request() -> None:
     assert invocation.resources.timeout_seconds == 5
     assert invocation.intent.execution_class is ExecutionClass.PROBE
     assert invocation.stderr is StreamDisposition.DISCARD
+
+
+def test_invocation_from_dict_rejects_non_string_command() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": 123})
+
+
+def test_invocation_from_dict_rejects_non_string_argument_item() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "arguments": ["-V", 1]})
+
+
+def test_invocation_from_dict_rejects_non_string_environment_value() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "environment": {"PORT": 8000}})
+
+
+def test_invocation_from_dict_rejects_unknown_resource_field() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "resources": {"unlimited": True}})
+
+
+def test_invocation_from_dict_rejects_boolean_resource_weight() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "resources": {"cpu_weight": True}})
+
+
+def test_invocation_from_dict_rejects_unknown_intent_field() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "intent": {"admin": True}})
+
+
+def test_invocation_from_dict_rejects_non_string_intent_actor() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "intent": {"actor": 42}})
+
+
+def test_invocation_from_dict_rejects_string_returncode_coercion() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "allowed_returncodes": ["0"]})
+
+
+def test_invocation_from_dict_rejects_boolean_returncode() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "allowed_returncodes": [True]})
+
+
+def test_invocation_from_dict_rejects_non_string_cwd() -> None:
+    with pytest.raises(ShellModelError):
+        invocation_from_dict({"command": "core:python@1", "cwd": 123})
 
 
 def test_invocation_from_dict_refuses_raw_stdin() -> None:
