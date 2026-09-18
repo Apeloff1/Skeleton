@@ -21,6 +21,7 @@ class AssuranceBinding:
     quorum_digest: str = ""
     execution_backend_id: str = ""
     sandbox_binding_digest: str = ""
+    runtime_trust_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -35,6 +36,7 @@ class AssuranceBinding:
             "preconditions_digest",
             "quorum_digest",
             "sandbox_binding_digest",
+            "runtime_trust_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -56,6 +58,7 @@ class AssuranceBinding:
             "quorum_digest": self.quorum_digest,
             "execution_backend_id": self.execution_backend_id,
             "sandbox_binding_digest": self.sandbox_binding_digest,
+            "runtime_trust_digest": self.runtime_trust_digest,
         }
 
     @property
