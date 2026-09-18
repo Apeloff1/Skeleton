@@ -14,9 +14,20 @@ class _OversizedStream(httpx.AsyncByteStream):
         yield b"y"
 
 
-def _run_get(url: str, handler, monkeypatch: pytest.MonkeyPatch) -> str | None:
+def _run_get(
+    url: str,
+    handler,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    dns_public: bool = True,
+) -> str | None:
     monkeypatch.setattr(scrapers, "HOST_DELAY", 0.0)
     scrapers.HOST_GUARD.clear()
+
+    async def resolve(_host: str) -> bool:
+        return dns_public
+
+    monkeypatch.setattr(scrapers, "_host_resolves_public", resolve)
 
     async def run() -> str | None:
         transport = httpx.MockTransport(handler)
@@ -123,3 +134,99 @@ def test_bounded_response_is_returned(monkeypatch: pytest.MonkeyPatch) -> None:
         return httpx.Response(200, content=b"<rss>safe</rss>")
 
     assert _run_get("https://public.example/feed", handler, monkeypatch) == "<rss>safe</rss>"
+
+
+
+def test_dns_policy_rejects_private_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                scrapers.socket.AF_INET,
+                scrapers.socket.SOCK_STREAM,
+                6,
+                "",
+                ("10.0.0.7", 443),
+            )
+        ],
+    )
+
+    assert asyncio.run(scrapers._host_resolves_public("private.example")) is False
+
+
+def test_dns_policy_rejects_mixed_public_private_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                scrapers.socket.AF_INET,
+                scrapers.socket.SOCK_STREAM,
+                6,
+                "",
+                ("93.184.216.34", 443),
+            ),
+            (
+                scrapers.socket.AF_INET,
+                scrapers.socket.SOCK_STREAM,
+                6,
+                "",
+                ("127.0.0.1", 443),
+            ),
+        ],
+    )
+
+    assert asyncio.run(scrapers._host_resolves_public("mixed.example")) is False
+
+
+def test_dns_policy_allows_only_global_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                scrapers.socket.AF_INET,
+                scrapers.socket.SOCK_STREAM,
+                6,
+                "",
+                ("93.184.216.34", 443),
+            )
+        ],
+    )
+
+    assert asyncio.run(scrapers._host_resolves_public("public.example")) is True
+
+
+def test_dns_policy_fails_closed_on_resolution_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail(*_args, **_kwargs):
+        raise OSError("resolver internals must not escape")
+
+    monkeypatch.setattr(scrapers.socket, "getaddrinfo", fail)
+
+    assert asyncio.run(scrapers._host_resolves_public("broken.example")) is False
+
+
+def test_dns_rejection_happens_before_http_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, content=b"should-not-run")
+
+    assert (
+        _run_get(
+            "https://public.example/feed",
+            handler,
+            monkeypatch,
+            dns_public=False,
+        )
+        is None
+    )
+    assert seen == []

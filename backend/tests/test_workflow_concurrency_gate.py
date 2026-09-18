@@ -211,6 +211,23 @@ def test_current_repository_concurrency_groups_pass() -> None:
     assert concurrency.repository_violations() == []
 
 
+def test_legacy_merge_readiness_drain_has_unique_top_level_concurrency() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github"
+        / "workflows"
+        / "merge-readiness-concurrency-drain.yml"
+    ).read_text(encoding="utf-8")
+
+    record, findings = concurrency.violations_from_text(
+        "merge-readiness-concurrency-drain.yml",
+        workflow,
+    )
+    assert findings == []
+    assert record is not None
+    assert record.prefix == "merge-readiness-legacy-drain-"
+
+
 def test_shared_prefix_across_workflows_is_a_collision() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)

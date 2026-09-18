@@ -78,11 +78,20 @@ python scripts/check_repository_process_safety.py
 printf '\n== Backend unsafe deserialization safety ==\n'
 python backend/scripts/check_deserialization_safety.py
 
+printf '\n== Repository unsafe deserialization safety ==\n'
+python scripts/check_repository_deserialization_safety.py
+
 printf '\n== Backend dynamic import safety ==\n'
 python backend/scripts/check_dynamic_import_safety.py
 
+printf '\n== Repository dynamic import safety ==\n'
+python scripts/check_repository_dynamic_import_safety.py
+
 printf '\n== Backend tar archive extraction safety ==\n'
 python backend/scripts/check_archive_extraction_safety.py
+
+printf '\n== Repository tar archive extraction safety ==\n'
+python scripts/check_repository_archive_extraction_safety.py
 
 printf '\n== Security scanner surface preflight ==\n'
 python backend/scripts/check_security_scan_surface.py
@@ -133,10 +142,13 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_process_safety_scanner_coverage.py \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
+  backend/tests/test_repository_deserialization_safety.py \
   backend/tests/test_dynamic_import_safety.py \
   backend/tests/test_dynamic_import_exception_policy.py \
+  backend/tests/test_repository_dynamic_import_safety.py \
   backend/tests/test_scanner_nonempty_contract.py \
   backend/tests/test_archive_extraction_safety.py \
+  backend/tests/test_repository_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
   backend/tests/test_live_scraper_network_security.py \
   backend/tests/test_ai_reader_error_redaction.py \

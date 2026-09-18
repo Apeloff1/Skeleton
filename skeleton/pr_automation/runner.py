@@ -454,6 +454,19 @@ def base_is_protected(client: GitHubClient, repository: str, base_ref: str) -> b
     return isinstance(branch, dict) and branch.get("protected") is True
 
 
+def queued_actions_count(client: GitHubClient, repository: str) -> int:
+    owner, name = repository.split("/", 1)
+    payload = client.get(
+        f"/repos/{owner}/{name}/actions/runs?status=queued&per_page=1"
+    )
+    if not isinstance(payload, dict):
+        raise GitHubError("invalid queued Actions response")
+    count = payload.get("total_count")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise GitHubError("invalid queued Actions count")
+    return count
+
+
 def _operational_hold(snapshot: PRSnapshot, evaluation: Evaluation, reason: str) -> Evaluation:
     return Evaluation(
         decision=Decision.HOLD,
@@ -538,6 +551,35 @@ def execute_actions(
             evaluation=held,
             event_type="unprotected_base",
             delivery_id=f"{delivery_id}:unprotected" if delivery_id else None,
+        )
+        publish_gate_status(client, live_snapshot, held)
+        return ActionOutcome(0, live_snapshot, held)
+
+    max_queued_actions = _int_env(
+        "PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS",
+        40,
+        minimum=0,
+        maximum=100_000,
+    )
+    queued_actions = queued_actions_count(client, live_snapshot.repository)
+    if queued_actions >= max_queued_actions:
+        held = _operational_hold(
+            live_snapshot,
+            live_evaluation,
+            (
+                "Actions queue pressure blocks automated merge: "
+                f"{queued_actions} queued >= {max_queued_actions}"
+            ),
+        )
+        index.append(
+            snapshot=live_snapshot,
+            evaluation=held,
+            event_type="actions_queue_pressure",
+            delivery_id=f"{delivery_id}:queue-pressure" if delivery_id else None,
+            extra={
+                "queued_actions_runs": queued_actions,
+                "threshold": max_queued_actions,
+            },
         )
         publish_gate_status(client, live_snapshot, held)
         return ActionOutcome(0, live_snapshot, held)

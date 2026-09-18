@@ -84,21 +84,41 @@ def literal_string(node: ast.AST) -> str | None:
 
 
 def obvious_command_string(node: ast.AST) -> bool:
-    """Return True when an argv expression is statically string-shaped.
+    """Return True when an argv expression is provably string/bytes-shaped.
 
-    This intentionally handles only cases that are safe to classify without
-    data-flow guessing: string literals, f-strings, concatenations containing a
-    string-shaped operand, and common string-building methods. Unknown names
-    remain allowed so legitimate dynamically assembled argument vectors are not
-    falsely rejected by this lightweight gate.
+    The check stays deliberately high-confidence: it recognizes literals,
+    f-strings, string-producing operators/constructors, and string-preserving
+    methods only when their receiver is already provably string-shaped.
     """
-    if literal_string(node) is not None or isinstance(node, ast.JoinedStr):
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
         return True
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        return obvious_command_string(node.left) or obvious_command_string(node.right)
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr in {"format", "join"}:
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Add):
+            return obvious_command_string(node.left) or obvious_command_string(node.right)
+        if isinstance(node.op, ast.Mod):
+            return obvious_command_string(node.left)
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes", "repr", "ascii"}:
             return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "format",
+            "format_map",
+            "join",
+            "strip",
+            "lstrip",
+            "rstrip",
+            "replace",
+            "lower",
+            "upper",
+            "casefold",
+            "removeprefix",
+            "removesuffix",
+            "encode",
+            "decode",
+        }:
+            return obvious_command_string(node.func.value)
     return False
 
 
