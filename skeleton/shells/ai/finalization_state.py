@@ -82,6 +82,7 @@ class AIExecutionFinalization:
     recovery_checkpoint_digest: str = ""
     audit_anchor_digest: str = ""
     audit_chain_node_hash: str = ""
+    audit_root: str = ""
     audit_witness_digest: str = ""
     audit_witness_sequence: int | None = None
     execution_evidence_digest: str = ""
@@ -111,6 +112,7 @@ class AIExecutionFinalization:
             "recovery_checkpoint_digest",
             "audit_anchor_digest",
             "audit_chain_node_hash",
+            "audit_root",
             "audit_witness_digest",
             "execution_evidence_digest",
             "execution_evidence_chain_node_hash",
@@ -183,9 +185,13 @@ class AIExecutionFinalization:
                     "checkpointed phase requires recovery_checkpoint_digest"
                 )
         if order >= _PHASE_ORDER[FinalizationPhase.ANCHORED]:
-            if not self.audit_anchor_digest or not self.audit_chain_node_hash:
+            if (
+                not self.audit_anchor_digest
+                or not self.audit_chain_node_hash
+                or not self.audit_root
+            ):
                 raise ValueError(
-                    "anchored phase requires audit anchor and chain node"
+                    "anchored phase requires audit anchor, chain node, and root"
                 )
         if self.phase is FinalizationPhase.WITNESSED:
             if not self.audit_witness_digest:
@@ -281,6 +287,7 @@ class AIExecutionFinalization:
             "recovery_checkpoint_digest": self.recovery_checkpoint_digest,
             "audit_anchor_digest": self.audit_anchor_digest,
             "audit_chain_node_hash": self.audit_chain_node_hash,
+            "audit_root": self.audit_root,
             "audit_witness_digest": self.audit_witness_digest,
             "audit_witness_sequence": self.audit_witness_sequence,
             "execution_evidence_digest": self.execution_evidence_digest,
@@ -435,6 +442,7 @@ class AIExecutionFinalizationStore:
         recovery_checkpoint_digest: str = "",
         audit_anchor_digest: str = "",
         audit_chain_node_hash: str = "",
+        audit_root: str = "",
         audit_witness_digest: str = "",
         audit_witness_sequence: int | None = None,
         execution_evidence_digest: str = "",
@@ -466,6 +474,7 @@ class AIExecutionFinalizationStore:
                 "recovery_checkpoint_digest": recovery_checkpoint_digest,
                 "audit_anchor_digest": audit_anchor_digest,
                 "audit_chain_node_hash": audit_chain_node_hash,
+                "audit_root": audit_root,
                 "audit_witness_digest": audit_witness_digest,
                 "audit_witness_sequence": audit_witness_sequence,
                 "execution_evidence_digest": execution_evidence_digest,
@@ -506,6 +515,10 @@ class AIExecutionFinalizationStore:
                 "audit_chain_node_hash": (
                     audit_chain_node_hash
                     or current.audit_chain_node_hash
+                ),
+                "audit_root": (
+                    audit_root
+                    or current.audit_root
                 ),
                 "audit_witness_digest": (
                     audit_witness_digest
