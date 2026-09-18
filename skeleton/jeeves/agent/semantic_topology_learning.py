@@ -870,6 +870,26 @@ class LearnedTopologyRule:
     bridge_quality: float
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        for name in (
+            "candidate_id",
+            "candidate_fingerprint",
+            "report_id",
+            "report_fingerprint",
+            "fingerprint",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise AgentContractError(f"{name} is required")
+            object.__setattr__(self, name, value)
+        if not isinstance(self.rule, LensInteractionRule):
+            raise TypeError("rule must be LensInteractionRule")
+        object.__setattr__(
+            self,
+            "bridge_quality",
+            probability("bridge_quality", self.bridge_quality),
+        )
+
     def as_json(self) -> dict[str, Any]:
         return json_safe(
             {
