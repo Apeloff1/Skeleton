@@ -78,6 +78,7 @@ class ShellPolicy:
     max_timeout: float = 60.0
     max_output_bytes: int = 1_048_576
     max_input_bytes: int = 1_048_576
+    max_env_bytes: int = 32_768
     max_args: int = 128
     max_arg_bytes: int = 65_536
 
@@ -96,17 +97,21 @@ class ShellPolicy:
             raise ShellPolicyError("at least one working-directory root is required")
         if self.default_timeout <= 0 or self.max_timeout <= 0 or self.default_timeout > self.max_timeout:
             raise ShellPolicyError("timeout bounds are invalid")
-        if self.max_output_bytes <= 0 or self.max_input_bytes < 0:
+        if self.max_output_bytes <= 0 or self.max_input_bytes < 0 or self.max_env_bytes <= 0:
             raise ShellPolicyError("I/O bounds are invalid")
         if self.max_args <= 0 or self.max_arg_bytes <= 0:
             raise ShellPolicyError("argument bounds are invalid")
-        for key in self.allowed_env | self.inherited_env:
+        allowed_env = frozenset(self.allowed_env)
+        inherited_env = frozenset(self.inherited_env)
+        for key in allowed_env | inherited_env:
             if not isinstance(key, str) or not _ENV_KEY.fullmatch(key):
                 raise ShellPolicyError("invalid environment variable name in policy")
-        if not self.inherited_env <= self.allowed_env:
+        if not inherited_env <= allowed_env:
             raise ShellPolicyError("inherited_env must be a subset of allowed_env")
         object.__setattr__(self, "executables", MappingProxyType(normalized))
         object.__setattr__(self, "cwd_roots", roots)
+        object.__setattr__(self, "allowed_env", allowed_env)
+        object.__setattr__(self, "inherited_env", inherited_env)
 
 
 @dataclass(frozen=True)
@@ -197,6 +202,9 @@ class ShellRunner:
             if not isinstance(value, str) or "\x00" in value:
                 raise ShellPolicyError("command environment values must be NUL-free strings")
             env[key] = value
+        total_bytes = sum(len(key.encode("utf-8")) + len(value.encode("utf-8")) + 2 for key, value in env.items())
+        if total_bytes > self.policy.max_env_bytes:
+            raise ShellPolicyError("command environment exceeds byte limit")
         return env
 
     def _timeout(self, command: ShellCommand) -> float:
