@@ -15,6 +15,7 @@ from collections import Counter, deque
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from .evaluation import EvalResult
 from .frontier_reasoning import FrontierReasoningDecision, InferenceDisposition
 from .types import AgentContractError, finite_number, positive_int, probability, stable_fingerprint
 
@@ -232,7 +233,176 @@ class FrontierReasoningFeedback:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class FrontierEvalComparison:
+    case_id: str
+    baseline_fingerprint: str
+    frontier_fingerprint: str
+    baseline_score: float
+    frontier_score: float
+    score_delta: float
+    baseline_passed: bool
+    frontier_passed: bool
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class FrontierEvalReport:
+    count: int
+    improved: int
+    regressed: int
+    unchanged: int
+    pass_gains: int
+    pass_losses: int
+    mean_score_delta: float
+    median_score_delta: float
+    win_rate: float
+    loss_rate: float
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class FrontierEvalGate:
+    passed: bool
+    reasons: tuple[str, ...]
+    report_fingerprint: str
+    fingerprint: str
+
+
+class FrontierEvalFeedback:
+    """Case-matched offline evaluation feedback for frontier promotion decisions."""
+
+    def __init__(self, *, history_limit: int = 4096) -> None:
+        self.history_limit = positive_int("history_limit", history_limit, maximum=1_000_000)
+        self._comparisons: deque[FrontierEvalComparison] = deque(maxlen=self.history_limit)
+        self._lock = threading.RLock()
+
+    def observe(self, baseline: EvalResult, frontier: EvalResult) -> FrontierEvalComparison:
+        if not isinstance(baseline, EvalResult) or not isinstance(frontier, EvalResult):
+            raise TypeError("baseline and frontier must be EvalResult")
+        if baseline.case_id != frontier.case_id:
+            raise AgentContractError("evaluation comparison requires matching case_id")
+        delta = frontier.score - baseline.score
+        fingerprint = stable_fingerprint(
+            {
+                "case": baseline.case_id,
+                "baseline": baseline.result_fingerprint,
+                "frontier": frontier.result_fingerprint,
+                "delta": delta,
+                "baseline_passed": baseline.passed,
+                "frontier_passed": frontier.passed,
+            }
+        )
+        comparison = FrontierEvalComparison(
+            case_id=baseline.case_id,
+            baseline_fingerprint=baseline.result_fingerprint,
+            frontier_fingerprint=frontier.result_fingerprint,
+            baseline_score=baseline.score,
+            frontier_score=frontier.score,
+            score_delta=delta,
+            baseline_passed=baseline.passed,
+            frontier_passed=frontier.passed,
+            fingerprint=fingerprint,
+        )
+        with self._lock:
+            self._comparisons.append(comparison)
+        return comparison
+
+    def comparisons(self) -> tuple[FrontierEvalComparison, ...]:
+        with self._lock:
+            return tuple(self._comparisons)
+
+    def report(self) -> FrontierEvalReport:
+        comparisons = self.comparisons()
+        if not comparisons:
+            fingerprint = stable_fingerprint({"frontier_eval": []})
+            return FrontierEvalReport(0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, fingerprint)
+        epsilon = 1e-12
+        improved = sum(1 for item in comparisons if item.score_delta > epsilon)
+        regressed = sum(1 for item in comparisons if item.score_delta < -epsilon)
+        unchanged = len(comparisons) - improved - regressed
+        pass_gains = sum(
+            1 for item in comparisons if not item.baseline_passed and item.frontier_passed
+        )
+        pass_losses = sum(
+            1 for item in comparisons if item.baseline_passed and not item.frontier_passed
+        )
+        deltas = [item.score_delta for item in comparisons]
+        payload = {
+            "comparisons": [item.fingerprint for item in comparisons],
+            "improved": improved,
+            "regressed": regressed,
+            "pass_gains": pass_gains,
+            "pass_losses": pass_losses,
+            "mean": statistics.fmean(deltas),
+            "median": statistics.median(deltas),
+        }
+        return FrontierEvalReport(
+            count=len(comparisons),
+            improved=improved,
+            regressed=regressed,
+            unchanged=unchanged,
+            pass_gains=pass_gains,
+            pass_losses=pass_losses,
+            mean_score_delta=statistics.fmean(deltas),
+            median_score_delta=statistics.median(deltas),
+            win_rate=improved / len(comparisons),
+            loss_rate=regressed / len(comparisons),
+            fingerprint=stable_fingerprint(payload),
+        )
+
+    def promotion_gate(
+        self,
+        *,
+        minimum_cases: int = 8,
+        minimum_mean_delta: float = 0.0,
+        maximum_loss_rate: float = 0.20,
+        allow_pass_losses: int = 0,
+    ) -> FrontierEvalGate:
+        minimum_cases = positive_int("minimum_cases", minimum_cases, maximum=1_000_000)
+        mean_delta = finite_number("minimum_mean_delta", minimum_mean_delta)
+        max_loss = probability("maximum_loss_rate", maximum_loss_rate)
+        if isinstance(allow_pass_losses, bool) or not isinstance(allow_pass_losses, int) or allow_pass_losses < 0:
+            raise AgentContractError("allow_pass_losses must be a non-negative integer")
+        report = self.report()
+        reasons: list[str] = []
+        if report.count < minimum_cases:
+            reasons.append(f"insufficient matched eval cases: {report.count} < {minimum_cases}")
+        if report.mean_score_delta < mean_delta:
+            reasons.append(
+                f"mean score delta below promotion floor: {report.mean_score_delta:.6f} < {mean_delta:.6f}"
+            )
+        if report.loss_rate > max_loss:
+            reasons.append(
+                f"regression rate above promotion ceiling: {report.loss_rate:.6f} > {max_loss:.6f}"
+            )
+        if report.pass_losses > allow_pass_losses:
+            reasons.append(
+                f"pass-to-fail regressions exceed allowance: {report.pass_losses} > {allow_pass_losses}"
+            )
+        fingerprint = stable_fingerprint(
+            {
+                "report": report.fingerprint,
+                "minimum_cases": minimum_cases,
+                "minimum_mean_delta": mean_delta,
+                "maximum_loss_rate": max_loss,
+                "allow_pass_losses": allow_pass_losses,
+                "reasons": reasons,
+            }
+        )
+        return FrontierEvalGate(
+            passed=not reasons,
+            reasons=tuple(reasons),
+            report_fingerprint=report.fingerprint,
+            fingerprint=fingerprint,
+        )
+
+
 __all__ = [
+    "FrontierEvalComparison",
+    "FrontierEvalFeedback",
+    "FrontierEvalGate",
+    "FrontierEvalReport",
     "FrontierFeedbackRecommendation",
     "FrontierFeedbackReport",
     "FrontierFeedbackSample",
