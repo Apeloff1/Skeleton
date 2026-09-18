@@ -248,14 +248,29 @@ class CylinderShape:
 
     def aabb(self, transform: Transform) -> AABB:
         axis = self.axis(transform)
+
+        def world_extent(component: float) -> float:
+            component = max(-1.0, min(1.0, component))
+            magnitude = abs(component)
+            extent = (
+                magnitude * self.half_height
+                + self.radius
+                * math.sqrt(max(0.0, 1.0 - component * component))
+            )
+            # For a rotated finite cylinder this expression and support()
+            # arrive at the same mathematical extreme through different
+            # floating-point paths. Expand mixed axial/radial components by
+            # one representable float so the broad-phase AABB remains
+            # conservative instead of occasionally excluding its own support.
+            if 0.0 < magnitude < 1.0:
+                extent = math.nextafter(extent, math.inf)
+            return extent
+
         values = axis.to_tuple()
         half = Vec3(
-            abs(values[0]) * self.half_height
-            + self.radius * math.sqrt(max(0.0, 1.0 - values[0] ** 2)),
-            abs(values[1]) * self.half_height
-            + self.radius * math.sqrt(max(0.0, 1.0 - values[1] ** 2)),
-            abs(values[2]) * self.half_height
-            + self.radius * math.sqrt(max(0.0, 1.0 - values[2] ** 2)),
+            world_extent(values[0]),
+            world_extent(values[1]),
+            world_extent(values[2]),
         )
         return AABB.from_center_half_extents(transform.position, half)
 
