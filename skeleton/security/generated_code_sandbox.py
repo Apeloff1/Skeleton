@@ -66,7 +66,7 @@ _SECRET_PATH_MARKERS = (
     "authorized_keys",
 )
 
-_FS_MODULES = frozenset({"os", "pathlib", "shutil", "tempfile", "aiofiles"})
+_FS_MODULES = frozenset({"os", "pathlib", "shutil", "tempfile", "aiofiles", "io"})
 _NET_MODULES = frozenset({
     "socket", "ssl", "http", "urllib", "requests", "httpx", "aiohttp",
     "ftplib", "smtplib", "telnetlib", "webbrowser",
@@ -81,7 +81,7 @@ _UNSAFE_MODULES = frozenset({
 })
 
 _FS_CALLS = frozenset({
-    "open", "builtins.open", "__builtins__.open", "os.open", "os.remove", "os.unlink", "os.rename", "os.replace",
+    "open", "builtins.open", "__builtins__.open", "io.open", "io.FileIO", "os.open", "os.fdopen", "os.remove", "os.unlink", "os.rename", "os.replace",
     "os.mkdir", "os.makedirs", "os.rmdir", "os.removedirs", "os.listdir",
     "os.scandir", "os.walk", "os.chmod", "os.chown", "os.link", "os.symlink",
     "os.readlink", "os.truncate", "pathlib.Path", "shutil.copy", "shutil.copy2",
