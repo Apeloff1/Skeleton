@@ -14,18 +14,15 @@ jobs:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}
     strategy:
       fail-fast: false
-      max-parallel: 9
+      max-parallel: 6
       matrix:
         sha:
-          - 7b681ba1805c52c2f35d9462c4ec9a92f0053d0b
-          - b784b18cb2f7b8088601f673820f052db54da11b
-          - baaf5f8eab1f3c82e2b24cbb9bb8ea27dcbe13c9
-          - 85d21bafc755d4111e3396737c70254b7cf2dbec
-          - bcef1bc9c5caa00b7e1ee8a36bb64db493b6856e
-          - 70302a63f3addf97a1615c52e2f46269048dfde3
-          - 9790135c12f22b4064ff6e4addd8f981a6ee5499
-          - a5a9168f02d91203825a36588d03431796d9c355
-          - 0d639993c9c88caa8e7b64c748df6b0be66fe733
+          - 4cdb341dafaf1749f331f9896a2aace28a0acfa7
+          - cdd4b94c0061600fe7f596f8a6416d73aa6804cf
+          - 90c96d1a907bd5d946cfea6257d995fc965da00c
+          - 86886dbc615ac4c8fff72a4afcf64025324ff7f9
+          - a544262c57baaabc4c8f1c4cf0c0ee36f2515a2a
+          - b8e9c40e115c6001ee76dab65ef7520c42d19eb8
     concurrency:
       # Intentionally matches the pre-#1203 SHA-scoped Merge Readiness group.
       # The current ref-scoped group is not present in this matrix.
@@ -37,7 +34,7 @@ jobs:
       - name: Confirm bounded tombstone identity
         env:
           LEGACY_SHA: ${{ matrix.sha }}
-          CURRENT_MAIN_SHA: 03b175d3ffbb2c32cee230ec90c5d12a32bdfa59
+          CURRENT_MAIN_SHA: 1344c3bf3c9fa1cf3b33a02236037a9d3a8e718e
         shell: bash
         run: |
           set -euo pipefail
