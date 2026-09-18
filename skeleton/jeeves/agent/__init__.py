@@ -170,6 +170,16 @@ from .execution_audit import (
     ReplayReport,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .frontier_reasoning import (
+    CandidateAssessment as FrontierCandidateAssessment,
+    EscalationCause as FrontierEscalationCause,
+    FrontierReasoningCoordinator,
+    FrontierReasoningDecision,
+    FrontierReasoningError,
+    FrontierReasoningPolicy,
+    InferenceDiagnostics as FrontierInferenceDiagnostics,
+    InferenceDisposition,
+)
 from .interpretive_science import (
     DomainCalibration,
     JuxtapositionTrial,
