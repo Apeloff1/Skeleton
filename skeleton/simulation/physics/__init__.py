@@ -2,6 +2,12 @@
 
 from .body import BodyType, RigidBody
 from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
+from .character import (
+    CharacterControllerSettings,
+    CharacterMoveResult,
+    CharacterSweepHit,
+    KinematicCapsuleController,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -159,6 +165,9 @@ __all__ = [
     "JointNotFoundError",
     "BodyType",
     "CapsuleShape",
+    "CharacterControllerSettings",
+    "CharacterMoveResult",
+    "CharacterSweepHit",
     "BoxShape",
     "BroadPhasePair",
     "CollisionShape",
@@ -177,6 +186,7 @@ __all__ = [
     "IslandGraphStats",
     "IslandSolveReceipt",
     "JumpTuning",
+    "KinematicCapsuleController",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
