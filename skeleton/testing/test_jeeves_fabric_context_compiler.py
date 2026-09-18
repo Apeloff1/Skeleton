@@ -332,6 +332,20 @@ def test_optional_fabric_failure_falls_back_to_base_context_and_is_observable() 
     assert "synthetic fabric failure" in snapshot["error"]
 
 
+def test_non_fabric_compiler_failure_is_not_hidden_by_fail_open_mode() -> None:
+    class BrokenRenderer(FabricContextCompiler):
+        def _render_context_fabric(self, result):
+            raise ValueError("synthetic renderer bug")
+
+    compiler = BrokenRenderer(
+        fabric=_external_fabric(_external_record()),
+        fabric_policy=FabricCompilerPolicy(fail_closed=False),
+    )
+
+    with pytest.raises(ValueError, match="synthetic renderer bug"):
+        _compile(compiler)
+
+
 def test_required_fabric_failure_fails_closed() -> None:
     compiler = FabricContextCompiler(
         fabric=ExplodingFabric(),
