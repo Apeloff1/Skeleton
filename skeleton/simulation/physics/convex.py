@@ -19,6 +19,7 @@ from .math3d import EPSILON, Mat3, Quat, Transform, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
@@ -667,6 +668,8 @@ def _shape_sweep_radius(body: RigidBody) -> float:
         return shape.half_height + shape.radius
     if isinstance(shape, CylinderShape):
         return math.hypot(shape.radius, shape.half_height)
+    if isinstance(shape, ConvexHullShape):
+        return max(vertex.length() for vertex in shape.vertices)
     raise PhysicsValidationError(
         "convex TOI requires finite supported shape"
     )
@@ -934,7 +937,13 @@ def _validate_convex_plane_pair(
         )
     if not isinstance(
         convex.shape,
-        (SphereShape, BoxShape, CapsuleShape, CylinderShape),
+        (
+            SphereShape,
+            BoxShape,
+            CapsuleShape,
+            CylinderShape,
+            ConvexHullShape,
+        ),
     ):
         raise PhysicsValidationError(
             "convex-plane TOI requires supported finite convex shape"
