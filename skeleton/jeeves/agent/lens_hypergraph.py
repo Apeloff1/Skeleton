@@ -29,6 +29,12 @@ class HyperedgeKind(str, Enum):
     PERSPECTIVE_SPLIT = "perspective_split"
     TEMPORAL_CHAIN = "temporal_chain"
     SYSTEMIC = "systemic"
+    CAUSAL_CHAIN = "causal_chain"
+    INFORMATION_FLOW = "information_flow"
+    COMPUTATIONAL_CONSTRAINT = "computational_constraint"
+    EPISTEMIC_CONTROL = "epistemic_control"
+    PROBABILISTIC_DEPENDENCE = "probabilistic_dependence"
+    PREDICTIVE_REGIME = "predictive_regime"
     EXPLORATORY = "exploratory"
 
 
@@ -172,6 +178,18 @@ class SemanticLensHypergraph:
         roles = {item.metadata.get("role") for item in items if item.metadata.get("role")}
         if LensFamily.TEMPORAL in families or any("temporal" in item.lens_key for item in items):
             return HyperedgeKind.TEMPORAL_CHAIN
+        if LensFamily.CAUSAL in families:
+            return HyperedgeKind.CAUSAL_CHAIN
+        if LensFamily.INFORMATION in families:
+            return HyperedgeKind.INFORMATION_FLOW
+        if LensFamily.COMPUTATIONAL in families:
+            return HyperedgeKind.COMPUTATIONAL_CONSTRAINT
+        if LensFamily.METACOGNITIVE in families:
+            return HyperedgeKind.EPISTEMIC_CONTROL
+        if LensFamily.PROBABILITY in families:
+            return HyperedgeKind.PROBABILISTIC_DEPENDENCE
+        if LensFamily.PREDICTIVE in families:
+            return HyperedgeKind.PREDICTIVE_REGIME
         if sum(item.family in {LensFamily.NARRATIVE, LensFamily.FILM, LensFamily.LITERATURE} for item in items) >= 2:
             return HyperedgeKind.PERSPECTIVE_SPLIT
         if LensFamily.SYSTEM in families or LensFamily.GAME in families:
