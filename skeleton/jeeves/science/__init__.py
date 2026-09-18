@@ -3,7 +3,9 @@
 The science package keeps architectural evolution evidence-bearing. Newer is
 not treated as better by default: candidate mechanisms must preserve mandatory
 invariants and earn promotion against explicit criteria. Chronological replay
-also prevents hindsight by enforcing historical availability and data custody.
+also prevents hindsight by enforcing historical availability and data custody,
+while the predictive exchange gives heterogeneous model families one common
+prequential evidence contract.
 """
 
 from .chronological_frontier import (
@@ -46,6 +48,30 @@ from .lineage import (
     TheoryRecord,
     default_lineage,
 )
+from .predictive_exchange import (
+    DistributionComponent,
+    EnsembleForecast,
+    ExpertIdentity,
+    ForecastArbiter,
+    ForecastEnvelope,
+    ForecastExpert,
+    ForecastExpertRegistry,
+    ForecastRequest,
+    ForecastScore,
+    ForecastShape,
+    FunctionalForecastExpert,
+    HistoricalEvidenceBuilder,
+    HistoricalEvidencePolicy,
+    PredictiveDistribution,
+    PredictiveTarget,
+    PredictiveTargetKind,
+    PrequentialExpertRouter,
+    PrequentialScoreLedger,
+    RouterPolicy,
+    RoutingSnapshot,
+    RoutingWeight,
+    ScoreAvailability,
+)
 
 __all__ = [
     "ArchitecturalLineage",
@@ -56,24 +82,46 @@ __all__ = [
     "ClaimEdge",
     "ClaimRelation",
     "ClaimStatus",
+    "DistributionComponent",
+    "EnsembleForecast",
     "EvidenceGrade",
     "EvidenceKind",
     "EvidenceProfile",
     "EvidenceSnapshot",
+    "ExpertIdentity",
+    "ForecastArbiter",
+    "ForecastEnvelope",
+    "ForecastExpert",
+    "ForecastExpertRegistry",
     "ForecastFamily",
+    "ForecastRequest",
+    "ForecastScore",
+    "ForecastShape",
     "ForecastTechnique",
     "FrontierDecisionStatus",
     "FrontierEntry",
     "FrontierTournamentPolicy",
+    "FunctionalForecastExpert",
     "HistoricalEvaluation",
+    "HistoricalEvidenceBuilder",
+    "HistoricalEvidencePolicy",
     "LineageDomain",
     "MetricComparison",
     "MetricDirection",
     "MetricRule",
+    "PredictiveDistribution",
+    "PredictiveTarget",
+    "PredictiveTargetKind",
+    "PrequentialExpertRouter",
+    "PrequentialScoreLedger",
     "PromotionCriterion",
     "PromotionDecision",
     "PromotionStatus",
     "ResearchArtifact",
+    "RouterPolicy",
+    "RoutingSnapshot",
+    "RoutingWeight",
+    "ScoreAvailability",
     "ScientificClaim",
     "ScientificEvidenceLedger",
     "TechniqueRegistry",
