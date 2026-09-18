@@ -1191,3 +1191,91 @@ def test_jeeves_exports_and_verifies_portable_game_loop_replay() -> None:
 
     assert verification.passed
     assert verification.advances == 1
+
+
+
+def test_input_batch_order_is_not_part_of_authoritative_replay_identity() -> None:
+    sandbox = (
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.PONG
+        )
+    )
+    first = build_game_loop(
+        sandbox
+    )
+    second = build_game_loop(
+        sandbox
+    )
+    delta = _one_step_delta(
+        first
+    )
+    left = RawInputSample(
+        tick=0,
+        player=0,
+        device=InputDevice.PADDLE,
+        move_y=-1.0,
+    )
+    right = RawInputSample(
+        tick=0,
+        player=1,
+        device=InputDevice.PADDLE,
+        move_y=1.0,
+    )
+
+    first_result = first.advance(
+        delta,
+        (
+            left,
+            right,
+        ),
+    )
+    second_result = second.advance(
+        delta,
+        (
+            right,
+            left,
+        ),
+    )
+
+    assert first_result == second_result
+    assert first.chain_digest == second.chain_digest
+    assert first.history == second.history
+    assert (
+        serialize_replay_tape(
+            build_replay_tape(
+                first
+            )
+        )
+        == serialize_replay_tape(
+            build_replay_tape(
+                second
+            )
+        )
+    )
+
+
+def test_game_loop_rejects_non_raw_input_sample_values() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="RawInputSample",
+    ):
+        loop.advance(
+            _one_step_delta(
+                loop
+            ),
+            (
+                object(),
+            ),
+        )
+
+    assert loop.machine.tick == 0
+    assert loop.clock.simulation_tick == 0
+    assert loop.history == ()
