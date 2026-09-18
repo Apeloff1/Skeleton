@@ -23,6 +23,8 @@ from .replay import (
 )
 
 __all__ = [
+    "REPLAY_SCHEMA",
+    "REPLAY_SCHEMA_VERSION",
     "AIBehaviorSpec",
     "CombatStyle",
     "CombatSystemSpec",
@@ -34,8 +36,6 @@ __all__ = [
     "MechanicsReplay",
     "ProgressionStyle",
     "ProgressionSystemSpec",
-    "REPLAY_SCHEMA",
-    "REPLAY_SCHEMA_VERSION",
     "ReplayComparison",
     "ReplayMismatch",
     "ReplayStep",

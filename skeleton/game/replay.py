@@ -780,8 +780,7 @@ def _apply_economy(
                 "delta": delta,
             },
         )
-    if next_value > cap:
-        next_value = cap
+    next_value = min(next_value, cap)
     state["wallets"][currency] = next_value
     return {"currency": currency, "delta": delta, "balance": next_value}
 
@@ -1201,7 +1200,7 @@ def _ratio_to_mille(value: Any) -> int:
             "ratio must be a finite non-negative number",
             context={"reason": "malformed_spec"},
         )
-    return int(round(number * 1000))
+    return round(number * 1000)
 
 
 def _expect_payload_keys(

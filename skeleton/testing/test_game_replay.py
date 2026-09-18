@@ -9,6 +9,8 @@ from itertools import count
 import pytest
 
 from skeleton.game import (
+    REPLAY_SCHEMA,
+    REPLAY_SCHEMA_VERSION,
     AIBehaviorSpec,
     CombatStyle,
     CombatSystemSpec,
@@ -17,8 +19,6 @@ from skeleton.game import (
     MechanicsReplay,
     ProgressionStyle,
     ProgressionSystemSpec,
-    REPLAY_SCHEMA,
-    REPLAY_SCHEMA_VERSION,
     ReplayStep,
 )
 from skeleton.game.replay import canonical_dumps, parse_trace
