@@ -52,6 +52,8 @@ def _run_get(
         "https://169.254.169.254/latest/meta-data",
         "https://2130706433/feed",
         "https://[::1]/feed",
+        "https://224.0.0.1/feed",
+        "https://[ff02::1]/feed",
         "https://metadata.google.internal/computeMetadata/v1/",
         "https://user:password@example.com/feed",
     ],
@@ -230,3 +232,28 @@ def test_dns_rejection_happens_before_http_request(
         is None
     )
     assert seen == []
+
+
+
+@pytest.mark.parametrize("address", ["224.0.0.1", "ff02::1"])
+def test_dns_policy_rejects_multicast_answers(
+    address: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    family = scrapers.socket.AF_INET6 if ":" in address else scrapers.socket.AF_INET
+    sockaddr = (address, 443, 0, 0) if family == scrapers.socket.AF_INET6 else (address, 443)
+    monkeypatch.setattr(
+        scrapers.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                family,
+                scrapers.socket.SOCK_STREAM,
+                6,
+                "",
+                sockaddr,
+            )
+        ],
+    )
+
+    assert asyncio.run(scrapers._host_resolves_public("multicast.example")) is False
