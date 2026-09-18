@@ -405,6 +405,32 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
     assert box.granted_capabilities() == frozenset()
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        'target = "/etc/passwd"\nopen(target, "r").read()\n',
+        'target = "/tmp/outside.txt"\nopen(target, "w").write("x")\n',
+        'from pathlib import Path\ntarget = "/etc/passwd"\nPath(target).read_text()\n',
+    ],
+)
+def test_dynamic_filesystem_targets_fail_closed_even_with_filesystem_grant(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+
+    decision = box.admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}
+    assert decision.operation.target == "<dynamic>"
+    assert "dynamic filesystem target" in decision.reason
+
+
 def test_secret_symlink_cannot_bypass_secrets_capability(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=REDACTED_SECRET_PLACEHOLDER\n", encoding="utf-8")
