@@ -62,6 +62,7 @@ jobs:
           # be garbage-collected as stale workload merely because a newer commit
           # appears while they are queued.
           control_plane_paths = frozenset({
+              '.github/workflows/actions-housekeeping-cli.yml',
               '.github/workflows/branch-clean.yml',
               '.github/workflows/branch-archive.yml',
               '.github/workflows/branch-flow.yml',
@@ -326,7 +327,7 @@ jobs:
                       f'- Terminal cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
-                      '- Safety: `branch-clean.yml`, `branch-flow.yml`, '
+                      '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
                       '`branch-repair-100.yml`, `merge-readiness.yml`, '
                       '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
                       'never cancellation targets; current main, PR work, and '

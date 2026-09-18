@@ -36,6 +36,14 @@ from .associative_memory import (
     MemoryAssociation,
     SequencePrediction,
 )
+from .context_acquisition import (
+    AcquisitionTrace,
+    CueFirstContextSystem,
+    InteractionAcquisitionEngine,
+    InteractionAcquisitionPolicy,
+    RecallTrace,
+    build_cue_first_context_system,
+)
 from .cognition import (
     CognitionError,
     ContextBudget,
@@ -152,6 +160,14 @@ from .interpretive_science import (
     ScientificLensReport,
     ScientificLensStatus,
 )
+from .lens_hypergraph import (
+    HyperedgeKind,
+    HypergraphPolicy,
+    LensHyperedge,
+    PerpendicularRestartBundle,
+    SemanticHypergraphSnapshot,
+    SemanticLensHypergraph,
+)
 from .memory import (
     ConsolidationCandidate,
     InMemoryStore,
@@ -250,6 +266,15 @@ from .probability_lenses import (
     possibility_necessity_support,
     transition_probability,
 )
+from .predictive_fusion import (
+    FusedPrediction,
+    FusionPolicy,
+    PredictiveFusionEngine,
+    PredictiveSignal,
+    PredictiveSource,
+    ReliabilityPosterior,
+    SignalAttribution,
+)
 from .provider import (
     CircuitBreaker,
     CircuitState,
@@ -289,6 +314,14 @@ from .frontier_runtime import (
     FrontierJeevesAgentRuntime,
     HardenedJeevesAgentRuntime,
 )
+from .semantic_extreme_lenses import (
+    LensMaturity,
+    RareLensDefinition,
+    definitions_by_family,
+    rare_semantic_definitions,
+    rare_semantic_specs,
+    register_rare_lenses,
+)
 from .semantic_frontier import (
     FrontierLensRouter,
     FrontierSemanticRegistry,
@@ -299,6 +332,12 @@ from .semantic_frontier import (
     SemanticComposition,
     default_interaction_rules,
     frontier_semantic_lenses,
+)
+from .semantic_maximal import (
+    MaximalLensRouter,
+    MaximalSemanticRegistry,
+    MaximalSemanticRuntime,
+    MaximalSemanticSnapshot,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,
