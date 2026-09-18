@@ -25,11 +25,11 @@ on:
 permissions: {}
 
 concurrency:
-  # Lifecycle signals for the same PR may supersede one another immediately.
-  # Main/scheduled backlog sweeps must not kill an active cleanup worker merely
-  # because main advances again while the repository is under queue pressure.
-  group: pr-run-drain-${{ github.event_name }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
-  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+  # Cleanup is itself part of the recovery control plane. Keep at most one
+  # active drainer plus one coalesced pending wake for the entire repository so
+  # a PR storm cannot create one cleanup run per branch and worsen saturation.
+  group: pr-run-drain-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   drain:
@@ -48,11 +48,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
-      WORKFLOW_RUN_PR_HINTS: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
-      EVENT_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
-      EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch }}
-      EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      MAX_CANCELLATIONS: '250'
     steps:
       - name: Check out trusted default-branch control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,11 +58,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Cancel obsolete live PR-linked runs
+      - name: Reconcile obsolete live PR-linked runs
         shell: bash
         run: |
           set -euo pipefail
-          python backend/scripts/pr_obsolete_run_from_workflow_run.py
+          python backend/scripts/pr_obsolete_run_sweep.py
 
   sweep:
     if: github.event_name == 'schedule' || github.event_name == 'push'
