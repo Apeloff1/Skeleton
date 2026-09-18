@@ -310,6 +310,10 @@ class AIApprovalQuorumStore:
         record = self._load(current.approval_id)
         if record is None:
             raise QuorumApprovalError("quorum approval disappeared")
+        if record.value.digest != current.digest:
+            raise QuorumApprovalError(
+                "quorum approval changed before consumption"
+            )
         consumed = QuorumApproval(
             current.approval_id,
             current.principal,
