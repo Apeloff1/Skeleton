@@ -71,14 +71,12 @@ jobs:
 
   studio:
     needs: pressure
+    # The pressure job is the single workflow_run trust boundary. This job only
+    # consumes its successful positive proceed output, so mutation authority
+    # cannot drift away from the trusted identity/conclusion checks above.
     if: >-
-      needs.pressure.outputs.proceed == 'true' &&
-      github.repository == 'Apeloff1/Skeleton' &&
-      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
-      (github.event_name != 'workflow_run' ||
-       (github.event.workflow_run.head_repository.full_name == github.repository &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.conclusion == 'success'))
+      needs.pressure.result == 'success' &&
+      needs.pressure.outputs.proceed == 'true'
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -119,24 +117,6 @@ jobs:
           skeleton.testing.test_idle_studio
           skeleton.testing.test_idle_studio_v2
           skeleton.testing.test_idle_studio_publisher
-
-      - name: Require successful supervisor refresh
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
-        env:
-          SUPERVISOR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .idle-studio-tmp
-          {
-            echo '## Shift supervisor'
-            echo
-            echo 'Status: **blocked**'
-            echo
-            echo "Shift Supervisor Control concluded: $SUPERVISOR_CONCLUSION"
-            echo 'No Idle Studio work was generated and prior worker status will be cleared.'
-          } > .idle-studio-tmp/shift-supervisor-summary.md
-          exit 1
 
       - name: Snapshot live repository state
         env:
