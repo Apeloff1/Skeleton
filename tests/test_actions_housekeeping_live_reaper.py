@@ -13,6 +13,8 @@ def test_live_reaper_is_bounded_to_obsolete_pr_runs() -> None:
 
     assert "LIVE_RUN_STALE_MINUTES: '30'" in workflow
     assert "LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'" in workflow
+    assert "FORCE_CANCEL_ATTEMPTS: '4'" in workflow
+    assert "FORCE_CANCEL_POLL_SECONDS: '2'" in workflow
     assert "MAX_LIVE_CANCELS: '100'" in workflow
     assert "pull-requests: read" in workflow
     assert "pull-requests: write" not in workflow
@@ -105,3 +107,23 @@ def test_live_reaper_force_cancel_is_queued_only_old_and_revalidated() -> None:
     assert 'if [[ "$force_status" != "queued" || "$force_sha" != "$head_sha" || "$force_branch" != "$head_branch" || "$force_event" != "pull_request" ]]' in live_reaper
     assert 'forced=$((forced + 1))' in live_reaper
     assert 'cancelled + forced >= MAX_LIVE_CANCELS' in live_reaper
+
+
+def test_live_reaper_retries_force_cancel_with_fresh_identity_and_polling() -> None:
+    workflow = _workflow()
+    live_reaper = workflow.split(
+        "      - name: Cancel obsolete live PR runs\n", 1
+    )[1].split(
+        "      - name: Prune only cold Actions caches\n", 1
+    )[0]
+
+    assert 'for force_attempt in $(seq 1 "$FORCE_CANCEL_ATTEMPTS"); do' in live_reaper
+    assert 'force-pr-${id}-${force_attempt}-${pr_number}.json' in live_reaper
+    assert 'force-run-${id}-${force_attempt}.json' in live_reaper
+    assert 'for force_poll in 1 2 3; do' in live_reaper
+    assert 'sleep "$FORCE_CANCEL_POLL_SECONDS"' in live_reaper
+    assert 'force-cancel accepted: run=${id} attempt=${force_attempt}' in live_reaper
+    assert 'force-cancel stuck: run=${id} remained queued after ${FORCE_CANCEL_ATTEMPTS}' in live_reaper
+    assert 'force_stuck=$((force_stuck + 1))' in live_reaper
+    assert 'force_transitioned=$((force_transitioned + 1))' in live_reaper
+    assert '--method DELETE "/repos/${REPO}/actions/runs/${id}"' not in live_reaper
