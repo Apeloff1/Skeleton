@@ -470,7 +470,7 @@ class CognitiveContextFabric:
 
         records: list[DeepContextRecord] = []
         stale: set[str] = set()
-        resolved_refs: set[str] = set()
+        resolved_sources: set[tuple[SourceTier, str, str]] = set()
         canonical_fingerprints: dict[tuple[SourceTier, str, str], set[str]] = {}
         budget_remaining = self.policy.maximum_tokens
 
@@ -516,11 +516,14 @@ class CognitiveContextFabric:
                             continue
                         records.append(record)
                         budget_remaining = max(0, budget_remaining - record.token_estimate)
-                        resolved_refs.add(record.source_ref)
                         source_key = (
                             record.source_tier,
                             record.source_provider,
                             record.source_ref,
+                        )
+                        resolved_sources.add(source_key)
+                        resolved_sources.add(
+                            (record.source_tier, "", record.source_ref)
                         )
                         canonical_fingerprints.setdefault(source_key, set()).add(record.source_fingerprint)
                         # Legacy cards without a provider are wildcards and may
@@ -558,7 +561,13 @@ class CognitiveContextFabric:
                 for tier, values in adapters.items()
                 for adapter in values
             ]
-            ordered_adapters.sort(key=lambda item: (item[0].value, type(item[1]).__name__))
+            ordered_adapters.sort(
+                key=lambda item: (
+                    item[0].value,
+                    str(getattr(item[1], "source_provider", "")),
+                    type(item[1]).__name__,
+                )
+            )
             for tier, adapter in ordered_adapters:
                 if budget_remaining <= 0:
                     break
@@ -575,7 +584,16 @@ class CognitiveContextFabric:
                         continue
                     records.append(record)
                     budget_remaining = max(0, budget_remaining - record.token_estimate)
-                    resolved_refs.add(record.source_ref)
+                    resolved_sources.add(
+                        (
+                            record.source_tier,
+                            record.source_provider,
+                            record.source_ref,
+                        )
+                    )
+                    resolved_sources.add(
+                        (record.source_tier, "", record.source_ref)
+                    )
 
         packed = self._dedupe(records)[: self.policy.deep_limit]
         if self.policy.index_deep_results:
@@ -586,7 +604,15 @@ class CognitiveContextFabric:
                 {
                     hit.card.source_ref
                     for hit in fast.all_hits
-                    if hit.card.source_ref not in resolved_refs and bool(adapters.get(hit.card.source_tier))
+                    if (
+                        (
+                            hit.card.source_tier,
+                            hit.card.source_provider,
+                            hit.card.source_ref,
+                        )
+                        not in resolved_sources
+                        and bool(adapters.get(hit.card.source_tier))
+                    )
                 }
             )
         )
@@ -598,7 +624,15 @@ class CognitiveContextFabric:
                 "fast": fast.fingerprint,
                 "lenses": lens_bundle.fingerprint,
                 "lens_governance": [decision.fingerprint for decision in lens_governance],
-                "records": [(record.source_tier.value, record.source_ref, record.source_fingerprint) for record in packed],
+                "records": [
+                    (
+                        record.source_tier.value,
+                        record.source_provider,
+                        record.source_ref,
+                        record.source_fingerprint,
+                    )
+                    for record in packed
+                ],
                 "stale": sorted(stale),
                 "unresolved": unresolved,
                 "broad": broad,
