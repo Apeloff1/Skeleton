@@ -709,7 +709,15 @@ def _import_operations(name: str) -> list[Operation]:
 
 def _call_operations(node: ast.Call, aliases: Mapping[str, str]) -> list[Operation]:
     name = _dotted_name(node.func, aliases)
+    if name.endswith(".__call__"):
+        base_name = name[: -len(".__call__")]
+        if base_name in _TRACKED_CALLABLES:
+            name = base_name
     operations: list[Operation] = []
+    for argument in (*node.args, *(item.value for item in node.keywords)):
+        reference = _sensitive_callable_reference(argument, aliases)
+        if reference is not None:
+            operations.append(reference)
     if not name or name == "<dynamic>":
         operations.append(
             Operation(
@@ -753,6 +761,56 @@ def _call_operations(node: ast.Call, aliases: Mapping[str, str]) -> list[Operati
     if name in {"sandbox.grant", "GeneratedCodeSandbox.grant"}:
         operations.append(Operation(OperationKind.POLICY_MUTATE, name, None, "grant call"))
     return operations
+
+
+def _sensitive_callable_reference(
+    node: ast.AST,
+    aliases: Mapping[str, str],
+) -> Optional[Operation]:
+    """Fail closed when a sensitive callable is handed to higher-order code."""
+    name = _dotted_name(node, aliases)
+    if name in _FS_CALLS:
+        return Operation(
+            OperationKind.FS_READ,
+            "<dynamic>",
+            SandboxCapability.FILESYSTEM,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _NET_CALLS:
+        return Operation(
+            OperationKind.NETWORK,
+            "<dynamic>",
+            SandboxCapability.NETWORK,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _PROC_CALLS:
+        return Operation(
+            OperationKind.PROCESS,
+            "<dynamic>",
+            SandboxCapability.PROCESS,
+            f"sensitive callable reference: {name}",
+        )
+    if name in _EVAL_CALLS or name in {
+        "getattr",
+        "builtins.getattr",
+        "importlib.import_module",
+        "sandbox.grant",
+        "GeneratedCodeSandbox.grant",
+    }:
+        return Operation(
+            OperationKind.UNSAFE_EVAL,
+            name or "<dynamic>",
+            None,
+            "sensitive callable reference",
+        )
+    if name in {"os.getenv", "os.environ.get", "os.environ.__getitem__"}:
+        return Operation(
+            OperationKind.SECRET_READ,
+            "<dynamic>",
+            SandboxCapability.SECRETS,
+            f"sensitive callable reference: {name}",
+        )
+    return None
 
 
 def _dotted_name(node: ast.AST, aliases: Mapping[str, str]) -> str:
