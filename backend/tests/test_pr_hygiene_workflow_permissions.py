@@ -33,3 +33,10 @@ def test_pr_hygiene_runs_only_when_diff_identity_can_change() -> None:
     ):
         assert metadata_only not in text
 
+
+
+def test_pr_hygiene_uses_general_runner_capacity() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "runs-on: ubuntu-latest" in text
+    assert "runs-on: ubuntu-24.04-arm" not in text
