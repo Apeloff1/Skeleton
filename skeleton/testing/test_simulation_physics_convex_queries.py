@@ -230,7 +230,7 @@ def test_world_ccd_prevents_fast_sphere_from_skipping_static_cylinder() -> None:
             gravity=Vec3.zero(),
             fixed_dt=0.25,
             ccd_motion_threshold=0.1,
-            max_ccd_substeps=8,
+            ccd_max_substeps=8,
             sleep_after_seconds=10.0,
         )
     )
@@ -241,5 +241,5 @@ def test_world_ccd_prevents_fast_sphere_from_skipping_static_cylinder() -> None:
 
     receipt = world.step()[0]
 
-    assert receipt.ccd_hits >= 1
+    assert receipt.ccd_clamps >= 1
     assert moving.position.x < 1.0
