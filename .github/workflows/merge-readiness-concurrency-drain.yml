@@ -41,7 +41,7 @@ jobs:
       - name: Confirm bounded tombstone identity
         env:
           LEGACY_SHA: ${{ matrix.sha }}
-          CURRENT_MAIN_SHA: 7572a9dd3a0c4658e0425d5e379cbb9c5bd653b7
+          CURRENT_MAIN_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
