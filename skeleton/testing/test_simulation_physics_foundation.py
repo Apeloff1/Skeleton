@@ -928,3 +928,19 @@ def test_matrix_invertibility_is_relative_not_absolute_determinant() -> None:
     assert small.is_invertible()
     assert large.is_invertible()
     assert not singular.is_invertible()
+
+
+
+def test_vec3_normalization_accepts_small_well_resolved_vector() -> None:
+    vector = Vec3(5.0e-10, 0.0, 0.0)
+    normalized = vector.normalized()
+    assert normalized == Vec3.axis(0)
+    assert normalized.length() == pytest.approx(1.0)
+
+
+def test_vec3_division_rejects_only_normalization_scale_zero() -> None:
+    vector = Vec3(1.0, 2.0, 3.0)
+    scaled = vector / 5.0e-10
+    assert scaled.x == pytest.approx(2.0e9)
+    with pytest.raises(PhysicsValidationError, match="divide"):
+        _ = vector / 1.0e-13
