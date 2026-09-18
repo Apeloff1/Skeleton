@@ -11,6 +11,7 @@ from skeleton.jeeves.agent.frontier_control_plane import (
 from skeleton.jeeves.agent.semantic_frontier import (
     LensCompositionEngine,
     LensInteractionKind,
+    LensInteractionRule,
     default_interaction_rules,
 )
 from skeleton.jeeves.agent.semantic_lens_topology import SemanticLensTopology
@@ -1020,6 +1021,41 @@ def test_controls_do_not_pollute_primary_bridge_calibration() -> None:
     assert report.negative_control_count == 2
     assert report.empirical_rate == 1.0
     assert report.mean_probability == pytest.approx(0.90)
+
+
+def test_learned_topology_edge_identity_tracks_report_lineage_without_mutating_static_graph() -> None:
+    _, topology, candidate, _lab = _system()
+    static_fingerprint = topology.snapshot.fingerprint
+
+    def rule(report_fingerprint: str) -> LensInteractionRule:
+        return LensInteractionRule(
+            left_key=candidate.left_key,
+            right_key=candidate.right_key,
+            kind=LensInteractionKind.REINFORCES,
+            rationale="validated learned bridge",
+            question="Does the relation replicate?",
+            predictive_effect="Retest on an independent case.",
+            symmetric=True,
+            tangent_axis_hint="semantic",
+            metadata={
+                "rule_source": "learned_topology",
+                "report_fingerprint": report_fingerprint,
+            },
+        )
+
+    first = topology.snapshot_with_rules((rule("report-a"),))
+    second = topology.snapshot_with_rules((rule("report-b"),))
+    first_edge = next(
+        item for item in first.edges if item.source == "learned"
+    )
+    second_edge = next(
+        item for item in second.edges if item.source == "learned"
+    )
+
+    assert first_edge.key == second_edge.key
+    assert first_edge.edge_id != second_edge.edge_id
+    assert first.fingerprint != second.fingerprint
+    assert topology.snapshot.fingerprint == static_fingerprint
 
 
 def test_supplemental_rule_cannot_override_static_interaction_contract() -> None:
