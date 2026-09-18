@@ -349,6 +349,69 @@ class Jeeves:
             },
         )
         return verification
+    def export_game_loop_replay(
+        self,
+        loop,
+    ) -> bytes:
+        """Serialize one verified deterministic game-loop replay tape."""
+        from skeleton.jeeves.game_engine_session import (
+            build_replay_tape,
+            serialize_replay_tape,
+        )
+
+        tape = build_replay_tape(
+            loop
+        )
+        data = serialize_replay_tape(
+            tape
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_exported",
+            {
+                "era": tape.era.value,
+                "tree_digest": tape.tree_digest,
+                "advances": len(tape.advances),
+                "tape_digest": tape.digest,
+                "bytes": len(data),
+            },
+        )
+        return data
+
+    def verify_game_loop_replay_tape(
+        self,
+        sandbox,
+        data: bytes,
+    ):
+        """Parse and replay a portable tape against the exact sandbox authority."""
+        from skeleton.jeeves.game_engine_session import (
+            parse_replay_tape,
+            verify_replay_tape,
+        )
+
+        tape = parse_replay_tape(
+            data
+        )
+        verification = verify_replay_tape(
+            sandbox,
+            tape,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.loop_replay_tape_verified",
+            {
+                "era": tape.era.value,
+                "tree_digest": tape.tree_digest,
+                "tape_digest": tape.digest,
+                "passed": verification.passed,
+                "advances": verification.advances,
+                "failure_index": verification.failure_index,
+                "chain_digest": verification.chain_digest,
+                "machine_digest": verification.machine_digest,
+                "clock_digest": verification.clock_digest,
+                "detail": verification.detail,
+            },
+        )
+        return verification
+
 
     def game_clock(
         self,
