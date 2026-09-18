@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S491-dependency-unlock-scan"
+TASK_ID = "reserve-S491-dependency-unlock-scan"
 CONFLICT_DOMAIN = "ops.readonly.dependency_unlocks"
 CLASSES: tuple[str, ...] = ("still_blocked", "unlocked", "unknown")
 CLASS_SET = frozenset(CLASSES)

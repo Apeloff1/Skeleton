@@ -9,7 +9,7 @@ from scripts.check_dependency_unlocks import (
     CONFLICT_DOMAIN,
     SATISFIED_STATUSES,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     classify_blocked_task,
     classify_document,
     load_document,
@@ -41,7 +41,7 @@ def test_closed_class_set_and_seed_identity() -> None:
     assert CLASSES == ("still_blocked", "unlocked", "unknown")
     assert len(CLASSES) == len(set(CLASSES))
     assert SATISFIED_STATUSES == frozenset({"validated", "merged"})
-    assert TASK_KEY == "reserve-S491-dependency-unlock-scan"
+    assert TASK_ID == "reserve-S491-dependency-unlock-scan"
     assert CONFLICT_DOMAIN == "ops.readonly.dependency_unlocks"
     assert SCHEMA_VERSION == 1
 
