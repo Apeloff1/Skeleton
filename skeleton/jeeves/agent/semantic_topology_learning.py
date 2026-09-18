@@ -687,6 +687,27 @@ class TopologyBridgePolicy:
                 "reject_domain_empirical_rate must be <= "
                 "minimum_domain_empirical_rate"
             )
+        if (
+            self.maximum_unresolved_predictions
+            > self.maximum_predictions
+        ):
+            raise AgentContractError(
+                "maximum_unresolved_predictions cannot exceed "
+                "maximum_predictions"
+            )
+        minimum_records = (
+            self.minimum_trials + self.minimum_negative_controls
+        )
+        if self.maximum_trials < minimum_records:
+            raise AgentContractError(
+                "maximum_trials cannot satisfy minimum primary/control "
+                "promotion requirements"
+            )
+        if self.maximum_predictions < minimum_records:
+            raise AgentContractError(
+                "maximum_predictions cannot satisfy minimum promotion "
+                "requirements"
+            )
 
     @property
     def fingerprint(self) -> str:
@@ -746,6 +767,27 @@ class TopologyBridgeDomainReport:
     qualified_control: bool
     fingerprint: str
 
+    def as_json(self) -> dict[str, Any]:
+        return json_safe(
+            {
+                "domain": self.domain,
+                "trial_count": self.trial_count,
+                "independent_run_count": self.independent_run_count,
+                "negative_control_count": self.negative_control_count,
+                "mean_probability": self.mean_probability,
+                "empirical_rate": self.empirical_rate,
+                "wilson_95": self.wilson_95,
+                "brier": self.brier,
+                "calibration_error": self.calibration_error,
+                "negative_control_positive_rate": (
+                    self.negative_control_positive_rate
+                ),
+                "qualified_primary": self.qualified_primary,
+                "qualified_control": self.qualified_control,
+                "fingerprint": self.fingerprint,
+            }
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class TopologyBridgeReport:
@@ -775,6 +817,47 @@ class TopologyBridgeReport:
     reasons: tuple[str, ...]
     fingerprint: str
 
+    def as_json(self) -> dict[str, Any]:
+        return json_safe(
+            {
+                "report_id": self.report_id,
+                "candidate_id": self.candidate_id,
+                "candidate_fingerprint": self.candidate_fingerprint,
+                "left_key": self.left_key,
+                "right_key": self.right_key,
+                "kind": self.kind.value,
+                "status": self.status.value,
+                "trial_count": self.trial_count,
+                "independent_run_count": self.independent_run_count,
+                "domain_count": self.domain_count,
+                "negative_control_count": self.negative_control_count,
+                "qualified_domain_count": self.qualified_domain_count,
+                "qualified_control_domain_count": (
+                    self.qualified_control_domain_count
+                ),
+                "mean_probability": self.mean_probability,
+                "empirical_rate": self.empirical_rate,
+                "wilson_95": self.wilson_95,
+                "brier": self.brier,
+                "calibration_error": self.calibration_error,
+                "negative_control_positive_rate": (
+                    self.negative_control_positive_rate
+                ),
+                "worst_domain_brier": self.worst_domain_brier,
+                "minimum_domain_empirical_rate": (
+                    self.minimum_domain_empirical_rate
+                ),
+                "worst_domain_control_positive_rate": (
+                    self.worst_domain_control_positive_rate
+                ),
+                "domain_reports": [
+                    item.as_json() for item in self.domain_reports
+                ],
+                "reasons": list(self.reasons),
+                "fingerprint": self.fingerprint,
+            }
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class LearnedTopologyRule:
@@ -784,6 +867,28 @@ class LearnedTopologyRule:
     report_fingerprint: str
     rule: LensInteractionRule
     fingerprint: str
+
+    def as_json(self) -> dict[str, Any]:
+        return json_safe(
+            {
+                "candidate_id": self.candidate_id,
+                "candidate_fingerprint": self.candidate_fingerprint,
+                "report_id": self.report_id,
+                "report_fingerprint": self.report_fingerprint,
+                "rule": {
+                    "left_key": self.rule.left_key,
+                    "right_key": self.rule.right_key,
+                    "kind": self.rule.kind.value,
+                    "rationale": self.rule.rationale,
+                    "question": self.rule.question,
+                    "predictive_effect": self.rule.predictive_effect,
+                    "symmetric": self.rule.symmetric,
+                    "tangent_axis_hint": self.rule.tangent_axis_hint,
+                    "metadata": dict(self.rule.metadata),
+                },
+                "fingerprint": self.fingerprint,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -799,6 +904,31 @@ class SemanticTopologyLearningSnapshot:
     ambiguous_active_candidate_ids: tuple[str, ...]
     learned_rule_keys: tuple[tuple[str, str], ...]
     fingerprint: str
+
+    def as_json(self) -> dict[str, Any]:
+        return json_safe(
+            {
+                "prediction_count": self.prediction_count,
+                "unresolved_prediction_count": (
+                    self.unresolved_prediction_count
+                ),
+                "trial_count": self.trial_count,
+                "tested_bridge_count": self.tested_bridge_count,
+                "active_report_ids": list(self.active_report_ids),
+                "restricted_report_ids": list(
+                    self.restricted_report_ids
+                ),
+                "rejected_report_ids": list(self.rejected_report_ids),
+                "candidate_report_ids": list(self.candidate_report_ids),
+                "ambiguous_active_candidate_ids": list(
+                    self.ambiguous_active_candidate_ids
+                ),
+                "learned_rule_keys": [
+                    list(item) for item in self.learned_rule_keys
+                ],
+                "fingerprint": self.fingerprint,
+            }
+        )
 
 
 _FAMILY_AXIS_HINT: Mapping[LensFamily, str] = {
