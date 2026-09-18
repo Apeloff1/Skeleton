@@ -519,16 +519,39 @@ class RawInputSample:
                 "input player outside global bounds"
             )
         if not isinstance(self.device, InputDevice):
+            try:
+                coerced_device = InputDevice(
+                    str(self.device)
+                )
+            except (
+                TypeError,
+                ValueError,
+            ) as exc:
+                raise GameEngineLabError(
+                    "input device is unknown"
+                ) from exc
             object.__setattr__(
                 self,
                 "device",
-                InputDevice(str(self.device)),
+                coerced_device,
             )
         if not isinstance(self.buttons, InputButton):
+            try:
+                coerced_buttons = InputButton(
+                    int(self.buttons)
+                )
+            except (
+                TypeError,
+                ValueError,
+                OverflowError,
+            ) as exc:
+                raise GameEngineLabError(
+                    "input button encoding is invalid"
+                ) from exc
             object.__setattr__(
                 self,
                 "buttons",
-                InputButton(int(self.buttons)),
+                coerced_buttons,
             )
         for name in (
             "move_x",
