@@ -128,7 +128,7 @@ def _router_with(*pairs: tuple[dict, FakeAdapter]) -> ModelRouter:
     router = ModelRouter()
     for metadata, adapter in pairs:
         router.register(metadata, adapter)
-
+    return router
 
 
 @pytest.mark.parametrize("max_attempts", [True, 1.5, "2"])
@@ -141,7 +141,6 @@ def test_retry_policy_rejects_non_integer_attempt_counts(max_attempts) -> None:
 def test_retry_policy_rejects_non_finite_backoff(backoff: float) -> None:
     with pytest.raises(ValueError, match="backoff_seconds"):
         RetryPolicy(backoff_seconds=backoff)
-    return router
 
 
 def test_capability_based_selection_is_deterministic() -> None:
