@@ -73,6 +73,7 @@ def _is_public_unicast(address) -> bool:
         and not address.is_loopback
         and not address.is_link_local
         and not address.is_reserved
+        and not getattr(address, "is_site_local", False)
     )
 
 
