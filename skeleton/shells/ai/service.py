@@ -146,6 +146,43 @@ class AIShellService:
             )
         return bundle, view
 
+    def _validate_human_approval(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approval,
+    ) -> bool:
+        if approval is None:
+            return False
+        proposal = review.planning.response.proposal
+        self.orchestrator.approvals.require(
+            approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+        return True
+
+    def _consume_assurance_only_approval(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approval,
+    ) -> None:
+        if approval is None or review.critique.policy.requires_approval:
+            return
+        proposal = review.planning.response.proposal
+        self.orchestrator.approvals.consume(
+            approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+
     def _quorum_digest(
         self,
         session: AIShellSession,
@@ -204,16 +241,16 @@ class AIShellService:
             policy=self.governance.current_policy(),
         )
         approval_id = ""
-        if review.critique.policy.requires_approval:
-            if approval is None:
-                raise RuntimeError("human approval is required before execution sealing")
-            self.orchestrator.approvals.require(
-                approval,
+        if approval is not None:
+            self._validate_human_approval(
+                session,
+                review,
                 principal=principal,
-                intent_fingerprint=session.intent.fingerprint,
-                proposal_fingerprint=proposal.fingerprint,
+                approval=approval,
             )
             approval_id = approval.approval_id
+        elif review.critique.policy.requires_approval:
+            raise RuntimeError("human approval is required before execution sealing")
         quorum_digest = self._quorum_digest(
             session,
             review,
@@ -272,6 +309,12 @@ class AIShellService:
                 raise RuntimeError("precondition checker is required")
             precondition_report = precondition_checker.require(preconditions)
             precondition_digest = preconditions.digest
+        human_approved = self._validate_human_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
         approval_id = "" if approval is None else approval.approval_id
         quorum_digest = self._quorum_digest(
             session,
@@ -286,10 +329,7 @@ class AIShellService:
             preconditions_verified=(
                 precondition_report is not None and precondition_report.ok
             ),
-            human_approved=(
-                review.critique.policy.requires_approval
-                and approval is not None
-            ),
+            human_approved=human_approved,
             quorum_approved=bool(quorum_digest),
         )
         use = seal_registry.consume(
@@ -311,6 +351,12 @@ class AIShellService:
                 intent_fingerprint=session.intent.fingerprint,
                 proposal_fingerprint=review.planning.response.proposal.fingerprint,
             )
+        self._consume_assurance_only_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
         result = self._execute_reviewed(
             session,
             review,
@@ -321,10 +367,7 @@ class AIShellService:
             preconditions_verified=(
                 precondition_report is not None and precondition_report.ok
             ),
-            human_approved=(
-                review.critique.policy.requires_approval
-                and approval is not None
-            ),
+            human_approved=human_approved,
             quorum_approved=bool(quorum_digest),
         )
         return result, precondition_report, use
@@ -368,6 +411,18 @@ class AIShellService:
         approval=None,
         execution_backend: AIPlanExecutionBackend | None = None,
     ) -> AIExecutionBundle:
+        human_approved = self._validate_human_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
+        self._consume_assurance_only_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
         return self._execute_reviewed(
             session,
             review,
@@ -376,10 +431,7 @@ class AIShellService:
             execution_backend=execution_backend,
             sealed=False,
             preconditions_verified=False,
-            human_approved=(
-                review.critique.policy.requires_approval
-                and approval is not None
-            ),
+            human_approved=human_approved,
             quorum_approved=False,
         )
 
