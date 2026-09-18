@@ -83,6 +83,12 @@ from .islands import (
     solve_islands,
 )
 from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_materials
+from .mesh import (
+    MeshBVHNode,
+    MeshRayHit,
+    TriangleMeshShape,
+    closest_point_on_triangle,
+)
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
 from .shapes import (
@@ -177,6 +183,8 @@ __all__ = [
     "IslandSolveReceipt",
     "JumpTuning",
     "MassProperties",
+    "MeshBVHNode",
+    "MeshRayHit",
     "Mat3",
     "PhysicsAggregate",
     "PhysicsIsland",
@@ -222,6 +230,7 @@ __all__ = [
     "SupportVertex",
     "SweepAndPruneBroadPhase",
     "TOIEvent",
+    "TriangleMeshShape",
     "Transform",
     "UnsupportedCollisionError",
     "Vec3",
@@ -231,6 +240,7 @@ __all__ = [
     "build_islands",
     "build_snapshot",
     "color_constraints",
+    "closest_point_on_triangle",
     "combine_materials",
     "convex_penetration",
     "detect_collision",
