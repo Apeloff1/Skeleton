@@ -465,8 +465,7 @@ class GeneratedCodeSandbox:
             return False
         if not self._process_allowlist:
             return False
-        executable = Path(target).name
-        return target in self._process_allowlist or executable in self._process_allowlist
+        return target in self._process_allowlist
 
 
 def _bounded_payload(payload: object) -> str:
