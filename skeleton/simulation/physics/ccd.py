@@ -11,21 +11,24 @@ the same physical time before an impact is solved.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .body import BodyType, RigidBody
+from .convex import gjk_distance
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
 )
 
 MAX_CCD_CHECKS = 1_000_000
+MAX_CONVEX_TOI_ITERATIONS = 128
 
 
 def _validate_dt(dt: float) -> float:
@@ -93,6 +96,8 @@ class ContinuousCollisionDetector:
         *,
         motion_threshold: float = 0.5,
         max_checks: int = 65_536,
+        convex_iterations: int = 32,
+        distance_tolerance: float = 1.0e-6,
     ) -> None:
         if (
             isinstance(motion_threshold, bool)
@@ -107,19 +112,81 @@ class ContinuousCollisionDetector:
             or not 1 <= max_checks <= MAX_CCD_CHECKS
         ):
             raise PhysicsValidationError("CCD max_checks outside supported range")
+        if (
+            isinstance(convex_iterations, bool)
+            or not isinstance(convex_iterations, int)
+            or not 1 <= convex_iterations <= MAX_CONVEX_TOI_ITERATIONS
+        ):
+            raise PhysicsValidationError(
+                "CCD convex_iterations outside supported range"
+            )
+        if (
+            isinstance(distance_tolerance, bool)
+            or not isinstance(distance_tolerance, (int, float))
+            or not math.isfinite(float(distance_tolerance))
+            or float(distance_tolerance) <= 0.0
+        ):
+            raise PhysicsValidationError(
+                "CCD distance_tolerance must be positive"
+            )
         self.motion_threshold = float(motion_threshold)
         self.max_checks = max_checks
+        self.convex_iterations = convex_iterations
+        self.distance_tolerance = float(distance_tolerance)
 
-    def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
+    @staticmethod
+    def _motion_radius(body: RigidBody) -> float:
+        shape = body.shape
+        if isinstance(shape, SphereShape):
+            return shape.radius
+        if isinstance(shape, BoxShape):
+            return shape.half_extents.length()
+        if isinstance(shape, CapsuleShape):
+            return shape.half_height + shape.radius
+        if isinstance(shape, CylinderShape):
+            return math.sqrt(
+                shape.radius * shape.radius
+                + shape.half_height * shape.half_height
+            )
+        if isinstance(shape, ConvexHullShape):
+            return max(vertex.length() for vertex in shape.vertices)
+        raise PhysicsValidationError(
+            "CCD motion radius requires finite convex shape"
+        )
+
+    @staticmethod
+    def _finite_convex(body: RigidBody) -> bool:
+        return isinstance(
+            body.shape,
+            (
+                SphereShape,
+                BoxShape,
+                CapsuleShape,
+                CylinderShape,
+                ConvexHullShape,
+            ),
+        )
+
+    def _eligible_continuous_body(self, body: RigidBody, dt: float) -> bool:
         if (
             not body.continuous
             or body.body_type is not BodyType.DYNAMIC
-            or not isinstance(body.shape, SphereShape)
             or not body.awake
+            or not self._finite_convex(body)
         ):
             return False
-        travel = body.linear_velocity.length() * dt
-        return travel > body.shape.radius * self.motion_threshold
+        radius = self._motion_radius(body)
+        swept_motion = (
+            body.linear_velocity.length()
+            + body.angular_velocity.length() * radius
+        ) * dt
+        return swept_motion > radius * self.motion_threshold
+
+    def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
+        return (
+            isinstance(body.shape, SphereShape)
+            and self._eligible_continuous_body(body, dt)
+        )
 
     @staticmethod
     def _sphere_sphere_toi(
@@ -222,26 +289,155 @@ class ContinuousCollisionDetector:
             hit.normal,
         )
 
+    @staticmethod
+    def _predicted_body(body: RigidBody, time: float) -> RigidBody:
+        if body.body_type is BodyType.STATIC or time <= 0.0:
+            return body
+        orientation = body.orientation
+        if body.angular_velocity.length_squared() > 0.0:
+            orientation = orientation.integrate_world_angular_velocity(
+                body.angular_velocity,
+                time,
+            )
+        return replace(
+            body,
+            position=body.position + body.linear_velocity * time,
+            orientation=orientation,
+        )
+
+    def _convex_toi(
+        self,
+        moving: RigidBody,
+        target: RigidBody,
+        dt: float,
+    ) -> CCDHit | None:
+        if not self._finite_convex(moving) or not self._finite_convex(target):
+            return None
+
+        radius_moving = self._motion_radius(moving)
+        radius_target = self._motion_radius(target)
+        time = 0.0
+        previous_normal = Vec3.zero()
+        time_tolerance = max(1.0e-12, dt * 1.0e-10)
+
+        for _ in range(self.convex_iterations):
+            predicted_moving = self._predicted_body(moving, time)
+            predicted_target = self._predicted_body(target, time)
+            distance = gjk_distance(
+                predicted_moving,
+                predicted_target,
+                max_iterations=64,
+                tolerance=max(
+                    1.0e-10,
+                    self.distance_tolerance * 0.1,
+                ),
+            )
+
+            if (
+                distance.intersects
+                or distance.distance <= self.distance_tolerance
+            ):
+                moving_to_target = (
+                    distance.normal
+                    if distance.normal.length_squared() > EPSILON * EPSILON
+                    else previous_normal
+                )
+                if moving_to_target.length_squared() <= EPSILON * EPSILON:
+                    moving_to_target = (
+                        predicted_target.position
+                        - predicted_moving.position
+                    ).normalized_or_zero()
+                if moving_to_target.length_squared() <= EPSILON * EPSILON:
+                    relative = (
+                        target.linear_velocity - moving.linear_velocity
+                    ).normalized_or_zero()
+                    moving_to_target = (
+                        relative
+                        if relative.length_squared() > EPSILON * EPSILON
+                        else Vec3.axis(0)
+                    )
+
+                target_to_moving = -moving_to_target
+                relative_moving = (
+                    moving.linear_velocity - target.linear_velocity
+                )
+                angular_bound = (
+                    moving.angular_velocity.length() * radius_moving
+                    + target.angular_velocity.length() * radius_target
+                )
+                if (
+                    time <= time_tolerance
+                    and relative_moving.dot(target_to_moving) >= 0.0
+                    and angular_bound <= EPSILON
+                ):
+                    return None
+
+                return CCDHit(
+                    moving_body=moving.body_id,
+                    target_body=target.body_id,
+                    fraction=min(1.0, max(0.0, time / dt)),
+                    distance=moving.linear_velocity.length() * time,
+                    center=predicted_moving.position,
+                    normal=target_to_moving,
+                )
+
+            previous_normal = distance.normal
+            relative_velocity = (
+                target.linear_velocity - moving.linear_velocity
+            )
+            linear_closing = max(
+                0.0,
+                -relative_velocity.dot(distance.normal),
+            )
+            angular_closing = (
+                moving.angular_velocity.length() * radius_moving
+                + target.angular_velocity.length() * radius_target
+            )
+            closing_bound = linear_closing + angular_closing
+            if closing_bound <= EPSILON:
+                return None
+
+            advance = max(
+                0.0,
+                distance.distance - self.distance_tolerance,
+            ) / closing_bound
+            if advance <= time_tolerance:
+                raise PhysicsValidationError(
+                    "convex CCD failed to make progress"
+                )
+            time += advance
+            if time > dt + time_tolerance:
+                return None
+            time = min(time, dt)
+
+        raise PhysicsValidationError(
+            "convex CCD iteration bound exceeded"
+        )
+
+
     def _sweep_pair(
         self,
         moving: RigidBody,
         target: RigidBody,
         dt: float,
     ) -> CCDHit | None:
-        if not self._eligible_continuous_sphere(moving, dt):
+        if not self._eligible_continuous_body(moving, dt):
             return None
-        assert isinstance(moving.shape, SphereShape)
 
-        if isinstance(target.shape, SphereShape):
-            return self._sphere_sphere_toi(moving, target, dt)
+        if isinstance(moving.shape, SphereShape):
+            if isinstance(target.shape, SphereShape):
+                return self._sphere_sphere_toi(moving, target, dt)
+            if (
+                target.body_type is BodyType.STATIC
+                and isinstance(
+                    target.shape,
+                    (BoxShape, CapsuleShape, CylinderShape, PlaneShape),
+                )
+            ):
+                return self._static_sweep(moving, target, dt)
 
-        if target.body_type is not BodyType.STATIC:
-            return None
-        if isinstance(
-            target.shape,
-            (BoxShape, CapsuleShape, CylinderShape, PlaneShape),
-        ):
-            return self._static_sweep(moving, target, dt)
+        if self._finite_convex(target):
+            return self._convex_toi(moving, target, dt)
         return None
 
     def sweep(
@@ -250,10 +446,10 @@ class ContinuousCollisionDetector:
         bodies: tuple[RigidBody, ...],
         dt: float,
     ) -> CCDHit | None:
-        """Return the earliest sweep hit for one continuous dynamic sphere."""
+        """Return the earliest sweep hit for one continuous dynamic convex body."""
 
         dt = _validate_dt(dt)
-        if not self._eligible_continuous_sphere(body, dt):
+        if not self._eligible_continuous_body(body, dt):
             return None
 
         candidates: list[CCDHit] = []
@@ -309,18 +505,18 @@ class ContinuousCollisionDetector:
         events: dict[tuple[str, str], TOIEvent] = {}
         checks = 0
 
+        visited_pairs: set[tuple[str, str]] = set()
         for moving in ordered:
-            if not self._eligible_continuous_sphere(moving, dt):
+            if not self._eligible_continuous_body(moving, dt):
                 continue
             for target in ordered:
                 if target.body_id == moving.body_id:
                     continue
 
                 pair = tuple(sorted((moving.body_id, target.body_id)))
-                if pair in events and isinstance(target.shape, SphereShape):
-                    # A two-continuous-sphere pair may be visited in both
-                    # directions. One canonical event is sufficient.
+                if pair in visited_pairs:
                     continue
+                visited_pairs.add(pair)
 
                 checks += 1
                 if checks > self.max_checks:
