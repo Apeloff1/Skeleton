@@ -54,7 +54,7 @@ from .semantic_prediction import (
     SemanticPredictionLedger,
     SemanticPredictiveModel,
 )
-from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph, TangentNode
+from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph
 from .types import (
     AgentContractError,
     bounded_text,
