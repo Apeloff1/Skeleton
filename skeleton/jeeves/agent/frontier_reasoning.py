@@ -33,6 +33,7 @@ from typing import Any, Mapping, Sequence
 
 from .adversarial_verification import CouncilVerdict, Verdict
 from .deliberation import CandidateProposal, CandidateScore, SearchResult
+from .frontier_consensus import ConsensusResult, ConsensusSelector, promote_consensus
 from .lens_fusion import (
     LensDependence,
     LensFusionEngine,
@@ -88,6 +89,7 @@ class EscalationCause(str, Enum):
     VERIFICATION_REJECTED = "verification_rejected"
     VERIFICATION_WEAK_BOUND = "verification_weak_bound"
     POSITIVE_VALUE_OF_COMPUTATION = "positive_value_of_computation"
+    CONSENSUS_WEAK = "consensus_weak"
 
 
 _RISK_ORDER = {
@@ -227,6 +229,7 @@ class FrontierReasoningDecision:
     diagnostics: InferenceDiagnostics
     causes: tuple[EscalationCause, ...]
     lens_fusion: LensFusionResult | None
+    consensus: ConsensusResult | None
     metareasoning: RationalMetaDecision | None
     verification: CouncilVerdict | None
     next_computation_action_id: str | None
@@ -335,10 +338,12 @@ class FrontierReasoningCoordinator:
         policy: FrontierReasoningPolicy | None = None,
         lens_fusion: LensFusionEngine | None = None,
         metareasoner: RationalMetareasoner | None = None,
+        consensus_selector: ConsensusSelector | None = None,
     ) -> None:
         self.policy = policy or FrontierReasoningPolicy()
         self.lens_fusion = lens_fusion or LensFusionEngine(LensFusionPolicy())
         self.metareasoner = metareasoner or RationalMetareasoner()
+        self.consensus_selector = consensus_selector or ConsensusSelector()
 
     def decide(
         self,
@@ -375,6 +380,8 @@ class FrontierReasoningCoordinator:
         if verification is not None and not isinstance(verification, CouncilVerdict):
             raise TypeError("verification must be CouncilVerdict or None")
 
+        consensus = self.consensus_selector.select(search)
+        search = promote_consensus(search, consensus)
         ranked = tuple(search.ranking[: self.policy.maximum_candidates])
         assessments, candidates = self._assess_candidates(ranked)
         diagnostics = self._diagnostics(assessments, candidates)
@@ -401,6 +408,7 @@ class FrontierReasoningCoordinator:
             fusion=fusion,
             verification=verification,
             metareasoning=meta,
+            consensus=consensus,
             risk=risk,
         )
         disposition, next_action = self._disposition(
@@ -419,6 +427,7 @@ class FrontierReasoningCoordinator:
             "assessments": [item.fingerprint for item in assessments],
             "diagnostics": diagnostics.fingerprint,
             "lens": fusion.fingerprint if fusion else None,
+            "consensus": consensus.fingerprint,
             "meta": meta.fingerprint if meta else None,
             "verification": verification.fingerprint if verification else None,
             "risk": risk.value,
@@ -432,6 +441,9 @@ class FrontierReasoningCoordinator:
             "search_stop_reason": search.stopped_reason,
             "search_trace": search.trace_fingerprint,
             "candidate_count": len(assessments),
+            "consensus_agreement": consensus.agreement,
+            "consensus_entropy": consensus.normalized_entropy,
+            "consensus_requires_more_sampling": consensus.requires_more_sampling,
             "lens_signal_count": len(lens_signals),
             "metareasoning_considered": len(meta.considered) if meta else 0,
             "verification_present": verification is not None,
@@ -443,6 +455,7 @@ class FrontierReasoningCoordinator:
             diagnostics=diagnostics,
             causes=causes,
             lens_fusion=fusion,
+            consensus=consensus,
             metareasoning=meta,
             verification=verification,
             next_computation_action_id=next_action,
@@ -594,6 +607,7 @@ class FrontierReasoningCoordinator:
         fusion: LensFusionResult | None,
         verification: CouncilVerdict | None,
         metareasoning: RationalMetaDecision | None,
+        consensus: ConsensusResult | None,
         risk: RiskTier,
     ) -> tuple[EscalationCause, ...]:
         causes: list[EscalationCause] = []
@@ -657,6 +671,9 @@ class FrontierReasoningCoordinator:
             ):
                 causes.append(EscalationCause.VERIFICATION_WEAK_BOUND)
 
+        if consensus is not None and consensus.requires_more_sampling and len(assessments) > 1:
+            causes.append(EscalationCause.CONSENSUS_WEAK)
+
         if (
             metareasoning is not None
             and metareasoning.selected_action_id is not None
@@ -714,6 +731,7 @@ class FrontierReasoningCoordinator:
             EscalationCause.OUTCOME_DISAGREEMENT,
             EscalationCause.LENS_CONFLICT,
             EscalationCause.LENS_SENSITIVITY,
+            EscalationCause.CONSENSUS_WEAK,
         }
         if cause_set & nonterminal:
             return InferenceDisposition.DELIBERATE, None
