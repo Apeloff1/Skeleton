@@ -85,8 +85,13 @@ def build(manifest: dict, assets: dict | None = None) -> dict:
     ({forged: N, families: [...]}). The 100 phases factor these in BEFORE the
     build — the Assets band only goes green when real forged assets exist, so
     the world is built from the assets, not the other way around."""
-    forged = int((assets or {}).get("forged", 0))
-    families = (assets or {}).get("families", []) or []
+    if assets is None:
+        capacity = manifest.get("capacity") or {}
+        forged = int(capacity.get("assets_forged", 0))
+        families = manifest.get("forged_families", []) or []
+    else:
+        forged = int(assets.get("forged", 0))
+        families = assets.get("families", []) or []
     m = {**manifest, "forged_assets": forged}
     # Era-scaled file output: the 100-phase build produces files up to the
     # chosen era's INDUSTRY-STANDARD count, allocated across the 8 bands.
