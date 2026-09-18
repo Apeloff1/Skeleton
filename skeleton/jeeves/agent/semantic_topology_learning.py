@@ -880,6 +880,7 @@ class LearnedTopologyRule:
     report_id: str
     report_fingerprint: str
     rule: LensInteractionRule
+    bridge_quality: float
     fingerprint: str
 
     def as_json(self) -> dict[str, Any]:
@@ -889,6 +890,7 @@ class LearnedTopologyRule:
                 "candidate_fingerprint": self.candidate_fingerprint,
                 "report_id": self.report_id,
                 "report_fingerprint": self.report_fingerprint,
+                "bridge_quality": self.bridge_quality,
                 "rule": {
                     "left_key": self.rule.left_key,
                     "right_key": self.rule.right_key,
@@ -1933,6 +1935,40 @@ class SemanticTopologyLearningLab:
             for candidate_id, kind in identities
         )
 
+    @staticmethod
+    def _bridge_quality(
+        report: TopologyBridgeReport,
+    ) -> float:
+        """Conservative quality floor across validated bridge dimensions."""
+
+        components: list[float] = []
+        if report.empirical_rate is not None:
+            components.append(report.empirical_rate)
+        if report.brier is not None:
+            components.append(1.0 - report.brier)
+        if report.calibration_error is not None:
+            components.append(1.0 - report.calibration_error)
+        if report.negative_control_positive_rate is not None:
+            components.append(
+                1.0 - report.negative_control_positive_rate
+            )
+        if report.minimum_domain_empirical_rate is not None:
+            components.append(
+                report.minimum_domain_empirical_rate
+            )
+        if report.worst_domain_brier is not None:
+            components.append(1.0 - report.worst_domain_brier)
+        if (
+            report.worst_domain_control_positive_rate
+            is not None
+        ):
+            components.append(
+                1.0 - report.worst_domain_control_positive_rate
+            )
+        if not components:
+            return 0.0
+        return max(0.0, min(1.0, min(components)))
+
     def _learned_rules_from_reports(
         self,
         reports: Sequence[TopologyBridgeReport],
@@ -1993,6 +2029,7 @@ class SemanticTopologyLearningLab:
                 {
                     "candidate": report.candidate_fingerprint,
                     "report": report.fingerprint,
+                    "bridge_quality": self._bridge_quality(report),
                     "rule": {
                         "key": rule.key,
                         "kind": rule.kind.value,
@@ -2011,6 +2048,7 @@ class SemanticTopologyLearningLab:
                     report_id=report.report_id,
                     report_fingerprint=report.fingerprint,
                     rule=rule,
+                    bridge_quality=self._bridge_quality(report),
                     fingerprint=fingerprint,
                 )
             )
