@@ -21,6 +21,7 @@ from .semantic_depth_lenses import register_depth_lenses
 from .semantic_research_lenses import register_research_lenses
 from .semantic_plane_lenses import register_plane_lenses
 from .semantic_plane_interactions import plane_interaction_rules
+from .semantic_depth_interactions import depth_interaction_rules
 from .semantic_frontier import (
     FrontierLensRouter,
     FrontierSemanticRegistry,
@@ -115,7 +116,7 @@ class MaximalSemanticRuntime:
         self.lab = lab or ScientificLensLab()
         self.graph = graph or TangentGraph()
         self.hypergraph = hypergraph or SemanticLensHypergraph()
-        self.pairwise = pairwise or LensCompositionEngine(plane_interaction_rules())
+        self.pairwise = pairwise or LensCompositionEngine((*plane_interaction_rules(), *depth_interaction_rules()))
 
     def select(
         self,
