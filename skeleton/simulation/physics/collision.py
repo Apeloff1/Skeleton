@@ -17,7 +17,11 @@ from .convex import convex_penetration
 from .errors import PhysicsValidationError, UnsupportedCollisionError
 from .materials import ContactMaterial, combine_materials
 from .math3d import EPSILON, AABB, Vec3
-from .mesh import TriangleMeshShape, closest_point_on_triangle
+from .mesh import (
+    TriangleMeshShape,
+    closest_point_on_triangle,
+    closest_points_segment_triangle,
+)
 from .shapes import (
     BoxShape,
     CapsuleShape,
@@ -996,6 +1000,100 @@ def _convex_convex(
     )
 
 
+def _mesh_capsule(
+    mesh: RigidBody,
+    capsule: RigidBody,
+) -> ContactManifold | None:
+    mesh_shape = mesh.shape
+    capsule_shape = capsule.shape
+    assert isinstance(mesh_shape, TriangleMeshShape)
+    assert isinstance(capsule_shape, CapsuleShape)
+
+    endpoint_a_world, endpoint_b_world = capsule_shape.segment_endpoints(
+        capsule.transform
+    )
+    endpoint_a = mesh.transform.inverse_transform_point(endpoint_a_world)
+    endpoint_b = mesh.transform.inverse_transform_point(endpoint_b_world)
+    radius = capsule_shape.radius
+    radius_vector = Vec3.one() * radius
+    query_bounds = AABB(
+        endpoint_a.min(endpoint_b) - radius_vector,
+        endpoint_a.max(endpoint_b) + radius_vector,
+    )
+    candidates = mesh_shape.candidate_triangles(query_bounds)
+    contacts: list[tuple[float, int, Vec3, Vec3]] = []
+
+    segment_midpoint = (endpoint_a + endpoint_b) * 0.5
+    for triangle_index in candidates:
+        first, second, third = mesh_shape.triangle_vertices(
+            triangle_index
+        )
+        closest = closest_points_segment_triangle(
+            endpoint_a,
+            endpoint_b,
+            first,
+            second,
+            third,
+        )
+        delta = closest.segment_point - closest.triangle_point
+        distance_sq = delta.length_squared()
+        if distance_sq > radius * radius + EPSILON:
+            continue
+
+        if distance_sq > _AXIS_EPSILON_SQ:
+            distance = math.sqrt(distance_sq)
+            normal_local = delta / distance
+        else:
+            distance = 0.0
+            normal_local = mesh_shape.triangle_normal(triangle_index)
+            triangle_reference = first
+            signed = normal_local.dot(
+                segment_midpoint - triangle_reference
+            )
+            if signed < 0.0:
+                normal_local = -normal_local
+
+        penetration = max(0.0, radius - distance)
+        capsule_surface = (
+            closest.segment_point - normal_local * radius
+        )
+        point_local = (
+            closest.triangle_point + capsule_surface
+        ) * 0.5
+        contacts.append(
+            (
+                penetration,
+                triangle_index,
+                normal_local,
+                point_local,
+            )
+        )
+
+    if not contacts:
+        return None
+
+    penetration, triangle_index, normal_local, point_local = sorted(
+        contacts,
+        key=lambda row: (
+            -row[0],
+            row[1],
+        ),
+    )[0]
+    return ContactManifold(
+        mesh.body_id,
+        capsule.body_id,
+        mesh.transform.transform_vector(normal_local).normalized(),
+        (
+            ContactPoint(
+                mesh.transform.transform_point(point_local),
+                penetration,
+                f"mesh-capsule:t{triangle_index}",
+            ),
+        ),
+        _contact_material(mesh, capsule),
+    )
+
+
 def _mesh_sphere(
     mesh: RigidBody,
     sphere: RigidBody,
@@ -1107,6 +1205,11 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
         return _mesh_sphere(a, b)
     if kind_a is ShapeKind.SPHERE and kind_b is ShapeKind.TRIANGLE_MESH:
         result = _mesh_sphere(b, a)
+        return None if result is None else result.flipped()
+    if kind_a is ShapeKind.TRIANGLE_MESH and kind_b is ShapeKind.CAPSULE:
+        return _mesh_capsule(a, b)
+    if kind_a is ShapeKind.CAPSULE and kind_b is ShapeKind.TRIANGLE_MESH:
+        result = _mesh_capsule(b, a)
         return None if result is None else result.flipped()
     if (
         kind_a is ShapeKind.TRIANGLE_MESH

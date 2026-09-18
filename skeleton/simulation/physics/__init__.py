@@ -2,6 +2,14 @@
 
 from .body import BodyType, RigidBody
 from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
+from .character import (
+    CapsuleCastHit,
+    CharacterControllerSettings,
+    CharacterMoveResult,
+    KinematicCharacterController,
+    capsule_cast_body,
+    capsule_cast_world,
+)
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -86,8 +94,11 @@ from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_ma
 from .mesh import (
     MeshBVHNode,
     MeshRayHit,
+    SegmentTriangleClosest,
     TriangleMeshShape,
     closest_point_on_triangle,
+    closest_points_on_segments,
+    closest_points_segment_triangle,
 )
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
@@ -140,6 +151,9 @@ __all__ = [
     "AABB",
     "BodyNotFoundError",
     "CCDHit",
+    "CapsuleCastHit",
+    "CharacterControllerSettings",
+    "CharacterMoveResult",
     "CommandCorrectionReceipt",
     "ConstraintColorBatch",
     "ConstraintColorSchedule",
@@ -182,6 +196,7 @@ __all__ = [
     "IslandGraphStats",
     "IslandSolveReceipt",
     "JumpTuning",
+    "KinematicCharacterController",
     "MassProperties",
     "MeshBVHNode",
     "MeshRayHit",
@@ -220,6 +235,7 @@ __all__ = [
     "RayHit",
     "RigidBody",
     "RollbackReceipt",
+    "SegmentTriangleClosest",
     "SequentialImpulseSolver",
     "ShapeKind",
     "SliderJoint",
@@ -240,7 +256,11 @@ __all__ = [
     "build_islands",
     "build_snapshot",
     "color_constraints",
+    "capsule_cast_body",
+    "capsule_cast_world",
     "closest_point_on_triangle",
+    "closest_points_on_segments",
+    "closest_points_segment_triangle",
     "combine_materials",
     "convex_penetration",
     "detect_collision",
