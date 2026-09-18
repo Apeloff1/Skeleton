@@ -31,6 +31,7 @@ def binding(**changes):
         execution_backend_id="sandbox:verified",
         sandbox_binding_digest=fp("s"),
         runtime_trust_digest=fp("t"),
+        execution_fence_digest=fp("f"),
     )
     values.update(changes)
     return AssuranceBinding(**values)
@@ -131,6 +132,7 @@ def test_assurance_binding_to_dict_contains_all_authority_surfaces():
         "execution_backend_id": "sandbox:verified",
         "sandbox_binding_digest": fp("s"),
         "runtime_trust_digest": fp("t"),
+        "execution_fence_digest": fp("f"),
     }
 
 
@@ -147,6 +149,7 @@ def test_assurance_binding_to_dict_contains_all_authority_surfaces():
         ("execution_backend_id", "sandbox:other"),
         ("sandbox_binding_digest", fp("z")),
         ("runtime_trust_digest", fp("y")),
+        ("execution_fence_digest", fp("g")),
     ],
 )
 def test_assurance_binding_digest_changes_for_every_bound_surface(field, value):
@@ -164,6 +167,7 @@ def test_assurance_binding_empty_optional_surfaces_supported():
         execution_backend_id="shell-service-host",
         sandbox_binding_digest="",
         runtime_trust_digest="",
+        execution_fence_digest="",
     )
     assert len(item.digest) == 64
     assert item.to_dict()["execution_backend_id"] == "shell-service-host"
@@ -180,6 +184,7 @@ def test_assurance_binding_empty_optional_surfaces_supported():
         ("quorum_digest", "bad"),
         ("sandbox_binding_digest", "bad"),
         ("runtime_trust_digest", "bad"),
+        ("execution_fence_digest", "bad"),
     ],
 )
 def test_assurance_binding_validation_rejects_invalid_digest_fields(field, value):
@@ -290,4 +295,16 @@ def test_assurance_binding_runtime_trust_epoch_change_invalidates_prior_digest()
 def test_assurance_binding_empty_runtime_trust_is_supported_without_guard():
     item = binding(runtime_trust_digest="")
     assert item.to_dict()["runtime_trust_digest"] == ""
+    assert len(item.digest) == 64
+
+
+def test_assurance_binding_execution_fence_change_invalidates_prior_digest():
+    first = binding(execution_fence_digest=fp("1"))
+    second = binding(execution_fence_digest=fp("2"))
+    assert first.digest != second.digest
+
+
+def test_assurance_binding_empty_execution_fence_supported():
+    item = binding(execution_fence_digest="")
+    assert item.to_dict()["execution_fence_digest"] == ""
     assert len(item.digest) == 64
