@@ -152,7 +152,9 @@ def _label_names(pr: dict[str, Any]) -> set[str]:
 
 def _is_protected_sync_base(ref: str) -> bool:
     normalized = ref.strip()
-    return normalized in _PROTECTED_SYNC_BASES or normalized.startswith("release/")
+    return normalized in _PROTECTED_SYNC_BASES or normalized.startswith(
+        ("release/", "keep/", "backup/", "archive/")
+    )
 
 
 def eligible_reverse_sync(
@@ -170,6 +172,8 @@ def eligible_reverse_sync(
     and body templates. Ordinary feature/release PRs are therefore out of
     scope even when they happen to merge the default branch into another ref.
     """
+    if int(pr.get("number") or 0) <= 0:
+        return False, "sync PR has invalid identity"
     if str(pr.get("state") or "").lower() != "open":
         return False, "sync PR is not open"
     if bool(pr.get("draft")):
@@ -185,7 +189,7 @@ def eligible_reverse_sync(
     base = pr.get("base") or {}
     if _repo_full_name(head.get("repo")) != repo:
         return False, "sync PR head is not same-repository"
-    if _repo_full_name(base.get("repo")) not in {"", repo}:
+    if _repo_full_name(base.get("repo")) != repo:
         return False, "sync PR base is not same-repository"
 
     head_ref = str(head.get("ref") or "")
