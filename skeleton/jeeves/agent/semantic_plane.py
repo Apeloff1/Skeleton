@@ -27,6 +27,7 @@ from typing import Sequence
 
 from .lens_fusion import LensFusionEngine, LensFusionResult, LensSignal
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
+from .interpretive_science import LensOutcomeTrial, ScientificLensReport
 from .perpendicular_semantics import (
     PerpendicularExpansionPlan,
     PerpendicularExpansionPlanner,
@@ -46,12 +47,18 @@ from .semantic_lenses import (
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .semantic_plane_interactions import plane_interaction_rules
-from .semantic_prediction import SemanticForecast, SemanticPredictiveModel
+from .semantic_prediction import (
+    SemanticForecast,
+    SemanticPredictionLedger,
+    SemanticPredictiveModel,
+)
 from .types import (
     AgentContractError,
     positive_int,
+    bounded_text,
     probability,
     stable_fingerprint,
+    stable_id,
 )
 
 
@@ -122,6 +129,15 @@ class SemanticPlaneCoverage:
 
 
 @dataclass(frozen=True, slots=True)
+class SemanticPlaneLearningUpdate:
+    forecast: SemanticForecast
+    trial_ids: tuple[str, ...]
+    calibrated_keys: tuple[str, ...]
+    reports: tuple[ScientificLensReport, ...]
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
 class SemanticPlaneSnapshot:
     observation_ids: tuple[str, ...]
     selection: LensSelection
@@ -151,6 +167,7 @@ class SemanticLensPlane:
         composition: LensCompositionEngine | None = None,
         hypergraph: SemanticLensHypergraph | None = None,
         predictive: SemanticPredictiveModel | None = None,
+        prediction_ledger: SemanticPredictionLedger | None = None,
         fusion: LensFusionEngine | None = None,
         policy: SemanticPlanePolicy | None = None,
     ) -> None:
@@ -161,6 +178,7 @@ class SemanticLensPlane:
         self.composition = composition or LensCompositionEngine(plane_interaction_rules())
         self.hypergraph = hypergraph or SemanticLensHypergraph()
         self.predictive = predictive or SemanticPredictiveModel()
+        self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.fusion = fusion or LensFusionEngine()
         self.policy = policy or SemanticPlanePolicy()
 
@@ -482,7 +500,7 @@ class SemanticLensPlane:
             ),
         )
         forecasts = tuple(
-            forecast
+            self.prediction_ledger.add(forecast)
             for forecast in proposal
             if self._forecast_allowed(forecast, governance)
         )
@@ -536,6 +554,99 @@ class SemanticLensPlane:
             coverage=coverage,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
+            fingerprint=fingerprint,
+        )
+
+    def resolve_forecast(
+        self,
+        forecast_id: str,
+        *,
+        outcome: bool,
+        domain: str,
+        independent_run: str,
+        observed_at: float | None = None,
+        observation_id: str | None = None,
+        negative_control: bool = False,
+    ) -> SemanticPlaneLearningUpdate:
+        """Resolve a semantic forecast and feed its outcome back to lens science.
+
+        Single-lens forecasts update that lens directly. Multi-lens interaction
+        forecasts are calibrated under a composite key so one interaction
+        outcome cannot be double-counted as independent evidence for each
+        constituent lens.
+        """
+        domain_value = bounded_text("domain", domain, maximum=256).casefold()
+        run_value = bounded_text(
+            "independent_run", independent_run, maximum=512
+        )
+        resolved = self.prediction_ledger.resolve(
+            forecast_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            observation_id=observation_id,
+        )
+        source_keys = tuple(sorted(set(resolved.source_lens_keys)))
+        calibration_keys = (
+            source_keys
+            if len(source_keys) == 1
+            else ("interaction:" + "+".join(source_keys),)
+        )
+        trials: list[LensOutcomeTrial] = []
+        reports: list[ScientificLensReport] = []
+        for key in calibration_keys:
+            trial_id = stable_id(
+                "semantic-plane-outcome",
+                {
+                    "forecast": resolved.forecast_id,
+                    "forecast_fingerprint": resolved.fingerprint,
+                    "lens_key": key,
+                    "outcome": outcome,
+                    "domain": domain_value,
+                    "run": run_value,
+                    "negative_control": negative_control,
+                },
+                length=32,
+            )
+            trial = LensOutcomeTrial(
+                trial_id=trial_id,
+                lens_key=key,
+                probability=resolved.probability,
+                outcome=outcome,
+                domain=domain_value,
+                independent_run=run_value,
+                proposition=resolved.proposition,
+                negative_control=negative_control,
+                source_finding_id=(
+                    resolved.source_finding_ids[0]
+                    if len(resolved.source_finding_ids) == 1
+                    else None
+                ),
+                observation_ids=resolved.observation_ids,
+                evidence_ids=resolved.evidence_ids,
+                metadata={
+                    "semantic_plane": True,
+                    "forecast_id": resolved.forecast_id,
+                    "forecast_fingerprint": resolved.fingerprint,
+                    "source_lens_keys": list(source_keys),
+                    "interaction_calibration": len(source_keys) > 1,
+                },
+            )
+            recorded = self.governance.registry.lab.record(trial)
+            trials.append(recorded)
+            reports.append(self.governance.registry.lab.report(key))
+
+        fingerprint = stable_fingerprint(
+            {
+                "forecast": resolved.fingerprint,
+                "trials": [trial.fingerprint for trial in trials],
+                "reports": [report.fingerprint for report in reports],
+            }
+        )
+        return SemanticPlaneLearningUpdate(
+            forecast=resolved,
+            trial_ids=tuple(trial.trial_id for trial in trials),
+            calibrated_keys=calibration_keys,
+            reports=tuple(reports),
             fingerprint=fingerprint,
         )
 
