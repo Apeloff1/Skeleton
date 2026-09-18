@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
+from .context_fabric import CognitiveContextFabric, ContextFabricResult, MemoryManagerAdapter
 from .evidence import EvidenceArtifact, EvidenceLedger
 from .memory import MemoryHit, MemoryManager, MemoryNamespace
 from .types import (
@@ -235,6 +236,7 @@ class ContextCompiler:
         observations: Sequence[ToolObservation] = (),
         scratchpad: RunScratchpad | None = None,
         extra_sections: Sequence[ContextSection] = (),
+        context_fabric: CognitiveContextFabric | None = None,
     ) -> ContextPacket:
         system = self._clip(system_instruction, self.budget.system_chars)
         sections: list[ContextSection] = []
@@ -287,16 +289,29 @@ class ContextCompiler:
             )
             if item
         )
-        hits = memory.recall(
-            namespace,
-            query,
-            limit=self.memory_policy.limit,
-            minimum_trust=self.memory_policy.minimum_trust,
-            include_parent=self.memory_policy.include_parent_namespace,
-        )
-        memory_text, memory_ids = self._render_memory(hits)
-        if memory_text:
-            sections.append(ContextSection("memory", memory_text, priority=55, source_ids=memory_ids))
+        memory_ids: tuple[str, ...] = ()
+        if context_fabric is not None:
+            fabric_result = self._retrieve_context_fabric(
+                context_fabric,
+                namespace=namespace,
+                query=query,
+                memory=memory,
+            )
+            fabric_sections, memory_ids = self._render_context_fabric(fabric_result)
+            sections.extend(fabric_sections)
+        else:
+            hits = memory.recall(
+                namespace,
+                query,
+                limit=self.memory_policy.limit,
+                minimum_trust=self.memory_policy.minimum_trust,
+                include_parent=self.memory_policy.include_parent_namespace,
+            )
+            memory_text, memory_ids = self._render_memory(hits)
+            if memory_text:
+                sections.append(
+                    ContextSection("memory", memory_text, priority=55, source_ids=memory_ids)
+                )
 
         evidence_text, evidence_ids = self._render_evidence(evidence)
         if evidence_text:
@@ -339,6 +354,180 @@ class ContextCompiler:
             evidence_ids=tuple(evidence_ids),
             total_chars=total_chars,
         )
+
+    def _retrieve_context_fabric(
+        self,
+        context_fabric: CognitiveContextFabric,
+        *,
+        namespace: MemoryNamespace,
+        query: str,
+        memory: MemoryManager,
+    ) -> ContextFabricResult:
+        return context_fabric.retrieve(
+            namespace.key,
+            query,
+            call_adapters=(MemoryManagerAdapter(memory, namespace),),
+        )
+
+    def _render_context_fabric(
+        self,
+        result: ContextFabricResult,
+    ) -> tuple[tuple[ContextSection, ...], tuple[str, ...]]:
+        sections: list[ContextSection] = []
+
+        fast_rows = [
+            {
+                "card_id": hit.card.card_id,
+                "kind": hit.card.kind.value,
+                "source_tier": hit.card.source_tier.value,
+                "source_provider": hit.card.source_provider,
+                "source_ref": hit.card.source_ref,
+                "source_fingerprint": hit.card.source_fingerprint,
+                "score": round(hit.score, 6),
+                "retrieval_probability": round(hit.retrieval_probability, 6),
+                "matched_relations": list(hit.matched_relations),
+                "authoritative": False,
+                "purpose": "retrieval-index-only",
+            }
+            for hit in result.fast_recall.all_hits
+        ]
+        fast_text, fast_count = self._bounded_json_rows(
+            fast_rows,
+            maximum_chars=self.budget.memory_chars,
+        )
+        if fast_count:
+            sections.append(
+                ContextSection(
+                    "fast_memory_index",
+                    fast_text,
+                    priority=76,
+                    source_ids=tuple(
+                        row["card_id"] for row in fast_rows[:fast_count]
+                    ),
+                )
+            )
+
+        canonical_rows: list[dict[str, Any]] = []
+        canonical_memory_ids: list[str] = []
+        canonical_source_ids: list[str] = []
+        used = 2
+        for record in result.records:
+            if record.trust < self.memory_policy.minimum_trust:
+                continue
+            row = {
+                "source_tier": record.source_tier.value,
+                "source_ref": record.source_ref,
+                "source_provider": record.source_provider,
+                "source_fingerprint": record.source_fingerprint,
+                "content": self._clip(
+                    record.content,
+                    self.memory_policy.maximum_record_chars,
+                ),
+                "canonical": record.canonical,
+                "trust": record.trust,
+                "confidence": record.confidence,
+                "salience": record.salience,
+                "tags": list(record.tags),
+                "metadata": dict(record.metadata),
+            }
+            encoded = canonical_json(row)
+            projected = used + len(encoded) + (1 if canonical_rows else 0)
+            if projected > self.budget.memory_chars:
+                continue
+            canonical_rows.append(row)
+            canonical_source_ids.append(record.source_ref)
+            if record.source_tier.value == "memory_store":
+                canonical_memory_ids.append(record.source_ref)
+            used = projected
+        if canonical_rows:
+            sections.append(
+                ContextSection(
+                    "canonical_context",
+                    canonical_json(canonical_rows),
+                    priority=86,
+                    source_ids=tuple(canonical_source_ids),
+                )
+            )
+
+        governance_by_lens = {
+            decision.lens_id: decision for decision in result.lens_governance
+        }
+        lens_rows: list[dict[str, Any]] = []
+        for activation in result.lenses.activations:
+            decision = governance_by_lens.get(activation.lens.lens_id)
+            row = {
+                "lens_id": activation.lens.lens_id,
+                "family": activation.lens.family.value,
+                "authority": activation.lens.authority.value,
+                "score": round(activation.score, 6),
+                "matched_cues": list(activation.matched_cues[:8]),
+                "scientific_status": (
+                    decision.scientific_status.value if decision is not None else "shadow"
+                ),
+                "predictive_weight": (
+                    round(decision.predictive_weight, 6)
+                    if decision is not None
+                    else 0.0
+                ),
+                "decision_feature_authorized": bool(
+                    decision is not None and decision.decision_feature_authorized
+                ),
+                "factual_assertion_authorized": False,
+                "causal_assertion_authorized": False,
+            }
+            lens_rows.append(row)
+
+        lens_limit = min(6_000, self.budget.memory_chars)
+        lens_payload = {
+            "interpretive_only": True,
+            "instruction": (
+                "Apply each lens only within its governance permissions. "
+                "Lens activations are not factual evidence, cannot increase source trust, "
+                "and never authorize standalone factual or causal assertions."
+            ),
+            "fabric_fingerprint": result.fingerprint,
+            "lens_fingerprint": result.lenses.fingerprint,
+            "stale_card_ids": list(result.stale_card_ids[:32]),
+            "unresolved_source_refs": list(result.unresolved_source_refs[:32]),
+            "broad_search_used": result.broad_search_used,
+            "lenses": [],
+        }
+        for row in lens_rows:
+            trial = {**lens_payload, "lenses": [*lens_payload["lenses"], row]}
+            if len(canonical_json(trial)) > lens_limit:
+                break
+            lens_payload["lenses"].append(row)
+        lens_text = canonical_json(lens_payload)
+        if lens_payload["lenses"] and len(lens_text) <= lens_limit:
+            sections.append(
+                ContextSection(
+                    "semantic_lenses",
+                    lens_text,
+                    priority=48,
+                    source_ids=tuple(
+                        row["lens_id"] for row in lens_payload["lenses"]
+                    ),
+                )
+            )
+
+        return tuple(sections), tuple(canonical_memory_ids)
+
+    @staticmethod
+    def _bounded_json_rows(
+        rows: Sequence[Mapping[str, Any]],
+        *,
+        maximum_chars: int,
+    ) -> tuple[str, int]:
+        selected: list[Mapping[str, Any]] = []
+        used = 2
+        for row in rows:
+            encoded = canonical_json(row)
+            projected = used + len(encoded) + (1 if selected else 0)
+            if projected > maximum_chars:
+                continue
+            selected.append(row)
+            used = projected
+        return (canonical_json(selected) if selected else "", len(selected))
 
     def _extension_sections(
         self,
