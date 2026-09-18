@@ -30,7 +30,6 @@ class DistributedAIIdempotencyRegistry:
         self.backend = backend
         self.config = config or DistributedIdempotencyConfig()
         self._clock = clock
-        self._serial = 0
         self._lock = threading.RLock()
 
     def register(
@@ -67,9 +66,8 @@ class DistributedAIIdempotencyRegistry:
             else:
                 return self._validate(item, request_digest, proposal_fingerprint)
         with self._lock:
-            self._serial += 1
             record = AIIdempotencyRecord(
-                self._serial,
+                key,
                 request_digest,
                 proposal_fingerprint,
                 now,
