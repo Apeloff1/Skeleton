@@ -699,19 +699,6 @@ class TopologyBridgePolicy:
                 "maximum_unresolved_predictions cannot exceed "
                 "maximum_predictions"
             )
-        minimum_records = (
-            self.minimum_trials + self.minimum_negative_controls
-        )
-        if self.maximum_trials < minimum_records:
-            raise AgentContractError(
-                "maximum_trials cannot satisfy minimum primary/control "
-                "promotion requirements"
-            )
-        if self.maximum_predictions < minimum_records:
-            raise AgentContractError(
-                "maximum_predictions cannot satisfy minimum promotion "
-                "requirements"
-            )
 
     @property
     def fingerprint(self) -> str:
