@@ -2,16 +2,11 @@ name: Shift Supervisor Control
 
 on:
   schedule:
-    # Run five minutes before Idle Studio (:07/:22/:37/:52) so consumers see
-    # a completed canonical refresh rather than racing the plan producer.
+    # Bounded canonical refresh cadence. Queue pressure is checked before any
+    # checkout, model call, or plan mutation.
     - cron: '2,32 * * * *'
     - cron: '17,47 * * * *'
   workflow_dispatch:
-  # GitHub can delay or omit scheduled events under heavy Actions pressure.
-  # Main-push fallback is gated below and only refreshes when the canonical
-  # plan is missing or already at the consumer freshness boundary.
-  push:
-    branches: [main]
 
 concurrency:
   group: shift-supervisor-control
