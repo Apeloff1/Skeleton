@@ -257,7 +257,9 @@ def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path
     [
         'import ctypes\nctypes.CDLL("libc.so.6")\n',
         'from ctypes import CDLL\nCDLL("libc.so.6")\n',
+        'import ctypes\nctypes.cdll.LoadLibrary("libc.so.6")\n',
         'import multiprocessing\nmultiprocessing.Process(target=print).start()\n',
+        'import multiprocessing\nmultiprocessing.get_context("spawn")\n',
         'from multiprocessing import Process\nProcess(target=print).start()\n',
         'import pty\npty.spawn("/bin/sh")\n',
         'from pty import spawn\nspawn("/bin/sh")\n',
