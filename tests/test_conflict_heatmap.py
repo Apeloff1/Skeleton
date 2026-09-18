@@ -145,17 +145,37 @@ def test_busy_sibling_makes_the_whole_cell_too_busy() -> None:
     report = classify_heatmap(
         _doc(
             surfaces=[
+                _surface(path="backend/core/http_errors.py", pr=44, updated="2026-09-18T09:50:00Z"),
+                _surface(path="backend/core/config.py", pr=None, updated="2026-09-01T00:00:00Z"),
+            ]
+        )
+    )
+    assert report.errors == ()
+    assert report.cells[0].key == "backend/core"
+    assert report.cells[0].classification == "busy"
+    assert report.cells[0].prs == (44,)
+    assert lookup_cell(report, "backend/core/auth.py") == "busy"
+    assert squad_may_enter(lookup_cell(report, "backend/core/auth.py")) is False
+
+
+def test_two_segment_files_do_not_share_a_parent_cell() -> None:
+    report = classify_heatmap(
+        _doc(
+            surfaces=[
                 _surface(path="scripts/check_foo.py", pr=44, updated="2026-09-18T09:50:00Z"),
                 _surface(path="scripts/check_bar.py", pr=None, updated="2026-09-01T00:00:00Z"),
             ]
         )
     )
     assert report.errors == ()
-    assert report.cells[0].key == "scripts"
-    assert report.cells[0].classification == "busy"
-    assert report.cells[0].prs == (44,)
-    assert lookup_cell(report, "scripts/check_baz.py") == "busy"
-    assert squad_may_enter(lookup_cell(report, "scripts/check_baz.py")) is False
+    by_key = {cell.key: cell.classification for cell in report.cells}
+    assert by_key == {
+        "scripts/check_foo.py": "busy",
+        "scripts/check_bar.py": "idle",
+    }
+    assert squad_may_enter(lookup_cell(report, "scripts/check_bar.py")) is True
+    assert squad_may_enter(lookup_cell(report, "scripts/check_foo.py")) is False
+    assert lookup_cell(report, "scripts/check_baz.py") == "unknown"
 
 
 def test_unobserved_path_is_unknown_not_idle() -> None:
