@@ -371,6 +371,12 @@ from .frontier_runtime import (
     FrontierJeevesAgentRuntime,
     HardenedJeevesAgentRuntime,
 )
+from .scientific_runtime import (
+    MaximalScientificAdaptiveJeevesRuntime,
+    MaximalScientificJeevesRuntime,
+    ScientificAdaptiveJeevesRuntime,
+    ScientificJeevesRuntime,
+)
 from .semantic_extreme_lenses import (
     LensMaturity,
     RareLensDefinition,
@@ -433,6 +439,16 @@ from .semantic_plane import (
     SemanticPlaneLearningUpdate,
     SemanticPlanePolicy,
     SemanticPlaneSnapshot,
+)
+from .semantic_fusion_runtime import (
+    SemanticForecastFusion,
+    SemanticForecastFusionEngine,
+    SemanticForecastFusionSnapshot,
+)
+from .semantic_governance import (
+    SemanticLensGovernanceBridge,
+    SemanticLensGovernanceRecord,
+    SemanticLensGovernanceSnapshot,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,
