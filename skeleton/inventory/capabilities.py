@@ -18,7 +18,7 @@ from typing import Final, Mapping, Sequence
 
 
 SCHEMA_VERSION: Final = 1
-TASK_KEY: Final = "reserve-S019-capability-inventory"
+TASK_ID: Final = "reserve-S019-capability-inventory"
 CONFLICT_DOMAIN: Final = "security.readonly.capability_inventory"
 
 CAPABILITY_NAMES: Final[tuple[str, ...]] = (
@@ -1079,7 +1079,7 @@ def inventory_snapshot(inventory: CapabilityInventory) -> dict[str, object]:
         )
     return {
         "schema_version": SCHEMA_VERSION,
-        "task_key": TASK_KEY,
+        "task_key": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "capability_names": list(CAPABILITY_NAMES),
         "counts": {

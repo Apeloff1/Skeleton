@@ -10,7 +10,7 @@ from skeleton.inventory.capabilities import (
     CAPABILITY_NAMES,
     CONFLICT_DOMAIN,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     CapabilityInventory,
     classify_path,
     classify_text,
@@ -248,7 +248,7 @@ def test_snapshot_round_trip_and_metadata() -> None:
     record = classify_text("mod.py", "VALUE = 1\n")
     snapshot = inventory_snapshot(CapabilityInventory(schema_version=SCHEMA_VERSION, records=(record,)))
     assert snapshot["schema_version"] == SCHEMA_VERSION == 1
-    assert snapshot["task_key"] == TASK_KEY
+    assert snapshot["task_key"] == TASK_ID
     assert snapshot["conflict_domain"] == CONFLICT_DOMAIN
     restored = inventory_from_mapping(snapshot)
     assert restored.records[0].path == "mod.py"
