@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          issue=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 1 --json number --jq '.[0].number // empty')
+          issue=$(gh issue list --repo "$REPO" --state all --search "${ISSUE_TITLE} in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -n 1)
           if [[ -z "$issue" ]]; then
             issue=$(gh api --method POST "repos/${REPO}/issues" \
               -f title="$ISSUE_TITLE" \
@@ -46,6 +46,7 @@ jobs:
             echo 'CI watchdog could not resolve a valid ledger issue number.' >&2
             exit 1
           fi
+          gh api --method PATCH "repos/${REPO}/issues/${issue}" -f state=closed >/dev/null
 
           cutoff=$(date -u -d '6 hours ago' +%s)
           retries=0
