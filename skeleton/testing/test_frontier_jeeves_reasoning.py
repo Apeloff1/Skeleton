@@ -528,6 +528,8 @@ def test_best_of_n_consensus_can_override_single_high_score_outlier() -> None:
     assert decision.leading_candidate.candidate_id in {"candidate:agree-a", "candidate:agree-b"}
     assert decision.consensus is not None
     assert decision.consensus.agreement > 0.5
+    assert decision.consensus.requires_more_sampling is False
+    assert decision.disposition is InferenceDisposition.COMMIT
 
 
 def test_feedback_tracks_verified_direct_and_escalated_outcomes() -> None:
@@ -706,3 +708,52 @@ def test_adaptive_config_has_positive_stagnation_threshold() -> None:
     config = AdaptiveConfig()
 
     assert 0.0 < config.minimum_frontier_uncertainty_reduction < 1.0
+
+
+
+def test_consensus_cannot_rescue_low_absolute_quality_or_grounding() -> None:
+    first = _candidate(
+        "weak-consensus-a",
+        confidence=0.45,
+        action="take the same unsupported action",
+        outcome="unsupported outcome",
+    )
+    second = _candidate(
+        "weak-consensus-b",
+        confidence=0.44,
+        action="take the same unsupported action",
+        outcome="unsupported outcome",
+    )
+    search = _search(
+        (
+            first,
+            _score(
+                first,
+                total=-0.20,
+                evidence_quality=0.10,
+                verifier=0.30,
+                risk_penalty=0.10,
+            ),
+        ),
+        (
+            second,
+            _score(
+                second,
+                total=-0.22,
+                evidence_quality=0.10,
+                verifier=0.30,
+                risk_penalty=0.10,
+            ),
+        ),
+    )
+
+    decision = FrontierReasoningCoordinator().decide(search)
+
+    assert decision.consensus is not None
+    assert decision.consensus.selected_candidate_id in {
+        "candidate:weak-consensus-a",
+        "candidate:weak-consensus-b",
+    }
+    assert EscalationCause.LOW_ABSOLUTE_QUALITY in decision.causes
+    assert EscalationCause.INSUFFICIENT_EVIDENCE in decision.causes
+    assert decision.disposition is not InferenceDisposition.COMMIT
