@@ -830,3 +830,40 @@ def test_eval_gated_policy_tuning_promotes_useful_extra_compute_safely() -> None
         proposal.proposed_policy.block_on_verifier_abstention
         == baseline.block_on_verifier_abstention
     )
+
+
+
+def test_policy_tuning_is_blocked_without_matched_eval_gate() -> None:
+    coordinator = FrontierReasoningCoordinator()
+    feedback = FrontierReasoningFeedback()
+    for index in range(6):
+        feedback.observe(
+            coordinator.decide(_strong_search(trace=f"blocked-direct:{index}")),
+            verified_success=False,
+            escalation_rounds=0,
+            model_calls=2,
+            estimated_tokens=1000,
+        )
+        feedback.observe(
+            coordinator.decide(_strong_search(trace=f"blocked-escalated:{index}")),
+            verified_success=True,
+            escalation_rounds=1,
+            model_calls=5,
+            estimated_tokens=3000,
+        )
+
+    recommendation = feedback.recommendation()
+    gate = FrontierEvalFeedback().promotion_gate(
+        minimum_cases=1,
+        minimum_mean_delta=0.0,
+        maximum_loss_rate=1.0,
+        allow_pass_losses=0,
+    )
+    baseline = FrontierReasoningPolicy()
+
+    proposal = FrontierPolicyTuner().propose(baseline, recommendation, gate)
+
+    assert gate.passed is False
+    assert proposal.approved_for_trial is False
+    assert proposal.proposed_policy == baseline
+    assert proposal.changed_fields == {}
