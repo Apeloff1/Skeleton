@@ -67,12 +67,26 @@ def _package_version(name: str) -> str:
         return "unavailable"
 
 
+def _canonical_provenance_name(path: Path) -> str:
+    """Return a stable repository-relative POSIX name for release evidence."""
+
+    name = path.as_posix()
+    if path.is_absolute() or "\\" in name:
+        raise ValueError("provenance input names must be repository-relative POSIX paths")
+    parts = name.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(
+            "provenance input names must not contain empty, dot, or parent path segments"
+        )
+    return name
+
+
 def _file_record(path: Path, *, root: Path | None = None) -> dict[str, Any]:
     resolved = path.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(path)
     if root is None:
-        name = path.as_posix()
+        name = _canonical_provenance_name(path)
     else:
         name = resolved.relative_to(root.resolve()).as_posix()
     return {"name": name, "sha256": _sha256(resolved), "size": resolved.stat().st_size}
