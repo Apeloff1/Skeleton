@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from .perpendicular_semantics import PerpendicularExpansionPlan
 from .semantic_frontier import SemanticComposition
 from .semantic_lenses import LensFamily, SemanticFinding, TangentSeed
 from .tangent_graph import ExplorationAxis, FrontierSelection, RestartContinuityBundle, TangentGraph, TangentNode
@@ -217,6 +218,79 @@ class SemanticTangentBridge:
                     sequence=sequence,
                 )
             )
+        unique = {node.tangent_id: node for node in added}
+        return tuple(sorted(unique.values(), key=lambda node: node.tangent_id))
+
+    def ingest_perpendicular(
+        self,
+        plan: PerpendicularExpansionPlan,
+        *,
+        root_fingerprint: str,
+        sequence: int,
+    ) -> tuple[TangentNode, ...]:
+        """Persist cue-supported orthogonal directions before restart/replan."""
+
+        if not isinstance(plan, PerpendicularExpansionPlan):
+            raise TypeError("plan must be PerpendicularExpansionPlan")
+        added: list[TangentNode] = []
+        for candidate in plan.candidates:
+            axis = (
+                ExplorationAxis.ADVERSARIAL
+                if candidate.role.value == "adversarial_reading"
+                else self._axis_for(candidate.family)
+            )
+            seed = TangentSeed(
+                seed_id=stable_id(
+                    "perpendicular-semantic",
+                    {
+                        "root": root_fingerprint,
+                        "plan": plan.fingerprint,
+                        "lens": candidate.lens_key,
+                        "direction": candidate.direction,
+                    },
+                    length=28,
+                ),
+                parent_fingerprint=root_fingerprint,
+                lens_key=candidate.lens_key,
+                direction=candidate.direction,
+                rationale=candidate.rationale,
+                novelty=max(candidate.family_novelty, candidate.role_novelty),
+                expected_value=candidate.expected_value,
+                evidence_ids=(),
+                tags=(
+                    "perpendicular",
+                    "semantic-research-direction",
+                    candidate.family.value,
+                    candidate.role.value,
+                ),
+            )
+            try:
+                node = self.graph.add_seed(
+                    seed,
+                    axis=axis,
+                    family=candidate.family,
+                    sequence=sequence,
+                    trigger_terms=(candidate.lens_key, *candidate.trigger_terms),
+                    risk=self.policy.default_risk,
+                    evidence_gap=candidate.evidence_gap,
+                )
+            except AgentContractError as exc:
+                existing_id = stable_id(
+                    "tangent",
+                    {
+                        "seed": seed.seed_id,
+                        "parent": None,
+                        "root": root_fingerprint,
+                        "axis": axis.value,
+                        "direction": seed.direction,
+                    },
+                    length=32,
+                )
+                existing = self.graph.get(existing_id)
+                if existing is None:
+                    raise exc
+                node = existing
+            added.append(node)
         unique = {node.tangent_id: node for node in added}
         return tuple(sorted(unique.values(), key=lambda node: node.tangent_id))
 
