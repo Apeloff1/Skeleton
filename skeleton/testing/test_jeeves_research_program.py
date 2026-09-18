@@ -6,6 +6,7 @@ from skeleton.jeeves.agent.epistemic_frontier import (
     EpistemicFrontierEngine,
     KnowledgeObligation,
 )
+from skeleton.jeeves.agent.frontier_control_plane import FrontierCognitiveControlPlane
 from skeleton.jeeves.agent.hypothesis_tournament import (
     CompetingHypothesis,
     DiscriminatingProbe,
@@ -218,3 +219,93 @@ def test_large_forecast_surprise_reopens_resolved_obligation() -> None:
     assert reopened
     assert all(item.status is AgendaStatus.QUEUED for item in reopened)
     assert agenda.item(claimed.agenda_id).maximum_surprise_bits == 4.0
+
+
+def test_control_plane_feeds_tournament_learning_back_into_research_agenda() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 1000.0)
+    control.map_epistemic_frontier(
+        (
+            KnowledgeObligation(
+                obligation_id="deploy-safety",
+                question="Is deployment safe?",
+                decision_impact=0.95,
+                confidence=0.55,
+                evidence_coverage=0.70,
+                model_disagreement=0.75,
+                evidence_refs=("ev-1",),
+            ),
+        )
+    )
+    agenda_item = control.research_agenda.claim_next()
+    assert agenda_item is not None
+
+    tournament = control.start_hypothesis_tournament(
+        (
+            _hypothesis("h-a", 0.5, cheap_yes=0.99, expensive_yes=0.5),
+            _hypothesis("h-b", 0.5, cheap_yes=0.01, expensive_yes=0.5),
+        ),
+        (
+            DiscriminatingProbe(
+                probe_id="cheap-check",
+                question="Observed?",
+                outcome_support=("yes", "no"),
+            ),
+            DiscriminatingProbe(
+                probe_id="expensive-check",
+                question="Secondary?",
+                outcome_support=("yes", "no"),
+            ),
+        ),
+        decision_impact=0.95,
+    )
+
+    update, attempt = control.observe_hypothesis_probe(
+        tournament.tournament_id,
+        "cheap-check",
+        "yes",
+        agenda_id=agenda_item.agenda_id,
+        evidence_refs=("ev-probe",),
+    )
+
+    assert update.information_gain_bits > 0.0
+    assert update.surprise_bits >= 0.0
+    assert attempt is not None
+    assert attempt.information_gain_bits == update.information_gain_bits
+    assert control.research_agenda.item(agenda_item.agenda_id).status is AgendaStatus.RESOLVED
+
+
+def test_surprising_precommitted_forecast_reopens_resolved_research() -> None:
+    control = FrontierCognitiveControlPlane(clock=lambda: 2000.0)
+    control.map_epistemic_frontier(
+        (
+            KnowledgeObligation(
+                obligation_id="deploy-safety",
+                question="Is deployment safe?",
+                decision_impact=0.95,
+                confidence=0.90,
+                evidence_coverage=0.20,
+                evidence_refs=("ev-1",),
+            ),
+        )
+    )
+    item = control.research_agenda.claim_next()
+    assert item is not None
+    control.research_agenda.record_attempt(
+        item.agenda_id,
+        information_gain_bits=0.5,
+        successful=True,
+    )
+    assert control.research_agenda.item(item.agenda_id).status is AgendaStatus.RESOLVED
+
+    control.precommit_research_forecast(
+        "deploy-safety",
+        {"safe": 0.99, "unsafe": 0.01},
+        forecast_id="deploy-forecast",
+    )
+    settlement = control.settle_research_forecast(
+        "deploy-forecast",
+        "unsafe",
+    )
+
+    assert settlement.surprise_bits > 6.0
+    assert control.research_agenda.item(item.agenda_id).status is AgendaStatus.QUEUED
