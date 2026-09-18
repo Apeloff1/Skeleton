@@ -19,7 +19,7 @@ from typing import Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S002-run-state-classification"
+TASK_ID = "reserve-S002-run-state-classification"
 CONFLICT_DOMAIN = "ci.readonly.run_classification"
 CLASSES: tuple[str, ...] = (
     "retryable",
