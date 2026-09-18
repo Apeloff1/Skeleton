@@ -814,11 +814,15 @@ def convex_time_of_impact(
                 initial_overlap=time <= time_tolerance,
             )
 
-        closing_linear = max(
+        # The signed linear term must remain inside the conservative
+        # rotational bound.  A body translating away from the witness normal
+        # can dominate the maximum possible angular approach rate; clipping
+        # the linear term to zero first would invent closing speed and can
+        # stall conservative advancement after a resolved impact.
+        closing_bound = max(
             0.0,
-            -relative_velocity.dot(result.normal),
+            -relative_velocity.dot(result.normal) + angular_bound,
         )
-        closing_bound = closing_linear + angular_bound
         if closing_bound <= EPSILON:
             return None
 
