@@ -107,7 +107,6 @@ jobs:
               open_bases["$branch"]=1
             done < "$bases_file"
           }
-
           load_archive_candidates() {
             local branch tip pr candidates_file
             candidates_file="$RUNNER_TEMP/archive-candidates.tsv"
@@ -118,7 +117,27 @@ jobs:
               echo '::warning::Branch archive could not load closed pull-request heads; no refs will be deleted.'
               return 1
             fi
-            while IFS=
+            while IFS=$'\t' read -r branch tip pr; do
+              [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
+              archive_pr["${branch}:${tip}"]="$pr"
+            done < "$candidates_file"
+          }
+          if ! load_open_refs; then
+            {
+              echo '## Closed PR branch archive deferred'
+              echo '- Open pull-request refs were unavailable.'
+              echo '- No refs were deleted because active-PR protection could not be established.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! load_archive_candidates; then
+            {
+              echo '## Closed PR branch archive deferred'
+              echo '- Closed pull-request evidence was unavailable.'
+              echo '- No refs were deleted because archive candidates could not be established.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           archived=0
           preserved_open=0
@@ -209,107 +228,4 @@ jobs:
             echo '- Archive tags use archive/closed-pr/pr-<number>-<sha12>.'
             echo '- No branch is deleted until its exact commit is confirmed reachable through the archive tag.'
             echo '- Any open-PR or closed-PR API failure stops deletion instead of being interpreted as an empty result.'
-          } >> "$GITHUB_STEP_SUMMARY"
-\t' read -r branch tip pr; do
-              [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
-              archive_pr["${branch}:${tip}"]="$pr"
-            done < "$candidates_file"
-          }
-
-          if ! load_open_refs; then
-            {
-              echo '## Closed PR branch archive deferred'
-              echo '- Open pull-request refs were unavailable.'
-              echo '- No refs were deleted because active-PR protection could not be established.'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if ! load_archive_candidates; then
-            {
-              echo '## Closed PR branch archive deferred'
-              echo '- Closed pull-request evidence was unavailable.'
-              echo '- No refs were deleted because archive candidates could not be established.'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          archived=0
-          preserved_open=0
-          preserved_named=0
-          raced=0
-          tag_conflict=0
-          no_match=0
-
-          while read -r tip branch; do
-            [[ -n "$tip" && -n "$branch" ]] || continue
-
-            case "$branch" in
-              main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
-                preserved_named=$((preserved_named + 1))
-                continue
-                ;;
-            esac
-
-            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
-              preserved_open=$((preserved_open + 1))
-              continue
-            fi
-
-            key="${branch}:${tip}"
-            pr="${archive_pr[$key]-}"
-            if [[ -z "$pr" ]]; then
-              no_match=$((no_match + 1))
-              continue
-            fi
-
-            # Revalidate both PR references immediately before mutation.
-            load_open_refs
-            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
-              preserved_open=$((preserved_open + 1))
-              continue
-            fi
-
-            live_tip=$(git ls-remote --heads origin "refs/heads/${branch}" | awk 'NR==1 {print $1}')
-            if [[ -z "$live_tip" || "$live_tip" != "$tip" ]]; then
-              raced=$((raced + 1))
-              continue
-            fi
-
-            tag="archive/closed-pr/pr-${pr}-${tip:0:12}"
-            remote_tag=$(git ls-remote --refs --tags origin "refs/tags/${tag}" | awk 'NR==1 {print $1}')
-            if [[ -z "$remote_tag" ]]; then
-              if ! git push --quiet origin "${tip}:refs/tags/${tag}"; then
-                tag_conflict=$((tag_conflict + 1))
-                continue
-              fi
-              remote_tag=$(git ls-remote --refs --tags origin "refs/tags/${tag}" | awk 'NR==1 {print $1}')
-            fi
-
-            if [[ "$remote_tag" != "$tip" ]]; then
-              tag_conflict=$((tag_conflict + 1))
-              continue
-            fi
-
-            # The tag now preserves the exact closed-PR commit. Delete only if
-            # the branch still points at the expected tip.
-            if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
-              archived=$((archived + 1))
-            else
-              raced=$((raced + 1))
-            fi
-          done < <(
-            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2
-          )
-
-          {
-            echo '## Closed PR branch archive'
-            echo "- Cutoff: closed on or before \`$cutoff\`"
-            echo "- Branches archived to exact tags then removed: $archived"
-            echo "- Open PR head/base refs preserved: $preserved_open"
-            echo "- Protected-name refs preserved: $preserved_named"
-            echo "- Refs without an exact inactive closed-PR match preserved: $no_match"
-            echo "- Branches that moved during cleanup preserved: $raced"
-            echo "- Archive-tag conflicts preserved: $tag_conflict"
-            echo '- Archive tags use archive/closed-pr/pr-<number>-<sha12>.'
-            echo '- No branch is deleted until its exact commit is confirmed reachable through the archive tag.'
           } >> "$GITHUB_STEP_SUMMARY"
