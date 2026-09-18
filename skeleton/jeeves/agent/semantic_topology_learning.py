@@ -614,6 +614,9 @@ class TopologyBridgePolicy:
     minimum_negative_controls: int = 2
     minimum_control_domains: int = 2
     minimum_controls_per_domain: int = 1
+    maximum_predictions: int = 500_000
+    maximum_trials: int = 500_000
+    maximum_unresolved_predictions: int = 50_000
     maximum_brier: float = 0.24
     maximum_ece: float = 0.20
     minimum_empirical_rate: float = 0.55
@@ -636,6 +639,9 @@ class TopologyBridgePolicy:
             "minimum_negative_controls",
             "minimum_control_domains",
             "minimum_controls_per_domain",
+            "maximum_predictions",
+            "maximum_trials",
+            "maximum_unresolved_predictions",
         ):
             object.__setattr__(
                 self,
@@ -694,6 +700,11 @@ class TopologyBridgePolicy:
                 "minimum_control_domains": self.minimum_control_domains,
                 "minimum_controls_per_domain": (
                     self.minimum_controls_per_domain
+                ),
+                "maximum_predictions": self.maximum_predictions,
+                "maximum_trials": self.maximum_trials,
+                "maximum_unresolved_predictions": (
+                    self.maximum_unresolved_predictions
                 ),
                 "maximum_brier": self.maximum_brier,
                 "maximum_ece": self.maximum_ece,
@@ -834,6 +845,10 @@ class SemanticTopologyLearningLab:
             str,
         ] = {}
         self._trials: dict[str, TopologyBridgeTrial] = {}
+        self._trials_by_candidate_kind: dict[
+            tuple[str, str],
+            set[str],
+        ] = {}
         self._resolved_predictions: dict[str, str] = {}
         self._lock = threading.RLock()
 
@@ -1049,6 +1064,20 @@ class SemanticTopologyLearningLab:
                     "different predeclared prediction"
                 )
 
+            if len(self._predictions) >= self.policy.maximum_predictions:
+                raise AgentContractError(
+                    "topology bridge prediction capacity exhausted"
+                )
+            unresolved_count = (
+                len(self._predictions) - len(self._resolved_predictions)
+            )
+            if (
+                unresolved_count
+                >= self.policy.maximum_unresolved_predictions
+            ):
+                raise AgentContractError(
+                    "topology bridge unresolved prediction capacity exhausted"
+                )
             self._predictions[prediction.prediction_id] = prediction
             self._prediction_slots[prediction.slot_key] = (
                 prediction.prediction_id
@@ -1141,7 +1170,19 @@ class SemanticTopologyLearningLab:
                     "topology bridge prediction already resolved differently"
                 )
 
+            if len(self._trials) >= self.policy.maximum_trials:
+                raise AgentContractError(
+                    "topology bridge trial capacity exhausted"
+                )
             self._trials[trial.trial_id] = trial
+            index_key = (
+                trial.candidate_id,
+                trial.kind.value,
+            )
+            self._trials_by_candidate_kind.setdefault(
+                index_key,
+                set(),
+            ).add(trial.trial_id)
             self._resolved_predictions[trial.prediction_id] = trial.trial_id
         return trial
 
@@ -1193,13 +1234,26 @@ class SemanticTopologyLearningLab:
             else LensInteractionKind(str(kind))
         )
         with self._lock:
+            if kind_value is not None:
+                trial_ids = self._trials_by_candidate_kind.get(
+                    (candidate_key, kind_value.value),
+                    set(),
+                )
+            else:
+                trial_ids = {
+                    trial_id
+                    for (indexed_candidate, _), ids
+                    in self._trials_by_candidate_kind.items()
+                    if indexed_candidate == candidate_key
+                    for trial_id in ids
+                }
             values = [
-                trial
-                for trial in self._trials.values()
-                if trial.candidate_id == candidate_key
-                and (kind_value is None or trial.kind is kind_value)
+                self._trials[trial_id]
+                for trial_id in trial_ids
             ]
-        return tuple(sorted(values, key=lambda item: item.trial_id))
+        return tuple(
+            sorted(values, key=lambda item: item.trial_id)
+        )
 
     def _domain_reports(
         self,
@@ -1707,14 +1761,21 @@ class SemanticTopologyLearningLab:
 
     def reports(self) -> tuple[TopologyBridgeReport, ...]:
         with self._lock:
-            identities = sorted(
-                {
-                    (trial.candidate_id, trial.kind)
-                    for trial in self._trials.values()
-                },
-                key=lambda item: (item[0], item[1].value),
+            identities = tuple(
+                sorted(
+                    (
+                        candidate_id,
+                        LensInteractionKind(kind_value),
+                    )
+                    for (candidate_id, kind_value), trial_ids
+                    in self._trials_by_candidate_kind.items()
+                    if trial_ids
+                )
             )
-        return tuple(self.report(candidate_id, kind) for candidate_id, kind in identities)
+        return tuple(
+            self.report(candidate_id, kind)
+            for candidate_id, kind in identities
+        )
 
     def _learned_rules_from_reports(
         self,
@@ -2243,7 +2304,13 @@ class SemanticTopologyLearningLab:
             staged_predictions[prediction.prediction_id] = prediction
             staged_slots[prediction.slot_key] = prediction.prediction_id
 
+        if len(staged_predictions) > self.policy.maximum_predictions:
+            raise AgentContractError(
+                "restored topology prediction capacity exceeded"
+            )
+
         staged_trials: dict[str, TopologyBridgeTrial] = {}
+        staged_trial_index: dict[tuple[str, str], set[str]] = {}
         staged_resolved: dict[str, str] = {}
         for trial in restored.trials:
             candidate = self._candidates.get(trial.candidate_id)
@@ -2275,12 +2342,29 @@ class SemanticTopologyLearningLab:
                     "restored topology prediction has multiple outcomes"
                 )
             staged_trials[trial.trial_id] = trial
+            staged_trial_index.setdefault(
+                (trial.candidate_id, trial.kind.value),
+                set(),
+            ).add(trial.trial_id)
             staged_resolved[trial.prediction_id] = trial.trial_id
+
+        if len(staged_trials) > self.policy.maximum_trials:
+            raise AgentContractError(
+                "restored topology trial capacity exceeded"
+            )
+        if (
+            len(staged_predictions) - len(staged_resolved)
+            > self.policy.maximum_unresolved_predictions
+        ):
+            raise AgentContractError(
+                "restored unresolved topology prediction capacity exceeded"
+            )
 
         with self._lock:
             self._predictions = staged_predictions
             self._prediction_slots = staged_slots
             self._trials = staged_trials
+            self._trials_by_candidate_kind = staged_trial_index
             self._resolved_predictions = staged_resolved
             reports = self.reports()
             learned = self._learned_rules_from_reports(reports)
