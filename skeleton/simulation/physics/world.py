@@ -34,7 +34,14 @@ from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
 from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
-from .shapes import BoxShape, CapsuleShape, CylinderShape, PlaneShape, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    ConvexHullShape,
+    CylinderShape,
+    PlaneShape,
+    SphereShape,
+)
 from .snapshots import (
     PhysicsBodyState,
     PhysicsSnapshot,
@@ -456,6 +463,12 @@ class PhysicsWorld:
                 "kind": shape.kind.value,
                 "radius": shape.radius,
                 "half_height": shape.half_height,
+            }
+        if isinstance(shape, ConvexHullShape):
+            return {
+                "kind": shape.kind.value,
+                "vertices": tuple(vertex.to_tuple() for vertex in shape.vertices),
+                "triangles": shape.triangles,
             }
         raise PhysicsValidationError("unknown shape implementation")
 
