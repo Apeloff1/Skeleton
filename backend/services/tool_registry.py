@@ -102,8 +102,12 @@ async def _tool_compile_code(params: dict) -> dict:
 
 
 async def _tool_run_code(params: dict) -> dict:
-    """Reuse the playground's run pipeline via local Python eval for python only;
-    other langs go through the existing route."""
+    """Fail closed instead of evaluating agent-supplied Python in the backend.
+
+    Executable snippets must go through the dedicated playground sandbox.  The
+    registry previously used builtins.exec(), which bypassed that isolation and
+    ran untrusted code inside the long-lived backend process.
+    """
     if not code_execution_enabled():
         return {
             "ok": False,
@@ -114,16 +118,14 @@ async def _tool_run_code(params: dict) -> dict:
 
     code = params.get("code", "")
     lang = params.get("language", "python")
-    if lang != "python":
-        return {"ok": False, "error": f"inline run only supports python; for {lang} call /api/playground/run"}
-    import io, contextlib, builtins
-    buf_out, buf_err = io.StringIO(), io.StringIO()
-    try:
-        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            builtins.exec(builtins.compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
-        return {"ok": True, "stdout": buf_out.getvalue()[-4000:], "stderr": buf_err.getvalue()[-4000:], "exit_code": 0}
-    except Exception:
-        return {"ok": False, "stdout": buf_out.getvalue()[-4000:], "stderr": (buf_err.getvalue() or "execution_failed")[-4000:], "exit_code": 1}
+    if not code:
+        return {"ok": False, "error": "empty code", "exit_code": 0}
+    return {
+        "ok": False,
+        "disabled": True,
+        "error": f"inline {lang} execution is disabled; use /api/playground/run",
+        "exit_code": 0,
+    }
 
 
 async def _tool_package_build(params: dict) -> dict:
