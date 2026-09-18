@@ -64,6 +64,44 @@ def _literal_ip(host: str):
     return ip_address(packed)
 
 
+async def _resolve_public_host(host: str, port: int = 443) -> tuple[str, ...]:
+    """Resolve a hostname and reject any non-public address before connecting."""
+    literal = _literal_ip(host)
+    if literal is not None:
+        if not literal.is_global:
+            raise ValueError("scrape hostname resolves to a non-public IP address")
+        return (str(literal),)
+
+    try:
+        infos = await asyncio.to_thread(
+            socket.getaddrinfo,
+            host,
+            port,
+            socket.AF_UNSPEC,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+        )
+    except OSError as exc:
+        raise ValueError("scrape hostname resolution failed") from exc
+
+    addresses: set[str] = set()
+    for _family, _socktype, _proto, _canonname, sockaddr in infos:
+        if not sockaddr:
+            continue
+        raw_address = str(sockaddr[0]).split("%", 1)[0]
+        try:
+            resolved = ip_address(raw_address)
+        except ValueError as exc:
+            raise ValueError("scrape hostname resolution returned an invalid IP address") from exc
+        if not resolved.is_global:
+            raise ValueError("scrape hostname resolves to a non-public IP address")
+        addresses.add(str(resolved))
+
+    if not addresses:
+        raise ValueError("scrape hostname resolution returned no usable addresses")
+    return tuple(sorted(addresses))
+
+
 def _validated_scrape_url(url: str) -> tuple[str, str]:
     """Return normalized public HTTPS URL and hostname, or fail closed."""
     value = url.strip()
@@ -110,6 +148,8 @@ async def _polite_get(client: httpx.AsyncClient, url: str) -> str | None:
     for redirect_count in range(MAX_REDIRECTS + 1):
         try:
             current, host = _validated_scrape_url(current)
+            port = urlsplit(current).port or 443
+            await _resolve_public_host(host, port)
         except ValueError:
             log.warning("scrape URL rejected by outbound network policy")
             return None
