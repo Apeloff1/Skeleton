@@ -247,7 +247,6 @@ def test_semantic_plane_contract_fingerprint_includes_depth_registry_and_rules()
 
     assert len(fingerprint) == 64
     assert plane.registry.get("target_leakage").family is LensFamily.PREDICTIVE
-    assert any(
-        set(rule.key) == {"retry_storm", "queue_backpressure"}
-        for rule in plane.composition._symmetric.values()
-    )
+    rule = plane.composition.rule_for("retry_storm", "queue_backpressure")
+    assert rule is not None
+    assert set(rule.key) == {"retry_storm", "queue_backpressure"}
