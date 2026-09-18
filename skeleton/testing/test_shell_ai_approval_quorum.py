@@ -11,6 +11,8 @@ from skeleton.shells.ai.approval_quorum import (
     QuorumApproval,
     QuorumApprovalError,
     QuorumApprovalPolicy,
+    QuorumApprovalState,
+    QuorumVoteDecision,
 )
 from skeleton.shells.ai.distributed_seal import DistributedExecutionSealRegistry
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
@@ -620,3 +622,190 @@ def test_distributed_seal_registry_consumes_matching_quorum_digest():
         assurance_digest=fp("q"),
     )
     assert registry.used(seal.seal_id)
+
+
+def test_quorum_reject_vote_is_terminal():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    rejected = store.reject(
+        opened.approval.approval_id,
+        approver="security-reviewer",
+        reason="unsafe side effect",
+    )
+    assert rejected.approval.policy_rejected
+    assert rejected.approval.state_at(rejected.approval.created_at) is QuorumApprovalState.REJECTED
+    assert rejected.approval.votes[0].decision is QuorumVoteDecision.REJECT
+    assert rejected.approval.votes[0].reason == "unsafe side effect"
+
+
+def test_quorum_rejected_cannot_receive_more_votes():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    store.reject(
+        opened.approval.approval_id,
+        approver="security-reviewer",
+    )
+    with pytest.raises(QuorumApprovalError, match="rejected"):
+        store.vote(
+            opened.approval.approval_id,
+            approver="operator-reviewer",
+        )
+
+
+def test_quorum_rejected_cannot_be_required():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    rejected = store.reject(
+        opened.approval.approval_id,
+        approver="security-reviewer",
+    )
+    with pytest.raises(QuorumApprovalError, match="rejected"):
+        store.require(
+            rejected.approval,
+            principal="alice",
+            intent_fingerprint=fp("i"),
+            proposal_fingerprint=fp("p"),
+        )
+
+
+def test_quorum_rejected_cannot_be_consumed():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    rejected = store.reject(
+        opened.approval.approval_id,
+        approver="security-reviewer",
+    )
+    with pytest.raises(QuorumApprovalError, match="rejected"):
+        store.consume(
+            rejected.approval,
+            principal="alice",
+            intent_fingerprint=fp("i"),
+            proposal_fingerprint=fp("p"),
+        )
+
+
+def test_quorum_approver_cannot_change_vote_decision():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    store.vote(
+        opened.approval.approval_id,
+        approver="reviewer-1",
+        role="security",
+        decision=QuorumVoteDecision.APPROVE,
+    )
+    with pytest.raises(QuorumApprovalError, match="change"):
+        store.vote(
+            opened.approval.approval_id,
+            approver="reviewer-1",
+            role="security",
+            decision=QuorumVoteDecision.REJECT,
+        )
+
+
+def test_quorum_reject_digest_differs_from_approve_digest():
+    approve_store = AIApprovalQuorumStore(
+        InMemoryFencedStore(),
+        clock=lambda: 100.0,
+    )
+    reject_store = AIApprovalQuorumStore(
+        InMemoryFencedStore(),
+        clock=lambda: 100.0,
+    )
+    approved = approve_store.open(
+        principal="alice",
+        intent_fingerprint=fp("i"),
+        proposal_fingerprint=fp("p"),
+    )
+    rejected = reject_store.open(
+        principal="alice",
+        intent_fingerprint=fp("i"),
+        proposal_fingerprint=fp("p"),
+    )
+    approved = approve_store.vote(
+        approved.approval.approval_id,
+        approver="reviewer",
+    )
+    rejected = reject_store.reject(
+        rejected.approval.approval_id,
+        approver="reviewer",
+    )
+    assert approved.approval.digest != rejected.approval.digest
+
+
+def test_quorum_metadata_is_immutable_and_in_digest():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    first = store.open(
+        principal="alice",
+        intent_fingerprint=fp("i"),
+        proposal_fingerprint=fp("p"),
+        metadata={"change_ticket": "CR-42"},
+    )
+    second = store.open(
+        principal="alice",
+        intent_fingerprint=fp("i"),
+        proposal_fingerprint=fp("p"),
+        metadata={"change_ticket": "CR-43"},
+    )
+    with pytest.raises(TypeError):
+        first.approval.metadata["change_ticket"] = "tampered"
+    assert first.approval.digest != second.approval.digest
+
+
+def test_quorum_metadata_field_limit():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    with pytest.raises(ValueError, match="metadata"):
+        store.open(
+            principal="alice",
+            intent_fingerprint=fp("i"),
+            proposal_fingerprint=fp("p"),
+            metadata={str(index): "x" for index in range(65)},
+        )
+
+
+def test_quorum_reject_reason_limit():
+    store = AIApprovalQuorumStore(InMemoryFencedStore())
+    opened = open_approval(store)
+    with pytest.raises(ValueError, match="reason"):
+        store.reject(
+            opened.approval.approval_id,
+            approver="reviewer",
+            reason="x" * 2049,
+        )
+
+
+def test_quorum_state_progression_pending_approved_consumed():
+    now = [0.0]
+    store = AIApprovalQuorumStore(
+        InMemoryFencedStore(clock=lambda: now[0]),
+        clock=lambda: now[0],
+    )
+    opened = open_approval(store, ttl=100)
+    assert opened.approval.state_at(now[0]) is QuorumApprovalState.PENDING
+    first = store.vote(
+        opened.approval.approval_id,
+        approver="reviewer-1",
+    )
+    assert first.approval.state_at(now[0]) is QuorumApprovalState.PENDING
+    second = store.vote(
+        opened.approval.approval_id,
+        approver="reviewer-2",
+    )
+    assert second.approval.state_at(now[0]) is QuorumApprovalState.APPROVED
+    consumed = store.consume(
+        second.approval,
+        principal="alice",
+        intent_fingerprint=fp("i"),
+        proposal_fingerprint=fp("p"),
+    )
+    assert consumed.state_at(now[0]) is QuorumApprovalState.CONSUMED
+
+
+def test_quorum_state_expired():
+    now = [0.0]
+    store = AIApprovalQuorumStore(
+        InMemoryFencedStore(clock=lambda: now[0]),
+        clock=lambda: now[0],
+    )
+    opened = open_approval(store, ttl=1)
+    now[0] = 1
+    assert opened.approval.state_at(now[0]) is QuorumApprovalState.EXPIRED
