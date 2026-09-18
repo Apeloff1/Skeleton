@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import secrets
 import time
 from typing import Callable
 
@@ -67,7 +68,8 @@ class DistributedAIReviewQueue:
         if ttl_seconds <= 0:
             raise ValueError("review TTL must be positive")
         now = self._clock()
-        raw = f"{review.proposal_fingerprint}:{now}".encode()
+        nonce = secrets.token_hex(16)
+        raw = f"{review.proposal_fingerprint}:{now}:{nonce}".encode()
         item_id = hashlib.sha256(raw).hexdigest()[:32]
         record = DistributedReviewRecord(
             item_id,
