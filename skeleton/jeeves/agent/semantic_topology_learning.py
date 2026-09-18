@@ -251,6 +251,7 @@ class SemanticTopologyLearningSnapshot:
     restricted_report_ids: tuple[str, ...]
     rejected_report_ids: tuple[str, ...]
     candidate_report_ids: tuple[str, ...]
+    ambiguous_active_candidate_ids: tuple[str, ...]
     learned_rule_keys: tuple[tuple[str, str], ...]
     fingerprint: str
 
@@ -609,10 +610,19 @@ class SemanticTopologyLearningLab:
 
     def learned_rules(self) -> tuple[LearnedTopologyRule, ...]:
         learned: list[LearnedTopologyRule] = []
+        active_by_candidate: dict[str, list[TopologyBridgeReport]] = {}
         for report in self.reports():
-            if report.status is not TopologyBridgeStatus.ACTIVE:
+            if report.status is TopologyBridgeStatus.ACTIVE:
+                active_by_candidate.setdefault(report.candidate_id, []).append(
+                    report
+                )
+        for candidate_id, active_reports in sorted(active_by_candidate.items()):
+            # Competing relation kinds for the same pair are a model-selection
+            # problem, not permission to execute multiple contradictory rules.
+            if len(active_reports) != 1:
                 continue
-            candidate = self._candidates[report.candidate_id]
+            report = active_reports[0]
+            candidate = self._candidates[candidate_id]
             axis_hint = _FAMILY_AXIS_HINT.get(
                 candidate.right_family if candidate.cross_family else candidate.left_family,
                 "semantic",
@@ -696,6 +706,19 @@ class SemanticTopologyLearningLab:
             for item in reports
             if item.status is TopologyBridgeStatus.CANDIDATE
         )
+        active_by_candidate: dict[str, int] = {}
+        for item in reports:
+            if item.status is TopologyBridgeStatus.ACTIVE:
+                active_by_candidate[item.candidate_id] = (
+                    active_by_candidate.get(item.candidate_id, 0) + 1
+                )
+        ambiguous = tuple(
+            sorted(
+                candidate_id
+                for candidate_id, count in active_by_candidate.items()
+                if count > 1
+            )
+        )
         with self._lock:
             trial_count = len(self._trials)
         fingerprint = stable_fingerprint(
@@ -704,6 +727,7 @@ class SemanticTopologyLearningLab:
                 "policy": self.policy.fingerprint,
                 "reports": [item.fingerprint for item in reports],
                 "learned": [item.fingerprint for item in learned],
+                "ambiguous_active_candidates": ambiguous,
                 "trial_count": trial_count,
             }
         )
@@ -714,6 +738,7 @@ class SemanticTopologyLearningLab:
             restricted_report_ids=restricted,
             rejected_report_ids=rejected,
             candidate_report_ids=candidates,
+            ambiguous_active_candidate_ids=ambiguous,
             learned_rule_keys=tuple(item.rule.key for item in learned),
             fingerprint=fingerprint,
         )
