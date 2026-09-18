@@ -475,9 +475,19 @@ def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
 
     receipt = world.step()[0]
 
-    assert receipt.ccd_clamps >= 1
-    assert moving.position.x < target.position.x
-    assert moving.linear_velocity.x < 9.0
+    assert receipt.ccd_clamps >= 1, (
+        f"expected at least one CCD clamp, got {receipt.ccd_clamps}"
+    )
+    assert moving.position.x < target.position.x, (
+        "CCD allowed capsule to cross cylinder: "
+        f"moving_x={moving.position.x!r}, target_x={target.position.x!r}, "
+        f"velocity_x={moving.linear_velocity.x!r}, clamps={receipt.ccd_clamps}"
+    )
+    assert moving.linear_velocity.x < 9.0, (
+        "CCD impact did not reduce closing velocity: "
+        f"velocity_x={moving.linear_velocity.x!r}, moving_x={moving.position.x!r}, "
+        f"clamps={receipt.ccd_clamps}"
+    )
 
 
 def test_general_convex_toi_tie_break_is_canonical() -> None:
