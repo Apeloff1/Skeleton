@@ -45,11 +45,18 @@ class Gh:
     def comment(self, number: int, body: str) -> None:
         self.run(["issue", "comment", str(number), "--repo", self.repo, "--body", body])
 
-    def create_issue(self, title: str, body: str, labels: Sequence[str]) -> None:
+    def create_issue(self, title: str, body: str, labels: Sequence[str]) -> int:
         args = ["issue", "create", "--repo", self.repo, "--title", title, "--body", body]
         for label in labels:
             args.extend(["--label", label])
-        self.run(args)
+        created = self.run(args).strip()
+        try:
+            number = int(created.rstrip("/").rsplit("/", 1)[-1])
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("created issue URL did not contain a numeric issue number") from exc
+        if number <= 0:
+            raise RuntimeError("created issue number must be positive")
+        return number
 
     def find_issue(self, title: str) -> Mapping[str, Any] | None:
         data = self.json([
@@ -143,11 +150,8 @@ def nightly_report(gh: Gh, results: Sequence[BotResult]) -> BotResult:
         gh.comment(number, body)
         gh.close_issue(number)
         return BotResult("nightly-report", 1, ("updated the closed report ledger",))
-    gh.create_issue(title, body, ())
-    created = gh.find_issue(title)
-    if created is None:
-        raise RuntimeError("night shift report issue was created but could not be resolved")
-    gh.close_issue(int(created["number"]))
+    created_number = gh.create_issue(title, body, ())
+    gh.close_issue(created_number)
     return BotResult("nightly-report", 1, ("created and closed the report ledger",))
 
 
