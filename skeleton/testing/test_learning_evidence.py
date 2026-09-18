@@ -300,6 +300,38 @@ def test_contradictory_observations_cannot_be_collapsed_into_one_feature() -> No
     assert caught.value.context["reason"] == "contradictory_signal"
 
 
+def test_hypothesis_cannot_cross_subject_feature_evidence() -> None:
+    store = _store()
+    store.record_observation(
+        _observation(
+            observation_id="obs-other",
+            subject_id="skill-rust",
+            payload={"score": 1},
+        )
+    )
+    store.record_feature(
+        Feature(
+            feature_id="feat-other",
+            subject_id="skill-rust",
+            name="score",
+            value=1,
+            observation_ids=("obs-other",),
+            provenance=make_provenance(
+                _feature_payload("score", 1, subject_id="skill-rust"),
+                parent_ids=("obs-other",),
+            ),
+        )
+    )
+
+    with pytest.raises(LearningEvidenceError) as caught:
+        store.record_hypothesis(
+            _hypothesis(feature_ids=("feat-other",))
+        )
+
+    assert caught.value.context["reason"] == "subject_mismatch"
+    assert "hyp-1" not in store.analysis()
+
+
 def test_contradictory_hypotheses_fail_closed() -> None:
     store = _store()
     _seed_feature(store)
