@@ -1020,6 +1020,71 @@ def test_semantic_plane_activates_bridge_only_after_empirical_promotion() -> Non
     assert after.causal_assertion_authorized is False
 
 
+def test_topology_diagnostics_expose_pending_prediction_without_claiming_evidence() -> None:
+    _, _, candidate, lab = _system()
+    prediction = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="diagnostic-pending",
+        predicted_at=10.0,
+    )
+
+    payload = lab.diagnostics(
+        candidate_id=candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+    )
+
+    assert len(payload["candidates"]) == 1
+    assert payload["candidates"][0]["candidate_id"] == candidate.candidate_id
+    assert payload["reports"] == []
+    assert [
+        item["prediction_id"]
+        for item in payload["unresolved_predictions"]
+    ] == [prediction.prediction_id]
+    assert payload["snapshot"]["unresolved_prediction_count"] == 1
+    assert payload["invariants"]["diagnostics_are_not_evidence"] is True
+
+
+def test_topology_diagnostics_expose_domain_calibration_and_rule_provenance() -> None:
+    _, _, candidate, lab = _system()
+    _promote(lab, candidate)
+
+    payload = lab.diagnostics(
+        candidate_id=candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+    )
+
+    assert len(payload["reports"]) == 1
+    report = payload["reports"][0]
+    assert report["status"] == "active"
+    assert report["qualified_domain_count"] == 2
+    assert report["qualified_control_domain_count"] == 2
+    assert {item["domain"] for item in report["domain_reports"]} == {
+        "film",
+        "game",
+    }
+    assert len(payload["learned_rules"]) == 1
+    learned = payload["learned_rules"][0]
+    assert learned["rule"]["metadata"]["rule_source"] == "learned_topology"
+    assert (
+        learned["rule"]["metadata"]["evidence_ceiling"]
+        == "interpretive_only"
+    )
+    assert learned["rule"]["metadata"]["may_promote_to_evidence"] is False
+
+
+def test_topology_diagnostics_are_bounded_and_report_truncation() -> None:
+    _, _, _, lab = _system()
+
+    payload = lab.diagnostics(limit=1)
+
+    assert len(payload["candidates"]) == 1
+    assert payload["truncated"]["candidates"] is True
+    assert payload["invariants"]["static_topology_contract_is_immutable"] is True
+
+
 def test_unvalidated_topology_candidate_becomes_research_obligation() -> None:
     _, _, candidate, lab = _system()
 
