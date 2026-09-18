@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from enum import Enum
 
 from skeleton.shells.ai.risk import RiskBand
@@ -64,6 +66,33 @@ class AIExecutionAssurancePolicy:
             RiskBand.HIGH: self.high,
             RiskBand.CRITICAL: self.critical,
         }[RiskBand(band)]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "low": self.low.value,
+            "medium": self.medium.value,
+            "high": self.high.value,
+            "critical": self.critical.value,
+            "require_release_bands": sorted(item.value for item in self.require_release_bands),
+            "require_preconditions_bands": sorted(
+                item.value for item in self.require_preconditions_bands
+            ),
+            "require_human_approval_bands": sorted(
+                item.value for item in self.require_human_approval_bands
+            ),
+            "require_quorum_bands": sorted(
+                item.value for item in self.require_quorum_bands
+            ),
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
 
 
 @dataclass(frozen=True)
