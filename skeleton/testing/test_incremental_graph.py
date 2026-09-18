@@ -575,6 +575,31 @@ def test_module_does_not_import_scanner_or_execute_builds() -> None:
     assert "socket" not in graph_mod.__dict__
 
 
+def test_declared_dependencies_consume_one_cumulative_edge_budget() -> None:
+    consumed = {"count": 0}
+
+    def second_dependencies():
+        for dependency in ("a", "b", "c"):
+            consumed["count"] += 1
+            yield dependency
+
+    with pytest.raises(IncrementalGraphError, match="dependencies count exceeds"):
+        build_incremental_graph(
+            [
+                {"id": "a"},
+                {"id": "b"},
+                {"id": "first", "dependencies": ["a", "b"]},
+                {"id": "second", "dependencies": second_dependencies()},
+            ],
+            max_nodes=4,
+            max_edges=3,
+        )
+
+    # Two edges were already consumed by "first", so coercing "second" may
+    # inspect only enough input to prove the one-edge remainder was exceeded.
+    assert consumed["count"] == 2
+
+
 def test_specs_and_dependencies_are_consumed_with_hard_bounds() -> None:
     def specs():
         index = 0
