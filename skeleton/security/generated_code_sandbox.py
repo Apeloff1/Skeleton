@@ -100,6 +100,8 @@ _PROC_CALLS = frozenset({
     "os.spawnlp", "os.spawnlpe", "os.posix_spawn", "os.fork", "os.forkpty",
     "subprocess.run", "subprocess.Popen", "subprocess.call",
     "subprocess.check_call", "subprocess.check_output",
+    "multiprocessing.Process", "multiprocessing.Pool",
+    "pty.spawn", "ctypes.CDLL", "ctypes.PyDLL",
 })
 _EVAL_CALLS = frozenset({"eval", "exec", "compile", "__import__", "builtins.eval", "builtins.exec"})
 
@@ -512,10 +514,13 @@ def _inspect_python(source: str) -> list[Operation]:
                 operations.extend(_import_operations(item.name))
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            aliases[module.split(".", 1)[0]] = module
+            if module:
+                aliases[module.split(".", 1)[0]] = module
             operations.extend(_import_operations(module))
             for item in node.names:
-                operations.extend(_import_operations(f"{module}.{item.name}" if module else item.name))
+                full_name = f"{module}.{item.name}" if module else item.name
+                aliases[item.asname or item.name] = full_name
+                operations.extend(_import_operations(full_name))
         elif isinstance(node, ast.Call):
             operations.extend(_call_operations(node, aliases))
         elif isinstance(node, ast.Attribute):
