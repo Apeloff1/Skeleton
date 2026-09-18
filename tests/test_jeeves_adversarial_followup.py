@@ -2,7 +2,7 @@
 
 import pytest
 
-from skeleton.jeeves.llm_core import JeevesCore
+from skeleton.jeeves.llm_core import JeevesCore, MemoryManager, _MAX_PROVIDER_OUTPUT_CHARS
 from skeleton.jeeves.providers import (
     _MAX_PROVIDER_RESPONSE_BYTES,
     _read_provider_json,
@@ -174,3 +174,108 @@ def test_whitespace_only_provider_key_is_unavailable(monkeypatch):
 
     with pytest.raises(RuntimeError, match="unavailable"):
         get_provider(preferred="openai")
+
+
+
+class OversizedProvider:
+    name = "oversized"
+    supports_system_prompt = True
+
+    def complete(self, prompt, context=None, max_tokens=512, system=None):
+        return "x" * (_MAX_PROVIDER_OUTPUT_CHARS + 1)
+
+
+class InvalidNameProvider:
+    name = {"secret": "provider-name-must-not-be-coerced"}
+    supports_system_prompt = True
+
+    def complete(self, prompt, context=None, max_tokens=512, system=None):
+        return "ok"
+
+
+def test_zero_context_window_does_not_expand_to_full_history():
+    memory = MemoryManager()
+    session = memory.create_session("u")
+    session.add_turn("user", "one")
+    session.add_turn("assistant", "two")
+
+    with pytest.raises(ValueError, match="max_turns"):
+        session.context_window(0)
+
+    with pytest.raises(ValueError, match="max_turns"):
+        session.context_window(False)
+
+
+def test_zero_history_limit_does_not_return_all_sessions():
+    memory = MemoryManager()
+    memory.create_session("u")
+    memory.create_session("u")
+
+    with pytest.raises(ValueError, match="limit"):
+        memory.get_user_history("u", limit=0)
+
+    with pytest.raises(ValueError, match="limit"):
+        memory.get_user_history("u", limit=False)
+
+
+@pytest.mark.parametrize("user_id", ["", "   ", "x" * 257])
+def test_memory_rejects_invalid_user_identifiers(user_id):
+    memory = MemoryManager()
+
+    with pytest.raises(ValueError, match="user_id"):
+        memory.create_session(user_id)
+
+
+def test_oversized_provider_output_fails_closed_before_memory_growth():
+    core = JeevesCore(provider=OversizedProvider())
+    session = core.open_session("u")
+
+    result = core.ask(session.session_id, "hello")
+
+    assert result["provider_failed"] is True
+    assert result["content"] == "[provider unavailable]"
+    assert session.turns[-1].content == "[provider unavailable]"
+    assert max(len(turn.content) for turn in session.turns) < _MAX_PROVIDER_OUTPUT_CHARS
+
+
+def test_non_string_provider_name_is_never_coerced_into_results():
+    core = JeevesCore(provider=InvalidNameProvider())
+    session = core.open_session("u")
+
+    result = core.ask(session.session_id, "hello")
+
+    assert result["provider"] == "unknown"
+    assert "secret" not in str(result)
+
+
+def test_public_helper_inputs_fail_closed_on_wrong_shapes():
+    core = _core()
+    session = core.open_session("u")
+
+    with pytest.raises(ValueError, match="session_id"):
+        core.ask([], "hello")  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="code"):
+        core.review_code(session.session_id, object())  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="code too large"):
+        core.review_code(session.session_id, "x" * 262_145)
+
+    with pytest.raises(ValueError, match="era"):
+        core.bind_era("   ")
+
+    with pytest.raises(ValueError, match="telemetry"):
+        core.advise(session.session_id, [])  # type: ignore[arg-type]
+
+
+def test_advise_validates_nested_telemetry_before_inspection():
+    core = _core()
+    session = core.open_session("u")
+    nested = {}
+    cursor = nested
+    for _ in range(10):
+        cursor["next"] = {}
+        cursor = cursor["next"]
+
+    with pytest.raises(ValueError, match="deep"):
+        core.advise(session.session_id, nested)
