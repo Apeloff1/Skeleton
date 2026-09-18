@@ -532,6 +532,7 @@ from .semantic_maximal import (
 )
 from .semantic_plane import (
     FindingRejection,
+    LearnedCompanionActivation,
     SemanticFindingAudit,
     SemanticLensPlane,
     SemanticPlaneCoverage,
