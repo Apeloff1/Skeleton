@@ -1,430 +1,616 @@
-# Shell Plane Threat Model
+# Shell Execution Plane Threat Model
 
-## Security objective
+## Purpose
 
-Prevent repository, model, user, workflow, or network-controlled data from silently expanding host process authority.
+This threat model documents attacker-controlled inputs, trust boundaries, abuse
+cases, required mitigations, and residual risks for Skeleton host process
+execution.
 
-The shell plane assumes that approved executables can themselves be powerful. Therefore safety is not defined as "no shell metacharacters" alone. Safety requires controlling executable identity, argv shape, environment, cwd, stdin, runtime resources, concurrency, and evidence leakage.
+It covers direct shell execution and the worker and control planes layered above
+it.
 
-## Assets
+Callers may include ordinary application code, plugins, agent tool invocations,
+model-generated plans, user-provided arguments, scheduled workflows, CI jobs,
+and maintenance operators.
 
-Protected assets include:
+Not every caller is equally trusted.
 
-- host filesystem outside task workspaces;
-- repository source and Git metadata;
-- runtime credentials and environment secrets;
-- SSH agents and credential helpers;
-- cloud metadata credentials;
-- GitHub and model-provider tokens;
-- local sockets and daemon control endpoints;
-- CPU/time/process capacity;
-- disk/log capacity;
-- audit evidence integrity;
-- command policy integrity;
-- generated-project/user-authored data.
+The shell plane therefore treats execution as capability authority rather than
+string processing.
 
-## Trust boundaries
+## Security objectives
 
-### Model and prompt input
+Primary objectives are preventing shell injection, executable substitution,
+ambient PATH execution, cwd escape, uncontrolled environment inheritance,
+unbounded argv, input, output, or runtime, capability escalation, stale ownership
+replay, evidence tampering, and secret leakage into logs or metrics.
 
-Model output and prompts are untrusted for executable selection, environment authority, cwd roots, and policy changes.
+## Trust boundary: caller to command model
 
-Model output may select among already-authorized logical commands only when the surrounding tool contract permits it.
+The caller may supply logical command name, argv values, cwd request,
+environment values, stdin bytes, timeout, and allowed success return codes.
 
-### HTTP/API input
+These fields are data.
 
-API clients cannot supply executable paths. API fields that eventually become argv must pass command-specific argument policy.
+They must never be concatenated into shell text.
 
-### Repository content
+## Trust boundary: command model to ShellExecutor
 
-Repository content is data, not policy. A checked-out branch must not be allowed to rewrite the active authority grant or security threshold merely by changing a manifest consumed from that branch.
+ShellExecutor checks capability grant, command-specific argument policy,
+environment policy, workspace policy, retry authority, circuit state, and
+session budget.
 
-### Workflow/event context
+Failure at this boundary must stop before ShellRunner.
 
-GitHub event fields and workflow inputs are untrusted strings. Existing workflow security gates remain independent of the Python shell plane.
+## Trust boundary: ShellExecutor to ShellRunner
 
-### Parent environment
+ShellRunner accepts prepared command data but independently enforces ShellPolicy.
 
-The parent process environment is sensitive by default. Inheritance is an explicit allowlist, not a baseline.
+Defense in depth is intentional.
 
-### Filesystem paths
+## Trust boundary: ShellRunner to operating system
 
-Path strings are untrusted until resolved. Workspace checks operate on resolved paths and compare authority against resolved roots.
+This is the final process boundary.
+
+Required properties include argv vector, no shell, absolute executable, bounded
+cwd, bounded env, bounded stdin, bounded output, bounded runtime, and
+process-group termination.
+
+## Trust boundary: control plane to ShellExecutor
+
+Dispatcher, plan executor, workers, schedulers, and services can choose when to
+call ShellExecutor.
+
+They do not gain a separate process-spawn primitive.
+
+## Trust boundary: worker to queue
+
+Queue ownership is protected by claim IDs.
+
+Worker identity alone cannot complete a queue item.
+
+## Trust boundary: evidence
+
+Receipts, chains, attestations, snapshots, and journals should verify what
+happened without containing secret child output by default.
 
 ## Threat: shell injection
 
-Classic payloads include:
+An attacker may supply semicolons, pipes, ampersands, redirections, command
+substitutions, quotes, newlines, wildcards, and option-looking values.
 
-```text
-; rm -rf ...
-&& curl ...
-| sh
-$(command)
-`command`
-> sensitive-file
-```
+Mitigation is argv execution with shell=False.
 
-Mitigation:
+No shell text exists.
 
-- no shell string execution;
-- argv-only process calls;
-- `shell=False` literal;
-- repository-wide static scanner rejects direct unsafe subprocess patterns;
-- adversarial tests prove metacharacters remain one literal argv element.
+Repository scanners reject shell execution and definite string command builders.
 
-Residual risk:
+Residual risk remains when the explicitly authorized executable itself
+interprets a string as code or shell syntax.
 
-An executable may implement its own expression language or `--eval` flag. That is why command-specific argument policy is required for high-risk tools.
+An interpreter with broad arguments is therefore a command-contract risk.
+
+Use narrow ArgumentPolicy for untrusted callers.
 
 ## Threat: executable substitution
 
-Attack:
+An attacker may try to choose a path or rely on malicious PATH.
 
-An attacker changes `PATH`, cwd, aliases, or a manifest so a trusted command name resolves to an attacker-controlled binary.
+Mitigation is logical command names mapped to resolved absolute files.
 
-Mitigation:
+No runtime PATH lookup is required.
 
-- policies hold resolved absolute executable files;
-- runtime command objects use logical names;
-- manifests cannot carry executable paths;
-- registry freezing and fingerprints expose configuration change;
-- policy diffs mark target changes as authority widening.
+Residual risk is on-disk executable replacement after registration.
 
-Residual risk:
+Policy health detects missing paths and basic filesystem changes.
 
-An authorized executable file could be replaced on disk after policy construction by a privileged local actor. Deployments that need stronger guarantees should bind executables to immutable images or add inode/content-digest verification at a lower platform layer.
+High-assurance deployments can add file digest or artifact provenance binding.
 
-## Threat: environment credential leakage
+## Threat: working-directory escape
 
-Attack:
+An attacker may request cwd outside approved workspace using parent traversal,
+absolute paths, symlinks, or replaced directories.
 
-A child receives `GITHUB_TOKEN`, cloud keys, model keys, proxy credentials, SSH agent endpoints, or other ambient values.
+Mitigation is resolved cwd containment under configured roots plus optional
+WorkspacePolicy narrowing.
 
-Mitigation:
+Residual race risk can remain on hostile mutable filesystems.
 
-- empty environment is the conceptual baseline;
-- only explicitly inherited keys are copied;
-- only allowed custom keys are accepted;
-- per-key validation and byte limits;
-- total environment byte limit;
-- tool/status/audit surfaces expose key names or hashes, not values.
+Mount namespace or fd-based containment can provide stronger isolation.
 
-Residual risk:
+## Threat: environment injection
 
-A deliberately allowed environment variable may itself contain sensitive content. It remains the command owner's responsibility to justify every allowed key and to use redaction when any value may enter child output.
+An attacker may supply high-impact variables such as PATH, PYTHONPATH,
+LD_PRELOAD, DYLD variables, NODE_OPTIONS, language startup hooks, proxy settings,
+or credentials.
 
-## Threat: cwd/path escape
+EnvironmentPolicy is default deny.
 
-Attack:
+ShellPolicy allowed_env is explicit.
 
-A task uses `..`, symlinks, alternate spellings, or an absolute path to execute in a more privileged directory.
+Inherited environment is explicit per key.
 
-Mitigation:
+Values and total child environment are bounded.
 
-- cwd is resolved before containment checks;
-- resolved cwd must be under an allowed root;
-- denied subroots can override broad allowed roots;
-- policy narrowing permits only descendant roots;
-- max relative depth can reduce traversal surface.
+Residual risk remains for the semantic power of a permitted environment key.
 
-Residual risk:
+Command owners must understand each allowed key.
 
-The shell plane confines cwd, not every path an executable can access. Strong filesystem isolation requires OS/container sandboxing in addition to these controls.
+## Threat: inherited secrets
 
-## Threat: argument-level authority escalation
+A child might receive parent credentials unintentionally.
 
-Attack:
+Full environment inheritance is not default.
 
-A safe executable is invoked with a dangerous feature such as arbitrary code evaluation, config override, output path, plugin loading, network target, or recursive delete.
+EnvironmentPolicy selects inherited keys.
 
-Mitigation:
+Policy health reports inheritance.
 
-- `ArgumentPolicy` allows explicit options only;
-- option values have regex/choice/length constraints;
-- positional values are typed by position/variadic rule;
-- deny tokens and deny patterns add targeted defense;
-- option repeats and `option=value` syntax are controlled;
-- total argv count and bytes are bounded.
+Migration planner marks inheritance widening for review.
 
-Recommended practice:
+## Threat: stdin abuse
 
-Prefer positive allowlists over broad deny regexes. Deny patterns should be a second line of defense, not the primary grammar.
+Large or unexpected stdin can drive parser bugs or blocking behavior.
 
-## Threat: stdin smuggling
+stdin requires explicit capability in ShellExecutor.
 
-Attack:
+CommandDefinition can disable stdin.
 
-A tool with a safe argv receives a program, credential, or destructive command through stdin.
+ShellPolicy bounds input bytes.
 
-Mitigation:
+ShellRunner writes bounded bytes and closes the pipe.
 
-- stdin requires the `stdin` capability;
-- command definition must independently allow stdin;
-- bytes are bounded;
-- stdin is absent by default.
+## Threat: output flooding
 
-Recommended practice:
+A child can write unbounded stdout or stderr.
 
-Disable stdin for commands that do not need it. Where structured stdin is necessary, validate the structure before converting to bytes.
+ShellRunner applies a combined output byte budget, drains pipes, and terminates
+the child process group on breach.
 
-## Threat: resource exhaustion
+Receipt records output-limited state and byte counts.
 
-Attack:
+## Threat: timeout evasion
 
-A process runs forever, floods stdout/stderr, receives huge stdin, creates excessive retries, or an autonomous loop spawns too many commands.
+A child can fork descendants or ignore graceful termination.
 
-Mitigation:
+On supported POSIX systems the runner creates a process group or session.
 
-Primitive limits:
+Timeout termination can escalate to kill.
 
-- wall-clock timeout;
-- combined output byte limit;
-- stdin byte limit;
-- environment byte limit;
-- argv count/byte limits.
+Higher-level deadlines only clamp timeout downward.
 
-Aggregate limits:
+## Threat: return-code widening
 
-- session command count;
-- failure count;
-- cumulative duration;
-- cumulative stdout/stderr;
-- retry count.
+A caller could mark arbitrary nonzero return codes successful.
 
-Coordination limits:
+Nonzero success requires capability.
 
-- bounded batch workers;
-- bounded queue capacity;
-- lease capacity;
-- token-bucket rate limiting;
-- circuit breakers.
+CommandDefinition may disable it.
 
-Residual risk:
-
-The runner does not currently impose OS CPU, memory, file-count, or process-count cgroups/rlimits. Container/runtime policy should provide those controls for untrusted workloads.
+Allowed return-code set is bounded.
 
 ## Threat: retry amplification
 
-Attack:
+One failed command can become many attempts.
 
-A failing operation is retried aggressively, multiplying side effects or load.
+Retry requires capability.
 
-Mitigation:
+RetryPolicy has bounded attempts and sleep.
 
-- retries disabled by default;
-- `retry` capability required;
-- retryable return codes explicit;
-- timeout retry opt-in;
-- output-limit retry opt-in and discouraged;
-- max attempts explicit;
-- deterministic backoff capped;
-- session retry budget;
-- circuit breaker can stop repeated failure.
+Session budgets, command budgets, and circuits constrain aggregate impact.
 
-For mutating commands, use an idempotency strategy or disable retries.
+## Threat: concurrency amplification
 
-## Threat: duplicate side effects
+A caller may launch many commands.
 
-Attack:
+WeightedConcurrency bounds in-flight dispatch.
 
-The same logical request is submitted repeatedly and performs duplicate mutation.
+Worker capacity bounds distributed work.
 
-Mitigation:
+Per-principal quotas and worker backpressure further constrain admission.
 
-`DedupeRegistry` binds a caller-supplied idempotency key to a command fingerprint. Reusing the key with another fingerprint fails.
+## Threat: stale admission lease replay
 
-A completed reservation can record a receipt ID.
+An old holder may try to mutate renewed lease state.
 
-Residual risk:
+AdmissionLease has revision.
 
-The registry is process-local and TTL-bound. Durable exactly-once semantics require transactional support in the underlying target system.
+An old revision cannot release the renewed lease.
 
-## Threat: concurrency stampede
+## Threat: stale queue claim
 
-Attack:
+A worker dies, claim is recovered, then old worker later completes item.
 
-Many workers simultaneously invoke the same expensive or conflicting command.
+Recovery creates a fresh runnable queue generation with cleared claim ID.
 
-Mitigation:
+Old QueueItem fails transition validation.
 
-- `LeaseRegistry` offers TTL ownership for a key;
-- `RateLimiter` bounds per-key admission;
-- `ShellWorkQueue` makes claimed ownership explicit;
-- parallel execution requires the `parallel` capability;
-- batch worker count is bounded.
+## Threat: heartbeat replay
 
-Residual risk:
+A stale worker may replay prior heartbeat.
 
-Process-local leases are not distributed locks.
+Heartbeat sequence must increase within generation.
 
-## Threat: pipeline dependency confusion
+Generation rollback fails.
 
-Attack:
+Replacement uses a higher generation.
 
-A plan runs a dependent step after a failed prerequisite, references an unknown prerequisite, or hides a cycle.
+## Threat: protocol replay
 
-Mitigation:
+An old worker message can be resent.
 
-- pipeline IDs unique;
-- unknown dependencies rejected;
-- self-dependencies rejected;
-- DAG cycle detection during construction;
-- failed dependencies become blocked;
-- stop/continue behavior explicit.
+ProtocolGuard stores generation and last sequence.
 
-## Threat: manifest authority expansion
+Same-generation non-increasing sequence fails.
 
-Attack:
+Older generation fails.
 
-A JSON plan supplies `/bin/sh`, `shell=true`, arbitrary extension fields, enormous payloads, or new policy knobs.
+## Threat: policy race
 
-Mitigation:
+Concurrent policy editors can overwrite each other.
 
-- strict schema version;
-- unknown fields rejected;
-- logical command names only;
-- executable paths absent from schema;
-- payload/step/arg/env/string limits;
-- parsed plan still goes through command admission and capability checks.
+PolicyStore uses revision compare-and-swap.
 
-## Threat: secret leakage through output
+PlanStore and WorkerStateStore use equivalent version protection.
 
-Attack:
+## Threat: unsafe policy rollout
 
-A child prints credentials or sensitive repository content and a tool response forwards it to logs/models/users.
+Broad policy widening could reach all principals immediately.
 
-Mitigation:
+PolicyRollout supports deterministic canary and staged phases.
 
-- raw output omitted from tool response by default;
-- optional output views are bounded;
-- `SecretRedactor` handles known key names and token-like patterns;
-- audit records store byte counts/digests rather than raw output;
-- execution exceptions do not include child output.
+Migration planner classifies widening and breaking changes.
 
-Residual risk:
+ChangeControl can require approvals.
 
-Pattern redaction cannot prove all secrets are removed. Do not expose raw child output to broader trust domains unless the command/output contract explicitly allows it.
+Feature gates can further isolate behavior rollout.
 
-## Threat: high-cardinality telemetry leakage
+## Threat: approval replay
 
-Attack:
+Approval for one command may be reused for another.
 
-Arguments, paths, user IDs, prompts, or secrets become metric labels and create both leakage and monitoring instability.
+ExecutionApproval binds principal, command, and fingerprint.
 
-Mitigation:
+Approval has TTL and one-use consumption.
 
-Metrics are keyed by registered logical command only. Correlation IDs, argv, cwd, task IDs, and env values are excluded.
+## Threat: namespace confusion
 
-The metric registry also has a command-key cardinality bound and overflow bucket.
+One subsystem may run another subsystem's commands.
 
-## Threat: audit tampering
+ShellNamespace can bind principals and command prefixes.
 
-Attack:
+Namespace authorization remains additive to capability checks.
 
-Execution history is modified or reordered.
+## Threat: maintenance bypass
 
-Mitigation:
+New commands may enter during a drain.
 
-`ReceiptChain` uses sequence numbers, previous hashes, and SHA-256 receipt hashes. `verify()` checks continuity and content.
+ShellMaintenance can deny new admission by command prefix and principal.
 
-JSONL audit output is append-oriented, rejects symlink targets, and bounds event size.
+Service lifecycle includes maintenance and draining states.
 
-Residual risk:
+## Threat: evidence tampering
 
-Local hash chaining is evidence of internal consistency, not an external signature. Strong non-repudiation requires signing/remote immutable storage.
+Receipt data may be modified after execution.
 
-## Threat: policy drift
+ReceiptChain hashes sequence, prior hash, and receipt.
 
-Attack:
+Verification recomputes the chain.
 
-A child configuration gradually gains more executables, roots, environment keys, or resource ceilings.
+HMACAttestor can provide keyed integrity.
 
-Mitigation:
+WorkerJournal provides separate worker-event integrity.
 
-- `narrow_policy` rejects widening;
-- `intersect_policies` keeps common authority;
-- `is_narrower_or_equal` gives a machine check;
-- `diff_policies` labels changes as wider/narrower;
-- registry snapshot digest detects metadata drift.
+## Threat: evidence replay becomes execution
 
-Recommended CI behavior:
+A replay tool might accidentally rerun historical commands.
 
-Treat policy widening as review-required. Do not auto-approve a widening change solely because tests pass.
+EvidenceReplay accepts receipt and attestation data and has no runner or executor
+dependency.
 
-## Threat: stale queue/lease ownership
+Replay means verification only.
 
-Attack:
+## Threat: secret output leakage
 
-A worker completes work using a stale claim after ownership changed.
+A secret can appear in stdout and get copied into logs, metrics, exceptions, or
+incidents.
 
-Mitigation:
+ExecutionReceipt stores byte counts rather than output content.
 
-Queue completion requires the current claim ID. Lease renewal/release requires the current lease ID.
+ShellExecutionError avoids child output.
 
-TTL expiration is checked on access.
+Failure ledger detail is bounded.
 
-## Threat: unsafe hook behavior
+OutputClassifier can classify sensitive or secret output.
 
-Attack:
+Retention defaults keep no sensitive or secret bytes.
 
-An optional observability hook changes execution outcome or leaks raw internals.
+ExecutionCache stores output digests and counts only.
 
-Mitigation:
+## Threat: metric cardinality
 
-Pre-hooks receive bounded metadata and can veto before spawn.
+A caller may inject unique argv or correlation values into metric keys.
 
-Post-hooks receive metadata plus result and are isolated: failures are recorded by exception type and do not change successful process outcome.
+Core telemetry keys by logical command.
 
-Do not register hooks from untrusted plugins without an independent plugin capability model.
+Worker metrics key by worker ID.
 
-## Threat: command output used as executable input
+Control events are bounded rings rather than metric dimensions.
 
-Attack:
+## Threat: incident evidence overflow
 
-Output from one process is interpolated into another command as shell text.
+A caller may trigger huge evidence payloads.
 
-Mitigation:
+Incident evidence field count and summaries are bounded.
 
-The shell plane has no shell-string interpolation primitive. Pipelines link step dependency status, not automatic output substitution.
+Raw output should not be put in incident evidence.
 
-If an application wants to derive arguments from prior output, it must parse and validate those values into individual argv elements under the destination command's argument policy.
+## Threat: unbounded history
 
-## Threat: Windows/POSIX semantic differences
+A long-running service can accumulate receipts, events, traces, failures, and
+output.
 
-The runner avoids shell syntax, which removes a major portability class. Process-group termination semantics differ across operating systems.
+Stores are explicitly bounded or intended for external bounded persistence.
 
-On POSIX the runner starts a new session and targets the process group. On other systems it uses process terminate/kill primitives.
+Operators must select deployment-appropriate limits.
 
-Platform-specific job objects or sandboxing can be added beneath the same high-level executor contract without changing manifests or agent interfaces.
+## Threat: hidden background work
 
-## Security invariants
+Constructing a helper could silently start polling or execution.
 
-The following invariants should remain true across future work:
+Control-plane primitives are synchronous and passive.
 
-1. No runtime manifest can add an executable path.
-2. No model/tool request can widen its capability grant.
-3. No child environment receives an unknown key through the canonical executor.
-4. No cwd outside an allowed resolved root reaches the canonical executor.
-5. No batch or pipeline bypasses `ShellExecutor`.
-6. No retry happens unless a retry policy and capability allow it.
-7. No raw secret-bearing output is present in normal audit events or receipts.
-8. No command metric label derives from argv, cwd, prompt, or env values.
-9. Policy narrowing helpers cannot widen authority.
-10. Direct Python process calls remain covered by the independent repository scanner.
+No hidden daemon is started by constructors.
 
-## Out of scope
+Scheduling requires explicit polling or release.
 
-The shell plane is not a replacement for:
+Workers are cooperative unless an outer service deliberately adds concurrency.
 
-- containers;
-- seccomp/AppArmor/SELinux;
-- cgroups/rlimits;
-- VM isolation;
-- distributed locks;
-- remote attestation;
-- executable code signing;
-- filesystem ACLs;
-- network egress policy;
-- secrets management.
+## Threat: scaling recommendation becomes authority
 
-Those controls compose below/around this subsystem.
+Autoscaling logic might execute infrastructure commands directly.
+
+WorkerScaler and WorkerBalancer only return recommendations.
+
+An infrastructure adapter must independently pass normal shell policy.
+
+## Threat: cache confusion
+
+A result for one context could be reused for another.
+
+ExecutionCache key is caller-provided fingerprint and stores metadata only.
+
+Only proven deterministic commands should use it.
+
+Future cache keys should include policy and command-contract identity.
+
+## Threat: plan mutation after approval
+
+Approved plan content might change before execution.
+
+ExecutionPlan is frozen.
+
+PlanStore records version and fingerprint.
+
+Approval can bind fingerprint.
+
+ChangeControl stores payload digest.
+
+## Threat: dependency bypass
+
+A plan step might execute despite failed prerequisite.
+
+ShellPlanExecutor skips dependency-blocked steps unless
+continue-on-failure is explicit.
+
+That flag is part of plan fingerprint.
+
+## Threat: deadline widening
+
+A caller might provide a long deadline to obtain more execution time.
+
+Dispatcher clamps requested timeout to remaining deadline.
+
+ShellPolicy max timeout still applies.
+
+Deadlines never widen policy.
+
+## Threat: cancellation race
+
+Cancellation can arrive between admission and execution.
+
+Dispatcher checks cancellation before admission and again after concurrency
+permit acquisition before calling executor.
+
+Cancellation after child creation is currently handled by bounded timeout and
+runner termination.
+
+Future live cancellation should integrate at runner child-lifecycle boundary.
+
+## Threat: fingerprint secret exposure
+
+ShellPolicy fingerprint contains executable paths, cwd roots, allowed env key
+names, inherited env key names, and numeric limits.
+
+It does not include runtime environment values.
+
+Plan fingerprint input includes argv and cwd, so secrets should not be placed in
+argv.
+
+Environment values are represented only by key names in plan shape.
+
+## Threat: interpreter exposure
+
+An argv-safe interpreter can still execute arbitrary code if its arguments are
+broad.
+
+Use command-specific ArgumentPolicy.
+
+Prefer narrow wrappers for untrusted tool surfaces.
+
+Require stronger capability or approval for sensitive interpreters.
+
+## Threat: child reads home
+
+Core runner constrains cwd but is not a complete filesystem sandbox.
+
+IsolationRequirement can declare home invisibility.
+
+OS-level sandbox adapter is required for enforcement.
+
+This is a residual risk on plain host execution.
+
+## Threat: child network access
+
+Core runner does not implement network namespaces.
+
+IsolationRequirement can declare network prohibition.
+
+OS or container enforcement is required.
+
+This is a residual risk on ordinary host execution.
+
+## Threat: CPU, memory, disk, fd exhaustion
+
+Runner bounds time, input, and output but does not universally enforce every OS
+resource.
+
+Session and worker budgets reduce amplification.
+
+Future platform adapters can enforce memory, CPU, process, fd, and disk quotas.
+
+Those adapters must preserve argv and no-shell rules.
+
+## Threat: symlink and TOCTOU races
+
+Executable registration resolves strict path.
+
+Policy health warns on symlink paths.
+
+Workspace paths are normalized.
+
+Residual time-of-check versus time-of-use risk remains on hostile mutable
+filesystems.
+
+Stronger fd-based execution or sandbox mounts can harden this.
+
+## Threat: subprocess scanner bypass
+
+A developer may introduce another process API or alias.
+
+Repository-wide static process safety scanning covers backend, skeleton, and
+scripts.
+
+It rejects shell execution, unsafe aliases, and definite string command
+builders.
+
+Regression tests cover alias, partial, dynamic lookup, and similar bypasses.
+
+## Threat: test bypass
+
+A shell feature might be added without tests.
+
+Canonical quality gate runs every skeleton/testing/test_shell_*.py file.
+
+The backend security regression gate runs the same shell glob again.
+
+New tests using that convention automatically join both gates.
+
+## Threat: policy health drift
+
+An executable may disappear or a cwd root may be removed after service startup.
+
+Policy health can be run repeatedly.
+
+ShellService startup runs diagnostics.
+
+Operators should run health after host maintenance and policy rollout.
+
+## Threat: broad feature gate
+
+A 100 percent gate can expose new control behavior rapidly.
+
+Feature gates do not bypass security, but they can create operational risk.
+
+Use canary percentages and explicit principals for high-risk behavior.
+
+## Threat: retention misconfiguration
+
+Internal output retention can fill memory or preserve sensitive data.
+
+Retention store bounds item count and total bytes.
+
+Classification should happen before storage.
+
+Sensitive and secret defaults retain no bytes.
+
+## Threat: HMAC key leakage
+
+If attestation key leaks, attacker can forge HMAC evidence.
+
+Store key outside receipts and source control.
+
+Rotate by key ID.
+
+Treat HMAC as symmetric integrity, not public identity proof.
+
+## Threat: change-control metadata leak
+
+Change metadata can accidentally contain secrets.
+
+Metadata is bounded but not automatically redacted.
+
+Store references and digests instead of secret payloads.
+
+## Threat: service not-ready bypass
+
+An outer API might bypass ShellService because it is not ready.
+
+Do not do this.
+
+Not-ready should be an explicit service-unavailable response.
+
+Direct fallback subprocess execution is prohibited.
+
+## Threat: worker healthy implies command trusted
+
+Worker health only means liveness.
+
+It does not authorize a command.
+
+Command still passes namespace, capability, argument, environment, workspace,
+executor, and runner policy.
+
+## Security severity guidance
+
+Critical issues include shell execution, arbitrary executable path, stale claim
+mutation after recovery, capability widening, unbounded child output, secret
+output copied broadly, or corrupted receipt chain silently accepted.
+
+High issues include cwd escape, environment injection, policy CAS bypass,
+approval replay, generation rollback, or sensitive maintenance bypass.
+
+Medium issues include observability drift, retention misconfiguration, and
+bounded scheduling fairness defects without authority impact.
+
+Low issues include cosmetic status formatting.
+
+## Security review checklist
+
+Before merging a shell feature verify no new subprocess path outside runner, no
+shell=True, no shell string builder, no PATH executable lookup, no unrestricted
+environment inheritance, no unbounded stdin, output, or runtime, no hidden
+background thread, stale tokens are rejected, registries are bounded, history
+stores are bounded, child output is not copied into broad errors or metrics,
+policy widening is explicit, and failure and tamper tests exist.
+
+## Residual risk statement
+
+Skeleton's shell plane substantially reduces command-injection and orchestration
+risk but is not equivalent to a hardened OS sandbox.
+
+Plain host execution still shares the host kernel, filesystem, and network
+according to the invoked process identity.
+
+For adversarial untrusted code, use a dedicated sandbox, container, or VM
+boundary integrated underneath the same command policy and evidence model.
