@@ -1026,14 +1026,20 @@ def _coerce_artifact(value: Mapping[str, Any] | ArtifactRecord) -> ArtifactRecor
             "artifact record is not canonical",
             context={"missing": missing, "extra": sorted(extra)},
         )
+    artifact_id = value["artifact_id"]
+    if not isinstance(artifact_id, str) or not artifact_id:
+        raise EvidenceSchemaError("artifact_id must be a non-empty string")
+    asset_id = value.get("asset_id") or ""
+    if not isinstance(asset_id, str):
+        raise EvidenceSchemaError("asset_id must be a string")
     return ArtifactRecord(
-        artifact_id=str(value["artifact_id"]),
+        artifact_id=artifact_id,
         name=_require_name(value["name"]),
         sha256=_require_digest(value["sha256"]),
         size=_require_size(value["size"]),
         locator=_coerce_locator(value["locator"]),
         upload=_coerce_upload(value["upload"]),
-        asset_id=str(value.get("asset_id") or ""),
+        asset_id=asset_id,
     )
 
 
@@ -1073,8 +1079,11 @@ def _coerce_test(value: Mapping[str, Any] | TestEvidence) -> TestEvidence:
     result = value["result"]
     if not isinstance(result, str) or not result.strip():
         raise EvidenceSchemaError("test evidence result must be a non-empty string")
+    evidence_id = value["evidence_id"]
+    if not isinstance(evidence_id, str) or not evidence_id:
+        raise EvidenceSchemaError("test evidence id must be a non-empty string")
     return TestEvidence(
-        evidence_id=str(value["evidence_id"]),
+        evidence_id=evidence_id,
         name=_require_name(value["name"]),
         sha256=_require_digest(value["sha256"]),
         result=result.strip(),
