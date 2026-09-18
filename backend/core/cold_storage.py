@@ -361,8 +361,8 @@ def freeze_all(
         try:
             res = freeze(n, drop_after=True, compact=False, force=False)
             results.append(res)
-        except Exception as ex:
-            results.append({"name": n, "status": "error", "error": str(ex)})
+        except Exception:
+            results.append({"name": n, "status": "error", "error": "freeze_failed"})
 
     # One compact pass at the DB level is cheaper than per-collection
     try:

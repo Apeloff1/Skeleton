@@ -218,8 +218,8 @@ class ProductControlPlane:
             binding = active.resolve(op.capability_id, op.action)
             if binding is None: report["unbound"].append(op.outbox_seq); continue
             try: result = await self.operations.execute_one(op.outbox_seq, binding.executor)
-            except OperationExecutionError as exc:
-                report["failed"].append({"outbox_seq": op.outbox_seq, "operation_id": op.id, "executor": binding.name, "error": str(exc)}); continue
+            except OperationExecutionError:
+                report["failed"].append({"outbox_seq": op.outbox_seq, "operation_id": op.id, "executor": binding.name, "error": "dispatch_failed"}); continue
             report["confirmed" if result.confirmed else "deferred"].append(op.outbox_seq)
         report["remaining"] = self.operations.outbox.pending_count; return report
 

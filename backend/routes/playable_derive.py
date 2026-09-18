@@ -304,7 +304,7 @@ async def _do_variants(base: dict, depth: str) -> dict:
         if isinstance(r, dict):
             variants.append({"color": c[0], "hex": c[1], **r})
         else:
-            variants.append({"color": c[0], "hex": c[1], "status": "failed", "error": str(r)})
+            variants.append({"color": c[0], "hex": c[1], "status": "failed", "error": "variant_failed"})
     return {"kind": "variants", "variants": variants,
             "parent_id": base.get("playable_id"), "count": len(variants)}
 

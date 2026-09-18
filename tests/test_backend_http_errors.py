@@ -96,7 +96,77 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "playable.py",
     REPO_ROOT / "backend" / "routes" / "discourse.py",
     REPO_ROOT / "backend" / "routes" / "jeeves_core.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_voice.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_game_builder.py",
+    REPO_ROOT / "backend" / "routes" / "game_command_agents.py",
+    REPO_ROOT / "backend" / "routes" / "creator_economy.py",
+    REPO_ROOT / "backend" / "routes" / "snowball.py",
+    REPO_ROOT / "backend" / "routes" / "nexus.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_studio.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_cns.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_runtime.py",
+    REPO_ROOT / "backend" / "routes" / "apk_inspector.py",
+    REPO_ROOT / "backend" / "routes" / "llm_router.py",
+    REPO_ROOT / "backend" / "routes" / "expo_flaps.py",
+    REPO_ROOT / "backend" / "routes" / "godot_engine.py",
+    REPO_ROOT / "backend" / "services" / "game_llm_service.py",
+    REPO_ROOT / "backend" / "services" / "ai_hub_svc.py",
+    REPO_ROOT / "backend" / "services" / "tool_registry.py",
+    REPO_ROOT / "backend" / "core" / "narrative_vault.py",
+    REPO_ROOT / "backend" / "core" / "provenance_ledger.py",
+    REPO_ROOT / "backend" / "core" / "autonomous_orchestrator.py",
+    REPO_ROOT / "backend" / "core" / "runtime_health.py",
+    REPO_ROOT / "backend" / "core" / "control_plane.py",
+    REPO_ROOT / "backend" / "core" / "feature_flags_audit.py",
+    REPO_ROOT / "backend" / "core" / "feature_flags_metrics.py",
+    REPO_ROOT / "backend" / "core" / "unbulk.py",
+    REPO_ROOT / "backend" / "core" / "mongo_guard.py",
+    REPO_ROOT / "backend" / "core" / "churn_2_service.py",
+    REPO_ROOT / "backend" / "core" / "scheduler.py",
+    REPO_ROOT / "backend" / "gameforge" / "rooms" / "room_api_gateway.py",
+    REPO_ROOT / "backend" / "gameforge" / "knowledge" / "free_apis.py",
+    REPO_ROOT / "backend" / "gameforge" / "omega" / "integration.py",
+    REPO_ROOT / "backend" / "gameforge" / "jeeves" / "jeeves_self_training.py",
+    REPO_ROOT / "backend" / "gameforge" / "api" / "control.py",
+    REPO_ROOT / "backend" / "gameforge" / "api" / "scim.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "binary.py",
+    REPO_ROOT / "backend" / "core" / "boot_stages.py",
+    REPO_ROOT / "backend" / "core" / "routes_registry.py",
+    REPO_ROOT / "backend" / "core" / "truth_watch.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "health.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "backup.py",
+    REPO_ROOT / "backend" / "gameforge" / "exocortex" / "neuro_layers.py",
+    REPO_ROOT / "backend" / "gameforge" / "prood" / "saga_orchestrator.py",
+    REPO_ROOT / "backend" / "gameforge" / "prood" / "event_bus.py",
+    REPO_ROOT / "backend" / "gameforge" / "persistence" / "chronoback.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_build.py",
+    REPO_ROOT / "backend" / "core" / "idle_curiosity_runtime.py",
+    REPO_ROOT / "backend" / "gameforge" / "godot_engine" / "pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_persona.py",
+    REPO_ROOT / "backend" / "routes" / "playable_derive.py",
+    REPO_ROOT / "backend" / "core" / "reliability.py",
+    REPO_ROOT / "backend" / "core" / "cold_storage.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "backup_scheduler.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_media.py",
+    REPO_ROOT / "backend" / "routes" / "final_build.py",
+    REPO_ROOT / "backend" / "core" / "swarm_scheduler.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_agents.py",
+    REPO_ROOT / "backend" / "routes" / "pipeline_agents.py",
+    REPO_ROOT / "backend" / "routes" / "code_intelligence.py",
+    REPO_ROOT / "backend" / "routes" / "collaboration.py",
+    REPO_ROOT / "backend" / "routes" / "ai_toolkit_enhanced.py",
+    REPO_ROOT / "backend" / "core" / "text_gamefile.py",
+    REPO_ROOT / "backend" / "core" / "observability.py",
+    REPO_ROOT / "backend" / "services" / "jeeves_consultant.py",
+    REPO_ROOT / "backend" / "gameforge" / "runtime" / "agent_runtime.py",
+    REPO_ROOT / "backend" / "gameforge" / "exocortex" / "quality.py",
+    REPO_ROOT / "backend" / "gameforge" / "personal" / "synergy" / "coherence.py",
+    REPO_ROOT / "backend" / "gameforge" / "enterprise" / "zaibatsu_security.py",
+    REPO_ROOT / "backend" / "gameforge" / "personal" / "synergy" / "reliability.py",
+    REPO_ROOT / "backend" / "core" / "product_control_plane.py",
+    REPO_ROOT / "backend" / "gameforge" / "bootstrap" / "begin_cns_activation.py",
 ]
+SERVER = REPO_ROOT / "backend" / "server.py"
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
 
@@ -183,11 +253,109 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     assert '"error": str(e)' not in source
     assert '"message": str(e)' not in source
+    assert '"detail": str(e)' not in source
     assert "persist failed: {e}" not in source
     assert "APK toolchain unavailable:" not in source
     assert "Failed to load build:" not in source
     assert "Failed to launch build task:" not in source
     assert "curiosity research unavailable:" not in source
+    assert "type(e).__name__}: {e}" not in source
+    assert 'f"stripe error:' not in source
+    assert "all models failed:" not in source
+    assert "persist_failed: {e}" not in source
+    assert "probe_crashed:" not in source
+    assert "engine run error:" not in source
+    assert "manifest_corrupt:" not in source
+    assert "type(exc).__name__}: {exc}" not in source
+    assert '"error": str(r)' not in source
+    assert '"error": str(ex)' not in source
+    assert '"error": str(error)' not in source
+    assert "self.last_error = str(e)" not in source
+    assert '"error": str(e)[:300]' not in source
+    assert '"error":       str(e)[:200]' not in source
+    assert "Agent temporarily unavailable:" not in source
+    assert "output pending —" not in source
+    assert 'f"Error: {str(e)}"' not in source
+    assert 'f"AI Error: {str(e)}"' not in source
+    assert "unreachable: {last_err}" not in source
+    assert 'res["error"] = str(e)' not in source
+    assert "err=str(e)[:300]" not in source
+    assert '_cp_err"] = str(e)' not in source
+    assert "work.error = str(e)" not in source
+    assert "last_error = str(e)" not in source
+    assert "worker-fallback:" not in source
+    assert "gaps=[str(e)]" not in source
+    assert "errors.append(str(e))" not in source
+    assert "data, [str(e)]" not in source
+    assert 'error=str(e)' not in source
+    assert "TriggerError(TriggerErrorCode.UNKNOWN, msg" not in source
+    assert '"error": str(exc)' not in source
+    assert 'f"ZIP extract failed: {pe}"' not in source
+    assert "vault injection soft-failed:" not in source
+    assert 'f"room_engine: {e}"' not in source
+
+
+
+def test_json_envelopes_do_not_expose_upstream_response_bodies() -> None:
+    source = (REPO_ROOT / "backend" / "routes" / "game_command_agents.py").read_text(encoding="utf-8")
+    assert "response.text" not in source
+    assert "Image generation unavailable (" not in source
+
+
+
+def test_holodeck_render_redacts_non_200_provider_body(monkeypatch) -> None:
+    import types
+    import routes.game_command_agents as command_agents
+
+    image_generation = types.ModuleType("routes.image_generation")
+
+    async def no_primary_image(_prompt: str) -> dict:
+        return {"images": []}
+
+    image_generation.generate_with_gemini = no_primary_image
+    monkeypatch.setitem(sys.modules, "routes.image_generation", image_generation)
+    monkeypatch.setattr(command_agents, "XAI_API_KEY", "test-key")
+
+    class FakeResponse:
+        status_code = 429
+        text = f"provider diagnostic: {_PRIVATE}"
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(command_agents.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient())
+
+    result = asyncio.run(command_agents.generate_holodeck_render("team", "output", "game"))
+
+    assert result["success"] is False
+    assert result["error"] == "image_render_failed"
+    assert _PRIVATE not in str(result)
+
+
+def test_holodeck_render_missing_provider_key_uses_same_stable_code(monkeypatch) -> None:
+    import types
+    import routes.game_command_agents as command_agents
+
+    image_generation = types.ModuleType("routes.image_generation")
+
+    async def no_primary_image(_prompt: str) -> dict:
+        return {"images": []}
+
+    image_generation.generate_with_gemini = no_primary_image
+    monkeypatch.setitem(sys.modules, "routes.image_generation", image_generation)
+    monkeypatch.setattr(command_agents, "XAI_API_KEY", "")
+
+    result = asyncio.run(command_agents.generate_holodeck_render("team", "output", "game"))
+
+    assert result["success"] is False
+    assert result["error"] == "image_render_failed"
 
 
 def test_internal_http_error_is_stable_and_typed() -> None:
@@ -235,3 +403,16 @@ def test_redact_client_payload_is_bounded() -> None:
     assert redacted["token"] == "[REDACTED]"
     assert redacted["nested"]["password"] == "[REDACTED]"
     assert redacted["nested"]["ok"] == "fine"
+
+
+def test_server_health_envelopes_do_not_stringify_exceptions() -> None:
+    source = SERVER.read_text(encoding="utf-8")
+    assert 'return {"error": str(e)}' not in source
+    assert '"error": str(e)[:200]' not in source
+    assert "index_audit_failed" in source
+    assert "probe_failed" in source
+    assert "analysis_failed" in source
+    assert "boot_task_failed" in source
+    assert "execution_failed" in source
+    assert 'entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"' not in source
+    assert "result.error = str(e)" not in source

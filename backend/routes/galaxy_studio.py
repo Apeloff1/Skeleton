@@ -795,9 +795,9 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
                     break
             except Exception as e:
                 import traceback, time as _time
-                last_error = str(e)
+                last_error = "phase_failed"
                 traceback.print_exc()
-                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {last_error}")
+                print(f"[GALAXY] Batch {batch_num} phase '{phase_id}' attempt {attempt}/{MAX_RETRIES} failed: {type(e).__name__}")
                 if attempt < MAX_RETRIES:
                     backoff = 0.5 * (2 ** (attempt - 1))
                     _time.sleep(backoff)
@@ -1286,8 +1286,8 @@ Before any narrative payload is written to disk, the Playwright sub-swarm must:
             ])
             out["docs/STYLE_MANIFEST.md"] = "\n".join(sm_lines) + "\n"
 
-    except Exception as _e:
-        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection soft-failed: {_e})\n"
+    except Exception:
+        out["docs/NARRATIVE_VAULT_BIBLE.md"] = f"# {title} — Narrative Vault\n\n(vault injection unavailable)\n"
     return out
 
 
@@ -1451,9 +1451,9 @@ def _gen_game_knowledge_docs(build: dict, title: str, genre: str) -> dict:
             }
         except Exception:
             pass
-    except Exception as _e:
+    except Exception:
         out["docs/GAME_KNOWLEDGE_VAULT.md"] = (
-            f"# {title} — Game Knowledge Vault\n\n(vault injection soft-failed: {_e})\n"
+            f"# {title} — Game Knowledge Vault\n\n(vault injection unavailable)\n"
         )
     return out
 
@@ -2421,7 +2421,7 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
         with _worker_lock:
             _worker_stats["total_completed"] += 1
         return (batch_num, files, None)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
         with _worker_lock:
@@ -2434,11 +2434,11 @@ def _safe_generate_batch(build_id: str, batch_num: int) -> tuple:
                 build.get("title", "game"),
                 build.get("genre", "rpg"),
                 f"batch_{batch_num}",
-                f"worker-fallback: {str(e)[:120]}",
+                "batch_failed",
             ) or {}
-            return (batch_num, fb, str(e)[:200])
+            return (batch_num, fb, "batch_failed")
         except Exception:
-            return (batch_num, {}, str(e)[:200])
+            return (batch_num, {}, "batch_failed")
     finally:
         with _worker_lock:
             _worker_stats["active"] = max(0, _worker_stats["active"] - 1)
@@ -5119,7 +5119,8 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
         subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d)) and d not in {".", ".."}]
         actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
     except Exception as pe:
-        return {"build_id": build_id, "status": "package_error", "message": f"ZIP extract failed: {pe}"}
+        print(f"[GALAXY] ZIP extract failed: {type(pe).__name__}", flush=True)
+        return {"build_id": build_id, "status": "package_error", "message": "zip_extract_failed"}
 
     env = _os.environ.copy()
     env["EXPO_TOKEN"] = token
