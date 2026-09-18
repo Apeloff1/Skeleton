@@ -13,6 +13,8 @@ from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnosti
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttempt,
     AIExecutionAttemptStore,
+    AttemptTrackingExecutionBackend,
+    ExecutionAttemptState,
 )
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_fence import (
@@ -575,6 +577,8 @@ class AIShellService:
             human_approved=human_approved,
             quorum_approved=bool(quorum_digest),
         )
+        attempt: AIExecutionAttempt | None = None
+        tracking_backend: AttemptTrackingExecutionBackend | None = None
         try:
             use = seal_registry.consume(
                 seal,
@@ -586,6 +590,33 @@ class AIShellService:
                 release_evidence_digest=self._release_digest(),
                 assurance_digest=assurance_digest,
             )
+            if self.execution_attempts is not None:
+                active_backend = (
+                    execution_backend or self.orchestrator.execution_backend
+                )
+                stored_attempt = self.execution_attempts.reserve(
+                    attempt_id=seal.seal_id,
+                    session_id=session.session_id,
+                    principal=context.principal,
+                    worker_id=self.worker_id,
+                    plan_fingerprint=review.compiled.plan.fingerprint,
+                    execution_seal_id=seal.seal_id,
+                    execution_fence_digest=execution_fence_digest,
+                    fencing_token=(
+                        None
+                        if execution_fence is None
+                        else execution_fence.lease.fencing_token
+                    ),
+                    runtime_trust_digest=self._runtime_trust_digest(),
+                    release_evidence_digest=self._release_digest(),
+                    execution_backend_id=active_backend.backend_id,
+                )
+                attempt = stored_attempt.attempt
+                tracking_backend = AttemptTrackingExecutionBackend(
+                    self.execution_attempts,
+                    attempt,
+                    active_backend,
+                )
             if quorum_approval is not None:
                 if self.approval_quorum is None:
                     raise RuntimeError("quorum approval store is not configured")
@@ -602,7 +633,11 @@ class AIShellService:
                 review,
                 context=context,
                 approval=approval,
-                execution_backend=execution_backend,
+                execution_backend=(
+                    tracking_backend
+                    if tracking_backend is not None
+                    else execution_backend
+                ),
                 sealed=True,
                 execution_fenced=bool(execution_fence_digest),
                 preconditions_verified=(
@@ -612,7 +647,43 @@ class AIShellService:
                 human_approved=human_approved,
                 quorum_approved=bool(quorum_digest),
             )
+            if tracking_backend is not None:
+                attempt = tracking_backend.attempt
+                if result.ok:
+                    self.execution_attempts.succeed(
+                        attempt,
+                        terminal_evidence_digest=result.provenance.digest,
+                    )
+                else:
+                    self.execution_attempts.fail(
+                        attempt,
+                        error_type="ExecutionOrVerificationFailed",
+                        terminal_evidence_digest=result.provenance.digest,
+                    )
             return result, precondition_report, use
+        except BaseException as exc:
+            if self.execution_attempts is not None and attempt is not None:
+                try:
+                    current = self.execution_attempts.current(
+                        attempt.attempt_id
+                    )
+                    if current is not None:
+                        attempt = current.attempt
+                        if attempt.state is ExecutionAttemptState.AUTHORIZED:
+                            self.execution_attempts.abandon(attempt)
+                        elif (
+                            attempt.state
+                            is ExecutionAttemptState.BOUNDARY_ENTERED
+                        ):
+                            self.execution_attempts.fail(
+                                attempt,
+                                error_type=type(exc).__name__,
+                            )
+                except Exception as ledger_exc:
+                    raise RuntimeError(
+                        "AI execution attempt ledger terminal write failed"
+                    ) from ledger_exc
+            raise
         finally:
             if execution_fence is not None and self.execution_fences is not None:
                 self.execution_fences.release(execution_fence)
@@ -660,6 +731,10 @@ class AIShellService:
         if self.execution_fences is not None:
             raise RuntimeError(
                 "configured distributed execution fencing requires execute_sealed"
+            )
+        if self.execution_attempts is not None:
+            raise RuntimeError(
+                "configured execution attempt ledger requires execute_sealed"
             )
         human_approved = self._validate_human_approval(
             session,
