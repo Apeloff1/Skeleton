@@ -179,6 +179,83 @@ def test_bridge_trial_rejects_post_outcome_prediction() -> None:
         )
 
 
+def test_outcome_requires_prediction_in_ledger() -> None:
+    _, _, candidate, lab = _system()
+    prediction = TopologyBridgePrediction(
+        prediction_id="bridge-prediction:undeclared",
+        candidate_id=candidate.candidate_id,
+        candidate_fingerprint=lab.candidate_fingerprint(candidate),
+        left_key=candidate.left_key,
+        right_key=candidate.right_key,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.8,
+        domain="film",
+        independent_run="run-undeclared",
+        predicted_at=10.0,
+    )
+    trial = TopologyBridgeTrial.from_prediction(
+        prediction,
+        trial_id="bridge-trial:undeclared",
+        outcome=True,
+        observed_at=11.0,
+    )
+
+    with pytest.raises(
+        AgentContractError,
+        match="must be declared before outcome",
+    ):
+        lab.record(trial)
+
+
+def test_prediction_resolution_is_single_assignment_and_idempotent() -> None:
+    _, _, candidate, lab = _system()
+    prediction = TopologyBridgePrediction(
+        prediction_id="bridge-prediction:single",
+        candidate_id=candidate.candidate_id,
+        candidate_fingerprint=lab.candidate_fingerprint(candidate),
+        left_key=candidate.left_key,
+        right_key=candidate.right_key,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.8,
+        domain="film",
+        independent_run="run-single",
+        predicted_at=10.0,
+    )
+    lab.declare(prediction)
+
+    pending = lab.snapshot()
+    assert pending.prediction_count == 1
+    assert pending.unresolved_prediction_count == 1
+    assert pending.trial_count == 0
+
+    first = lab.resolve(
+        prediction.prediction_id,
+        outcome=True,
+        observed_at=11.0,
+    )
+    same = lab.resolve(
+        prediction.prediction_id,
+        outcome=True,
+        observed_at=11.0,
+    )
+    assert same.fingerprint == first.fingerprint
+
+    resolved = lab.snapshot()
+    assert resolved.prediction_count == 1
+    assert resolved.unresolved_prediction_count == 0
+    assert resolved.trial_count == 1
+
+    with pytest.raises(
+        AgentContractError,
+        match="reused differently",
+    ):
+        lab.resolve(
+            prediction.prediction_id,
+            outcome=False,
+            observed_at=11.0,
+        )
+
+
 def test_replicated_bridge_promotes_to_active_learned_rule() -> None:
     _, _, candidate, lab = _system()
     _promote(lab, candidate)
@@ -496,9 +573,13 @@ def test_topology_learning_summary_preserves_epistemic_boundaries() -> None:
 
     summary = plane.topology_learning_summary()
 
+    assert summary["prediction_count"] == 6
+    assert summary["unresolved_prediction_count"] == 0
     assert summary["trial_count"] == 6
     assert summary["tested_bridge_count"] == 1
     assert summary["learned_rule_keys"]
     assert summary["invariants"]["cue_overlap_never_auto_promotes"] is True
+    assert summary["invariants"]["outcomes_require_predeclared_predictions"] is True
+    assert summary["invariants"]["each_prediction_resolves_at_most_once"] is True
     assert summary["invariants"]["negative_controls_are_required"] is True
     assert summary["invariants"]["learned_bridges_never_create_evidence"] is True
