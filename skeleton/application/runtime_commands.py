@@ -68,6 +68,12 @@ _CAPABILITY_VIEW_FLAGS = (
     "live_hmac_audit",
     "nested_audit",
     "env_audit",
+    "view_audit",
+    "idempotency_audit",
+    "seal_audit",
+    "admit_audit",
+    "limit_audit",
+    "shared_audit",
 )
 
 
@@ -103,6 +109,30 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["shared_audit"]:
+            from .cli_shared_audit import cli_shared_audit_snapshot, get_cli_shared_audit_row
+
+            return _lookup_row(payload, "command_id", get_cli_shared_audit_row, cli_shared_audit_snapshot)
+        if flags["limit_audit"]:
+            from .gate_limit_audit import gate_limit_audit_snapshot, get_gate_limit_audit_row
+
+            return _lookup_row(payload, "flag_id", get_gate_limit_audit_row, gate_limit_audit_snapshot)
+        if flags["admit_audit"]:
+            from .admit_write_audit import admit_write_audit_snapshot, get_admit_write_audit_row
+
+            return _lookup_row(payload, "method_id", get_admit_write_audit_row, admit_write_audit_snapshot)
+        if flags["seal_audit"]:
+            from .seal_audit import get_seal_audit_row, seal_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_seal_audit_row, seal_audit_snapshot)
+        if flags["idempotency_audit"]:
+            from .idempotency_audit import get_idempotency_audit_row, idempotency_audit_snapshot
+
+            return _lookup_row(payload, "handler_id", get_idempotency_audit_row, idempotency_audit_snapshot)
+        if flags["view_audit"]:
+            from .capability_view_audit import capability_view_audit_snapshot, get_capability_view_audit_row
+
+            return _lookup_row(payload, "flag_id", get_capability_view_audit_row, capability_view_audit_snapshot)
         if flags["env_audit"]:
             from .env_flag_audit import env_flag_audit_snapshot, get_env_flag_audit_row
 

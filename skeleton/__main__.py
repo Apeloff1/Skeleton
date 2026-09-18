@@ -34,6 +34,12 @@ Commands:
                 Use `capabilities --live-hmac-audit` for HMAC prefixes vs live handlers
                 Use `capabilities --nested-audit` for nested include_router mounts
                 Use `capabilities --env-audit` for SKELETON_OWN / HMAC env flags
+                Use `capabilities --view-audit` for capability-view flag inventory
+                Use `capabilities --idempotency-audit` for IdempotencyGuard handlers
+                Use `capabilities --seal-audit` for live require_seal versus HMAC open
+                Use `capabilities --admit-audit` for WriteAdmit mutating methods
+                Use `capabilities --limit-audit` for SKELETON_GATE_* body/header limits
+                Use `capabilities --shared-audit` for status/config shared-command mapping
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -76,6 +82,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         live_hmac_audit_snapshot,
         nested_router_audit_snapshot,
         env_flag_audit_snapshot,
+        capability_view_audit_snapshot,
+        idempotency_audit_snapshot,
+        seal_audit_snapshot,
+        admit_write_audit_snapshot,
+        gate_limit_audit_snapshot,
+        cli_shared_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -99,6 +111,12 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "live_hmac_audit": {"--live-hmac-audit", "live-hmac-audit", "--live_hmac_audit", "live_hmac_audit"},
         "nested_audit": {"--nested-audit", "nested-audit", "--nested_audit", "nested_audit"},
         "env_audit": {"--env-audit", "env-audit", "--env_audit", "env_audit"},
+        "view_audit": {"--view-audit", "view-audit", "--view_audit", "view_audit"},
+        "idempotency_audit": {"--idempotency-audit", "idempotency-audit", "--idempotency_audit", "idempotency_audit"},
+        "seal_audit": {"--seal-audit", "seal-audit", "--seal_audit", "seal_audit"},
+        "admit_audit": {"--admit-audit", "admit-audit", "--admit_audit", "admit_audit"},
+        "limit_audit": {"--limit-audit", "limit-audit", "--limit_audit", "limit_audit"},
+        "shared_audit": {"--shared-audit", "shared-audit", "--shared_audit", "shared_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -110,7 +128,19 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "env_audit":
+    if view == "shared_audit":
+        payload = cli_shared_audit_snapshot()
+    elif view == "limit_audit":
+        payload = gate_limit_audit_snapshot()
+    elif view == "admit_audit":
+        payload = admit_write_audit_snapshot()
+    elif view == "seal_audit":
+        payload = seal_audit_snapshot()
+    elif view == "idempotency_audit":
+        payload = idempotency_audit_snapshot()
+    elif view == "view_audit":
+        payload = capability_view_audit_snapshot()
+    elif view == "env_audit":
         payload = env_flag_audit_snapshot()
     elif view == "nested_audit":
         payload = nested_router_audit_snapshot()

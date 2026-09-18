@@ -357,3 +357,57 @@ def test_http_game_logic_curve_allow_list_fail_closed() -> None:
         asyncio.run(routes.pipeline_game_logic({"description": "d", "curve": True}, _HttpState()))
 
 
+def test_http_forge_component_and_wire_items_fail_closed() -> None:
+    from skeleton.api import routes
+
+    class _Blueprint:
+        blueprint_id = "bp-1"
+
+        def connect(self, src, dst):
+            self.src = src
+            self.dst = dst
+
+        def validate(self):
+            return []
+
+    class _Forge:
+        def new_blueprint(self, name):
+            self.name = name
+            self.bp = _Blueprint()
+            return self.bp
+
+        def instantiate(self, bp, kind, instance_id, config=None):
+            self.kind = kind
+            self.instance_id = instance_id
+            self.config = config
+
+    class _HttpState:
+        forge = _Forge()
+
+    body = asyncio.run(
+        routes.forge_blueprint(
+            {
+                "name": "room",
+                "components": [{"kind": "room", "instance_id": "r1", "config": {"hp": 1}}],
+                "wires": [{"from": ["r1", "out"], "to": ["r2", "in"]}],
+            },
+            _HttpState(),
+        )
+    )
+    assert body["status"] == "created"
+    with pytest.raises(HTTPException) as bad_comp:
+        asyncio.run(routes.forge_blueprint({"components": ["room"]}, _HttpState()))
+    assert bad_comp.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.forge_blueprint({"components": [{"kind": 1, "instance_id": "r1"}]}, _HttpState()))
+    with pytest.raises(HTTPException):
+        asyncio.run(
+            routes.forge_blueprint(
+                {"components": [{"kind": "room", "instance_id": "r1", "config": []}]},
+                _HttpState(),
+            )
+        )
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.forge_blueprint({"wires": [{"from": "ab", "to": ["x", "y"]}]}, _HttpState()))
+
+

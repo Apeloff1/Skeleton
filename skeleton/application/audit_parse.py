@@ -287,6 +287,8 @@ def main_router_handlers() -> list[dict[str, object]]:
                     "path": full_path,
                     "handler": node.name,
                     "charter_gated": _charter_gated(node),
+                    "seal_gated": _depends_named(node, "require_seal"),
+                    "calls_seal": _calls_named(node, "require_seal"),
                 }
             )
     return rows
@@ -397,6 +399,13 @@ def _is_named_ref(node: ast.AST, name: str) -> bool:
     return _is_named_call(node, name)
 
 
+def _calls_named(fn: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> bool:
+    for child in ast.walk(fn):
+        if child is not fn and _is_named_call(child, name):
+            return True
+    return False
+
+
 def _depends_named(fn: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> bool:
     defaults = list(fn.args.defaults) + [item for item in fn.args.kw_defaults if item is not None]
     for default in defaults:
@@ -459,6 +468,7 @@ def module_router_handlers(
                     "source": source or module.rsplit(".", 1)[-1],
                     "charter_gated": _depends_named(node, "require_charter"),
                     "seal_gated": _depends_named(node, "require_seal"),
+                    "calls_seal": _calls_named(node, "require_seal"),
                 }
             )
     return rows
@@ -759,6 +769,7 @@ def cortex_route_handlers() -> list[dict[str, object]]:
                         "source": "cortex",
                         "charter_gated": _depends_named(child, "require_charter"),
                         "seal_gated": _depends_named(child, "require_seal"),
+                        "calls_seal": _calls_named(child, "require_seal"),
                     }
                 )
         break
@@ -926,6 +937,7 @@ def create_app_inline_handlers() -> list[dict[str, object]]:
                         "source": "create_app",
                         "charter_gated": _depends_named(child, "require_charter"),
                         "seal_gated": _depends_named(child, "require_seal"),
+                        "calls_seal": _calls_named(child, "require_seal"),
                     }
                 )
         break
@@ -1160,6 +1172,9 @@ def live_handler_rows() -> list[dict[str, object]]:
                     "handler": row.get("handler", ""),
                     "source": row.get("source", source),
                     "surface": source,
+                    "charter_gated": bool(row.get("charter_gated", False)),
+                    "seal_gated": bool(row.get("seal_gated", False)),
+                    "calls_seal": bool(row.get("calls_seal", False)),
                 }
             )
     return rows
@@ -1279,3 +1294,226 @@ def audited_environ_flags() -> list[dict[str, object]]:
             seen.add(name)
             rows.append({"name": name, "module": module})
     return rows
+
+
+def literal_str_collection(node: ast.AST | None) -> list[str]:
+    if node is None:
+        return []
+    if isinstance(node, ast.Call) and node.args:
+        func = node.func
+        name = ""
+        if isinstance(func, ast.Name):
+            name = func.id
+        elif isinstance(func, ast.Attribute):
+            name = func.attr
+        if name in {"frozenset", "set", "tuple", "list"}:
+            return literal_str_collection(node.args[0])
+    if isinstance(node, ast.Set):
+        return [
+            element.value
+            for element in node.elts
+            if isinstance(element, ast.Constant) and isinstance(element.value, str)
+        ]
+    return literal_str_list(node)
+
+
+def class_assigned_str_collection(module: str, class_name: str, attr: str) -> list[str]:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or node.name != class_name:
+            continue
+        for child in node.body:
+            value: ast.AST | None = None
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name) and target.id == attr:
+                        value = child.value
+            elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and child.target.id == attr:
+                value = child.value
+            if value is not None:
+                return literal_str_collection(value)
+        break
+    return []
+
+
+def runtime_capability_view_flags() -> list[str]:
+    return assigned_str_tuple(parse_module_tree("skeleton.application.runtime_commands"), "_CAPABILITY_VIEW_FLAGS")
+
+
+def main_cli_capability_alias_flags() -> list[str]:
+    tree = parse_module_tree("skeleton.__main__")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "_cmd_capabilities":
+            continue
+        for child in node.body:
+            value: ast.AST | None = None
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name) and target.id == "aliases":
+                        value = child.value
+            if not isinstance(value, ast.Dict):
+                continue
+            names: list[str] = []
+            for key in value.keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    names.append(key.value)
+            return names
+        break
+    return []
+
+
+def main_cli_capability_help_flags() -> list[str]:
+    tree = parse_module_tree("skeleton.__main__")
+    if tree is None:
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for line in (ast.get_docstring(tree) or "").splitlines():
+        if "capabilities" not in line or "--" not in line:
+            continue
+        for token in line.replace("`", " ").split():
+            if not token.startswith("--"):
+                continue
+            name = token[2:].replace("-", "_")
+            if name and name not in seen:
+                seen.add(name)
+                names.append(name)
+    return names
+
+
+def _idempotency_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool, bool]:
+    replay = False
+    remember = False
+    for child in ast.walk(fn):
+        if not isinstance(child, ast.Call) or not isinstance(child.func, ast.Attribute):
+            continue
+        receiver = child.func.value
+        if not isinstance(receiver, ast.Name) or receiver.id != "_idempotency":
+            continue
+        if child.func.attr == "replay":
+            replay = True
+        elif child.func.attr == "remember":
+            remember = True
+    return replay, remember
+
+
+def idempotency_handler_rows() -> list[dict[str, object]]:
+    modules = (
+        ("skeleton.api.routes", "/api/v1"),
+        ("skeleton.api.gameforge_routes", "/api/v1"),
+    )
+    rows: list[dict[str, object]] = []
+    for module, prefix in modules:
+        tree = parse_module_tree(module)
+        if tree is None or not isinstance(tree, ast.Module):
+            continue
+        for node in tree.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            replay, remember = _idempotency_attrs(node)
+            if not replay and not remember:
+                continue
+            for decorator in node.decorator_list:
+                parsed = _decorator_route(decorator)
+                if parsed is None:
+                    continue
+                method, path = parsed
+                full_path = path if path.startswith(_API_PREFIX) else join_url_paths(prefix, path)
+                rows.append(
+                    {
+                        "key": f"{module}:{node.name}",
+                        "module": module,
+                        "handler": node.name,
+                        "method": method,
+                        "path": full_path,
+                        "replay": replay,
+                        "remember": remember,
+                    }
+                )
+                break
+    return rows
+
+
+def write_admit_mutating_methods() -> list[str]:
+    return class_assigned_str_collection("skeleton.api.admit_write", "WriteAdmitMiddleware", "_MUTATING")
+
+
+AUDITED_GATE_LIMIT_MODULES = (
+    "skeleton.api.request_bounds",
+    "skeleton.api.middleware",
+)
+
+
+def audited_gate_limit_flags() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for module in AUDITED_GATE_LIMIT_MODULES:
+        tree = parse_module_tree(module)
+        names = list(environ_flag_names(module))
+        if tree is not None:
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not node.args or not _is_named_call(node, "_positive_limit"):
+                    continue
+                arg = node.args[0]
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    names.append(arg.value)
+        for name in names:
+            if not name.startswith("SKELETON_GATE_") or name in seen:
+                continue
+            seen.add(name)
+            rows.append({"name": name, "module": module})
+    return rows
+
+
+def main_cli_shared_command_map() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.__main__")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "main":
+            continue
+        for child in node.body:
+            if not isinstance(child, ast.If):
+                continue
+            cli_names = _cmd_compare_values(child.test) if isinstance(child.test, ast.Compare) else []
+            spec = ""
+            dispatcher = False
+            found = False
+            for stmt in child.body:
+                call = stmt.value if isinstance(stmt, ast.Return) else None
+                if not isinstance(call, ast.Call) or not call.args:
+                    continue
+                func = call.func
+                if not isinstance(func, ast.Name) or func.id != "_cmd_shared_command":
+                    continue
+                found = True
+                arg = call.args[0]
+                if isinstance(arg, ast.Name) and arg.id == "rest":
+                    dispatcher = True
+                elif isinstance(arg, (ast.List, ast.Tuple)) and arg.elts:
+                    first = arg.elts[0]
+                    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                        spec = first.value
+                break
+            if not found:
+                continue
+            for name in cli_names:
+                if name in seen:
+                    continue
+                seen.add(name)
+                rows.append(
+                    {
+                        "cli": name,
+                        "spec": spec,
+                        "dispatcher": dispatcher,
+                    }
+                )
+        break
+    return rows
+

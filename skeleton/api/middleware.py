@@ -298,13 +298,13 @@ class BodyBoundMiddleware:
 
     def __init__(self, app, *, max_body_bytes: Optional[int] = None) -> None:
         self.app = app
-        env = os.environ.get("SKELETON_GATE_MAX_BODY_BYTES")
-        configured = int(env) if env else (
-            max_body_bytes if max_body_bytes is not None else _DEFAULT_MAX_BODY
+        from skeleton.api.request_bounds import _positive_limit
+
+        self.max_body = _positive_limit(
+            "SKELETON_GATE_MAX_BODY_BYTES",
+            max_body_bytes,
+            _DEFAULT_MAX_BODY,
         )
-        if configured <= 0:
-            raise ValueError("max body size must be positive")
-        self.max_body = configured
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":

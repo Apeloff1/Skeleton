@@ -4,6 +4,30 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-44..F-51 forge item types, body limits, and gate/CLI audits
+
+- Forge HTTP component/wire items use `require_mapping` plus `require_text` for
+  `kind`/`instance_id`. Optional `config` is an object; `from`/`to` are string
+  arrays so `"ab"` no longer becomes `("a", "b")`.
+- `BodyBoundMiddleware` rejects bool/float constructor stand-ins via the same
+  `_positive_limit` primitive as header bounds.
+- Additive `capability_view_audit` locks runtime view flags against CLI aliases
+  and help text with zero drift.
+- Additive `idempotency_audit` locks the five replay/remember pairs on main
+  forge/GameForge plus the sidecar GameForge run handler.
+- Additive `seal_audit` reports live-union `Depends(require_seal)` as empty
+  (main charter handlers win the path), sidecar `gameforge_run` as the explicit
+  Depends site, and command execute as the in-body `require_seal` call.
+  HMAC-open routes stay unsealed.
+- Additive `admit_write_audit` locks WriteAdmit mutating methods. PATCH has no
+  live handler; POST/PUT/DELETE do.
+- Additive `gate_limit_audit` lists `SKELETON_GATE_MAX_HEADER_BYTES`,
+  `HEADER_COUNT`, and `BODY_BYTES` without reopening the F-43 env-flag names.
+- Additive `cli_shared_audit` locks `config` → `configuration` and the generic
+  `command` dispatcher.
+- Identical payloads through matching CLI flags, HTTP audit routes, and the
+  shared `capabilities` command. Combined views fail closed.
+
 ## 2026-09-18 — F-36..F-43 sidecar intake, curves, and live-surface audits
 
 - Sidecar GameForge intake `answers` uses `require_mapping`; the whole request

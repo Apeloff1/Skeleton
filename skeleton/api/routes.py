@@ -580,6 +580,132 @@ async def application_env_flag_audit() -> Dict[str, Any]:
     return env_flag_audit_snapshot()
 
 
+@router.get("/application/views/audit/{flag_id}")
+async def application_capability_view_audit_row(flag_id: str) -> Dict[str, Any]:
+    """Return one capability-view flag audit row by flag name."""
+    from skeleton.application import get_capability_view_audit_row
+
+    try:
+        return get_capability_view_audit_row(flag_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/views/audit")
+async def application_capability_view_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --view-audit``."""
+    from skeleton.application import capability_view_audit_snapshot
+
+    return capability_view_audit_snapshot()
+
+
+@router.get("/application/idempotency/audit/{handler_id:path}")
+async def application_idempotency_audit_row(handler_id: str) -> Dict[str, Any]:
+    """Return one idempotency-audit row by module:handler key."""
+    from skeleton.application import get_idempotency_audit_row
+
+    try:
+        return get_idempotency_audit_row(handler_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/idempotency/audit")
+async def application_idempotency_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --idempotency-audit``."""
+    from skeleton.application import idempotency_audit_snapshot
+
+    return idempotency_audit_snapshot()
+
+
+@router.get("/application/seal/audit/{method}/{path:path}")
+async def application_seal_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one live-seal audit row by method and path."""
+    from skeleton.application import get_seal_audit_row
+
+    try:
+        return get_seal_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/seal/audit")
+async def application_seal_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --seal-audit``."""
+    from skeleton.application import seal_audit_snapshot
+
+    return seal_audit_snapshot()
+
+
+@router.get("/application/admit/audit/{method_id}")
+async def application_admit_write_audit_row(method_id: str) -> Dict[str, Any]:
+    """Return one write-admit audit row by HTTP method."""
+    from skeleton.application import get_admit_write_audit_row
+
+    try:
+        return get_admit_write_audit_row(method_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/admit/audit")
+async def application_admit_write_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --admit-audit``."""
+    from skeleton.application import admit_write_audit_snapshot
+
+    return admit_write_audit_snapshot()
+
+
+@router.get("/application/limits/audit/{flag_id}")
+async def application_gate_limit_audit_row(flag_id: str) -> Dict[str, Any]:
+    """Return one gate-limit audit row by environment variable name."""
+    from skeleton.application import get_gate_limit_audit_row
+
+    try:
+        return get_gate_limit_audit_row(flag_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/limits/audit")
+async def application_gate_limit_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --limit-audit``."""
+    from skeleton.application import gate_limit_audit_snapshot
+
+    return gate_limit_audit_snapshot()
+
+
+@router.get("/application/shared/audit/{command_id}")
+async def application_cli_shared_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one CLI shared-command mapping row by command name."""
+    from skeleton.application import get_cli_shared_audit_row
+
+    try:
+        return get_cli_shared_audit_row(command_id)
+    except KeyError as extra:
+        raise HTTPException(status_code=404, detail=str(extra)) from extra
+    except (TypeError, ValueError) as extra:
+        raise HTTPException(status_code=422, detail=str(extra)) from extra
+
+
+@router.get("/application/shared/audit")
+async def application_cli_shared_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --shared-audit``."""
+    from skeleton.application import cli_shared_audit_snapshot
+
+    return cli_shared_audit_snapshot()
+
+
 @router.get("/application/planes/audit/{plane_id}")
 async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
     """Return one F-15 plane audit row by stable ID."""
@@ -871,18 +997,32 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
     }
 
 
+def _item_mapping(item: Any, *, label: str) -> Dict[str, Any]:
+    return _mapping_field({label: item}, label, optional=False) or {}
+
+
+def _apply_forge_graph(forge: Any, bp: Any, request: Dict[str, Any]) -> None:
+    for comp in _list_field(request, "components", [], optional=False) or []:
+        item = _item_mapping(comp, label="components")
+        forge.instantiate(
+            bp,
+            _text_field(item, "kind", ""),
+            _text_field(item, "instance_id", ""),
+            config=_mapping_field(item, "config", {}, optional=True) or {},
+        )
+    for wire in _list_field(request, "wires", [], optional=False) or []:
+        item = _item_mapping(wire, label="wires")
+        bp.connect(
+            tuple(_list_field(item, "from", [], optional=False, item_type=str) or []),
+            tuple(_list_field(item, "to", [], optional=False, item_type=str) or []),
+        )
+
+
 @router.post("/forge/blueprint")
 async def forge_blueprint(request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "blueprint"))) -> Dict[str, Any]:
     forge = _require(state.forge, "Forge")
     bp = forge.new_blueprint(_text_field(request, "name", "unnamed"))
-    for comp in _list_field(request, "components", [], optional=False) or []:
-        if not isinstance(comp, dict):
-            raise HTTPException(status_code=422, detail="components items must be objects")
-        forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
-    for wire in _list_field(request, "wires", [], optional=False) or []:
-        if not isinstance(wire, dict):
-            raise HTTPException(status_code=422, detail="wires items must be objects")
-        bp.connect(tuple(wire["from"]), tuple(wire["to"]))
+    _apply_forge_graph(forge, bp, request)
     problems = bp.validate()
     return {"blueprint_id": bp.blueprint_id, "valid": not problems, "problems": problems, "status": "created"}
 
@@ -894,14 +1034,7 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         return replay  # type: ignore[return-value]
     forge = _require(state.forge, "Forge")
     bp = forge.new_blueprint(_text_field(request, "name", "unnamed"))
-    for comp in _list_field(request, "components", [], optional=False) or []:
-        if not isinstance(comp, dict):
-            raise HTTPException(status_code=422, detail="components items must be objects")
-        forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
-    for wire in _list_field(request, "wires", [], optional=False) or []:
-        if not isinstance(wire, dict):
-            raise HTTPException(status_code=422, detail="wires items must be objects")
-        bp.connect(tuple(wire["from"]), tuple(wire["to"]))
+    _apply_forge_graph(forge, bp, request)
     repair = _bool_field(request, "repair", False)
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
