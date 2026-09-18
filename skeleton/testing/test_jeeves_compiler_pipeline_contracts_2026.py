@@ -110,7 +110,7 @@ def test_declared_determinism_requires_explicit_replay_safety_before_execution()
     assert record.committed is False
     assert compiler_pass.calls == 0
     assert record.determinism_verified is False
-    assert record.analysis_contract["replay_safe"] == ("false",)
+    assert record.replay_safe_declared is False
     assert any(
         "replay_safe=True" in reason and "not executed" in reason
         for reason in record.rejected_reasons
