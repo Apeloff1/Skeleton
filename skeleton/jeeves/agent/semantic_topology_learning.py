@@ -487,7 +487,9 @@ class SemanticTopologyLearningLab:
             minimum_score=0.0,
         )
         self._candidates = {item.candidate_id: item for item in candidates}
+        self._predictions: dict[str, TopologyBridgePrediction] = {}
         self._trials: dict[str, TopologyBridgeTrial] = {}
+        self._resolved_predictions: dict[str, str] = {}
         self._lock = threading.RLock()
 
     @staticmethod
@@ -511,12 +513,94 @@ class SemanticTopologyLearningLab:
     def candidate(self, candidate_id: str) -> LensBridgeCandidate | None:
         return self._candidates.get(str(candidate_id).strip())
 
+    def _validate_prediction_candidate(
+        self,
+        prediction: TopologyBridgePrediction,
+    ) -> LensBridgeCandidate:
+        candidate = self._candidates.get(prediction.candidate_id)
+        if candidate is None:
+            raise AgentContractError(
+                "unknown semantic topology bridge candidate"
+            )
+        expected_fingerprint = self.candidate_fingerprint(candidate)
+        if prediction.candidate_fingerprint != expected_fingerprint:
+            raise AgentContractError(
+                "topology bridge candidate changed before prediction declaration"
+            )
+        if prediction.bridge_key != tuple(
+            sorted((candidate.left_key, candidate.right_key))
+        ):
+            raise AgentContractError(
+                "topology bridge prediction lens pair does not match candidate"
+            )
+        return candidate
+
+    def declare(
+        self,
+        prediction: TopologyBridgePrediction,
+    ) -> TopologyBridgePrediction:
+        """Persist an immutable bridge prediction before its outcome exists."""
+
+        if not isinstance(prediction, TopologyBridgePrediction):
+            raise TypeError(
+                "prediction must be TopologyBridgePrediction"
+            )
+        self._validate_prediction_candidate(prediction)
+        with self._lock:
+            existing = self._predictions.get(prediction.prediction_id)
+            if existing is not None:
+                if existing.fingerprint != prediction.fingerprint:
+                    raise AgentContractError(
+                        "topology bridge prediction id reused differently: "
+                        + prediction.prediction_id
+                    )
+                return existing
+            self._predictions[prediction.prediction_id] = prediction
+        return prediction
+
+    def prediction(
+        self,
+        prediction_id: str,
+    ) -> TopologyBridgePrediction | None:
+        with self._lock:
+            return self._predictions.get(str(prediction_id).strip())
+
+    @staticmethod
+    def _trial_matches_prediction(
+        trial: TopologyBridgeTrial,
+        prediction: TopologyBridgePrediction,
+    ) -> bool:
+        return (
+            trial.prediction_id == prediction.prediction_id
+            and trial.prediction_fingerprint == prediction.fingerprint
+            and trial.candidate_id == prediction.candidate_id
+            and trial.candidate_fingerprint
+            == prediction.candidate_fingerprint
+            and trial.bridge_key == prediction.bridge_key
+            and trial.kind is prediction.kind
+            and trial.predicted_probability
+            == prediction.predicted_probability
+            and trial.domain == prediction.domain
+            and trial.independent_run == prediction.independent_run
+            and trial.predicted_at == prediction.predicted_at
+            and trial.negative_control == prediction.negative_control
+            and trial.source_finding_ids
+            == prediction.source_finding_ids
+            and trial.source_forecast_ids
+            == prediction.source_forecast_ids
+            and trial.evidence_ids == prediction.evidence_ids
+        )
+
     def record(self, trial: TopologyBridgeTrial) -> TopologyBridgeTrial:
+        """Record a resolved trial only when its prediction was predeclared."""
+
         if not isinstance(trial, TopologyBridgeTrial):
             raise TypeError("trial must be TopologyBridgeTrial")
         candidate = self._candidates.get(trial.candidate_id)
         if candidate is None:
-            raise AgentContractError("unknown semantic topology bridge candidate")
+            raise AgentContractError(
+                "unknown semantic topology bridge candidate"
+            )
         expected_fingerprint = self.candidate_fingerprint(candidate)
         if trial.candidate_fingerprint != expected_fingerprint:
             raise AgentContractError(
@@ -528,16 +612,76 @@ class SemanticTopologyLearningLab:
             raise AgentContractError(
                 "topology bridge trial lens pair does not match candidate"
             )
+
         with self._lock:
+            prediction = self._predictions.get(trial.prediction_id)
+            if prediction is None:
+                raise AgentContractError(
+                    "topology bridge prediction must be declared before outcome"
+                )
+            if not self._trial_matches_prediction(trial, prediction):
+                raise AgentContractError(
+                    "topology bridge trial differs from declared prediction"
+                )
+
             existing = self._trials.get(trial.trial_id)
             if existing is not None:
                 if existing.fingerprint != trial.fingerprint:
                     raise AgentContractError(
-                        f"topology bridge trial id reused differently: {trial.trial_id}"
+                        "topology bridge trial id reused differently: "
+                        + trial.trial_id
                     )
                 return existing
+
+            prior_trial_id = self._resolved_predictions.get(
+                trial.prediction_id
+            )
+            if prior_trial_id is not None:
+                prior = self._trials[prior_trial_id]
+                if prior.fingerprint == trial.fingerprint:
+                    return prior
+                raise AgentContractError(
+                    "topology bridge prediction already resolved differently"
+                )
+
             self._trials[trial.trial_id] = trial
+            self._resolved_predictions[trial.prediction_id] = trial.trial_id
         return trial
+
+    def resolve(
+        self,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeTrial:
+        """Resolve a previously declared prediction exactly once."""
+
+        with self._lock:
+            prediction = self._predictions.get(str(prediction_id).strip())
+            if prediction is None:
+                raise AgentContractError(
+                    "unknown topology bridge prediction"
+                )
+            trial_id = stable_id(
+                "semantic-topology-trial",
+                {
+                    "prediction": prediction.prediction_id,
+                    "prediction_fingerprint": prediction.fingerprint,
+                },
+                length=32,
+            )
+            trial = TopologyBridgeTrial.from_prediction(
+                prediction,
+                trial_id=trial_id,
+                outcome=outcome,
+                observed_at=observed_at,
+                outcome_evidence_ids=outcome_evidence_ids,
+                metadata=metadata,
+            )
+            return self.record(trial)
 
     def trials(
         self,
