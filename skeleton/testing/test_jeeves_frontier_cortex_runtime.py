@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import pytest
 
+from skeleton.jeeves.agent.action_model import SkillSpec
 from skeleton.jeeves.agent.cortex import JeevesCortex
 from skeleton.jeeves.agent.execution_audit import AuditEventKind
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import RunInputs
+from skeleton.jeeves.agent.tools import ToolSpec
 from skeleton.jeeves.agent.types import (
     AgentResult,
     Goal,
+    Plan,
+    PlanStep,
     RiskTier,
     TerminationReason,
     ToolObservation,
@@ -158,6 +162,9 @@ def test_cortex_learning_preserves_audited_tool_risk_and_verification_score() ->
     runtime = _runtime(clock)
     inputs = _inputs("run-cortex-learning")
     state = runtime._new_state("run-cortex-learning", inputs)
+    runtime.cortex.register_skill(
+        SkillSpec.tool("mutate_value", risk=RiskTier.READ_ONLY)
+    )
     observation = ToolObservation(
         call_id="call-risk-bound",
         tool_name="mutate_value",
@@ -220,3 +227,33 @@ def test_frontier_cortex_learning_signals_are_derived_from_guard_audit() -> None
 
     assert scores == {"call-audited": pytest.approx(0.81)}
     assert risks == {"call-audited": RiskTier.EXTERNAL}
+
+
+def test_cortex_current_risk_uses_host_tool_risk_not_model_understatement() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    runtime.tools.register(
+        ToolSpec(
+            name="external_write",
+            description="External side effect used to verify risk binding.",
+            risk=RiskTier.EXTERNAL,
+        ),
+        lambda arguments, context: {"ok": True},
+    )
+    inputs = _inputs("run-cortex-host-risk")
+    state = runtime._new_state("run-cortex-host-risk", inputs)
+    state.plan = Plan(
+        plan_id="plan-host-risk",
+        goal_id=inputs.goal.goal_id,
+        steps=(
+            PlanStep(
+                step_id="step-host-risk",
+                title="External write",
+                description="Exercise host risk binding.",
+                tool="external_write",
+                risk=RiskTier.READ_ONLY,
+            ),
+        ),
+    )
+
+    assert runtime._cortex_current_risk(state) is RiskTier.EXTERNAL
