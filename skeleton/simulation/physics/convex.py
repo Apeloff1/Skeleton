@@ -1457,6 +1457,40 @@ def _initial_epa_faces(
     return faces
 
 
+def _epa_horizon_edges(
+    visible: list[_EPAFace],
+) -> tuple[tuple[int, int], ...]:
+    """Return the unique directed horizon of the visible EPA region.
+
+    The horizon is topological: an edge shared by two visible triangles is
+    interior regardless of whether floating-point face construction left both
+    triangles with the same directed edge. Counting undirected incidences
+    prevents duplicate horizon edges from multiplying identical replacement
+    faces and corrupting the EPA frontier.
+    """
+
+    counts: dict[tuple[int, int], int] = {}
+    oriented: dict[tuple[int, int], tuple[int, int]] = {}
+    for face in visible:
+        for edge in (
+            (face.a, face.b),
+            (face.b, face.c),
+            (face.c, face.a),
+        ):
+            key = tuple(sorted(edge))
+            counts[key] = counts.get(key, 0) + 1
+            oriented.setdefault(key, edge)
+
+    if any(count > 2 for count in counts.values()):
+        raise ConvexQueryError("EPA visible horizon is non-manifold")
+
+    return tuple(
+        oriented[key]
+        for key in sorted(counts)
+        if counts[key] == 1
+    )
+
+
 def epa_penetration(
     a: RigidBody,
     b: RigidBody,
@@ -1546,23 +1580,14 @@ def epa_penetration(
                 iterations=iteration,
             )
 
-        boundary: list[tuple[int, int]] = []
-        for visible_face in visible:
-            for edge in (
-                (visible_face.a, visible_face.b),
-                (visible_face.b, visible_face.c),
-                (visible_face.c, visible_face.a),
-            ):
-                reverse = (edge[1], edge[0])
-                if reverse in boundary:
-                    boundary.remove(reverse)
-                else:
-                    boundary.append(edge)
+        boundary = _epa_horizon_edges(visible)
+        if not boundary:
+            raise ConvexQueryError("EPA visible horizon is empty")
 
         visible_set = set(visible)
         faces = [face_row for face_row in faces if face_row not in visible_set]
 
-        for edge in sorted(boundary):
+        for edge in boundary:
             new_face = _make_epa_face(
                 vertices,
                 edge[0],
