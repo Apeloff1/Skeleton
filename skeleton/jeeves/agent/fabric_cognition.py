@@ -63,6 +63,8 @@ class FabricCompilerPolicy:
             raise AgentContractError("section_priority must be a non-negative integer")
         if priority > 1_000_000:
             raise AgentContractError("section_priority is too large")
+        if self.maximum_section_chars < 512:
+            raise AgentContractError("maximum_section_chars must be at least 512")
         if not isinstance(self.fail_closed, bool):
             raise AgentContractError("fail_closed must be boolean")
 
@@ -194,6 +196,7 @@ class FabricContextCompiler(ContextCompiler):
             "records": [],
         }
 
+        included_source_ids: list[str] = []
         for record in candidates[: self.fabric_policy.maximum_records]:
             row = {
                 "source_tier": record.source_tier.value,
@@ -212,6 +215,7 @@ class FabricContextCompiler(ContextCompiler):
             if len(canonical_json(trial)) > self.fabric_policy.maximum_section_chars:
                 break
             payload["records"].append(row)
+            included_source_ids.append(record.source_ref)
 
         encoded = canonical_json(payload)
         if len(encoded) > self.fabric_policy.maximum_section_chars:
@@ -234,12 +238,7 @@ class FabricContextCompiler(ContextCompiler):
         ):
             return None
 
-        source_ids = tuple(
-            dict.fromkeys(
-                record.source_ref
-                for record in candidates[: self.fabric_policy.maximum_records]
-            )
-        )
+        source_ids = tuple(dict.fromkeys(included_source_ids))
         return ContextSection(
             "context_fabric",
             encoded,
