@@ -875,10 +875,13 @@ class ScientificContextCompiler:
             {
                 "resolver_policy": {
                     "card_limit": self.resolver.policy.card_limit,
-                    "relation_seed_limit": self.resolver.policy.relation_seed_limit,
-                    "relation_limit_per_seed": self.resolver.policy.relation_limit_per_seed,
                     "memory_limit": self.resolver.policy.memory_limit,
                     "repository_limit": self.resolver.policy.repository_limit,
+                    "source_limit_per_tier": self.resolver.policy.source_limit_per_tier,
+                    "minimum_item_score": self.resolver.policy.minimum_item_score,
+                    "stop_coverage": self.resolver.policy.stop_coverage,
+                    "stop_confidence": self.resolver.policy.stop_confidence,
+                    "stop_trust": self.resolver.policy.stop_trust,
                     "maximum_tier": int(self.resolver.policy.maximum_tier),
                     "max_total_chars": self.resolver.policy.max_total_chars,
                 },
