@@ -305,6 +305,10 @@ def test_semantic_plane_executes_selection_governance_composition_prediction_and
     assert snapshot.coverage.accepted_findings == len(findings)
     assert snapshot.coverage.pairwise_interactions == len(snapshot.composition.interactions)
     assert snapshot.coverage.hyperedges == len(snapshot.hypergraph.edges)
+    assert snapshot.tangent_ids
+    assert snapshot.frontier.tangent_ids
+    assert snapshot.coverage.tangent_count == len(snapshot.tangent_ids)
+    assert snapshot.coverage.frontier_tangent_count == len(snapshot.frontier.tangent_ids)
     assert snapshot.coverage.family_coverage > 0.0
     assert snapshot.coverage.role_coverage > 0.0
     assert snapshot.factual_assertion_authorized is False
@@ -340,6 +344,7 @@ def test_semantic_plane_resolution_feeds_scientific_calibration_ledger() -> None
         "concept_drift",
         LensFamily.PREDICTIVE,
     )
+    contract_before = plane.fingerprint
     snapshot = plane.analyze(
         _observations(),
         findings=(finding,),
@@ -366,6 +371,7 @@ def test_semantic_plane_resolution_feeds_scientific_calibration_ledger() -> None
     assert report.trial_count == 1
     assert report.independent_runs == 1
     assert len(update.fingerprint) == 64
+    assert plane.fingerprint == contract_before
 
     # The same ScientificLensLab is used by governance on the next plane pass,
     # closing the outcome -> calibration -> routing loop.
@@ -425,3 +431,73 @@ def test_interaction_forecast_calibrates_composite_not_constituent_lenses_twice(
             "interaction:backdoor_confounding+covariate_shift"
         )
     ) == 1
+
+
+def test_semantic_plane_audit_rejects_unknown_evidence_and_duplicate_ids() -> None:
+    plane = SemanticLensPlane(
+        policy=SemanticPlanePolicy(
+            max_lenses=32,
+            max_per_family=5,
+            minimum_rare_when_supported=2,
+        )
+    )
+    observations = _observations()
+    selection = plane.select(
+        observations,
+        requested=("backdoor_confounding",),
+    )
+    duplicate_a = SemanticFinding(
+        finding_id="duplicate-id",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1",),
+        interpretation="First duplicate.",
+        prediction="First duplicate prediction.",
+        confidence=0.8,
+        ambiguity=0.2,
+        novelty=0.5,
+        evidence_ids=("ev-1",),
+    )
+    duplicate_b = SemanticFinding(
+        finding_id="duplicate-id",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1",),
+        interpretation="Second duplicate.",
+        prediction="Second duplicate prediction.",
+        confidence=0.8,
+        ambiguity=0.2,
+        novelty=0.5,
+        evidence_ids=("ev-1",),
+    )
+    bad_evidence = SemanticFinding(
+        finding_id="bad-evidence",
+        lens_key="backdoor_confounding",
+        family=LensFamily.CAUSAL,
+        observation_ids=("plane-o1",),
+        interpretation="Uses an evidence id absent from the observation.",
+        prediction="Bad provenance should be rejected.",
+        confidence=0.8,
+        ambiguity=0.2,
+        novelty=0.5,
+        evidence_ids=("not-provenanced",),
+    )
+
+    audit = plane.audit_findings(
+        (duplicate_a, duplicate_b, bad_evidence),
+        observations=observations,
+        selection=selection,
+    )
+
+    assert not audit.accepted
+    assert audit.duplicate_finding_ids == ("duplicate-id",)
+    assert audit.evidence_mismatch_ids == ("bad-evidence",)
+    duplicate_reasons = [
+        set(item.reasons)
+        for item in audit.rejected
+        if item.finding_id == "duplicate-id"
+    ]
+    assert len(duplicate_reasons) == 2
+    assert all("duplicate_finding_id" in reasons for reasons in duplicate_reasons)
+    bad = next(item for item in audit.rejected if item.finding_id == "bad-evidence")
+    assert "evidence_not_provenanced_by_observations" in bad.reasons
