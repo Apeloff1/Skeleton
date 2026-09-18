@@ -641,29 +641,41 @@ class LearningEvidenceStore:
         return self._clock_version
 
     def record_observation(self, observation: Observation) -> UpdateRecord:
-        self._reject_stale(observation.provenance)
+        commit_time = self._reject_stale(observation.provenance)
         self._reject_duplicate(observation.observation_id)
         self._observations[observation.observation_id] = observation
-        return self._commit(UpdateKind.OBSERVATION, observation.observation_id)
+        return self._commit(
+            UpdateKind.OBSERVATION,
+            observation.observation_id,
+            timestamp=commit_time,
+        )
 
     def record_feature(self, feature: Feature) -> UpdateRecord:
-        self._reject_stale(feature.provenance)
+        commit_time = self._reject_stale(feature.provenance)
         self._reject_duplicate(feature.feature_id)
         self._require_existing(feature.observation_ids, self._observations, kind="observation")
         self._reject_feature_contradiction(feature)
         self._features[feature.feature_id] = feature
-        return self._commit(UpdateKind.FEATURE, feature.feature_id)
+        return self._commit(
+            UpdateKind.FEATURE,
+            feature.feature_id,
+            timestamp=commit_time,
+        )
 
     def record_hypothesis(self, hypothesis: Hypothesis) -> UpdateRecord:
-        self._reject_stale(hypothesis.provenance)
+        commit_time = self._reject_stale(hypothesis.provenance)
         self._reject_duplicate(hypothesis.hypothesis_id)
         self._require_existing(hypothesis.feature_ids, self._features, kind="feature")
         self._reject_hypothesis_contradiction(hypothesis)
         self._hypotheses[hypothesis.hypothesis_id] = hypothesis
-        return self._commit(UpdateKind.HYPOTHESIS, hypothesis.hypothesis_id)
+        return self._commit(
+            UpdateKind.HYPOTHESIS,
+            hypothesis.hypothesis_id,
+            timestamp=commit_time,
+        )
 
     def record_prediction(self, prediction: Prediction) -> UpdateRecord:
-        self._reject_stale(prediction.provenance)
+        commit_time = self._reject_stale(prediction.provenance)
         self._reject_duplicate(prediction.prediction_id)
         self._require_existing((prediction.hypothesis_id,), self._hypotheses, kind="hypothesis")
         existing = [
@@ -683,10 +695,14 @@ class LearningEvidenceStore:
                 },
             )
         self._predictions[prediction.prediction_id] = prediction
-        return self._commit(UpdateKind.PREDICTION, prediction.prediction_id)
+        return self._commit(
+            UpdateKind.PREDICTION,
+            prediction.prediction_id,
+            timestamp=commit_time,
+        )
 
     def record_outcome(self, outcome: Outcome) -> UpdateRecord:
-        self._reject_stale(outcome.provenance)
+        commit_time = self._reject_stale(outcome.provenance)
         self._reject_duplicate(outcome.outcome_id)
         prediction = self._predictions.get(outcome.prediction_id)
         if prediction is None:
@@ -714,7 +730,11 @@ class LearningEvidenceStore:
             stated_confidence=prediction.confidence,
         )
         self._outcomes[outcome.outcome_id] = outcome
-        return self._commit(UpdateKind.OUTCOME, outcome.outcome_id)
+        return self._commit(
+            UpdateKind.OUTCOME,
+            outcome.outcome_id,
+            timestamp=commit_time,
+        )
 
     def rollback(self, version: int) -> UpdateRecord:
         snapshot = self._snapshots.get(version)
@@ -723,8 +743,11 @@ class LearningEvidenceStore:
                 "rollback target is outside bounded history",
                 context={"reason": "rollback_unavailable", "version": version, "retained": sorted(self._snapshots)},
             )
+        # Validate the journal timestamp before restoring any snapshot. A failed
+        # clock must leave the current store, version, and history untouched.
+        commit_time = _non_negative("clock", self._clock())
         self._restore(snapshot)
-        return self._commit(UpdateKind.ROLLBACK, f"v{version}")
+        return self._commit(UpdateKind.ROLLBACK, f"v{version}", timestamp=commit_time)
 
     def lineage(self, record_id: str) -> tuple[str, ...]:
         """Walk provenance parents from roots to ``record_id``."""
@@ -766,7 +789,7 @@ class LearningEvidenceStore:
             context={"reason": "unknown_record", "record_id": record_id},
         )
 
-    def _reject_stale(self, provenance: EvidenceProvenance) -> None:
+    def _reject_stale(self, provenance: EvidenceProvenance) -> float:
         now = _non_negative("clock", self._clock())
         age = now - provenance.observed_at
         if age > self._max_age_seconds:
@@ -794,6 +817,7 @@ class LearningEvidenceStore:
                     "store_clock_version": self._clock_version,
                 },
             )
+        return now
 
     def _reject_duplicate(self, record_id: str) -> None:
         if (
@@ -872,19 +896,32 @@ class LearningEvidenceStore:
                     },
                 )
 
-    def _commit(self, kind: UpdateKind, target_id: str) -> UpdateRecord:
+    def _commit(
+        self,
+        kind: UpdateKind,
+        target_id: str,
+        *,
+        timestamp: float,
+    ) -> UpdateRecord:
+        """Append one already-validated mutation to the bounded journal.
+
+        Callers must sample/validate time before mutating their plane. Construct
+        the immutable record before advancing the store version so validation
+        failures cannot create version gaps.
+        """
         previous = self._version if self._version > 0 else None
-        self._version += 1
+        new_version = self._version + 1
         record = UpdateRecord(
-            version=self._version,
+            version=new_version,
             kind=kind,
             target_id=target_id,
-            timestamp=self._clock(),
+            timestamp=timestamp,
             previous_version=previous,
             reversible=True,
         )
+        self._version = new_version
         self._history.append(record)
-        self._snapshots[self._version] = self._capture()
+        self._snapshots[new_version] = self._capture()
         self._prune()
         return record
 
