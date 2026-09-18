@@ -40,9 +40,7 @@ from .semantic_governance_bridge import (
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
-    ReadingStatus,
     SemanticFinding,
-    SemanticLensSpec,
     SemanticObservation,
     SemanticRole,
     TangentSeed,
@@ -55,10 +53,11 @@ from .semantic_prediction import (
     SemanticPredictiveModel,
 )
 from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph, TangentNode
+from .tangent_graph import ExplorationAxis, FrontierSelection, TangentGraph
 from .types import (
     AgentContractError,
-    positive_int,
     bounded_text,
+    positive_int,
     probability,
     stable_fingerprint,
     stable_id,
@@ -101,6 +100,27 @@ _AXIS_TAG: dict[str, ExplorationAxis] = {
     "computational": ExplorationAxis.SYSTEM,
     "metacognitive": ExplorationAxis.ADVERSARIAL,
     "information": ExplorationAxis.SEMANTIC,
+}
+
+
+
+_FAMILY_AXIS: dict[LensFamily, ExplorationAxis] = {
+    LensFamily.FILM: ExplorationAxis.CINEMATIC,
+    LensFamily.LITERATURE: ExplorationAxis.LITERARY,
+    LensFamily.GAME: ExplorationAxis.LUDIC,
+    LensFamily.NARRATIVE: ExplorationAxis.SEMANTIC,
+    LensFamily.SEMIOTIC: ExplorationAxis.SEMANTIC,
+    LensFamily.COGNITIVE: ExplorationAxis.MEMORY,
+    LensFamily.RHETORIC: ExplorationAxis.SEMANTIC,
+    LensFamily.SOCIAL: ExplorationAxis.SOCIAL,
+    LensFamily.TEMPORAL: ExplorationAxis.TEMPORAL,
+    LensFamily.SYSTEM: ExplorationAxis.SYSTEM,
+    LensFamily.CAUSAL: ExplorationAxis.CAUSAL,
+    LensFamily.INFORMATION: ExplorationAxis.SEMANTIC,
+    LensFamily.COMPUTATIONAL: ExplorationAxis.SYSTEM,
+    LensFamily.METACOGNITIVE: ExplorationAxis.ADVERSARIAL,
+    LensFamily.PROBABILITY: ExplorationAxis.PROBABILISTIC,
+    LensFamily.PREDICTIVE: ExplorationAxis.PROBABILISTIC,
 }
 
 
