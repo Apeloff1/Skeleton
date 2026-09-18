@@ -97,3 +97,21 @@ def test_code_or_large_documentation_change_is_not_auto_mergeable() -> None:
         assert decision.risk == "medium"
         assert decision.human_review_required
         assert not decision.automated_merge_allowed
+
+
+def test_high_risk_repairs_have_explicit_quarantine_disposition() -> None:
+    workflow = classify_change([".github/workflows/repair.yml"])
+    security = classify_change(["docs/guide.md"], security_finding=True)
+    ordinary_code = classify_change(["backend/app.py"])
+    safe_docs = classify_change(["docs/guide.md"])
+
+    for decision in (workflow, security):
+        assert decision.quarantined is True
+        assert decision.disposition == "quarantine"
+        assert decision.human_review_required is True
+        assert decision.automated_merge_allowed is False
+
+    assert ordinary_code.quarantined is False
+    assert ordinary_code.disposition == "human_review"
+    assert safe_docs.quarantined is False
+    assert safe_docs.disposition == "auto_merge"

@@ -346,3 +346,34 @@ def test_supervised_night_rejects_scope_mapper_that_changes_plan_id(tmp_path, mo
     rows = [json.loads(line) for line in audit.read_text(encoding="utf-8").splitlines()]
     assert rows[-1]["event"] == "run_failed_closed"
     assert rows[-1]["stage"] == "supervisor_scope"
+
+
+def test_supervised_night_operator_pause_preempts_model_work(tmp_path, monkeypatch):
+    state = _repo(tmp_path, monkeypatch)
+    monkeypatch.setenv("SKELETON_AUTOMATION_PAUSED", "true")
+    monkeypatch.setenv("SKELETON_AUTOMATION_HOLD_REASON", "maintenance")
+    monkeypatch.delenv("SKELETON_AUTOMATION_QUARANTINED", raising=False)
+
+    class UnusedReasoner:
+        def __init__(self, *_args, **_kwargs):
+            raise AssertionError("model reasoner must not be constructed while paused")
+
+    monkeypatch.setattr(supervised_studio, "ChatGPTReasoner", UnusedReasoner)
+    patch = tmp_path.parent / "paused.patch"
+    audit = tmp_path.parent / "paused-audit.jsonl"
+
+    assert supervised_studio.propose(
+        patch_path=patch,
+        audit_path=audit,
+        repo_state_path=state,
+        max_tasks=1,
+        cohort_size=3,
+        seed="paused",
+    ) == 0
+
+    assert patch.read_text(encoding="utf-8") == ""
+    rows = [json.loads(line) for line in audit.read_text(encoding="utf-8").splitlines()]
+    blocked = rows[-1]
+    assert blocked["event"] == "run_blocked_by_operator"
+    assert blocked["hold_status"] == "paused"
+    assert blocked["reason"] == "maintenance"

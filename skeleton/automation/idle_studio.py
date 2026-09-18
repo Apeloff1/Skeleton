@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 from urllib import error, parse, request
 
+from .automation_safety import AutomationSafetyError, load_automation_safety
 from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
 
 FLEET_SIZE = 1_000
@@ -700,6 +701,24 @@ def run_studio(config: StudioConfig) -> int:
     model = os.getenv("OPENAI_MODEL", "").strip() or None
     current_run_id = os.getenv("GITHUB_RUN_ID", "").strip() or None
     base_sha = os.getenv("GITHUB_SHA", "").strip()
+
+    try:
+        safety = load_automation_safety()
+    except AutomationSafetyError as exc:
+        print(json.dumps({"status": "stopped", "reason": str(exc)[:500]}))
+        return 2
+    if safety.blocked:
+        print(
+            json.dumps(
+                {
+                    "status": safety.status,
+                    "reason": safety.reason or "operator safety hold",
+                    "fleet": FLEET_SIZE,
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
 
     if not repo or not token or not base_sha:
         print(json.dumps({"status": "stopped", "reason": "missing GitHub repository/token/SHA"}))
