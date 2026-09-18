@@ -418,6 +418,13 @@ from .semantic_governance_bridge import (
     semantic_maturity_index,
     semantic_spec_to_definition,
 )
+from .semantic_lens_topology import (
+    LensBridgeCandidate,
+    LensTopologyEdge,
+    LensTopologyNode,
+    SemanticLensTopology,
+    SemanticTopologySnapshot,
+)
 
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
