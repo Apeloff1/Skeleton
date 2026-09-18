@@ -35,6 +35,7 @@ from skeleton.shells.ai.policy import AIShellPolicy, AutonomyMode
 from skeleton.shells.ai.policy_store import AIPolicyStore
 from skeleton.shells.ai.protocol import AIModelResponse
 from skeleton.shells.ai.router import AIToolRouter
+from skeleton.shells.ai.recovery_store import AIRecoveryCheckpointStore
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry
 from skeleton.shells.ai.service import AIShellService
 from skeleton.shells.ai.session_evidence import SessionEvidenceStore
@@ -226,6 +227,11 @@ class EvidenceEnvironment:
             namespace="finalizations",
             clock=lambda: 10.0,
         )
+        self.recovery_checkpoints = AIRecoveryCheckpointStore(
+            self.backend,
+            namespace="recovery-checkpoints",
+            clock=lambda: 10.0,
+        )
         self.finalizer = AIExecutionEvidenceFinalizer(
             journal=self.orchestrator.journal,
             receipt_chain=self.orchestrator.shell_service.receipts,
@@ -234,6 +240,7 @@ class EvidenceEnvironment:
             audit_witnesses=self.witnesses,
             execution_evidence=self.execution_evidence,
             finalizations=self.finalizations,
+            recovery_checkpoints=self.recovery_checkpoints,
         )
 
     def reviewed(self, session_id="session"):
