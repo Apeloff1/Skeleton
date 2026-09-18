@@ -33,7 +33,11 @@ from .perpendicular_semantics import (
     PerpendicularExpansionPlan,
     PerpendicularExpansionPlanner,
 )
-from .semantic_frontier import LensCompositionEngine, SemanticComposition
+from .semantic_frontier import (
+    LensCompositionEngine,
+    LensInteractionKind,
+    SemanticComposition,
+)
 from .semantic_governance_bridge import (
     SemanticGovernanceBridge,
     SemanticGovernanceSnapshot,
