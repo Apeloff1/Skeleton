@@ -880,6 +880,9 @@ def test_learned_bridge_overlays_effective_topology_without_mutating_static_grap
     )
     assert learned_edge.source == "learned"
     assert effective.candidate_bridge_count == static.candidate_bridge_count - 1
+    assert sum(item[2] for item in effective.family_pair_counts) == len(
+        effective.edges
+    )
     assert candidate.right_key in topology.neighbors_with_rules(
         candidate.left_key,
         (learned[0].rule,),
