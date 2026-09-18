@@ -155,7 +155,7 @@ def test_executor_error_can_stop_worker() -> None:
     assert snap.stop_requested is True
     assert snap.state is WorkerState.FAILED
     assert worker.run_once() is None
-    assert worker.snapshot().state is WorkerState.STOPPED
+    assert worker.snapshot().state is WorkerState.FAILED
 
 
 def test_consecutive_failure_guard_trips() -> None:
@@ -228,6 +228,30 @@ def test_invalid_retry_factory_fails_claim_and_raises() -> None:
         worker.run_once()
 
     assert queue.get(item.item_id).state is QueueState.FAILED
+    snap = worker.snapshot()
+    assert snap.state is WorkerState.FAILED
+    assert snap.stop_requested is True
+    assert snap.counters.executor_errors == 1
+
+
+class StaleFailureQueue(ShellWorkQueue):
+    def fail(self, item):
+        raise RuntimeError("simulated stale queue claim")
+
+
+def test_stale_failure_transition_preserves_failed_worker_state() -> None:
+    queue = StaleFailureQueue()
+    queue.enqueue(_command(), item_id="stale")
+    worker = QueueWorker("worker-a", queue, FakeExecutor([RuntimeError("executor boom")]))
+
+    with pytest.raises(RuntimeError, match="stale queue claim"):
+        worker.run_once()
+
+    snap = worker.snapshot()
+    assert snap.state is WorkerState.FAILED
+    assert snap.stop_requested is True
+    assert snap.counters.transition_errors == 1
+    assert snap.counters.executor_errors == 0
 
 
 def test_session_is_forwarded_without_worker_mutation() -> None:
