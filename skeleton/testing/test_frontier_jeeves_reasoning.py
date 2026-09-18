@@ -1,0 +1,484 @@
+from __future__ import annotations
+
+from skeleton.jeeves.agent.adversarial_verification import CouncilVerdict, Verdict
+from skeleton.jeeves.agent.deliberation import (
+    CandidateProposal,
+    CandidateScore,
+    DeliberationMode,
+    SearchResult,
+    SpecialistRole,
+)
+from skeleton.jeeves.agent.frontier_reasoning import (
+    EscalationCause,
+    FrontierReasoningCoordinator,
+    InferenceDisposition,
+)
+from skeleton.jeeves.agent.lens_fusion import LensSignal
+from skeleton.jeeves.agent.rational_metareasoning import (
+    ComputationAction,
+    ComputationOutcome,
+    DecisionAlternative,
+    MetaActionKind,
+    MetaBudget,
+    MetaState,
+)
+from skeleton.jeeves.agent.semantic_lenses import LensFamily
+from skeleton.jeeves.agent.types import (
+    EvidenceKind,
+    EvidenceRef,
+    RiskTier,
+    stable_fingerprint,
+)
+
+
+def _evidence(name: str, confidence: float = 0.9) -> EvidenceRef:
+    token = stable_fingerprint({"evidence": name})
+    return EvidenceRef(
+        evidence_id=f"evidence:{name}",
+        kind=EvidenceKind.FIXTURE,
+        source="frontier-reasoning-test",
+        fingerprint=token,
+        confidence=confidence,
+        observed_at=1.0,
+    )
+
+
+def _candidate(
+    name: str,
+    *,
+    confidence: float,
+    action: str,
+    outcome: str,
+    evidence: tuple[EvidenceRef, ...] = (),
+) -> CandidateProposal:
+    return CandidateProposal(
+        candidate_id=f"candidate:{name}",
+        parent_id=None,
+        depth=0,
+        role=SpecialistRole.SOLVER,
+        summary=f"Candidate {name}",
+        proposed_action=action,
+        predicted_outcome=outcome,
+        confidence=confidence,
+        evidence=evidence,
+    )
+
+
+def _score(
+    candidate: CandidateProposal,
+    *,
+    total: float,
+    evidence_quality: float,
+    verifier: float,
+    risk_penalty: float = 0.05,
+    cost_penalty: float = 0.0,
+) -> CandidateScore:
+    return CandidateScore(
+        candidate_id=candidate.candidate_id,
+        utility=max(-1.0, min(1.0, total)),
+        evidence_quality=evidence_quality,
+        confidence_quality=candidate.confidence,
+        risk_penalty=risk_penalty,
+        cost_penalty=cost_penalty,
+        novelty_bonus=0.5,
+        verifier_score=verifier,
+        total=total,
+        reasons=(),
+    )
+
+
+def _search(
+    *pairs: tuple[CandidateProposal, CandidateScore],
+    trace: str = "search-trace",
+) -> SearchResult:
+    return SearchResult(
+        mode=DeliberationMode.COMMITTEE,
+        best=pairs[0][0] if pairs else None,
+        ranking=tuple(pairs),
+        explored=tuple(candidate for candidate, _ in pairs),
+        ledger={"model_calls": 2, "candidates": len(pairs)},
+        stopped_reason="fixture complete",
+        trace_fingerprint=stable_fingerprint(trace),
+    )
+
+
+def _council(verdict: Verdict, *, lower: float = 0.8) -> CouncilVerdict:
+    return CouncilVerdict(
+        subject_id="subject:frontier",
+        verdict=verdict,
+        score=0.9 if verdict is Verdict.ACCEPT else 0.2,
+        lower_bound=lower,
+        upper_bound=0.96,
+        host_score=0.92,
+        weighted_votes=(),
+        axis_scores={},
+        challenges=(),
+        quorum_satisfied=True,
+        reward_hacking_alarm=False,
+        reasons=(),
+        fingerprint=stable_fingerprint(
+            {"verdict": verdict.value, "lower": lower}
+        ),
+    )
+
+
+def _strong_search() -> SearchResult:
+    first = _candidate(
+        "primary",
+        confidence=0.95,
+        action="apply verified patch",
+        outcome="tests pass and behavior remains compatible",
+        evidence=(_evidence("primary"),),
+    )
+    second = _candidate(
+        "fallback",
+        confidence=0.40,
+        action="defer patch",
+        outcome="behavior remains unchanged",
+        evidence=(_evidence("fallback", 0.4),),
+    )
+    return _search(
+        (
+            first,
+            _score(
+                first,
+                total=0.95,
+                evidence_quality=0.90,
+                verifier=0.95,
+            ),
+        ),
+        (
+            second,
+            _score(
+                second,
+                total=0.10,
+                evidence_quality=0.30,
+                verifier=0.30,
+                risk_penalty=0.20,
+            ),
+        ),
+    )
+
+
+def test_clear_low_risk_candidate_commits() -> None:
+    coordinator = FrontierReasoningCoordinator()
+
+    decision = coordinator.decide(_strong_search())
+
+    assert decision.disposition is InferenceDisposition.COMMIT
+    assert decision.committed_candidate is not None
+    assert decision.committed_candidate.candidate_id == "candidate:primary"
+    assert decision.assessments[0].absolute_quality > 0.8
+    assert decision.assessments[0].choice_probability > 0.8
+    assert EscalationCause.LOW_MARGIN not in decision.causes
+
+
+def test_close_competing_actions_trigger_more_deliberation() -> None:
+    left = _candidate(
+        "left",
+        confidence=0.92,
+        action="use strategy alpha",
+        outcome="alpha succeeds",
+        evidence=(_evidence("shared"),),
+    )
+    right = _candidate(
+        "right",
+        confidence=0.90,
+        action="use strategy beta",
+        outcome="beta succeeds",
+        evidence=(_evidence("shared"),),
+    )
+    search = _search(
+        (
+            left,
+            _score(
+                left,
+                total=0.90,
+                evidence_quality=0.90,
+                verifier=0.90,
+            ),
+        ),
+        (
+            right,
+            _score(
+                right,
+                total=0.88,
+                evidence_quality=0.89,
+                verifier=0.89,
+            ),
+        ),
+    )
+
+    decision = FrontierReasoningCoordinator().decide(search)
+
+    assert decision.disposition is InferenceDisposition.DELIBERATE
+    assert decision.diagnostics.normalized_entropy > 0.95
+    assert decision.diagnostics.action_disagreement > 0.45
+    assert EscalationCause.LOW_MARGIN in decision.causes
+    assert EscalationCause.ACTION_DISAGREEMENT in decision.causes
+
+
+def test_mutating_candidate_requires_explicit_verification() -> None:
+    decision = FrontierReasoningCoordinator().decide(
+        _strong_search(),
+        risk=RiskTier.MUTATING,
+    )
+
+    assert decision.disposition is InferenceDisposition.VERIFY
+    assert EscalationCause.VERIFICATION_REQUIRED in decision.causes
+    assert decision.committed_candidate is None
+
+
+def test_mutating_candidate_can_commit_after_strong_council_acceptance() -> None:
+    decision = FrontierReasoningCoordinator().decide(
+        _strong_search(),
+        risk=RiskTier.MUTATING,
+        verification=_council(Verdict.ACCEPT, lower=0.82),
+    )
+
+    assert decision.disposition is InferenceDisposition.COMMIT
+    assert decision.committed_candidate is not None
+    assert EscalationCause.VERIFICATION_REQUIRED not in decision.causes
+
+
+def test_verifier_rejection_blocks_high_confidence_candidate() -> None:
+    decision = FrontierReasoningCoordinator().decide(
+        _strong_search(),
+        verification=_council(Verdict.REJECT, lower=0.10),
+    )
+
+    assert decision.disposition is InferenceDisposition.ABSTAIN
+    assert EscalationCause.VERIFICATION_REJECTED in decision.causes
+    assert decision.committed_candidate is None
+
+
+def test_semantic_lens_conflict_forces_deliberation() -> None:
+    primary = _strong_search()
+    signals = (
+        LensSignal(
+            signal_id="lens:positive",
+            lens_key="system-positive",
+            family=LensFamily.SYSTEM,
+            probability=0.90,
+            confidence=1.0,
+            ambiguity=0.0,
+            reliability=1.0,
+            epistemic_strength=1.0,
+            calibration_group="system-a",
+        ),
+        LensSignal(
+            signal_id="lens:negative",
+            lens_key="cognitive-negative",
+            family=LensFamily.COGNITIVE,
+            probability=0.10,
+            confidence=1.0,
+            ambiguity=0.0,
+            reliability=1.0,
+            epistemic_strength=1.0,
+            calibration_group="cognitive-b",
+        ),
+    )
+
+    decision = FrontierReasoningCoordinator().decide(
+        primary,
+        lens_signals=signals,
+    )
+
+    assert decision.lens_fusion is not None
+    assert decision.lens_fusion.conflict_strength >= 0.99
+    assert decision.lens_fusion.abstain is True
+    assert EscalationCause.LENS_CONFLICT in decision.causes
+    assert decision.disposition is InferenceDisposition.DELIBERATE
+
+
+def test_positive_value_of_computation_postpones_commit() -> None:
+    state = MetaState(
+        decisions=(
+            DecisionAlternative("patch", expected_utility=0.60),
+            DecisionAlternative("defer", expected_utility=0.50),
+        ),
+        belief_entropy=0.80,
+        current_risk=0.25,
+        budget=MetaBudget(
+            remaining_compute=10.0,
+            remaining_tokens=10_000,
+            remaining_money=10.0,
+            remaining_seconds=30.0,
+        ),
+    )
+    action = ComputationAction(
+        action_id="compute:counterfactual",
+        kind=MetaActionKind.SIMULATE,
+        outcomes=(
+            ComputationOutcome(
+                probability=0.5,
+                posterior_utilities={"patch": 0.95, "defer": 0.30},
+                posterior_entropy=0.30,
+                posterior_risk=0.15,
+                observation_label="patch robust",
+            ),
+            ComputationOutcome(
+                probability=0.5,
+                posterior_utilities={"patch": 0.30, "defer": 0.95},
+                posterior_entropy=0.30,
+                posterior_risk=0.15,
+                observation_label="defer robust",
+            ),
+        ),
+        compute_cost=0.02,
+        delay_seconds=0.01,
+        token_cost=100,
+        evidence_producing=False,
+    )
+
+    decision = FrontierReasoningCoordinator().decide(
+        _strong_search(),
+        meta_state=state,
+        computation_actions=(action,),
+    )
+
+    assert decision.metareasoning is not None
+    assert decision.metareasoning.selected_action_id == "compute:counterfactual"
+    assert decision.disposition is InferenceDisposition.DELIBERATE
+    assert decision.next_computation_action_id == "compute:counterfactual"
+    assert EscalationCause.POSITIVE_VALUE_OF_COMPUTATION in decision.causes
+
+
+def test_evidence_producing_meta_action_routes_to_seek_evidence() -> None:
+    state = MetaState(
+        decisions=(
+            DecisionAlternative("patch", expected_utility=0.55),
+            DecisionAlternative("defer", expected_utility=0.50),
+        ),
+        belief_entropy=0.90,
+        current_risk=0.30,
+        budget=MetaBudget(
+            remaining_compute=5.0,
+            remaining_tokens=5_000,
+            remaining_money=5.0,
+            remaining_seconds=20.0,
+        ),
+        information_utility_rate=0.5,
+    )
+    action = ComputationAction(
+        action_id="search:missing-evidence",
+        kind=MetaActionKind.SEARCH,
+        outcomes=(
+            ComputationOutcome(
+                probability=0.5,
+                posterior_utilities={"patch": 0.90, "defer": 0.40},
+                posterior_entropy=0.20,
+                posterior_risk=0.15,
+            ),
+            ComputationOutcome(
+                probability=0.5,
+                posterior_utilities={"patch": 0.35, "defer": 0.85},
+                posterior_entropy=0.20,
+                posterior_risk=0.15,
+            ),
+        ),
+        compute_cost=0.01,
+        token_cost=50,
+        evidence_producing=True,
+        evidence_class="retrieval",
+    )
+
+    decision = FrontierReasoningCoordinator().decide(
+        _strong_search(),
+        meta_state=state,
+        computation_actions=(action,),
+    )
+
+    assert decision.disposition is InferenceDisposition.SEEK_EVIDENCE
+    assert decision.next_computation_action_id == "search:missing-evidence"
+
+
+def test_low_evidence_quality_routes_to_seek_evidence() -> None:
+    candidate = _candidate(
+        "ungrounded",
+        confidence=0.96,
+        action="answer now",
+        outcome="answer is accepted",
+    )
+    search = _search(
+        (
+            candidate,
+            _score(
+                candidate,
+                total=0.95,
+                evidence_quality=0.10,
+                verifier=0.95,
+            ),
+        ),
+    )
+
+    decision = FrontierReasoningCoordinator().decide(search)
+
+    assert decision.assessments[0].absolute_quality > 0.62
+    assert EscalationCause.INSUFFICIENT_EVIDENCE in decision.causes
+    assert decision.disposition is InferenceDisposition.SEEK_EVIDENCE
+
+
+def test_strong_semantic_signal_cannot_rescue_low_quality_candidate() -> None:
+    candidate = _candidate(
+        "weak",
+        confidence=0.35,
+        action="guess",
+        outcome="guess happens to work",
+    )
+    search = _search(
+        (
+            candidate,
+            _score(
+                candidate,
+                total=-0.05,
+                evidence_quality=0.25,
+                verifier=0.35,
+                risk_penalty=0.10,
+            ),
+        ),
+    )
+    signals = (
+        LensSignal(
+            signal_id="lens:optimistic",
+            lens_key="optimistic-reading",
+            family=LensFamily.NARRATIVE,
+            probability=0.99,
+            confidence=1.0,
+            ambiguity=0.0,
+            reliability=1.0,
+            epistemic_strength=1.0,
+            calibration_group="optimistic",
+        ),
+    )
+
+    decision = FrontierReasoningCoordinator().decide(
+        search,
+        lens_signals=signals,
+    )
+
+    assert EscalationCause.LOW_ABSOLUTE_QUALITY in decision.causes
+    assert decision.disposition is not InferenceDisposition.COMMIT
+    assert decision.committed_candidate is None
+
+
+def test_identical_inputs_produce_identical_replay_fingerprint() -> None:
+    coordinator = FrontierReasoningCoordinator()
+    search = _strong_search()
+
+    first = coordinator.decide(search)
+    second = coordinator.decide(search)
+
+    assert first.fingerprint == second.fingerprint
+    assert first.diagnostics.fingerprint == second.diagnostics.fingerprint
+    assert tuple(item.fingerprint for item in first.assessments) == tuple(
+        item.fingerprint for item in second.assessments
+    )
+
+
+def test_empty_search_abstains() -> None:
+    decision = FrontierReasoningCoordinator().decide(_search())
+
+    assert decision.disposition is InferenceDisposition.ABSTAIN
+    assert decision.leading_candidate is None
+    assert EscalationCause.NO_CANDIDATE in decision.causes
