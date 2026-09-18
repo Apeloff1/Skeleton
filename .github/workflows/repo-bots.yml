@@ -1,0 +1,49 @@
+name: Repository Bots
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot:
+        description: Bot to run
+        required: true
+        default: all
+        type: choice
+        options: [all, triage, ci, security, cleanup]
+  schedule:
+    - cron: "17 * * * *"
+
+concurrency:
+  group: repo-bots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bot:
+    name: ${{ matrix.bot }}
+    if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        bot: [triage, ci, security, cleanup]
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Run bounded repository bot
+        run: python -m skeleton.automation.repo_bots --mode "${{ matrix.bot }}"
