@@ -503,3 +503,58 @@ def test_outer_fabric_rejects_oversized_record_from_noncompliant_adapter() -> No
 
     assert result.records == ()
     assert result.token_estimate == 0
+
+
+def test_fabric_section_fallback_keeps_hard_size_and_provenance_bounds() -> None:
+    clock = TickClock()
+    namespace = _namespace()
+    record = DeepContextRecord(
+        source_tier=SourceTier.EXTERNAL,
+        source_ref="large-source",
+        source_provider="provider-a",
+        source_fingerprint=stable_fingerprint("large-source"),
+        content="x" * 8_000,
+        canonical=True,
+        trust=0.9,
+        confidence=0.9,
+        salience=0.8,
+        token_estimate=100,
+    )
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=4,
+            maximum_tokens=2_000,
+            minimum_deep_trust=0.0,
+            minimum_fast_hits_before_skip_deep=1,
+        )
+    )
+    fabric.register(
+        CallableContextAdapter(
+            SourceTier.EXTERNAL,
+            fetcher=lambda ns, refs, max_records, max_tokens: (record,),
+            searcher=lambda ns, query, max_records, max_tokens: (record,),
+            source_provider=record.source_provider,
+        )
+    )
+    compiler = FabricContextCompiler(
+        fabric=fabric,
+        fabric_policy=FabricCompilerPolicy(
+            maximum_section_chars=512,
+            maximum_record_chars=8_000,
+        ),
+    )
+
+    packet = compiler.compile(
+        system_instruction="Use evidence carefully.",
+        task_instruction="Build a bounded plan.",
+        goal=_goal(),
+        namespace=namespace,
+        memory=MemoryManager(clock=clock),
+        evidence=EvidenceLedger(clock=clock),
+    )
+
+    section = next(item for item in packet.sections if item.name == "context_fabric")
+    payload = json.loads(section.content)
+    assert len(section.content) <= 512
+    assert payload["records"] == []
+    assert section.source_ids == ()
