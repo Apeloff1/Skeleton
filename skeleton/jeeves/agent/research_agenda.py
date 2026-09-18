@@ -48,6 +48,7 @@ class ResearchAgendaPolicy:
     reopen_surprise_bits: float = 2.5
     maximum_items: int = 5000
     maximum_attempts_before_defer: int = 8
+    require_assurance_for_resolution: bool = False
 
     def __post_init__(self) -> None:
         for name in (
@@ -76,6 +77,8 @@ class ResearchAgendaPolicy:
                 maximum=10_000,
             ),
         )
+        if not isinstance(self.require_assurance_for_resolution, bool):
+            raise AgentContractError("require_assurance_for_resolution must be boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -433,6 +436,8 @@ class ResearchAgenda:
         successful: bool = True,
         resolution_note: str = "",
         defer_seconds: float | None = None,
+        completion_certificate_id: str | None = None,
+        completion_accepted: bool = False,
     ) -> AttemptResult:
         agenda_id = require_id("agenda_id", agenda_id)
         try:
@@ -453,7 +458,25 @@ class ResearchAgenda:
 
         previous_status = item.status
         reopened = False
-        if successful and info >= self.policy.resolution_information_gain_bits:
+        if completion_certificate_id is not None:
+            completion_certificate_id = require_id(
+                "completion_certificate_id",
+                completion_certificate_id,
+            )
+        if not isinstance(completion_accepted, bool):
+            raise AgentContractError("completion_accepted must be boolean")
+        assurance_ready = (
+            completion_accepted
+            and completion_certificate_id is not None
+        )
+        if (
+            successful
+            and info >= self.policy.resolution_information_gain_bits
+            and (
+                assurance_ready
+                or not self.policy.require_assurance_for_resolution
+            )
+        ):
             status = AgendaStatus.RESOLVED
             defer_until_value = None
         elif attempts >= self.policy.maximum_attempts_before_defer:
@@ -497,6 +520,17 @@ class ResearchAgenda:
                 if status is AgendaStatus.RESOLVED
                 else ""
             ),
+            metadata={
+                **dict(item.metadata),
+                **(
+                    {
+                        "completion_certificate_id": completion_certificate_id,
+                        "completion_accepted": completion_accepted,
+                    }
+                    if completion_certificate_id is not None
+                    else {}
+                ),
+            },
         )
         self._items[agenda_id] = updated
         payload = {
@@ -508,6 +542,8 @@ class ResearchAgenda:
             "cumulative_information_gain_bits": cumulative,
             "surprise_bits": surprise,
             "reopened": reopened,
+            "completion_certificate_id": completion_certificate_id,
+            "completion_accepted": completion_accepted,
             "item": updated.fingerprint,
         }
         return AttemptResult(
@@ -590,6 +626,7 @@ class ResearchAgenda:
                 "reopen_surprise_bits": self.policy.reopen_surprise_bits,
                 "maximum_items": self.policy.maximum_items,
                 "maximum_attempts_before_defer": self.policy.maximum_attempts_before_defer,
+                "require_assurance_for_resolution": self.policy.require_assurance_for_resolution,
             },
             "items": [item.as_json() for item in snapshot.items],
             "fingerprint": snapshot.fingerprint,
