@@ -539,3 +539,163 @@ def test_execution_evidence_optional_trust_health_can_be_empty():
     )
     assert evidence.runtime_trust_digest == ""
     assert evidence.authority_health_policy_digest == ""
+
+
+def test_execution_evidence_binds_attempt_identity_and_state():
+    evidence = build(
+        execution_attempt_id="attempt-1",
+        execution_attempt_authority_digest=fp("z"),
+        execution_attempt_state="succeeded",
+    )
+    assert evidence.execution_attempt_id == "attempt-1"
+    assert evidence.execution_attempt_authority_digest == fp("z")
+    assert evidence.execution_attempt_state == "succeeded"
+    data = evidence.to_dict()
+    assert data["execution_attempt_id"] == "attempt-1"
+    assert data["execution_attempt_authority_digest"] == fp("z")
+    assert data["execution_attempt_state"] == "succeeded"
+
+
+def test_execution_evidence_digest_changes_with_attempt_authority():
+    first = build(
+        execution_attempt_id="attempt",
+        execution_attempt_authority_digest=fp("a"),
+        execution_attempt_state="succeeded",
+    )
+    second = build(
+        execution_attempt_id="attempt",
+        execution_attempt_authority_digest=fp("b"),
+        execution_attempt_state="succeeded",
+    )
+    assert first.digest != second.digest
+
+
+def test_execution_evidence_digest_changes_with_attempt_state():
+    first = build(
+        execution_attempt_id="attempt",
+        execution_attempt_authority_digest=fp("a"),
+        execution_attempt_state="succeeded",
+    )
+    second = build(
+        execution_attempt_id="attempt",
+        execution_attempt_authority_digest=fp("a"),
+        execution_attempt_state="failed",
+    )
+    assert first.digest != second.digest
+
+
+def test_execution_evidence_digest_changes_with_attempt_id():
+    first = build(
+        execution_attempt_id="attempt-a",
+        execution_attempt_authority_digest=fp("a"),
+        execution_attempt_state="succeeded",
+    )
+    second = build(
+        execution_attempt_id="attempt-b",
+        execution_attempt_authority_digest=fp("a"),
+        execution_attempt_state="succeeded",
+    )
+    assert first.digest != second.digest
+
+
+@pytest.mark.parametrize(
+    "attempt_id,authority_digest,state",
+    [
+        ("attempt", "", "succeeded"),
+        ("", fp("a"), ""),
+        ("", "", "succeeded"),
+    ],
+)
+def test_execution_evidence_attempt_fields_must_be_consistent(
+    attempt_id,
+    authority_digest,
+    state,
+):
+    with pytest.raises(ValueError, match="execution attempt"):
+        build(
+            execution_attempt_id=attempt_id,
+            execution_attempt_authority_digest=authority_digest,
+            execution_attempt_state=state,
+        )
+
+
+def test_execution_evidence_attempt_authority_digest_validation():
+    with pytest.raises(ValueError, match="execution_attempt_authority_digest"):
+        build(
+            execution_attempt_id="attempt",
+            execution_attempt_authority_digest="bad",
+            execution_attempt_state="succeeded",
+        )
+
+
+def test_execution_evidence_attempt_id_limit():
+    with pytest.raises(ValueError, match="execution_attempt_id"):
+        build(
+            execution_attempt_id="x" * 257,
+            execution_attempt_authority_digest=fp("a"),
+            execution_attempt_state="succeeded",
+        )
+
+
+def test_execution_evidence_attempt_state_limit():
+    with pytest.raises(ValueError, match="execution_attempt_state"):
+        build(
+            execution_attempt_id="attempt",
+            execution_attempt_authority_digest=fp("a"),
+            execution_attempt_state="x" * 65,
+        )
+
+
+def test_execution_evidence_attempt_round_trip_through_store():
+    target = store()
+    evidence = build(
+        execution_attempt_id="attempt-1",
+        execution_attempt_authority_digest=fp("z"),
+        execution_attempt_state="succeeded",
+    )
+    target.append(evidence)
+    loaded = target.snapshot()[0].evidence
+    assert loaded.execution_attempt_id == "attempt-1"
+    assert loaded.execution_attempt_authority_digest == fp("z")
+    assert loaded.execution_attempt_state == "succeeded"
+    assert loaded.digest == evidence.digest
+    assert target.verify()
+
+
+def test_execution_evidence_attempt_tamper_breaks_outer_chain():
+    backend = InMemoryFencedStore()
+    target = store(backend=backend)
+    target.append(
+        build(
+            execution_attempt_id="attempt-1",
+            execution_attempt_authority_digest=fp("z"),
+            execution_attempt_state="succeeded",
+        )
+    )
+    node = target._chain.snapshot()[0]
+    record = backend.get(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+    )
+    payload = dict(node.payload)
+    raw = dict(payload["evidence"])
+    raw["execution_attempt_state"] = "failed"
+    payload["evidence"] = raw
+    backend.compare_and_swap(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+        expected_revision=record.revision,
+        value=replace(node, payload=payload),
+    )
+    assert not target.verify()
+
+
+def test_execution_evidence_attempt_fields_can_be_absent_for_legacy_flow():
+    evidence = build(
+        execution_attempt_id="",
+        execution_attempt_authority_digest="",
+        execution_attempt_state="",
+    )
+    assert evidence.execution_attempt_id == ""
+    assert evidence.execution_attempt_authority_digest == ""
+    assert evidence.execution_attempt_state == ""
