@@ -300,6 +300,38 @@ def test_contradictory_observations_cannot_be_collapsed_into_one_feature() -> No
     assert caught.value.context["reason"] == "contradictory_signal"
 
 
+def test_hypothesis_cannot_cross_subject_feature_evidence() -> None:
+    store = _store()
+    store.record_observation(
+        _observation(
+            observation_id="obs-other",
+            subject_id="skill-rust",
+            payload={"score": 1},
+        )
+    )
+    store.record_feature(
+        Feature(
+            feature_id="feat-other",
+            subject_id="skill-rust",
+            name="score",
+            value=1,
+            observation_ids=("obs-other",),
+            provenance=make_provenance(
+                _feature_payload("score", 1, subject_id="skill-rust"),
+                parent_ids=("obs-other",),
+            ),
+        )
+    )
+
+    with pytest.raises(LearningEvidenceError) as caught:
+        store.record_hypothesis(
+            _hypothesis(feature_ids=("feat-other",))
+        )
+
+    assert caught.value.context["reason"] == "subject_mismatch"
+    assert "hyp-1" not in store.analysis()
+
+
 def test_contradictory_hypotheses_fail_closed() -> None:
     store = _store()
     _seed_feature(store)
@@ -486,3 +518,47 @@ def test_learning_package_still_exports_curriculum_service() -> None:
     snapshot = service.snapshot()
     assert snapshot.ready_lesson_ids == ("intro",)
     assert isinstance(Curriculum(), Curriculum)
+
+
+
+def test_record_observation_uses_one_clock_sample_for_validation_and_commit() -> None:
+    ticks = iter([NOW, float("nan")])
+    store = _store(clock=lambda: next(ticks))
+
+    update = store.record_observation(_observation())
+
+    assert update.version == 1
+    assert update.timestamp == NOW
+    assert store.version == 1
+    assert [record.version for record in store.history()] == [1]
+    assert store.observations()[0].observation_id == "obs-1"
+
+
+def test_failed_rollback_clock_leaves_store_version_and_history_unchanged() -> None:
+    store = _store()
+    _seed_observation(store)
+    version_after_fact = store.version
+    _seed_feature(store)
+    before_version = store.version
+    before_history = store.history()
+    before_facts = store.facts()
+
+    store._clock = lambda: float("nan")  # type: ignore[method-assign]
+
+    with pytest.raises(LearningEvidenceError, match="clock"):
+        store.rollback(version_after_fact)
+
+    assert store.version == before_version
+    assert store.history() == before_history
+    assert store.facts() == before_facts
+    assert "feat-1" in store.facts()
+
+
+def test_commit_timestamp_matches_staleness_clock_sample() -> None:
+    ticks = iter([NOW])
+    store = _store(clock=lambda: next(ticks))
+
+    update = store.record_observation(_observation(observed_at=NOW))
+
+    assert update.timestamp == NOW
+    assert update.previous_version is None
