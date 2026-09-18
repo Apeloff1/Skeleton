@@ -19,12 +19,19 @@ from .math3d import EPSILON, Quat, Vec3
 from .shapes import (
     BoxShape,
     CapsuleShape,
+    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     SphereShape,
 )
 
-_SUPPORTED_FINITE = (SphereShape, BoxShape, CapsuleShape, CylinderShape)
+_SUPPORTED_FINITE = (
+    SphereShape,
+    BoxShape,
+    CapsuleShape,
+    CylinderShape,
+    ConvexHullShape,
+)
 _CHARACTER_STATE_DOMAIN = "skeleton.simulation.physics.character_state.v1"
 _CHARACTER_STATE_VERSION = 1
 
