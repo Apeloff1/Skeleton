@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import math
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .errors import PhysicsValidationError
 from .math3d import AABB, Transform, Vec3
@@ -221,6 +221,28 @@ class TriangleMeshShape:
 
     vertices: tuple[Vec3, ...]
     triangles: tuple[tuple[int, int, int], ...]
+    _triangle_bounds: tuple[AABB, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _centroids: tuple[Vec3, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _nodes: tuple[MeshBVHNode, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _root: int = field(init=False, repr=False, compare=False)
+    _local_bounds: AABB = field(init=False, repr=False, compare=False)
+    _geometry_fingerprint: str = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         try:
