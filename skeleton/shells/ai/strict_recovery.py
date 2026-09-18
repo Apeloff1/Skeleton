@@ -312,10 +312,6 @@ class StrictAIRecoveryManager:
                     attempt.recovery
                     is ExecutionAttemptRecovery.TERMINAL_SUCCESS
                 ):
-                    # A successful ledger entry proves the executor returned
-                    # terminal provenance, but recovery still relies on the
-                    # session evidence/journal checks below to prove that the
-                    # persisted checkpoint reflects that result.
                     if not attempt.terminal_evidence_digest:
                         action = self._stronger(
                             action,
@@ -324,6 +320,15 @@ class StrictAIRecoveryManager:
                         reasons.append(
                             "successful execution attempt lacks terminal "
                             "evidence digest"
+                        )
+                    elif session.phase != "complete":
+                        action = self._stronger(
+                            action,
+                            RecoveryAction.REQUIRE_VERIFICATION,
+                        )
+                        reasons.append(
+                            "successful execution attempt is newer than the "
+                            "persisted session checkpoint"
                         )
                 elif (
                     attempt.recovery
