@@ -192,3 +192,43 @@ def test_run_checked_error_does_not_embed_child_output(tmp_path: Path) -> None:
         )
     assert "super-secret" not in str(caught.value)
     assert caught.value.result.returncode == 3
+
+
+def test_rejects_executable_replaced_after_policy_construction(tmp_path: Path) -> None:
+    executable = tmp_path / "tool"
+    executable.write_bytes(b"first")
+    policy = ShellPolicy(
+        executables={"tool": str(executable.resolve())},
+        cwd_roots=(tmp_path,),
+    )
+    runner = ShellRunner(policy)
+
+    replacement = tmp_path / "replacement"
+    replacement.write_bytes(b"other")
+    replacement.replace(executable)
+
+    with pytest.raises(
+        ShellPolicyError,
+        match="registered executable changed after policy construction",
+    ):
+        runner.run(ShellCommand("tool", cwd=tmp_path))
+
+
+def test_rejects_in_place_executable_mutation_after_policy_construction(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "tool"
+    executable.write_bytes(b"first-version")
+    policy = ShellPolicy(
+        executables={"tool": str(executable.resolve())},
+        cwd_roots=(tmp_path,),
+    )
+    runner = ShellRunner(policy)
+
+    executable.write_bytes(b"second-version-with-different-size")
+
+    with pytest.raises(
+        ShellPolicyError,
+        match="registered executable changed after policy construction",
+    ):
+        runner.run(ShellCommand("tool", cwd=tmp_path))
