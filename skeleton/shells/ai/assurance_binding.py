@@ -22,6 +22,7 @@ class AssuranceBinding:
     execution_backend_id: str = ""
     sandbox_binding_digest: str = ""
     runtime_trust_digest: str = ""
+    execution_fence_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -37,6 +38,7 @@ class AssuranceBinding:
             "quorum_digest",
             "sandbox_binding_digest",
             "runtime_trust_digest",
+            "execution_fence_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -59,6 +61,7 @@ class AssuranceBinding:
             "execution_backend_id": self.execution_backend_id,
             "sandbox_binding_digest": self.sandbox_binding_digest,
             "runtime_trust_digest": self.runtime_trust_digest,
+            "execution_fence_digest": self.execution_fence_digest,
         }
 
     @property
