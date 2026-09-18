@@ -1357,6 +1357,85 @@ class SemanticTopologyLearningLab:
             fingerprint=fingerprint,
         )
 
+    def export_state(self) -> SemanticTopologyLearningState:
+        """Export a versioned immutable snapshot for durable storage."""
+
+        with self._lock:
+            return SemanticTopologyLearningState(
+                schema_version=1,
+                contract_fingerprint=self.contract_fingerprint,
+                predictions=tuple(self._predictions.values()),
+                trials=tuple(self._trials.values()),
+            )
+
+    def restore_state(
+        self,
+        state: SemanticTopologyLearningState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        """Atomically replace learning state after full contract validation."""
+
+        restored = (
+            state
+            if isinstance(state, SemanticTopologyLearningState)
+            else SemanticTopologyLearningState.from_json(state)
+        )
+        if restored.contract_fingerprint != self.contract_fingerprint:
+            raise AgentContractError(
+                "topology learning state contract fingerprint mismatch"
+            )
+
+        staged_predictions: dict[str, TopologyBridgePrediction] = {}
+        for prediction in restored.predictions:
+            self._validate_prediction_candidate(prediction)
+            if prediction.prediction_id in staged_predictions:
+                raise AgentContractError(
+                    "duplicate topology bridge prediction during restore"
+                )
+            staged_predictions[prediction.prediction_id] = prediction
+
+        staged_trials: dict[str, TopologyBridgeTrial] = {}
+        staged_resolved: dict[str, str] = {}
+        for trial in restored.trials:
+            candidate = self._candidates.get(trial.candidate_id)
+            if candidate is None:
+                raise AgentContractError(
+                    "restored trial references unknown topology candidate"
+                )
+            expected_candidate = self.candidate_fingerprint(candidate)
+            if trial.candidate_fingerprint != expected_candidate:
+                raise AgentContractError(
+                    "restored topology candidate fingerprint mismatch"
+                )
+            prediction = staged_predictions.get(trial.prediction_id)
+            if prediction is None:
+                raise AgentContractError(
+                    "restored topology trial has no declared prediction"
+                )
+            if not self._trial_matches_prediction(trial, prediction):
+                raise AgentContractError(
+                    "restored topology trial differs from prediction custody"
+                )
+            if trial.trial_id in staged_trials:
+                raise AgentContractError(
+                    "duplicate topology bridge trial during restore"
+                )
+            prior_trial = staged_resolved.get(trial.prediction_id)
+            if prior_trial is not None:
+                raise AgentContractError(
+                    "restored topology prediction has multiple outcomes"
+                )
+            staged_trials[trial.trial_id] = trial
+            staged_resolved[trial.prediction_id] = trial.trial_id
+
+        with self._lock:
+            self._predictions = staged_predictions
+            self._trials = staged_trials
+            self._resolved_predictions = staged_resolved
+            reports = self.reports()
+            learned = self._learned_rules_from_reports(reports)
+            snapshot = self._snapshot_from_reports(reports, learned)
+        return snapshot
+
     def evaluate(
         self,
     ) -> tuple[
@@ -1412,6 +1491,7 @@ __all__ = [
     "LearnedTopologyRule",
     "SemanticTopologyLearningLab",
     "SemanticTopologyLearningSnapshot",
+    "SemanticTopologyLearningState",
     "TopologyBridgePolicy",
     "TopologyBridgePrediction",
     "TopologyBridgeReport",
