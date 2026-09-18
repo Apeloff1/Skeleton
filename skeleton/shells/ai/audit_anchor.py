@@ -27,6 +27,8 @@ class AIAuditAnchor:
     session_evidence_digest: str
     release_evidence_digest: str = ""
     sandbox_binding_digest: str = ""
+    runtime_trust_digest: str = ""
+    authority_health_policy_digest: str = ""
     observed_at: float = 0.0
 
     def __post_init__(self) -> None:
@@ -46,6 +48,8 @@ class AIAuditAnchor:
         for name in (
             "release_evidence_digest",
             "sandbox_binding_digest",
+            "runtime_trust_digest",
+            "authority_health_policy_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -64,6 +68,10 @@ class AIAuditAnchor:
             "session_evidence_digest": self.session_evidence_digest,
             "release_evidence_digest": self.release_evidence_digest,
             "sandbox_binding_digest": self.sandbox_binding_digest,
+            "runtime_trust_digest": self.runtime_trust_digest,
+            "authority_health_policy_digest": (
+                self.authority_health_policy_digest
+            ),
             "observed_at": self.observed_at,
         }
 
@@ -127,6 +135,8 @@ class AIAuditAnchorStore:
         session_evidence_digest: str,
         release_evidence_digest: str = "",
         sandbox_binding_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
     ) -> SignedAIAuditAnchor:
         anchor = AIAuditAnchor(
             1,
@@ -138,6 +148,8 @@ class AIAuditAnchorStore:
             session_evidence_digest,
             release_evidence_digest,
             sandbox_binding_digest,
+            runtime_trust_digest,
+            authority_health_policy_digest,
             self._clock(),
         )
         signature = self.signer.sign(
@@ -170,6 +182,8 @@ class AIAuditAnchorStore:
             str(raw["session_evidence_digest"]),
             str(raw.get("release_evidence_digest", "")),
             str(raw.get("sandbox_binding_digest", "")),
+            str(raw.get("runtime_trust_digest", "")),
+            str(raw.get("authority_health_policy_digest", "")),
             float(raw["observed_at"]),
         )
 
