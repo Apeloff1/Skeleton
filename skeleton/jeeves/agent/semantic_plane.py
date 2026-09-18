@@ -650,6 +650,8 @@ class SemanticLensPlane:
         hypergraph: SemanticHypergraphSnapshot,
         forecasts: Sequence[SemanticForecast],
         fusion: LensFusionResult,
+        tangent_ids: Sequence[str],
+        frontier: FrontierSelection,
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
             sorted({spec.family for spec in selection.lenses}, key=lambda item: item.value)
@@ -694,6 +696,8 @@ class SemanticLensPlane:
                 "perpendicular": len(perpendicular.candidates),
                 "forecasts": len(forecasts),
                 "effective_lenses": fusion.effective_lens_count,
+                "tangents": sorted(tangent_ids),
+                "frontier": frontier.fingerprint,
             }
         )
         return SemanticPlaneCoverage(
@@ -714,6 +718,8 @@ class SemanticLensPlane:
             perpendicular_candidates=len(perpendicular.candidates),
             forecast_count=len(forecasts),
             fused_effective_lens_count=fusion.effective_lens_count,
+            tangent_count=len(tuple(tangent_ids)),
+            frontier_tangent_count=len(frontier.tangent_ids),
             fingerprint=fingerprint,
         )
 
