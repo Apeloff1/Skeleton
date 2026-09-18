@@ -50,3 +50,13 @@ def test_night_shift_report_reuses_closed_machine_ledger() -> None:
     assert '"-f", "state=closed"' in text
     assert "updated the closed report ledger" in text
     assert "created and closed the report ledger" in text
+
+
+def test_new_night_report_closes_identity_returned_by_create() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert "def create_issue(self, title: str, body: str, labels: Sequence[str]) -> int:" in text
+    assert 'created.rstrip("/").rsplit("/", 1)[-1]' in text
+    assert "created_number = gh.create_issue(title, body, ())" in text
+    assert "gh.close_issue(created_number)" in text
+    assert "issue was created but could not be resolved" not in text
