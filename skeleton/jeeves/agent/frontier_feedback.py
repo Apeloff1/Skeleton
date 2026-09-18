@@ -67,6 +67,24 @@ class FrontierFeedbackReport:
 
 
 @dataclass(frozen=True, slots=True)
+class FrontierComputeEfficiency:
+    direct_count: int
+    escalated_count: int
+    direct_success_rate: float
+    escalated_success_rate: float
+    direct_mean_model_calls: float
+    escalated_mean_model_calls: float
+    direct_mean_estimated_tokens: float
+    escalated_mean_estimated_tokens: float
+    incremental_success_rate: float
+    incremental_model_calls: float
+    incremental_estimated_tokens: float
+    success_gain_per_extra_model_call: float
+    success_gain_per_1k_extra_tokens: float
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
 class FrontierFeedbackRecommendation:
     minimum_quality_delta: float
     minimum_choice_probability_delta: float
@@ -195,8 +213,79 @@ class FrontierReasoningFeedback:
             fingerprint=stable_fingerprint(payload),
         )
 
+    def compute_efficiency(self) -> FrontierComputeEfficiency:
+        samples = self.samples()
+        direct = tuple(item for item in samples if item.escalation_rounds == 0)
+        escalated = tuple(item for item in samples if item.escalation_rounds > 0)
+
+        def rate(values: Sequence[FrontierFeedbackSample]) -> float:
+            return (
+                sum(1 for item in values if item.verified_success) / len(values)
+                if values
+                else 0.0
+            )
+
+        def mean(values: Sequence[FrontierFeedbackSample], attribute: str) -> float:
+            return (
+                statistics.fmean(float(getattr(item, attribute)) for item in values)
+                if values
+                else 0.0
+            )
+
+        direct_success = rate(direct)
+        escalated_success = rate(escalated)
+        direct_calls = mean(direct, "model_calls")
+        escalated_calls = mean(escalated, "model_calls")
+        direct_tokens = mean(direct, "estimated_tokens")
+        escalated_tokens = mean(escalated, "estimated_tokens")
+        success_delta = (
+            escalated_success - direct_success if direct and escalated else 0.0
+        )
+        call_delta = (
+            escalated_calls - direct_calls if direct and escalated else 0.0
+        )
+        token_delta = (
+            escalated_tokens - direct_tokens if direct and escalated else 0.0
+        )
+        per_call = success_delta / call_delta if call_delta > 0.0 else 0.0
+        per_1k_tokens = (
+            success_delta / (token_delta / 1000.0) if token_delta > 0.0 else 0.0
+        )
+        payload = {
+            "direct_count": len(direct),
+            "escalated_count": len(escalated),
+            "direct_success": direct_success,
+            "escalated_success": escalated_success,
+            "direct_calls": direct_calls,
+            "escalated_calls": escalated_calls,
+            "direct_tokens": direct_tokens,
+            "escalated_tokens": escalated_tokens,
+            "success_delta": success_delta,
+            "call_delta": call_delta,
+            "token_delta": token_delta,
+            "per_call": per_call,
+            "per_1k_tokens": per_1k_tokens,
+        }
+        return FrontierComputeEfficiency(
+            direct_count=len(direct),
+            escalated_count=len(escalated),
+            direct_success_rate=direct_success,
+            escalated_success_rate=escalated_success,
+            direct_mean_model_calls=direct_calls,
+            escalated_mean_model_calls=escalated_calls,
+            direct_mean_estimated_tokens=direct_tokens,
+            escalated_mean_estimated_tokens=escalated_tokens,
+            incremental_success_rate=success_delta,
+            incremental_model_calls=call_delta,
+            incremental_estimated_tokens=token_delta,
+            success_gain_per_extra_model_call=per_call,
+            success_gain_per_1k_extra_tokens=per_1k_tokens,
+            fingerprint=stable_fingerprint(payload),
+        )
+
     def recommendation(self) -> FrontierFeedbackRecommendation:
         report = self.report()
+        efficiency = self.compute_efficiency()
         quality_delta = 0.0
         choice_delta = 0.0
         entropy_delta = 0.0
@@ -208,7 +297,11 @@ class FrontierReasoningFeedback:
         if report.escalated_count >= 6 and report.direct_count >= 6:
             if report.observed_escalation_delta > 0.08:
                 entropy_delta += 0.04
-                reasons.append("extra inference is associated with higher verified success")
+                reasons.append(
+                    "extra inference is associated with higher verified success "
+                    f"(gain/call={efficiency.success_gain_per_extra_model_call:.4f}, "
+                    f"gain/1k_tokens={efficiency.success_gain_per_1k_extra_tokens:.4f})"
+                )
             elif report.observed_escalation_delta < -0.08:
                 entropy_delta -= 0.04
                 reasons.append("extra inference is associated with lower verified success")
@@ -218,6 +311,7 @@ class FrontierReasoningFeedback:
         fingerprint = stable_fingerprint(
             {
                 "report": report.fingerprint,
+                "efficiency": efficiency.fingerprint,
                 "quality": quality_delta,
                 "choice": choice_delta,
                 "entropy": entropy_delta,
@@ -399,6 +493,7 @@ class FrontierEvalFeedback:
 
 
 __all__ = [
+    "FrontierComputeEfficiency",
     "FrontierEvalComparison",
     "FrontierEvalFeedback",
     "FrontierEvalGate",
