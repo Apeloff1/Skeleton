@@ -378,10 +378,9 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         if search.best is None:
             return super()._execute_reasoning_step(state, step)
 
-        if decision is not None and decision.disposition in {
-            InferenceDisposition.SEEK_EVIDENCE,
-            InferenceDisposition.ABSTAIN,
-            InferenceDisposition.DELIBERATE,
+        if decision is not None and decision.disposition not in {
+            InferenceDisposition.COMMIT,
+            InferenceDisposition.VERIFY,
         }:
             reason = self._frontier_block_reason(decision)
             state.scratch.set(
@@ -435,6 +434,18 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     "frontier_disposition": decision.disposition.value,
                 },
             )
+
+        if decision is not None and decision.disposition is InferenceDisposition.VERIFY:
+            state.trace.emit(
+                "frontier.verification_required",
+                {
+                    "step_id": step.step_id,
+                    "decision": decision.fingerprint,
+                    "causes": [cause.value for cause in decision.causes],
+                    "verification": "step_verifier",
+                },
+            )
+            self.metrics.increment("agent.frontier.verification_required")
 
         selected = (
             decision.leading_candidate
