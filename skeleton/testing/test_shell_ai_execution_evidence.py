@@ -142,6 +142,7 @@ def test_execution_evidence_required_digest_validation(field):
         "quorum_approval_digest",
         "runtime_trust_digest",
         "authority_health_policy_digest",
+        "execution_attempt_authority_digest",
         "audit_witness_digest",
     ],
 )
@@ -699,3 +700,75 @@ def test_execution_evidence_attempt_fields_can_be_absent_for_legacy_flow():
     assert evidence.execution_attempt_id == ""
     assert evidence.execution_attempt_authority_digest == ""
     assert evidence.execution_attempt_state == ""
+
+
+def test_execution_evidence_digest_changes_with_execution_attempt():
+    first = build(
+        execution_attempt_id="seal-a",
+        execution_attempt_authority_digest=fp("a"),
+    )
+    second = build(
+        execution_attempt_id="seal-b",
+        execution_attempt_authority_digest=fp("b"),
+    )
+    assert first.digest != second.digest
+
+
+@pytest.mark.parametrize(
+    "attempt_id,authority_digest",
+    [
+        ("seal", ""),
+        ("", fp("a")),
+        ("x" * 257, fp("a")),
+    ],
+)
+def test_execution_evidence_attempt_fields_must_be_paired(
+    attempt_id,
+    authority_digest,
+):
+    with pytest.raises(ValueError):
+        build(
+            execution_attempt_id=attempt_id,
+            execution_attempt_authority_digest=authority_digest,
+        )
+
+
+def test_execution_evidence_attempt_round_trip_through_store():
+    target = store()
+    evidence = build(
+        execution_attempt_id="seal-1",
+        execution_attempt_authority_digest=fp("a"),
+    )
+    target.append(evidence)
+    loaded = target.snapshot()[0].evidence
+    assert loaded.execution_attempt_id == "seal-1"
+    assert loaded.execution_attempt_authority_digest == fp("a")
+    assert loaded.digest == evidence.digest
+    assert target.verify()
+
+
+def test_execution_evidence_attempt_tamper_breaks_outer_chain():
+    backend = InMemoryFencedStore()
+    target = store(backend=backend)
+    target.append(
+        build(
+            execution_attempt_id="seal-1",
+            execution_attempt_authority_digest=fp("a"),
+        )
+    )
+    node = target._chain.snapshot()[0]
+    record = backend.get(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+    )
+    payload = dict(node.payload)
+    raw = dict(payload["evidence"])
+    raw["execution_attempt_authority_digest"] = fp("x")
+    payload["evidence"] = raw
+    backend.compare_and_swap(
+        target._chain.namespace,
+        f"node:{node.node_hash}",
+        expected_revision=record.revision,
+        value=replace(node, payload=payload),
+    )
+    assert not target.verify()
