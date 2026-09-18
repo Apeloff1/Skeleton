@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import stat
 import subprocess
 import threading
 import time
@@ -49,17 +50,17 @@ def _resolved_directory(path: Path) -> Path:
 
 def _executable_identity(path: str) -> tuple[int, int, int, int, int]:
     try:
-        stat = os.stat(path, follow_symlinks=False)
+        metadata = os.stat(path, follow_symlinks=False)
     except OSError as exc:
         raise ShellPolicyError("registered executable is unavailable") from exc
-    if not Path(path).is_file():
-        raise ShellPolicyError("registered executable must remain a file")
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ShellPolicyError("registered executable must remain a regular file")
     return (
-        int(stat.st_dev),
-        int(stat.st_ino),
-        int(stat.st_mode),
-        int(stat.st_size),
-        int(stat.st_mtime_ns),
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(metadata.st_mode),
+        int(metadata.st_size),
+        int(metadata.st_mtime_ns),
     )
 
 
