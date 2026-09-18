@@ -1,1 +1,336 @@
-"""Reliability-aware predictive fusion for Jeeves.\n\nSignals from memory sequences, semantic lenses, games, causal models, and base\nrates are not independent votes. This module combines compatible binary\nforecasts while discounting correlated sources, learning source reliability,\npreserving disagreement, and never converting prediction into evidence.\n"""\n\nfrom __future__ import annotations\n\nimport math\nfrom dataclasses import dataclass, field, replace\nfrom enum import Enum\nfrom typing import Any, Mapping, Sequence\n\nfrom .associative_memory import SequencePrediction\nfrom .lens_hypergraph import LensHyperedge\nfrom .semantic_prediction import SemanticForecast\nfrom .types import AgentContractError, finite_number, json_safe, positive_int, probability, stable_fingerprint, stable_id\n\n\nclass PredictiveSource(str, Enum):\n    MEMORY_SEQUENCE = "memory_sequence"\n    SEMANTIC_LENS = "semantic_lens"\n    SEMANTIC_HYPEREDGE = "semantic_hyperedge"\n    CAUSAL_MODEL = "causal_model"\n    GAME_MODEL = "game_model"\n    EMPIRICAL_BASE_RATE = "empirical_base_rate"\n    HUMAN_PRIOR = "human_prior"\n    OTHER = "other"\n\n\n@dataclass(frozen=True, slots=True)\nclass ReliabilityPosterior:\n    successes: float = 1.0\n    failures: float = 1.0\n\n    def __post_init__(self) -> None:\n        s = finite_number("successes", self.successes)\n        f = finite_number("failures", self.failures)\n        if s <= 0 or f <= 0:\n            raise AgentContractError("beta reliability parameters must be positive")\n        object.__setattr__(self, "successes", s)\n        object.__setattr__(self, "failures", f)\n\n    @property\n    def mean(self) -> float:\n        return self.successes / (self.successes + self.failures)\n\n    @property\n    def effective_samples(self) -> float:\n        return max(0.0, self.successes + self.failures - 2.0)\n\n    def update(self, success: bool, *, weight: float = 1.0) -> "ReliabilityPosterior":\n        w = finite_number("weight", weight)\n        if w <= 0:\n            raise AgentContractError("reliability update weight must be positive")\n        return ReliabilityPosterior(\n            self.successes + (w if success else 0.0),\n            self.failures + (0.0 if success else w),\n        )\n\n\n@dataclass(frozen=True, slots=True)\nclass PredictiveSignal:\n    signal_id: str\n    proposition: str\n    probability: float\n    source: PredictiveSource\n    source_key: str\n    independence_group: str\n    base_weight: float = 0.5\n    ambiguity: float = 0.0\n    evidence_ids: tuple[str, ...] = ()\n    metadata: Mapping[str, Any] = field(default_factory=dict)\n\n    def __post_init__(self) -> None:\n        if not str(self.signal_id).strip() or not str(self.proposition).strip():\n            raise AgentContractError("predictive signal requires id and proposition")\n        object.__setattr__(self, "probability", probability("signal probability", self.probability))\n        if not isinstance(self.source, PredictiveSource):\n            object.__setattr__(self, "source", PredictiveSource(str(self.source)))\n        object.__setattr__(self, "source_key", str(self.source_key).strip().casefold())\n        object.__setattr__(self, "independence_group", str(self.independence_group).strip().casefold())\n        if not self.source_key or not self.independence_group:\n            raise AgentContractError("source_key and independence_group are required")\n        object.__setattr__(self, "base_weight", probability("base_weight", self.base_weight))\n        object.__setattr__(self, "ambiguity", probability("ambiguity", self.ambiguity))\n        object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))\n        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))\n\n    @property\n    def fingerprint(self) -> str:\n        return stable_fingerprint({\n            "proposition": self.proposition,\n            "probability": self.probability,\n            "source": self.source.value,\n            "source_key": self.source_key,\n            "group": self.independence_group,\n            "weight": self.base_weight,\n            "ambiguity": self.ambiguity,\n            "evidence": self.evidence_ids,\n        })\n\n\n@dataclass(frozen=True, slots=True)\nclass FusionPolicy:\n    maximum_signal_weight: float = 0.70\n    minimum_signal_weight: float = 0.01\n    ambiguity_penalty: float = 0.65\n    duplicate_group_penalty: float = 0.55\n    prior_probability: float = 0.50\n    prior_weight: float = 0.20\n    minimum_probability: float = 0.01\n    maximum_probability: float = 0.99\n    minimum_independence_groups: int = 2\n    high_disagreement_threshold: float = 0.25\n\n    def __post_init__(self) -> None:\n        for name in (\n            "maximum_signal_weight", "minimum_signal_weight", "ambiguity_penalty",\n            "duplicate_group_penalty", "prior_probability", "prior_weight",\n            "minimum_probability", "maximum_probability", "high_disagreement_threshold",\n        ):\n            object.__setattr__(self, name, probability(name, getattr(self, name)))\n        object.__setattr__(\n            self, "minimum_independence_groups",\n            positive_int("minimum_independence_groups", self.minimum_independence_groups, maximum=1000),\n        )\n        if self.minimum_probability >= self.maximum_probability:\n            raise AgentContractError("probability bounds are invalid")\n\n\n@dataclass(frozen=True, slots=True)\nclass SignalAttribution:\n    signal_id: str\n    source_key: str\n    independence_group: str\n    probability: float\n    reliability: float\n    effective_weight: float\n    log_odds_contribution: float\n\n\n@dataclass(frozen=True, slots=True)\nclass FusedPrediction:\n    proposition: str\n    probability: float\n    robust_lower: float\n    robust_upper: float\n    disagreement: float\n    entropy_bits: float\n    epistemic_dispersion: float\n    source_count: int\n    independence_groups: tuple[str, ...]\n    underidentified: bool\n    attributions: tuple[SignalAttribution, ...]\n    evidence_ids: tuple[str, ...]\n    fingerprint: str\n\n\nclass PredictiveFusionEngine:\n    def __init__(self, *, policy: FusionPolicy | None = None) -> None:\n        self.policy = policy or FusionPolicy()\n        self._reliability: dict[str, ReliabilityPosterior] = {}\n\n    def reliability(self, source_key: str) -> ReliabilityPosterior:\n        key = str(source_key).strip().casefold()\n        return self._reliability.get(key, ReliabilityPosterior())\n\n    def record_outcome(\n        self,\n        source_key: str,\n        *,\n        predicted_probability: float,\n        outcome: bool,\n        weight: float = 1.0,\n    ) -> ReliabilityPosterior:\n        p = probability("predicted_probability", predicted_probability)\n        if not isinstance(outcome, bool):\n            raise AgentContractError("outcome must be bool")\n        # Reliability is correctness of direction, not a substitute for calibration.\n        # p == .5 is neutral and earns half credit rather than a forced success/failure.\n        directional_success = (p > 0.5 and outcome) or (p < 0.5 and not outcome)\n        key = str(source_key).strip().casefold()\n        posterior = self.reliability(key)\n        if abs(p - 0.5) < 1e-12:\n            updated = ReliabilityPosterior(\n                posterior.successes + 0.5 * weight,\n                posterior.failures + 0.5 * weight,\n            )\n        else:\n            updated = posterior.update(directional_success, weight=weight)\n        self._reliability[key] = updated\n        return updated\n\n    @staticmethod\n    def _logit(p: float) -> float:\n        x = min(1.0 - 1e-9, max(1e-9, p))\n        return math.log(x / (1.0 - x))\n\n    @staticmethod\n    def _logistic(x: float) -> float:\n        if x >= 0:\n            e = math.exp(-x)\n            return 1.0 / (1.0 + e)\n        e = math.exp(x)\n        return e / (1.0 + e)\n\n    def fuse(self, proposition: str, signals: Sequence[PredictiveSignal]) -> FusedPrediction:\n        usable = [signal for signal in signals if signal.proposition == proposition]\n        if not usable:\n            raise AgentContractError("fusion requires compatible signals for proposition")\n        group_counts: dict[str, int] = {}\n        for signal in usable:\n            group_counts[signal.independence_group] = group_counts.get(signal.independence_group, 0) + 1\n\n        weighted_log_odds = self.policy.prior_weight * self._logit(self.policy.prior_probability)\n        total_weight = self.policy.prior_weight\n        attributions: list[SignalAttribution] = []\n        probabilities: list[float] = []\n        evidence_ids: set[str] = set()\n        for signal in usable:\n            posterior = self.reliability(signal.source_key)\n            reliability = posterior.mean\n            duplicate_factor = 1.0 / (1.0 + self.policy.duplicate_group_penalty * (group_counts[signal.independence_group] - 1))\n            ambiguity_factor = max(0.0, 1.0 - self.policy.ambiguity_penalty * signal.ambiguity)\n            effective = signal.base_weight * reliability * duplicate_factor * ambiguity_factor\n            effective = min(self.policy.maximum_signal_weight, max(self.policy.minimum_signal_weight, effective))\n            contribution = effective * self._logit(signal.probability)\n            weighted_log_odds += contribution\n            total_weight += effective\n            probabilities.append(signal.probability)\n            evidence_ids.update(signal.evidence_ids)\n            attributions.append(SignalAttribution(\n                signal.signal_id, signal.source_key, signal.independence_group,\n                signal.probability, reliability, effective, contribution,\n            ))\n        pooled = self._logistic(weighted_log_odds / max(total_weight, 1e-12))\n        pooled = min(self.policy.maximum_probability, max(self.policy.minimum_probability, pooled))\n        mean = sum(probabilities) / len(probabilities)\n        variance = sum((p - mean) ** 2 for p in probabilities) / len(probabilities)\n        dispersion = min(1.0, math.sqrt(variance) * 2.0)\n        disagreement = max(probabilities) - min(probabilities)\n        robust_lower = min(probabilities + [self.policy.prior_probability])\n        robust_upper = max(probabilities + [self.policy.prior_probability])\n        entropy = 0.0 if pooled in (0.0, 1.0) else -pooled * math.log2(pooled) - (1.0 - pooled) * math.log2(1.0 - pooled)\n        groups = tuple(sorted(group_counts))\n        underidentified = len(groups) < self.policy.minimum_independence_groups or disagreement >= self.policy.high_disagreement_threshold\n        fp = stable_fingerprint({\n            "proposition": proposition,\n            "signals": sorted(signal.fingerprint for signal in usable),\n            "probability": pooled,\n            "lower": robust_lower,\n            "upper": robust_upper,\n            "groups": groups,\n            "reliability": {key: self.reliability(key).mean for key in sorted({s.source_key for s in usable})},\n        })\n        return FusedPrediction(\n            proposition=proposition,\n            probability=pooled,\n            robust_lower=robust_lower,\n            robust_upper=robust_upper,\n            disagreement=disagreement,\n            entropy_bits=entropy,\n            epistemic_dispersion=dispersion,\n            source_count=len(usable),\n            independence_groups=groups,\n            underidentified=underidentified,\n            attributions=tuple(sorted(attributions, key=lambda x: (-x.effective_weight, x.signal_id))),\n            evidence_ids=tuple(sorted(evidence_ids)),\n            fingerprint=fp,\n        )\n\n    def semantic_signal(self, forecast: SemanticForecast, *, weight: float = 0.45) -> PredictiveSignal:\n        return PredictiveSignal(\n            signal_id=forecast.forecast_id,\n            proposition=forecast.proposition,\n            probability=forecast.probability,\n            source=PredictiveSource.SEMANTIC_LENS,\n            source_key="semantic:" + "+".join(forecast.source_lens_keys or ("unknown",)),\n            independence_group="semantic:" + (forecast.calibration_group or "generic"),\n            base_weight=weight,\n            ambiguity=forecast.ambiguity,\n            evidence_ids=forecast.evidence_ids,\n            metadata={"is_evidence": False, "forecast_fingerprint": forecast.fingerprint},\n        )\n\n    def hyperedge_signal(self, edge: LensHyperedge, proposition: str, *, weight: float = 0.35) -> PredictiveSignal:\n        # Hyperedge confidence is interpretive confidence, so shrink aggressively toward .5.\n        signed = edge.confidence - 0.5\n        p = 0.5 + signed * max(0.0, 1.0 - edge.ambiguity) * 0.60\n        if edge.unresolved:\n            p = 0.5 + (p - 0.5) * 0.35\n        return PredictiveSignal(\n            signal_id=stable_id("hyperedge-signal", {"edge": edge.fingerprint, "proposition": proposition}, length=28),\n            proposition=proposition,\n            probability=p,\n            source=PredictiveSource.SEMANTIC_HYPEREDGE,\n            source_key="hyperedge:" + edge.edge_id,\n            independence_group="semantic-hypergraph:" + edge.kind.value,\n            base_weight=weight,\n            ambiguity=edge.ambiguity,\n            evidence_ids=edge.evidence_ids,\n            metadata={"is_evidence": False, "edge": edge.edge_id, "unresolved": edge.unresolved},\n        )\n\n    def sequence_signals(\n        self,\n        prediction: SequencePrediction,\n        *,\n        proposition_prefix: str = "next-card:",\n        weight: float = 0.55,\n    ) -> tuple[PredictiveSignal, ...]:\n        result: list[PredictiveSignal] = []\n        for card_id, p in prediction.candidates:\n            proposition = f"{proposition_prefix}{card_id}"\n            result.append(PredictiveSignal(\n                signal_id=stable_id("sequence-signal", {"prediction": prediction.fingerprint, "card": card_id}, length=28),\n                proposition=proposition,\n                probability=p,\n                source=PredictiveSource.MEMORY_SEQUENCE,\n                source_key="memory-sequence:" + prediction.namespace_key,\n                independence_group="memory-sequence:" + prediction.namespace_key,\n                base_weight=weight,\n                ambiguity=min(1.0, prediction.entropy_bits / max(1.0, math.log2(max(2, len(prediction.candidates))))),\n                metadata={"evidence_count": prediction.evidence_count, "prefix": list(prediction.prefix)},\n            ))\n        return tuple(result)\n\n    @property\n    def fingerprint(self) -> str:\n        return stable_fingerprint({key: (value.successes, value.failures) for key, value in sorted(self._reliability.items())})
+"""Reliability-aware predictive fusion for Jeeves.
+
+Signals from memory sequences, semantic lenses, games, causal models, and base
+rates are not independent votes. This module combines compatible binary
+forecasts while discounting correlated sources, learning source reliability,
+preserving disagreement, and never converting prediction into evidence.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field, replace
+from enum import Enum
+from typing import Any, Mapping, Sequence
+
+from .associative_memory import SequencePrediction
+from .lens_hypergraph import LensHyperedge
+from .semantic_prediction import SemanticForecast
+from .types import AgentContractError, finite_number, json_safe, positive_int, probability, stable_fingerprint, stable_id
+
+
+class PredictiveSource(str, Enum):
+    MEMORY_SEQUENCE = "memory_sequence"
+    SEMANTIC_LENS = "semantic_lens"
+    SEMANTIC_HYPEREDGE = "semantic_hyperedge"
+    CAUSAL_MODEL = "causal_model"
+    GAME_MODEL = "game_model"
+    EMPIRICAL_BASE_RATE = "empirical_base_rate"
+    HUMAN_PRIOR = "human_prior"
+    OTHER = "other"
+
+
+@dataclass(frozen=True, slots=True)
+class ReliabilityPosterior:
+    successes: float = 1.0
+    failures: float = 1.0
+
+    def __post_init__(self) -> None:
+        s = finite_number("successes", self.successes)
+        f = finite_number("failures", self.failures)
+        if s <= 0 or f <= 0:
+            raise AgentContractError("beta reliability parameters must be positive")
+        object.__setattr__(self, "successes", s)
+        object.__setattr__(self, "failures", f)
+
+    @property
+    def mean(self) -> float:
+        return self.successes / (self.successes + self.failures)
+
+    @property
+    def effective_samples(self) -> float:
+        return max(0.0, self.successes + self.failures - 2.0)
+
+    def update(self, success: bool, *, weight: float = 1.0) -> "ReliabilityPosterior":
+        w = finite_number("weight", weight)
+        if w <= 0:
+            raise AgentContractError("reliability update weight must be positive")
+        return ReliabilityPosterior(
+            self.successes + (w if success else 0.0),
+            self.failures + (0.0 if success else w),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PredictiveSignal:
+    signal_id: str
+    proposition: str
+    probability: float
+    source: PredictiveSource
+    source_key: str
+    independence_group: str
+    base_weight: float = 0.5
+    ambiguity: float = 0.0
+    evidence_ids: tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not str(self.signal_id).strip() or not str(self.proposition).strip():
+            raise AgentContractError("predictive signal requires id and proposition")
+        object.__setattr__(self, "probability", probability("signal probability", self.probability))
+        if not isinstance(self.source, PredictiveSource):
+            object.__setattr__(self, "source", PredictiveSource(str(self.source)))
+        object.__setattr__(self, "source_key", str(self.source_key).strip().casefold())
+        object.__setattr__(self, "independence_group", str(self.independence_group).strip().casefold())
+        if not self.source_key or not self.independence_group:
+            raise AgentContractError("source_key and independence_group are required")
+        object.__setattr__(self, "base_weight", probability("base_weight", self.base_weight))
+        object.__setattr__(self, "ambiguity", probability("ambiguity", self.ambiguity))
+        object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))
+        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint({
+            "proposition": self.proposition,
+            "probability": self.probability,
+            "source": self.source.value,
+            "source_key": self.source_key,
+            "group": self.independence_group,
+            "weight": self.base_weight,
+            "ambiguity": self.ambiguity,
+            "evidence": self.evidence_ids,
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class FusionPolicy:
+    maximum_signal_weight: float = 0.70
+    minimum_signal_weight: float = 0.01
+    ambiguity_penalty: float = 0.65
+    duplicate_group_penalty: float = 0.55
+    prior_probability: float = 0.50
+    prior_weight: float = 0.20
+    minimum_probability: float = 0.01
+    maximum_probability: float = 0.99
+    minimum_independence_groups: int = 2
+    high_disagreement_threshold: float = 0.25
+
+    def __post_init__(self) -> None:
+        for name in (
+            "maximum_signal_weight", "minimum_signal_weight", "ambiguity_penalty",
+            "duplicate_group_penalty", "prior_probability", "prior_weight",
+            "minimum_probability", "maximum_probability", "high_disagreement_threshold",
+        ):
+            object.__setattr__(self, name, probability(name, getattr(self, name)))
+        object.__setattr__(
+            self, "minimum_independence_groups",
+            positive_int("minimum_independence_groups", self.minimum_independence_groups, maximum=1000),
+        )
+        if self.minimum_probability >= self.maximum_probability:
+            raise AgentContractError("probability bounds are invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class SignalAttribution:
+    signal_id: str
+    source_key: str
+    independence_group: str
+    probability: float
+    reliability: float
+    effective_weight: float
+    log_odds_contribution: float
+
+
+@dataclass(frozen=True, slots=True)
+class FusedPrediction:
+    proposition: str
+    probability: float
+    robust_lower: float
+    robust_upper: float
+    disagreement: float
+    entropy_bits: float
+    epistemic_dispersion: float
+    source_count: int
+    independence_groups: tuple[str, ...]
+    underidentified: bool
+    attributions: tuple[SignalAttribution, ...]
+    evidence_ids: tuple[str, ...]
+    fingerprint: str
+
+
+class PredictiveFusionEngine:
+    def __init__(self, *, policy: FusionPolicy | None = None) -> None:
+        self.policy = policy or FusionPolicy()
+        self._reliability: dict[str, ReliabilityPosterior] = {}
+
+    def reliability(self, source_key: str) -> ReliabilityPosterior:
+        key = str(source_key).strip().casefold()
+        return self._reliability.get(key, ReliabilityPosterior())
+
+    def record_outcome(
+        self,
+        source_key: str,
+        *,
+        predicted_probability: float,
+        outcome: bool,
+        weight: float = 1.0,
+    ) -> ReliabilityPosterior:
+        p = probability("predicted_probability", predicted_probability)
+        w = finite_number("weight", weight)
+        if w <= 0:
+            raise AgentContractError("outcome weight must be positive")
+        if not isinstance(outcome, bool):
+            raise AgentContractError("outcome must be bool")
+        # Reliability is correctness of direction, not a substitute for calibration.
+        # p == .5 is neutral and earns half credit rather than a forced success/failure.
+        directional_success = (p > 0.5 and outcome) or (p < 0.5 and not outcome)
+        key = str(source_key).strip().casefold()
+        posterior = self.reliability(key)
+        if abs(p - 0.5) < 1e-12:
+            updated = ReliabilityPosterior(
+                posterior.successes + 0.5 * w,
+                posterior.failures + 0.5 * w,
+            )
+        else:
+            updated = posterior.update(directional_success, weight=w)
+        self._reliability[key] = updated
+        return updated
+
+    @staticmethod
+    def _logit(p: float) -> float:
+        x = min(1.0 - 1e-9, max(1e-9, p))
+        return math.log(x / (1.0 - x))
+
+    @staticmethod
+    def _logistic(x: float) -> float:
+        if x >= 0:
+            e = math.exp(-x)
+            return 1.0 / (1.0 + e)
+        e = math.exp(x)
+        return e / (1.0 + e)
+
+    def fuse(self, proposition: str, signals: Sequence[PredictiveSignal]) -> FusedPrediction:
+        usable = [signal for signal in signals if signal.proposition == proposition]
+        if not usable:
+            raise AgentContractError("fusion requires compatible signals for proposition")
+        group_counts: dict[str, int] = {}
+        for signal in usable:
+            group_counts[signal.independence_group] = group_counts.get(signal.independence_group, 0) + 1
+
+        weighted_log_odds = self.policy.prior_weight * self._logit(self.policy.prior_probability)
+        total_weight = self.policy.prior_weight
+        attributions: list[SignalAttribution] = []
+        probabilities: list[float] = []
+        evidence_ids: set[str] = set()
+        for signal in usable:
+            posterior = self.reliability(signal.source_key)
+            reliability = posterior.mean
+            duplicate_factor = 1.0 / (1.0 + self.policy.duplicate_group_penalty * (group_counts[signal.independence_group] - 1))
+            ambiguity_factor = max(0.0, 1.0 - self.policy.ambiguity_penalty * signal.ambiguity)
+            effective = signal.base_weight * reliability * duplicate_factor * ambiguity_factor
+            effective = min(self.policy.maximum_signal_weight, max(self.policy.minimum_signal_weight, effective))
+            contribution = effective * self._logit(signal.probability)
+            weighted_log_odds += contribution
+            total_weight += effective
+            probabilities.append(signal.probability)
+            evidence_ids.update(signal.evidence_ids)
+            attributions.append(SignalAttribution(
+                signal.signal_id, signal.source_key, signal.independence_group,
+                signal.probability, reliability, effective, contribution,
+            ))
+        pooled = self._logistic(weighted_log_odds / max(total_weight, 1e-12))
+        pooled = min(self.policy.maximum_probability, max(self.policy.minimum_probability, pooled))
+        mean = sum(probabilities) / len(probabilities)
+        variance = sum((p - mean) ** 2 for p in probabilities) / len(probabilities)
+        dispersion = min(1.0, math.sqrt(variance) * 2.0)
+        disagreement = max(probabilities) - min(probabilities)
+        robust_lower = min(probabilities + [self.policy.prior_probability])
+        robust_upper = max(probabilities + [self.policy.prior_probability])
+        entropy = 0.0 if pooled in (0.0, 1.0) else -pooled * math.log2(pooled) - (1.0 - pooled) * math.log2(1.0 - pooled)
+        groups = tuple(sorted(group_counts))
+        underidentified = len(groups) < self.policy.minimum_independence_groups or disagreement >= self.policy.high_disagreement_threshold
+        fp = stable_fingerprint({
+            "proposition": proposition,
+            "signals": sorted(signal.fingerprint for signal in usable),
+            "probability": pooled,
+            "lower": robust_lower,
+            "upper": robust_upper,
+            "groups": groups,
+            "reliability": {key: self.reliability(key).mean for key in sorted({s.source_key for s in usable})},
+        })
+        return FusedPrediction(
+            proposition=proposition,
+            probability=pooled,
+            robust_lower=robust_lower,
+            robust_upper=robust_upper,
+            disagreement=disagreement,
+            entropy_bits=entropy,
+            epistemic_dispersion=dispersion,
+            source_count=len(usable),
+            independence_groups=groups,
+            underidentified=underidentified,
+            attributions=tuple(sorted(attributions, key=lambda x: (-x.effective_weight, x.signal_id))),
+            evidence_ids=tuple(sorted(evidence_ids)),
+            fingerprint=fp,
+        )
+
+    def semantic_signal(self, forecast: SemanticForecast, *, weight: float = 0.45) -> PredictiveSignal:
+        return PredictiveSignal(
+            signal_id=forecast.forecast_id,
+            proposition=forecast.proposition,
+            probability=forecast.probability,
+            source=PredictiveSource.SEMANTIC_LENS,
+            source_key="semantic:" + "+".join(forecast.source_lens_keys or ("unknown",)),
+            independence_group="semantic:" + (forecast.calibration_group or "generic"),
+            base_weight=weight,
+            ambiguity=forecast.ambiguity,
+            evidence_ids=forecast.evidence_ids,
+            metadata={"is_evidence": False, "forecast_fingerprint": forecast.fingerprint},
+        )
+
+    def hyperedge_signal(self, edge: LensHyperedge, proposition: str, *, weight: float = 0.35) -> PredictiveSignal:
+        # Hyperedge confidence is interpretive confidence, so shrink aggressively toward .5.
+        signed = edge.confidence - 0.5
+        p = 0.5 + signed * max(0.0, 1.0 - edge.ambiguity) * 0.60
+        if edge.unresolved:
+            p = 0.5 + (p - 0.5) * 0.35
+        return PredictiveSignal(
+            signal_id=stable_id("hyperedge-signal", {"edge": edge.fingerprint, "proposition": proposition}, length=28),
+            proposition=proposition,
+            probability=p,
+            source=PredictiveSource.SEMANTIC_HYPEREDGE,
+            source_key="hyperedge:" + edge.edge_id,
+            independence_group="semantic-hypergraph:" + edge.kind.value,
+            base_weight=weight,
+            ambiguity=edge.ambiguity,
+            evidence_ids=edge.evidence_ids,
+            metadata={"is_evidence": False, "edge": edge.edge_id, "unresolved": edge.unresolved},
+        )
+
+    def sequence_signals(
+        self,
+        prediction: SequencePrediction,
+        *,
+        proposition_prefix: str = "next-card:",
+        weight: float = 0.55,
+    ) -> tuple[PredictiveSignal, ...]:
+        result: list[PredictiveSignal] = []
+        for card_id, p in prediction.candidates:
+            proposition = f"{proposition_prefix}{card_id}"
+            result.append(PredictiveSignal(
+                signal_id=stable_id("sequence-signal", {"prediction": prediction.fingerprint, "card": card_id}, length=28),
+                proposition=proposition,
+                probability=p,
+                source=PredictiveSource.MEMORY_SEQUENCE,
+                source_key="memory-sequence:" + prediction.namespace_key,
+                independence_group="memory-sequence:" + prediction.namespace_key,
+                base_weight=weight,
+                ambiguity=min(1.0, prediction.entropy_bits / max(1.0, math.log2(max(2, len(prediction.candidates))))),
+                metadata={"evidence_count": prediction.evidence_count, "prefix": list(prediction.prefix)},
+            ))
+        return tuple(result)
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint({key: (value.successes, value.failures) for key, value in sorted(self._reliability.items())})
