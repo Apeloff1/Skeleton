@@ -1,0 +1,30 @@
+name: reconcile-jeeves-branches
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - feature/jeeves-agent-runtime-v2
+          - feature/jeeves-scientific-nuance-2026
+          - feature/jeeves-scientific-internals-v3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge current main into feature branch
+        env:
+          TARGET: ${{ matrix.branch }}
+        run: |
+          git fetch origin main "${TARGET}"
+          git checkout -B "${TARGET}" "origin/${TARGET}"
+          git merge --no-edit -X ours origin/main
+          git push origin "HEAD:${TARGET}"
