@@ -186,9 +186,9 @@ def test_dynamic_filesystem_target_fails_closed_even_with_filesystem_grant(
         kind=PayloadKind.PYTHON,
     )
     assert decision.allowed is False
-    assert "path escapes sandbox workspace" in decision.reason
+    assert "dynamic filesystem target" in decision.reason
 
-    with pytest.raises(SandboxPolicyError, match="path escapes"):
+    with pytest.raises(SandboxPolicyError, match="dynamic filesystem target"):
         box.attempt(
             Operation(
                 OperationKind.FS_READ,
@@ -226,6 +226,29 @@ def test_filesystem_network_process_attempts_outside_grant_fail_closed(tmp_path:
         box.attempt(Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS))
 
 
+@pytest.mark.parametrize(
+    ("target", "allowed_host"),
+    [
+        ("http://100.64.0.1/", "100.64.0.1"),
+        ("http://[fec0::1]/", "fec0::1"),
+    ],
+)
+def test_non_public_ip_literal_cannot_be_authorized_even_when_allowlisted(
+    tmp_path: Path,
+    target: str,
+    allowed_host: str,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.NETWORK},
+        network_allowlist=(allowed_host,),
+    )
+    box.seal()
+
+    with pytest.raises(SandboxPolicyError, match="network target"):
+        box.attempt(Operation(OperationKind.NETWORK, target, SandboxCapability.NETWORK))
+
+
 def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path: Path) -> None:
     box = GeneratedCodeSandbox(
         workspace_root=tmp_path,
@@ -255,6 +278,50 @@ def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path
         box.attempt(Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS, "python; rm -rf /"))
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import ctypes\nctypes.CDLL("libc.so.6")\n',
+        'from ctypes import CDLL\nCDLL("libc.so.6")\n',
+        'import multiprocessing\nmultiprocessing.Process(target=print).start()\n',
+        'from multiprocessing import Process\nProcess(target=print).start()\n',
+        'import pty\npty.spawn("/bin/sh")\n',
+        'from pty import spawn\nspawn("/bin/sh")\n',
+    ],
+)
+def test_ffi_and_process_construction_require_process_capability(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind is OperationKind.PROCESS
+
+
+def test_process_allowlist_does_not_authorize_matching_basename_at_another_path(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.PROCESS},
+        process_allowlist=("python",),
+    )
+    box.seal()
+
+    assert box.authorize(
+        Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS)
+    ).allowed is True
+    with pytest.raises(SandboxPolicyError, match="process target"):
+        box.attempt(
+            Operation(
+                OperationKind.PROCESS,
+                "/tmp/python",
+                SandboxCapability.PROCESS,
+            )
+        )
+
+
 def test_parse_failure_fails_closed_and_does_not_pass(tmp_path: Path) -> None:
     decision = _sandbox(tmp_path).admit("def broken(:\n", kind=PayloadKind.PYTHON)
     assert decision.allowed is False
@@ -280,6 +347,32 @@ def test_kernel_capability_contract_remains_deny_by_default() -> None:
     kernel.grant("generated-code", Capability.FS_READ, scope="/workspace*")
     assert kernel.can("generated-code", Capability.FS_READ, "/workspace/file.txt")
     assert not kernel.can("generated-code", Capability.FS_WRITE, "/workspace/file.txt")
+
+
+def test_partial_kernel_filesystem_grant_cannot_widen_to_write(tmp_path: Path) -> None:
+    kernel = Sandbox()
+    kernel.grant("generated-code", Capability.FS_READ, scope="*")
+    box = GeneratedCodeSandbox(tmp_path, kernel=kernel)
+    box.seal()
+
+    source = tmp_path / "source.txt"
+    source.write_text("readable", encoding="utf-8")
+    read = Operation(
+        OperationKind.FS_READ,
+        str(source),
+        SandboxCapability.FILESYSTEM,
+    )
+    write = Operation(
+        OperationKind.FS_WRITE,
+        str(tmp_path / "written.txt"),
+        SandboxCapability.FILESYSTEM,
+        "nope",
+    )
+
+    assert box.authorize(read).allowed is True
+    assert box.authorize(write).allowed is False
+    assert "fs.write" in box.authorize(write).reason
+    assert SandboxCapability.FILESYSTEM not in box.granted_capabilities()
 
 
 def test_tool_capability_strings_align_with_orchestrator_without_self_grant(tmp_path: Path) -> None:
@@ -336,6 +429,105 @@ def test_mutating_corpus_payload_as_tool_json_cannot_widen_sandbox(tmp_path: Pat
     decision = box.admit(payload, kind=PayloadKind.TOOL_JSON)
     assert decision.allowed is False
     assert box.granted_capabilities() == frozenset()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'target = "/etc/passwd"\nopen(target, "r").read()\n',
+        'target = "/tmp/outside.txt"\nopen(target, "w").write("x")\n',
+        'from pathlib import Path\ntarget = "/etc/passwd"\nPath(target).read_text()\n',
+    ],
+)
+@pytest.mark.parametrize(
+    "source",
+    [
+        'reader = open\nreader("/etc/passwd", "r")\n',
+        'reader = open\nalias = reader\nalias("/etc/passwd", "r")\n',
+        'runner = eval\nrunner("1 + 1")\n',
+    ],
+)
+def test_sensitive_callable_aliases_cannot_bypass_python_inspection(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {
+        OperationKind.FS_READ,
+        OperationKind.UNSAFE_EVAL,
+    }
+
+
+def test_sensitive_alias_provenance_survives_reassignment_noise(tmp_path: Path) -> None:
+    source = (
+        'reader = open\n'
+        'reader = print\n'
+        'reader("/etc/passwd")\n'
+    )
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind is OperationKind.FS_READ
+
+
+def test_aliased_open_still_enforces_workspace_containment_with_filesystem_grant(
+    tmp_path: Path,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+
+    decision = box.admit(
+        'reader = open\nreader("/etc/passwd", "r")\n',
+        kind=PayloadKind.PYTHON,
+    )
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.target == "/etc/passwd"
+    assert "path escapes" in decision.reason
+
+
+def test_dynamic_filesystem_targets_fail_closed_even_with_filesystem_grant(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    box = GeneratedCodeSandbox(
+        workspace_root=tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+
+    decision = box.admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind in {OperationKind.FS_READ, OperationKind.FS_WRITE}
+    assert decision.operation.target == "<dynamic>"
+    assert "dynamic filesystem target" in decision.reason
+
+
+def test_secret_symlink_cannot_bypass_secrets_capability(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENAI_API_KEY=REDACTED_SECRET_PLACEHOLDER\n", encoding="utf-8")
+    alias = tmp_path / "notes.txt"
+    alias.symlink_to(env_file)
+
+    box = GeneratedCodeSandbox(
+        tmp_path,
+        grants={SandboxCapability.FILESYSTEM},
+    )
+    box.seal()
+    with pytest.raises(SandboxPolicyError, match="secret-bearing path"):
+        box.attempt(
+            Operation(
+                OperationKind.FS_READ,
+                str(alias),
+                SandboxCapability.FILESYSTEM,
+            )
+        )
 
 
 def test_secret_path_requires_secrets_even_inside_workspace(tmp_path: Path) -> None:
