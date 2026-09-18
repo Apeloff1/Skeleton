@@ -113,6 +113,8 @@ class PhysicsSettings:
     ccd_contact_slop: float = 1.0e-7
     ccd_max_substeps: int = 8
     ccd_min_advance_fraction: float = 1.0e-6
+    ccd_convex_iterations: int = 32
+    ccd_distance_tolerance: float = 1.0e-6
     max_ccd_checks: int = 65_536
     constraint_velocity_iterations: int = 8
     constraint_position_iterations: int = 4
@@ -155,6 +157,20 @@ class PhysicsSettings:
             "ccd_min_advance_fraction",
             float(self.ccd_min_advance_fraction),
         )
+        if (
+            isinstance(self.ccd_distance_tolerance, bool)
+            or not isinstance(self.ccd_distance_tolerance, (int, float))
+            or not math.isfinite(float(self.ccd_distance_tolerance))
+            or float(self.ccd_distance_tolerance) <= 0.0
+        ):
+            raise PhysicsValidationError(
+                "ccd_distance_tolerance must be finite and positive"
+            )
+        object.__setattr__(
+            self,
+            "ccd_distance_tolerance",
+            float(self.ccd_distance_tolerance),
+        )
         for name in ("sleep_linear_speed", "sleep_angular_speed"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -193,6 +209,11 @@ class PhysicsSettings:
             name="ccd_max_substeps",
             maximum=128,
         )
+        _bounded_int(
+            self.ccd_convex_iterations,
+            name="ccd_convex_iterations",
+            maximum=128,
+        )
         for name in (
             "velocity_iterations",
             "position_iterations",
@@ -205,7 +226,7 @@ class PhysicsSettings:
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v4",
+                "domain": "skeleton.simulation.physics.settings.v5",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
@@ -225,6 +246,8 @@ class PhysicsSettings:
                 "ccd_contact_slop": self.ccd_contact_slop,
                 "ccd_max_substeps": self.ccd_max_substeps,
                 "ccd_min_advance_fraction": self.ccd_min_advance_fraction,
+                "ccd_convex_iterations": self.ccd_convex_iterations,
+                "ccd_distance_tolerance": self.ccd_distance_tolerance,
                 "max_ccd_checks": self.max_ccd_checks,
                 "constraint_velocity_iterations": self.constraint_velocity_iterations,
                 "constraint_position_iterations": self.constraint_position_iterations,
@@ -281,6 +304,8 @@ class PhysicsWorld:
         self._ccd = ContinuousCollisionDetector(
             motion_threshold=self.settings.ccd_motion_threshold,
             max_checks=self.settings.max_ccd_checks,
+            convex_iterations=self.settings.ccd_convex_iterations,
+            distance_tolerance=self.settings.ccd_distance_tolerance,
         )
         self._last_manifolds: tuple[ContactManifold, ...] = ()
 
