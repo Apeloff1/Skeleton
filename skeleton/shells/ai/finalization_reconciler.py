@@ -647,12 +647,9 @@ class AIExecutionFinalizationReconciler:
             anchor is not None
             and anchor_report.verified
         ):
-            audit_root = item.audit_root
-            if not audit_root and (
-                self.audit_anchors.root_hash()
-                == anchor.chain_node_hash
-            ):
-                audit_root = anchor.chain_node_hash
+            audit_root = (
+                item.audit_root or anchor.chain_node_hash
+            )
             if audit_root:
                 item = self.finalizations.advance(
                     item,
