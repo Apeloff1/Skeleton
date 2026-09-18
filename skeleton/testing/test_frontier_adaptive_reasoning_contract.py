@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from skeleton.jeeves.agent.adaptive_runtime import AdaptiveConfig, AdaptiveJeevesRuntime
+from skeleton.jeeves.agent.adaptive_runtime import (
+    AdaptiveConfig,
+    AdaptiveJeevesRuntime,
+    FrontierAdaptiveJeevesRuntime,
+)
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 
 
 def test_adaptive_runtime_inherits_hardened_frontier_runtime() -> None:
     assert issubclass(AdaptiveJeevesRuntime, FrontierJeevesAgentRuntime)
+    assert FrontierAdaptiveJeevesRuntime is AdaptiveJeevesRuntime
 
 
 def test_adaptive_frontier_controls_default_on_and_bounded() -> None:
