@@ -925,7 +925,9 @@ class SemanticLensPlane:
             composition=composition,
             fusion=fusion,
         ) and not bool(audit.rejected)
-        topology = self.topology.snapshot
+        topology = self.topology.snapshot_with_rules(
+            tuple(item.rule for item in learned_topology_rules)
+        )
         learned_candidate_ids = {
             item.candidate_id for item in learned_topology_rules
         }
