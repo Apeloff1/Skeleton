@@ -532,6 +532,11 @@ class DecompilationAssurance:
         LossKind.OPTIMIZATION_HISTORY: 0.75,
         LossKind.PROVENANCE: 3.0,
         LossKind.UNSUPPORTED_SEMANTICS: 4.0,
+        LossKind.NONDETERMINISM: 3.0,
+        LossKind.REPLAY: 3.0,
+        LossKind.UNDEFINED_BEHAVIOR: 4.0,
+        LossKind.ASSUMPTION: 2.0,
+        LossKind.SAFETY_CONTRACT: 4.0,
         LossKind.DEBUG_INFORMATION: 0.5,
     }
 
