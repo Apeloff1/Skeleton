@@ -858,6 +858,142 @@ class SemanticTopologyLearningLab:
     def candidate(self, candidate_id: str) -> LensBridgeCandidate | None:
         return self._candidates.get(str(candidate_id).strip())
 
+    def declare_candidate_prediction(
+        self,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        """Construct and declare one contract-bound experiment prediction."""
+
+        candidate = self._candidates.get(str(candidate_id).strip())
+        if candidate is None:
+            raise AgentContractError(
+                "unknown semantic topology bridge candidate"
+            )
+        kind_value = (
+            kind
+            if isinstance(kind, LensInteractionKind)
+            else LensInteractionKind(str(kind))
+        )
+        domain_value = bounded_text(
+            "domain",
+            domain,
+            maximum=256,
+        ).casefold()
+        run_value = bounded_text(
+            "independent_run",
+            independent_run,
+            maximum=512,
+        )
+        predicted_time = finite_number("predicted_at", predicted_at)
+        if predicted_time < 0:
+            raise AgentContractError(
+                "topology bridge prediction time must be non-negative"
+            )
+        candidate_fingerprint = self.candidate_fingerprint(candidate)
+        normalized_findings = tuple(
+            sorted(
+                {
+                    str(value).strip()
+                    for value in source_finding_ids
+                    if str(value).strip()
+                }
+            )
+        )
+        normalized_forecasts = tuple(
+            sorted(
+                {
+                    str(value).strip()
+                    for value in source_forecast_ids
+                    if str(value).strip()
+                }
+            )
+        )
+        normalized_evidence = tuple(
+            sorted(
+                {
+                    str(value).strip()
+                    for value in evidence_ids
+                    if str(value).strip()
+                }
+            )
+        )
+        metadata_value = json_safe(dict(metadata or {}))
+        prediction_id = stable_id(
+            "semantic-topology-prediction",
+            {
+                "candidate": candidate_fingerprint,
+                "kind": kind_value.value,
+                "probability": probability(
+                    "predicted_probability",
+                    predicted_probability,
+                ),
+                "domain": domain_value,
+                "run": run_value,
+                "predicted_at": predicted_time,
+                "negative_control": negative_control,
+                "findings": normalized_findings,
+                "forecasts": normalized_forecasts,
+                "evidence": normalized_evidence,
+                "metadata": metadata_value,
+            },
+            length=32,
+        )
+        prediction = TopologyBridgePrediction(
+            prediction_id=prediction_id,
+            candidate_id=candidate.candidate_id,
+            candidate_fingerprint=candidate_fingerprint,
+            left_key=candidate.left_key,
+            right_key=candidate.right_key,
+            kind=kind_value,
+            predicted_probability=predicted_probability,
+            domain=domain_value,
+            independent_run=run_value,
+            predicted_at=predicted_time,
+            negative_control=negative_control,
+            source_finding_ids=normalized_findings,
+            source_forecast_ids=normalized_forecasts,
+            evidence_ids=normalized_evidence,
+            metadata=metadata_value,
+        )
+        return self.declare(prediction)
+
+    def unresolved_predictions(
+        self,
+        *,
+        candidate_id: str | None = None,
+    ) -> tuple[TopologyBridgePrediction, ...]:
+        """Return declared predictions that do not yet have an outcome."""
+
+        candidate_key = (
+            str(candidate_id).strip()
+            if candidate_id is not None
+            else None
+        )
+        with self._lock:
+            values = [
+                prediction
+                for prediction_id, prediction in self._predictions.items()
+                if prediction_id not in self._resolved_predictions
+                and (
+                    candidate_key is None
+                    or prediction.candidate_id == candidate_key
+                )
+            ]
+        return tuple(
+            sorted(values, key=lambda item: item.prediction_id)
+        )
+
     def _validate_prediction_candidate(
         self,
         prediction: TopologyBridgePrediction,
