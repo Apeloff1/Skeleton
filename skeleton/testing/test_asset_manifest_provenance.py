@@ -262,6 +262,37 @@ def test_digest_drift_fails_closed_on_bytes_and_declared_identity():
         )
 
 
+def test_byte_verification_map_must_cover_exact_manifest_identities():
+    left, left_data = _record("left")
+    right, right_data = _record("right")
+    manifest = _manifest(left, right)
+
+    verified = validate_manifest(
+        manifest,
+        data_by_id={
+            left.identity.asset_id: left_data,
+            right.identity.asset_id: right_data,
+        },
+    )
+    assert len(verified.assets) == 2
+
+    with pytest.raises(DigestDriftError, match="verification set"):
+        validate_manifest(
+            manifest,
+            data_by_id={left.identity.asset_id: left_data},
+        )
+
+    with pytest.raises(DigestDriftError, match="verification set"):
+        validate_manifest(
+            manifest,
+            data_by_id={
+                left.identity.asset_id: left_data,
+                right.identity.asset_id: right_data,
+                "ghost": b"not-in-manifest",
+            },
+        )
+
+
 def test_malformed_lineage_fails_closed():
     data = _bytes("lineage")
     digest = content_digest(data)
