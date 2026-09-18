@@ -61,6 +61,7 @@ from .frontier_reasoning import (
     InferenceDisposition,
 )
 from .frontier_runtime import FrontierJeevesAgentRuntime
+from .lens_fusion import LensSignal
 from .runtime import (
     AgentResult,
     RunCheckpoint,
@@ -68,6 +69,8 @@ from .runtime import (
     RuntimeErrorBase,
     _RunState,
 )
+from .semantic_lenses import SemanticFinding, SemanticObservation
+from .semantic_plane import SemanticPlaneSnapshot
 from .trajectory_learning import (
     CausalCreditAssigner,
     CreditReport,
@@ -115,10 +118,20 @@ class AdaptiveConfig:
     frontier_escalation_min_budget: float = 0.15
     minimum_frontier_uncertainty_reduction: float = 0.03
     fail_closed_on_evidence_gap: bool = True
+    enable_semantic_frontier_signals: bool = True
+    semantic_frontier_signal_limit: int = 24
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "specialist_search_threshold", probability("specialist_search_threshold", self.specialist_search_threshold))
-        for name in ("maximum_specialist_width", "checkpoint_snapshot_limit", "context_retrieval_entries", "context_retrieval_tokens", "retain_adaptive_reports", "maximum_frontier_rounds"):
+        for name in (
+            "maximum_specialist_width",
+            "checkpoint_snapshot_limit",
+            "context_retrieval_entries",
+            "context_retrieval_tokens",
+            "retain_adaptive_reports",
+            "maximum_frontier_rounds",
+            "semantic_frontier_signal_limit",
+        ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{name} must be positive integer")
@@ -162,6 +175,8 @@ class SpecialistSearchRecord:
     escalation_rounds: int = 0
     frontier_stagnated: bool = False
     uncertainty_reduction: float = 0.0
+    semantic_signal_count: int = 0
+    semantic_fusion_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +234,10 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         self._context_factory = context_repository_factory or (lambda namespace: ContextRepository(namespace, clock=self._wall_clock))
         self._context_repositories: dict[str, ContextRepository] = {}
         self._adaptive: dict[str, _AdaptiveState] = {}
+        self._semantic_reasoning_snapshots: dict[
+            str,
+            SemanticPlaneSnapshot,
+        ] = {}
         self._reports: dict[str, AdaptiveRunReport] = {}
         self._adaptive_lock = threading.RLock()
 
@@ -250,6 +269,172 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         with self._adaptive_lock:
             self._adaptive.setdefault(checkpoint.run_id, _AdaptiveState(checkpoint.run_id, branch))
         return state
+
+    def bind_semantic_reasoning_snapshot(
+        self,
+        run_id: str,
+        snapshot: SemanticPlaneSnapshot,
+    ) -> tuple[LensSignal, ...]:
+        """Bind a semantic snapshot as escalation-only advice for one run."""
+
+        run_key = require_id("run_id", run_id)
+        if not isinstance(snapshot, SemanticPlaneSnapshot):
+            raise TypeError("snapshot must be SemanticPlaneSnapshot")
+        if (
+            snapshot.factual_assertion_authorized
+            or snapshot.causal_assertion_authorized
+        ):
+            raise AdaptiveRuntimeError(
+                "semantic advisory snapshot cannot carry factual/causal authority"
+            )
+
+        current_learning = self.semantic_plane.topology_learning.snapshot()
+        if (
+            snapshot.topology_learning.fingerprint
+            != current_learning.fingerprint
+        ):
+            raise AdaptiveRuntimeError(
+                "semantic advisory topology-learning revision is stale"
+            )
+        learned = self.semantic_plane.topology_learning.learned_rules()
+        current_topology = self.semantic_plane.topology.snapshot_with_rules(
+            tuple(item.rule for item in learned)
+        )
+        if snapshot.topology.fingerprint != current_topology.fingerprint:
+            raise AdaptiveRuntimeError(
+                "semantic advisory effective topology is stale"
+            )
+
+        signals = self.semantic_plane.reasoning_signals(
+            snapshot,
+            limit=self.adaptive_config.semantic_frontier_signal_limit,
+        )
+        if any(
+            signal.metadata.get("inference_authority")
+            != "escalation_only"
+            for signal in signals
+        ):
+            raise AdaptiveRuntimeError(
+                "semantic advisory contains non-escalation authority"
+            )
+        with self._adaptive_lock:
+            self._semantic_reasoning_snapshots[run_key] = snapshot
+        return signals
+
+    def analyze_semantics_for_run(
+        self,
+        run_id: str,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        sequence: int = 0,
+    ) -> SemanticPlaneSnapshot:
+        """Analyze semantic input and bind its advisory to an adaptive run."""
+
+        snapshot = self.analyze_semantics(
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=sequence,
+        )
+        self.bind_semantic_reasoning_snapshot(run_id, snapshot)
+        return snapshot
+
+    def clear_semantic_reasoning_snapshot(self, run_id: str) -> bool:
+        run_key = require_id("run_id", run_id)
+        with self._adaptive_lock:
+            return (
+                self._semantic_reasoning_snapshots.pop(run_key, None)
+                is not None
+            )
+
+    def _semantic_frontier_signals(
+        self,
+        state: _RunState,
+    ) -> tuple[LensSignal, ...]:
+        if not self.adaptive_config.enable_semantic_frontier_signals:
+            return ()
+        with self._adaptive_lock:
+            snapshot = self._semantic_reasoning_snapshots.get(state.run_id)
+        if snapshot is None:
+            return ()
+
+        current_learning = self.semantic_plane.topology_learning.snapshot()
+        if (
+            snapshot.topology_learning.fingerprint
+            != current_learning.fingerprint
+        ):
+            with self._adaptive_lock:
+                self._semantic_reasoning_snapshots.pop(
+                    state.run_id,
+                    None,
+                )
+            self.metrics.increment(
+                "agent.frontier.semantic_advisory_stale"
+            )
+            state.trace.emit(
+                "frontier.semantic_advisory_stale",
+                {
+                    "run_id": state.run_id,
+                    "snapshot": snapshot.fingerprint,
+                    "reason": "topology_learning_revision_changed",
+                },
+            )
+            return ()
+
+        try:
+            signals = self.semantic_plane.reasoning_signals(
+                snapshot,
+                limit=(
+                    self.adaptive_config.semantic_frontier_signal_limit
+                ),
+            )
+        except Exception as exc:
+            with self._adaptive_lock:
+                self._semantic_reasoning_snapshots.pop(
+                    state.run_id,
+                    None,
+                )
+            self.metrics.increment(
+                "agent.frontier.semantic_advisory_invalid"
+            )
+            state.trace.emit(
+                "frontier.semantic_advisory_invalid",
+                {
+                    "run_id": state.run_id,
+                    "snapshot": snapshot.fingerprint,
+                    "error": f"{type(exc).__name__}: {str(exc)[:512]}",
+                },
+            )
+            return ()
+
+        signals = tuple(
+            signal
+            for signal in signals
+            if self.semantic_plane.reasoning_signal_is_current(signal)
+        )
+        if not signals:
+            return ()
+
+        state.scratch.set(
+            "semantic:frontier_advisory",
+            {
+                "authority": "escalation_only",
+                "snapshot_fingerprint": snapshot.fingerprint,
+                "topology_learning_fingerprint": (
+                    snapshot.topology_learning.fingerprint
+                ),
+                "signal_count": len(signals),
+                "signal_ids": [item.signal_id for item in signals],
+                "may_increase_evidence_quality": False,
+                "may_authorize_commit": False,
+            },
+            importance=0.78,
+        )
+        return signals
 
     def _model_call(
         self,
@@ -315,8 +500,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             clock=self._monotonic,
         )
         search = engine.search(task, allocation)
+        semantic_signals = self._semantic_frontier_signals(state)
         decision = (
-            self.frontier_reasoning.decide(search, risk=step.risk)
+            self.frontier_reasoning.decide(
+                search,
+                risk=step.risk,
+                lens_signals=semantic_signals,
+            )
             if self.adaptive_config.enable_frontier_reasoning
             else None
         )
@@ -348,7 +538,12 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             ).search(task, escalated)
             search = merge_search_results(search, extra)
             escalation_rounds += 1
-            decision = self.frontier_reasoning.decide(search, risk=step.risk)
+            semantic_signals = self._semantic_frontier_signals(state)
+            decision = self.frontier_reasoning.decide(
+                search,
+                risk=step.risk,
+                lens_signals=semantic_signals,
+            )
             current_uncertainty = self._frontier_uncertainty(decision)
             frontier_uncertainty_reduction = max(
                 0.0,
@@ -403,6 +598,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 escalation_rounds=escalation_rounds,
                 frontier_stagnated=frontier_stagnated,
                 uncertainty_reduction=frontier_uncertainty_reduction,
+                semantic_signal_count=len(semantic_signals),
+                semantic_fusion_fingerprint=(
+                    decision.lens_fusion.fingerprint
+                    if decision is not None
+                    and decision.lens_fusion is not None
+                    else None
+                ),
             )
         )
         state.trace.emit(
@@ -427,6 +629,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 "escalation_rounds": escalation_rounds,
                 "frontier_stagnated": frontier_stagnated,
                 "uncertainty_reduction": frontier_uncertainty_reduction,
+                "semantic_signal_count": len(semantic_signals),
+                "semantic_fusion_fingerprint": (
+                    decision.lens_fusion.fingerprint
+                    if decision is not None
+                    and decision.lens_fusion is not None
+                    else None
+                ),
             },
         )
 
@@ -646,6 +855,18 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         if decision.consensus is not None:
             values.append(decision.consensus.normalized_entropy)
             values.append(1.0 - decision.consensus.agreement)
+        if decision.lens_fusion is not None:
+            values.append(decision.lens_fusion.conflict_strength)
+            values.append(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        decision.lens_fusion.sensitivity_high
+                        - decision.lens_fusion.sensitivity_low,
+                    ),
+                )
+            )
         return max(0.0, min(1.0, max(values, default=0.0)))
 
     @staticmethod
