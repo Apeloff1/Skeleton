@@ -32,6 +32,7 @@ class LensFamily(str, Enum):
     CAUSAL = "causal"
     INFORMATION = "information"
     MEMORY = "memory"
+    SEMIOTIC = "semiotic"
     CINEMA = "cinema"
     LITERARY = "literary"
     LUDIC = "ludic"
@@ -266,6 +267,7 @@ def default_lenses() -> tuple[LensDefinition, ...]:
     C = LensFamily.CAUSAL
     N = LensFamily.INFORMATION
     M = LensFamily.MEMORY
+    Y = LensFamily.SEMIOTIC
     V = LensFamily.CINEMA
     L = LensFamily.LITERARY
     G = LensFamily.LUDIC
@@ -300,6 +302,16 @@ def default_lenses() -> tuple[LensDefinition, ...]:
         _spec("memory_retrieval_probability", P, E, "Estimate recall probability from strength, spacing, interference, cue match and recency.", ("remember","recall","memory game","spacing","forget"), ("recall_probability","review_priority")),
         _spec("ensemble_model_probability", P, F, "Average across supported models while exposing model disagreement.", ("ensemble","model uncertainty","model average"), ("mixture_prediction","model_disagreement")),
         _spec("decision_probability", P, H, "Keep probability of outcomes distinct from utilities and decisions.", ("decision","utility","choice","expected utility"), ("outcome_probability","utility_separation")),
+        _spec("martingale_evalue", P, F, "Use nonnegative test martingales/e-values for sequential evidence while preserving optional-stopping guarantees under their assumptions.", ("e-value","martingale","sequential test","optional stopping"), ("e_value","sequential_evidence")),
+        _spec("proper_scoring_rule", P, F, "Evaluate probabilistic forecasts with proper scores so truthful probabilities are incentivized.", ("brier","log score","proper scoring","forecast score"), ("proper_score","calibration_sharpness")),
+        _spec("multicalibration", P, E, "Audit calibration simultaneously across many overlapping subgroups instead of relying only on global calibration.", ("multicalibration","subgroup calibration","group reliability"), ("subgroup_calibration","worst_group_error")),
+        _spec("selective_prediction", P, F, "Trade coverage against error by allowing abstention when uncertainty is too high.", ("selective prediction","coverage risk","abstain","reject option"), ("coverage","selective_risk")),
+        _spec("extreme_value_tail", P, F, "Model rare extremes separately from the distribution body when tail risk drives the decision.", ("extreme value","gev","gpd","tail exceedance","rare extreme"), ("tail_index","return_level")),
+        _spec("copula_dependence", P, F, "Separate marginal uncertainty from dependence structure for correlated risks.", ("copula","tail dependence","dependence structure"), ("marginals","dependence_parameter","joint_tail")),
+        _spec("bayesian_nonparametric", P, F, "Permit model complexity to grow with evidence instead of fixing a finite parametric family in advance.", ("dirichlet process","gaussian process","nonparametric bayes"), ("posterior_process","adaptive_complexity")),
+        _spec("importance_sampling_rare_event", P, F, "Estimate very rare probabilities by sampling from a proposal and correcting with likelihood ratios.", ("importance sampling","rare event","proposal distribution"), ("rare_event_probability","effective_sample_size")),
+        _spec("distribution_shift_probability", P, E, "Separate in-distribution uncertainty from covariate, label, concept, and mechanism shift.", ("distribution shift","covariate shift","concept drift","ood"), ("shift_type","shift_score","recalibration_need")),
+        _spec("forecast_combination", P, E, "Combine independently useful forecasts while measuring redundancy and disagreement.", ("forecast combination","pool forecasts","ensemble forecast"), ("combined_forecast","diversity_gain")),
 
         # Predictive / causal / information.
         _spec("base_rate", R, E, "Anchor forecasts in reference-class prevalence before case-specific adjustments.", ("base rate","prevalence","reference class"), ("base_rate","adjustment")),
@@ -335,6 +347,19 @@ def default_lenses() -> tuple[LensDefinition, ...]:
         _spec("associative_pair", M, E, "Use pair and triad associations for fast cue-based recall.", ("pair","association","next to","juxtapose"), ("associates","pair_strength")),
         _spec("source_monitoring", M, E, "Keep remembered content tied to where and how it was acquired.", ("source","where did","provenance"), ("source_refs","source_confidence")),
 
+        # Semiotic / relational meaning lenses.  These never create source truth;
+        # they expose relational hypotheses for retrieval, comparison and testing.
+        _spec("semiotic_square", Y, I, "Expand a binary opposition into contradiction and implication relations to expose missing semantic quadrants.", ("semiotic square","opposition","contradiction","contrary"), ("opposition_graph","missing_quadrant")),
+        _spec("icon_index_symbol", Y, I, "Distinguish resemblance, causal/contiguous indication, and conventional symbolism.", ("icon","index","symbol","semiotic"), ("sign_mode","referent_relation")),
+        _spec("denotation_connotation", Y, I, "Keep literal reference separate from culturally or contextually associated meaning.", ("denotation","connotation","literal","associated meaning"), ("denotative_plane","connotative_plane")),
+        _spec("syntagm_paradigm", Y, I, "Contrast meaning from sequence/combination with meaning from selectable alternatives.", ("syntagm","paradigm","sequence","alternative"), ("sequence_relation","alternative_set")),
+        _spec("markedness", Y, I, "Detect asymmetric oppositions where one form is treated as default and the other explicitly marked.", ("marked","unmarked","default term","markedness"), ("default_pole","marked_pole")),
+        _spec("figure_ground", Y, E, "Separate attended figure from contextual ground and test whether interpretation flips when attention is reassigned.", ("figure ground","foreground","background","salience"), ("figure","ground","attention_flip")),
+        _spec("contrastive_semantics", Y, H, "Infer dimensions made salient by explicit juxtaposition while keeping each item's literal attributes separate.", ("contrast","juxtaposition","versus","side by side"), ("contrast_dimensions","relational_meaning")),
+        _spec("absent_presence", Y, I, "Treat conspicuous omission as a hypothesis-generating cue without assuming what the missing element is.", ("absence","missing","omitted","not shown"), ("absence_hypotheses","expected_but_missing")),
+        _spec("frame_boundary", Y, I, "Ask how inclusion/exclusion boundaries change the apparent meaning of the same material.", ("frame","crop","boundary","context window"), ("included_context","excluded_context","frame_effect")),
+        _spec("semantic_inversion", Y, H, "Test whether swapping roles, order, polarity or foreground/background reveals a hidden dependency.", ("invert","swap roles","reverse","opposite framing"), ("invariant_features","order_sensitive_features")),
+
         # Cinema / editing lenses. These are interpretive unless supported by task evidence.
         _spec("kuleshov_juxtaposition", V, I, "Interpret meaning changes created by placing one shot/event beside another.", ("juxtaposition","kuleshov","shot","cut","reaction"), ("relational_meaning","contrast")),
         _spec("montage_collision", V, I, "Inspect conceptual meaning produced by collision/conflict between successive images.", ("montage","collision","conflict","edit"), ("emergent_concept","tension")),
@@ -363,6 +388,17 @@ def default_lenses() -> tuple[LensDefinition, ...]:
         _spec("offscreen_space", V, I, "Represent causally relevant but unseen space as uncertain latent context.", ("offscreen","outside frame","heard not seen"), ("latent_space","uncertainty")),
         _spec("visual_foreshadowing", V, I, "Track planted visual details whose significance may emerge later.", ("foreshadow","plant","visual clue"), ("future_link_candidate",)),
 
+        _spec("suture", V, I, "Track how shot/reverse-shot and off-screen absence position a viewer into an inferred viewpoint.", ("suture","viewer position","offscreen look"), ("viewpoint_position","missing_viewpoint")),
+        _spec("diegetic_boundary", V, I, "Separate events/sounds inside the represented story world from extradiegetic presentation.", ("diegetic","nondiegetic","score","story world"), ("diegetic_plane","presentation_plane")),
+        _spec("deep_focus_relation", V, I, "Treat simultaneous foreground/midground/background action as competing semantic evidence rather than a forced single focal path.", ("deep focus","foreground","midground","background"), ("simultaneous_planes","attention_options")),
+        _spec("long_take_continuity", V, I, "Analyze meaning preserved by continuous duration where editing does not provide segmentation.", ("long take","oner","continuous shot","no cut"), ("continuous_dependencies","event_boundaries")),
+        _spec("subjective_camera", V, I, "Model camera position/motion as aligned with a character or observer state without treating that alignment as objective truth.", ("subjective camera","first person camera","character viewpoint"), ("viewpoint_hypothesis","observer_state")),
+        _spec("split_screen_parallelism", V, I, "Represent simultaneous visible streams and compare synchronization, contrast and causal independence.", ("split screen","simultaneous panels","parallel frame"), ("parallel_streams","synchrony","contrast")),
+        _spec("graphic_rhyme", V, I, "Detect repeated visual geometry/color/motion across separated shots as a candidate semantic bridge.", ("graphic rhyme","visual rhyme","repeated composition"), ("visual_correspondence","bridge_candidate")),
+        _spec("shot_scale_progression", V, I, "Track systematic changes in shot scale as a cue for attention, intimacy or information release.", ("close up","wide shot","shot scale","push in"), ("scale_sequence","attention_trajectory")),
+        _spec("screen_direction_axis", V, I, "Track axis-of-action and screen direction so apparent pursuit, opposition or continuity is not inferred from cuts alone.", ("screen direction","axis of action","180 degree","left to right"), ("spatial_axis","continuity_break")),
+        _spec("temporal_disjunction", V, I, "Treat non-contiguous cuts as possible time reordering rather than automatically continuous chronology.", ("nonlinear edit","temporal disjunction","out of order"), ("temporal_order_hypotheses","continuity_uncertainty")),
+
         # Literary / narratological lenses.
         _spec("focalization", L, I, "Separate who perceives from who narrates.", ("focalization","perspective","sees","perceives"), ("perceiver","narrator")),
         _spec("free_indirect_discourse", L, I, "Detect narrator language colored by a character's idiom or perspective.", ("free indirect","voice","thought style"), ("voice_blend",)),
@@ -389,6 +425,18 @@ def default_lenses() -> tuple[LensDefinition, ...]:
         _spec("narrative_distance", L, I, "Estimate distance between narration and immediate embodied event.", ("distance","close narration","detached"), ("distance_hypothesis",)),
         _spec("stream_of_consciousness", L, I, "Treat associative ordering as mental sequence rather than objective chronology.", ("stream of consciousness","associative thought","interior"), ("mental_sequence","chronology_separation")),
         _spec("constraint_poetics", L, I, "Inspect how explicit formal constraints generate structure and unexpected solutions.", ("constraint","oulipo","lipogram","formal rule"), ("constraint_effects",)),
+
+        _spec("fabula_syuzhet", L, I, "Separate reconstructed chronological events from the order in which discourse presents them.", ("fabula","syuzhet","story order","plot order"), ("event_chronology","presentation_order")),
+        _spec("metalepsis", L, I, "Detect crossings between narrative levels instead of collapsing nested worlds into one scope.", ("metalepsis","narrative level crossing","breaks into story"), ("level_crossing","scope_violation")),
+        _spec("mise_en_abyme", L, I, "Track embedded miniature or mirrored versions of the containing narrative.", ("mise en abyme","story mirrors itself","embedded mirror"), ("self_mirroring_structure","nested_correspondence")),
+        _spec("heteroglossia", L, I, "Preserve socially distinct registers and worldviews carried by different voices.", ("heteroglossia","register","social voice","many speech types"), ("voice_registers","ideological_contrast")),
+        _spec("chronotope", L, I, "Analyze coupled time-space structures that constrain what actions and meanings are plausible.", ("chronotope","time space","setting and time"), ("time_space_regime","action_constraints")),
+        _spec("aporia", L, I, "Mark irresolvable or structurally undecidable tensions instead of forcing premature synthesis.", ("aporia","undecidable","paradox","cannot resolve"), ("unresolved_tension","competing_readings")),
+        _spec("ekphrasis", L, I, "Track transformations when one medium verbally represents another visual or material artifact.", ("ekphrasis","description of image","verbal painting"), ("cross_medium_mapping","representation_loss")),
+        _spec("anagnorisis", L, I, "Detect recognition events that reclassify earlier evidence and relationships.", ("anagnorisis","recognition","revelation","realizes"), ("recognition_point","retroactive_reinterpretation")),
+        _spec("peripeteia", L, I, "Detect reversals where the direction of action/outcome changes because prior assumptions fail.", ("peripeteia","reversal","turning point"), ("reversal_point","failed_expectation")),
+        _spec("paratext", L, I, "Keep titles, framing notes, metadata and other threshold material distinct from the primary text while allowing them to guide interpretation.", ("paratext","title","preface","caption","metadata"), ("primary_text","framing_material")),
+        _spec("negative_capability", L, H, "Preserve productive ambiguity when evidence does not justify collapsing multiple readings.", ("negative capability","ambiguity","uncertainty","multiple readings"), ("preserved_ambiguity","premature_closure_risk")),
 
         # Game / ludic lenses.
         _spec("mechanics_dynamics_aesthetics", G, H, "Separate rules/mechanics, emergent dynamics and player experience.", ("mechanic","dynamic","aesthetic","mda"), ("mechanics","dynamics","experience")),
@@ -417,6 +465,21 @@ def default_lenses() -> tuple[LensDefinition, ...]:
         _spec("quest_branching", G, H, "Track branch prerequisites, irreversible choices and convergence points.", ("quest","branch","choice","ending"), ("branch_graph","irreversibility")),
         _spec("pacing_loop", G, H, "Track tension/release and activity/rest cycles across play.", ("pacing","tension","downtime","loop"), ("pacing_state",)),
         _spec("memory_match_game", G, E, "Use cue-pair matching, interference and retrieval latency as measurable memory-game signals.", ("memory game","matching pairs","flip card","remember location"), ("match_probability","retrieval_latency","interference")),
+
+        _spec("possibility_space", G, F, "Represent the reachable action/state space induced by rules instead of reasoning only from authored examples.", ("possibility space","reachable states","rules allow"), ("reachable_space","constraints")),
+        _spec("magic_circle_boundary", G, H, "Track when rules, norms and meanings are local to the game frame versus imported from outside it.", ("magic circle","inside game","outside game","play frame"), ("frame_rules","boundary_crossing")),
+        _spec("diegetic_interface", G, I, "Distinguish UI information that exists inside the game world from player-only overlays.", ("diegetic ui","hud","in world interface"), ("character_information","player_information")),
+        _spec("environmental_storytelling", G, I, "Infer candidate past events from spatially arranged traces while keeping reconstruction uncertainty explicit.", ("environmental storytelling","scene tells story","environment clue"), ("trace_set","event_hypotheses")),
+        _spec("emergent_narrative", G, H, "Track story structure produced by interacting simulation systems rather than only scripted beats.", ("emergent narrative","simulation story","systemic story"), ("event_chain","authored_vs_emergent")),
+        _spec("exploitability", G, F, "Measure how much a strategy can lose to an informed best response.", ("exploitability","best response gap","nash gap"), ("exploitability_gap","best_response")),
+        _spec("regret_minimization", G, F, "Evaluate strategies by cumulative counterfactual regret rather than only realized reward.", ("regret minimization","counterfactual regret","cfr"), ("regret","strategy_update")),
+        _spec("signaling_game", G, F, "Model strategic messages/actions whose meaning depends on sender type, receiver belief and equilibrium incentives.", ("signaling game","sender receiver","signal type"), ("sender_type","receiver_belief","signal_equilibrium")),
+        _spec("telegraphing", G, E, "Measure how clearly impending actions are signaled before they become costly to respond to.", ("telegraph","windup","warning cue","readable attack"), ("cue_lead_time","response_window")),
+        _spec("player_modeling", G, E, "Maintain probabilistic hypotheses over player goals, skill and policy and update them from interaction.", ("player model","player behavior","skill estimate","preference model"), ("player_state_belief","behavior_prediction")),
+        _spec("save_scumming_epistemics", G, H, "Separate knowledge accumulated across retries from knowledge available to the in-world agent.", ("save scum","retry knowledge","reload knowledge"), ("player_meta_knowledge","character_knowledge")),
+        _spec("procedural_generation", G, F, "Analyze generator constraints, distributions and coverage rather than treating generated content as independent hand-authored samples.", ("procedural generation","pcg","generator","seed"), ("generator_distribution","coverage","constraint_violations")),
+        _spec("speedrun_route", G, H, "Model route optimization under reset cost, execution variance, exploit availability and split dependencies.", ("speedrun","route","split","reset","world record"), ("route_graph","expected_time","variance")),
+        _spec("systemic_storytelling", G, H, "Map narrative consequences onto simulation state transitions and persistent world variables.", ("systemic storytelling","world state story","simulation consequence"), ("story_state","systemic_consequence")),
 
         # Pragmatics/social/computational/metacognitive.
         _spec("gricean_implicature", Q, I, "Infer possible conversational implicature while preserving literal content.", ("imply","implicature","why say","conversational"), ("literal","implicature_hypothesis")),
@@ -534,6 +597,15 @@ class SemanticLensRouter:
                     "associative_pair",
                     "sequence_prediction",
                     "memory_match_game",
+                    "contrastive_semantics",
+                    "syntagm_paradigm",
+                    "semiotic_square",
+                    "split_screen_parallelism",
+                    "graphic_rhyme",
+                    "fabula_syuzhet",
+                    "mise_en_abyme",
+                    "environmental_storytelling",
+                    "emergent_narrative",
                 }:
                     relation = min(1.0, relation + 0.25)
 
