@@ -438,6 +438,8 @@ class LearnedTopologyRule:
 
 @dataclass(frozen=True, slots=True)
 class SemanticTopologyLearningSnapshot:
+    prediction_count: int
+    unresolved_prediction_count: int
     trial_count: int
     tested_bridge_count: int
     active_report_ids: tuple[str, ...]
@@ -1064,6 +1066,10 @@ class SemanticTopologyLearningLab:
             )
         )
         trial_count = len(self._trials)
+        prediction_count = len(self._predictions)
+        unresolved_prediction_count = (
+            prediction_count - len(self._resolved_predictions)
+        )
         fingerprint = stable_fingerprint(
             {
                 "topology": self.topology.fingerprint,
@@ -1071,10 +1077,14 @@ class SemanticTopologyLearningLab:
                 "reports": [item.fingerprint for item in reports],
                 "learned": [item.fingerprint for item in learned],
                 "ambiguous_active_candidates": ambiguous,
+                "prediction_count": prediction_count,
+                "unresolved_prediction_count": unresolved_prediction_count,
                 "trial_count": trial_count,
             }
         )
         return SemanticTopologyLearningSnapshot(
+            prediction_count=prediction_count,
+            unresolved_prediction_count=unresolved_prediction_count,
             trial_count=trial_count,
             tested_bridge_count=len({item.candidate_id for item in reports}),
             active_report_ids=active,
@@ -1119,6 +1129,11 @@ class SemanticTopologyLearningLab:
     @property
     def fingerprint(self) -> str:
         with self._lock:
+            predictions = [
+                (prediction_id, prediction.fingerprint)
+                for prediction_id, prediction
+                in sorted(self._predictions.items())
+            ]
             trials = [
                 (trial_id, trial.fingerprint)
                 for trial_id, trial in sorted(self._trials.items())
@@ -1126,6 +1141,7 @@ class SemanticTopologyLearningLab:
         return stable_fingerprint(
             {
                 "contract": self.contract_fingerprint,
+                "predictions": predictions,
                 "trials": trials,
             }
         )
@@ -1136,6 +1152,7 @@ __all__ = [
     "SemanticTopologyLearningLab",
     "SemanticTopologyLearningSnapshot",
     "TopologyBridgePolicy",
+    "TopologyBridgePrediction",
     "TopologyBridgeReport",
     "TopologyBridgeStatus",
     "TopologyBridgeTrial",
