@@ -144,6 +144,36 @@ def test_topology_research_bridge_preserves_obligation_provenance_in_agenda() ->
         )
 
 
+def test_topology_obligation_provenance_survives_research_state_restore() -> None:
+    candidate, _, control, bridge = _system()
+    update = bridge.refresh(
+        limit=100,
+        minimum_candidate_score=0.0,
+    )
+    obligation = next(
+        item
+        for item in update.obligations
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+    state = control.dump_research_state()
+
+    restored = FrontierCognitiveControlPlane(clock=lambda: 100.0)
+    restored.restore_research_state(state)
+    items = restored.research_agenda.items_for_obligation(
+        obligation.obligation_id
+    )
+
+    assert items
+    for item in items:
+        metadata = item.metadata["obligation_metadata"]
+        assert metadata["semantic_topology"] is True
+        assert metadata["candidate_id"] == candidate.candidate_id
+        assert (
+            item.metadata["obligation_fingerprint"]
+            == obligation.fingerprint
+        )
+
+
 def test_repeated_topology_research_refresh_reuses_agenda_identity() -> None:
     _, _, control, bridge = _system()
 
