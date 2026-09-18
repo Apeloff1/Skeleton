@@ -199,6 +199,8 @@ class AIShellOrchestrator:
         approval: AIPlanApproval | None = None,
         execution_backend: AIPlanExecutionBackend | None = None,
         release_evidence_digest: str = "",
+        runtime_trust_digest: str = "",
+        authority_health_policy_digest: str = "",
     ) -> AIExecutionBundle:
         if session.phase is not AISessionPhase.REVIEW:
             raise RuntimeError("AI session is not ready for execution decision")
@@ -291,6 +293,8 @@ class AIShellOrchestrator:
                 session_evidence_digest=session_evidence_digest,
                 sandbox_binding_digest=sandbox_binding_digest,
                 release_evidence_digest=release_evidence_digest,
+                runtime_trust_digest=runtime_trust_digest,
+                authority_health_policy_digest=authority_health_policy_digest,
             )
             self.journal.append(
                 "ai.plan.completed",
@@ -307,6 +311,10 @@ class AIShellOrchestrator:
                     "session_evidence_digest": session_evidence_digest,
                     "sandbox_binding_digest": sandbox_binding_digest,
                     "release_evidence_digest": release_evidence_digest,
+                    "runtime_trust_digest": runtime_trust_digest,
+                    "authority_health_policy_digest": (
+                        authority_health_policy_digest
+                    ),
                 },
             )
             if success:
