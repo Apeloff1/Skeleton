@@ -19,6 +19,10 @@ class AIDecisionProvenance:
     risk_score: int
     approval_id: str = ""
     receipt_root: str = ""
+    execution_backend_id: str = ""
+    session_evidence_digest: str = ""
+    sandbox_binding_digest: str = ""
+    release_evidence_digest: str = ""
 
     def __post_init__(self) -> None:
         for name in (
@@ -38,9 +42,19 @@ class AIDecisionProvenance:
             raise ValueError("provenance identity field too long")
         if self.receipt_root and len(self.receipt_root) != 64:
             raise ValueError("receipt_root must be SHA-256 hex")
+        if len(self.execution_backend_id) > 256:
+            raise ValueError("execution_backend_id too long")
+        for name in (
+            "session_evidence_digest",
+            "sandbox_binding_digest",
+            "release_evidence_digest",
+        ):
+            value = getattr(self, name)
+            if value and len(value) != 64:
+                raise ValueError(f"{name} must be SHA-256 hex")
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data = {
             "intent_fingerprint": self.intent_fingerprint,
             "proposal_fingerprint": self.proposal_fingerprint,
             "tool_catalog_digest": self.tool_catalog_digest,
@@ -52,6 +66,15 @@ class AIDecisionProvenance:
             "approval_id": self.approval_id,
             "receipt_root": self.receipt_root,
         }
+        if self.execution_backend_id:
+            data["execution_backend_id"] = self.execution_backend_id
+        if self.session_evidence_digest:
+            data["session_evidence_digest"] = self.session_evidence_digest
+        if self.sandbox_binding_digest:
+            data["sandbox_binding_digest"] = self.sandbox_binding_digest
+        if self.release_evidence_digest:
+            data["release_evidence_digest"] = self.release_evidence_digest
+        return data
 
     @property
     def digest(self) -> str:
