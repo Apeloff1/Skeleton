@@ -411,3 +411,69 @@ def test_correction_rejects_invalid_through_tick() -> None:
             bodies_at_tick=_empty_bodies,
             through_tick=0,
         )
+
+
+
+def test_failed_step_at_full_command_capacity_restores_evicted_frame() -> None:
+    controller = _controller()
+    session = CharacterRollbackSession(
+        controller,
+        history_capacity=8,
+        command_capacity=2,
+    )
+    session.step(Vec3(1.0, 0.0, 0.0), (), dt=0.1)
+    session.step(Vec3(2.0, 0.0, 0.0), (), dt=0.1)
+    session.rollback_to(1)
+    before_state = controller.capture_state()
+    before_inputs = session.input_ticks()
+    before_command_digest = session.command_digest
+
+    # Tick 2 already exists, so move to tick 2 identically first, then the
+    # failing tick 3 append would evict tick 1 if not rolled back atomically.
+    session.step(Vec3(2.0, 0.0, 0.0), (), dt=0.1)
+    before_failure = controller.capture_state()
+    before_failure_inputs = session.input_ticks()
+    before_failure_digest = session.command_digest
+
+    with pytest.raises(PhysicsValidationError, match="bodies"):
+        session.step(
+            Vec3(3.0, 0.0, 0.0),
+            object(),  # type: ignore[arg-type]
+            dt=0.1,
+        )
+
+    assert controller.capture_state() == before_failure
+    assert session.tick == 2
+    assert session.input_ticks() == before_failure_inputs
+    assert session.command_digest == before_failure_digest
+    assert session.input_at(1).requested_velocity == Vec3(1.0, 0.0, 0.0)
+    assert before_inputs == (1, 2)
+    assert before_command_digest != ""
+    assert before_state != before_failure
+
+
+def test_direct_resimulation_failure_is_atomic() -> None:
+    controller = _controller()
+    session = CharacterRollbackSession(controller, history_capacity=8)
+    session.step(Vec3(1.0, 0.0, 0.0), (), dt=0.1)
+    session.step(Vec3(2.0, 0.0, 0.0), (), dt=0.1)
+    session.step(Vec3(3.0, 0.0, 0.0), (), dt=0.1)
+    session.rollback_to(0)
+
+    before_state = controller.capture_state()
+    before_tick = session.tick
+    before_history = session.history_digest
+    before_states = session.state_ticks()
+
+    def fail_after_one_tick(tick: int) -> tuple[RigidBody, ...]:
+        if tick == 2:
+            raise RuntimeError("synthetic resimulation failure")
+        return ()
+
+    with pytest.raises(RuntimeError, match="resimulation"):
+        session.resimulate_to(3, fail_after_one_tick)
+
+    assert controller.capture_state() == before_state
+    assert session.tick == before_tick
+    assert session.state_ticks() == before_states
+    assert session.history_digest == before_history
