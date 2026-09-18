@@ -433,6 +433,42 @@ def test_deep_context_record_rejects_invalid_token_estimates() -> None:
             )
 
 
+def test_wrong_provider_same_ref_does_not_resolve_provider_bound_card() -> None:
+    namespace = _namespace()
+    indexed = _external_record(
+        content="Provider A indexed content.",
+        source_ref="shared-provider-ref",
+        provider="provider-a",
+    )
+    wrong = _external_record(
+        content="Provider B different canonical content.",
+        source_ref="shared-provider-ref",
+        provider="provider-b",
+    )
+    fabric = CognitiveContextFabric(
+        policy=ContextFabricPolicy(
+            deep_limit=4,
+            maximum_tokens=1_000,
+            minimum_deep_trust=0.0,
+            minimum_fast_hits_before_skip_deep=1,
+        )
+    )
+    fabric.index_record(namespace.key, indexed, cue="shared provider ref")
+    fabric.register(
+        CallableContextAdapter(
+            SourceTier.EXTERNAL,
+            fetcher=lambda ns, refs, max_records, max_tokens: (wrong,),
+            searcher=lambda ns, query, max_records, max_tokens: (wrong,),
+            source_provider="provider-b",
+        )
+    )
+
+    result = fabric.retrieve(namespace.key, "shared provider ref")
+
+    assert "shared-provider-ref" in result.unresolved_source_refs
+    assert any(record.source_provider == "provider-b" for record in result.records)
+
+
 def test_context_dedupe_preserves_provider_identity_for_same_source_ref() -> None:
     left = _external_record(
         content="Provider A canonical content.",
