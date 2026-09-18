@@ -133,6 +133,18 @@ jobs: {}
     assert any("pull_request runs do not populate github.event.issue.number" in finding for finding in findings)
 
 
+def test_allows_pr_push_branch_identity_coalescing() -> None:
+    text = """name: frontier
+on:
+  pull_request:
+  push:
+concurrency:
+  group: frontier-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    assert _scan(text, "frontier.yml") == []
+
 def test_rejects_branch_name_fallback_without_event_name() -> None:
     text = """name: unsafe
 on:
