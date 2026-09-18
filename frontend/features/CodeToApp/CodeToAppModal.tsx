@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
+import { safeErrorMessage } from '../../utils/safeError';
 import { toast } from '../../components/Toast';
 import Skeleton from '../../components/UI/Skeleton';
 import RetryBanner from '../../components/UI/RetryBanner';
@@ -143,8 +144,9 @@ export const CodeToAppModal: React.FC<CodeToAppModalProps> = ({
       }
       setLastError(null);
       setLastRetryFn(null);
-    } catch (error: any) {
-      const msg = `Generation failed: ${error.message}`;
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      const msg = 'Generation failed';
       toast.error(msg);
       setLastError(msg);
       setLastRetryFn(() => generateApp);
@@ -177,8 +179,9 @@ export const CodeToAppModal: React.FC<CodeToAppModalProps> = ({
       
       const data = await response.json();
       setResult(data);
-    } catch (error: any) {
-      const msg = `Game generation failed: ${error.message}`;
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      const msg = 'Game generation failed';
       toast.error(msg); setLastError(msg); setLastRetryFn(() => generateGame);
     } finally {
       setIsLoading(false);
@@ -207,8 +210,9 @@ export const CodeToAppModal: React.FC<CodeToAppModalProps> = ({
       
       const data = await response.json();
       setResult(data);
-    } catch (error: any) {
-      const msg = `Conversion failed: ${error.message}`;
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      const msg = 'Conversion failed';
       toast.error(msg); setLastError(msg); setLastRetryFn(() => convertCode);
     } finally {
       setIsLoading(false);
@@ -237,8 +241,9 @@ export const CodeToAppModal: React.FC<CodeToAppModalProps> = ({
       
       const data = await response.json();
       setResult(data);
-    } catch (error: any) {
-      const msg = `Enhancement failed: ${error.message}`;
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      const msg = 'Enhancement failed';
       toast.error(msg); setLastError(msg); setLastRetryFn(() => enhanceCode);
     } finally {
       setIsLoading(false);

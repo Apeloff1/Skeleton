@@ -158,6 +158,7 @@ const RosettaPlaygroundModal = lazyNamed(() => import('../features/RosettaPlaygr
 const ChallengeArenaModal = lazyNamed(() => import('../features/ChallengeArena/ChallengeArenaModal'), 'ChallengeArenaModal');
 
 import { resolveAction } from '../utils/actionMap';
+import { safeErrorMessage } from '../utils/safeError';
 import { toast } from '../components/Toast';
 import { useFeatureFlag, FLAG } from '../src/feature-flags';
 
@@ -536,8 +537,9 @@ function CodeDockAppContent() {
       } else {
         setOutput('✓ Program executed successfully (no output)');
       }
-    } catch (error: any) {
-      setOutput(`❌ Execution failed: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      setOutput('❌ Execution failed');
     } finally {
       setIsExecuting(false);
     }
@@ -561,8 +563,9 @@ function CodeDockAppContent() {
       });
       toast.success(`Saved ${currentFileName}${selectedLanguage.extension}`);
       refreshFiles();
-    } catch (error: any) {
-      toast.error(`Failed to save: ${error.message}`);
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      toast.error('Failed to save');
     }
   }, [code, selectedLanguage, currentFileName, apiSaveFile, refreshFiles]);
 
@@ -598,8 +601,9 @@ function CodeDockAppContent() {
     try {
       const result = await aiAssist(code, selectedLanguage?.key || 'python', mode.key);
       setAIResponse(result?.response || 'No suggestion available');
-    } catch (error: any) {
-      setAIResponse(`AI Error: ${error.message}`);
+    } catch (error: unknown) {
+      void safeErrorMessage(error);
+      setAIResponse('AI request failed');
     } finally {
       setIsAILoading(false);
     }
@@ -939,7 +943,7 @@ function CodeDockAppContent() {
         <View style={[styles.errorBanner, { backgroundColor: colors.error + '15', borderColor: colors.error }]}>
           <View style={styles.errorContent}>
             <Ionicons name="alert-circle" size={18} color={colors.error} />
-            <Text style={[styles.errorText, { color: colors.error }]}>{lastError.message}</Text>
+            <Text style={[styles.errorText, { color: colors.error }]}>Failed to load</Text>
           </View>
           {lastError.retry && (
             <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.error }]} onPress={loadInitialData}>

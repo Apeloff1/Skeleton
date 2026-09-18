@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
 import { apiFetch } from '../../utils/apiController';
+import { safeErrorMessage } from '../../utils/safeError';
 import { toast } from '../../components/Toast';
 const API_URL = API_BASE;
 
@@ -70,9 +71,6 @@ const readApiJson = async (response: Response) => {
 
   return data;
 };
-
-const getErrorMessage = (error: unknown) =>
-  error instanceof Error && error.message ? error.message : 'Unknown generation error';
 
 const parseCommaSeparated = (value: string) =>
   value.split(',').map(item => item.trim()).filter(Boolean);
@@ -155,13 +153,13 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const testTypes = ['functional', 'unit', 'integration', 'performance', 'regression'];
 
   const recordFailure = (prefix: string, error: unknown) => {
-    const message = getErrorMessage(error);
+    void safeErrorMessage(error);
     setResult({
       success: false,
-      data: { error: message },
+      data: { error: prefix },
       ai_generated: false,
     });
-    toast.error(`${prefix}: ${message}`);
+    toast.error(prefix);
   };
 
   // =========================================================================
