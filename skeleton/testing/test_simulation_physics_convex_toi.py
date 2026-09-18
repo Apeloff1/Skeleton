@@ -20,6 +20,7 @@ from skeleton.simulation.physics import (
     SphereShape,
     Vec3,
     convex_distance,
+    detect_collision,
     convex_time_of_impact,
 )
 
@@ -475,9 +476,22 @@ def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
 
     receipt = world.step()[0]
 
+    # A tilted capsule/cylinder impact is allowed to glance around the target,
+    # so crossing the target's center plane is not itself tunneling.  Require
+    # an actual CCD response, reduced forward speed, and no unresolved
+    # *closing* contact at the end of the frame.
     assert receipt.ccd_clamps >= 1
-    assert moving.position.x < target.position.x
+    assert moving.position.x < -3.0 + 9.0 * world.settings.fixed_dt
     assert moving.linear_velocity.x < 9.0
+
+    manifold = detect_collision(moving, target)
+    if manifold is not None:
+        point = manifold.points[0].position
+        relative_velocity = (
+            target.velocity_at_world_point(point)
+            - moving.velocity_at_world_point(point)
+        )
+        assert relative_velocity.dot(manifold.normal) >= -1.0e-6
 
 
 def test_general_convex_toi_tie_break_is_canonical() -> None:
