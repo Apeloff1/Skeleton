@@ -167,6 +167,14 @@ def test_allows_job_local_write_elevation(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_allows_empty_workflow_permissions_with_job_local_write(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  bot:\n    permissions:\n      contents: write\n      pull-requests: write\n    steps:\n      - run: echo safe\n",
+    )
+    assert findings == []
+
+
 def test_rejects_direct_pr_title_interpolation_in_inline_run(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
