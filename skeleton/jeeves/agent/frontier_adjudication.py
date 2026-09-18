@@ -170,6 +170,8 @@ class HostCandidateAdjudicator:
             + 0.20 * mean_confidence
             + 0.10 * source_diversity
             + 0.18 * confidence_alignment
+            - 0.25 * (1.0 - custody_fraction)
+            - 0.25 * (1.0 - fingerprint_fraction)
             - 0.45 * contradiction_rate
         )
         score = max(0.0, min(1.0, score))
