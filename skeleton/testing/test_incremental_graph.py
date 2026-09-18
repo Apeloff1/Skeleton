@@ -282,6 +282,7 @@ def _valid_repo_index() -> dict[str, object]:
             "size": 0,
             "working_tree": True,
             "deleted": True,
+            "working_mode": None,
         },
         {
             "path": "src/a.c",
@@ -289,6 +290,9 @@ def _valid_repo_index() -> dict[str, object]:
             "index_blob": "a" * 64,
             "effective_blob": "a" * 64,
             "size": 3,
+            "working_tree": False,
+            "deleted": False,
+            "working_mode": None,
         },
         {
             "path": "src/b.c",
@@ -298,6 +302,7 @@ def _valid_repo_index() -> dict[str, object]:
             "size": 3,
             "working_tree": True,
             "deleted": False,
+            "working_mode": None,
         },
     ]
     return {
@@ -355,6 +360,19 @@ def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
         repo_index=typed,
     )
     assert typed_graph.fingerprint == graph.fingerprint
+
+
+def test_missing_repo_index_contract_fields_fail_closed() -> None:
+    snapshot = _valid_repo_index()
+    missing_schema = dict(snapshot)
+    missing_schema.pop("schema")
+    with pytest.raises(IncrementalGraphError, match="missing required keys"):
+        build_incremental_graph(repo_index=missing_schema)
+
+    files = [dict(item) for item in snapshot["files"]]  # type: ignore[union-attr]
+    files[1].pop("working_mode")
+    with pytest.raises(IncrementalGraphError, match="tracked file is missing required keys"):
+        build_incremental_graph(repo_index={**snapshot, "files": files})
 
 
 def test_repo_index_metadata_tampering_fails_closed() -> None:
