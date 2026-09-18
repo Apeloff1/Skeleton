@@ -2,12 +2,13 @@ name: Automated Repair Intake
 
 on:
   workflow_run:
+    # Keep intake on the canonical aggregate failure signal plus the
+    # dedicated malware boundary. CodeQL, dependency review, and repository
+    # hygiene still run and gate independently; duplicating every completion
+    # here only creates skipped privileged consumer runs.
     workflows:
       - Merge Readiness
-      - CodeQL
       - Malware Gate
-      - Dependency Review
-      - Repository Hygiene Gate
     types: [completed]
     branches:
       - "*"

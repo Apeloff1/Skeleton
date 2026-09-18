@@ -4,6 +4,21 @@
 concept-to-release scoring, or mechanics replay.
 """
 
+from skeleton.quality.replay_evidence import (
+    SCHEMA_ID,
+    EvidenceReport,
+    QualityEvidenceError,
+    ReplayTape,
+    ScenarioManifest,
+    Tolerances,
+    Verdict,
+    evidence_digest_for,
+    load_manifest,
+    run_harness,
+    snapshot_payload,
+    verify_evidence,
+)
+
 from skeleton.quality.property_inventory import (
     CONFLICT_DOMAIN,
     CoverageRow,
@@ -24,6 +39,18 @@ from skeleton.quality.property_inventory import (
 )
 
 __all__ = [
+    "verify_evidence",
+    "snapshot_payload",
+    "run_harness",
+    "load_manifest",
+    "evidence_digest_for",
+    "Verdict",
+    "Tolerances",
+    "ScenarioManifest",
+    "ReplayTape",
+    "QualityEvidenceError",
+    "EvidenceReport",
+    "SCHEMA_ID",
     "CONFLICT_DOMAIN",
     "CoverageRow",
     "CoverageStatus",
