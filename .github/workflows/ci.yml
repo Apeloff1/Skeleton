@@ -224,7 +224,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      - id: app_image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ./Dockerfile
@@ -233,7 +234,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      - id: backend_image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ./backend/Dockerfile
@@ -242,7 +244,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      - id: frontend_image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./frontend
           target: production
@@ -251,3 +254,21 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+      - name: Verify published multi-arch manifests
+        env:
+          APP_IMAGE: ${{ env.IMAGE }}:latest
+          BACKEND_IMAGE: ${{ env.IMAGE }}/backend:latest
+          FRONTEND_IMAGE: ${{ env.IMAGE }}/frontend:latest
+          APP_DIGEST: ${{ steps.app_image.outputs.digest }}
+          BACKEND_DIGEST: ${{ steps.backend_image.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          for image_digest in \
+            "$APP_IMAGE@$APP_DIGEST" \
+            "$BACKEND_IMAGE@$BACKEND_DIGEST" \
+            "$FRONTEND_IMAGE@$FRONTEND_DIGEST"; do
+            test -n "${image_digest##*@}"
+            docker buildx imagetools inspect "$image_digest" | grep -q "linux/amd64"
+            docker buildx imagetools inspect "$image_digest" | grep -q "linux/arm64"
+          done
