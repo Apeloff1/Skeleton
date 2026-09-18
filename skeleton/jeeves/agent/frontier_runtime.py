@@ -412,6 +412,109 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             sequence=sequence,
         )
 
+    def declare_scoped_semantic_topology_candidate_prediction(
+        self,
+        inputs: RunInputs,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        plane = self.semantic_plane_for(inputs)
+        return plane.declare_topology_candidate_prediction(
+            candidate_id,
+            kind=kind,
+            predicted_probability=predicted_probability,
+            domain=domain,
+            independent_run=independent_run,
+            predicted_at=predicted_at,
+            negative_control=negative_control,
+            source_finding_ids=source_finding_ids,
+            source_forecast_ids=source_forecast_ids,
+            evidence_ids=evidence_ids,
+            metadata=metadata,
+        )
+
+    def resolve_scoped_semantic_topology_prediction(
+        self,
+        inputs: RunInputs,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeReport:
+        plane = self.semantic_plane_for(inputs)
+        return plane.resolve_topology_bridge_prediction(
+            prediction_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            outcome_evidence_ids=outcome_evidence_ids,
+            metadata=metadata,
+        )
+
+    def scoped_semantic_topology_learning_summary(
+        self,
+        inputs: RunInputs,
+    ) -> Mapping[str, Any]:
+        return self.semantic_plane_for(
+            inputs
+        ).topology_learning_summary()
+
+    def scoped_semantic_topology_learning_diagnostics(
+        self,
+        inputs: RunInputs,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        return self.semantic_plane_for(
+            inputs
+        ).topology_learning_diagnostics(
+            candidate_id=candidate_id,
+            kind=kind,
+            limit=limit,
+        )
+
+    def export_scoped_semantic_topology_learning_state(
+        self,
+        inputs: RunInputs,
+    ) -> SemanticTopologyLearningState:
+        return self.semantic_plane_for(
+            inputs
+        ).export_topology_learning_state()
+
+    def restore_scoped_semantic_topology_learning_state(
+        self,
+        inputs: RunInputs,
+        state: SemanticTopologyLearningState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        return self.semantic_plane_for(
+            inputs
+        ).restore_topology_learning_state(state)
+
+    def semantic_scope_diagnostics(self) -> Mapping[str, Any]:
+        return {
+            "enabled": self.semantic_scoping_enabled,
+            "pool": self.semantic_scope_pool.diagnostics(),
+            "global_compatibility_plane": {
+                "contract_fingerprint": self.semantic_plane.fingerprint,
+                "topology_learning_fingerprint": (
+                    self.semantic_plane.topology_learning.fingerprint
+                ),
+            },
+        }
+
     def analyze_semantics(
         self,
         observations: Sequence[SemanticObservation],
