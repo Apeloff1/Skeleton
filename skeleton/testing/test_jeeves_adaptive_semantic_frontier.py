@@ -361,6 +361,87 @@ def test_semantic_conflict_can_escalate_but_cannot_improve_evidence_quality() ->
     )
 
 
+def test_semantic_compute_pressure_is_monotonic_and_does_not_touch_evidence(
+    monkeypatch,
+) -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-semantic-compute")
+    state = runtime._new_state(inputs.run_id, inputs)
+
+    baseline = runtime._compute_signals(
+        state,
+        purpose="reasoning-step",
+    )
+    evidence_before = state.ledger.fingerprint
+
+    monkeypatch.setattr(
+        runtime,
+        "_semantic_frontier_signals",
+        lambda _state: _conflicting_signals(),
+    )
+    pressured = runtime._compute_signals(
+        state,
+        purpose="reasoning-step",
+    )
+
+    assert pressured.uncertainty >= baseline.uncertainty
+    assert pressured.contradiction >= baseline.contradiction
+    assert (
+        pressured.expected_information_gain
+        >= baseline.expected_information_gain
+    )
+    assert state.ledger.fingerprint == evidence_before
+    assert state.ledger.artifacts() == ()
+
+
+class _SemanticDriveProbeRuntime(AdaptiveJeevesRuntime):
+    def _drive(self, state):
+        signals = self._semantic_frontier_signals(state)
+        assert signals
+        assert state.scratch.get("semantic:frontier_advisory") is not None
+        return {
+            "run_id": state.run_id,
+            "signal_ids": tuple(item.signal_id for item in signals),
+        }
+
+    def _post_run(self, inputs, result):
+        return result
+
+
+def test_run_with_semantics_binds_advisory_before_drive() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(("unused",))
+    runtime = _SemanticDriveProbeRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    inputs = _inputs("run-with-semantics")
+
+    result = runtime.run_with_semantics(
+        inputs,
+        _observations(),
+        findings=(
+            _finding(
+                "run-with-semantics-drift",
+                "concept_drift",
+                LensFamily.PREDICTIVE,
+                confidence=0.88,
+                ambiguity=0.12,
+            ),
+        ),
+        requested=("concept_drift",),
+        base_rate=0.5,
+    )
+
+    assert result["run_id"] == inputs.run_id
+    assert result["signal_ids"]
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    assert scoped_plane is not runtime.semantic_plane
+    assert scoped_plane.prediction_ledger.open_forecasts()
+
+
 def test_lens_conflict_contributes_to_adaptive_frontier_uncertainty() -> None:
     coordinator = FrontierReasoningCoordinator()
     decision = coordinator.decide(
