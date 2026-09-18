@@ -201,7 +201,11 @@ class CharacterControllerState:
     state_digest: str
 
     def __post_init__(self) -> None:
-        if self.version != _CHARACTER_STATE_VERSION:
+        if (
+            isinstance(self.version, bool)
+            or not isinstance(self.version, int)
+            or self.version != _CHARACTER_STATE_VERSION
+        ):
             raise PhysicsSnapshotError(
                 "unsupported character state version"
             )
