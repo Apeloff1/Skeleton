@@ -19,6 +19,7 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
     assert "types: [completed]" in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
+    assert "group: queue-drain-v3-${{ github.repository }}" in workflow
     assert "cancel-in-progress: false" in workflow
 
 
@@ -162,3 +163,21 @@ def test_queue_drain_does_not_duplicate_live_housekeeping() -> None:
     assert "existing Housekeeping run is ${housekeeping_status}" in workflow
     assert 'gh workflow run "$HOUSEKEEPING_WORKFLOW" --repo "$REPO" --ref main' in workflow
     assert "Housekeeping independently re-proves PR/run identity before any cancellation." in workflow
+
+
+def test_housekeeping_wake_is_independent_arm_job() -> None:
+    workflow = _workflow_text()
+
+    drain_start = workflow.index("  drain:\n")
+    wake_start = workflow.index("  wake-housekeeping:\n")
+    drain = workflow[drain_start:wake_start]
+    wake = workflow[wake_start:]
+
+    assert "Wake exact stale-PR housekeeping when needed" not in drain
+    assert "runs-on: ubuntu-latest" in drain
+    assert "Wake exact stale-PR housekeeping when needed" in wake
+    assert "runs-on: ubuntu-24.04-arm" in wake
+    assert "timeout-minutes: 3" in wake
+    assert "actions: write" in wake
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in wake
+    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in wake

@@ -13,12 +13,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# One live drainer plus one coalesced pending run. Do not trigger on every main
-# push: during merge storms GitHub replaces the pending run before it receives
-# a runner. Successful canonical main Merge Readiness completion provides a
-# lower-frequency recovery wake when scheduled workflows are delayed.
+# v3 escapes the queued v2 recovery generation while keeping one live run plus
+# one coalesced pending run. Future triggers remain non-preemptive.
 concurrency:
-  group: queue-drain-v2-${{ github.repository }}
+  group: queue-drain-v3-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -536,6 +534,18 @@ jobs:
               )
           PY
 
+  wake-housekeeping:
+    # This tiny recovery wake uses a different runner pool from the broad x64
+    # drainer so a saturated x64 queue cannot prevent exact stale-PR cleanup.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
+    permissions:
+      actions: write
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
+    steps:
       - name: Wake exact stale-PR housekeeping when needed
         env:
           GH_TOKEN: ${{ github.token }}
