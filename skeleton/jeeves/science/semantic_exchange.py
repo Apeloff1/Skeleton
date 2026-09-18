@@ -26,6 +26,7 @@ from typing import Mapping
 
 from ..agent.semantic_prediction import PredictionStatus, SemanticForecast, SemanticPredictionLedger
 from ..agent.types import AgentContractError, json_safe, stable_fingerprint, stable_id
+from .chronological_frontier import ForecastFamily
 from .predictive_exchange import (
     ExpertIdentity,
     ForecastEnvelope,
@@ -86,6 +87,9 @@ class SemanticTargetBinding:
         )
 
 
+SEMANTIC_EXCHANGE_TECHNIQUE_ID = "semantic_adapter_2026"
+
+
 class SemanticForecastExpert:
     """Expose bound semantic forecasts through the ForecastExpert protocol.
 
@@ -101,6 +105,14 @@ class SemanticForecastExpert:
     ) -> None:
         if not isinstance(identity, ExpertIdentity):
             raise TypeError("identity must be ExpertIdentity")
+        if identity.technique_id != SEMANTIC_EXCHANGE_TECHNIQUE_ID:
+            raise AgentContractError(
+                "semantic exchange requires the dedicated semantic_adapter_2026 technique"
+            )
+        if identity.family is not ForecastFamily.PROBABILISTIC:
+            raise AgentContractError(
+                "semantic exchange expert family must be probabilistic"
+            )
         if not isinstance(ledger, SemanticPredictionLedger):
             raise TypeError("ledger must be SemanticPredictionLedger")
         self._identity = identity
