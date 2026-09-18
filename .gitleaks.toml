@@ -17,3 +17,19 @@ description = "High-entropy value assigned to a secret-bearing identifier"
 regex = '''(?i)(?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|credential)\s*[:=]\s*["']?([A-Za-z0-9+/_=.\-]{28,})["']?'''
 secretGroup = 1
 entropy = 4.2
+
+
+# Gitleaks 8.24.x rule-specific false-positive exception.
+# The generic-api-key detector interprets the explicit idempotency-key regression
+# assertion below as a credential because of the word "key" and token entropy.
+# Match the exact historical test line only; do not exempt the test file or a
+# broader class of key-like values.
+[[rules]]
+id = "generic-api-key"
+
+  [rules.allowlist]
+  description = "Benign distributed idempotency logical-key regression literal"
+  regexTarget = "line"
+  regexes = [
+    '''^\s*assert record\.key == "operation-123"\s*$''',
+  ]
