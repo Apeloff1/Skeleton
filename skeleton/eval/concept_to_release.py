@@ -430,6 +430,8 @@ def _score_correctness(payload: Mapping[str, Any]) -> float | None:
             "correctness score must be a unit interval",
             context={"field": "score"},
         )
+    if not accepted:
+        return 0.0
     return round(score, 4)
 
 
@@ -765,6 +767,17 @@ def score_concept_to_release(bundle: EvidenceBundle) -> dict[str, Any]:
             dimensions[dimension] = {"status": "missing", "value": None, "source": None}
             continue
         _assert_fresh(item, evaluated_at=evaluated_at, freshness_seconds=freshness)
+        if item.source == "release" and dimension in {"provenance", "release_completeness"}:
+            evidence_commit = _source_commit_from_payload(item.payload)
+            if evidence_commit and evidence_commit != source_commit:
+                raise ConceptToReleaseError(
+                    "release evidence source commit does not match benchmark run",
+                    context={
+                        "dimension": dimension,
+                        "benchmark_commit": source_commit,
+                        "evidence_commit": evidence_commit,
+                    },
+                )
         value = _SCORERS[dimension](item.payload)
         raw_store[item.digest] = {
             "digest": item.digest,
