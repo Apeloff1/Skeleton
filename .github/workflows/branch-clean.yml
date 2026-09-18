@@ -32,6 +32,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_TERMINAL_PROMPT: '0'
+      BRANCH_CLEAN_GRACE_SECONDS: '1800'
     steps:
       - name: Fetch complete branch graph
         shell: bash
@@ -72,28 +73,47 @@ jobs:
           max_rounds=8
           delete_batch_size=32
 
+          if [[ ! "$BRANCH_CLEAN_GRACE_SECONDS" =~ ^[0-9]+$ ]]; then
+            echo 'BRANCH_CLEAN_GRACE_SECONDS must be a non-negative integer.' >&2
+            exit 1
+          fi
+
           declare -A open_pr_heads=()
           declare -A open_pr_bases=()
           declare -A merged_pr_head_tips=()
+          declare -A branch_creation_epochs=()
+          declare -A branch_deletion_epochs=()
 
           load_open_pr_refs() {
-            local branch
+            local branch heads_file bases_file
+            heads_file="$RUNNER_TEMP/open-pr-heads.txt"
+            bases_file="$RUNNER_TEMP/open-pr-bases.txt"
             open_pr_heads=()
             open_pr_bases=()
+
+            # Process substitution hides producer failures from set -e. Materialize
+            # both protection sets and require successful API reads before pruning.
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
+              > "$heads_file"; then
+              echo '::warning::Branch cleanup could not load open pull-request heads; no refs will be deleted.'
+              return 1
+            fi
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
+              > "$bases_file"; then
+              echo '::warning::Branch cleanup could not load open pull-request bases; no refs will be deleted.'
+              return 1
+            fi
+
             while IFS= read -r branch; do
               [[ -n "$branch" ]] || continue
               open_pr_heads["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
-            )
+            done < "$heads_file"
             while IFS= read -r branch; do
               [[ -n "$branch" && "$branch" != main ]] || continue
               open_pr_bases["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref'
-            )
+            done < "$bases_file"
           }
 
           load_merged_pr_head_tips() {
@@ -108,6 +128,40 @@ jobs:
             )
           }
 
+          load_branch_creation_history() {
+            local events_file kind ref created created_epoch prior
+            events_file="$RUNNER_TEMP/branch-ref-events.tsv"
+            branch_creation_epochs=()
+            branch_deletion_epochs=()
+
+            # Repository events are bounded. Missing creation history is therefore
+            # unknown, never proof that a branch is old enough to delete.
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/events?per_page=100" \
+              --jq '.[] | select((.type == "CreateEvent" or .type == "DeleteEvent") and .payload.ref_type == "branch") | [.type, .payload.ref, .created_at] | @tsv' \
+              > "$events_file"; then
+              echo '::warning::Branch cleanup could not load branch creation history; no refs will be deleted.'
+              return 1
+            fi
+
+            while IFS=$'\t' read -r kind ref created; do
+              [[ -n "$kind" && -n "$ref" && -n "$created" ]] || continue
+              if ! created_epoch=$(date -u -d "$created" +%s 2>/dev/null); then
+                continue
+              fi
+              if [[ "$kind" == "CreateEvent" ]]; then
+                prior="${branch_creation_epochs[$ref]:-}"
+                if [[ -z "$prior" ]] || (( created_epoch > prior )); then
+                  branch_creation_epochs["$ref"]="$created_epoch"
+                fi
+              else
+                prior="${branch_deletion_epochs[$ref]:-}"
+                if [[ -z "$prior" ]] || (( created_epoch > prior )); then
+                  branch_deletion_epochs["$ref"]="$created_epoch"
+                fi
+              fi
+            done < "$events_file"
+          }
+
           for ((round=1; round<=max_rounds; round++)); do
             # Refresh every branch before classification. If main moves during
             # the pass we retry without deleting anything from stale ancestry.
@@ -120,6 +174,11 @@ jobs:
             exact_main_count=0
             merged_pr_tip_count=0
             identical_tree_count=0
+            recent_creation_count=0
+            unknown_creation_count=0
+            delayed_create_count=0
+            recent_tip_count=0
+            unknown_tip_age_count=0
             unique_count=0
             protected_count=0
             open_pr_count=0
@@ -128,7 +187,22 @@ jobs:
             late_open_pr_base_count=0
             : > ../preserved-branches.txt
 
-            load_open_pr_refs
+            if ! load_open_pr_refs; then
+              {
+                echo '## Safe branch pruning deferred'
+                echo '- Open pull-request refs were unavailable.'
+                echo '- No branch refs were deleted because PR protection could not be established.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if ! load_branch_creation_history; then
+              {
+                echo '## Safe branch pruning deferred'
+                echo '- Branch creation history was unavailable.'
+                echo '- No branch refs were deleted because creation-age safety could not be established.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             load_merged_pr_head_tips
 
             while read -r tip branch; do
@@ -158,6 +232,46 @@ jobs:
                 continue
               fi
 
+              # Deletion requires positive branch-creation age evidence.
+              if [[ -z "${branch_creation_epochs[$branch]+x}" ]]; then
+                unknown_creation_count=$((unknown_creation_count + 1))
+                printf '%s %s creation-age-unknown\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
+              creation_epoch="${branch_creation_epochs[$branch]}"
+              deletion_epoch="${branch_deletion_epochs[$branch]:-}"
+              # A DeleteEvent at or after the newest CreateEvent means a recreated
+              # live ref may be waiting for its delayed CreateEvent.
+              if [[ -n "$deletion_epoch" ]] && (( deletion_epoch >= creation_epoch )); then
+                delayed_create_count=$((delayed_create_count + 1))
+                printf '%s %s delayed-create-event\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
+              now_epoch=$(date -u +%s)
+              creation_age=$((now_epoch - creation_epoch))
+              if (( creation_age < 0 || creation_age < BRANCH_CLEAN_GRACE_SECONDS )); then
+                recent_creation_count=$((recent_creation_count + 1))
+                printf '%s %s recent-create-event\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
+              # A recently created commit may back a just-started branch whose
+              # CreateEvent delivery is late or whose lifecycle is not settled.
+              committed_at=$(git show -s --format=%cI "$tip" 2>/dev/null || true)
+              if [[ -z "$committed_at" ]] || ! committed_epoch=$(date -u -d "$committed_at" +%s 2>/dev/null); then
+                unknown_tip_age_count=$((unknown_tip_age_count + 1))
+                printf '%s %s tip-age-unavailable\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+              tip_age=$((now_epoch - committed_epoch))
+              if (( tip_age < 0 || tip_age < BRANCH_CLEAN_GRACE_SECONDS )); then
+                recent_tip_count=$((recent_tip_count + 1))
+                printf '%s %s recent-tip\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
               # Squash/rebase merges do not make the original branch tip an
               # ancestor of main. A closed merged PR is therefore an additional
               # safe deletion proof only when the live branch still points at
@@ -169,9 +283,11 @@ jobs:
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
               elif [[ "$tip" == "$classified_main" ]]; then
+                # Exact-main refs may be intentional work branches waiting for
+                # their first unique commit. Never prune them automatically.
                 exact_main_count=$((exact_main_count + 1))
-                delete_branches+=("$branch")
-                delete_tips+=("$tip")
+                printf '%s %s exact-current-main\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
               elif git merge-base --is-ancestor "$tip" "$main_ref"; then
                 # Every commit reachable from this branch tip is already
                 # reachable from main, so deleting only the ref cannot discard
@@ -213,8 +329,16 @@ jobs:
               exit 0
             fi
 
-            # A PR opened during classification wins over cleanup.
-            load_open_pr_refs
+            # A PR opened during classification wins over cleanup. Failure to
+            # re-establish either head/base protection makes this run non-mutating.
+            if ! load_open_pr_refs; then
+              {
+                echo '## Safe branch pruning deferred'
+                echo '- Late open pull-request revalidation failed.'
+                echo '- No branch refs were deleted because PR protection could not be re-established.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             safe_delete_branches=()
             safe_delete_tips=()
             for ((i=0; i<${#delete_branches[@]}; i++)); do
@@ -272,7 +396,12 @@ jobs:
               echo '## Safe branch pruning'
               echo "- Stable classification round: $round/$max_rounds"
               echo "- main tip: \`$current_main\`"
-              echo "- Exact-main duplicate refs eligible: $exact_main_count"
+              echo "- Recent branch creations preserved: $recent_creation_count"
+              echo "- Unknown creation-age refs preserved: $unknown_creation_count"
+              echo "- Delayed CreateEvent recreations preserved: $delayed_create_count"
+              echo "- Recent branch tips preserved: $recent_tip_count"
+              echo "- Unknown tip-age refs preserved: $unknown_tip_age_count"
+              echo "- Exact-current-main refs preserved: $exact_main_count"
               echo "- Older ancestor refs eligible: $ancestor_count"
               echo "- Merged-PR exact-head refs eligible: $merged_pr_tip_count"
               echo "- Tree-identical divergent refs eligible: $identical_tree_count"
@@ -285,8 +414,12 @@ jobs:
               echo "- Branch refs deleted: $deleted"
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
-              echo '- A non-protected branch is eligible only when its tip is main/an ancestor of main, exactly matches a merged same-repository PR head, or has a tree identical to current main.'
+              echo "- New-branch grace period: ${BRANCH_CLEAN_GRACE_SECONDS}s"
+              echo '- A non-protected branch is eligible only with known old creation/tip ages and when its tip is an ancestor of main, exactly matches a merged same-repository PR head, or has a tree identical to current main.'
+              echo '- Exact-current-main refs are preserved so a new work branch waiting for its first unique commit is never mistaken for debris.'
+              echo '- Missing branch creation history preserves the ref; DeleteEvent >= CreateEvent preserves a delayed recreation.'
               echo '- Open PR heads and non-main open PR base branches are never cleanup candidates.'
+              echo '- Failure to load open PR refs or creation history produces zero deletions.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
                 echo
