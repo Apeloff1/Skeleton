@@ -113,6 +113,16 @@ def test_rejects_loss_of_review_comment_event_coverage() -> None:
     assert "pull_request_review_comment trigger is missing activity type" in _messages(source)
 
 
+def test_rejects_merge_queue_state_churn() -> None:
+    for event in ("enqueued", "dequeued"):
+        source = _replace_once(
+            _source(),
+            "      - auto_merge_disabled\n",
+            f"      - auto_merge_disabled\n      - {event}\n",
+        )
+        assert f"merge-queue state churn: {event}" in _messages(source)
+
+
 def test_repository_attention_uses_general_runner_capacity() -> None:
     source = _source()
 
