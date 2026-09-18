@@ -14,6 +14,7 @@ from skeleton.jeeves.agent.deliberation import (
 from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
 from skeleton.jeeves.agent.evaluation import EvalResult
 from skeleton.jeeves.agent.frontier_feedback import FrontierEvalFeedback, FrontierReasoningFeedback
+from skeleton.jeeves.agent.frontier_policy_tuning import FrontierPolicyTuner
 from skeleton.jeeves.agent.frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
