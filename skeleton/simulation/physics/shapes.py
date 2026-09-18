@@ -34,6 +34,7 @@ class ShapeKind(str, Enum):
     PLANE = "plane"
     CAPSULE = "capsule"
     CYLINDER = "cylinder"
+    CONVEX_HULL = "convex_hull"
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,6 +291,262 @@ class CylinderShape:
             mass,
             Vec3.zero(),
             Mat3.diagonal(Vec3(transverse, axial, transverse)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ConvexHullShape:
+    """Closed triangular convex polyhedron in local coordinates."""
+
+    vertices: tuple[Vec3, ...]
+    faces: tuple[tuple[int, int, int], ...]
+
+    def __post_init__(self) -> None:
+        try:
+            vertices = tuple(self.vertices)
+            faces = tuple(tuple(face) for face in self.faces)
+        except TypeError as exc:
+            raise PhysicsValidationError(
+                "convex hull vertices/faces must be iterable"
+            ) from exc
+
+        if len(vertices) < 4:
+            raise PhysicsValidationError(
+                "convex hull requires at least four vertices"
+            )
+        if len(faces) < 4:
+            raise PhysicsValidationError(
+                "convex hull requires at least four triangular faces"
+            )
+        if not all(isinstance(vertex, Vec3) for vertex in vertices):
+            raise PhysicsValidationError(
+                "convex hull vertices must be Vec3"
+            )
+        if len(set(vertices)) != len(vertices):
+            raise PhysicsValidationError(
+                "convex hull vertices must be unique"
+            )
+
+        normalized_faces: list[tuple[int, int, int]] = []
+        directed_edges: dict[tuple[int, int], int] = {}
+        undirected_edges: dict[tuple[int, int], int] = {}
+        seen_faces: set[tuple[int, int, int]] = set()
+        tolerance = 1.0e-10
+
+        for face in faces:
+            if len(face) != 3:
+                raise PhysicsValidationError(
+                    "convex hull faces must be triangles"
+                )
+            if any(
+                isinstance(index, bool)
+                or not isinstance(index, int)
+                or index < 0
+                or index >= len(vertices)
+                for index in face
+            ):
+                raise PhysicsValidationError(
+                    "convex hull face index out of range"
+                )
+            if len(set(face)) != 3:
+                raise PhysicsValidationError(
+                    "convex hull face indices must be distinct"
+                )
+            canonical = tuple(sorted(face))
+            if canonical in seen_faces:
+                raise PhysicsValidationError(
+                    "convex hull contains duplicate face"
+                )
+            seen_faces.add(canonical)
+
+            a, b, d = (vertices[index] for index in face)
+            normal = (b - a).cross(d - a)
+            if normal.length_squared() <= tolerance * tolerance:
+                raise PhysicsValidationError(
+                    "convex hull contains degenerate face"
+                )
+
+            signs: set[int] = set()
+            for index, vertex in enumerate(vertices):
+                if index in face:
+                    continue
+                distance = normal.dot(vertex - a)
+                if distance > tolerance:
+                    signs.add(1)
+                elif distance < -tolerance:
+                    signs.add(-1)
+            if len(signs) > 1:
+                raise PhysicsValidationError(
+                    "convex hull face does not bound a convex vertex set"
+                )
+
+            normalized_faces.append(face)
+            for start, end in (
+                (face[0], face[1]),
+                (face[1], face[2]),
+                (face[2], face[0]),
+            ):
+                directed_edges[(start, end)] = (
+                    directed_edges.get((start, end), 0) + 1
+                )
+                key = (min(start, end), max(start, end))
+                undirected_edges[key] = undirected_edges.get(key, 0) + 1
+
+        if any(count != 2 for count in undirected_edges.values()):
+            raise PhysicsValidationError(
+                "convex hull must be a closed two-manifold"
+            )
+        for start, end in undirected_edges:
+            if (
+                directed_edges.get((start, end), 0) != 1
+                or directed_edges.get((end, start), 0) != 1
+            ):
+                raise PhysicsValidationError(
+                    "convex hull face winding must be consistent"
+                )
+
+        signed_volume = 0.0
+        for i, j, k in normalized_faces:
+            a, b, d = vertices[i], vertices[j], vertices[k]
+            signed_volume += a.dot(b.cross(d)) / 6.0
+        if abs(signed_volume) <= 1.0e-12:
+            raise PhysicsValidationError(
+                "convex hull enclosed volume must be non-zero"
+            )
+
+        object.__setattr__(self, "vertices", vertices)
+        object.__setattr__(self, "faces", tuple(normalized_faces))
+
+    @property
+    def kind(self) -> ShapeKind:
+        return ShapeKind.CONVEX_HULL
+
+    def aabb(self, transform: Transform) -> AABB:
+        points = tuple(
+            transform.transform_point(vertex)
+            for vertex in self.vertices
+        )
+        minimum = points[0]
+        maximum = points[0]
+        for point in points[1:]:
+            minimum = minimum.min(point)
+            maximum = maximum.max(point)
+        return AABB(minimum, maximum)
+
+    def support(self, direction: Vec3, transform: Transform) -> Vec3:
+        local_direction = transform.inverse_transform_vector(direction)
+        if local_direction.length_squared() <= 1.0e-24:
+            raise PhysicsValidationError(
+                "convex hull support direction must be non-zero"
+            )
+        index = max(
+            range(len(self.vertices)),
+            key=lambda row: (
+                self.vertices[row].dot(local_direction),
+                -row,
+            ),
+        )
+        return transform.transform_point(self.vertices[index])
+
+    def mass_properties(self, density: float) -> MassProperties:
+        density = _positive(density, name="density")
+
+        volume = 0.0
+        first = Vec3.zero()
+        int_x2 = 0.0
+        int_y2 = 0.0
+        int_z2 = 0.0
+        int_xy = 0.0
+        int_xz = 0.0
+        int_yz = 0.0
+
+        for i, j, k in self.faces:
+            a, b, c = self.vertices[i], self.vertices[j], self.vertices[k]
+            tetra_volume = a.dot(b.cross(c)) / 6.0
+            volume += tetra_volume
+            first = first + (a + b + c) * (tetra_volume / 4.0)
+
+            xs = (a.x, b.x, c.x)
+            ys = (a.y, b.y, c.y)
+            zs = (a.z, b.z, c.z)
+
+            def square_integral(values: tuple[float, float, float]) -> float:
+                x, y, z = values
+                return tetra_volume * (
+                    x * x + y * y + z * z
+                    + x * y + x * z + y * z
+                ) / 10.0
+
+            def product_integral(
+                left: tuple[float, float, float],
+                right: tuple[float, float, float],
+            ) -> float:
+                diagonal = sum(
+                    left[index] * right[index]
+                    for index in range(3)
+                )
+                off_diagonal = sum(
+                    left[i0] * right[i1]
+                    for i0 in range(3)
+                    for i1 in range(3)
+                    if i0 != i1
+                )
+                return tetra_volume * (
+                    2.0 * diagonal + off_diagonal
+                ) / 20.0
+
+            int_x2 += square_integral(xs)
+            int_y2 += square_integral(ys)
+            int_z2 += square_integral(zs)
+            int_xy += product_integral(xs, ys)
+            int_xz += product_integral(xs, zs)
+            int_yz += product_integral(ys, zs)
+
+        if abs(volume) <= 1.0e-12:
+            raise PhysicsValidationError(
+                "convex hull enclosed volume must be non-zero"
+            )
+        orientation_sign = 1.0 if volume > 0.0 else -1.0
+        volume *= orientation_sign
+        first = first * orientation_sign
+        int_x2 *= orientation_sign
+        int_y2 *= orientation_sign
+        int_z2 *= orientation_sign
+        int_xy *= orientation_sign
+        int_xz *= orientation_sign
+        int_yz *= orientation_sign
+
+        center = first / volume
+        mass = density * volume
+        inertia_origin = Mat3(
+            density * (int_y2 + int_z2),
+            -density * int_xy,
+            -density * int_xz,
+            -density * int_xy,
+            density * (int_x2 + int_z2),
+            -density * int_yz,
+            -density * int_xz,
+            -density * int_yz,
+            density * (int_x2 + int_y2),
+        )
+
+        cx, cy, cz = center.to_tuple()
+        shift = Mat3(
+            mass * (cy * cy + cz * cz),
+            -mass * cx * cy,
+            -mass * cx * cz,
+            -mass * cx * cy,
+            mass * (cx * cx + cz * cz),
+            -mass * cy * cz,
+            -mass * cx * cz,
+            -mass * cy * cz,
+            mass * (cx * cx + cy * cy),
+        )
+        inertia_com = inertia_origin + (shift * -1.0)
+        return MassProperties(
+            mass=mass,
+            center_of_mass=center,
+            inertia=inertia_com,
         )
 
 
