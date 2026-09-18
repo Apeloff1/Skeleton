@@ -39,6 +39,13 @@ from .context_repository import (
     ContextRepository,
     PatchOperation,
 )
+from .context_fabric import (
+    CognitiveContextFabric,
+    ContextFabricPolicy,
+    MemoryManagerAdapter,
+    RepositoryContextAdapter,
+)
+from .memory_game_index import CardKind, MemoryGameIndex, RelationKind, SourceTier
 from .deliberation import (
     CandidateProposal,
     ComputeAllocation,
@@ -69,6 +76,7 @@ from .trajectory_learning import (
 from .types import (
     AgentPhase,
     ModelMessage,
+    MemoryKind,
     RiskTier,
     StepStatus,
     TerminationReason,
@@ -158,6 +166,7 @@ class _AdaptiveState:
     searches: list[SpecialistSearchRecord] = field(default_factory=list)
     experience_matches: int = 0
     allocation_sequence: int = 0
+    last_index_card_id: str | None = None
 
 
 class AdaptiveJeevesRuntime(JeevesAgentRuntime):
@@ -182,6 +191,8 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         self.adaptive_config = adaptive_config or AdaptiveConfig()
         self._context_factory = context_repository_factory or (lambda namespace: ContextRepository(namespace, clock=self._wall_clock))
         self._context_repositories: dict[str, ContextRepository] = {}
+        self._memory_indexes: dict[str, MemoryGameIndex] = {}
+        self._context_fabrics: dict[str, CognitiveContextFabric] = {}
         self._adaptive: dict[str, _AdaptiveState] = {}
         self._reports: dict[str, AdaptiveRunReport] = {}
         self._adaptive_lock = threading.RLock()
@@ -203,6 +214,7 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         with self._adaptive_lock:
             self._adaptive[run_id] = _AdaptiveState(run_id=run_id, context_branch=branch)
         self._seed_run_context(repo, branch, inputs, run_id)
+        self._seed_fast_index(repo, branch, inputs, run_id)
         return state
 
     def _state_from_checkpoint(self, inputs: RunInputs, checkpoint: RunCheckpoint) -> _RunState:
@@ -390,6 +402,10 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
             self._stage_run_summary(repo, adaptive.context_branch, inputs, result, trajectory, credit, council)
         except Exception:
             self.metrics.increment("agent.adaptive.summary_failures")
+        try:
+            self._archive_episode_memory(repo, inputs, result, trajectory, credit, council)
+        except Exception:
+            self.metrics.increment("agent.adaptive.episode_archive_failures")
         report_payload = {
             "run": result.run_id,
             "success": result.success,
@@ -557,18 +573,43 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
         return generate
 
     def _specialist_task(self, state: _RunState, step) -> str:
-        context = self._context_repo(state.inputs).retrieve(
-            state.inputs.goal.objective + " " + step.description,
-            branch=self._adaptive_state(state.run_id).context_branch,
-            max_entries=self.adaptive_config.context_retrieval_entries,
-            max_tokens=self.adaptive_config.context_retrieval_tokens,
-            minimum_trust=0.0,
-            include_unpromoted=True,
-            touch=False,
+        adaptive = self._adaptive_state(state.run_id)
+        repo = self._context_repo(state.inputs)
+        fabric = self._context_fabric(state.inputs, adaptive.context_branch)
+        query = " ".join(
+            value
+            for value in (
+                state.inputs.goal.objective,
+                step.title,
+                step.description,
+                step.expected_outcome,
+            )
+            if value
         )
-        context_payload = [
-            {"key": hit.entry.key, "kind": hit.entry.kind.value, "content": hit.entry.content, "trust": hit.entry.trust, "confidence": hit.entry.confidence}
-            for hit in context
+        context = fabric.retrieve(repo.namespace.key, query)
+        context_payload = context.render_payload()
+        fast_payload = [
+            {
+                "card_id": hit.card.card_id,
+                "kind": hit.card.kind.value,
+                "preview": hit.card.preview,
+                "source_tier": hit.card.source_tier.value,
+                "source_ref": hit.card.source_ref,
+                "score": round(hit.score, 8),
+                "retrieval_probability": round(hit.retrieval_probability, 8),
+                "relations": list(hit.matched_relations),
+            }
+            for hit in context.fast_recall.all_hits[:16]
+        ]
+        lens_payload = [
+            {
+                "id": activation.lens.lens_id,
+                "family": activation.lens.family.value,
+                "authority": activation.lens.authority.value,
+                "score": round(activation.score, 8),
+                "outputs": list(activation.lens.outputs),
+            }
+            for activation in context.lenses.activations
         ]
         payload = {
             "goal": state.inputs.goal.objective,
@@ -582,7 +623,16 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
                 "verification": step.verification,
                 "risk": step.risk.value,
             },
+            "fast_memory_index": {
+                "hits": fast_payload,
+                "fallback_to_deep_context": context.fast_recall.fallback_to_deep_context,
+                "conflict_detected": context.fast_recall.conflict_detected,
+                "stale_card_ids": list(context.stale_card_ids),
+                "unresolved_source_refs": list(context.unresolved_source_refs),
+            },
+            "semantic_lenses": lens_payload,
             "context": context_payload,
+            "context_fabric_fingerprint": context.fingerprint,
             "evidence": [
                 {"id": artifact.evidence_id, "source": artifact.source, "confidence": artifact.confidence, "fingerprint": artifact.fingerprint}
                 for artifact in state.ledger.artifacts()[-32:]
@@ -647,6 +697,33 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
                 self._context_repositories[namespace.key] = repo
             return repo
 
+    def _memory_index(self, inputs: RunInputs) -> MemoryGameIndex:
+        repo = self._context_repo(inputs)
+        with self._adaptive_lock:
+            index = self._memory_indexes.get(repo.namespace.key)
+            if index is None:
+                index = MemoryGameIndex(clock=self._wall_clock)
+                self._memory_indexes[repo.namespace.key] = index
+            return index
+
+    def _context_fabric(self, inputs: RunInputs, branch: str) -> CognitiveContextFabric:
+        repo = self._context_repo(inputs)
+        key = f"{repo.namespace.key}|{branch}"
+        with self._adaptive_lock:
+            fabric = self._context_fabrics.get(key)
+            if fabric is None:
+                fabric = CognitiveContextFabric(
+                    index=self._memory_index(inputs),
+                    policy=ContextFabricPolicy(
+                        deep_limit=self.adaptive_config.context_retrieval_entries,
+                        maximum_tokens=self.adaptive_config.context_retrieval_tokens,
+                    ),
+                )
+                fabric.register(RepositoryContextAdapter(repo, branch=branch))
+                fabric.register(MemoryManagerAdapter(self.memory, inputs.namespace))
+                self._context_fabrics[key] = fabric
+            return fabric
+
     @staticmethod
     def _run_branch(run_id: str) -> str:
         return require_id("branch", f"run:{stable_fingerprint(run_id)[:24]}")
@@ -680,6 +757,66 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
             source_run_id=run_id,
         )
         repo.commit(branch, patch, message="seed adaptive run context", expected_head=repo.head(branch))
+
+    def _seed_fast_index(self, repo: ContextRepository, branch: str, inputs: RunInputs, run_id: str) -> None:
+        fabric = self._context_fabric(inputs, branch)
+        prior = fabric.index.query(
+            repo.namespace.key,
+            inputs.goal.objective,
+            limit=1,
+            associative_limit=1,
+            touch=False,
+        )
+        record = self.memory.remember(
+            inputs.namespace.parent(),
+            inputs.goal.objective,
+            kind=MemoryKind.EPISODIC,
+            salience=0.90,
+            trust=1.0,
+            source="user-interaction",
+            tags=("interaction", "goal", "user"),
+            metadata={
+                "run_id": run_id,
+                "goal_id": inputs.goal.goal_id,
+                "workspace_id": inputs.workspace_id,
+                "direct_user_evidence": True,
+            },
+        )
+        card = fabric.index.index_source(
+            namespace_key=repo.namespace.key,
+            source_tier=SourceTier.MEMORY_STORE,
+            source_ref=record.memory_id,
+            source_fingerprint=record.fingerprint,
+            cue=inputs.goal.objective,
+            preview=record.content,
+            kind=CardKind.INTERACTION,
+            salience=record.salience,
+            trust=record.trust,
+            confidence=1.0,
+            sequence=0,
+            tags=("interaction", "goal", "user"),
+            metadata={
+                "run_id": run_id,
+                "goal_id": inputs.goal.goal_id,
+                "canonical_source_required": True,
+                "durable_across_sessions": True,
+            },
+        )
+        if prior.direct_hits:
+            previous = prior.direct_hits[0].card
+            if previous.card_id != card.card_id:
+                try:
+                    fabric.index.link(
+                        (previous.card_id, card.card_id),
+                        kind=RelationKind.CALLBACK,
+                        strength=min(0.95, max(0.25, prior.direct_hits[0].score)),
+                        confidence=min(previous.confidence, card.confidence),
+                        source="adaptive-runtime",
+                        interpretive=False,
+                    )
+                except Exception:
+                    self.metrics.increment("agent.adaptive.index_relation_failures")
+        self._adaptive_state(run_id).last_index_card_id = card.card_id
 
     def _snapshot_checkpoint_context(self, state: _RunState, checkpoint: RunCheckpoint) -> None:
         repo = self._context_repo(state.inputs)
@@ -726,6 +863,35 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
             source_run_id=state.run_id,
         )
         repo.commit(branch, patch, message=f"checkpoint {checkpoint.sequence}", expected_head=repo.head(branch))
+        fabric = self._context_fabric(state.inputs, branch)
+        card = fabric.index.index_source(
+            namespace_key=repo.namespace.key,
+            source_tier=SourceTier.CONTEXT_REPOSITORY,
+            source_ref=entry.key,
+            source_fingerprint=entry.content_fingerprint,
+            cue=f"checkpoint {checkpoint.sequence} {checkpoint.phase.value}",
+            preview=entry.content,
+            kind=CardKind.EPISODE_CUE,
+            salience=entry.salience,
+            trust=entry.trust,
+            confidence=entry.confidence,
+            sequence=checkpoint.sequence,
+            tags=("checkpoint", checkpoint.phase.value, state.run_id),
+            metadata={"run_id": state.run_id, "canonical_source_required": True},
+        )
+        adaptive = self._adaptive_state(state.run_id)
+        if adaptive.last_index_card_id and adaptive.last_index_card_id != card.card_id:
+            try:
+                fabric.index.link(
+                    (adaptive.last_index_card_id, card.card_id),
+                    kind=RelationKind.NEXT_TURN,
+                    strength=0.85,
+                    confidence=1.0,
+                    source="adaptive-runtime",
+                )
+            except Exception:
+                self.metrics.increment("agent.adaptive.index_relation_failures")
+        adaptive.last_index_card_id = card.card_id
 
     def _stage_run_summary(self, repo: ContextRepository, branch: str, inputs: RunInputs, result: AgentResult, trajectory: Trajectory | None, credit: CreditReport | None, council: CouncilVerdict | None) -> None:
         now = self._wall_clock()
@@ -770,6 +936,99 @@ class AdaptiveJeevesRuntime(JeevesAgentRuntime):
             source_run_id=result.run_id,
         )
         repo.commit(branch, patch, message="stage adaptive run episode", expected_head=repo.head(branch))
+        fabric = self._context_fabric(inputs, branch)
+        card = fabric.index.index_source(
+            namespace_key=repo.namespace.key,
+            source_tier=SourceTier.CONTEXT_REPOSITORY,
+            source_ref=entry.key,
+            source_fingerprint=entry.content_fingerprint,
+            cue=inputs.goal.objective + " " + ("success" if result.success else "failure"),
+            preview=entry.content,
+            kind=CardKind.EPISODE_CUE,
+            salience=entry.salience,
+            trust=entry.trust,
+            confidence=entry.confidence,
+            tags=("episode", "success" if result.success else "failure", result.reason.value),
+            metadata={"run_id": result.run_id, "canonical_source_required": True},
+        )
+        adaptive = self._adaptive_state(result.run_id)
+        if adaptive.last_index_card_id and adaptive.last_index_card_id != card.card_id:
+            try:
+                fabric.index.link(
+                    (adaptive.last_index_card_id, card.card_id),
+                    kind=RelationKind.SEQUENCE,
+                    strength=0.90,
+                    confidence=1.0,
+                    source="adaptive-runtime",
+                )
+            except Exception:
+                self.metrics.increment("agent.adaptive.index_relation_failures")
+        adaptive.last_index_card_id = card.card_id
+
+    def _archive_episode_memory(
+        self,
+        repo: ContextRepository,
+        inputs: RunInputs,
+        result: AgentResult,
+        trajectory: Trajectory | None,
+        credit: CreditReport | None,
+        council: CouncilVerdict | None,
+    ) -> None:
+        payload = {
+            "goal": inputs.goal.objective,
+            "success": result.success,
+            "reason": result.reason.value,
+            "trajectory": trajectory.trajectory_id if trajectory else None,
+            "trajectory_fingerprint": trajectory.fingerprint if trajectory else None,
+            "credit_fingerprint": credit.fingerprint if credit else None,
+            "council": (
+                {
+                    "verdict": council.verdict.value,
+                    "score": council.score,
+                    "fingerprint": council.fingerprint,
+                }
+                if council
+                else None
+            ),
+            "answer_fingerprint": stable_fingerprint(result.answer),
+        }
+        content = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        record = self.memory.remember(
+            inputs.namespace.parent(),
+            content,
+            kind=MemoryKind.EPISODIC,
+            salience=0.82 if result.success else 0.90,
+            trust=0.95 if result.success else 0.90,
+            source="adaptive-episode",
+            tags=("episode", "success" if result.success else "failure", result.reason.value),
+            metadata={
+                "run_id": result.run_id,
+                "trace": result.trace_fingerprint,
+                "canonical_episode_summary": True,
+            },
+        )
+        index = self._memory_index(inputs)
+        index.index_source(
+            namespace_key=repo.namespace.key,
+            source_tier=SourceTier.MEMORY_STORE,
+            source_ref=record.memory_id,
+            source_fingerprint=record.fingerprint,
+            cue=inputs.goal.objective + " " + ("success" if result.success else "failure"),
+            preview=record.content,
+            kind=CardKind.EPISODE_CUE if result.success else CardKind.FAILURE_CUE,
+            salience=record.salience,
+            trust=record.trust,
+            confidence=record.trust,
+            tags=("episode", "success" if result.success else "failure", result.reason.value),
+            metadata={
+                "run_id": result.run_id,
+                "canonical_source_required": True,
+                "durable_across_sessions": True,
+            },
+        )
+        # Checkpoint cards point at run-branch context and are only useful while
+        # that branch is active. Durable interaction/episode cards remain.
+        index.prune_tag(repo.namespace.key, result.run_id)
 
     def _adaptive_state(self, run_id: str) -> _AdaptiveState:
         run_id = require_id("run_id", run_id)

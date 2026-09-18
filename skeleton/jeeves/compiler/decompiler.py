@@ -38,6 +38,11 @@ class LossKind(str, Enum):
     OPTIMIZATION_HISTORY = "optimization_history"
     PROVENANCE = "provenance"
     UNSUPPORTED_SEMANTICS = "unsupported_semantics"
+    NONDETERMINISM = "nondeterminism"
+    REPLAY = "replay"
+    UNDEFINED_BEHAVIOR = "undefined_behavior"
+    ASSUMPTION = "assumption"
+    SAFETY_CONTRACT = "safety_contract"
     DEBUG_INFORMATION = "debug_information"
 
 
@@ -287,6 +292,77 @@ class Decompiler:
                     "instruction has no source/evidence provenance",
                     RecoveryConfidence.EXACT,
                     False,
+                )
+            )
+        if Effect.NONDETERMINISTIC in instruction.effects:
+            nondeterminism_source = instruction.attributes.get("nondeterminism_source")
+            replay_policy = instruction.attributes.get("replay_policy")
+            if not isinstance(nondeterminism_source, str) or not nondeterminism_source.strip():
+                losses.append(
+                    LossRecord(
+                        LossKind.NONDETERMINISM,
+                        lhs or instruction.opcode,
+                        "nondeterministic behavior is explicit but its source is not recoverable",
+                        RecoveryConfidence.EXACT,
+                        False,
+                    )
+                )
+            if not isinstance(replay_policy, str) or not replay_policy.strip():
+                losses.append(
+                    LossRecord(
+                        LossKind.REPLAY,
+                        lhs or instruction.opcode,
+                        "nondeterministic instruction has no recovered replay policy",
+                        RecoveryConfidence.EXACT,
+                        False,
+                    )
+                )
+        if bool(instruction.attributes.get("may_poison", False)) and not bool(
+            instruction.attributes.get("freeze_guarded", False)
+        ):
+            losses.append(
+                LossRecord(
+                    LossKind.UNDEFINED_BEHAVIOR,
+                    lhs or instruction.opcode,
+                    "poison-like state may affect behavior without a recovered freeze/guard contract",
+                    RecoveryConfidence.EXACT,
+                    False,
+                )
+            )
+        if instruction.opcode in {"div", "floordiv", "mod"} and instruction.attributes.get(
+            "division_by_zero"
+        ) not in {"reject", "trap", "defined", "guarded"}:
+            losses.append(
+                LossRecord(
+                    LossKind.UNDEFINED_BEHAVIOR,
+                    lhs or instruction.opcode,
+                    "zero-divisor behavior is not explicitly represented",
+                    RecoveryConfidence.EXACT,
+                    True,
+                )
+            )
+        if bool(instruction.attributes.get("assumption", False)) or instruction.opcode == "assume":
+            losses.append(
+                LossRecord(
+                    LossKind.ASSUMPTION,
+                    lhs or instruction.opcode,
+                    "behavior depends on an assumption that cannot be promoted to source fact",
+                    RecoveryConfidence.EXACT,
+                    True,
+                )
+            )
+        if (
+            instruction.effects
+            & frozenset({Effect.NETWORK, Effect.FILESYSTEM, Effect.PROCESS, Effect.PRIVILEGED})
+            and "risk" not in instruction.attributes
+        ):
+            losses.append(
+                LossRecord(
+                    LossKind.SAFETY_CONTRACT,
+                    lhs or instruction.opcode,
+                    "effectful operation is recoverable but its risk contract is absent",
+                    RecoveryConfidence.EXACT,
+                    True,
                 )
             )
         known = instruction.opcode in {

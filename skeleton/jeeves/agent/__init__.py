@@ -136,6 +136,15 @@ from .interpretive_science import (
     ScientificLensReport,
     ScientificLensStatus,
 )
+from .lens_governance import (
+    LensGovernanceDecision,
+    LensPermission,
+    LensScienceProfile,
+    LensScienceRegistry,
+    ResearchReference,
+    ScientificGrade,
+    explicit_profiles,
+)
 from .memory import (
     ConsolidationCandidate,
     InMemoryStore,
@@ -178,6 +187,15 @@ from .metacognition import (
     budget_pressure,
     epistemic_signals,
     progress_signals,
+)
+from .nuance_runtime import (
+    FrontierUncertaintyRouter,
+    NuanceFrame,
+    NuanceRuntimeError,
+    NuanceRuntimePolicy,
+    NuanceUpdate,
+    ScientificNuanceRuntime,
+    UncertaintyRecommendation,
 )
 from .planning import (
     ModelPlanParser,
@@ -388,6 +406,203 @@ from .world_model import (
     clamp_probability,
     proposition_from_artifact,
     reliability_to_likelihood_ratio,
+)
+
+
+# Scientific inference, fast memory, semantic lenses, and context fabric.
+from .probability_lenses import (
+    AssessmentShape,
+    ProbabilityAssessment,
+    ProbabilityError,
+    ProbabilityLens,
+    ProbabilityWorkbench,
+    aleatoric_epistemic_assessment,
+    bayesian_beta_probability,
+    calibrated_forecast_probability,
+    causal_interventional_probability,
+    conformal_coverage_assessment,
+    counterfactual_probability,
+    discrete_cvar,
+    empirical_game_probability,
+    ensemble_model_probability,
+    expected_calibration_error,
+    expected_information_gain,
+    fair_dice_sum_probability,
+    frequentist_probability,
+    hidden_state_binary_update,
+    hypergeometric_probability,
+    imprecise_probability,
+    likelihood_evidence,
+    memory_pair_next_flip_probability,
+    memory_retrieval_probability,
+    posterior_predictive_probability,
+    robust_bayes_envelope,
+    surprisal_probability,
+    transition_probability,
+)
+from .lens_system import (
+    DirectionLedger,
+    LensActivation,
+    LensAuthority,
+    LensBundle,
+    LensCatalog,
+    LensDefinition,
+    LensFamily,
+    PerpendicularDirection,
+    SemanticLensRouter,
+    default_lenses,
+)
+from .memory_game_index import (
+    CardKind,
+    CardRelation,
+    IndexCard,
+    IndexCardError,
+    MemoryGameIndex,
+    MemoryGamePolicy,
+    RecallHit,
+    RecallPacket,
+    RelationKind,
+    SourceTier,
+)
+from .context_fabric import (
+    CallableContextAdapter,
+    CognitiveContextFabric,
+    ContextFabricPolicy,
+    ContextFabricResult,
+    ContextStoreAdapter,
+    DeepContextRecord,
+    MemoryManagerAdapter,
+    RepositoryContextAdapter,
+)
+from .predictive_memory import (
+    MemoryPrediction,
+    PredictionUpdate as MemoryPredictionUpdate,
+    PredictiveMemoryEngine,
+    PredictiveMemoryPolicy,
+    TransitionEstimate,
+)
+from .historical_synthesis import (
+    AnnualFrontier,
+    ChronologicalScientificFrontier,
+    EvidenceProfile as HistoricalEvidenceProfile,
+    HistoricalContextAdapter,
+    HistoricalMethod,
+    HistoricalReference,
+    HistoricalSynthesisPolicy,
+    MethodEvaluation,
+    MethodFamily,
+    MethodScore,
+    QualityVector,
+    foundational_seed_methods,
+)
+
+# Causal inference, Bayesian mechanism learning, and robust cognitive control.
+from .causal_epistemics import (
+    ActionEvaluation as CausalActionEvaluation,
+    ActiveInferencePlanner,
+    CategoricalDistribution,
+    CausalEpistemicKernel,
+    CausalExperimentPlanner,
+    CausalMechanism,
+    CausalVariable,
+    CounterfactualEstimate,
+    DecisionRegretAudit,
+    ExperimentCandidate,
+    InferenceResult as CausalInferenceResult,
+    MechanismDriftDetector,
+    Preference as CausalPreference,
+    SimulationRecord,
+    StructuralCausalModel,
+    TransitionSample,
+)
+from .causal_ensemble import (
+    BayesianCausalEnsemble,
+    CausalModelHypothesis,
+    EnsembleExperiment,
+    EnsemblePolicy,
+    EnsemblePrediction,
+    ModelPosterior,
+    PosteriorHealth,
+    RobustActionEvaluation,
+    RobustObjective,
+)
+from .interventional_learning import (
+    BayesianMechanismTrainer,
+    DirichletPosterior,
+    MechanismTrainingPolicy,
+    MechanismTrainingReport,
+    PredictiveMetrics,
+    promote_training_report,
+)
+from .causal_inference import (
+    EliminationHeuristic,
+    Factor,
+    FactorCompiler,
+    FactorComplexityExceeded,
+    FactorInferenceResult,
+    InferenceDiagnostics,
+    InferencePolicy,
+    ScalableCausalView,
+    VariableEliminationEngine,
+)
+from .scalable_causal_ensemble import (
+    FactorizedBayesianCausalEnsemble,
+    ScalableCausalEnsembleFactory,
+)
+from .frontier_control_plane import FrontierCognitiveControlPlane
+
+# Multi-level semantic compiler/decompiler and translation validation.
+from .semantic_ir import (
+    BasicBlock as SemanticBasicBlock,
+    Dialect as SemanticDialect,
+    Effect as SemanticEffect,
+    IRFunction,
+    IRModule,
+    IRStage,
+    IRType,
+    IRValidationError,
+    OpCode as SemanticOpCode,
+    Operation as SemanticOperation,
+    SourceOrigin,
+    ValueRef,
+)
+from .compiler_assurance import (
+    AnalysisDomain,
+    AssurancePolicy,
+    CompilerSemanticAssurance,
+    FailureReproducer,
+    FindingSeverity,
+    PassAnalysisDeclaration,
+    ProofScope,
+    SemanticAssuranceFinding,
+    SemanticAssuranceReport,
+    STANDARD_REFERENCES as COMPILER_STANDARD_REFERENCES,
+)
+from .compiler_validation import (
+    PassApplication,
+    PassContract,
+    StageLoweringPass,
+    TransactionalPassManager,
+    TranslationCounterexample,
+    TranslationValidationReport,
+    TranslationValidationStatus,
+    TranslationValidator,
+)
+from .semantic_compiler import (
+    CompilationArtifact,
+    CompilationPolicy,
+    ExecutionDialectLoweringPass,
+    SemanticCompiler,
+)
+from .semantic_decompiler import (
+    DecompilationLoss,
+    DecompilationReport,
+    LossKind,
+    RecoveredFunction,
+    RecoveredOperation,
+    RecoveryConfidence,
+    RecoveryMapping,
+    SemanticDecompiler,
 )
 
 __all__ = [name for name in globals() if not name.startswith("_")]

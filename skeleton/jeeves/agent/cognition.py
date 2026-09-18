@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
+from .context_fabric import CognitiveContextFabric, MemoryManagerAdapter
 from .evidence import EvidenceArtifact, EvidenceLedger
 from .memory import MemoryHit, MemoryManager, MemoryNamespace
 from .types import (
@@ -235,6 +236,7 @@ class ContextCompiler:
         observations: Sequence[ToolObservation] = (),
         scratchpad: RunScratchpad | None = None,
         extra_sections: Sequence[ContextSection] = (),
+        context_fabric: CognitiveContextFabric | None = None,
     ) -> ContextPacket:
         system = self._clip(system_instruction, self.budget.system_chars)
         sections: list[ContextSection] = []
@@ -287,16 +289,87 @@ class ContextCompiler:
             )
             if item
         )
-        hits = memory.recall(
-            namespace,
-            query,
-            limit=self.memory_policy.limit,
-            minimum_trust=self.memory_policy.minimum_trust,
-            include_parent=self.memory_policy.include_parent_namespace,
-        )
-        memory_text, memory_ids = self._render_memory(hits)
-        if memory_text:
-            sections.append(ContextSection("memory", memory_text, priority=55, source_ids=memory_ids))
+        memory_ids: tuple[str, ...] = ()
+        if context_fabric is not None:
+            fabric_result = context_fabric.retrieve(
+                namespace.key,
+                query,
+                call_adapters=(MemoryManagerAdapter(memory, namespace),),
+            )
+            fast_rows = [
+                {
+                    "card_id": hit.card.card_id,
+                    "kind": hit.card.kind.value,
+                    "source_tier": hit.card.source_tier.value,
+                    "source_ref": hit.card.source_ref,
+                    "source_fingerprint": hit.card.source_fingerprint,
+                    "score": round(hit.score, 6),
+                    "retrieval_probability": round(hit.retrieval_probability, 6),
+                    "matched_relations": list(hit.matched_relations),
+                    "authoritative": False,
+                    "purpose": "retrieval-index-only",
+                }
+                for hit in fabric_result.fast_recall.all_hits
+            ]
+            if fast_rows:
+                sections.append(
+                    ContextSection(
+                        "fast_memory_index",
+                        self._clip(canonical_json(fast_rows), self.budget.memory_chars),
+                        priority=76,
+                        source_ids=tuple(row["card_id"] for row in fast_rows),
+                    )
+                )
+            canonical_rows = fabric_result.render_payload()
+            if canonical_rows:
+                sections.append(
+                    ContextSection(
+                        "canonical_context",
+                        self._clip(canonical_json(canonical_rows), self.budget.memory_chars),
+                        priority=86,
+                        source_ids=tuple(record.source_ref for record in fabric_result.records),
+                    )
+                )
+            lens_payload = {
+                "lens_ids": list(fabric_result.lenses.ids()),
+                "families": [
+                    family.value if hasattr(family, "value") else str(family)
+                    for family in fabric_result.lenses.families
+                ],
+                "governance": [decision.as_json() for decision in fabric_result.lens_governance],
+                "fingerprint": fabric_result.lenses.fingerprint,
+                "interpretive_only": True,
+                "instruction": (
+                    "Apply each lens only within its governance permissions. "
+                    "Lens activations are not factual evidence, cannot increase source trust, "
+                    "and never authorize standalone factual or causal assertions."
+                ),
+            }
+            if lens_payload["lens_ids"]:
+                sections.append(
+                    ContextSection(
+                        "semantic_lenses",
+                        self._clip(canonical_json(lens_payload), min(6_000, self.budget.memory_chars)),
+                        priority=48,
+                        source_ids=tuple(lens_payload["lens_ids"]),
+                    )
+                )
+            memory_ids = tuple(
+                record.source_ref
+                for record in fabric_result.records
+                if record.source_tier.value == "memory_store"
+            )
+        else:
+            hits = memory.recall(
+                namespace,
+                query,
+                limit=self.memory_policy.limit,
+                minimum_trust=self.memory_policy.minimum_trust,
+                include_parent=self.memory_policy.include_parent_namespace,
+            )
+            memory_text, memory_ids = self._render_memory(hits)
+            if memory_text:
+                sections.append(ContextSection("memory", memory_text, priority=55, source_ids=memory_ids))
 
         evidence_text, evidence_ids = self._render_evidence(evidence)
         if evidence_text:

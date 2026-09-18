@@ -1,0 +1,617 @@
+"""Multi-stage context fabric for Jeeves.
+
+Retrieval order:
+    1. memory-game cue/index cards (cheap, associative, user-local)
+    2. targeted canonical rehydration of the indexed sources
+    3. semantic-lens routing over query + recalled adjacency
+    4. broad deep-store search only when required
+    5. provenance-aware deduplication and bounded packing
+
+The fabric can front journals, logs, diaries, annals, chronicles, databases,
+caches, files, the ContextRepository, and MemoryManager through adapters.
+
+Fast cards never override canonical source content.  A stale card fingerprint is
+reported and the canonical record wins.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping, Protocol, Sequence
+
+from .context_repository import ContextKind, ContextRepository
+from .lens_governance import LensGovernanceDecision, LensScienceRegistry
+from .lens_system import LensBundle, SemanticLensRouter
+from .memory import MemoryManager, MemoryNamespace
+from .memory_game_index import CardKind, MemoryGameIndex, RecallPacket, SourceTier
+from .types import AgentContractError, json_safe, positive_int, probability, stable_fingerprint
+
+
+@dataclass(frozen=True, slots=True)
+class DeepContextRecord:
+    source_tier: SourceTier
+    source_ref: str
+    source_fingerprint: str
+    content: str
+    canonical: bool
+    trust: float
+    confidence: float
+    salience: float
+    token_estimate: int
+    tags: tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source_tier, SourceTier):
+            object.__setattr__(self, "source_tier", SourceTier(str(self.source_tier)))
+        for name in ("source_ref", "source_fingerprint"):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise AgentContractError(f"{name} cannot be empty")
+            object.__setattr__(self, name, value[:2048])
+        object.__setattr__(self, "content", str(self.content))
+        for name in ("trust", "confidence", "salience"):
+            object.__setattr__(self, name, probability(name, getattr(self, name)))
+        object.__setattr__(self, "token_estimate", positive_int("token_estimate", max(1, self.token_estimate), maximum=10_000_000))
+        object.__setattr__(self, "tags", tuple(sorted({str(value).casefold().strip() for value in self.tags if str(value).strip()})))
+        object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
+
+
+class ContextStoreAdapter(Protocol):
+    source_tier: SourceTier
+
+    def fetch_refs(
+        self,
+        namespace_key: str,
+        source_refs: Sequence[str],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        ...
+
+    def search(
+        self,
+        namespace_key: str,
+        query: str,
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ContextFabricPolicy:
+    fast_limit: int = 8
+    associative_limit: int = 8
+    deep_limit: int = 16
+    maximum_tokens: int = 6000
+    minimum_fast_hits_before_skip_deep: int = 2
+    minimum_deep_trust: float = 0.0
+    always_rehydrate_index_hits: bool = True
+    broad_search_on_conflict: bool = True
+    broad_search_on_fast_fallback: bool = True
+    lens_limit: int = 16
+    index_deep_results: bool = True
+
+    def __post_init__(self) -> None:
+        for name in ("fast_limit", "associative_limit", "deep_limit", "maximum_tokens", "minimum_fast_hits_before_skip_deep", "lens_limit"):
+            object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1_000_000))
+        object.__setattr__(self, "minimum_deep_trust", probability("minimum_deep_trust", self.minimum_deep_trust))
+
+
+@dataclass(frozen=True, slots=True)
+class ContextFabricResult:
+    namespace_key: str
+    query: str
+    fast_recall: RecallPacket
+    lenses: LensBundle
+    lens_governance: tuple[LensGovernanceDecision, ...]
+    records: tuple[DeepContextRecord, ...]
+    stale_card_ids: tuple[str, ...]
+    unresolved_source_refs: tuple[str, ...]
+    broad_search_used: bool
+    token_estimate: int
+    fingerprint: str
+
+    def render_payload(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "source_tier": record.source_tier.value,
+                "source_ref": record.source_ref,
+                "source_fingerprint": record.source_fingerprint,
+                "content": record.content,
+                "canonical": record.canonical,
+                "trust": record.trust,
+                "confidence": record.confidence,
+                "salience": record.salience,
+                "tags": list(record.tags),
+                "metadata": dict(record.metadata),
+            }
+            for record in self.records
+        ]
+
+
+class RepositoryContextAdapter:
+    source_tier = SourceTier.CONTEXT_REPOSITORY
+
+    def __init__(self, repository: ContextRepository, *, branch: str = "main") -> None:
+        self.repository = repository
+        self.branch = str(branch)
+
+    def fetch_refs(
+        self,
+        namespace_key: str,
+        source_refs: Sequence[str],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        if namespace_key != self.repository.namespace.key:
+            return ()
+        refs = {str(value) for value in source_refs}
+        if not refs:
+            return ()
+        records: list[DeepContextRecord] = []
+        used = 0
+        snapshot = self.repository.checkout(self.branch, include_tombstones=False)
+        for entry in snapshot.entries:
+            if entry.key not in refs and entry.entry_id not in refs:
+                continue
+            record = self._record(entry)
+            if records and used + record.token_estimate > max_tokens:
+                continue
+            records.append(record)
+            used += record.token_estimate
+            if len(records) >= max_records:
+                break
+        return tuple(records)
+
+    def search(
+        self,
+        namespace_key: str,
+        query: str,
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        if namespace_key != self.repository.namespace.key:
+            return ()
+        hits = self.repository.retrieve(
+            query,
+            branch=self.branch,
+            max_entries=max_records,
+            max_tokens=max_tokens,
+            minimum_trust=0.0,
+            include_unpromoted=True,
+            touch=False,
+        )
+        return tuple(self._record(hit.entry) for hit in hits)
+
+    @staticmethod
+    def _record(entry) -> DeepContextRecord:
+        return DeepContextRecord(
+            source_tier=SourceTier.CONTEXT_REPOSITORY,
+            source_ref=entry.key,
+            source_fingerprint=entry.content_fingerprint,
+            content=entry.content,
+            canonical=True,
+            trust=entry.trust,
+            confidence=entry.confidence,
+            salience=entry.salience,
+            token_estimate=max(1, len(entry.content) // 4),
+            tags=entry.tags,
+            metadata={
+                "entry_id": entry.entry_id,
+                "kind": entry.kind.value,
+                "promoted": entry.promoted,
+                "protected": entry.protected,
+                "source": entry.source,
+                "evidence_ids": [ref.evidence_id for ref in entry.evidence],
+            },
+        )
+
+
+class MemoryManagerAdapter:
+    source_tier = SourceTier.MEMORY_STORE
+
+    def __init__(self, manager: MemoryManager, namespace: MemoryNamespace) -> None:
+        self.manager = manager
+        self.namespace = namespace
+
+    def fetch_refs(
+        self,
+        namespace_key: str,
+        source_refs: Sequence[str],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+            return ()
+        refs = {str(value) for value in source_refs}
+        records: list[DeepContextRecord] = []
+        used = 0
+        for source_ref in refs:
+            record = self.manager.store.get(source_ref)
+            if record is None:
+                continue
+            item = self._record(record)
+            if records and used + item.token_estimate > max_tokens:
+                continue
+            records.append(item)
+            used += item.token_estimate
+            if len(records) >= max_records:
+                break
+        return tuple(records)
+
+    def search(
+        self,
+        namespace_key: str,
+        query: str,
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+            return ()
+        hits = self.manager.retriever.search(
+            self.namespace,
+            query,
+            limit=max_records,
+            minimum_trust=0.0,
+            include_parent=True,
+        )
+        records: list[DeepContextRecord] = []
+        used = 0
+        for hit in hits:
+            item = self._record(hit.record)
+            if records and used + item.token_estimate > max_tokens:
+                continue
+            records.append(item)
+            used += item.token_estimate
+        return tuple(records)
+
+    @staticmethod
+    def _record(record) -> DeepContextRecord:
+        return DeepContextRecord(
+            source_tier=SourceTier.MEMORY_STORE,
+            source_ref=record.memory_id,
+            source_fingerprint=record.fingerprint,
+            content=record.content,
+            canonical=True,
+            trust=record.trust,
+            confidence=record.trust,
+            salience=record.salience,
+            token_estimate=max(1, len(record.content) // 4),
+            tags=record.tags,
+            metadata={
+                "kind": record.kind.value,
+                "promoted": record.promoted,
+                "source": record.source,
+                "evidence_ids": [ref.evidence_id for ref in record.evidence],
+            },
+        )
+
+
+class CallableContextAdapter:
+    """Adapter for journal/log/DB/cache/file implementations supplied by host code."""
+
+    def __init__(
+        self,
+        source_tier: SourceTier,
+        *,
+        fetcher: Callable[[str, Sequence[str], int, int], Sequence[DeepContextRecord]],
+        searcher: Callable[[str, str, int, int], Sequence[DeepContextRecord]],
+    ) -> None:
+        self.source_tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
+        self._fetcher = fetcher
+        self._searcher = searcher
+
+    def fetch_refs(
+        self,
+        namespace_key: str,
+        source_refs: Sequence[str],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        values = tuple(self._fetcher(namespace_key, source_refs, max_records, max_tokens))
+        self._validate(values)
+        return values[:max_records]
+
+    def search(
+        self,
+        namespace_key: str,
+        query: str,
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        values = tuple(self._searcher(namespace_key, query, max_records, max_tokens))
+        self._validate(values)
+        return values[:max_records]
+
+    def _validate(self, values: Sequence[DeepContextRecord]) -> None:
+        if any(not isinstance(value, DeepContextRecord) for value in values):
+            raise TypeError("context adapter must return DeepContextRecord values")
+        if any(value.source_tier is not self.source_tier for value in values):
+            raise AgentContractError("context adapter returned wrong source tier")
+
+
+class CognitiveContextFabric:
+    def __init__(
+        self,
+        *,
+        index: MemoryGameIndex | None = None,
+        lens_router: SemanticLensRouter | None = None,
+        lens_science: LensScienceRegistry | None = None,
+        policy: ContextFabricPolicy | None = None,
+    ) -> None:
+        self.index = index or MemoryGameIndex()
+        self.lens_router = lens_router or SemanticLensRouter()
+        self.lens_science = lens_science or LensScienceRegistry()
+        self.policy = policy or ContextFabricPolicy()
+        self._adapters: dict[SourceTier, ContextStoreAdapter] = {}
+        self._lock = threading.RLock()
+
+    def register(self, adapter: ContextStoreAdapter) -> None:
+        tier = adapter.source_tier
+        if not isinstance(tier, SourceTier):
+            tier = SourceTier(str(tier))
+        with self._lock:
+            self._adapters[tier] = adapter
+
+    def unregister(self, source_tier: SourceTier) -> bool:
+        tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
+        with self._lock:
+            return self._adapters.pop(tier, None) is not None
+
+    def retrieve(
+        self,
+        namespace_key: str,
+        query: str,
+        *,
+        requested_tiers: Sequence[SourceTier] = (),
+        tags: Sequence[str] = (),
+        prior_lens_ids: Sequence[str] = (),
+        call_adapters: Sequence[ContextStoreAdapter] = (),
+    ) -> ContextFabricResult:
+        fast = self.index.query(
+            namespace_key,
+            query,
+            limit=self.policy.fast_limit,
+            associative_limit=self.policy.associative_limit,
+            tags=tags,
+            touch=True,
+        )
+        adjacent = tuple(hit.card.preview for hit in fast.all_hits[:12])
+        lens_bundle = self.lens_router.route(
+            query,
+            adjacent_text=adjacent,
+            prior_lens_ids=tuple(prior_lens_ids) + fast.lens_hints,
+            limit=self.policy.lens_limit,
+        )
+
+        lens_governance = self.lens_science.assess_bundle(lens_bundle)
+
+        with self._lock:
+            adapters = dict(self._adapters)
+        # Per-call adapters let the runtime expose namespace-scoped stores
+        # (notably MemoryManager) without mutating the shared adapter registry.
+        # This is important for concurrent tenants: a run must never replace
+        # another run's namespace adapter merely because both use MEMORY_STORE.
+        for adapter in tuple(call_adapters):
+            tier = adapter.source_tier
+            if not isinstance(tier, SourceTier):
+                tier = SourceTier(str(tier))
+            adapters[tier] = adapter
+        requested = {
+            tier if isinstance(tier, SourceTier) else SourceTier(str(tier))
+            for tier in requested_tiers
+        }
+        if requested:
+            adapters = {tier: adapter for tier, adapter in adapters.items() if tier in requested}
+
+        records: list[DeepContextRecord] = []
+        stale: set[str] = set()
+        resolved_refs: set[str] = set()
+        budget_remaining = self.policy.maximum_tokens
+
+        # Targeted canonical rehydration comes before any broad retrieval.
+        refs_by_tier: dict[SourceTier, list[str]] = {}
+        card_by_source: dict[tuple[SourceTier, str], list[Any]] = {}
+        for hit in fast.all_hits:
+            key = (hit.card.source_tier, hit.card.source_ref)
+            refs_by_tier.setdefault(hit.card.source_tier, []).append(hit.card.source_ref)
+            card_by_source.setdefault(key, []).append(hit.card)
+
+        if self.policy.always_rehydrate_index_hits:
+            for tier, refs in refs_by_tier.items():
+                adapter = adapters.get(tier)
+                if adapter is None:
+                    continue
+                fetched = adapter.fetch_refs(
+                    namespace_key,
+                    tuple(dict.fromkeys(refs)),
+                    max_records=self.policy.deep_limit,
+                    max_tokens=max(1, budget_remaining),
+                )
+                for record in fetched:
+                    if record.trust < self.policy.minimum_deep_trust:
+                        continue
+                    if records and record.token_estimate > budget_remaining:
+                        continue
+                    records.append(record)
+                    budget_remaining = max(0, budget_remaining - record.token_estimate)
+                    resolved_refs.add(record.source_ref)
+                    for card in card_by_source.get((record.source_tier, record.source_ref), ()):
+                        if card.source_fingerprint != record.source_fingerprint:
+                            stale.add(card.card_id)
+
+        fast_is_weak = (
+            fast.fallback_to_deep_context
+            or len(fast.direct_hits) < self.policy.minimum_fast_hits_before_skip_deep
+        )
+        broad = (
+            (fast_is_weak and self.policy.broad_search_on_fast_fallback)
+            or (fast.conflict_detected and self.policy.broad_search_on_conflict)
+        )
+        if broad and budget_remaining > 0:
+            per_adapter_records = max(1, self.policy.deep_limit // max(1, len(adapters)))
+            for tier, adapter in sorted(adapters.items(), key=lambda item: item[0].value):
+                if budget_remaining <= 0:
+                    break
+                found = adapter.search(
+                    namespace_key,
+                    query,
+                    max_records=per_adapter_records,
+                    max_tokens=max(1, budget_remaining),
+                )
+                for record in found:
+                    if record.trust < self.policy.minimum_deep_trust:
+                        continue
+                    if records and record.token_estimate > budget_remaining:
+                        continue
+                    records.append(record)
+                    budget_remaining = max(0, budget_remaining - record.token_estimate)
+                    resolved_refs.add(record.source_ref)
+
+        packed = self._dedupe(records)[: self.policy.deep_limit]
+        if self.policy.index_deep_results:
+            self._index_records(namespace_key, packed, lens_bundle)
+
+        unresolved = tuple(
+            sorted(
+                {
+                    hit.card.source_ref
+                    for hit in fast.all_hits
+                    if hit.card.source_ref not in resolved_refs and hit.card.source_tier in adapters
+                }
+            )
+        )
+        token_estimate = sum(record.token_estimate for record in packed)
+        fingerprint = stable_fingerprint(
+            {
+                "namespace": namespace_key,
+                "query": query,
+                "fast": fast.fingerprint,
+                "lenses": lens_bundle.fingerprint,
+                "lens_governance": [decision.fingerprint for decision in lens_governance],
+                "records": [(record.source_tier.value, record.source_ref, record.source_fingerprint) for record in packed],
+                "stale": sorted(stale),
+                "unresolved": unresolved,
+                "broad": broad,
+            }
+        )
+        return ContextFabricResult(
+            namespace_key=namespace_key,
+            query=query,
+            fast_recall=fast,
+            lenses=lens_bundle,
+            lens_governance=lens_governance,
+            records=tuple(packed),
+            stale_card_ids=tuple(sorted(stale)),
+            unresolved_source_refs=unresolved,
+            broad_search_used=broad,
+            token_estimate=token_estimate,
+            fingerprint=fingerprint,
+        )
+
+    def index_record(
+        self,
+        namespace_key: str,
+        record: DeepContextRecord,
+        *,
+        cue: str | None = None,
+        kind: CardKind = CardKind.SOURCE_CUE,
+        lens_ids: Sequence[str] = (),
+        continuation_ids: Sequence[str] = (),
+    ):
+        return self.index.index_source(
+            namespace_key=namespace_key,
+            source_tier=record.source_tier,
+            source_ref=record.source_ref,
+            source_fingerprint=record.source_fingerprint,
+            cue=cue or record.content[:2048],
+            preview=record.content[:8192],
+            kind=kind,
+            salience=record.salience,
+            trust=record.trust,
+            confidence=record.confidence,
+            tags=record.tags,
+            lens_ids=lens_ids,
+            continuation_ids=continuation_ids,
+            metadata={
+                "canonical_source_required": True,
+                "indexed_by": "context-fabric",
+                "source_metadata": dict(record.metadata),
+            },
+        )
+
+    def _index_records(self, namespace_key: str, records: Sequence[DeepContextRecord], lenses: LensBundle) -> None:
+        lens_ids = lenses.ids()
+        for record in records:
+            self.index_record(namespace_key, record, lens_ids=lens_ids[:8])
+
+    @staticmethod
+    def _dedupe(records: Sequence[DeepContextRecord]) -> list[DeepContextRecord]:
+        by_key: dict[tuple[SourceTier, str], DeepContextRecord] = {}
+        by_fingerprint: dict[str, DeepContextRecord] = {}
+        for record in records:
+            key = (record.source_tier, record.source_ref)
+            prior = by_key.get(key)
+            if prior is None or (
+                record.canonical,
+                record.trust,
+                record.confidence,
+                record.salience,
+            ) > (
+                prior.canonical,
+                prior.trust,
+                prior.confidence,
+                prior.salience,
+            ):
+                by_key[key] = record
+        for record in by_key.values():
+            prior = by_fingerprint.get(record.source_fingerprint)
+            if prior is None or (
+                record.canonical,
+                record.trust,
+                record.confidence,
+                record.salience,
+            ) > (
+                prior.canonical,
+                prior.trust,
+                prior.confidence,
+                prior.salience,
+            ):
+                by_fingerprint[record.source_fingerprint] = record
+        values = list(by_fingerprint.values())
+        values.sort(
+            key=lambda record: (
+                record.canonical,
+                record.trust,
+                record.confidence,
+                record.salience,
+                -record.token_estimate,
+                record.source_ref,
+            ),
+            reverse=True,
+        )
+        return values
+
+
+__all__ = [
+    "CallableContextAdapter",
+    "CognitiveContextFabric",
+    "ContextFabricPolicy",
+    "ContextFabricResult",
+    "ContextStoreAdapter",
+    "DeepContextRecord",
+    "MemoryManagerAdapter",
+    "RepositoryContextAdapter",
+]
