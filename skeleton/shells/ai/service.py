@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import uuid
 
+from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
@@ -13,6 +14,7 @@ from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
 from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
 from skeleton.shells.ai.preconditions import Preconditions, PreconditionChecker, PreconditionReport
 from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
+from skeleton.shells.ai.sandbox_backend import VerifiedSandboxExecutionBackend
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
@@ -52,6 +54,7 @@ class AIShellService:
         *,
         release_guard: AIStartupReleaseGuard | None = None,
         release_expectation: RuntimeReleaseExpectation | None = None,
+        assurance: AIExecutionAssuranceInspector | None = None,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -60,6 +63,7 @@ class AIShellService:
         self.governance = governance
         self.release_guard = release_guard
         self.release_expectation = release_expectation
+        self.assurance = assurance
         self._release_report: StartupReleaseReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
@@ -235,14 +239,35 @@ class AIShellService:
             approval_id=approval_id,
             release_evidence_digest=self._release_digest(),
         )
-        result = self.execute(
+        result = self._execute_reviewed(
             session,
             review,
             context=context,
             approval=approval,
             execution_backend=execution_backend,
+            sealed=True,
         )
         return result, precondition_report, use
+
+    def _require_assurance(
+        self,
+        review: AIReviewBundle,
+        *,
+        execution_backend: AIPlanExecutionBackend | None,
+        sealed: bool,
+    ) -> None:
+        if self.assurance is None:
+            return
+        active_backend = execution_backend or self.orchestrator.execution_backend
+        self.assurance.require(
+            review.critique.risk.band,
+            sealed=sealed,
+            sandbox_verified=isinstance(
+                active_backend,
+                VerifiedSandboxExecutionBackend,
+            ),
+            backend_id=active_backend.backend_id,
+        )
 
     def execute(
         self,
@@ -253,9 +278,33 @@ class AIShellService:
         approval=None,
         execution_backend: AIPlanExecutionBackend | None = None,
     ) -> AIExecutionBundle:
+        return self._execute_reviewed(
+            session,
+            review,
+            context=context,
+            approval=approval,
+            execution_backend=execution_backend,
+            sealed=False,
+        )
+
+    def _execute_reviewed(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        approval=None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        sealed: bool,
+    ) -> AIExecutionBundle:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
+        self._require_assurance(
+            review,
+            execution_backend=execution_backend,
+            sealed=sealed,
+        )
         proposal = review.planning.response.proposal
         pin = self._pins.get(session.session_id)
         if review.compiled is not None:
@@ -282,11 +331,7 @@ class AIShellService:
                 context=context,
                 approval=approval,
                 execution_backend=execution_backend,
-                release_evidence_digest=(
-                    ""
-                    if self._release_report is None
-                    else self._release_report.evidence_digest
-                ),
+                release_evidence_digest=self._release_digest(),
             )
         finally:
             if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
