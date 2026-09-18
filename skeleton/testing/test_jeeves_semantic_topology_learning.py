@@ -390,6 +390,109 @@ def test_negative_control_failure_blocks_promotion() -> None:
     assert lab.learned_rules() == ()
 
 
+def test_active_bridge_is_revoked_when_new_trials_break_calibration() -> None:
+    _, _, candidate, lab = _system()
+    _promote(lab, candidate)
+    active = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+    assert active.status is TopologyBridgeStatus.ACTIVE
+    assert len(lab.learned_rules()) == 1
+
+    for index, domain in (
+        (401, "film"),
+        (402, "film"),
+        (403, "game"),
+        (404, "game"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=False,
+                domain=domain,
+                run=f"drift-{index}",
+            )
+        )
+
+    restricted = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+    assert restricted.status is TopologyBridgeStatus.RESTRICTED
+    assert lab.learned_rules() == ()
+
+    obligations = lab.research_obligations(
+        limit=100,
+        minimum_candidate_score=0.0,
+    )
+    obligation = next(
+        item
+        for item in obligations
+        if item.metadata["candidate_id"] == candidate.candidate_id
+    )
+    assert obligation.metadata["status"] == "restricted"
+    assert obligation.contradiction_strength > 0.0
+
+
+def test_restricted_bridge_can_recover_after_new_replication() -> None:
+    _, _, candidate, lab = _system()
+    _promote(lab, candidate)
+    for index, domain in (
+        (401, "film"),
+        (402, "film"),
+        (403, "game"),
+        (404, "game"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=False,
+                domain=domain,
+                run=f"drift-{index}",
+            )
+        )
+    assert lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    ).status is TopologyBridgeStatus.RESTRICTED
+
+    for index, domain in (
+        (501, "film"),
+        (502, "film"),
+        (503, "game"),
+        (504, "game"),
+        (505, "film"),
+        (506, "game"),
+        (507, "film"),
+        (508, "game"),
+    ):
+        lab.record(
+            _trial(
+                lab,
+                candidate,
+                index,
+                probability=0.90,
+                outcome=True,
+                domain=domain,
+                run=f"recovery-{index}",
+            )
+        )
+
+    recovered = lab.report(
+        candidate.candidate_id,
+        LensInteractionKind.REINFORCES,
+    )
+    assert recovered.status is TopologyBridgeStatus.ACTIVE
+    assert len(lab.learned_rules()) == 1
+
+
 def test_competing_active_relation_kinds_fail_closed() -> None:
     _, _, candidate, lab = _system()
     _promote(
