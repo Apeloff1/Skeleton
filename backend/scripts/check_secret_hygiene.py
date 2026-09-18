@@ -28,7 +28,7 @@ SKIP_DIRS = {
     ".expo",
     "__pycache__",
 }
-MAX_FILE_BYTES = 2 * 1024 * 1024
+# Large checked-in curriculum/snapshot sources exceed 2 MiB. Keep the reader\n# bounded while scanning those tracked text corpora in full.\nMAX_FILE_BYTES = 16 * 1024 * 1024
 TEXT_SUFFIXES = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".yml", ".yaml",
     ".toml", ".ini", ".cfg", ".conf", ".env", ".example", ".md",
