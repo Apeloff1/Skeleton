@@ -36,6 +36,7 @@ jobs:
       MAX_CACHE_DELETES: '500'
       MAX_RUN_DELETES: '1000'
       LIVE_RUN_STALE_MINUTES: '30'
+      LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
       MAX_LIVE_CANCELS: '100'
     steps:
       - name: Verify GitHub CLI
@@ -50,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           cutoff=$(date -u -d "${LIVE_RUN_STALE_MINUTES} minutes ago" +%s)
+          force_cutoff=$(date -u -d "${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes ago" +%s)
           inventory="$RUNNER_TEMP/live-runs.tsv"
           : > "$inventory"
 
@@ -84,6 +86,7 @@ jobs:
 
           inspected=0
           cancelled=0
+          forced=0
           moved=0
           preserved_errors=0
           kept_current=0
@@ -241,12 +244,77 @@ jobs:
             done
 
             [[ "$obsolete" == "true" ]] || continue
-            if (( cancelled >= MAX_LIVE_CANCELS )); then
+            if (( cancelled + forced >= MAX_LIVE_CANCELS )); then
               break
             fi
 
             if gh api --method POST "/repos/${REPO}/actions/runs/${id}/cancel" >/dev/null 2>&1; then
               cancelled=$((cancelled + 1))
+              continue
+            fi
+
+            status_now=$(gh api "/repos/${REPO}/actions/runs/${id}" --jq '.status // empty' 2>/dev/null || true)
+            if [[ "$status_now" == "completed" ]]; then
+              moved=$((moved + 1))
+              continue
+            fi
+
+            # GitHub can leave old queued runs in a provider-stuck state where
+            # ordinary cancellation returns 409/422 indefinitely. Escalation is
+            # deliberately much narrower than ordinary cleanup: only a run that
+            # is still exactly queued, older than 24 hours, and freshly proven
+            # obsolete against every linked same-repository PR may be force-cancelled.
+            if [[ "$status_now" != "queued" || "$created_epoch" -ge "$force_cutoff" ]]; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            force_obsolete=true
+            for pr_number in "${pr_numbers[@]}"; do
+              force_pr_json="$RUNNER_TEMP/force-pr-${pr_number}.json"
+              if ! gh api "/repos/${REPO}/pulls/${pr_number}" > "$force_pr_json"; then
+                force_obsolete=false
+                break
+              fi
+              force_pr_state=$(jq -r '.state // empty' "$force_pr_json")
+              force_pr_head_sha=$(jq -r '.head.sha // empty' "$force_pr_json")
+              force_pr_head_repo=$(jq -r '.head.repo.full_name // empty' "$force_pr_json")
+              force_pr_head_ref=$(jq -r '.head.ref // empty' "$force_pr_json")
+
+              if [[ "$force_pr_head_repo" != "$REPO" || "$force_pr_head_ref" != "$head_branch" ]]; then
+                force_obsolete=false
+                break
+              fi
+              if [[ "$force_pr_state" == "open" && "$force_pr_head_sha" == "$head_sha" ]]; then
+                force_obsolete=false
+                break
+              fi
+              if [[ "$force_pr_state" != "open" && "$force_pr_state" != "closed" ]]; then
+                force_obsolete=false
+                break
+              fi
+            done
+            if [[ "$force_obsolete" != "true" ]]; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            force_run_json="$RUNNER_TEMP/force-run-${id}.json"
+            if ! gh api "/repos/${REPO}/actions/runs/${id}" > "$force_run_json"; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+            force_status=$(jq -r '.status // empty' "$force_run_json")
+            force_sha=$(jq -r '.head_sha // empty' "$force_run_json")
+            force_branch=$(jq -r '.head_branch // empty' "$force_run_json")
+            force_event=$(jq -r '.event // empty' "$force_run_json")
+            if [[ "$force_status" != "queued" || "$force_sha" != "$head_sha" || "$force_branch" != "$head_branch" || "$force_event" != "pull_request" ]]; then
+              preserved_errors=$((preserved_errors + 1))
+              continue
+            fi
+
+            if gh api --method POST "/repos/${REPO}/actions/runs/${id}/force-cancel" >/dev/null 2>&1; then
+              forced=$((forced + 1))
               continue
             fi
 
@@ -261,7 +329,8 @@ jobs:
           {
             echo '## Live Actions reaper'
             echo "- Live runs inspected: $inspected"
-            echo "- Obsolete PR runs cancelled: $cancelled"
+            echo "- Obsolete PR runs cancelled normally: $cancelled"
+            echo "- Provider-stuck queued PR runs force-cancelled: $forced"
             echo "- Runs that completed before cancellation: $moved"
             echo "- Ambiguous/API/cancellation runs preserved: $preserved_errors"
             echo "- Current PR-head runs preserved: $kept_current"
@@ -269,8 +338,10 @@ jobs:
             echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
             echo "- Recent live runs preserved: $kept_recent"
             echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
+            echo "- Force-cancel threshold: ${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes"
             echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
-            echo '- Cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
+            echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA.'
+            echo '- Force-cancel additionally requires a fresh queued-only run check and a fresh PR-state revalidation after ordinary cancellation fails.'
           } >> "$GITHUB_STEP_SUMMARY"
 
           if (( preserved_errors > 0 )); then
