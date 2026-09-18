@@ -314,6 +314,32 @@ def test_unknown_schema_version_fails_closed():
     assert empty.assets == ()
 
 
+def test_typed_target_constraints_reject_noncanonical_sequences_and_duplicates():
+    record = AssetRecord.from_bytes(
+        asset_id="typed-targets",
+        kind="image",
+        data=b"asset-bytes",
+    )
+
+    bad_engines = replace(
+        record,
+        targets=TargetConstraints(engines="pc"),  # type: ignore[arg-type]
+    )
+    with pytest.raises(SerializationError, match="engines must be a tuple"):
+        validate_manifest(AssetManifest(schema_version=SCHEMA_VERSION, assets=(bad_engines,)))
+
+    duplicate_constraints = replace(
+        record,
+        targets=TargetConstraints(
+            constraints=(("quality", 1), ("quality", 2)),
+        ),
+    )
+    with pytest.raises(SerializationError, match="duplicate keys"):
+        validate_manifest(
+            AssetManifest(schema_version=SCHEMA_VERSION, assets=(duplicate_constraints,))
+        )
+
+
 def test_from_bytes_lineage_iterable_is_hard_bounded():
     def endless_lineage():
         index = 0
