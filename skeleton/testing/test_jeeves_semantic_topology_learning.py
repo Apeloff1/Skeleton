@@ -850,9 +850,9 @@ def test_active_learned_bridge_can_add_freshly_supported_companion_lens() -> Non
     (
         registry,
         topology,
-        _candidate,
+        candidate,
         lab,
-        _left,
+        left,
         right,
         selection,
         supported,
@@ -880,8 +880,67 @@ def test_active_learned_bridge_can_add_freshly_supported_companion_lens() -> Non
     }
     assert snapshot.learned_companion_keys == (right.key,)
     assert snapshot.coverage.learned_companion_lenses == 1
+    assert len(snapshot.learned_companion_activations) == 1
+    activation = snapshot.learned_companion_activations[0]
+    learned = lab.learned_rules()[0]
+    assert activation.lens_key == right.key
+    assert activation.source_lens_key == left.key
+    assert activation.candidate_id == candidate.candidate_id
+    assert activation.report_id == learned.report_id
+    assert activation.interaction_kind is learned.rule.kind
+    assert activation.bridge_quality == learned.bridge_quality
+    assert activation.bridge_quality >= (
+        plane.policy.minimum_learned_companion_bridge_quality
+    )
+    assert activation.cue_support >= (
+        plane.policy.minimum_learned_companion_cue_support
+    )
+    assert activation.activation_score == (
+        snapshot.selection.activation_scores[right.key]
+    )
     assert snapshot.factual_assertion_authorized is False
     assert snapshot.causal_assertion_authorized is False
+
+
+def test_active_bridge_below_companion_quality_floor_does_not_auto_route() -> None:
+    (
+        registry,
+        topology,
+        _candidate,
+        lab,
+        _left,
+        right,
+        selection,
+        supported,
+        _unsupported,
+    ) = _companion_fixture()
+    learned = lab.learned_rules()[0]
+    assert learned.bridge_quality < 0.95
+
+    plane = SemanticLensPlane(
+        registry=registry,
+        router=_FixedRouter(registry, selection),
+        topology=topology,
+        topology_learning=lab,
+        policy=SemanticPlanePolicy(
+            require_selected_findings=False,
+            max_lenses=8,
+            max_per_family=6,
+            enable_learned_companions=True,
+            max_learned_companions=2,
+            minimum_learned_companion_cue_support=0.20,
+            minimum_learned_companion_bridge_quality=0.95,
+        ),
+    )
+
+    snapshot = plane.analyze(supported)
+
+    assert right.key not in {
+        item.key for item in snapshot.selection.lenses
+    }
+    assert snapshot.learned_companion_keys == ()
+    assert snapshot.learned_companion_activations == ()
+    assert snapshot.coverage.learned_companion_lenses == 0
 
 
 def test_learned_bridge_never_adds_companion_without_fresh_cue_support() -> None:
