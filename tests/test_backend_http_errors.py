@@ -99,7 +99,24 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "jeeves_voice.py",
     REPO_ROOT / "backend" / "routes" / "jeeves_game_builder.py",
     REPO_ROOT / "backend" / "routes" / "game_command_agents.py",
+    REPO_ROOT / "backend" / "routes" / "creator_economy.py",
+    REPO_ROOT / "backend" / "routes" / "snowball.py",
+    REPO_ROOT / "backend" / "routes" / "nexus.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_studio.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_cns.py",
+    REPO_ROOT / "backend" / "routes" / "gameforge_runtime.py",
+    REPO_ROOT / "backend" / "routes" / "apk_inspector.py",
+    REPO_ROOT / "backend" / "routes" / "llm_router.py",
+    REPO_ROOT / "backend" / "routes" / "expo_flaps.py",
+    REPO_ROOT / "backend" / "routes" / "godot_engine.py",
+    REPO_ROOT / "backend" / "services" / "game_llm_service.py",
+    REPO_ROOT / "backend" / "services" / "ai_hub_svc.py",
+    REPO_ROOT / "backend" / "services" / "tool_registry.py",
+    REPO_ROOT / "backend" / "core" / "narrative_vault.py",
+    REPO_ROOT / "backend" / "core" / "provenance_ledger.py",
+    REPO_ROOT / "backend" / "core" / "autonomous_orchestrator.py",
 ]
+SERVER = REPO_ROOT / "backend" / "server.py"
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
 
@@ -186,11 +203,15 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     assert '"error": str(e)' not in source
     assert '"message": str(e)' not in source
+    assert '"detail": str(e)' not in source
     assert "persist failed: {e}" not in source
     assert "APK toolchain unavailable:" not in source
     assert "Failed to load build:" not in source
     assert "Failed to launch build task:" not in source
     assert "curiosity research unavailable:" not in source
+    assert "type(e).__name__}: {e}" not in source
+    assert 'f"stripe error:' not in source
+    assert "all models failed:" not in source
 
 
 
@@ -301,3 +322,11 @@ def test_redact_client_payload_is_bounded() -> None:
     assert redacted["token"] == "[REDACTED]"
     assert redacted["nested"]["password"] == "[REDACTED]"
     assert redacted["nested"]["ok"] == "fine"
+
+
+def test_server_health_envelopes_do_not_stringify_exceptions() -> None:
+    source = SERVER.read_text(encoding="utf-8")
+    assert 'return {"error": str(e)}' not in source
+    assert '"error": str(e)[:200]' not in source
+    assert "index_audit_failed" in source
+    assert "probe_failed" in source

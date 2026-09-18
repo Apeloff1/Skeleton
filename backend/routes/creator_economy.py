@@ -290,8 +290,8 @@ async def premium_checkout(body: PremiumCheckoutBody, request: Request):
         cancel_url=f"{origin}/premium?cancelled=1", metadata=meta)
     try:
         session = await sc.create_checkout_session(req)
-    except Exception as e:
-        return {"error": f"stripe error: {str(e)[:200]}"}
+    except Exception:
+        return {"error": "stripe_error"}
     await _db.payment_transactions.insert_one({
         "session_id": session.session_id, "buyer_id": vid, "amount": float(cfg["price"]),
         "currency": "usd", "metadata": meta, "payment_status": "initiated", "status": "open",
@@ -307,8 +307,8 @@ async def premium_session_status(session_id: str, request: Request):
     sc = _checkout(str(request.base_url))
     try:
         status = await sc.get_checkout_status(session_id)
-    except Exception as e:
-        return {"error": f"stripe error: {str(e)[:200]}", "payment_status": txn.get("payment_status")}
+    except Exception:
+        return {"error": "stripe_error", "payment_status": txn.get("payment_status")}
     await _db.payment_transactions.update_one(
         {"session_id": session_id},
         {"$set": {"status": status.status, "payment_status": status.payment_status, "updated_at": _now()}})
