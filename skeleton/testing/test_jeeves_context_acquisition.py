@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from skeleton.jeeves.agent.associative_memory import AssociationKind, AssociativeMemoryGameIndex
-from skeleton.jeeves.agent.context_acquisition import InteractionAcquisitionEngine
-from skeleton.jeeves.agent.memory import MemoryNamespace
+from skeleton.jeeves.agent.context_acquisition import InteractionAcquisitionEngine, build_cue_first_context_system
+from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game import MemoryGamePolicy
 
 
@@ -115,3 +115,12 @@ def test_user_namespaces_do_not_share_cards_or_associations() -> None:
     bob_hits = engine.cards.search(bob, "Alice deployment", limit=20)
     assert a.card.card_id not in {hit.card.card_id for hit in bob_hits}
     assert b.card.card_id in {card.card_id for card in engine.cards.store.namespace_cards(bob)}
+
+
+def test_factory_guarantees_shared_associative_l0_before_deep_context() -> None:
+    system = build_cue_first_context_system(memory=MemoryManager())
+    assert system.resolver.cards is system.cards
+    assert system.compiler.resolver is system.resolver
+    assert system.acquisition.cards is system.cards
+    assert system.acquisition.resolver is system.resolver
+    assert isinstance(system.cards, AssociativeMemoryGameIndex)
