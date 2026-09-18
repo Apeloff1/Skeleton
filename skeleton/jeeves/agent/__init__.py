@@ -494,6 +494,7 @@ from .semantic_research_bridge import (
 
 from .semantic_scope import (
     ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
     SemanticLearningScope,
     SemanticScopePoolSnapshot,
 )
