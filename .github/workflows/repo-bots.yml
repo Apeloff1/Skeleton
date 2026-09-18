@@ -16,12 +16,15 @@ concurrency:
   group: repo-bots-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   bot:
+    permissions:
+      actions: read
+      contents: write
+      issues: read
+      pull-requests: write
     name: ${{ matrix.bot }}
     if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
     runs-on: ubuntu-latest
