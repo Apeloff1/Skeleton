@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import uuid
 
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
 from skeleton.shells.ai.governance import AIShellGovernance
 from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
@@ -15,6 +16,7 @@ from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
+from skeleton.shells.ai.startup_release import AIStartupReleaseGuard, RuntimeReleaseExpectation, StartupReleaseReport
 from skeleton.shells.ai.types import AIIntent
 from skeleton.shells.execution_context import ExecutionContext
 
@@ -25,14 +27,18 @@ class AIServiceStatus:
     diagnostics: dict[str, object]
     governance: dict[str, object]
     shell_phase: str
+    release: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data = {
             "phase": self.phase.value,
             "diagnostics": dict(self.diagnostics),
             "governance": dict(self.governance),
             "shell_phase": self.shell_phase,
         }
+        if self.release is not None:
+            data["release"] = dict(self.release)
+        return data
 
 
 class AIShellService:
