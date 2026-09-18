@@ -268,6 +268,48 @@ class AIExecutionEvidenceStore:
             node.node_hash,
         )
 
+    def find_by_attempt_id(
+        self,
+        execution_attempt_id: str,
+    ) -> SignedAIExecutionEvidence | None:
+        if not execution_attempt_id or len(execution_attempt_id) > 256:
+            raise ValueError("invalid execution_attempt_id")
+        for item in self.snapshot():
+            if item.evidence.execution_attempt_id == execution_attempt_id:
+                return item
+        return None
+
+    def find_by_digest(
+        self,
+        evidence_digest: str,
+    ) -> SignedAIExecutionEvidence | None:
+        if len(evidence_digest) != 64:
+            raise ValueError("evidence_digest must be SHA-256 hex")
+        for item in self.snapshot():
+            if item.evidence.digest == evidence_digest:
+                return item
+        return None
+
+    def append_once(
+        self,
+        evidence: AIExecutionEvidence,
+    ) -> SignedAIExecutionEvidence:
+        if evidence.execution_attempt_id:
+            existing = self.find_by_attempt_id(
+                evidence.execution_attempt_id
+            )
+            if existing is not None:
+                if existing.evidence.digest != evidence.digest:
+                    raise RuntimeError(
+                        "execution attempt already binds different final evidence"
+                    )
+                return existing
+        else:
+            existing = self.find_by_digest(evidence.digest)
+            if existing is not None:
+                return existing
+        return self.append(evidence)
+
     @staticmethod
     def _evidence(raw: dict[str, object]) -> AIExecutionEvidence:
         return AIExecutionEvidence(
