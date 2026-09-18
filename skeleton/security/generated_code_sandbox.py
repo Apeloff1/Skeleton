@@ -608,7 +608,7 @@ def _stable_callable_aliases(
 
 def _inspect_tool_json(text: str) -> list[Operation]:
     try:
-        payload = json.loads(text)
+        payload = json.loads(text, object_pairs_hook=_json_object_no_duplicates)
     except (json.JSONDecodeError, RecursionError) as exc:
         message = exc.msg if isinstance(exc, json.JSONDecodeError) else "nesting too deep"
         raise SandboxPolicyError(
@@ -637,6 +637,18 @@ def _inspect_tool_json(text: str) -> list[Operation]:
             Operation(OperationKind.PROCESS, name, SandboxCapability.PROCESS, "sensitive tool name")
         )
     return operations
+
+
+def _json_object_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise SandboxPolicyError(
+                "tool payload contains duplicate JSON keys",
+                context={"key": key},
+            )
+        payload[key] = value
+    return payload
 
 
 def _nested_policy_key(payload: object) -> Optional[str]:
@@ -730,12 +742,23 @@ def _import_operations(name: str) -> list[Operation]:
         )
     if root in _NET_MODULES:
         operations.append(Operation(OperationKind.NETWORK, name, SandboxCapability.NETWORK, "network import"))
-    if root in _PROC_MODULES and name.split(".")[-1] in {
-        "system", "popen", "execv", "execve", "fork", "spawnv", "posix_spawn",
-    }:
-        operations.append(Operation(OperationKind.PROCESS, name, SandboxCapability.PROCESS, "process import"))
-    if root == "subprocess":
-        operations.append(Operation(OperationKind.PROCESS, name, SandboxCapability.PROCESS, "process import"))
+    process_import = (
+        root in {"subprocess", "multiprocessing", "pty", "ctypes"}
+        or (
+            root == "os"
+            and name.split(".")[-1]
+            in {"system", "popen", "execv", "execve", "fork", "spawnv", "posix_spawn"}
+        )
+    )
+    if process_import:
+        operations.append(
+            Operation(
+                OperationKind.PROCESS,
+                name,
+                SandboxCapability.PROCESS,
+                "process-sensitive import",
+            )
+        )
     if root in _SECRET_MODULES and "environ" in name:
         operations.append(
             Operation(
