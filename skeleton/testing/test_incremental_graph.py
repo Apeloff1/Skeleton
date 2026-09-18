@@ -316,6 +316,45 @@ def _valid_repo_index() -> dict[str, object]:
     }
 
 
+def test_repo_index_non_ascii_paths_use_utf8_canonical_order_and_digest() -> None:
+    files = [
+        {
+            "path": "src/a.c",
+            "mode": "100644",
+            "index_blob": "a" * 64,
+            "effective_blob": "a" * 64,
+            "size": 1,
+            "working_tree": False,
+            "deleted": False,
+            "working_mode": None,
+        },
+        {
+            "path": "src/å.c",
+            "mode": "100644",
+            "index_blob": "b" * 64,
+            "effective_blob": "b" * 64,
+            "size": 1,
+            "working_tree": False,
+            "deleted": False,
+            "working_mode": None,
+        },
+    ]
+    files.sort(key=lambda item: str(item["path"]).encode("utf-8"))
+    snapshot = {
+        "schema": "build.incremental_graph.v1",
+        "object_format": "sha256",
+        "head": "c" * 64,
+        "source_digest": _repo_source_digest(files),
+        "tracked_files": len(files),
+        "tracked_bytes": 2,
+        "files": files,
+    }
+    first = build_incremental_graph(repo_index=snapshot)
+    second = build_incremental_graph(repo_index=snapshot)
+    assert first.serialize() == second.serialize()
+    assert first.fingerprint == second.fingerprint
+
+
 def test_trusted_repo_index_snapshot_becomes_source_nodes() -> None:
     snapshot = _valid_repo_index()
     graph = build_incremental_graph(
