@@ -22,6 +22,10 @@ from skeleton.shells.ai.finalization_state import (
     FinalizationPhase,
 )
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
+from skeleton.shells.ai.recovery_store import (
+    AIRecoveryCheckpointStore,
+    RecoveryCheckpointCommit,
+)
 from skeleton.shells.ai.session import AIShellSession
 from skeleton.shells.ai.session_evidence import (
     SessionEvidenceStore,
@@ -40,6 +44,7 @@ class FinalizedAIExecutionEvidence:
     audit_witness: SignedAIAuditWitness | None = None
     execution_evidence: SignedAIExecutionEvidence | None = None
     finalization: AIExecutionFinalization | None = None
+    recovery_commit: RecoveryCheckpointCommit | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -67,6 +72,11 @@ class FinalizedAIExecutionEvidence:
                 if self.finalization is None
                 else self.finalization.to_dict()
             ),
+            "recovery_commit": (
+                None
+                if self.recovery_commit is None
+                else self.recovery_commit.to_dict()
+            ),
         }
 
 
@@ -88,6 +98,7 @@ class AIExecutionEvidenceFinalizer:
         execution_evidence: AIExecutionEvidenceStore | None = None,
         execution_evidence_builder: AIExecutionEvidenceBuilder | None = None,
         finalizations: AIExecutionFinalizationStore | None = None,
+        recovery_checkpoints: AIRecoveryCheckpointStore | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -99,6 +110,7 @@ class AIExecutionEvidenceFinalizer:
             execution_evidence_builder or AIExecutionEvidenceBuilder()
         )
         self.finalizations = finalizations
+        self.recovery_checkpoints = recovery_checkpoints
 
     def finalize(
         self,
@@ -247,6 +259,16 @@ class AIExecutionEvidenceFinalizer:
             )
             finalization = stored_finalization.finalization
 
+        finalization_id = (
+            finalization.finalization_id
+            if finalization is not None
+            else AIExecutionFinalization.derive_id(
+                session_id=session.session_id,
+                provenance_digest=execution.provenance.digest,
+                execution_attempt_id=execution_attempt_id,
+            )
+        )
+
         if not self.journal.verify():
             raise RuntimeError("AI decision journal failed integrity verification")
         if not self.receipt_chain.verify():
@@ -291,6 +313,19 @@ class AIExecutionEvidenceFinalizer:
                 execution_attempt_authority_digest
             ),
         )
+        recovery_commit = None
+        if self.recovery_checkpoints is not None:
+            recovery_commit = self.recovery_checkpoints.put(
+                finalization_id,
+                recovery,
+            )
+            if (
+                recovery_commit.stored.record.checkpoint.digest
+                != recovery.digest
+            ):
+                raise RuntimeError(
+                    "stored recovery checkpoint differs from final evidence"
+                )
         if self.finalizations is not None and finalization is not None:
             finalization = self.finalizations.advance(
                 finalization,
@@ -476,4 +511,5 @@ class AIExecutionEvidenceFinalizer:
             audit_witness,
             signed_execution_evidence,
             finalization,
+            recovery_commit,
         )
