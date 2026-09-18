@@ -709,6 +709,10 @@ class DeterministicGameLoop:
                 self._history
             )
             or not isinstance(
+                snapshot.clock_snapshot,
+                ClockSnapshot,
+            )
+            or not isinstance(
                 snapshot.chain_digest,
                 str,
             )
