@@ -8,6 +8,7 @@ import uuid
 from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.assurance_binding import AssuranceBinding
+from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
 from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
@@ -34,6 +35,7 @@ class AIServiceStatus:
     shell_phase: str
     release: dict[str, object] | None = None
     runtime_trust: dict[str, object] | None = None
+    authority_health: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -46,6 +48,8 @@ class AIServiceStatus:
             data["release"] = dict(self.release)
         if self.runtime_trust is not None:
             data["runtime_trust"] = dict(self.runtime_trust)
+        if self.authority_health is not None:
+            data["authority_health"] = dict(self.authority_health)
         return data
 
 
@@ -63,6 +67,7 @@ class AIShellService:
         assurance: AIExecutionAssuranceInspector | None = None,
         approval_quorum: AIApprovalQuorumStore | None = None,
         runtime_trust: AIRuntimeTrustGuard | None = None,
+        authority_health: AIAuthorityHealthGuard | None = None,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -74,8 +79,10 @@ class AIShellService:
         self.assurance = assurance
         self.approval_quorum = approval_quorum
         self.runtime_trust = runtime_trust
+        self.authority_health = authority_health
         self._release_report: StartupReleaseReport | None = None
         self._runtime_trust_report: RuntimeTrustReport | None = None
+        self._authority_health_report: AuthorityHealthReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
         self.stale_guard = AIPlanStaleGuard()
@@ -112,6 +119,15 @@ class AIShellService:
                     reason="AI runtime trust verification failed",
                 )
                 return report
+        if self.authority_health is not None:
+            try:
+                self._authority_health_report = self.authority_health.require()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI authority dependency health failed",
+                )
+                return report
         self.state.transition(AIServicePhase.READY)
         return report
 
@@ -145,6 +161,20 @@ class AIShellService:
                 )
             raise RuntimeError("AI runtime trust verification failed") from None
         self._runtime_trust_report = report
+
+    def _require_authority_health(self) -> None:
+        if self.authority_health is None:
+            return
+        try:
+            report = self.authority_health.require()
+        except RuntimeError:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason="AI authority dependency health failed",
+                )
+            raise RuntimeError("AI authority dependency health failed") from None
+        self._authority_health_report = report
 
     def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
         if not self.state.ready():
@@ -294,6 +324,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_authority_health()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         proposal = review.planning.response.proposal
@@ -525,6 +556,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_authority_health()
         self._require_assurance(
             review,
             execution_backend=execution_backend,
@@ -582,5 +614,10 @@ class AIShellService:
                 None
                 if self._runtime_trust_report is None
                 else self._runtime_trust_report.to_dict()
+            ),
+            (
+                None
+                if self._authority_health_report is None
+                else self._authority_health_report.to_dict()
             ),
         )
