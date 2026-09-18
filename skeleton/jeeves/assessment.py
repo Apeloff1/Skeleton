@@ -47,10 +47,13 @@ def _unit_interval(name: str, value: Any) -> float:
 def _skill_id(value: Any) -> str:
     if not isinstance(value, str) or not value.strip():
         raise AssessmentError("skill_id must be a non-empty string")
-    if len(value) > MAX_SKILL_ID_CHARS:
-        raise AssessmentError("skill_id is too long",
-                              context={"max_chars": MAX_SKILL_ID_CHARS})
-    return value
+    normalized = value.strip()
+    if len(normalized) > MAX_SKILL_ID_CHARS:
+        raise AssessmentError(
+            "skill_id is too long",
+            context={"max_chars": MAX_SKILL_ID_CHARS},
+        )
+    return normalized
 
 
 class BloomLevel(str, Enum):
