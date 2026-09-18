@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Protocol, runtime_checkable
 
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
@@ -57,6 +59,15 @@ class SandboxBinding:
             "contract_digest": self.contract_digest,
             "backend_capability_digest": self.backend_capability_digest,
         }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
 
 
 class VerifiedSandboxExecutionBackend:
