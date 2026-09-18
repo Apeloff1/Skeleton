@@ -848,6 +848,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 semantic_scope.fingerprint
             ),
             "semantic_plane_fingerprint": semantic_plane.fingerprint,
+            "semantic_runtime_state_fingerprint": (
+                semantic_plane.runtime_state_fingerprint
+            ),
             "semantic_topology_learning_fingerprint": (
                 semantic_plane.topology_learning.fingerprint
             ),
@@ -878,7 +881,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             metadata=metadata,
         )
         binding_payload = {
-            "frontier_binding_version": 4,
+            "frontier_binding_version": 5,
             "checkpoint_sequence": checkpoint.sequence,
             "checkpoint_fingerprint": checkpoint.fingerprint,
             "audit_head_before": audit.head_hash,
@@ -892,6 +895,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 semantic_scope.fingerprint
             ),
             "semantic_plane_fingerprint": semantic_plane.fingerprint,
+            "semantic_runtime_state_fingerprint": (
+                semantic_plane.runtime_state_fingerprint
+            ),
             "semantic_topology_learning_fingerprint": (
                 semantic_plane.topology_learning.fingerprint
             ),
@@ -1277,6 +1283,21 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "semantic plane contract fingerprint changed on resume"
             )
 
+        expected_semantic_state = checkpoint.metadata.get(
+            "semantic_runtime_state_fingerprint"
+        )
+        if expected_semantic_state is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic runtime state root"
+            )
+        if (
+            expected_semantic_state
+            != semantic_plane.runtime_state_fingerprint
+        ):
+            raise ExecutionAuditError(
+                "semantic runtime state fingerprint changed on resume"
+            )
+
         expected_topology_learning = checkpoint.metadata.get(
             "semantic_topology_learning_fingerprint"
         )
@@ -1389,6 +1410,17 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 checkpoint_semantic_plane is not None
                 and payload.get("semantic_plane_fingerprint")
                 != checkpoint_semantic_plane
+            ):
+                continue
+            checkpoint_semantic_state = checkpoint.metadata.get(
+                "semantic_runtime_state_fingerprint"
+            )
+            if (
+                checkpoint_semantic_state is None
+                or payload.get(
+                    "semantic_runtime_state_fingerprint"
+                )
+                != checkpoint_semantic_state
             ):
                 continue
             checkpoint_topology_learning = checkpoint.metadata.get(
