@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttemptStore,
+    ExecutionAttemptRecovery,
+)
 from skeleton.shells.ai.recovery import (
     AIRecoveryManager,
     AIRecoveryReport,
     RecoveryAction,
 )
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
-from skeleton.shells.ai.execution_attempt import (
-    AIExecutionAttemptStore,
-    ExecutionAttemptRecovery,
-)
 from skeleton.shells.ai.session_evidence import SessionEvidenceStore
 from skeleton.shells.ai.session_journal import SessionJournalEvidence
 
@@ -36,7 +36,10 @@ class StrictRecoveryReport:
 
     @property
     def safe_to_resume(self) -> bool:
-        return self.action in {RecoveryAction.NONE, RecoveryAction.RESUME_REVIEW}
+        return self.action in {
+            RecoveryAction.NONE,
+            RecoveryAction.RESUME_REVIEW,
+        }
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -59,26 +62,23 @@ class StrictRecoveryReport:
         }
 
 
-_RECOVERY_PRIORITY = {
-    RecoveryAction.NONE: 0,
-    RecoveryAction.RESUME_REVIEW: 1,
-    RecoveryAction.MARK_FAILED: 2,
-    RecoveryAction.REQUIRE_REPLAN: 3,
-    RecoveryAction.REQUIRE_VERIFICATION: 4,
-    RecoveryAction.MANUAL_REVIEW: 5,
-}
-
-
-def _stronger(
-    current: RecoveryAction,
-    candidate: RecoveryAction,
-) -> RecoveryAction:
-    if _RECOVERY_PRIORITY[candidate] > _RECOVERY_PRIORITY[current]:
-        return candidate
-    return current
-
-
 class StrictAIRecoveryManager:
+    """Combine checkpoint, durable session evidence, and attempt evidence.
+
+    Recovery obligations are monotonic: later checks may strengthen an action,
+    never weaken an integrity or side-effect concern raised by an earlier
+    layer.
+    """
+
+    _PRIORITY = {
+        RecoveryAction.NONE: 0,
+        RecoveryAction.RESUME_REVIEW: 10,
+        RecoveryAction.REQUIRE_REPLAN: 30,
+        RecoveryAction.MARK_FAILED: 40,
+        RecoveryAction.REQUIRE_VERIFICATION: 50,
+        RecoveryAction.MANUAL_REVIEW: 60,
+    }
+
     def __init__(
         self,
         *,
@@ -86,30 +86,15 @@ class StrictAIRecoveryManager:
     ) -> None:
         self.base = base or AIRecoveryManager()
 
-    @staticmethod
+    @classmethod
     def _stronger(
+        cls,
         current: RecoveryAction,
         candidate: RecoveryAction,
     ) -> RecoveryAction:
-        """Return the action that preserves the stricter recovery obligation.
-
-        Integrity uncertainty dominates all automated recovery. Interrupted
-        execution verification dominates replanning because side effects may
-        already have occurred. Terminal failure remains terminal. Ordinary
-        replan dominates a resumable review.
-        """
-
-        priority = {
-            RecoveryAction.NONE: 0,
-            RecoveryAction.RESUME_REVIEW: 10,
-            RecoveryAction.REQUIRE_REPLAN: 30,
-            RecoveryAction.MARK_FAILED: 40,
-            RecoveryAction.REQUIRE_VERIFICATION: 50,
-            RecoveryAction.MANUAL_REVIEW: 60,
-        }
         return (
             candidate
-            if priority[candidate] > priority[current]
+            if cls._PRIORITY[candidate] > cls._PRIORITY[current]
             else current
         )
 
@@ -130,10 +115,9 @@ class StrictAIRecoveryManager:
         execution_attempts: AIExecutionAttemptStore | None = None,
     ) -> StrictRecoveryReport:
         session = checkpoint.session
+
         journal_valid = journal.verify()
-        journal_root_matches = (
-            journal.root_hash() == session.journal_root
-        )
+        journal_root_matches = journal.root_hash() == session.journal_root
         current_session_journal = SessionJournalEvidence.from_journal(
             journal,
             session.session_id,
@@ -145,15 +129,18 @@ class StrictAIRecoveryManager:
             )
         else:
             session_journal_matches = journal_root_matches
+
         receipt_valid = receipt_chain.verify()
         stored = session_evidence.current(session.session_id)
         if checkpoint.session_evidence_digest:
             session_evidence_matches = (
                 stored is not None
-                and stored.evidence.digest == checkpoint.session_evidence_digest
+                and stored.evidence.digest
+                == checkpoint.session_evidence_digest
             )
         else:
             session_evidence_matches = stored is None
+
         release_matches = (
             not checkpoint.release_evidence_digest
             or checkpoint.release_evidence_digest
@@ -195,10 +182,10 @@ class StrictAIRecoveryManager:
                     )
                     execution_attempt_recovery = attempt.recovery.value
 
-        # The legacy global receipt root is passed as its checkpoint value here.
-        # Session-scoped evidence below is authoritative for cross-session
-        # recovery because unrelated sessions may legitimately advance the
-        # global receipt chain.
+        # Global receipt chains may legitimately advance because another AI
+        # session executed. Session-scoped evidence below is authoritative for
+        # this checkpoint, so the legacy base manager receives the checkpoint's
+        # own receipt root instead of the current global head.
         base = self.base.inspect(
             session,
             journal,
@@ -222,13 +209,19 @@ class StrictAIRecoveryManager:
                 action,
                 RecoveryAction.MANUAL_REVIEW,
             )
-            reasons.append("AI session journal commitment differs from checkpoint")
+            reasons.append(
+                "AI session journal commitment differs from checkpoint"
+            )
+
         if not receipt_valid:
             action = self._stronger(
                 action,
                 RecoveryAction.MANUAL_REVIEW,
             )
-            reasons.append("global shell receipt chain integrity failure")
+            reasons.append(
+                "global shell receipt chain integrity failure"
+            )
+
         if not release_matches:
             action = self._stronger(
                 action,
@@ -246,7 +239,9 @@ class StrictAIRecoveryManager:
                 action,
                 RecoveryAction.REQUIRE_REPLAN,
             )
-            reasons.append("runtime trust epoch changed since checkpoint")
+            reasons.append(
+                "runtime trust epoch changed since checkpoint"
+            )
         if not authority_health_policy_matches:
             action = self._stronger(
                 action,
@@ -255,56 +250,100 @@ class StrictAIRecoveryManager:
             reasons.append(
                 "authority health policy changed since checkpoint"
             )
+
         if checkpoint.execution_attempt_id:
             if not execution_attempt_matches:
-                action = _stronger(
+                action = self._stronger(
                     action,
                     RecoveryAction.MANUAL_REVIEW,
                 )
                 reasons.append(
-                    "execution attempt evidence is missing or differs from checkpoint"
+                    "execution attempt evidence is missing or differs "
+                    "from checkpoint"
                 )
             elif attempt is not None:
-                if attempt.recovery is ExecutionAttemptRecovery.NOT_STARTED:
-                    action = _stronger(
+                if (
+                    attempt.recovery
+                    is ExecutionAttemptRecovery.NOT_STARTED
+                ):
+                    action = self._stronger(
                         action,
                         RecoveryAction.REQUIRE_REPLAN,
                     )
                     reasons.append(
-                        "execution seal was consumed but process boundary was not entered"
+                        "execution seal was consumed but process boundary "
+                        "was not entered"
                     )
                 elif (
                     attempt.recovery
                     is ExecutionAttemptRecovery.REQUIRE_VERIFICATION
                 ):
-                    action = _stronger(
+                    action = self._stronger(
                         action,
                         RecoveryAction.REQUIRE_VERIFICATION,
                     )
                     reasons.append(
-                        "execution attempt crossed process boundary without terminal evidence"
+                        "execution attempt crossed process boundary "
+                        "without terminal evidence"
                     )
                 elif (
                     attempt.recovery
                     is ExecutionAttemptRecovery.TERMINAL_FAILURE
                 ):
-                    action = _stronger(
-                        action,
-                        RecoveryAction.MARK_FAILED,
-                    )
-                    reasons.append(
-                        "execution attempt recorded terminal failure"
-                    )
-                elif attempt.recovery is ExecutionAttemptRecovery.ABANDONED:
-                    action = _stronger(
+                    if attempt.terminal_evidence_digest:
+                        action = self._stronger(
+                            action,
+                            RecoveryAction.MARK_FAILED,
+                        )
+                        reasons.append(
+                            "execution attempt recorded terminal failure "
+                            "with terminal evidence"
+                        )
+                    else:
+                        action = self._stronger(
+                            action,
+                            RecoveryAction.REQUIRE_VERIFICATION,
+                        )
+                        reasons.append(
+                            "execution attempt failed after process "
+                            "boundary without terminal evidence"
+                        )
+                elif (
+                    attempt.recovery
+                    is ExecutionAttemptRecovery.TERMINAL_SUCCESS
+                ):
+                    # A successful ledger entry proves the executor returned
+                    # terminal provenance, but recovery still relies on the
+                    # session evidence/journal checks below to prove that the
+                    # persisted checkpoint reflects that result.
+                    if not attempt.terminal_evidence_digest:
+                        action = self._stronger(
+                            action,
+                            RecoveryAction.MANUAL_REVIEW,
+                        )
+                        reasons.append(
+                            "successful execution attempt lacks terminal "
+                            "evidence digest"
+                        )
+                elif (
+                    attempt.recovery
+                    is ExecutionAttemptRecovery.ABANDONED
+                ):
+                    action = self._stronger(
                         action,
                         RecoveryAction.REQUIRE_REPLAN,
                     )
                     reasons.append(
-                        "execution attempt was abandoned before process boundary"
+                        "execution attempt was abandoned before process "
+                        "boundary"
                     )
+
         if not session_evidence_matches:
-            if session.phase in {"executing", "verifying", "complete"}:
+            if session.phase in {
+                "executing",
+                "verifying",
+                "complete",
+            }:
                 action = self._stronger(
                     action,
                     RecoveryAction.REQUIRE_VERIFICATION,
@@ -314,12 +353,13 @@ class StrictAIRecoveryManager:
                 )
             elif checkpoint.session_evidence_digest:
                 action = self._stronger(
-                action,
-                RecoveryAction.MANUAL_REVIEW,
-            )
-                reasons.append("unexpected session execution evidence drift")
+                    action,
+                    RecoveryAction.MANUAL_REVIEW,
+                )
+                reasons.append(
+                    "unexpected session execution evidence drift"
+                )
 
-        # De-duplicate while preserving diagnostic order.
         reasons = list(dict.fromkeys(reasons))
         return StrictRecoveryReport(
             action,
