@@ -29,6 +29,7 @@ from .nuance_runtime import (
     ScientificNuanceRuntime,
 )
 from .runtime import JeevesAgentRuntime, RunCheckpoint, RunInputs, _RunState
+from .types import EvidenceRef, MemoryKind
 
 
 class _ScientificRuntimeMixin:
@@ -134,6 +135,34 @@ class _ScientificRuntimeMixin:
             **kwargs,
         )
 
+    def _remember_working(
+        self,
+        namespace: MemoryNamespace,
+        content: str,
+        *,
+        kind: MemoryKind = MemoryKind.WORKING,
+        source: str,
+        tags: Sequence[str],
+        trust: float,
+        salience: float,
+        evidence: Sequence[EvidenceRef] = (),
+    ) -> None:
+        # The base runtime stores source=run-goal from _new_state(), before the
+        # first planning retrieval. Scientific runtimes defer that current-turn
+        # memory so the goal cannot satisfy its own prior-context query.
+        if source == "run-goal":
+            return
+        super()._remember_working(
+            namespace,
+            content,
+            kind=kind,
+            source=source,
+            tags=tags,
+            trust=trust,
+            salience=salience,
+            evidence=evidence,
+        )
+
     @staticmethod
     def _interaction_tags(inputs: RunInputs) -> tuple[str, ...]:
         tags = {"user-intent", "run-goal"}
@@ -205,9 +234,10 @@ class _ScientificRuntimeMixin:
         checkpoint: RunCheckpoint,
     ) -> _RunState:
         state = super()._state_from_checkpoint(inputs, checkpoint)
-        # A resumed checkpoint necessarily postdates the original first-turn
-        # retrieval. Restoring a missing run card is therefore leakage-safe.
-        self._capture_run_interaction(state)
+        # The initial CREATED checkpoint predates planning retrieval. Only an
+        # accepted plan proves the first retrieval boundary has been crossed.
+        if state.plan is not None:
+            self._capture_run_interaction(state)
         return state
 
     def scientific_summary(self) -> Mapping[str, Any]:
@@ -217,7 +247,9 @@ class _ScientificRuntimeMixin:
             "relational_memory_count": self.relational_memory.store.count(),
             "captured_runs": tuple(sorted(self._scientific_captured_runs)),
             "invariants": {
+                "run_goal_memory_deferred_until_after_first_retrieval": True,
                 "capture_after_initial_resolution": True,
+                "resume_requires_accepted_plan_before_capture": True,
                 "relational_memory_never_promotes_factual_trust": True,
                 "semantic_interpretation_is_not_evidence": True,
             },

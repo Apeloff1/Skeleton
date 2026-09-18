@@ -183,6 +183,76 @@ def test_scientific_runtime_resolves_first_then_captures_current_goal() -> None:
     assert runtime.scientific_summary()["invariants"]["capture_after_initial_resolution"] is True
 
 
+def test_scientific_runtime_does_not_expose_current_goal_as_preplan_memory() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    inputs = RunInputs(
+        goal=_goal(),
+        tenant_id="tenant",
+        user_id="user",
+        workspace_id="workspace",
+        session_id="session",
+        run_id="run-no-self-memory",
+    )
+
+    runtime._new_state("run-no-self-memory", inputs)
+    hits = runtime.memory.retriever.search(
+        inputs.namespace,
+        inputs.goal.objective,
+        limit=20,
+        include_parent=True,
+    )
+
+    assert all(hit.record.source != "run-goal" for hit in hits)
+    assert runtime.memory_cards.store.namespace_cards(inputs.namespace) == ()
+    assert (
+        runtime.scientific_summary()["invariants"][
+            "run_goal_memory_deferred_until_after_first_retrieval"
+        ]
+        is True
+    )
+
+
+def test_scientific_runtime_does_not_capture_from_initial_checkpoint() -> None:
+    clock = TickClock()
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        wall_clock=clock,
+        monotonic=clock,
+    )
+    inputs = RunInputs(
+        goal=_goal(),
+        tenant_id="tenant",
+        user_id="user",
+        workspace_id="workspace",
+        session_id="session",
+        run_id="run-initial-checkpoint",
+    )
+
+    runtime._new_state("run-initial-checkpoint", inputs)
+    checkpoint = runtime.checkpointer.latest("run-initial-checkpoint")
+    assert checkpoint is not None
+    assert checkpoint.plan is None
+    assert runtime.memory_cards.store.namespace_cards(inputs.namespace) == ()
+
+    restored = runtime._state_from_checkpoint(inputs, checkpoint)
+
+    assert restored.plan is None
+    assert runtime.memory_cards.store.namespace_cards(inputs.namespace) == ()
+    assert (
+        runtime.scientific_summary()["invariants"][
+            "resume_requires_accepted_plan_before_capture"
+        ]
+        is True
+    )
+
+
 def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     clock = TickClock()
     provider = DeterministicProvider(("unused",))
