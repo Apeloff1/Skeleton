@@ -58,14 +58,20 @@ A production execution may involve the following independent control layers:
 16. assurance binding
 17. signed execution seal
 18. global seal replay barrier
-19. sandbox capability attestation
-20. resource ceilings
-21. shell command policy
-22. receipt evidence
-23. decision journal
-24. session evidence commitment
-25. audit anchor
-26. recovery checkpoint
+19. runtime trust epoch
+20. durable runtime-trust pin
+21. distributed execution fence
+22. durable execution-attempt ledger
+23. sandbox capability attestation
+24. resource ceilings
+25. shell command policy
+26. receipt evidence
+27. decision journal
+28. session evidence commitment
+29. signed audit anchor
+30. anti-rollback audit witness
+31. recovery checkpoint
+32. signed final execution evidence
 
 These layers are intentionally not collapsed into one opaque "AI safety" score.
 
@@ -378,6 +384,213 @@ A stale revision retries against the latest value.
 Consumption uses compare-and-swap.
 
 If the quorum changes between require and consume, consumption fails.
+
+## Runtime trust epoch
+
+Long-lived workers must not assume that startup validation remains true.
+
+AIRuntimeTrustGuard binds the live authority surface into one epoch:
+
+- code revision
+- AI policy fingerprint
+- tool catalog digest
+- effect registry digest
+- assurance policy digest
+- workspace manifest digest
+- admitted model/provider identities
+- model registry revisions
+- provider attestation digests
+- release evidence digest
+- release revision
+- release-channel revision
+
+The service pins the epoch at startup.
+
+It rechecks the epoch before:
+
+- creating new sessions
+- review
+- seal issuance
+- execution-fence acquisition
+- sealed execution
+
+If the epoch drifts, the worker degrades and refuses new authority.
+
+A provider/model upgrade is therefore not a transparent runtime mutation. It is
+a trust-epoch change.
+
+## Durable runtime-trust pin
+
+Process-local pinning is not sufficient across worker restart.
+
+RuntimeTrustPinStore persists a signed epoch pin per deployment scope.
+
+Explicit rollover requires:
+
+- current revision
+- predecessor digest
+- new epoch digest
+- change ID
+- reason
+- valid signature
+
+Restarting a worker does not automatically bless a changed model/release
+surface.
+
+A durable rollover is an operational change event.
+
+## Distributed execution fence
+
+A signed execution seal proves that a principal may execute a reviewed plan.
+
+In a multi-worker fleet, that does not identify the one worker currently
+entitled to cross the process boundary.
+
+AIExecutionFenceManager adds a short-lived distributed lease bound to:
+
+- session ID
+- principal
+- worker ID
+- plan fingerprint
+- runtime trust digest
+- release evidence digest
+- fence policy digest
+- worst-case execution window
+
+The backend issues a monotonic fencing token.
+
+A stale worker cannot reuse an older token after lease expiry, release, renewal,
+or takeover.
+
+The fence TTL must cover the deterministic worst-case plan wall-time budget.
+
+Do not renew implicitly in a hidden background thread.
+
+## Durable execution-attempt ledger
+
+The fence proves current ownership, but crash recovery also needs to know whether
+the worker had already begun execution.
+
+AIExecutionAttemptStore records a CAS-backed state machine:
+
+- AUTHORIZED
+- BOUNDARY_ENTERED
+- SUCCEEDED
+- FAILED
+- ABANDONED
+
+The authority binding includes:
+
+- attempt/seal ID
+- session ID
+- principal
+- worker ID
+- plan fingerprint
+- execution fence digest
+- fencing token
+- runtime trust digest
+- release evidence digest
+- execution backend ID
+
+The tracking backend writes BOUNDARY_ENTERED immediately before delegating to
+the real execution backend.
+
+This location matters.
+
+Writing the state too early would create false ambiguity.
+
+Writing it after process creation would leave a crash window in which side
+effects may have happened but the ledger still says NOT_STARTED.
+
+## Attempt recovery semantics
+
+Recovery must interpret attempt state conservatively.
+
+AUTHORIZED means:
+
+- the seal was consumed
+- durable authority was reserved
+- the process boundary was not entered
+
+The old seal is no longer reusable.
+
+A new plan/review/seal cycle is required.
+
+BOUNDARY_ENTERED means:
+
+- execution may have produced side effects
+- no trustworthy terminal result is yet bound
+
+Recovery requires verification.
+
+Never auto-replay.
+
+SUCCEEDED means a terminal provenance digest is bound.
+
+FAILED means the execution path recorded a terminal failure.
+
+ABANDONED means the attempt stopped before boundary entry.
+
+A new authorization cycle is required.
+
+## Recovery severity ordering
+
+When several recovery findings exist, never let a weaker later finding downgrade
+a stronger earlier one.
+
+The recovery ordering is:
+
+1. MANUAL_REVIEW
+2. REQUIRE_VERIFICATION
+3. REQUIRE_REPLAN
+4. MARK_FAILED
+5. RESUME_REVIEW
+6. NONE
+
+Examples:
+
+- journal corruption plus release drift remains MANUAL_REVIEW
+- boundary-entered ambiguity plus trust drift remains REQUIRE_VERIFICATION
+- an abandoned pre-boundary attempt plus policy drift remains REQUIRE_REPLAN
+
+Integrity failure always wins over convenience.
+
+## Attempt evidence in final audit chain
+
+Completed execution evidence binds the durable attempt authority into:
+
+- AIRecoveryCheckpoint
+- AIAuditAnchor
+- AIExecutionEvidence
+
+The execution attempt ID and authority digest must be paired.
+
+For service-integrated attempts the attempt ID is the consumed execution seal
+ID.
+
+Changing the attempt authority binding changes the recovery checkpoint, audit
+anchor, and final execution-evidence digests.
+
+## Anti-rollback audit witness
+
+A content-addressed audit chain detects internal mutation, but an attacker who
+can restore an older complete chain may still present a valid historical root.
+
+AIAuditWitnessStore publishes a separate signed monotonic witness over the
+current audit root.
+
+The witness also binds:
+
+- sequence
+- predecessor witness digest
+- runtime trust digest
+- release evidence digest
+- observed time
+
+Recovery and external audit can compare the expected latest witness with the
+presented chain root.
+
+A valid but older root is therefore detectable as rollback.
 
 ## Execution seal
 
@@ -1049,6 +1262,16 @@ Track at least:
 - seal issuance
 - seal expiry
 - seal replay
+- execution-fence acquisition/expiry/takeover
+- stale fencing token
+- attempt AUTHORIZED
+- attempt BOUNDARY_ENTERED
+- attempt terminal failure
+- attempt ledger outage
+- attempt authority mismatch
+- runtime-trust drift
+- durable trust-pin rollover
+- audit-witness rollback mismatch
 - assurance digest mismatch
 - sandbox attestation failure
 - sandbox capability drift
@@ -1115,6 +1338,11 @@ Before resuming confirm:
 - session execution evidence matches
 - release digest matches
 - sandbox binding matches
+- runtime trust epoch matches
+- durable trust pin matches
+- execution-attempt authority digest matches
+- attempt state is understood
+- audit witness is current
 - policy/tool/effect surfaces match
 - external side effects are understood
 
