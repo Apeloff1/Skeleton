@@ -1,0 +1,35 @@
+name: reconcile-jeeves-conflicts
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+permissions:
+  contents: write
+jobs:
+  reconcile:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - feature/jeeves-agent-runtime-v2
+          - feature/jeeves-scientific-nuance-2026
+          - feature/jeeves-scientific-internals-v3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconcile branch using feature-first conflict policy
+        env:
+          TARGET: ${{ matrix.branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET}"
+          git checkout -B "${TARGET}" "origin/${TARGET}"
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Already contains current main"
+            exit 0
+          fi
+          git merge --no-edit -X ours origin/main
+          git push origin "HEAD:${TARGET}"
