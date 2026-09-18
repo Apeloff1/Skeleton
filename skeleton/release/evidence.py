@@ -423,6 +423,8 @@ def evaluate_release_ready(
 
     if not document.test_evidence:
         reasons.append("missing required test evidence")
+    if not document.eval_evidence:
+        reasons.append("missing required eval evidence")
     reasons.extend(_reasons_test_records("test_evidence", document.test_evidence, require_pass=True))
     reasons.extend(_reasons_test_records("eval_evidence", document.eval_evidence, require_pass=True))
 
