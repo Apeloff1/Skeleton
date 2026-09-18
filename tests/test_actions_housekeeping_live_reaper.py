@@ -74,10 +74,10 @@ def test_live_reaper_preserves_ambiguous_targets_without_aborting_housekeeping()
     assert "return \"$status\"" in live_reaper
 
 
-def test_housekeeping_drain_uses_general_recovery_pool_and_supersedes_itself() -> None:
+def test_housekeeping_drain_uses_general_recovery_pool_and_is_nonpreemptive() -> None:
     workflow = _workflow()
 
     assert "runs-on: ubuntu-latest" in workflow
     assert "ubuntu-24.04-arm" not in workflow
     assert "group: actions-housekeeping-cli-${{ github.repository }}" in workflow
-    assert "cancel-in-progress: true" in workflow
+    assert "cancel-in-progress: false" in workflow
