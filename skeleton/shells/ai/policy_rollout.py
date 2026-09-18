@@ -58,6 +58,7 @@ class AIPolicyRolloutManager:
         self._clock = clock
         self._items: dict[str, AIPolicyRollout] = {}
         self._base: dict[str, AIShellPolicy] = {}
+        self._target: dict[str, AIShellPolicy] = {}
         self._lock = threading.RLock()
 
     def prepare(
@@ -78,12 +79,11 @@ class AIPolicyRolloutManager:
             if len(self._items) >= self.max_rollouts:
                 raise RuntimeError("AI policy rollout capacity exhausted")
             base = self.store.current()
-            target_revision = self.store.compare_and_swap(base.revision, target)
             now = self._clock()
             item = AIPolicyRollout(
                 rollout_id,
                 base.revision,
-                target_revision.revision,
+                0,
                 AIPolicyRolloutPhase.PREPARED,
                 canary_percent,
                 now,
@@ -92,6 +92,7 @@ class AIPolicyRolloutManager:
             )
             self._items[rollout_id] = item
             self._base[rollout_id] = base.policy
+            self._target[rollout_id] = target
             return item
 
     def _replace(self, item: AIPolicyRollout, phase: AIPolicyRolloutPhase) -> AIPolicyRollout:
@@ -118,7 +119,41 @@ class AIPolicyRolloutManager:
             }.get(item.phase)
             if next_phase is None:
                 raise RuntimeError("AI policy rollout cannot advance")
+            if next_phase is AIPolicyRolloutPhase.BROAD:
+                current = self.store.current()
+                if current.revision != item.base_revision:
+                    raise RuntimeError("AI policy changed while rollout was in canary")
+                revision = self.store.compare_and_swap(
+                    current.revision,
+                    self._target[rollout_id],
+                )
+                item = AIPolicyRollout(
+                    item.rollout_id,
+                    item.base_revision,
+                    revision.revision,
+                    item.phase,
+                    item.canary_percent,
+                    item.created_at,
+                    item.updated_at,
+                    item.reason,
+                )
+                self._items[rollout_id] = item
             return self._replace(item, next_phase)
+
+    def policy_for(self, rollout_id: str, principal: str) -> AIShellPolicy:
+        with self._lock:
+            item = self._items[rollout_id]
+            if item.phase is AIPolicyRolloutPhase.ROLLED_BACK:
+                return self._base[rollout_id]
+            if item.phase is AIPolicyRolloutPhase.PREPARED:
+                return self._base[rollout_id]
+            if item.phase is AIPolicyRolloutPhase.CANARY:
+                return (
+                    self._target[rollout_id]
+                    if self.selected(rollout_id, principal)
+                    else self._base[rollout_id]
+                )
+            return self._target[rollout_id]
 
     def selected(self, rollout_id: str, principal: str) -> bool:
         with self._lock:
@@ -140,7 +175,8 @@ class AIPolicyRolloutManager:
                 raise RuntimeError("completed AI policy rollout cannot be rolled back implicitly")
             if item.phase is AIPolicyRolloutPhase.ROLLED_BACK:
                 return item
-            self.store.replace(self._base[rollout_id])
+            if item.phase is AIPolicyRolloutPhase.BROAD:
+                self.store.replace(self._base[rollout_id])
             return self._replace(item, AIPolicyRolloutPhase.ROLLED_BACK)
 
     def get(self, rollout_id: str) -> AIPolicyRollout:
