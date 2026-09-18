@@ -197,3 +197,27 @@ def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     assert runtime.nuance_runtime.resolver is runtime.context_resolver
     assert runtime.context_resolver.cards is runtime.memory_cards
     assert runtime.context_resolver.relations is runtime.relational_memory
+
+
+def test_scientific_runtime_rebinds_relations_to_supplied_resolver_cards() -> None:
+    clock = TickClock()
+    memory = MemoryManager(clock=clock)
+    cards = MemoryGameIndex(policy=MemoryGamePolicy(minimum_score=0.0), clock=clock)
+    resolver = LayeredContextResolver(
+        cards=cards,
+        memory=memory,
+        relations=None,
+        policy=ResolutionPolicy(minimum_item_score=0.0, maximum_tier=1),
+    )
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        memory=memory,
+        context_resolver=resolver,
+        wall_clock=clock,
+        monotonic=clock,
+    )
+
+    assert runtime.memory_cards is cards
+    assert runtime.relational_memory.cards is cards
+    assert resolver.relations is runtime.relational_memory
