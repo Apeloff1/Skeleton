@@ -31,11 +31,13 @@ on:
   pull_request_review_comment:
     types: [created, edited]
 
-# Serialize all event handlers for the same issue/PR. Never let an untrusted or
-# lower-value event cancel a trusted clear that is already in flight.
+# Serialize all event handlers for the same issue/PR. A newer same-repository
+# PR lifecycle event may supersede an older clear because every accepted PR
+# lifecycle job clears the same managed labels. Comments, reviews, issue events,
+# and the scheduled sweep cannot cancel in-flight trusted work.
 concurrency:
   group: repository-attention-${{ github.event.issue.number || github.event.pull_request.number || 'sweep' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
 
 # Fail closed at workflow scope. Jobs receive only the permissions they need.
 permissions: {}
