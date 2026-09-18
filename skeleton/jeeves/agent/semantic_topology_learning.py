@@ -623,10 +623,13 @@ class SemanticTopologyLearningLab:
             )
         return tuple(self.report(candidate_id, kind) for candidate_id, kind in identities)
 
-    def learned_rules(self) -> tuple[LearnedTopologyRule, ...]:
+    def _learned_rules_from_reports(
+        self,
+        reports: Sequence[TopologyBridgeReport],
+    ) -> tuple[LearnedTopologyRule, ...]:
         learned: list[LearnedTopologyRule] = []
         active_by_candidate: dict[str, list[TopologyBridgeReport]] = {}
-        for report in self.reports():
+        for report in reports:
             if report.status is TopologyBridgeStatus.ACTIVE:
                 active_by_candidate.setdefault(report.candidate_id, []).append(
                     report
@@ -639,7 +642,9 @@ class SemanticTopologyLearningLab:
             report = active_reports[0]
             candidate = self._candidates[candidate_id]
             axis_hint = _FAMILY_AXIS_HINT.get(
-                candidate.right_family if candidate.cross_family else candidate.left_family,
+                candidate.right_family
+                if candidate.cross_family
+                else candidate.left_family,
                 "semantic",
             )
             rule = LensInteractionRule(
@@ -698,9 +703,11 @@ class SemanticTopologyLearningLab:
         )
         return tuple(learned)
 
-    def snapshot(self) -> SemanticTopologyLearningSnapshot:
-        reports = self.reports()
-        learned = self.learned_rules()
+    def _snapshot_from_reports(
+        self,
+        reports: Sequence[TopologyBridgeReport],
+        learned: Sequence[LearnedTopologyRule],
+    ) -> SemanticTopologyLearningSnapshot:
         active = tuple(
             item.report_id
             for item in reports
@@ -734,8 +741,7 @@ class SemanticTopologyLearningLab:
                 if count > 1
             )
         )
-        with self._lock:
-            trial_count = len(self._trials)
+        trial_count = len(self._trials)
         fingerprint = stable_fingerprint(
             {
                 "topology": self.topology.fingerprint,
@@ -757,6 +763,26 @@ class SemanticTopologyLearningLab:
             learned_rule_keys=tuple(item.rule.key for item in learned),
             fingerprint=fingerprint,
         )
+
+    def evaluate(
+        self,
+    ) -> tuple[
+        tuple[LearnedTopologyRule, ...],
+        SemanticTopologyLearningSnapshot,
+    ]:
+        """Read learned rules and diagnostics from one atomic trial revision."""
+
+        with self._lock:
+            reports = self.reports()
+            learned = self._learned_rules_from_reports(reports)
+            snapshot = self._snapshot_from_reports(reports, learned)
+        return learned, snapshot
+
+    def learned_rules(self) -> tuple[LearnedTopologyRule, ...]:
+        return self.evaluate()[0]
+
+    def snapshot(self) -> SemanticTopologyLearningSnapshot:
+        return self.evaluate()[1]
 
     @property
     def contract_fingerprint(self) -> str:
