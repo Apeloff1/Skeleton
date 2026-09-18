@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from skeleton.jeeves.agent.action_model import SkillSpec
-from skeleton.jeeves.agent.cortex import JeevesCortex
+from skeleton.jeeves.agent.cortex import CortexError, JeevesCortex
 from skeleton.jeeves.agent.execution_audit import AuditEventKind
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
@@ -257,3 +257,46 @@ def test_cortex_current_risk_uses_host_tool_risk_not_model_understatement() -> N
     )
 
     assert runtime._cortex_current_risk(state) is RiskTier.EXTERNAL
+
+
+def test_resume_rebinds_existing_cortex_run_to_restored_evidence_ledger() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-cortex-resume")
+    original = runtime._new_state("run-cortex-resume", inputs)
+    checkpoint = runtime.checkpointer.latest(original.run_id)
+    assert checkpoint is not None
+    cortex_state = runtime.cortex.require_state(original.run_id)
+    assert cortex_state.world.evidence_ledger is original.ledger
+    assert cortex_state.checkpoint_count == 1
+
+    restored = runtime._state_from_checkpoint(inputs, checkpoint)
+
+    resumed_cortex = runtime.cortex.require_state(original.run_id)
+    assert resumed_cortex.world.evidence_ledger is restored.ledger
+    assert resumed_cortex.world.evidence_ledger is not original.ledger
+    assert resumed_cortex.checkpoint_count == 1
+    advisory = restored.scratch.get(runtime._CORTEX_ASSESSMENT_KEY)
+    assert advisory["checkpoint_sequence"] == checkpoint.sequence
+
+
+def test_cortex_rejects_reusing_run_id_across_scope_boundaries() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-cortex-scope")
+    state = runtime._new_state("run-cortex-scope", inputs)
+    mismatched = RunInputs(
+        goal=inputs.goal,
+        tenant_id=inputs.tenant_id,
+        user_id=inputs.user_id,
+        workspace_id="other-workspace",
+        session_id=inputs.session_id,
+        run_id=inputs.run_id,
+    )
+
+    with pytest.raises(CortexError, match="scope"):
+        runtime.cortex.begin(
+            mismatched,
+            run_id=state.run_id,
+            evidence_ledger=state.ledger,
+        )
