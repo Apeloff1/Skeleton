@@ -64,11 +64,22 @@ def _literal_ip(host: str):
     return ip_address(packed)
 
 
+def _is_public_unicast(address) -> bool:
+    return bool(
+        address.is_global
+        and not address.is_multicast
+        and not address.is_unspecified
+        and not address.is_loopback
+        and not address.is_link_local
+        and not address.is_reserved
+    )
+
+
 async def _resolve_public_host(host: str, port: int = 443) -> tuple[str, ...]:
     """Resolve a hostname and reject any non-public address before connecting."""
     literal = _literal_ip(host)
     if literal is not None:
-        if not literal.is_global:
+        if not _is_public_unicast(literal):
             raise ValueError("scrape hostname resolves to a non-public IP address")
         return (str(literal),)
 
@@ -93,7 +104,7 @@ async def _resolve_public_host(host: str, port: int = 443) -> tuple[str, ...]:
             resolved = ip_address(raw_address)
         except ValueError as exc:
             raise ValueError("scrape hostname resolution returned an invalid IP address") from exc
-        if not resolved.is_global:
+        if not _is_public_unicast(resolved):
             raise ValueError("scrape hostname resolves to a non-public IP address")
         addresses.add(str(resolved))
 
@@ -129,7 +140,7 @@ def _validated_scrape_url(url: str) -> tuple[str, str]:
     if normalized_host in _BLOCKED_SCRAPE_HOSTS or normalized_host.endswith(".localhost"):
         raise ValueError("scrape URL targets a blocked local endpoint")
     literal = _literal_ip(normalized_host)
-    if literal is not None and not literal.is_global:
+    if literal is not None and not _is_public_unicast(literal):
         raise ValueError("scrape URL targets a non-public IP address")
     return value, normalized_host
 
