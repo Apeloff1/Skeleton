@@ -1312,12 +1312,18 @@ class SemanticTopologyLearningLab:
                 independent_run_count=0,
                 domain_count=0,
                 negative_control_count=0,
+                qualified_domain_count=0,
+                qualified_control_domain_count=0,
                 mean_probability=None,
                 empirical_rate=None,
                 wilson_95=None,
                 brier=None,
                 calibration_error=None,
                 negative_control_positive_rate=None,
+                worst_domain_brier=None,
+                minimum_domain_empirical_rate=None,
+                worst_domain_control_positive_rate=None,
+                domain_reports=(),
                 reasons=("no_trials",),
                 fingerprint=fingerprint,
             )
@@ -1348,6 +1354,19 @@ class SemanticTopologyLearningLab:
                 independent_run_count=0,
                 domain_count=0,
                 negative_control_count=len(controls),
+                qualified_domain_count=0,
+                qualified_control_domain_count=len(
+                    {
+                        item.domain
+                        for item in controls
+                        if sum(
+                            1
+                            for control in controls
+                            if control.domain == item.domain
+                        )
+                        >= self.policy.minimum_controls_per_domain
+                    }
+                ),
                 mean_probability=None,
                 empirical_rate=None,
                 wilson_95=None,
@@ -1358,6 +1377,28 @@ class SemanticTopologyLearningLab:
                     if not controls
                     else sum(item.outcome for item in controls) / len(controls)
                 ),
+                worst_domain_brier=None,
+                minimum_domain_empirical_rate=None,
+                worst_domain_control_positive_rate=(
+                    None
+                    if not controls
+                    else max(
+                        sum(
+                            control.outcome
+                            for control in controls
+                            if control.domain == domain
+                        )
+                        / sum(
+                            1
+                            for control in controls
+                            if control.domain == domain
+                        )
+                        for domain in {
+                            item.domain for item in controls
+                        }
+                    )
+                ),
+                domain_reports=self._domain_reports((), controls),
                 reasons=("no_primary_trials",),
                 fingerprint=fingerprint,
             )
@@ -1381,15 +1422,55 @@ class SemanticTopologyLearningLab:
             if not controls
             else sum(item.outcome for item in controls) / len(controls)
         )
+        domain_reports = self._domain_reports(primary, controls)
+        qualified_primary_reports = [
+            item for item in domain_reports if item.qualified_primary
+        ]
+        qualified_control_reports = [
+            item for item in domain_reports if item.qualified_control
+        ]
+        worst_domain_brier = (
+            None
+            if not qualified_primary_reports
+            else max(
+                item.brier
+                for item in qualified_primary_reports
+                if item.brier is not None
+            )
+        )
+        minimum_domain_empirical_rate = (
+            None
+            if not qualified_primary_reports
+            else min(
+                item.empirical_rate
+                for item in qualified_primary_reports
+                if item.empirical_rate is not None
+            )
+        )
+        worst_domain_control_positive_rate = (
+            None
+            if not qualified_control_reports
+            else max(
+                item.negative_control_positive_rate
+                for item in qualified_control_reports
+                if item.negative_control_positive_rate is not None
+            )
+        )
         status, reasons = self._report_status(
             trial_count=len(primary),
             independent_runs=len(runs),
-            domains=len(domains),
+            qualified_domains=len(qualified_primary_reports),
             negative_control_count=len(controls),
+            qualified_control_domains=len(qualified_control_reports),
             brier=brier,
             calibration_error=calibration_error,
             empirical_rate=empirical_rate,
             negative_control_positive_rate=control_rate,
+            worst_domain_brier=worst_domain_brier,
+            minimum_domain_empirical_rate=minimum_domain_empirical_rate,
+            worst_domain_control_positive_rate=(
+                worst_domain_control_positive_rate
+            ),
         )
         fingerprint = stable_fingerprint(
             {
@@ -1405,6 +1486,22 @@ class SemanticTopologyLearningLab:
                     "brier": brier,
                     "calibration_error": calibration_error,
                     "negative_control_positive_rate": control_rate,
+                    "qualified_domain_count": len(
+                        qualified_primary_reports
+                    ),
+                    "qualified_control_domain_count": len(
+                        qualified_control_reports
+                    ),
+                    "worst_domain_brier": worst_domain_brier,
+                    "minimum_domain_empirical_rate": (
+                        minimum_domain_empirical_rate
+                    ),
+                    "worst_domain_control_positive_rate": (
+                        worst_domain_control_positive_rate
+                    ),
+                    "domain_reports": [
+                        item.fingerprint for item in domain_reports
+                    ],
                 },
                 "reasons": reasons,
                 "policy": self.policy.fingerprint,
@@ -1422,12 +1519,22 @@ class SemanticTopologyLearningLab:
             independent_run_count=len(runs),
             domain_count=len(domains),
             negative_control_count=len(controls),
+            qualified_domain_count=len(qualified_primary_reports),
+            qualified_control_domain_count=len(
+                qualified_control_reports
+            ),
             mean_probability=mean_probability,
             empirical_rate=empirical_rate,
             wilson_95=interval,
             brier=brier,
             calibration_error=calibration_error,
             negative_control_positive_rate=control_rate,
+            worst_domain_brier=worst_domain_brier,
+            minimum_domain_empirical_rate=minimum_domain_empirical_rate,
+            worst_domain_control_positive_rate=(
+                worst_domain_control_positive_rate
+            ),
+            domain_reports=domain_reports,
             reasons=reasons,
             fingerprint=fingerprint,
         )
