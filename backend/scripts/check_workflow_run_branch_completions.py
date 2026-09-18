@@ -18,9 +18,9 @@ AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
 QUEUE_DEFAULT_BRANCH_TRIGGER_RE = re.compile(
-    r"(?m)^  workflow_run:\\s*(?:#.*)?$\\n"
-    r"(?:    [^\\n]*\\n)*?"
-    r"    branches:\\s*\\[main\\]\\s*$"
+    r"(?m)^  workflow_run:\s*(?:#.*)?$\n"
+    r"(?:    [^\n]*\n)*?"
+    r"    branches:\s*\[main\]\s*$"
 )
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
