@@ -1038,9 +1038,16 @@ class Authority:
                 context={"peer_id": ack.peer_id},
             )
         frame = self._core._frame(ack.last_applied_sequence)
-        if frame is not None and (
-            ack.last_applied_digest != frame.digest or ack.tick != frame.tick
-        ):
+        if frame is None:
+            raise HistoryExhaustedError(
+                "acknowledgement frame is outside retained authority history",
+                context={
+                    "peer_id": ack.peer_id,
+                    "sequence": ack.last_applied_sequence,
+                    "retained": self._core._retained_sequences(),
+                },
+            )
+        if ack.last_applied_digest != frame.digest or ack.tick != frame.tick:
             raise ReplicationError(
                 "acknowledgement does not match retained authority frame",
                 context={"peer_id": ack.peer_id, "sequence": ack.last_applied_sequence},
