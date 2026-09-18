@@ -636,6 +636,150 @@ def _box_box_face_contacts(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _BoxEdge:
+    start: Vec3
+    end: Vec3
+    feature_id: str
+
+
+def _support_edge(
+    shape: BoxShape,
+    body: RigidBody,
+    *,
+    edge_axis_index: int,
+    support_direction: Vec3,
+    label: str,
+) -> _BoxEdge:
+    axes = shape.axes(body.transform)
+    extents = shape.half_extents.to_tuple()
+    center = body.position
+    fixed_signs: list[str] = []
+
+    for axis_index, axis in enumerate(axes):
+        if axis_index == edge_axis_index:
+            continue
+        projection = axis.dot(support_direction)
+        sign = 1.0 if projection >= 0.0 else -1.0
+        center = center + axis * (extents[axis_index] * sign)
+        fixed_signs.append(
+            f"{axis_index}{'+' if sign > 0.0 else '-'}"
+        )
+
+    direction = axes[edge_axis_index]
+    extent = extents[edge_axis_index]
+    feature = (
+        f"{label}:edge:{edge_axis_index}:"
+        + ",".join(fixed_signs)
+    )
+    return _BoxEdge(
+        start=center - direction * extent,
+        end=center + direction * extent,
+        feature_id=feature,
+    )
+
+
+def _closest_segment_points(
+    first_start: Vec3,
+    first_end: Vec3,
+    second_start: Vec3,
+    second_end: Vec3,
+) -> tuple[Vec3, Vec3, float, float]:
+    """Return closest points and normalized parameters on two finite segments."""
+
+    d1 = first_end - first_start
+    d2 = second_end - second_start
+    relative = first_start - second_start
+    a = d1.dot(d1)
+    e = d2.dot(d2)
+    f = d2.dot(relative)
+
+    if a <= _AXIS_EPSILON_SQ and e <= _AXIS_EPSILON_SQ:
+        return first_start, second_start, 0.0, 0.0
+
+    if a <= _AXIS_EPSILON_SQ:
+        s = 0.0
+        t = min(1.0, max(0.0, f / e))
+    else:
+        c = d1.dot(relative)
+        if e <= _AXIS_EPSILON_SQ:
+            t = 0.0
+            s = min(1.0, max(0.0, -c / a))
+        else:
+            b = d1.dot(d2)
+            denominator = a * e - b * b
+            if abs(denominator) > _AXIS_EPSILON_SQ:
+                s = min(
+                    1.0,
+                    max(0.0, (b * f - c * e) / denominator),
+                )
+            else:
+                # Nearly parallel segments: choose the first endpoint
+                # deterministically, then project onto the other segment.
+                s = 0.0
+
+            t = (b * s + f) / e
+            if t < 0.0:
+                t = 0.0
+                s = min(1.0, max(0.0, -c / a))
+            elif t > 1.0:
+                t = 1.0
+                s = min(1.0, max(0.0, (b - c) / a))
+
+    first = first_start + d1 * s
+    second = second_start + d2 * t
+    return first, second, s, t
+
+
+def _box_box_edge_contact(
+    a: RigidBody,
+    b: RigidBody,
+    *,
+    manifold_normal: Vec3,
+    penetration: float,
+    axis_a_index: int,
+    axis_b_index: int,
+) -> ContactPoint:
+    shape_a = a.shape
+    shape_b = b.shape
+    assert isinstance(shape_a, BoxShape)
+    assert isinstance(shape_b, BoxShape)
+
+    edge_a = _support_edge(
+        shape_a,
+        a,
+        edge_axis_index=axis_a_index,
+        support_direction=manifold_normal,
+        label="a",
+    )
+    edge_b = _support_edge(
+        shape_b,
+        b,
+        edge_axis_index=axis_b_index,
+        support_direction=-manifold_normal,
+        label="b",
+    )
+    closest_a, closest_b, _, _ = _closest_segment_points(
+        edge_a.start,
+        edge_a.end,
+        edge_b.start,
+        edge_b.end,
+    )
+    point = (closest_a + closest_b) * 0.5
+    feature_id = (
+        f"box-box:{edge_a.feature_id}:{edge_b.feature_id}"
+    )
+    if len(feature_id) > 128:
+        feature_id = (
+            f"box-box:edge-pair:h{_feature_hash(feature_id)}"
+        )
+    return ContactPoint(
+        point,
+        penetration,
+        feature_id,
+    )
+
+
 def _box_box(a: RigidBody, b: RigidBody) -> ContactManifold | None:
     shape_a = a.shape
     shape_b = b.shape
@@ -704,16 +848,14 @@ def _box_box(a: RigidBody, b: RigidBody) -> ContactManifold | None:
             reference_axis_index=minimum_index_a,
         )
     else:
-        support_a = shape_a.support(minimum_axis, a.transform)
-        support_b = shape_b.support(-minimum_axis, b.transform)
-        point = (support_a + support_b) * 0.5
         points = (
-            ContactPoint(
-                point,
-                minimum_overlap,
-                (
-                    f"box-box:edge:a{minimum_index_a}:b{minimum_index_b}"
-                ),
+            _box_box_edge_contact(
+                a,
+                b,
+                manifold_normal=minimum_axis,
+                penetration=minimum_overlap,
+                axis_a_index=minimum_index_a,
+                axis_b_index=minimum_index_b,
             ),
         )
 
