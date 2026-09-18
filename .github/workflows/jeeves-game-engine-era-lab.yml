@@ -20,6 +20,7 @@ on:
       - "skeleton/jeeves/game_engine_saves.py"
       - "skeleton/jeeves/game_engine_input.py"
       - "skeleton/jeeves/game_engine_timing.py"
+      - "skeleton/jeeves/game_engine_session.py"
       - "skeleton/jeeves/game_engine_project.py"
       - "skeleton/jeeves/__init__.py"
       - "skeleton/testing/test_jeeves_game_engine_lab.py"
@@ -38,6 +39,7 @@ on:
       - "skeleton/testing/test_jeeves_game_engine_saves.py"
       - "skeleton/testing/test_jeeves_game_engine_input.py"
       - "skeleton/testing/test_jeeves_game_engine_timing.py"
+      - "skeleton/testing/test_jeeves_game_engine_session.py"
       - "skeleton/testing/test_jeeves_game_engine_project.py"
       - ".github/workflows/jeeves-game-engine-era-lab.yml"
   push:
@@ -60,6 +62,7 @@ on:
       - "skeleton/testing/test_jeeves_game_engine_saves.py"
       - "skeleton/testing/test_jeeves_game_engine_input.py"
       - "skeleton/testing/test_jeeves_game_engine_timing.py"
+      - "skeleton/testing/test_jeeves_game_engine_session.py"
       - "skeleton/testing/test_jeeves_game_engine_project.py"
       - "skeleton/jeeves/game_engine_runtime.py"
       - "skeleton/jeeves/game_engine_assets.py"
@@ -73,6 +76,7 @@ on:
       - "skeleton/jeeves/game_engine_saves.py"
       - "skeleton/jeeves/game_engine_input.py"
       - "skeleton/jeeves/game_engine_timing.py"
+      - "skeleton/jeeves/game_engine_session.py"
       - "skeleton/jeeves/game_engine_project.py"
       - "skeleton/jeeves/__init__.py"
       - "skeleton/testing/test_jeeves_game_engine_lab.py"
@@ -124,6 +128,7 @@ jobs:
           skeleton/jeeves/game_engine_saves.py
           skeleton/jeeves/game_engine_input.py
           skeleton/jeeves/game_engine_timing.py
+          skeleton/jeeves/game_engine_session.py
           skeleton/jeeves/game_engine_project.py
       - name: Run Pong-to-next sandbox regressions
         env:
@@ -146,4 +151,5 @@ jobs:
           skeleton/testing/test_jeeves_game_engine_saves.py
           skeleton/testing/test_jeeves_game_engine_input.py
           skeleton/testing/test_jeeves_game_engine_timing.py
+          skeleton/testing/test_jeeves_game_engine_session.py
           skeleton/testing/test_jeeves_game_engine_project.py
