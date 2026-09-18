@@ -238,6 +238,42 @@ def test_corrupt_evidence_digest_fails_closed() -> None:
     assert "passed flag disagrees" in disagree.reasons[0]
 
 
+def test_declared_baseline_digest_must_match_baseline_trace() -> None:
+    baseline = _tape(("tick", {"n": 1}), ("tick", {"n": 2}))
+    candidate = _tape(("tick", {"n": 1}), ("tick", {"n": 3}))
+    report = run_harness(
+        _manifest(
+            kind="divergence",
+            max_runs=1,
+            trace=baseline,
+            baseline_digest="0" * 64,
+            expect_divergence_at=1,
+        ),
+        candidate=candidate,
+    )
+    assert report.verdict is Verdict.CORRUPT
+    assert report.passed is False
+    assert "baseline digest does not match baseline trace" in report.reasons
+
+
+def test_digest_valid_evidence_rejects_schema_and_pass_flag_contradictions() -> None:
+    clean = run_harness(_manifest(max_runs=1))
+
+    false_pass = dict(clean.to_mapping())
+    false_pass["passed"] = False
+    false_pass["evidence_digest"] = evidence_digest_for(false_pass)
+    rejected_flag = verify_evidence(false_pass)
+    assert rejected_flag.verdict is Verdict.CORRUPT
+    assert "passed flag disagrees" in rejected_flag.reasons[0]
+
+    wrong_schema = dict(clean.to_mapping())
+    wrong_schema["schema"] = "quality.replay_evidence.v0"
+    wrong_schema["evidence_digest"] = evidence_digest_for(wrong_schema)
+    rejected_schema = verify_evidence(wrong_schema)
+    assert rejected_schema.verdict is Verdict.CORRUPT
+    assert "unsupported schema" in rejected_schema.reasons[0]
+
+
 def test_timeout_does_not_pass() -> None:
     report = run_harness(
         _manifest(max_runs=2, time_budget_ms=100.0),
