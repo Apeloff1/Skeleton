@@ -93,7 +93,7 @@ class CommandContractLinter:
             )
 
         arg_policy = definition.arguments
-        if arg_policy.max_args > 256:
+        if arg_policy.max_total_args > 256:
             findings.append(
                 ContractFinding(
                     ContractSeverity.WARNING,
@@ -113,7 +113,7 @@ class CommandContractLinter:
             )
 
         env_policy = definition.environment
-        if len(env_policy.allowed_keys) > 128:
+        if len(env_policy.allowed_keys()) > 128:
             findings.append(
                 ContractFinding(
                     ContractSeverity.WARNING,
@@ -122,7 +122,7 @@ class CommandContractLinter:
                     "command environment allowlist has high cardinality",
                 )
             )
-        if env_policy.inherit:
+        if env_policy.inherited:
             findings.append(
                 ContractFinding(
                     ContractSeverity.INFO,
