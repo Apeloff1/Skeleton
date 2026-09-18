@@ -61,11 +61,7 @@ class DistributedReceiptChain:
         # Compute the committed shell receipt hash from the current durable root.
         # Store it inside the generic evidence payload, while the outer chain also
         # hashes the entire payload for content-addressed durability.
-        previous = self.root_hash()
-        sequence = self._chain.length() + 1
-        receipt_hash = ReceiptChain._hash(previous, sequence, receipt)
         payload = {
-            "receipt_hash": receipt_hash,
             "receipt": self._payload(receipt),
         }
         node = self._chain.append("shell.execution.receipt", payload)
