@@ -38,6 +38,7 @@ TEST_MODULE_NAMES = (
     "tests.test_cortex",
     "tests.test_cortex_acquire_contract",
     "skeleton.testing.test_simulation_physics_ccd_advanced",
+    "skeleton.testing.test_simulation_physics_character",
     "skeleton.testing.test_simulation_physics_constraints",
     "skeleton.testing.test_simulation_physics_convex",
     "skeleton.testing.test_simulation_physics_convex_collision",
