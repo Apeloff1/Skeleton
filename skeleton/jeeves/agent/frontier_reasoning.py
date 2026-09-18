@@ -615,28 +615,39 @@ class FrontierReasoningCoordinator:
             causes.append(EscalationCause.NO_CANDIDATE)
         else:
             lead = assessments[0]
+            consensus_resolves_relative = self._consensus_resolves_relative_uncertainty(
+                consensus,
+                lead,
+            )
             if lead.absolute_quality < self.policy.minimum_absolute_quality:
                 causes.append(EscalationCause.LOW_ABSOLUTE_QUALITY)
-            if lead.choice_probability < self.policy.minimum_choice_probability:
+            if (
+                not consensus_resolves_relative
+                and lead.choice_probability < self.policy.minimum_choice_probability
+            ):
                 causes.append(EscalationCause.LOW_CHOICE_CONFIDENCE)
             if (
-                len(assessments) > 1
+                not consensus_resolves_relative
+                and len(assessments) > 1
                 and diagnostics.choice_margin < self.policy.minimum_choice_margin
             ):
                 causes.append(EscalationCause.LOW_MARGIN)
             if (
-                len(assessments) > 1
+                not consensus_resolves_relative
+                and len(assessments) > 1
                 and diagnostics.normalized_entropy
                 > self.policy.maximum_normalized_entropy
             ):
                 causes.append(EscalationCause.HIGH_ENTROPY)
             if (
-                diagnostics.action_disagreement
+                not consensus_resolves_relative
+                and diagnostics.action_disagreement
                 > self.policy.maximum_action_disagreement
             ):
                 causes.append(EscalationCause.ACTION_DISAGREEMENT)
             if (
-                diagnostics.outcome_disagreement
+                not consensus_resolves_relative
+                and diagnostics.outcome_disagreement
                 > self.policy.maximum_outcome_disagreement
             ):
                 causes.append(EscalationCause.OUTCOME_DISAGREEMENT)
@@ -681,6 +692,27 @@ class FrontierReasoningCoordinator:
             causes.append(EscalationCause.POSITIVE_VALUE_OF_COMPUTATION)
 
         return tuple(dict.fromkeys(causes))
+
+    @staticmethod
+    def _consensus_resolves_relative_uncertainty(
+        consensus: ConsensusResult | None,
+        lead: CandidateAssessment,
+    ) -> bool:
+        if (
+            consensus is None
+            or consensus.requires_more_sampling
+            or consensus.selected_candidate_id != lead.candidate_id
+        ):
+            return False
+        winner = next(
+            (
+                cluster
+                for cluster in consensus.clusters
+                if cluster.best_candidate_id == consensus.selected_candidate_id
+            ),
+            None,
+        )
+        return winner is not None and len(winner.candidate_ids) >= 2
 
     def _disposition(
         self,
