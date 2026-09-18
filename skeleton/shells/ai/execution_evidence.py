@@ -41,6 +41,7 @@ class AIExecutionEvidence:
     audit_witness_sequence: int | None = None
     execution_attempt_state: str = ""
     completed_at: float = 0.0
+    session_integrity_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -69,6 +70,7 @@ class AIExecutionEvidence:
             "authority_health_policy_digest",
             "execution_attempt_authority_digest",
             "audit_witness_digest",
+            "session_integrity_digest",
         )
         for name in optional:
             value = getattr(self, name)
@@ -134,6 +136,7 @@ class AIExecutionEvidence:
             "audit_witness_sequence": self.audit_witness_sequence,
             "execution_attempt_state": self.execution_attempt_state,
             "completed_at": self.completed_at,
+            "session_integrity_digest": self.session_integrity_digest,
         }
 
     @property
@@ -197,6 +200,7 @@ class AIExecutionEvidenceBuilder:
         audit_witness_digest: str = "",
         audit_witness_sequence: int | None = None,
         execution_attempt_state: str = "",
+        session_integrity_digest: str = "",
     ) -> AIExecutionEvidence:
         return AIExecutionEvidence(
             1,
@@ -222,6 +226,7 @@ class AIExecutionEvidenceBuilder:
             audit_witness_sequence,
             execution_attempt_state,
             self._clock(),
+            session_integrity_digest,
         )
 
 
@@ -340,6 +345,7 @@ class AIExecutionEvidenceStore:
             ),
             str(raw.get("execution_attempt_state", "")),
             float(raw["completed_at"]),
+            str(raw.get("session_integrity_digest", "")),
         )
 
     @staticmethod
