@@ -17,6 +17,10 @@ AUTOMATION_MAIN_ONLY_EXCLUSION_RE = re.compile(
 )
 DRAIN_WORKFLOW = "pr-obsolete-run-drain.yml"
 QUEUE_DRAIN_WORKFLOW = "queue-drain.yml"
+QUEUE_DEFAULT_BRANCH_GUARD = (
+    "github.event.workflow_run.head_branch == "
+    "github.event.repository.default_branch"
+)
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
@@ -54,6 +58,43 @@ def _workflow_run_trigger_block(text: str) -> str:
     )
     return tail if next_section is None else tail[: next_section.start()]
 
+def _queue_drain_default_branch_contract(
+    text: str,
+    workflow_run_block: str,
+) -> bool:
+    """Require every Actions-mutating queue-drain job to guard workflow_run.
+
+    A file-global substring check is insufficient because one guarded job can
+    mask another mutation-capable job whose guard was broadened or removed.
+    """
+    if "branches: [main]" not in workflow_run_block:
+        return False
+    jobs_match = re.search(r"(?m)^jobs:\s*$", text)
+    if jobs_match is None:
+        return False
+    jobs_text = text[jobs_match.end():]
+    job_pattern = re.compile(
+        r"(?ms)^  (?P<name>[A-Za-z0-9_-]+):\s*\n"
+        r"(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\s*\n|\Z)"
+    )
+    mutation_jobs = []
+    for match in job_pattern.finditer(jobs_text):
+        body = match.group("body")
+        if re.search(
+            r"(?m)^    permissions:\s*\n"
+            r"(?:(?:      [A-Za-z0-9_-]+:\s*[^\n]+\n)*)"
+            r"      actions:\s*write\s*$",
+            body,
+        ):
+            mutation_jobs.append((match.group("name"), body))
+    if not mutation_jobs:
+        return False
+    return all(
+        QUEUE_DEFAULT_BRANCH_GUARD in body
+        for _, body in mutation_jobs
+    )
+
+
 def violations_for_text(path_name: str, text: str) -> list[str]:
     findings: list[str] = []
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
@@ -74,9 +115,10 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
 
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
-        and "branches: [main]" in workflow_run_block
-        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
-        in text
+        and _queue_drain_default_branch_contract(
+            text,
+            workflow_run_block,
+        )
     )
 
     if (
