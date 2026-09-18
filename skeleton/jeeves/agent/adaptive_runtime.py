@@ -1,9 +1,9 @@
 """Adaptive execution harness for the advanced Jeeves stack.
 
-``JeevesAgentRuntime`` is the deterministic safety/control substrate.  This
+``FrontierJeevesAgentRuntime`` is the hardened safety/control substrate. This
 module subclasses it with adaptive inference-time compute and cross-run learning
-hooks while preserving the base runtime's authority over tools, evidence,
-verification, budgets, and checkpoints.
+hooks while preserving frontier tool authorization, audit binding, evidence,
+verification, budgets, crash quarantine, and checkpoints.
 
 The adaptive harness adds:
 
@@ -1049,3 +1049,8 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
     @staticmethod
     def _maximum_plan_risk(plan) -> RiskTier:
         return AdaptiveJeevesRuntime._current_risk(plan)
+
+
+# Explicit public name for callers that want adaptive inference while retaining
+# the hardened frontier execution substrate.
+FrontierAdaptiveJeevesRuntime = AdaptiveJeevesRuntime
