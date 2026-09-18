@@ -174,7 +174,7 @@ class RepositoryContextAdapter:
             if entry.key not in refs and entry.entry_id not in refs:
                 continue
             record = self._record(entry)
-            if records and used + record.token_estimate > max_tokens:
+            if used + record.token_estimate > max_tokens:
                 continue
             records.append(record)
             used += record.token_estimate
@@ -254,7 +254,7 @@ class MemoryManagerAdapter:
             if record is None:
                 continue
             item = self._record(record)
-            if records and used + item.token_estimate > max_tokens:
+            if used + item.token_estimate > max_tokens:
                 continue
             records.append(item)
             used += item.token_estimate
@@ -283,7 +283,7 @@ class MemoryManagerAdapter:
         used = 0
         for hit in hits:
             item = self._record(hit.record)
-            if records and used + item.token_estimate > max_tokens:
+            if used + item.token_estimate > max_tokens:
                 continue
             records.append(item)
             used += item.token_estimate
@@ -338,7 +338,7 @@ class CallableContextAdapter:
     ) -> tuple[DeepContextRecord, ...]:
         values = tuple(self._fetcher(namespace_key, source_refs, max_records, max_tokens))
         self._validate(values)
-        return values[:max_records]
+        return self._bounded(values, max_records=max_records, max_tokens=max_tokens)
 
     def search(
         self,
@@ -350,7 +350,25 @@ class CallableContextAdapter:
     ) -> tuple[DeepContextRecord, ...]:
         values = tuple(self._searcher(namespace_key, query, max_records, max_tokens))
         self._validate(values)
-        return values[:max_records]
+        return self._bounded(values, max_records=max_records, max_tokens=max_tokens)
+
+    @staticmethod
+    def _bounded(
+        values: Sequence[DeepContextRecord],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        records: list[DeepContextRecord] = []
+        used = 0
+        for value in values:
+            if len(records) >= max_records:
+                break
+            if used + value.token_estimate > max_tokens:
+                continue
+            records.append(value)
+            used += value.token_estimate
+        return tuple(records)
 
     def _validate(self, values: Sequence[DeepContextRecord]) -> None:
         if any(not isinstance(value, DeepContextRecord) for value in values):
