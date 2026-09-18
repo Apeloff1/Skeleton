@@ -57,6 +57,7 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
         if not self.kinds:
             raise AgentContractError("multiplexed repository adapter requires context kinds")
         self.branch = str(branch)
+        self.source_provider = f"context-mesh:{self.source_tier.value}"
         self._repositories: dict[str, ContextRepository] = {}
         self._lock = threading.RLock()
 
@@ -154,6 +155,7 @@ class MultiplexedRepositoryAdapter(ContextStoreAdapter):
             confidence=entry.confidence,
             salience=entry.salience,
             token_estimate=max(1, len(entry.content) // 4),
+            source_provider=self.source_provider,
             tags=entry.tags,
             metadata={
                 "entry_id": entry.entry_id,
