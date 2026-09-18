@@ -3,13 +3,16 @@ from __future__ import annotations
 import pytest
 
 from skeleton.jeeves.agent.cortex import JeevesCortex
+from skeleton.jeeves.agent.execution_audit import AuditEventKind
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import RunInputs
 from skeleton.jeeves.agent.types import (
     AgentResult,
     Goal,
+    RiskTier,
     TerminationReason,
+    ToolObservation,
     Usage,
 )
 
@@ -148,3 +151,72 @@ def test_required_cortex_cannot_be_disabled() -> None:
     clock = TickClock()
     with pytest.raises(ValueError, match="cortex_required"):
         _runtime(clock, cortex_enabled=False, cortex_required=True)
+
+
+def test_cortex_learning_preserves_audited_tool_risk_and_verification_score() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-cortex-learning")
+    state = runtime._new_state("run-cortex-learning", inputs)
+    observation = ToolObservation(
+        call_id="call-risk-bound",
+        tool_name="mutate_value",
+        ok=True,
+        payload={"status": "ok"},
+        latency_ms=3.0,
+    )
+    result = AgentResult(
+        run_id=state.run_id,
+        goal_id=inputs.goal.goal_id,
+        success=True,
+        reason=TerminationReason.GOAL_REACHED,
+        answer="Mutation was verified.",
+        usage=Usage(tool_calls=1),
+        observations=(observation,),
+    )
+
+    report = runtime.cortex.observe_result(
+        inputs,
+        result,
+        verification_scores={"call-risk-bound": 0.73},
+        action_risks={"call-risk-bound": RiskTier.MUTATING},
+    )
+
+    assert len(report.learned_skill_ids) == 1
+    profile = runtime.cortex.skills.require_profile(report.learned_skill_ids[0])
+    assert profile.spec.risk is RiskTier.MUTATING
+    episodes = runtime.cortex.skills.episodes(
+        skill_id=profile.spec.skill_id,
+        run_id=state.run_id,
+    )
+    assert len(episodes) == 1
+    assert episodes[0].verification_score == pytest.approx(0.73)
+    assert episodes[0].verified is True
+
+
+def test_frontier_cortex_learning_signals_are_derived_from_guard_audit() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    state = runtime._new_state(
+        "run-cortex-audit-signals",
+        _inputs("run-cortex-audit-signals"),
+    )
+    ledger = runtime.runtime_guard.audit_store.get_or_create(state.run_id)
+    ledger.append(
+        AuditEventKind.INTENT_BOUND,
+        {
+            "call_id": "call-audited",
+            "risk": RiskTier.EXTERNAL.value,
+        },
+        operation_id="operation-audited",
+    )
+    ledger.append(
+        AuditEventKind.EXECUTION_FINALIZED,
+        {"verification_score": 0.81},
+        operation_id="operation-audited",
+    )
+
+    scores, risks = runtime._cortex_learning_signals(state.run_id)
+
+    assert scores == {"call-audited": pytest.approx(0.81)}
+    assert risks == {"call-audited": RiskTier.EXTERNAL}
