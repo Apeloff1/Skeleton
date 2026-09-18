@@ -48,6 +48,7 @@ from .semantic_lenses import (
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .semantic_plane_interactions import plane_interaction_rules
+from .semantic_depth_interactions import depth_interaction_rules
 from .semantic_prediction import (
     PredictionStatus,
     SemanticForecast,
@@ -236,7 +237,7 @@ class SemanticLensPlane:
         self.router = router or MaximalLensRouter(self.registry)
         self.governance = governance or SemanticGovernanceBridge()
         self.perpendicular = perpendicular or PerpendicularExpansionPlanner(self.registry)
-        self.composition = composition or LensCompositionEngine(plane_interaction_rules())
+        self.composition = composition or LensCompositionEngine((*plane_interaction_rules(), *depth_interaction_rules()))
         self.hypergraph = hypergraph or SemanticLensHypergraph()
         self.predictive = predictive or SemanticPredictiveModel()
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
@@ -1019,7 +1020,7 @@ class SemanticLensPlane:
                         rule.symmetric,
                         rule.tangent_axis_hint,
                     )
-                    for rule in plane_interaction_rules()
+                    for rule in (*plane_interaction_rules(), *depth_interaction_rules())
                 ],
                 "policy": {
                     "max_lenses": self.policy.max_lenses,
