@@ -144,3 +144,46 @@ def test_unknown_strip_receiver_is_not_classified_as_string(tmp_path: Path) -> N
         "import subprocess\nsubprocess.run(builder.strip(), shell=False)\n",
     )
     assert findings == []
+
+
+
+def test_rejects_stable_subprocess_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "proc = subprocess\n"
+        "proc.run('python --version', shell=False)\n",
+    )
+    assert any("subprocess.run" in finding and "argument vector" in finding for finding in findings)
+
+
+def test_rejects_stable_os_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import os\n"
+        "process_os = os\n"
+        "process_os.system('echo unsafe')\n",
+    )
+    assert any("os.system() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_stable_module_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "first = subprocess\n"
+        "second = first\n"
+        "second.run('python --version', shell=False)\n",
+    )
+    assert any("subprocess.run" in finding and "argument vector" in finding for finding in findings)
+
+
+def test_reassigned_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\n"
+        "proc = subprocess\n"
+        "proc = custom_runner\n"
+        "proc.run('python --version', shell=False)\n",
+    )
+    assert findings == []
