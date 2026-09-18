@@ -41,6 +41,7 @@ from .context_repository import (
 )
 from .deliberation import (
     CandidateProposal,
+    CandidateScorer,
     ComputeAllocation,
     ComputeBudget,
     ComputeSignals,
@@ -51,6 +52,7 @@ from .deliberation import (
     proposal,
 )
 from .evidence import EvidenceLedger
+from .frontier_adjudication import HostCandidateAdjudicator
 from .frontier_consensus import merge_search_results
 from .frontier_feedback import FrontierReasoningFeedback
 from .frontier_reasoning import (
@@ -305,7 +307,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
 
         task = self._specialist_task(state, step)
         generator = self._provider_specialist_generator(state)
-        engine = DeliberationEngine(generator, clock=self._monotonic)
+        candidate_adjudicator = HostCandidateAdjudicator(state.ledger)
+        candidate_scorer = CandidateScorer(verifier=candidate_adjudicator.score)
+        engine = DeliberationEngine(
+            generator,
+            scorer=candidate_scorer,
+            clock=self._monotonic,
+        )
         search = engine.search(task, allocation)
         decision = (
             self.frontier_reasoning.decide(search, risk=step.risk)
@@ -335,6 +343,7 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                 break
             extra = DeliberationEngine(
                 generator,
+                scorer=candidate_scorer,
                 clock=self._monotonic,
             ).search(task, escalated)
             search = merge_search_results(search, extra)
