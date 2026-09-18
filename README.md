@@ -38,6 +38,7 @@ python -m skeleton test
 | `skeleton.swarm` | Multi-agent coordination |
 | `skeleton.forge` | Blueprint-based system composition |
 | `skeleton.resilience` | Security and fault tolerance |
+| `skeleton.shells` | Policy-bound, argv-only host process execution |
 | `skeleton.observability` | Metrics and anomaly detection |
 | `skeleton.api` | REST API surface |
 | `skeleton.cortex` | Observability hub |
