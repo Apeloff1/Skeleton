@@ -69,3 +69,18 @@ def test_control_plane_triggers_are_bounded() -> None:
     assert 'workflow_run:' not in watchdog_trigger
     assert "cron: '12,42 * * * *'" in watchdog_trigger
     assert 'workflow_dispatch:' in watchdog_trigger
+
+
+def test_control_plane_triggers_are_bounded_not_event_fanout() -> None:
+    supervisor = _read('shift-supervisor-control.yml')
+    watchdog = _read('shift-supervisor-watchdog.yml')
+
+    assert '  push:\n    branches: [main]' not in supervisor
+    assert "workflow_dispatch:" in supervisor
+    assert "cron: '2,32 * * * *'" in supervisor
+    assert "cron: '17,47 * * * *'" in supervisor
+
+    assert "workflow_run:" not in watchdog
+    assert "PR Automation Index" not in watchdog
+    assert "cron: '12,42 * * * *'" in watchdog
+    assert "workflow_dispatch:" in watchdog
