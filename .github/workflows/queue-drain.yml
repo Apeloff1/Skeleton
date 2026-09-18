@@ -3,7 +3,7 @@ name: Drain superseded Actions queue
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Drain obsolete PR Actions"]
+    workflows: ["Merge Readiness"]
     types: [completed]
     branches: [main]
   schedule:
@@ -15,8 +15,8 @@ on:
 
 # One live drainer plus one coalesced pending run. Do not trigger on every main
 # push: during merge storms GitHub replaces the pending run before it receives
-# a runner. Successful PR-drain completion provides an event-driven recovery
-# wake path when GitHub's scheduled workflows are delayed under saturation.
+# a runner. Successful canonical main Merge Readiness completion provides a
+# lower-frequency recovery wake when scheduled workflows are delayed.
 concurrency:
   group: queue-drain-v2-${{ github.repository }}
   cancel-in-progress: false
