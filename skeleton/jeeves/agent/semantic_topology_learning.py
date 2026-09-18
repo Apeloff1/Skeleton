@@ -736,8 +736,6 @@ class TopologyBridgeDomainReport:
     trial_count: int
     independent_run_count: int
     negative_control_count: int
-    qualified_domain_count: int
-    qualified_control_domain_count: int
     mean_probability: float | None
     empirical_rate: float | None
     wilson_95: tuple[float, float] | None
@@ -762,6 +760,8 @@ class TopologyBridgeReport:
     independent_run_count: int
     domain_count: int
     negative_control_count: int
+    qualified_domain_count: int
+    qualified_control_domain_count: int
     mean_probability: float | None
     empirical_rate: float | None
     wilson_95: tuple[float, float] | None
