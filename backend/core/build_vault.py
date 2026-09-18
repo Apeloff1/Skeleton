@@ -30,6 +30,7 @@ import time
 import zipfile
 import threading
 import logging
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Iterator, Tuple
 
@@ -39,16 +40,32 @@ _log = logging.getLogger(__name__)
 
 
 # ── Paths ───────────────────────────────────────────────────────────────
+def _probe_writable_dir(path: Path) -> None:
+    """Prove writability without touching a predictable helper filename."""
+    fd = -1
+    probe: Path | None = None
+    try:
+        fd, raw_probe = tempfile.mkstemp(prefix=".w_probe.", dir=path)
+        probe = Path(raw_probe)
+        os.write(fd, b"ok")
+        os.fsync(fd)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        if probe is not None:
+            probe.unlink(missing_ok=True)
+
+
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-        t = p / ".w_probe"
-        t.write_text("ok"); t.unlink(missing_ok=True)
+        _probe_writable_dir(p)
         return p
     except Exception:
         fp = Path(fallback)
         fp.mkdir(parents=True, exist_ok=True)
+        _probe_writable_dir(fp)
         return fp
 
 
@@ -128,6 +145,29 @@ _DECOMPRESSOR = zstd.ZstdDecompressor()
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Atomically publish text through an unpredictable same-directory file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, raw_tmp = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+        text=True,
+    )
+    tmp = Path(raw_tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink(missing_ok=True)
+        finally:
+            raise
+
+
 def _build_dir(build_id: str) -> Path:
     build_id = _validate_build_id(build_id)
     root = os.path.realpath(os.fspath(BUILDS_ROOT))
@@ -167,9 +207,7 @@ def _read_manifest(build_id: str) -> dict:
 
 def _write_manifest(build_id: str, manifest: dict) -> None:
     mp = _manifest_path(build_id)
-    tmp = mp.with_suffix(".tmp")
-    tmp.write_text(json.dumps(manifest, separators=(",", ":")))
-    tmp.replace(mp)
+    _atomic_write_text(mp, json.dumps(manifest, separators=(",", ":")))
 
 
 def _rebuild_manifest(build_id: str) -> dict:
@@ -435,7 +473,7 @@ def preserve_on_failure(build_id: str) -> dict:
     works. Writes a FAILED marker file and returns stats. Does NOT delete."""
     m = _read_manifest(build_id)
     marker = _build_dir(build_id) / "FAILED.marker"
-    marker.write_text(json.dumps({
+    _atomic_write_text(marker, json.dumps({
         "build_id": build_id,
         "preserved_at": time.time(),
         "file_count": m.get("file_count", 0),
