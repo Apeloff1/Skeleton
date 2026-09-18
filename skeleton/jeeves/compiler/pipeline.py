@@ -72,6 +72,7 @@ class PassContract:
     preserved_analyses: FrozenSet[AnalysisDomain] = frozenset()
     invalidated_analyses: FrozenSet[AnalysisDomain] = frozenset()
     deterministic: bool = True
+    replay_safe: bool = False
     thread_safe: bool = True
 
     def __post_init__(self) -> None:
@@ -93,6 +94,12 @@ class PassContract:
         )
         if preserved & invalidated:
             raise ValueError("an analysis cannot be both preserved and invalidated")
+        if not isinstance(self.deterministic, bool):
+            raise TypeError("deterministic must be bool")
+        if not isinstance(self.replay_safe, bool):
+            raise TypeError("replay_safe must be bool")
+        if not isinstance(self.thread_safe, bool):
+            raise TypeError("thread_safe must be bool")
         object.__setattr__(self, "required_analyses", required)
         object.__setattr__(self, "preserved_analyses", preserved)
         object.__setattr__(self, "invalidated_analyses", invalidated)
@@ -428,6 +435,19 @@ class PassManager:
                 contract.pass_id, module, None, module, False, input_report, None, None, reasons,
                 contract=contract,
             )
+        if (
+            self.verify_declared_determinism
+            and contract.deterministic
+            and not contract.replay_safe
+        ):
+            reasons.append(
+                "determinism verification requires replay_safe=True; "
+                "pass was not executed"
+            )
+            return module, self._record(
+                contract.pass_id, module, None, module, False, input_report, None, None, reasons,
+                contract=contract,
+            )
 
         try:
             candidate = compiler_pass.apply(module)
@@ -581,6 +601,8 @@ class PassManager:
                 "required": tuple(sorted(item.value for item in contract.required_analyses)),
                 "preserved": tuple(sorted(item.value for item in contract.preserved_analyses)),
                 "invalidated": tuple(sorted(item.value for item in contract.invalidated_analyses)),
+                "replay_safe": ("true",) if contract.replay_safe else ("false",),
+                "thread_safe": ("true",) if contract.thread_safe else ("false",),
             },
         )
 
