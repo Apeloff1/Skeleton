@@ -196,6 +196,87 @@ def test_bridge_trial_rejects_post_outcome_prediction() -> None:
         )
 
 
+def test_candidate_prediction_helper_is_idempotent_and_slot_guarded() -> None:
+    _, _, candidate, lab = _system()
+
+    first = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="canonical-run",
+        predicted_at=10.0,
+        source_forecast_ids=("forecast:canonical",),
+    )
+    same = lab.declare_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.70,
+        domain="film",
+        independent_run="canonical-run",
+        predicted_at=10.0,
+        source_forecast_ids=("forecast:canonical",),
+    )
+
+    assert same.prediction_id == first.prediction_id
+    assert same.fingerprint == first.fingerprint
+    assert lab.unresolved_predictions(
+        candidate_id=candidate.candidate_id
+    ) == (first,)
+
+    with pytest.raises(
+        AgentContractError,
+        match="experiment slot already has",
+    ):
+        lab.declare_candidate_prediction(
+            candidate.candidate_id,
+            kind=LensInteractionKind.REINFORCES,
+            predicted_probability=0.90,
+            domain="film",
+            independent_run="canonical-run",
+            predicted_at=10.0,
+            source_forecast_ids=("forecast:canonical",),
+        )
+
+    lab.resolve(
+        first.prediction_id,
+        outcome=True,
+        observed_at=11.0,
+        outcome_evidence_ids=("evidence:canonical-outcome",),
+    )
+    assert lab.unresolved_predictions(
+        candidate_id=candidate.candidate_id
+    ) == ()
+
+
+def test_semantic_plane_candidate_helper_owns_candidate_fingerprint() -> None:
+    registry, topology, candidate, lab = _system()
+    plane = SemanticLensPlane(
+        registry=registry,
+        topology=topology,
+        topology_learning=lab,
+    )
+
+    prediction = plane.declare_topology_candidate_prediction(
+        candidate.candidate_id,
+        kind=LensInteractionKind.CONDITIONS,
+        predicted_probability=0.65,
+        domain="game",
+        independent_run="plane-run",
+        predicted_at=20.0,
+        evidence_ids=("evidence:plane",),
+    )
+
+    assert prediction.candidate_id == candidate.candidate_id
+    assert (
+        prediction.candidate_fingerprint
+        == lab.candidate_fingerprint(candidate)
+    )
+    assert plane.unresolved_topology_predictions(
+        candidate_id=candidate.candidate_id
+    ) == (prediction,)
+
+
 def test_outcome_requires_prediction_in_ledger() -> None:
     _, _, candidate, lab = _system()
     prediction = TopologyBridgePrediction(
