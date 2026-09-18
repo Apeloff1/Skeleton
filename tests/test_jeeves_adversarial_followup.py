@@ -226,6 +226,20 @@ def test_memory_rejects_invalid_user_identifiers(user_id):
         memory.create_session(user_id)
 
 
+def test_public_identifiers_are_canonicalized_before_storage_and_lookup():
+    memory = MemoryManager(max_sessions=1)
+
+    session = memory.create_session(" learner ")
+    same_history = memory.get_user_history("learner", limit=1)
+
+    assert session.user_id == "learner"
+    assert same_history == [session]
+
+    core = _core()
+    bound = core.bind_era(" bronze ")
+    assert bound["era"] == "bronze"
+
+
 def test_oversized_provider_output_fails_closed_before_memory_growth():
     core = JeevesCore(provider=OversizedProvider())
     session = core.open_session("u")
