@@ -1058,6 +1058,73 @@ def test_learned_topology_edge_identity_tracks_report_lineage_without_mutating_s
     assert topology.snapshot.fingerprint == static_fingerprint
 
 
+def test_semantic_plane_executes_default_interaction_rules_known_to_topology() -> None:
+    registry = MaximalSemanticRegistry()
+    plane = SemanticLensPlane(
+        registry=registry,
+        policy=SemanticPlanePolicy(
+            require_selected_findings=False,
+        ),
+    )
+    observations = (
+        SemanticObservation(
+            "default-rule:obs:1",
+            "A neutral face is placed after a contextual image.",
+            0,
+        ),
+        SemanticObservation(
+            "default-rule:obs:2",
+            "The narrator claims a meaning that independent context challenges.",
+            1,
+        ),
+    )
+    observation_ids = tuple(item.observation_id for item in observations)
+    findings = (
+        SemanticFinding(
+            finding_id="default-rule:kuleshov",
+            lens_key="kuleshov_context",
+            family=registry.get("kuleshov_context").family,
+            observation_ids=observation_ids,
+            interpretation="Adjacent context changes the plausible reading.",
+            prediction="Changing context changes the induced interpretation.",
+            confidence=0.80,
+            ambiguity=0.20,
+            novelty=0.55,
+        ),
+        SemanticFinding(
+            finding_id="default-rule:narrator",
+            lens_key="unreliable_narrator",
+            family=registry.get("unreliable_narrator").family,
+            observation_ids=observation_ids,
+            interpretation="Independent context challenges the source report.",
+            prediction="Independent evidence diverges from the narrated claim.",
+            confidence=0.78,
+            ambiguity=0.24,
+            novelty=0.52,
+        ),
+    )
+
+    snapshot = plane.analyze(
+        observations,
+        findings=findings,
+        requested=("kuleshov_context", "unreliable_narrator"),
+    )
+
+    interaction = next(
+        item
+        for item in snapshot.composition.interactions
+        if item.rule.key
+        == tuple(sorted(("kuleshov_context", "unreliable_narrator")))
+    )
+    assert interaction.rule.kind is LensInteractionKind.CONDITIONS
+    assert interaction.metadata["interpretive_only"] is True
+    assert interaction.metadata["may_promote_to_evidence"] is False
+    assert any(
+        edge.key == interaction.rule.key
+        for edge in snapshot.topology.edges
+    )
+
+
 def test_supplemental_rule_cannot_override_static_interaction_contract() -> None:
     engine = LensCompositionEngine()
     static = default_interaction_rules()[0]
