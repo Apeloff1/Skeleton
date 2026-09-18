@@ -3,6 +3,7 @@ import math
 import pytest
 
 from skeleton.jeeves.agent.probability_lenses import (
+    ProbabilityError,
     ProbabilityLens,
     ProbabilityWorkbench,
     categorical_entropy,
@@ -92,7 +93,7 @@ def test_aleatoric_epistemic_split_and_surprisal_are_explicit():
 
 
 def test_memory_game_probability_rejects_impossible_singleton_state():
-    with pytest.raises(Exception, match="known_singletons exceeds"):
+    with pytest.raises(ProbabilityError, match="known_singletons exceeds"):
         memory_pair_next_flip_probability(
             total_pairs=4,
             removed_pairs=3,
@@ -101,7 +102,7 @@ def test_memory_game_probability_rejects_impossible_singleton_state():
 
 
 def test_information_gain_requires_one_shared_state_space():
-    with pytest.raises(Exception, match="same state space"):
+    with pytest.raises(ProbabilityError, match="same state space"):
         expected_information_gain(
             (0.5, 0.5),
             ((1.0, (0.2, 0.3, 0.5)),),
