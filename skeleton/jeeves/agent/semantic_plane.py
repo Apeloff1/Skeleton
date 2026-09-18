@@ -919,7 +919,10 @@ class SemanticLensPlane:
         selection: LensSelection,
         observations: Sequence[SemanticObservation],
         learned_rules: Sequence[LearnedTopologyRule],
-    ) -> tuple[LensSelection, tuple[str, ...]]:
+    ) -> tuple[
+        LensSelection,
+        tuple[LearnedCompanionActivation, ...],
+    ]:
         if (
             not self.policy.enable_learned_companions
             or not learned_rules
@@ -936,13 +939,26 @@ class SemanticLensPlane:
                 family_counts.get(spec.family, 0) + 1
             )
 
-        proposals: dict[str, tuple[float, SemanticLensSpec]] = {}
+        proposals: dict[
+            str,
+            tuple[
+                float,
+                SemanticLensSpec,
+                LearnedCompanionActivation,
+            ],
+        ] = {}
         for learned in learned_rules:
+            if (
+                learned.bridge_quality
+                < self.policy.minimum_learned_companion_bridge_quality
+            ):
+                continue
             left_key, right_key = learned.rule.key
             left_selected = left_key in selected_keys
             right_selected = right_key in selected_keys
             if left_selected == right_selected:
                 continue
+            source_key = left_key if left_selected else right_key
             companion_key = right_key if left_selected else left_key
             try:
                 companion = self.registry.get(companion_key)
@@ -955,46 +971,75 @@ class SemanticLensPlane:
                 >= self.policy.max_per_family
             ):
                 continue
+
             cue_support = self._cue_support(companion, observations)
             if (
                 cue_support
                 < self.policy.minimum_learned_companion_cue_support
             ):
                 continue
+
             pair_bonus = (
-                0.08
+                0.07
                 if companion.pairwise and len(observations) >= 2
                 else 0.0
             )
             sequential_bonus = (
-                0.08
+                0.07
                 if companion.sequential and len(observations) >= 3
                 else 0.0
             )
-            rarity_bonus = 0.04 if companion.rare else 0.0
+            rarity_bonus = 0.03 if companion.rare else 0.0
             activation = min(
                 1.0,
-                0.18
-                + 0.56 * cue_support
+                0.10
+                + 0.50 * cue_support
+                + 0.23 * learned.bridge_quality
                 + pair_bonus
                 + sequential_bonus
-                + rarity_bonus
-                + 0.12,
+                + rarity_bonus,
+            )
+            activation_record = LearnedCompanionActivation(
+                lens_key=companion.key,
+                source_lens_key=source_key,
+                candidate_id=learned.candidate_id,
+                report_id=learned.report_id,
+                interaction_kind=learned.rule.kind,
+                cue_support=cue_support,
+                bridge_quality=learned.bridge_quality,
+                activation_score=activation,
+                fingerprint=stable_fingerprint(
+                    {
+                        "lens": companion.key,
+                        "source": source_key,
+                        "candidate": learned.candidate_id,
+                        "report": learned.report_fingerprint,
+                        "kind": learned.rule.kind.value,
+                        "cue_support": cue_support,
+                        "bridge_quality": learned.bridge_quality,
+                        "activation": activation,
+                    }
+                ),
             )
             prior = proposals.get(companion.key)
             if prior is None or activation > prior[0]:
-                proposals[companion.key] = (activation, companion)
+                proposals[companion.key] = (
+                    activation,
+                    companion,
+                    activation_record,
+                )
 
         ordered = sorted(
             proposals.values(),
             key=lambda item: (
                 -item[0],
+                -item[2].bridge_quality,
                 item[1].family.value,
                 item[1].key,
             ),
         )
-        added: list[str] = []
-        for activation, companion in ordered:
+        added: list[LearnedCompanionActivation] = []
+        for activation, companion, activation_record in ordered:
             if (
                 len(selected) >= self.policy.max_lenses
                 or len(added) >= self.policy.max_learned_companions
@@ -1013,7 +1058,7 @@ class SemanticLensPlane:
                 family_counts.get(companion.family, 0) + 1
             )
             scores[companion.key] = activation
-            added.append(companion.key)
+            added.append(activation_record)
 
         if not added:
             return selection, ()
@@ -1029,7 +1074,16 @@ class SemanticLensPlane:
                 ),
                 perpendicular=selection.perpendicular,
             ),
-            tuple(sorted(added)),
+            tuple(
+                sorted(
+                    added,
+                    key=lambda item: (
+                        item.lens_key,
+                        item.source_lens_key,
+                        item.candidate_id,
+                    ),
+                )
+            ),
         )
 
     def _coverage(
