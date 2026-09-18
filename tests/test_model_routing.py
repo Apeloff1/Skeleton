@@ -311,6 +311,46 @@ def test_budget_exhaustion_fails_closed_without_calling_unaffordable_providers()
     assert also_expensive.calls == []
 
 
+def test_unaffordable_priority_provider_does_not_consume_fallback_slot() -> None:
+    expensive = FakeAdapter("premium")
+    affordable = FakeAdapter("value")
+    router = _router_with(
+        (
+            _metadata(
+                "premium",
+                priority=0,
+                input_cost=1_000_000.0,
+                output_cost=1_000_000.0,
+            ),
+            expensive,
+        ),
+        (
+            _metadata(
+                "value",
+                priority=10,
+                input_cost=1.0,
+                output_cost=1.0,
+            ),
+            affordable,
+        ),
+    )
+    request = _request(
+        budget=RouteBudget(max_cost=0.001, max_provider_attempts=1),
+        estimated_input_tokens=100,
+        max_output_tokens=100,
+    )
+
+    plan = router.plan(request)
+    assert plan.provider_ids == ("value",)
+    assert "estimated cost exceeds route budget" in plan.rejected["premium"]
+
+    result = asyncio.run(router.invoke(request))
+    assert result.status == "ok"
+    assert result.selected_provider_id == "value"
+    assert expensive.calls == []
+    assert len(affordable.calls) == 1
+
+
 def test_actual_usage_over_budget_is_not_reported_as_success() -> None:
     greedy = FakeAdapter(
         "greedy",
