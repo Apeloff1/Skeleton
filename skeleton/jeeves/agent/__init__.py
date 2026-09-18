@@ -488,6 +488,7 @@ from .semantic_topology_learning import (
     SemanticTopologyLearningLab,
     SemanticTopologyLearningSnapshot,
     SemanticTopologyLearningState,
+    TopologyBridgeDomainReport,
     TopologyBridgePolicy,
     TopologyBridgePrediction,
     TopologyBridgeReport,
