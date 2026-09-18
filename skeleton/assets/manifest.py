@@ -241,7 +241,7 @@ class AssetRecord:
         media_type: str = "",
         source: SourceMetadata | None = None,
         license: LicenseMetadata | None = None,
-        lineage: Sequence[LineageStep] = (),
+        lineage: Iterable[LineageStep] = (),
         targets: TargetConstraints | None = None,
         release_marked: bool = False,
     ) -> AssetRecord:
@@ -249,14 +249,16 @@ class AssetRecord:
             raise SerializationError("asset bytes must be bytes")
         payload = bytes(data)
         digest = content_digest(payload)
+        if not isinstance(release_marked, bool):
+            raise SerializationError("release_marked must be a boolean")
         record = cls(
             identity=_build_identity(asset_id, kind, logical_name or asset_id),
             content=_build_content(kind, digest, len(payload), media_type),
             source=source or SourceMetadata(),
             license=license or LicenseMetadata(),
-            lineage=tuple(lineage),
+            lineage=_bounded_lineage_steps(lineage),
             targets=targets or TargetConstraints(),
-            release_marked=bool(release_marked),
+            release_marked=release_marked,
             fingerprint=content_fingerprint(payload),
         )
         return validate_record(record, data=payload)
@@ -544,7 +546,31 @@ def verify_content(record: AssetRecord, data: bytes) -> None:
         )
 
 
+def _bounded_lineage_steps(steps: Iterable[LineageStep]) -> tuple[LineageStep, ...]:
+    if isinstance(steps, (str, bytes, bytearray)):
+        raise LineageError("lineage must be an iterable of LineageStep values")
+    bounded: list[LineageStep] = []
+    try:
+        iterator = iter(steps)
+    except TypeError as exc:
+        raise LineageError("lineage must be iterable") from exc
+    for step in iterator:
+        if len(bounded) >= MAX_LINEAGE_STEPS:
+            raise LineageError(
+                "lineage exceeds step bound",
+                context={"max_steps": MAX_LINEAGE_STEPS},
+            )
+        if not isinstance(step, LineageStep):
+            raise LineageError("lineage entries must be LineageStep values")
+        bounded.append(step)
+    return tuple(bounded)
+
+
 def validate_lineage(steps: Sequence[LineageStep], content_sha256: str) -> None:
+    if isinstance(steps, (str, bytes, bytearray)) or not isinstance(steps, Sequence):
+        raise LineageError("lineage must be a sequence of LineageStep values")
+    if any(not isinstance(step, LineageStep) for step in steps):
+        raise LineageError("lineage entries must be LineageStep values")
     digest = _require_digest(content_sha256)
     if len(steps) > MAX_LINEAGE_STEPS:
         raise LineageError(
@@ -968,10 +994,22 @@ def _validate_license(license_meta: LicenseMetadata) -> None:
 
 
 def _validate_targets(targets: TargetConstraints, size_bytes: int) -> None:
-    for engine in targets.engines:
-        _bounded_token("engine", engine)
-    for fmt in targets.formats:
-        _bounded_token("format", fmt)
+    if not isinstance(targets, TargetConstraints):
+        raise SerializationError("targets must be TargetConstraints")
+    for label, values in (("engines", targets.engines), ("formats", targets.formats)):
+        if not isinstance(values, tuple):
+            raise SerializationError(f"{label} must be a tuple")
+        if len(values) > MAX_LIST_ITEMS:
+            raise SerializationError(
+                f"{label} exceeds bound",
+                context={"max_items": MAX_LIST_ITEMS},
+            )
+        normalized = tuple(
+            _bounded_token(label[:-1], item)
+            for item in values
+        )
+        if len(set(normalized)) != len(normalized):
+            raise SerializationError(f"{label} contains duplicates")
     if targets.max_bytes is not None:
         _require_int("max_bytes", targets.max_bytes, minimum=1)
         if size_bytes > targets.max_bytes:
@@ -979,7 +1017,23 @@ def _validate_targets(targets: TargetConstraints, size_bytes: int) -> None:
                 "asset exceeds target max_bytes constraint",
                 context={"size_bytes": size_bytes, "max_bytes": targets.max_bytes},
             )
-    _frozen_parameters(dict(targets.constraints))
+    if not isinstance(targets.constraints, tuple):
+        raise SerializationError("target constraints must be a tuple")
+    if len(targets.constraints) > MAX_PARAMETERS:
+        raise SerializationError(
+            "target constraints exceed bound",
+            context={"max_parameters": MAX_PARAMETERS},
+        )
+    seen: set[str] = set()
+    for entry in targets.constraints:
+        if not isinstance(entry, tuple) or len(entry) != 2:
+            raise SerializationError("target constraint entries must be (name, value) pairs")
+        key, value = entry
+        token = _bounded_token("parameter", key)
+        if token in seen:
+            raise SerializationError("target constraints contain duplicate keys")
+        seen.add(token)
+        _canonicalize(value)
 
 
 def _validate_fingerprint(fingerprint: ContentFingerprint) -> None:
