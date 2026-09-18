@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterator, Mapping, Sequence
 
-TASK_KEY = "reserve-S026-build-network-audit"
+TASK_ID = "reserve-S026-build-network-audit"
 CONFLICT_DOMAIN = "build.readonly.network_dependencies"
 KIND = "build_network_audit"
 SCHEMA_VERSION = 1
@@ -213,7 +213,7 @@ class CommandFinding:
 class NetworkAuditReport:
     schema_version: int = SCHEMA_VERSION
     kind: str = KIND
-    task_key: str = TASK_KEY
+    task_key: str = TASK_ID
     conflict_domain: str = CONFLICT_DOMAIN
     fail_closed: bool = True
     scanned_files: tuple[str, ...] = ()

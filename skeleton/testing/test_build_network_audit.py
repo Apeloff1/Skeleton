@@ -15,7 +15,7 @@ from skeleton.build.network_audit import (
     CONFLICT_DOMAIN,
     KIND,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     audit_repository,
     classify_action_ref,
     classify_command,
@@ -218,7 +218,7 @@ def test_audit_scans_makefile_scripts_workflows_and_npm(tmp_path: Path) -> None:
     payload = report.to_payload()
     assert payload["schema_version"] == SCHEMA_VERSION == 1
     assert payload["kind"] == KIND == "build_network_audit"
-    assert payload["task_key"] == TASK_KEY
+    assert payload["task_key"] == TASK_ID
     assert payload["conflict_domain"] == CONFLICT_DOMAIN
     assert payload["fail_closed"] is True
     assert "scripts/ignored.py" not in payload["scanned_files"]
@@ -305,7 +305,7 @@ def test_offline_classification_never_emitted_without_offline_evidence() -> None
 def test_canonical_repo_flags_known_hidden_network_commands() -> None:
     report = audit_repository(REPO_ROOT)
     payload = report.to_payload()
-    assert payload["task_key"] == TASK_KEY == "reserve-S026-build-network-audit"
+    assert payload["task_key"] == TASK_ID == "reserve-S026-build-network-audit"
     assert payload["conflict_domain"] == CONFLICT_DOMAIN
     assert payload["fail_closed"] is True
 
