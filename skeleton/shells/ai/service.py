@@ -11,6 +11,7 @@ from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
 from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
 from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
 from skeleton.shells.ai.session import AIShellSession
+from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
 from skeleton.shells.ai.types import AIIntent
 from skeleton.shells.execution_context import ExecutionContext
 
@@ -45,6 +46,9 @@ class AIShellService:
         self.governance = governance
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
+        self.stale_guard = AIPlanStaleGuard()
+        self._pins: dict[str, PlanPin] = {}
+        self._max_pins = 10000
 
     def start(self) -> AIDiagnosticsReport:
         if self.state.phase is AIServicePhase.NEW:
@@ -78,6 +82,17 @@ class AIShellService:
             commands=tuple(action.command for action in proposal.actions),
         )
         view = self.review_builder.build(session.intent, proposal, bundle.critique)
+        if bundle.compiled is not None:
+            if session.session_id not in self._pins and len(self._pins) >= self._max_pins:
+                raise RuntimeError("AI shell plan-pin capacity exhausted")
+            self._pins[session.session_id] = self.stale_guard.pin(
+                session.intent,
+                proposal,
+                bundle.compiled,
+                self.orchestrator.planner.catalog,
+                self.orchestrator.compiler.effects,
+                self.governance.current_policy(),
+            )
         return bundle, view
 
     def execute(
@@ -91,17 +106,34 @@ class AIShellService:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         proposal = review.planning.response.proposal
+        pin = self._pins.get(session.session_id)
+        if review.compiled is not None:
+            if pin is None:
+                raise RuntimeError("AI shell reviewed plan has no execution pin")
+            self.stale_guard.require_current(
+                pin,
+                intent=session.intent,
+                proposal=proposal,
+                compiled=review.compiled,
+                catalog=self.orchestrator.planner.catalog,
+                effects=self.orchestrator.compiler.effects,
+                policy=self.governance.current_policy(),
+            )
         self.governance.require_not_quarantined(
             model_id=proposal.model_id or self.orchestrator.planner.model.model_id,
             proposal_fingerprint=proposal.fingerprint,
             commands=tuple(action.command for action in proposal.actions),
         )
-        return self.orchestrator.execute(
-            session,
-            review,
-            context=context,
-            approval=approval,
-        )
+        try:
+            return self.orchestrator.execute(
+                session,
+                review,
+                context=context,
+                approval=approval,
+            )
+        finally:
+            if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
+                self._pins.pop(session.session_id, None)
 
     def status(self) -> AIServiceStatus:
         return AIServiceStatus(
