@@ -31,7 +31,10 @@ on:
       - '.github/workflows/frontier-contracts.yml'
 
 concurrency:
-  group: frontier-contracts-${{ github.event.pull_request.number || github.ref }}
+  # A frontier branch with an open PR receives both push and pull_request
+  # events for the same commit. Key both forms by the head branch so only one
+  # contract run survives while newer commits still supersede older ones.
+  group: frontier-contracts-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:

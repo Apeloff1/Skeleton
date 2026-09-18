@@ -279,7 +279,8 @@ def _group_findings(
                 "PR 123 and branch 123 would share a slot"
             )
         if "ref_name" in chain_kinds and not has_event_name and "safe" not in chain_kinds:
-            if "||" in match.group("body"):
+            pr_push_only = bool(events) and events.issubset({"pull_request", "push"})
+            if "||" in match.group("body") and not pr_push_only:
                 findings.append(
                     f"{name}: branch-name concurrency fallbacks must include github.event_name "
                     "so schedule/push/workflow_run runs cannot collapse onto one another"
