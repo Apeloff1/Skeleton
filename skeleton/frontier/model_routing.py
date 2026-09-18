@@ -874,10 +874,15 @@ class ModelRouter:
             actual_cost = _usage_cost(metadata, response.usage)
             spent_cost += actual_cost
             spent_output += response.usage.output_tokens
-            if (
+            cost_exhausted = (
                 request.budget.max_cost is not None
                 and spent_cost > request.budget.max_cost
-            ):
+            )
+            output_exhausted = (
+                request.budget.max_output_tokens is not None
+                and spent_output > request.budget.max_output_tokens
+            )
+            if cost_exhausted or output_exhausted:
                 attempts.append(
                     AttemptRecord(
                         provider_id=metadata.provider_id,
