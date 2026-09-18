@@ -18,6 +18,7 @@ from skeleton.jeeves.agent.semantic_lenses import (
     SemanticObservation,
 )
 from skeleton.jeeves.agent.semantic_maximal import MaximalSemanticRegistry
+from skeleton.jeeves.agent.semantic_lens_topology import SemanticLensTopology
 from skeleton.jeeves.agent.semantic_plane import SemanticLensPlane, SemanticPlanePolicy
 from skeleton.jeeves.agent.semantic_plane_interactions import plane_interaction_keys
 
@@ -250,3 +251,72 @@ def test_semantic_plane_contract_fingerprint_includes_depth_registry_and_rules()
     rule = plane.composition.rule_for("retry_storm", "queue_backpressure")
     assert rule is not None
     assert set(rule.key) == {"retry_storm", "queue_backpressure"}
+
+
+
+def test_semantic_topology_covers_registered_rules_without_dangling_edges() -> None:
+    registry = MaximalSemanticRegistry()
+    topology = SemanticLensTopology(registry)
+    snapshot = topology.snapshot
+    registered = {spec.key for spec in registry.all()}
+
+    assert len(snapshot.nodes) == len(registered)
+    assert len(snapshot.edges) >= 76
+    assert all(edge.left_key in registered for edge in snapshot.edges)
+    assert all(edge.right_key in registered for edge in snapshot.edges)
+    assert len({edge.edge_id for edge in snapshot.edges}) == len(snapshot.edges)
+    assert snapshot.component_count >= 1
+    assert snapshot.largest_component_size >= 2
+    assert snapshot.conflict_edge_ids
+    assert snapshot.reinforcement_edge_ids
+
+
+def test_semantic_topology_connects_depth_rules_across_rule_layers() -> None:
+    topology = SemanticLensTopology(MaximalSemanticRegistry())
+
+    assert "queue_backpressure" in topology.neighbors("retry_storm")
+    path = topology.shortest_path(
+        "retry_storm",
+        "forecast_horizon_decay",
+        max_depth=4,
+    )
+
+    assert path
+    assert path[0] == "retry_storm"
+    assert path[-1] == "forecast_horizon_decay"
+    assert "queue_backpressure" in path
+
+
+def test_semantic_topology_bridge_candidates_are_bounded_and_not_existing_edges() -> None:
+    topology = SemanticLensTopology(MaximalSemanticRegistry())
+    candidates = topology.bridge_candidates(limit=20, minimum_score=0.18)
+
+    assert len(candidates) <= 20
+    assert candidates
+    for candidate in candidates:
+        assert candidate.shared_cues
+        assert candidate.score >= 0.18
+        assert candidate.right_key not in topology.neighbors(candidate.left_key)
+        assert 0.0 <= candidate.cue_overlap <= 1.0
+        assert 0.0 <= candidate.role_novelty <= 1.0
+
+
+def test_semantic_plane_snapshot_exposes_static_topology_diagnostics() -> None:
+    plane = SemanticLensPlane()
+    snapshot = plane.analyze(
+        _observations(),
+        requested=("retry_storm", "target_leakage"),
+    )
+
+    assert snapshot.topology.fingerprint == plane.topology.fingerprint
+    assert snapshot.coverage.topology_components == snapshot.topology.component_count
+    assert (
+        snapshot.coverage.topology_isolated_lenses
+        == len(snapshot.topology.isolated_lens_keys)
+    )
+    assert (
+        snapshot.coverage.topology_bridge_lenses
+        == len(snapshot.topology.bridge_lens_keys)
+    )
+    assert snapshot.factual_assertion_authorized is False
+    assert snapshot.causal_assertion_authorized is False
