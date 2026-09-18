@@ -358,3 +358,14 @@ def test_mcp_transport_require_raises():
                 "Mcp-Name": "python",
             },
         )
+
+
+def test_distributed_idempotency_preserves_logical_key():
+    backend = InMemoryFencedStore()
+    registry = DistributedAIIdempotencyRegistry(backend)
+    record = registry.register(
+        "operation-123",
+        request_digest=fp("a"),
+        proposal_fingerprint=fp("b"),
+    )
+    assert record.key == "operation-123"
