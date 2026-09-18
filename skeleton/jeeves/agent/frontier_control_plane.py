@@ -41,6 +41,12 @@ from .research_assurance import (
     ResearchEvidenceSummary,
     ResearchStopPolicy,
 )
+from .research_synthesis import (
+    HypothesisProposal,
+    HypothesisSynthesisGate,
+    HypothesisSynthesisPolicy,
+    SynthesisReport,
+)
 from .scalable_causal_ensemble import FactorizedBayesianCausalEnsemble
 
 
@@ -56,6 +62,7 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         epistemic_policy: EpistemicFrontierPolicy | None = None,
         agenda_policy: ResearchAgendaPolicy | None = None,
         tournament_policy: TournamentPolicy | None = None,
+        synthesis_policy: HypothesisSynthesisPolicy | None = None,
         research_stop_policy: ResearchStopPolicy | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -87,6 +94,9 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
             clock=clock,
         )
         self.tournament_policy = tournament_policy or TournamentPolicy()
+        self.hypothesis_synthesis = HypothesisSynthesisGate(
+            policy=synthesis_policy,
+        )
         self.research_assurance = ResearchAssuranceGate(
             policy=research_stop_policy,
         )
@@ -134,6 +144,24 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         )
         self._tournaments[tournament.tournament_id] = tournament
         return tournament
+
+    def start_synthesized_tournament(
+        self,
+        proposals: Sequence[HypothesisProposal],
+        probes: Sequence[DiscriminatingProbe],
+        *,
+        decision_impact: float = 1.0,
+    ) -> tuple[SynthesisReport, HypothesisTournament]:
+        """Strict tournament admission with anti-collapse synthesis checks."""
+
+        report, tournament = self.hypothesis_synthesis.build_tournament(
+            proposals,
+            probes,
+            tournament_policy=self.tournament_policy,
+            decision_impact=decision_impact,
+        )
+        self._tournaments[tournament.tournament_id] = tournament
+        return report, tournament
 
     def hypothesis_tournament(self, tournament_id: str) -> HypothesisTournament:
         try:
@@ -305,6 +333,12 @@ class FrontierCognitiveControlPlane(CognitiveControlPlane):
         return {
             "engine": "hypothesis-tournament",
             "active_tournaments": len(active),
+            "strict_synthesis": {
+                "minimum_hypotheses": self.hypothesis_synthesis.policy.minimum_hypotheses,
+                "minimum_mechanism_families": self.hypothesis_synthesis.policy.minimum_mechanism_families,
+                "require_null_hypothesis": self.hypothesis_synthesis.policy.require_null_hypothesis,
+                "minimum_pairwise_separation": self.hypothesis_synthesis.policy.minimum_pairwise_separation,
+            },
             "tournaments": [
                 {
                     "tournament_id": item.tournament_id,
