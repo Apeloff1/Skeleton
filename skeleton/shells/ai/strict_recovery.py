@@ -25,6 +25,8 @@ class StrictRecoveryReport:
     session_evidence_matches: bool
     release_evidence_matches: bool
     sandbox_binding_matches: bool
+    runtime_trust_matches: bool
+    authority_health_policy_matches: bool
 
     @property
     def safe_to_resume(self) -> bool:
@@ -42,6 +44,10 @@ class StrictRecoveryReport:
             "session_evidence_matches": self.session_evidence_matches,
             "release_evidence_matches": self.release_evidence_matches,
             "sandbox_binding_matches": self.sandbox_binding_matches,
+            "runtime_trust_matches": self.runtime_trust_matches,
+            "authority_health_policy_matches": (
+                self.authority_health_policy_matches
+            ),
         }
 
 
@@ -65,6 +71,8 @@ class StrictAIRecoveryManager:
         current_effect_digest: str,
         current_release_evidence_digest: str = "",
         current_sandbox_binding_digest: str = "",
+        current_runtime_trust_digest: str = "",
+        current_authority_health_policy_digest: str = "",
     ) -> StrictRecoveryReport:
         session = checkpoint.session
         journal_valid = journal.verify()
@@ -101,6 +109,16 @@ class StrictAIRecoveryManager:
             or checkpoint.sandbox_binding_digest
             == current_sandbox_binding_digest
         )
+        runtime_trust_matches = (
+            not checkpoint.runtime_trust_digest
+            or checkpoint.runtime_trust_digest
+            == current_runtime_trust_digest
+        )
+        authority_health_policy_matches = (
+            not checkpoint.authority_health_policy_digest
+            or checkpoint.authority_health_policy_digest
+            == current_authority_health_policy_digest
+        )
 
         # The legacy global receipt root is passed as its checkpoint value here.
         # Session-scoped evidence below is authoritative for cross-session
@@ -133,6 +151,14 @@ class StrictAIRecoveryManager:
         if not sandbox_matches:
             action = RecoveryAction.REQUIRE_REPLAN
             reasons.append("sandbox binding changed since checkpoint")
+        if not runtime_trust_matches:
+            action = RecoveryAction.REQUIRE_REPLAN
+            reasons.append("runtime trust epoch changed since checkpoint")
+        if not authority_health_policy_matches:
+            action = RecoveryAction.REQUIRE_REPLAN
+            reasons.append(
+                "authority health policy changed since checkpoint"
+            )
         if not session_evidence_matches:
             if session.phase in {"executing", "verifying", "complete"}:
                 action = RecoveryAction.REQUIRE_VERIFICATION
@@ -153,4 +179,6 @@ class StrictAIRecoveryManager:
             session_evidence_matches,
             release_matches,
             sandbox_matches,
+            runtime_trust_matches,
+            authority_health_policy_matches,
         )
