@@ -236,3 +236,54 @@ def test_rejects_literal_dunder_dict_asyncio_shell(tmp_path: Path) -> None:
 def test_rejects_asyncio_star_import(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "from asyncio import *\ncreate_subprocess_shell('echo unsafe')\n")
     assert any("star import from asyncio" in finding for finding in findings)
+
+
+
+def test_rejects_bytes_literal_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(b'python --version', shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_rejects_str_constructor_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ncommand = ['python', '--version']\n"
+        "subprocess.run(str(command), shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_rejects_percent_formatted_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nname = 'python'\n"
+        "subprocess.run('%s --version' % name, shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_rejects_literal_string_preserving_method_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(' python --version '.strip(), shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_rejects_literal_encode_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run('python --version'.encode(), shell=False)\n",
+    )
+    assert any("argument vector, not a string-shaped command" in finding for finding in findings)
+
+
+def test_unknown_string_like_method_receiver_is_not_guessed(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nsubprocess.run(builder.strip(), shell=False)\n",
+    )
+    assert findings == []
