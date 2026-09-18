@@ -67,6 +67,17 @@ from .cognition import (
     ScratchEntry,
     approximate_tokens,
 )
+from .context_fabric import (
+    CallableContextAdapter,
+    CognitiveContextFabric,
+    ContextFabricPolicy,
+    ContextFabricResult,
+    ContextStoreAdapter,
+    DeepContextRecord,
+    MemoryManagerAdapter,
+    RepositoryContextAdapter,
+)
+from .fabric_cognition import FabricCompilerPolicy, FabricContextCompiler
 from .context_pipeline import (
     ContextResolution,
     ContextSourceAdapter,
