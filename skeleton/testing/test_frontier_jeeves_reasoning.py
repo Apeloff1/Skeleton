@@ -11,8 +11,10 @@ from skeleton.jeeves.agent.deliberation import (
     SearchResult,
     SpecialistRole,
 )
+from skeleton.jeeves.agent.frontier_adjudication import HostCandidateAdjudicator
 from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
 from skeleton.jeeves.agent.evaluation import EvalResult
+from skeleton.jeeves.agent.evidence import EvidenceArtifact, EvidenceLedger
 from skeleton.jeeves.agent.frontier_feedback import (
     FrontierEvalFeedback,
     FrontierFeedbackRecommendation,
@@ -1041,3 +1043,111 @@ def test_policy_tuner_rejects_unbound_fabricated_recommendation() -> None:
     assert proposal.proposed_policy == baseline
     assert proposal.changed_fields == {}
     assert any("insufficient bound feedback" in reason for reason in proposal.reasons)
+
+
+def test_host_candidate_adjudicator_rewards_authoritative_diverse_evidence() -> None:
+    ledger = EvidenceLedger(clock=lambda: 10.0)
+    first = ledger.append(
+        EvidenceArtifact(
+            evidence_id="evidence:adjudicate-a",
+            kind=EvidenceKind.FIXTURE,
+            source="source:a",
+            payload={"value": "a"},
+            observed_at=1.0,
+            confidence=0.92,
+        )
+    )
+    second = ledger.append(
+        EvidenceArtifact(
+            evidence_id="evidence:adjudicate-b",
+            kind=EvidenceKind.FIXTURE,
+            source="source:b",
+            payload={"value": "b"},
+            observed_at=1.0,
+            confidence=0.88,
+        )
+    )
+    candidate = _candidate(
+        "adjudicated-strong",
+        confidence=0.90,
+        action="use supported action",
+        outcome="supported outcome",
+        evidence=(first.ref, second.ref),
+    )
+
+    result = HostCandidateAdjudicator(ledger).adjudicate(candidate)
+
+    assert result.score > 0.90
+    assert result.custody_fraction == 1.0
+    assert result.fingerprint_fraction == 1.0
+    assert result.source_diversity == 1.0
+    assert result.contradiction_count == 0
+    assert result.known_evidence_count == 2
+
+
+def test_host_candidate_adjudicator_penalizes_contradictions_and_bad_custody() -> None:
+    ledger = EvidenceLedger(clock=lambda: 10.0)
+    first = ledger.append(
+        EvidenceArtifact(
+            evidence_id="evidence:conflict-a",
+            kind=EvidenceKind.FIXTURE,
+            source="source:a",
+            payload={"value": "a"},
+            observed_at=1.0,
+            confidence=0.95,
+        )
+    )
+    second = ledger.append(
+        EvidenceArtifact(
+            evidence_id="evidence:conflict-b",
+            kind=EvidenceKind.FIXTURE,
+            source="source:b",
+            payload={"value": "b"},
+            observed_at=1.0,
+            confidence=0.95,
+        )
+    )
+    clean = _candidate(
+        "clean-before-conflict",
+        confidence=0.95,
+        action="bounded action",
+        outcome="bounded outcome",
+        evidence=(first.ref, second.ref),
+    )
+    adjudicator = HostCandidateAdjudicator(ledger)
+    clean_score = adjudicator.score(clean)
+
+    ledger.mark_contradiction(
+        first.evidence_id,
+        second.evidence_id,
+        "fixture contradiction",
+    )
+    conflicted = adjudicator.adjudicate(clean)
+
+    bad_ref = EvidenceRef(
+        evidence_id=first.evidence_id,
+        kind=first.kind,
+        source=first.source,
+        fingerprint=stable_fingerprint({"wrong": "fingerprint"}),
+        confidence=first.confidence,
+        observed_at=first.observed_at,
+    )
+    unknown_ref = _evidence("missing-from-ledger", confidence=0.95)
+    bad_custody = _candidate(
+        "bad-custody",
+        confidence=0.95,
+        action="unsupported action",
+        outcome="unsupported outcome",
+        evidence=(bad_ref, unknown_ref),
+    )
+    bad = adjudicator.adjudicate(bad_custody)
+
+    assert conflicted.score < clean_score
+    assert conflicted.contradiction_count == 1
+    assert conflicted.contradiction_rate == 1.0
+    assert bad.score < conflicted.score
+    assert bad.custody_fraction == 0.5
+    assert bad.fingerprint_fraction == 0.0
+    assert bad.known_evidence_count == 1
+    assert any("unknown_evidence=" in reason for reason in bad.reasons)
+    assert any("fingerprint_mismatch=" in reason for reason in bad.reasons)
