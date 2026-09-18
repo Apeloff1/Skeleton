@@ -67,6 +67,7 @@ jobs:
       PR_AUTOMATION_MAX_CHANGED_FILES: ${{ vars.PR_AUTOMATION_MAX_CHANGED_FILES || '250' }}
       PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
       PR_AUTOMATION_MAX_MUTATIONS: "1"
+      PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
 
     steps:
       - name: Checkout trusted default branch
