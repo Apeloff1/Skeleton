@@ -2,6 +2,12 @@ name: Archive closed PR branches safely
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Prune redundant branches safely"]
+    types: [completed]
+    branches:
+      - "*"
+      - "**"
   schedule:
     - cron: '7-57/10 * * * *'
   push:
@@ -16,6 +22,10 @@ permissions: {}
 
 jobs:
   archive:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     name: Tag and remove inactive closed-PR refs
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -68,41 +78,68 @@ jobs:
           declare -A archive_pr=()
 
           load_open_refs() {
-            local branch
+            local branch heads_file bases_file
+            heads_file="$RUNNER_TEMP/archive-open-heads.txt"
+            bases_file="$RUNNER_TEMP/archive-open-bases.txt"
             open_heads=()
             open_bases=()
+
+            # Persist API results before consuming them. Process substitution can
+            # hide a failed gh command from set -e and make "unknown" look empty.
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
+              > "$heads_file"; then
+              echo '::warning::Branch archive could not load open pull-request heads; no further refs will be deleted.'
+              return 1
+            fi
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
+              > "$bases_file"; then
+              echo '::warning::Branch archive could not load open pull-request bases; no further refs will be deleted.'
+              return 1
+            fi
 
             while IFS= read -r branch; do
               [[ -n "$branch" ]] || continue
               open_heads["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
-            )
+            done < "$heads_file"
 
             while IFS= read -r branch; do
               [[ -n "$branch" && "$branch" != main ]] || continue
               open_bases["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref'
-            )
+            done < "$bases_file"
           }
-
           load_archive_candidates() {
-            local branch tip pr
+            local branch tip pr candidates_file
+            candidates_file="$RUNNER_TEMP/archive-candidates.tsv"
             archive_pr=()
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+              --jq ".[] | select(.closed_at != null and .closed_at <= \"$cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha, (.number|tostring)] | @tsv" \
+              > "$candidates_file"; then
+              echo '::warning::Branch archive could not load closed pull-request heads; no refs will be deleted.'
+              return 1
+            fi
             while IFS=$'\t' read -r branch tip pr; do
               [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
               archive_pr["${branch}:${tip}"]="$pr"
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
-                --jq ".[] | select(.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha, (.number|tostring)] | @tsv"
-            )
+            done < "$candidates_file"
           }
-
-          load_open_refs
-          load_archive_candidates
+          if ! load_open_refs; then
+            {
+              echo '## Closed PR branch archive deferred'
+              echo '- Open pull-request refs were unavailable.'
+              echo '- No refs were deleted because active-PR protection could not be established.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! load_archive_candidates; then
+            {
+              echo '## Closed PR branch archive deferred'
+              echo '- Closed pull-request evidence was unavailable.'
+              echo '- No refs were deleted because archive candidates could not be established.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           archived=0
           preserved_open=0
@@ -134,7 +171,15 @@ jobs:
             fi
 
             # Revalidate both PR references immediately before mutation.
-            load_open_refs
+            # If GitHub cannot establish the active-PR set, stop the sweep.
+            if ! load_open_refs; then
+              {
+                echo '## Closed PR branch archive stopped safely'
+                echo '- Open pull-request revalidation failed during the sweep.'
+                echo '- No additional refs were deleted.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
               preserved_open=$((preserved_open + 1))
               continue
@@ -181,6 +226,8 @@ jobs:
             echo "- Refs without an exact inactive closed-PR match preserved: $no_match"
             echo "- Branches that moved during cleanup preserved: $raced"
             echo "- Archive-tag conflicts preserved: $tag_conflict"
+            echo '- Archive candidates include merged and unmerged PRs closed for at least 24 hours.'
             echo '- Archive tags use archive/closed-pr/pr-<number>-<sha12>.'
             echo '- No branch is deleted until its exact commit is confirmed reachable through the archive tag.'
+            echo '- Any open-PR or closed-PR API failure stops deletion instead of being interpreted as an empty result.'
           } >> "$GITHUB_STEP_SUMMARY"
