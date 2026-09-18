@@ -3,9 +3,8 @@ name: Prune redundant branches safely
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
-  push:
-    branches: [main]
+    # Avoid push-storm starvation: one durable cleanup sweep every five minutes.
+    - cron: '3-58/5 * * * *'
 
 # Keep one cleanup sweep alive while main is moving rapidly. New triggers
 # coalesce behind the active worker instead of repeatedly cancelling it.
@@ -107,6 +106,7 @@ jobs:
             ancestor_count=0
             exact_main_count=0
             merged_pr_tip_count=0
+            identical_tree_count=0
             unique_count=0
             protected_count=0
             open_pr_count=0
@@ -156,6 +156,13 @@ jobs:
                 # reachable from main, so deleting only the ref cannot discard
                 # unique commit work.
                 ancestor_count=$((ancestor_count + 1))
+                delete_branches+=("$branch")
+                delete_tips+=("$tip")
+              elif [[ "$(git rev-parse \"$tip^{tree}\")" == "$(git rev-parse \"$main_ref^{tree}\")" ]]; then
+                # Histories may differ after rebase/squash/cherry-pick while the
+                # complete repository snapshot is byte-for-byte identical.
+                # In that case the branch carries no unique file content.
+                identical_tree_count=$((identical_tree_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
               else
@@ -242,6 +249,7 @@ jobs:
               echo "- Exact-main duplicate refs eligible: $exact_main_count"
               echo "- Older ancestor refs eligible: $ancestor_count"
               echo "- Merged-PR exact-head refs eligible: $merged_pr_tip_count"
+              echo "- Tree-identical divergent refs eligible: $identical_tree_count"
               echo "- Unique/diverged refs preserved: $unique_count"
               echo "- Long-lived/release/backup refs preserved: $protected_count"
               echo "- Open-PR refs preserved during classification: $open_pr_count"
@@ -249,7 +257,7 @@ jobs:
               echo "- Branch refs deleted: $deleted"
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
-              echo '- A non-protected branch is eligible only when its tip is main/an ancestor of main, or exactly matches the recorded head SHA of a merged same-repository PR.'
+              echo '- A non-protected branch is eligible only when its tip is main/an ancestor of main, exactly matches a merged same-repository PR head, or has a tree identical to current main.'
               echo '- Open PR heads are never cleanup candidates.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
