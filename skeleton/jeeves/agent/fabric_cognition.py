@@ -1,10 +1,8 @@
-"""Operational bridge from the cognitive context fabric into model context.
+"""Default-runtime wrapper for Jeeves' canonical cognitive context fabric.
 
-The fabric is a retrieval/routing sidecar, not an evidence authority.  The base
-ContextCompiler remains responsible for goal, plan, evidence, observations,
-memory, scratch, and global context budgeting.  This adapter contributes only
-bounded, provenance-visible supplemental context and interpretive routing
-metadata.
+The base :class:`ContextCompiler` owns the rendering contract.  This wrapper
+only supplies a fabric by default, records operational status, and decides
+whether a fabric failure may fall back to legacy memory retrieval.
 """
 
 from __future__ import annotations
@@ -13,23 +11,25 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from .cognition import ContextCompiler, ContextSection, RunScratchpad
+from .cognition import (
+    ContextCompiler,
+    ContextPacket,
+    ContextSection,
+    RunScratchpad,
+)
 from .context_fabric import (
     CognitiveContextFabric,
     ContextFabricPolicy,
     ContextFabricResult,
-    MemoryManagerAdapter,
 )
 from .evidence import EvidenceLedger
 from .memory import MemoryManager, MemoryNamespace
-from .memory_game_index import SourceTier
 from .types import (
     AgentContractError,
     Goal,
     Plan,
     PlanStep,
     ToolObservation,
-    canonical_json,
     json_safe,
     positive_int,
 )
@@ -37,45 +37,35 @@ from .types import (
 
 @dataclass(frozen=True, slots=True)
 class FabricCompilerPolicy:
-    """Prompt-facing bounds and failure semantics for the fabric sidecar."""
+    """Operational bounds for the default runtime fabric."""
 
     maximum_records: int = 8
-    maximum_record_chars: int = 3_000
     maximum_lenses: int = 6
-    maximum_section_chars: int = 16_000
-    section_priority: int = 60
+    maximum_tokens: int = 6_000
     fail_closed: bool = False
 
     def __post_init__(self) -> None:
-        for name in (
+        object.__setattr__(
+            self,
             "maximum_records",
-            "maximum_record_chars",
+            positive_int("maximum_records", self.maximum_records, maximum=1_000),
+        )
+        object.__setattr__(
+            self,
             "maximum_lenses",
-            "maximum_section_chars",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                positive_int(name, getattr(self, name), maximum=256_000),
-            )
-        priority = self.section_priority
-        if isinstance(priority, bool) or not isinstance(priority, int) or priority < 0:
-            raise AgentContractError("section_priority must be a non-negative integer")
-        if priority > 1_000_000:
-            raise AgentContractError("section_priority is too large")
-        if self.maximum_section_chars < 512:
-            raise AgentContractError("maximum_section_chars must be at least 512")
+            positive_int("maximum_lenses", self.maximum_lenses, maximum=1_000),
+        )
+        object.__setattr__(
+            self,
+            "maximum_tokens",
+            positive_int("maximum_tokens", self.maximum_tokens, maximum=1_000_000),
+        )
         if not isinstance(self.fail_closed, bool):
             raise AgentContractError("fail_closed must be boolean")
 
 
 class FabricContextCompiler(ContextCompiler):
-    """ContextCompiler with an operational CognitiveContextFabric sidecar.
-
-    The sidecar may influence retrieval/query selection and provide canonical
-    supplemental records.  It cannot turn a lens activation, index card, stale
-    cue, or unverified source into factual evidence.
-    """
+    """ContextCompiler that uses one CognitiveContextFabric by default."""
 
     def __init__(
         self,
@@ -90,42 +80,60 @@ class FabricContextCompiler(ContextCompiler):
         self.fabric_policy = fabric_policy or FabricCompilerPolicy()
         self.fabric = fabric or CognitiveContextFabric(
             policy=ContextFabricPolicy(
-                deep_limit=self.memory_policy.limit,
-                maximum_tokens=max(1, min(6_000, self.budget.memory_chars // 4)),
+                fast_limit=self.fabric_policy.maximum_records,
+                associative_limit=self.fabric_policy.maximum_records,
+                deep_limit=self.fabric_policy.maximum_records,
+                maximum_tokens=max(
+                    1,
+                    min(
+                        self.fabric_policy.maximum_tokens,
+                        self.budget.memory_chars // 4,
+                    ),
+                ),
                 minimum_deep_trust=self.memory_policy.minimum_trust,
-                lens_limit=max(1, self.fabric_policy.maximum_lenses),
+                lens_limit=self.fabric_policy.maximum_lenses,
             )
         )
         self._fabric_state_lock = threading.RLock()
         self._last_result: ContextFabricResult | None = None
         self._last_error: str | None = None
 
-    def _extension_sections(
+    def compile(
         self,
         *,
-        query: str,
+        system_instruction: str,
+        task_instruction: str,
         goal: Goal,
         namespace: MemoryNamespace,
         memory: MemoryManager,
         evidence: EvidenceLedger,
-        plan: Plan | None,
-        current_step: PlanStep | None,
-        observations: Sequence[ToolObservation],
-        scratchpad: RunScratchpad | None,
-        memory_ids: tuple[str, ...],
-    ) -> tuple[ContextSection, ...]:
-        del evidence, observations, scratchpad  # authority remains with base compiler
-        try:
-            result = self.fabric.retrieve(
-                namespace.key,
-                query,
-                call_adapters=(MemoryManagerAdapter(memory, namespace),),
+        plan: Plan | None = None,
+        current_step: PlanStep | None = None,
+        observations: Sequence[ToolObservation] = (),
+        scratchpad: RunScratchpad | None = None,
+        extra_sections: Sequence[ContextSection] = (),
+        context_fabric: CognitiveContextFabric | None = None,
+    ) -> ContextPacket:
+        if context_fabric is not None and context_fabric is not self.fabric:
+            raise ValueError(
+                "FabricContextCompiler owns its fabric; pass a custom ContextCompiler "
+                "when per-call fabric replacement is required"
             )
-            with self._fabric_state_lock:
-                self._last_result = result
-                self._last_error = None
-            section = self._section(result, memory_ids=memory_ids)
-            return () if section is None else (section,)
+        try:
+            return super().compile(
+                system_instruction=system_instruction,
+                task_instruction=task_instruction,
+                goal=goal,
+                namespace=namespace,
+                memory=memory,
+                evidence=evidence,
+                plan=plan,
+                current_step=current_step,
+                observations=observations,
+                scratchpad=scratchpad,
+                extra_sections=extra_sections,
+                context_fabric=self.fabric,
+            )
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as exc:
@@ -134,121 +142,50 @@ class FabricContextCompiler(ContextCompiler):
                 self._last_error = f"{type(exc).__name__}: {str(exc)[:1024]}"
             if self.fabric_policy.fail_closed:
                 raise
-            return ()
-
-    def _section(
-        self,
-        result: ContextFabricResult,
-        *,
-        memory_ids: tuple[str, ...],
-    ) -> ContextSection | None:
-        memory_id_set = set(memory_ids)
-        candidates = [
-            record
-            for record in result.records
-            if record.trust >= self.memory_policy.minimum_trust
-            and not (
-                record.source_tier is SourceTier.MEMORY_STORE
-                and record.source_ref in memory_id_set
+            return super().compile(
+                system_instruction=system_instruction,
+                task_instruction=task_instruction,
+                goal=goal,
+                namespace=namespace,
+                memory=memory,
+                evidence=evidence,
+                plan=plan,
+                current_step=current_step,
+                observations=observations,
+                scratchpad=scratchpad,
+                extra_sections=extra_sections,
+                context_fabric=None,
             )
-        ]
 
-        activations = [
-            {
-                "lens_id": activation.lens.lens_id,
-                "family": activation.lens.family.value,
-                "authority": activation.lens.authority.value,
-                "score": round(activation.score, 8),
-                "matched_cues": list(activation.matched_cues[:8]),
-            }
-            for activation in result.lenses.activations[: self.fabric_policy.maximum_lenses]
-        ]
-        governance = [
-            {
-                "lens_id": decision.lens_id,
-                "grade": decision.grade.value,
-                "scientific_status": decision.scientific_status.value,
-                "permissions": [item.value for item in decision.permissions],
-                "predictive_weight": round(decision.predictive_weight, 8),
-                "decision_feature_authorized": decision.decision_feature_authorized,
-                "factual_assertion_authorized": False,
-                "causal_assertion_authorized": False,
-            }
-            for decision in result.lens_governance[: self.fabric_policy.maximum_lenses]
-        ]
-
-        payload: dict[str, Any] = {
-            "contract": {
-                "authority": "context_only",
-                "evidence_ledger_remains_authoritative": True,
-                "records_are_not_evidence_by_inclusion": True,
-                "lens_activations_are_interpretive_not_evidence": True,
-                "stale_index_cards_are_not_canonical": True,
-                "canonical_source_content_wins_over_index_preview": True,
-            },
-            "fabric_fingerprint": result.fingerprint,
-            "fast_recall_fingerprint": result.fast_recall.fingerprint,
-            "broad_search_used": result.broad_search_used,
-            "stale_card_ids": list(result.stale_card_ids),
-            "unresolved_source_refs": list(result.unresolved_source_refs),
-            "lenses": activations,
-            "lens_governance": governance,
-            "records": [],
-        }
-
-        included_source_ids: list[str] = []
-        for record in candidates[: self.fabric_policy.maximum_records]:
-            row = {
-                "source_tier": record.source_tier.value,
-                "source_ref": record.source_ref,
-                "source_provider": record.source_provider,
-                "source_fingerprint": record.source_fingerprint,
-                "canonical": record.canonical,
-                "trust": record.trust,
-                "confidence": record.confidence,
-                "salience": record.salience,
-                "tags": list(record.tags),
-                "content": record.content[: self.fabric_policy.maximum_record_chars],
-            }
-            trial = dict(payload)
-            trial["records"] = [*payload["records"], row]
-            if len(canonical_json(trial)) > self.fabric_policy.maximum_section_chars:
-                break
-            payload["records"].append(row)
-            included_source_ids.append(record.source_ref)
-
-        encoded = canonical_json(payload)
-        if len(encoded) > self.fabric_policy.maximum_section_chars:
-            included_source_ids = []
-            payload = {
-                "contract": payload["contract"],
-                "fabric_fingerprint": result.fingerprint,
-                "broad_search_used": result.broad_search_used,
-                "records": [],
-            }
-            encoded = canonical_json(payload)
-        if len(encoded) > self.fabric_policy.maximum_section_chars:
-            return None
-
-        if not (
-            payload.get("records")
-            or result.fast_recall.all_hits
-            or result.stale_card_ids
-            or result.unresolved_source_refs
-            or activations
-        ):
-            return None
-
-        source_ids = tuple(dict.fromkeys(included_source_ids))
-        return ContextSection(
-            "context_fabric",
-            encoded,
-            priority=self.fabric_policy.section_priority,
-            source_ids=source_ids,
-        )
+    def _retrieve_context_fabric(
+        self,
+        context_fabric: CognitiveContextFabric,
+        *,
+        namespace: MemoryNamespace,
+        query: str,
+        memory: MemoryManager,
+    ) -> ContextFabricResult:
+        try:
+            result = super()._retrieve_context_fabric(
+                context_fabric,
+                namespace=namespace,
+                query=query,
+                memory=memory,
+            )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            with self._fabric_state_lock:
+                self._last_result = None
+                self._last_error = f"{type(exc).__name__}: {str(exc)[:1024]}"
+            raise
+        with self._fabric_state_lock:
+            self._last_result = result
+            self._last_error = None
+        return result
 
     def last_fabric_snapshot(self) -> Mapping[str, Any]:
-        """Return bounded operational state without exposing prompt contents."""
+        """Return bounded operational state without exposing context contents."""
 
         with self._fabric_state_lock:
             result = self._last_result
