@@ -47,7 +47,17 @@ def python_files() -> Iterable[Path]:
         if not root.is_dir():
             raise OSError(f"required scan root is unavailable: {root}")
         for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
+            relative = path.relative_to(REPO_ROOT)
+            parts = relative.parts
+            # skeleton/build is a live first-party package (#940), not a
+            # generated build-output directory. Ignore only that canonical
+            # occurrence of the generic build skip token.
+            filtered_parts = (
+                (parts[0], *parts[2:])
+                if len(parts) >= 2 and parts[:2] == ("skeleton", "build")
+                else parts
+            )
+            if any(part in SKIP_DIRS for part in filtered_parts):
                 continue
             yield path
 
