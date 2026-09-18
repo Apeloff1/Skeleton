@@ -15,6 +15,7 @@ from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
 from skeleton.jeeves.agent.evaluation import EvalResult
 from skeleton.jeeves.agent.frontier_feedback import FrontierEvalFeedback, FrontierReasoningFeedback
 from skeleton.jeeves.agent.frontier_policy_tuning import FrontierPolicyTuner
+from skeleton.jeeves.agent.frontier_trials import FrontierTrialEvaluator
 from skeleton.jeeves.agent.frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
@@ -867,3 +868,67 @@ def test_policy_tuning_is_blocked_without_matched_eval_gate() -> None:
     assert proposal.approved_for_trial is False
     assert proposal.proposed_policy == baseline
     assert proposal.changed_fields == {}
+
+
+
+def test_repeated_trial_pass_at_k_measures_frontier_best_of_n_gain() -> None:
+    evaluator = FrontierTrialEvaluator()
+    for case_index in range(2):
+        case_id = f"case:passk-{case_index}"
+        for trial_index in range(4):
+            baseline_passed = trial_index == 0
+            frontier_passed = trial_index < 2
+            evaluator.observe(
+                EvalResult(
+                    case_id=case_id,
+                    run_id=f"run:baseline-passk-{case_index}-{trial_index}",
+                    score=0.80 if baseline_passed else 0.50,
+                    passed=baseline_passed,
+                    checks=(),
+                    result_fingerprint=stable_fingerprint(
+                        {"baseline-passk": case_index, "trial": trial_index}
+                    ),
+                ),
+                variant="baseline",
+                model_calls=2,
+                estimated_tokens=1000,
+            )
+            evaluator.observe(
+                EvalResult(
+                    case_id=case_id,
+                    run_id=f"run:frontier-passk-{case_index}-{trial_index}",
+                    score=0.85 if frontier_passed else 0.60,
+                    passed=frontier_passed,
+                    checks=(),
+                    result_fingerprint=stable_fingerprint(
+                        {"frontier-passk": case_index, "trial": trial_index}
+                    ),
+                ),
+                variant="frontier",
+                model_calls=5,
+                estimated_tokens=3000,
+            )
+
+    baseline = evaluator.report(variant="baseline", k=2)
+    frontier = evaluator.report(variant="frontier", k=2)
+    comparison = evaluator.compare(k=2)
+    gate = evaluator.promotion_gate(
+        comparison,
+        minimum_cases=2,
+        minimum_pass_at_k_delta=0.20,
+        minimum_mean_score_delta=0.0,
+        maximum_regression_rate=0.0,
+    )
+
+    assert FrontierTrialEvaluator.empirical_pass_at_k(
+        trials=4,
+        successes=1,
+        k=2,
+    ) == 0.5
+    assert baseline.mean_pass_at_k == 0.5
+    assert frontier.mean_pass_at_k == 5.0 / 6.0
+    assert comparison.pass_at_k_delta == (5.0 / 6.0) - 0.5
+    assert comparison.incremental_model_calls == 3.0
+    assert comparison.incremental_estimated_tokens == 2000.0
+    assert comparison.regressed_cases == 0
+    assert gate.passed is True
