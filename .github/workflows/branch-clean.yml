@@ -67,6 +67,7 @@ jobs:
           delete_batch_size=32
 
           declare -A open_pr_heads=()
+          declare -A merged_pr_head_tips=()
 
           load_open_pr_heads() {
             local branch
@@ -77,6 +78,184 @@ jobs:
             done < <(
               gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
                 --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
+            )
+          }
+
+          load_merged_pr_head_tips() {
+            local branch tip
+            merged_pr_head_tips=()
+            while IFS=
+            # Refresh every branch before classification. If main moves during
+            # the pass we retry without deleting anything from stale ancestry.
+            git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+            classified_main=$(git rev-parse "$main_ref")
+
+            delete_branches=()
+            delete_tips=()
+            ancestor_count=0
+            exact_main_count=0
+            merged_pr_tip_count=0
+            unique_count=0
+            protected_count=0
+            open_pr_count=0
+            late_open_pr_count=0
+            : > ../preserved-branches.txt
+
+            load_open_pr_heads
+            load_merged_pr_head_tips
+
+            while read -r tip branch; do
+              [[ -n "$tip" && -n "$branch" ]] || continue
+
+              # Preserve explicit coordination, deployment, publication, and
+              # backup refs. Everything else may be removed only when all of its
+              # commits are already reachable from main.
+              case "$branch" in
+                main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
+                  protected_count=$((protected_count + 1))
+                  printf '%s %s protected-name\n' "$branch" "$tip" >> ../preserved-branches.txt
+                  continue
+                  ;;
+              esac
+
+              # Never mutate a branch that currently backs an open same-repo PR.
+              if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+                open_pr_count=$((open_pr_count + 1))
+                printf '%s %s open-pr-head\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
+              # Squash/rebase merges do not make the original branch tip an
+              # ancestor of main. A closed merged PR is therefore an additional
+              # safe deletion proof only when the live branch still points at
+              # exactly the head SHA GitHub recorded for that merged PR. The
+              # expected-tip lease below still prevents deleting a later push.
+              merged_key="${branch}:${tip}"
+              if [[ -n "${merged_pr_head_tips[$merged_key]+x}" ]]; then
+                merged_pr_tip_count=$((merged_pr_tip_count + 1))
+                delete_branches+=("$branch")
+                delete_tips+=("$tip")
+              elif [[ "$tip" == "$classified_main" ]]; then
+                exact_main_count=$((exact_main_count + 1))
+                delete_branches+=("$branch")
+                delete_tips+=("$tip")
+              elif git merge-base --is-ancestor "$tip" "$main_ref"; then
+                # Every commit reachable from this branch tip is already
+                # reachable from main, so deleting only the ref cannot discard
+                # unique commit work.
+                ancestor_count=$((ancestor_count + 1))
+                delete_branches+=("$branch")
+                delete_tips+=("$tip")
+              else
+                unique_count=$((unique_count + 1))
+                printf '%s %s unique-or-diverged\n' "$branch" "$tip" >> ../preserved-branches.txt
+              fi
+            done < <(git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2)
+
+            # Do not act on ancestry calculated against an old main tip.
+            git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
+            current_main=$(git rev-parse "$main_ref")
+            if [[ "$current_main" != "$classified_main" ]]; then
+              {
+                echo "- round $round/$max_rounds deferred: main moved from \`$classified_main\` to \`$current_main\`; no refs deleted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              if (( round < max_rounds )); then
+                sleep 1
+                continue
+              fi
+              {
+                echo
+                echo '## Branch cleanup remains live'
+                echo "- main moved during all $max_rounds in-run classification attempts."
+                echo '- No stale ancestry result was used for deletion.'
+                echo '- The queued/scheduled cleanup run will retry.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            # A PR opened during classification wins over cleanup.
+            load_open_pr_heads
+            safe_delete_branches=()
+            safe_delete_tips=()
+            for ((i=0; i<${#delete_branches[@]}; i++)); do
+              branch="${delete_branches[$i]}"
+              tip="${delete_tips[$i]}"
+              if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+                late_open_pr_count=$((late_open_pr_count + 1))
+                printf '%s %s open-pr-head-late\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+              safe_delete_branches+=("$branch")
+              safe_delete_tips+=("$tip")
+            done
+
+            deleted=0
+            raced_or_blocked=0
+            for ((offset=0; offset<${#safe_delete_branches[@]}; offset+=delete_batch_size)); do
+              batch_branches=("${safe_delete_branches[@]:offset:delete_batch_size}")
+              batch_tips=("${safe_delete_tips[@]:offset:delete_batch_size}")
+              lease_args=()
+              refspecs=()
+
+              for ((i=0; i<${#batch_branches[@]}; i++)); do
+                branch="${batch_branches[$i]}"
+                tip="${batch_tips[$i]}"
+                lease_args+=("--force-with-lease=refs/heads/${branch}:${tip}")
+                refspecs+=(":refs/heads/${branch}")
+              done
+
+              if git push --quiet --atomic "${lease_args[@]}" origin "${refspecs[@]}"; then
+                deleted=$((deleted + ${#batch_branches[@]}))
+                continue
+              fi
+
+              # Isolate a moved or ruleset-protected ref instead of blocking the
+              # rest of the batch. The expected-tip lease prevents deleting a
+              # branch that received a new commit after classification.
+              for ((i=0; i<${#batch_branches[@]}; i++)); do
+                branch="${batch_branches[$i]}"
+                tip="${batch_tips[$i]}"
+                if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
+                  deleted=$((deleted + 1))
+                else
+                  raced_or_blocked=$((raced_or_blocked + 1))
+                fi
+              done
+            done
+
+            {
+              echo '## Safe branch pruning'
+              echo "- Stable classification round: $round/$max_rounds"
+              echo "- main tip: \`$current_main\`"
+              echo "- Exact-main duplicate refs eligible: $exact_main_count"
+              echo "- Older ancestor refs eligible: $ancestor_count"
+              echo "- Merged-PR exact-head refs eligible: $merged_pr_tip_count"
+              echo "- Unique/diverged refs preserved: $unique_count"
+              echo "- Long-lived/release/backup refs preserved: $protected_count"
+              echo "- Open-PR refs preserved during classification: $open_pr_count"
+              echo "- Newly opened PR refs preserved before deletion: $late_open_pr_count"
+              echo "- Branch refs deleted: $deleted"
+              echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
+              echo '- main is never modified by this workflow.'
+              echo '- A non-protected branch is eligible only when its tip is main/an ancestor of main, or exactly matches the recorded head SHA of a merged same-repository PR.'
+              echo '- Open PR heads are never cleanup candidates.'
+              echo '- Every deletion uses an expected-tip lease.'
+              if [[ -s ../preserved-branches.txt ]]; then
+                echo
+                echo '### Preserved branch sample'
+                echo '```text'
+                head -100 ../preserved-branches.txt
+                echo '```'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          done
+\t' read -r branch tip; do
+              [[ -n "$branch" && -n "$tip" ]] || continue
+              merged_pr_head_tips["${branch}:${tip}"]=1
+            done < <(
+              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+                --jq '.[] | select(.merged_at != null and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv'
             )
           }
 
