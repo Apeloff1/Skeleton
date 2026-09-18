@@ -53,11 +53,25 @@ def test_stat_failure_does_not_drop_secret_candidate(tmp_path: Path, monkeypatch
     assert path in list(secret_hygiene.candidate_files())
 
 
-def test_bounded_reader_skips_oversized_candidate(tmp_path: Path) -> None:
+def test_bounded_reader_fails_closed_on_oversized_candidate(tmp_path: Path) -> None:
     path = tmp_path / "large.env"
     path.write_bytes(b"A" * (secret_hygiene.MAX_FILE_BYTES + 1))
 
-    assert violations(path) == []
+    findings = violations(path)
+
+    assert len(findings) == 1
+    assert "scan failure: exceeds" in findings[0]
+    assert str(secret_hygiene.MAX_FILE_BYTES) in findings[0]
+
+
+def test_candidate_discovery_does_not_skip_oversized_text_files(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    path = tmp_path / "large.env"
+    path.write_bytes(b"A" * (secret_hygiene.MAX_FILE_BYTES + 1))
+    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
+
+    assert path in list(secret_hygiene.candidate_files())
 
 
 def test_main_fails_closed_when_no_candidates(monkeypatch, capsys) -> None:

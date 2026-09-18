@@ -205,8 +205,9 @@ def candidate_files() -> Iterable[Path]:
                     continue
                 if not _is_text_candidate(path):
                     continue
-                if metadata.st_size > MAX_FILE_BYTES:
-                    continue
+                # Oversized tracked-style candidates must still reach the
+                # bounded reader. Silently skipping them lets file padding
+                # suppress secret scanning.
                 yield path
 
 
@@ -231,7 +232,9 @@ def violations(path: Path) -> list[str]:
         return [f"{label}: read failure: {type(exc).__name__}"]
 
     if len(raw) > MAX_FILE_BYTES:
-        return []
+        return [
+            f"{label}: scan failure: exceeds {MAX_FILE_BYTES}-byte secret-scan limit"
+        ]
 
     try:
         text = raw.decode("utf-8")
