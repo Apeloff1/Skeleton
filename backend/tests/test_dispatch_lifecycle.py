@@ -38,6 +38,8 @@ def test_batch_dispatch_isolates_confirmed_deferred_unbound_and_failed(tmp_path)
     assert report["deferred"] == [deferred.outbox_seq]
     assert report["unbound"] == [unbound.outbox_seq]
     assert report["failed"][0]["outbox_seq"] == failed.outbox_seq
+    assert report["failed"][0]["error"] == "dispatch_failed"
+    assert "boom" not in str(report)
     assert report["remaining"] == 3
 
 
