@@ -537,6 +537,15 @@ class ConvexHullShape:
             )
 
         center = first_moment / volume
+        centroid_tolerance = 1.0e-12 * max(
+            1.0,
+            self.bounding_radius(),
+        )
+        center = Vec3(
+            0.0 if abs(center.x) <= centroid_tolerance else center.x,
+            0.0 if abs(center.y) <= centroid_tolerance else center.y,
+            0.0 if abs(center.z) <= centroid_tolerance else center.z,
+        )
         mass = density * volume
         trace = second[0][0] + second[1][1] + second[2][2]
         inertia_origin = Mat3(
