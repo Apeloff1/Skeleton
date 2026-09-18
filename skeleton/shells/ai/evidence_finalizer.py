@@ -102,7 +102,7 @@ class AIExecutionEvidenceFinalizer:
         quorum_approval_digest: str = "",
         runtime_trust_digest: str = "",
         authority_health_policy_digest: str = "",
-        execution_attempt_authority_digest: str = "",
+        execution_attempt: AIExecutionAttempt | None = None,
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
             raise RuntimeError("AI execution evidence may only finalize a completed attempt")
@@ -145,22 +145,14 @@ class AIExecutionEvidenceFinalizer:
             raise RuntimeError(
                 "execution provenance authority health policy differs from finalizer"
             )
-        if execution_attempt_authority_digest:
-            if not execution_seal_id:
-                raise RuntimeError(
-                    "execution attempt authority requires execution seal ID"
-                )
-            if len(execution_attempt_authority_digest) != 64:
-                raise ValueError(
-                    "execution_attempt_authority_digest must be SHA-256 hex"
-                )
-        execution_attempt_id = (
-            execution_seal_id if execution_attempt_authority_digest else ""
-        )
         execution_attempt_id = ""
         execution_attempt_authority_digest = ""
         execution_attempt_state = ""
         if execution_attempt is not None:
+            if not isinstance(execution_attempt, AIExecutionAttempt):
+                raise TypeError("execution_attempt must be AIExecutionAttempt")
+            if not execution_seal_id:
+                execution_seal_id = execution_attempt.execution_seal_id
             if execution_attempt.session_id != session.session_id:
                 raise RuntimeError(
                     "execution attempt session differs from finalized session"
@@ -338,10 +330,6 @@ class AIExecutionEvidenceFinalizer:
                     None
                     if audit_witness is None
                     else audit_witness.witness.sequence
-                ),
-                execution_attempt_id=execution_attempt_id,
-                execution_attempt_authority_digest=(
-                    execution_attempt_authority_digest
                 ),
                 execution_attempt_state=execution_attempt_state,
             )
