@@ -249,6 +249,8 @@ class AssetRecord:
             raise SerializationError("asset bytes must be bytes")
         payload = bytes(data)
         digest = content_digest(payload)
+        if not isinstance(release_marked, bool):
+            raise SerializationError("release_marked must be a boolean")
         record = cls(
             identity=_build_identity(asset_id, kind, logical_name or asset_id),
             content=_build_content(kind, digest, len(payload), media_type),
@@ -256,7 +258,7 @@ class AssetRecord:
             license=license or LicenseMetadata(),
             lineage=tuple(lineage),
             targets=targets or TargetConstraints(),
-            release_marked=bool(release_marked),
+            release_marked=release_marked,
             fingerprint=content_fingerprint(payload),
         )
         return validate_record(record, data=payload)
@@ -476,6 +478,10 @@ def validate_record(record: AssetRecord, *, data: bytes | None = None) -> AssetR
     _require_kind(identity.kind)
     _bounded_token("asset_id", identity.asset_id)
     _bounded_string("logical_name", identity.logical_name, allow_empty=True)
+    _require_int("size_bytes", record.content.size_bytes, minimum=0)
+    _bounded_string("media_type", record.content.media_type, allow_empty=True)
+    if not isinstance(record.release_marked, bool):
+        raise SerializationError("release_marked must be a boolean")
     expected_identity = canonical_content_identity(
         kind=identity.kind,
         content_sha256=record.content.sha256,
