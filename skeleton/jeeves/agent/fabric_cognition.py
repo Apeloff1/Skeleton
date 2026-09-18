@@ -117,7 +117,6 @@ class FabricContextCompiler(ContextCompiler):
             result = self.fabric.retrieve(
                 namespace.key,
                 query,
-                tags=self._fabric_tags(goal, plan, current_step),
                 call_adapters=(MemoryManagerAdapter(memory, namespace),),
             )
             with self._fabric_state_lock:
@@ -247,25 +246,6 @@ class FabricContextCompiler(ContextCompiler):
             priority=self.fabric_policy.section_priority,
             source_ids=source_ids,
         )
-
-    @staticmethod
-    def _fabric_tags(
-        goal: Goal,
-        plan: Plan | None,
-        current_step: PlanStep | None,
-    ) -> tuple[str, ...]:
-        tags = {"jeeves", "context-fabric"}
-        for key in ("domain", "task", "mode"):
-            value = goal.metadata.get(key)
-            if isinstance(value, str) and value.strip():
-                tags.add(value.strip().casefold()[:128])
-        if plan is not None:
-            tags.add(f"plan-version:{plan.version}")
-        if current_step is not None:
-            tags.add(current_step.risk.value)
-            if current_step.tool:
-                tags.add(f"tool:{current_step.tool}")
-        return tuple(sorted(tags))
 
     def last_fabric_snapshot(self) -> Mapping[str, Any]:
         """Return bounded operational state without exposing prompt contents."""
