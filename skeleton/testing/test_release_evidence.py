@@ -596,7 +596,20 @@ def test_from_v1_provenance_keeps_schema_version_1_callers() -> None:
     assert blocked.release_ready is False
     assert any("missing required test evidence" in reason for reason in blocked.reasons)
 
-    evidence = from_v1_provenance(v1, test_evidence=[_test()])
+    tests_only = from_v1_provenance(v1, test_evidence=[_test()])
+    tests_only_result = evaluate_release_ready(
+        tests_only,
+        expected_commit=COMMIT,
+        observed_artifacts={"skeleton-16.0.0-py3-none-any.whl": WHEEL},
+    )
+    assert tests_only_result.release_ready is False
+    assert "missing required eval evidence" in tests_only_result.reasons
+
+    evidence = from_v1_provenance(
+        v1,
+        test_evidence=[_test()],
+        eval_evidence=[_test("eval", b"eval-pass")],
+    )
     payload = json.loads(serialize_evidence(evidence))
     assert payload["schema_version"] == SCHEMA_VERSION
     assert payload["provenance"]["schema_version"] == 1
