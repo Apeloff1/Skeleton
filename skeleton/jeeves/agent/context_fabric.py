@@ -47,11 +47,14 @@ class DeepContextRecord:
     def __post_init__(self) -> None:
         if not isinstance(self.source_tier, SourceTier):
             object.__setattr__(self, "source_tier", SourceTier(str(self.source_tier)))
-        for name in ("source_ref", "source_fingerprint"):
-            value = str(getattr(self, name)).strip()
-            if not value:
-                raise AgentContractError(f"{name} cannot be empty")
-            object.__setattr__(self, name, value[:2048])
+        source_ref = str(self.source_ref).strip()
+        if not source_ref:
+            raise AgentContractError("source_ref cannot be empty")
+        object.__setattr__(self, "source_ref", source_ref[:2048])
+        source_fingerprint = str(self.source_fingerprint).strip().lower()
+        if not source_fingerprint:
+            raise AgentContractError("source_fingerprint cannot be empty")
+        object.__setattr__(self, "source_fingerprint", source_fingerprint[:2048])
         object.__setattr__(self, "content", str(self.content))
         object.__setattr__(
             self,
