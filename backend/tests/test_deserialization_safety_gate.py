@@ -233,3 +233,55 @@ def test_discovery_does_not_follow_symlink_directories(tmp_path: Path) -> None:
         pytest.skip("directory symlinks are unavailable on this platform")
 
     assert list(scanner.python_files(root)) == [root / "safe.py"]
+
+
+
+def test_rejects_pickle_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\n"
+        "serializer = pickle\n"
+        "value = serializer.loads(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_yaml_module_alias_without_safe_loader(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import yaml\n"
+        "codec = yaml\n"
+        "value = codec.load(text, Loader=codec.FullLoader)\n",
+    )
+    assert any("yaml.load() requires literal SafeLoader" in finding for finding in findings)
+
+
+def test_rejects_numpy_module_alias_pickle_enabled_load(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import numpy\n"
+        "arrays = numpy\n"
+        "value = arrays.load(path, allow_pickle=True)\n",
+    )
+    assert any("allow_pickle override must be literal False" in finding for finding in findings)
+
+
+def test_rejects_torch_module_alias_without_weights_only(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\n"
+        "models = torch\n"
+        "value = models.load(path)\n",
+    )
+    assert any("weights_only=True" in finding for finding in findings)
+
+
+def test_reassigned_deserializer_module_alias_is_not_inferred(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\n"
+        "serializer = pickle\n"
+        "serializer = safe_serializer\n"
+        "value = serializer.loads(payload)\n",
+    )
+    assert findings == []
