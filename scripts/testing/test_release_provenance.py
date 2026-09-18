@@ -5,6 +5,7 @@ import gzip
 import importlib.util
 import io
 import json
+import sys
 import tarfile
 from pathlib import Path
 
@@ -195,3 +196,139 @@ def test_invalid_source_identity_fails_closed() -> None:
         release_provenance._validate_commit("main")
     with pytest.raises(ValueError):
         release_provenance._validate_epoch("-1")
+
+def test_schema_version_1_callers_are_unchanged(tmp_path: Path) -> None:
+    assert release_provenance.SCHEMA_VERSION == 1
+    artifacts = tmp_path / "dist"
+    artifacts.mkdir()
+    wheel = artifacts / "skeleton-16.0.0-py3-none-any.whl"
+    wheel.write_bytes(b"deterministic-wheel")
+    sbom = artifacts / "release-sbom.cdx.json"
+    sbom.write_text('{"bomFormat":"CycloneDX"}\n', encoding="utf-8")
+    output = tmp_path / "provenance.json"
+    checksums = tmp_path / "SHA256SUMS"
+    args = argparse.Namespace(
+        artifacts_dir=str(artifacts),
+        output=str(output),
+        checksums=str(checksums),
+        source_commit=COMMIT,
+        source_date_epoch="1700000000",
+        input=[],
+        sbom_ref=[str(sbom)],
+    )
+    assert release_provenance.emit_provenance(args) == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert "schema_id" not in payload
+    assert payload["source"]["commit"] == COMMIT
+
+
+def test_evidence_loader_does_not_require_preexisting_pythonpath() -> None:
+    """Reproducible Release pytest runs from the parent of the checkout."""
+
+    root = str(REPO_ROOT.resolve())
+    original_path = list(sys.path)
+    original_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "pydantic"
+        or name.startswith("pydantic.")
+        or name == "skeleton"
+        or name.startswith("skeleton.")
+    }
+    sys.path[:] = [
+        entry
+        for entry in sys.path
+        if entry not in {"", ".", root}
+        and Path(entry).resolve() != REPO_ROOT.resolve()
+    ]
+    for name in list(original_modules):
+        sys.modules.pop(name, None)
+    try:
+        module = release_provenance._load_release_evidence()
+        assert module.SCHEMA_ID == "skeleton.release.evidence"
+        assert "pydantic" not in sys.modules
+        assert "skeleton.config.settings" not in sys.modules
+    finally:
+        sys.path[:] = original_path
+        sys.modules.update(original_modules)
+
+
+def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) -> None:
+    artifacts = tmp_path / "dist"
+    artifacts.mkdir()
+    wheel = artifacts / "skeleton-16.0.0-py3-none-any.whl"
+    wheel.write_bytes(b"deterministic-wheel")
+    sbom = artifacts / "release-sbom.cdx.json"
+    sbom.write_text('{"bomFormat":"CycloneDX"}\n', encoding="utf-8")
+    build_lock = tmp_path / "requirements-build.txt"
+    build_lock.write_text("build==1.3.0\n", encoding="utf-8")
+    provenance_path = tmp_path / "provenance.json"
+    checksums = tmp_path / "SHA256SUMS"
+    emit_args = argparse.Namespace(
+        artifacts_dir=str(artifacts),
+        output=str(provenance_path),
+        checksums=str(checksums),
+        source_commit=COMMIT,
+        source_date_epoch="1700000000",
+        input=[str(build_lock)],
+        sbom_ref=[str(sbom)],
+    )
+    assert release_provenance.emit_provenance(emit_args) == 0
+
+    evidence_path = tmp_path / "evidence.json"
+    missing = argparse.Namespace(
+        provenance=str(provenance_path),
+        output=str(evidence_path),
+        source_commit=COMMIT,
+        test_evidence=[],
+        eval_evidence=[],
+        asset_provenance=None,
+        observed=[],
+        gate=True,
+    )
+    assert release_provenance.emit_release_evidence(missing) == 1
+
+    tests = tmp_path / "tests.json"
+    tests.write_text(
+        json.dumps(
+            [
+                {
+                    "evidence_id": "unit",
+                    "name": "unit.xml",
+                    "sha256": "a" * 64,
+                    "result": "pass",
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    observed = [
+        f"skeleton-16.0.0-py3-none-any.whl={wheel}",
+        f"release-sbom.cdx.json={sbom}",
+    ]
+    ready = argparse.Namespace(
+        provenance=str(provenance_path),
+        output=str(evidence_path),
+        source_commit=COMMIT,
+        test_evidence=[str(tests)],
+        eval_evidence=[],
+        asset_provenance=None,
+        observed=observed,
+        gate=True,
+    )
+    assert release_provenance.emit_release_evidence(ready) == 0
+    document = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert document["schema_version"] == 1
+    assert document["schema_id"] == "skeleton.release.evidence"
+    assert document["provenance"]["schema_version"] == 1
+
+    gate_args = argparse.Namespace(
+        evidence=str(evidence_path),
+        source_commit=COMMIT,
+        observed=observed,
+    )
+    assert release_provenance.gate_release_evidence(gate_args) == 0
+    gate_args.source_commit = "ffffffffffffffffffffffffffffffffffffffff"
+    assert release_provenance.gate_release_evidence(gate_args) == 1
