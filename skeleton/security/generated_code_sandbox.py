@@ -760,11 +760,12 @@ def _is_blocked_host(host: str) -> bool:
         address = ipaddress.ip_address(host)
     except ValueError:
         return host.startswith("169.254.")
-    return bool(
-        address.is_loopback
-        or address.is_private
-        or address.is_link_local
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
+    return not bool(
+        address.is_global
+        and not address.is_multicast
+        and not address.is_unspecified
+        and not address.is_loopback
+        and not address.is_link_local
+        and not address.is_reserved
+        and not getattr(address, "is_site_local", False)
     )
