@@ -219,6 +219,25 @@ jobs: {}
     assert _scan(text, "quoted.yml") == []
 
 
+
+def test_accepts_immutable_workflow_run_concurrency_identity() -> None:
+    text = """name: workflow-run-safe
+on:
+  workflow_run:
+    workflows: [Merge Readiness]
+    types: [completed]
+concurrency:
+  group: workflow-run-safe-${{ github.event.workflow_run.workflow_id }}-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    _record, findings = concurrency.violations_from_text(
+        "workflow-run-safe.yml",
+        text,
+    )
+    assert findings == []
+
+
 def test_current_repository_concurrency_groups_pass() -> None:
     assert concurrency.repository_violations() == []
 
