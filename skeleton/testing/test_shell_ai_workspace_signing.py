@@ -310,3 +310,15 @@ def test_plan_cache_lru_eviction():
         tool_catalog_digest="t",
         effect_digest="e",
     ) is not None
+
+
+def test_signed_artifact_metadata_is_immutable():
+    signer = ArtifactSigner("key-1", b"k" * 32)
+    artifact = signer.sign(
+        "release-evidence",
+        fp("a"),
+        metadata={"environment": "prod"},
+    )
+    with pytest.raises(TypeError):
+        artifact.metadata["environment"] = "changed"
+    signer.verify(artifact)
