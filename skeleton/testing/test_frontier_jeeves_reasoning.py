@@ -9,7 +9,8 @@ from skeleton.jeeves.agent.deliberation import (
     SpecialistRole,
 )
 from skeleton.jeeves.agent.frontier_consensus import ConsensusSelector
-from skeleton.jeeves.agent.frontier_feedback import FrontierReasoningFeedback
+from skeleton.jeeves.agent.evaluation import EvalResult
+from skeleton.jeeves.agent.frontier_feedback import FrontierEvalFeedback, FrontierReasoningFeedback
 from skeleton.jeeves.agent.frontier_reasoning import (
     EscalationCause,
     FrontierReasoningCoordinator,
@@ -565,3 +566,78 @@ def test_consensus_is_deterministic_for_identical_search() -> None:
     assert first.fingerprint == second.fingerprint
     assert first.selected_candidate_id == second.selected_candidate_id
     assert first.clusters == second.clusters
+
+
+
+def test_matched_eval_feedback_blocks_pass_to_fail_regression() -> None:
+    feedback = FrontierEvalFeedback()
+    baseline = EvalResult(
+        case_id="case:frontier-eval",
+        run_id="run:baseline",
+        score=0.80,
+        passed=True,
+        checks=(),
+        result_fingerprint=stable_fingerprint("baseline"),
+    )
+    frontier = EvalResult(
+        case_id="case:frontier-eval",
+        run_id="run:frontier",
+        score=0.72,
+        passed=False,
+        checks=(),
+        result_fingerprint=stable_fingerprint("frontier"),
+    )
+
+    comparison = feedback.observe(baseline, frontier)
+    report = feedback.report()
+    gate = feedback.promotion_gate(
+        minimum_cases=1,
+        minimum_mean_delta=0.0,
+        maximum_loss_rate=1.0,
+        allow_pass_losses=0,
+    )
+
+    assert comparison.score_delta < 0.0
+    assert report.pass_losses == 1
+    assert report.regressed == 1
+    assert gate.passed is False
+    assert any("pass-to-fail" in reason for reason in gate.reasons)
+
+
+def test_matched_eval_feedback_allows_measured_improvement() -> None:
+    feedback = FrontierEvalFeedback()
+    for index, (baseline_score, frontier_score) in enumerate(
+        ((0.50, 0.70), (0.60, 0.75), (0.72, 0.80)),
+        start=1,
+    ):
+        feedback.observe(
+            EvalResult(
+                case_id=f"case:gain-{index}",
+                run_id=f"run:baseline-{index}",
+                score=baseline_score,
+                passed=baseline_score >= 0.70,
+                checks=(),
+                result_fingerprint=stable_fingerprint({"baseline": index}),
+            ),
+            EvalResult(
+                case_id=f"case:gain-{index}",
+                run_id=f"run:frontier-{index}",
+                score=frontier_score,
+                passed=frontier_score >= 0.70,
+                checks=(),
+                result_fingerprint=stable_fingerprint({"frontier": index}),
+            ),
+        )
+
+    report = feedback.report()
+    gate = feedback.promotion_gate(
+        minimum_cases=3,
+        minimum_mean_delta=0.05,
+        maximum_loss_rate=0.10,
+        allow_pass_losses=0,
+    )
+
+    assert report.improved == 3
+    assert report.pass_gains >= 1
+    assert report.mean_score_delta > 0.05
+    assert gate.passed is True
