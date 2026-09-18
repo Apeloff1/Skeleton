@@ -19,10 +19,12 @@ serialized mappings or duck-typed objects with ``to_dict()`` / ``files``.
 from __future__ import annotations
 
 from collections import deque
+import heapq
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 import hashlib
 import json
+import os
 
 from skeleton.kernel.errors import SkeletonError
 
@@ -188,8 +190,15 @@ def build_incremental_graph(
     _require_positive_bound(max_edges, "max_edges")
     _require_positive_bound(max_visits, "max_visits")
 
-    declared = [_coerce_spec(item) for item in _require_sequence(specs, field="specs")]
-    sources = _source_specs_from_repo_index(repo_index) if repo_index is not None else []
+    declared = [
+        _coerce_spec(item, max_dependencies=max_edges)
+        for item in _require_sequence(specs, field="specs", max_items=max_nodes)
+    ]
+    sources = (
+        _source_specs_from_repo_index(repo_index, max_nodes=max_nodes)
+        if repo_index is not None
+        else []
+    )
 
     merged: dict[str, NodeSpec] = {}
     for spec in (*sources, *declared):
@@ -305,20 +314,40 @@ def _require_positive_bound(value: Any, field: str) -> None:
         )
 
 
-def _require_sequence(value: Any, *, field: str) -> tuple[Any, ...]:
+def _require_sequence(
+    value: Any,
+    *,
+    field: str,
+    max_items: int | None = None,
+) -> tuple[Any, ...]:
     if isinstance(value, (str, bytes, bytearray, Mapping)):
         raise IncrementalGraphError(
             f"{field} must be a sequence",
             context={"field": field},
         )
+    if max_items is not None and (
+        isinstance(max_items, bool) or not isinstance(max_items, int) or max_items < 0
+    ):
+        raise IncrementalGraphError(
+            "sequence bound must be a non-negative integer",
+            context={"field": field},
+        )
+    items: list[Any] = []
     try:
-        items = tuple(value)
+        iterator = iter(value)
     except TypeError as exc:
         raise IncrementalGraphError(
             f"{field} must be a sequence",
             context={"field": field},
         ) from exc
-    return items
+    for item in iterator:
+        if max_items is not None and len(items) >= max_items:
+            raise IncrementalGraphError(
+                f"{field} count exceeds configured limit",
+                context={"field": field, "max_items": max_items},
+            )
+        items.append(item)
+    return tuple(items)
 
 
 def _require_id(value: Any, *, field: str) -> str:
@@ -375,7 +404,7 @@ def _unknown_keys(payload: Mapping[str, Any], allowed: frozenset[str], *, field:
         )
 
 
-def _coerce_spec(raw: Any) -> NodeSpec:
+def _coerce_spec(raw: Any, *, max_dependencies: int = MAX_EDGES) -> NodeSpec:
     if isinstance(raw, NodeSpec):
         payload: dict[str, Any] = {
             "id": raw.node_id,
@@ -392,10 +421,15 @@ def _coerce_spec(raw: Any) -> NodeSpec:
             context={"type": type(raw).__name__},
         )
     _unknown_keys(payload, _NODE_SPEC_KEYS, field="node")
+    if "id" in payload and "node_id" in payload:
+        raise IncrementalGraphError("node spec cannot contain both id and node_id")
     node_id = payload.get("id", payload.get("node_id"))
     if node_id is None:
         raise IncrementalGraphError("node id is required")
-    dependencies = _normalize_dependencies(payload.get("dependencies", ()))
+    dependencies = _normalize_dependencies(
+        payload.get("dependencies", ()),
+        max_items=max_dependencies,
+    )
     return NodeSpec(
         node_id=_require_id(node_id, field="id"),
         kind=_require_kind(payload.get("kind", "unit")),
@@ -405,8 +439,8 @@ def _coerce_spec(raw: Any) -> NodeSpec:
     )
 
 
-def _normalize_dependencies(raw: Any) -> tuple[str, ...]:
-    items = _require_sequence(raw, field="dependencies")
+def _normalize_dependencies(raw: Any, *, max_items: int = MAX_EDGES) -> tuple[str, ...]:
+    items = _require_sequence(raw, field="dependencies", max_items=max_items)
     deps: list[str] = []
     seen: set[str] = set()
     for item in items:
@@ -468,41 +502,58 @@ def _coerce_repo_index(raw: Any) -> Mapping[str, Any]:
     elif isinstance(raw, Mapping):
         payload = dict(raw)
     else:
-        files = getattr(raw, "files", None)
-        if files is None:
+        required = (
+            "schema",
+            "head",
+            "object_format",
+            "source_digest",
+            "tracked_files",
+            "tracked_bytes",
+            "files",
+        )
+        missing = [name for name in required if not hasattr(raw, name)]
+        if missing:
             raise IncrementalGraphError(
-                "repo index must be a mapping, snapshot, or object with files",
-                context={"type": type(raw).__name__},
+                "repo index object is missing required fields",
+                context={"fields": missing, "type": type(raw).__name__},
             )
-        payload = {
-            "schema": getattr(raw, "schema", GRAPH_SCHEMA),
-            "head": getattr(raw, "head", None),
-            "object_format": getattr(raw, "object_format", None),
-            "source_digest": getattr(raw, "source_digest", None),
-            "tracked_files": getattr(raw, "tracked_files", None),
-            "tracked_bytes": getattr(raw, "tracked_bytes", None),
-            "files": files,
-        }
+        payload = {name: getattr(raw, name) for name in required}
     if not isinstance(payload, Mapping):
         raise IncrementalGraphError("repo index payload must be a mapping")
     _unknown_keys(payload, _REPO_INDEX_KEYS, field="repo_index")
+    missing = sorted(_REPO_INDEX_KEYS.difference(payload))
+    if missing:
+        raise IncrementalGraphError(
+            "repo index is missing required keys",
+            context={"keys": missing},
+        )
     return payload
 
 
-def _source_specs_from_repo_index(raw: Any) -> list[NodeSpec]:
-    payload = _coerce_repo_index(raw)
-    files = payload.get("files")
-    if not isinstance(files, Sequence) or isinstance(files, (str, bytes, bytearray)):
-        raise IncrementalGraphError("repo index files must be a sequence")
-    specs: list[NodeSpec] = []
-    for item in files:
-        spec = _source_spec_from_tracked_file(item)
-        if spec is not None:
-            specs.append(spec)
-    return specs
+def _require_repo_int(value: Any, *, field: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise IncrementalGraphError(
+            f"repo index {field} must be an integer >= {minimum}",
+            context={"field": field},
+        )
+    return value
 
 
-def _source_spec_from_tracked_file(raw: Any) -> NodeSpec | None:
+def _require_repo_digest(value: Any, *, field: str, length: int) -> str:
+    if not isinstance(value, str) or len(value) != length:
+        raise IncrementalGraphError(
+            f"repo index {field} has invalid digest length",
+            context={"field": field, "length": length},
+        )
+    if any(ch not in "0123456789abcdef" for ch in value):
+        raise IncrementalGraphError(
+            f"repo index {field} must be lowercase hexadecimal",
+            context={"field": field},
+        )
+    return value
+
+
+def _normalize_tracked_file(raw: Any, *, object_format: str) -> dict[str, Any]:
     if hasattr(raw, "__dataclass_fields__"):
         payload = {
             key: getattr(raw, key)
@@ -517,32 +568,191 @@ def _source_spec_from_tracked_file(raw: Any) -> NodeSpec | None:
             context={"type": type(raw).__name__},
         )
     _unknown_keys(payload, _TRACKED_FILE_KEYS, field="tracked_file")
-    if payload.get("deleted") is True:
-        return None
-    path = _require_id(payload.get("path"), field="path")
-    blob = payload.get("effective_blob")
-    if blob is None:
-        blob = payload.get("index_blob")
-    if not isinstance(blob, str) or not blob:
+    missing = sorted(_TRACKED_FILE_KEYS.difference(payload))
+    if missing:
         raise IncrementalGraphError(
-            "tracked file missing content digest",
+            "tracked file is missing required keys",
+            context={"keys": missing},
+        )
+
+    path = _require_id(payload["path"], field="path")
+    mode = payload["mode"]
+    if mode not in {"100644", "100755", "120000", "160000"}:
+        raise IncrementalGraphError(
+            "tracked file mode is unsupported",
+            context={"path": path, "mode": mode},
+        )
+    oid_length = 40 if object_format == "sha1" else 64
+    index_blob = _require_repo_digest(
+        payload["index_blob"],
+        field="index_blob",
+        length=oid_length,
+    )
+    deleted = payload["deleted"]
+    working_tree = payload["working_tree"]
+    if not isinstance(deleted, bool) or not isinstance(working_tree, bool):
+        raise IncrementalGraphError(
+            "tracked file flags must be booleans",
             context={"path": path},
         )
-    if "\x00" in blob:
-        raise IncrementalGraphError("tracked file digest contains NUL", context={"path": path})
-    mode = payload.get("mode", "100644")
-    if not isinstance(mode, str) or not mode:
-        raise IncrementalGraphError("tracked file mode must be a string", context={"path": path})
-    size = payload.get("size", 0)
+    size = payload["size"]
     if isinstance(size, bool) or not isinstance(size, int) or size < 0:
-        raise IncrementalGraphError("tracked file size must be a non-negative integer")
-    return NodeSpec(
-        node_id=path,
-        kind=SOURCE_KIND,
-        inputs={"blob": blob, "mode": mode, "size": str(size)},
-        dependencies=(),
-        cost=1,
+        raise IncrementalGraphError(
+            "tracked file size must be a non-negative integer",
+            context={"path": path},
+        )
+    working_mode = payload["working_mode"]
+    if working_mode is not None:
+        if working_mode not in {"100644", "100755", "120000", "160000"}:
+            raise IncrementalGraphError(
+                "tracked file working_mode is unsupported",
+                context={"path": path, "working_mode": working_mode},
+            )
+        if working_mode == mode:
+            raise IncrementalGraphError(
+                "tracked file working_mode redundantly matches index mode",
+                context={"path": path},
+            )
+
+    effective_blob = payload["effective_blob"]
+    if deleted:
+        if effective_blob != "DELETED" or size != 0 or not working_tree or working_mode is not None:
+            raise IncrementalGraphError(
+                "deleted tracked file state is inconsistent",
+                context={"path": path},
+            )
+    else:
+        effective_blob = _require_repo_digest(
+            effective_blob,
+            field="effective_blob",
+            length=oid_length,
+        )
+        changed = effective_blob != index_blob or working_mode is not None
+        if working_tree != changed:
+            raise IncrementalGraphError(
+                "tracked file working_tree flag is inconsistent",
+                context={"path": path},
+            )
+
+    return {
+        "path": path,
+        "mode": mode,
+        "index_blob": index_blob,
+        "effective_blob": effective_blob,
+        "size": size,
+        "working_tree": working_tree,
+        "deleted": deleted,
+        "working_mode": working_mode,
+    }
+
+
+def _repo_source_digest(files: Sequence[Mapping[str, Any]]) -> str:
+    digest = hashlib.sha256()
+    for item in files:
+        effective_mode = item["working_mode"] or item["mode"]
+        digest.update(os.fsencode(item["path"]))
+        digest.update(b"\0")
+        digest.update(item["mode"].encode("ascii"))
+        digest.update(b"\0")
+        digest.update(effective_mode.encode("ascii"))
+        digest.update(b"\0")
+        digest.update(item["index_blob"].encode("ascii"))
+        digest.update(b"\0")
+        digest.update(item["effective_blob"].encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(item["size"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(b"1" if item["working_tree"] else b"0")
+        digest.update(b"1" if item["deleted"] else b"0")
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _source_specs_from_repo_index(raw: Any, *, max_nodes: int) -> list[NodeSpec]:
+    payload = _coerce_repo_index(raw)
+    schema = payload["schema"]
+    if isinstance(schema, bool) or not isinstance(schema, int) or schema != 1:
+        raise IncrementalGraphError("repo index schema must equal 1")
+    object_format = payload["object_format"]
+    if object_format not in {"sha1", "sha256"}:
+        raise IncrementalGraphError(
+            "repo index object_format is unsupported",
+            context={"object_format": object_format},
+        )
+    oid_length = 40 if object_format == "sha1" else 64
+    head = payload["head"]
+    if head is not None:
+        _require_repo_digest(head, field="head", length=oid_length)
+    expected_source_digest = _require_repo_digest(
+        payload["source_digest"],
+        field="source_digest",
+        length=64,
     )
+    files = payload["files"]
+    if not isinstance(files, Sequence) or isinstance(files, (str, bytes, bytearray)):
+        raise IncrementalGraphError("repo index files must be a sequence")
+    if len(files) > max_nodes:
+        raise IncrementalGraphError(
+            "repo index file count exceeds configured node limit",
+            context={"files": len(files), "max_nodes": max_nodes},
+        )
+    tracked_files = _require_repo_int(payload["tracked_files"], field="tracked_files")
+    if tracked_files != len(files):
+        raise IncrementalGraphError(
+            "repo index tracked_files count mismatch",
+            context={"declared": tracked_files, "actual": len(files)},
+        )
+    tracked_bytes = _require_repo_int(payload["tracked_bytes"], field="tracked_bytes")
+
+    normalized: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+    previous_path: bytes | None = None
+    total_bytes = 0
+    for item in files:
+        row = _normalize_tracked_file(item, object_format=object_format)
+        path_bytes = os.fsencode(row["path"])
+        if row["path"] in seen_paths:
+            raise IncrementalGraphError(
+                "repo index contains duplicate tracked path",
+                context={"path": row["path"]},
+            )
+        if previous_path is not None and path_bytes <= previous_path:
+            raise IncrementalGraphError("repo index files are not in canonical path order")
+        previous_path = path_bytes
+        seen_paths.add(row["path"])
+        total_bytes += row["size"]
+        normalized.append(row)
+    if total_bytes != tracked_bytes:
+        raise IncrementalGraphError(
+            "repo index tracked_bytes count mismatch",
+            context={"declared": tracked_bytes, "actual": total_bytes},
+        )
+    actual_source_digest = _repo_source_digest(normalized)
+    if actual_source_digest != expected_source_digest:
+        raise IncrementalGraphError(
+            "repo index source_digest mismatch",
+            context={"expected": expected_source_digest, "actual": actual_source_digest},
+        )
+
+    specs: list[NodeSpec] = []
+    for row in normalized:
+        if row["deleted"]:
+            continue
+        effective_mode = row["working_mode"] or row["mode"]
+        specs.append(
+            NodeSpec(
+                node_id=row["path"],
+                kind=SOURCE_KIND,
+                inputs={
+                    "blob": row["effective_blob"],
+                    "mode": effective_mode,
+                    "size": str(row["size"]),
+                },
+                dependencies=(),
+                cost=1,
+            )
+        )
+    return specs
 
 
 def _walk_bound(max_visits: int) -> Any:
@@ -561,34 +771,43 @@ def _walk_bound(max_visits: int) -> Any:
 
 def _detect_cycles(adjacency: Mapping[str, Sequence[str]], *, max_visits: int) -> None:
     bump = _walk_bound(max_visits)
-    white = set(adjacency)
-    gray: set[str] = set()
-    black: set[str] = set()
-    stack: list[str] = []
+    state = {node_id: 0 for node_id in adjacency}
+    path: list[str] = []
+    path_index: dict[str, int] = {}
 
-    def visit(node_id: str) -> None:
-        bump()
-        if node_id in black:
-            return
-        if node_id in gray:
-            start = stack.index(node_id)
-            cycle = stack[start:] + [node_id]
-            raise IncrementalGraphError(
-                "dependency cycle",
-                context={"cycle": cycle},
-            )
-        gray.add(node_id)
-        white.discard(node_id)
-        stack.append(node_id)
-        for dep in adjacency[node_id]:
-            visit(dep)
-        stack.pop()
-        gray.discard(node_id)
-        black.add(node_id)
+    for root in sorted(adjacency):
+        if state[root] != 0:
+            continue
+        frames: list[tuple[str, int]] = [(root, 0)]
+        while frames:
+            node_id, next_index = frames[-1]
+            if state[node_id] == 0:
+                bump()
+                state[node_id] = 1
+                path_index[node_id] = len(path)
+                path.append(node_id)
 
-    for node_id in sorted(white):
-        if node_id in white:
-            visit(node_id)
+            deps = adjacency[node_id]
+            if next_index >= len(deps):
+                frames.pop()
+                state[node_id] = 2
+                path_index.pop(node_id, None)
+                if path and path[-1] == node_id:
+                    path.pop()
+                continue
+
+            dep = deps[next_index]
+            frames[-1] = (node_id, next_index + 1)
+            bump()
+            if state[dep] == 0:
+                frames.append((dep, 0))
+                continue
+            if state[dep] == 1:
+                start = path_index[dep]
+                raise IncrementalGraphError(
+                    "dependency cycle",
+                    context={"cycle": path[start:] + [dep]},
+                )
 
 
 def _topological_order(
@@ -604,22 +823,21 @@ def _topological_order(
             bump()
             indegree[node_id] += 1
             dependents[dep].append(node_id)
-    ready = deque(sorted(node_id for node_id, count in indegree.items() if count == 0))
+    ready = [node_id for node_id, count in indegree.items() if count == 0]
+    heapq.heapify(ready)
     order: list[str] = []
     while ready:
         bump()
-        node_id = ready.popleft()
+        node_id = heapq.heappop(ready)
         order.append(node_id)
-        unlocked: list[str] = []
-        for child in dependents[node_id]:
+        for child in sorted(dependents[node_id]):
             bump()
             indegree[child] -= 1
             if indegree[child] == 0:
-                unlocked.append(child)
-        for child in sorted(unlocked):
-            ready.append(child)
+                heapq.heappush(ready, child)
     if len(order) != len(adjacency):
-        remaining = sorted(node_id for node_id in adjacency if node_id not in set(order))
+        emitted = set(order)
+        remaining = sorted(node_id for node_id in adjacency if node_id not in emitted)
         raise IncrementalGraphError(
             "dependency cycle",
             context={"cycle": remaining},
