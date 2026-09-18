@@ -1035,68 +1035,235 @@ class SemanticTopologyLearningLab:
             ]
         return tuple(sorted(values, key=lambda item: item.trial_id))
 
+    def _domain_reports(
+        self,
+        primary: Sequence[TopologyBridgeTrial],
+        controls: Sequence[TopologyBridgeTrial],
+    ) -> tuple[TopologyBridgeDomainReport, ...]:
+        domains = sorted(
+            {
+                item.domain for item in (*tuple(primary), *tuple(controls))
+            }
+        )
+        reports: list[TopologyBridgeDomainReport] = []
+        for domain in domains:
+            domain_primary = [
+                item for item in primary if item.domain == domain
+            ]
+            domain_controls = [
+                item for item in controls if item.domain == domain
+            ]
+            if domain_primary:
+                probabilities = [
+                    item.predicted_probability
+                    for item in domain_primary
+                ]
+                outcomes = [item.outcome for item in domain_primary]
+                positive_count = sum(outcomes)
+                mean_probability = sum(probabilities) / len(probabilities)
+                empirical_rate = positive_count / len(domain_primary)
+                interval = wilson_interval(
+                    positive_count,
+                    len(domain_primary),
+                )
+                brier = brier_score(probabilities, outcomes)
+                calibration_error = expected_calibration_error(
+                    probabilities,
+                    outcomes,
+                    bins=min(10, len(domain_primary)),
+                )
+            else:
+                mean_probability = None
+                empirical_rate = None
+                interval = None
+                brier = None
+                calibration_error = None
+            control_rate = (
+                None
+                if not domain_controls
+                else sum(item.outcome for item in domain_controls)
+                / len(domain_controls)
+            )
+            qualified_primary = (
+                len(domain_primary)
+                >= self.policy.minimum_trials_per_domain
+            )
+            qualified_control = (
+                len(domain_controls)
+                >= self.policy.minimum_controls_per_domain
+            )
+            fingerprint = stable_fingerprint(
+                {
+                    "domain": domain,
+                    "primary": [
+                        item.fingerprint for item in domain_primary
+                    ],
+                    "controls": [
+                        item.fingerprint for item in domain_controls
+                    ],
+                    "metrics": {
+                        "mean_probability": mean_probability,
+                        "empirical_rate": empirical_rate,
+                        "wilson_95": interval,
+                        "brier": brier,
+                        "calibration_error": calibration_error,
+                        "control_positive_rate": control_rate,
+                    },
+                    "qualified_primary": qualified_primary,
+                    "qualified_control": qualified_control,
+                    "policy": self.policy.fingerprint,
+                }
+            )
+            reports.append(
+                TopologyBridgeDomainReport(
+                    domain=domain,
+                    trial_count=len(domain_primary),
+                    independent_run_count=len(
+                        {
+                            item.independent_run
+                            for item in domain_primary
+                        }
+                    ),
+                    negative_control_count=len(domain_controls),
+                    mean_probability=mean_probability,
+                    empirical_rate=empirical_rate,
+                    wilson_95=interval,
+                    brier=brier,
+                    calibration_error=calibration_error,
+                    negative_control_positive_rate=control_rate,
+                    qualified_primary=qualified_primary,
+                    qualified_control=qualified_control,
+                    fingerprint=fingerprint,
+                )
+            )
+        return tuple(reports)
+
     def _report_status(
         self,
         *,
         trial_count: int,
         independent_runs: int,
-        domains: int,
+        qualified_domains: int,
         negative_control_count: int,
+        qualified_control_domains: int,
         brier: float,
         calibration_error: float,
         empirical_rate: float,
         negative_control_positive_rate: float | None,
+        worst_domain_brier: float | None,
+        minimum_domain_empirical_rate: float | None,
+        worst_domain_control_positive_rate: float | None,
     ) -> tuple[TopologyBridgeStatus, tuple[str, ...]]:
         reasons: list[str] = []
         if trial_count < self.policy.minimum_trials:
             reasons.append("insufficient_trials")
         if independent_runs < self.policy.minimum_independent_runs:
             reasons.append("insufficient_independent_runs")
-        if domains < self.policy.minimum_domains:
+        if qualified_domains < self.policy.minimum_domains:
             reasons.append("insufficient_domain_replication")
         if negative_control_count < self.policy.minimum_negative_controls:
             reasons.append("insufficient_negative_controls")
+        if (
+            qualified_control_domains
+            < self.policy.minimum_control_domains
+        ):
+            reasons.append("insufficient_control_domain_replication")
 
-        enough_for_rejection = trial_count >= self.policy.minimum_trials
+        enough_for_rejection = (
+            trial_count >= self.policy.minimum_trials
+            and qualified_domains >= self.policy.minimum_domains
+        )
         if enough_for_rejection and brier >= self.policy.reject_brier:
             reasons.append("brier_rejection_threshold")
-        if enough_for_rejection and calibration_error >= self.policy.reject_ece:
+        if (
+            enough_for_rejection
+            and calibration_error >= self.policy.reject_ece
+        ):
             reasons.append("calibration_rejection_threshold")
         if (
             enough_for_rejection
             and empirical_rate <= self.policy.reject_empirical_rate
         ):
             reasons.append("empirical_rate_rejection_threshold")
-        rejection = any(reason.endswith("rejection_threshold") for reason in reasons)
+        if (
+            enough_for_rejection
+            and worst_domain_brier is not None
+            and worst_domain_brier >= self.policy.reject_domain_brier
+        ):
+            reasons.append("domain_brier_rejection_threshold")
+        if (
+            enough_for_rejection
+            and minimum_domain_empirical_rate is not None
+            and minimum_domain_empirical_rate
+            <= self.policy.reject_domain_empirical_rate
+        ):
+            reasons.append("domain_empirical_rate_rejection_threshold")
+        rejection = any(
+            reason.endswith("rejection_threshold")
+            for reason in reasons
+        )
         if rejection:
             return TopologyBridgeStatus.REJECTED, tuple(reasons)
 
         negative_control_failed = (
-            negative_control_positive_rate is not None
-            and negative_control_count >= self.policy.minimum_negative_controls
-            and negative_control_positive_rate
-            > self.policy.maximum_negative_control_positive_rate
+            (
+                negative_control_positive_rate is not None
+                and negative_control_count
+                >= self.policy.minimum_negative_controls
+                and negative_control_positive_rate
+                > self.policy.maximum_negative_control_positive_rate
+            )
+            or (
+                worst_domain_control_positive_rate is not None
+                and qualified_control_domains
+                >= self.policy.minimum_control_domains
+                and worst_domain_control_positive_rate
+                > self.policy.maximum_domain_control_positive_rate
+            )
         )
         if negative_control_failed:
             reasons.append("negative_control_failure")
 
+        domain_transfer_failed = (
+            (
+                worst_domain_brier is not None
+                and qualified_domains >= self.policy.minimum_domains
+                and worst_domain_brier
+                > self.policy.maximum_domain_brier
+            )
+            or (
+                minimum_domain_empirical_rate is not None
+                and qualified_domains >= self.policy.minimum_domains
+                and minimum_domain_empirical_rate
+                < self.policy.minimum_domain_empirical_rate
+            )
+        )
+        if domain_transfer_failed:
+            reasons.append("domain_transfer_failure")
+
         complete = (
             trial_count >= self.policy.minimum_trials
             and independent_runs >= self.policy.minimum_independent_runs
-            and domains >= self.policy.minimum_domains
-            and negative_control_count >= self.policy.minimum_negative_controls
+            and qualified_domains >= self.policy.minimum_domains
+            and negative_control_count
+            >= self.policy.minimum_negative_controls
+            and qualified_control_domains
+            >= self.policy.minimum_control_domains
         )
         calibrated = (
             brier <= self.policy.maximum_brier
             and calibration_error <= self.policy.maximum_ece
             and empirical_rate >= self.policy.minimum_empirical_rate
             and not negative_control_failed
+            and not domain_transfer_failed
         )
         if complete and calibrated:
             reasons.append("replicated_calibrated_bridge")
             return TopologyBridgeStatus.ACTIVE, tuple(reasons)
         if complete:
-            reasons.append("replication_complete_but_promotion_thresholds_unmet")
+            reasons.append(
+                "replication_complete_but_promotion_thresholds_unmet"
+            )
             return TopologyBridgeStatus.RESTRICTED, tuple(reasons)
         return TopologyBridgeStatus.CANDIDATE, tuple(reasons)
 
