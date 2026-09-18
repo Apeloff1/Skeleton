@@ -552,6 +552,28 @@ def test_traces_and_eval_contract_keep_secrets_and_provenance() -> None:
     assert report.verdicts[0].result.trace["caller_metadata"]["token"] == REDACTED
 
 
+def test_rejected_duplicate_provider_does_not_leak_runtime_adapter() -> None:
+    router = ModelRouter()
+    primary = FakeAdapter("primary-adapter")
+    ghost = FakeAdapter("ghost-adapter")
+    router.register(
+        _metadata("same-provider", adapter_name="primary-adapter"),
+        primary,
+    )
+    before = router.catalog()
+
+    with pytest.raises(ProviderMetadataError, match="already registered"):
+        router.register(
+            _metadata("same-provider", adapter_name="ghost-adapter"),
+            ghost,
+        )
+
+    assert router.catalog() == before
+    assert router.runtime.resolve("primary-adapter") is primary
+    with pytest.raises(KeyError):
+        router.runtime.resolve("ghost-adapter")
+
+
 def test_disabled_and_duplicate_registration_rules() -> None:
     router = ModelRouter()
     adapter = FakeAdapter("shared")
