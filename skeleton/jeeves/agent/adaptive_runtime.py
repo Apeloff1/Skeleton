@@ -402,7 +402,12 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             ):
                 return super()._execute_reasoning_step(state, step)
             assert state.plan is not None
-            state.plan = self.scheduler.fail(state.plan, step.step_id, retryable=False)
+            retryable = decision.disposition is InferenceDisposition.DELIBERATE
+            state.plan = self.scheduler.fail(
+                state.plan,
+                step.step_id,
+                retryable=retryable,
+            )
             state.last_error = reason[:8192]
             state.trace.emit(
                 "frontier.reasoning_blocked",
@@ -411,9 +416,14 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
                     "decision": decision.fingerprint,
                     "disposition": decision.disposition.value,
                     "causes": [cause.value for cause in decision.causes],
+                    "retryable": retryable,
                 },
             )
             self.metrics.increment("agent.frontier.reasoning_blocked")
+            if retryable and state.plan.step(step.step_id).status is not StepStatus.FAILED:
+                self.metrics.increment("agent.frontier.reasoning_retries")
+                self._checkpoint(state)
+                return None
             if self._attempt_replan(state, reason, failed_step_id=step.step_id):
                 return None
             return self._finish_failure(
