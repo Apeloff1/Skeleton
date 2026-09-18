@@ -119,9 +119,13 @@ class SemanticLensTopology:
             source_rules = (("custom", tuple(rules)),)
 
         self._specs = {spec.key: spec for spec in registry.all()}
-        self._edges: tuple[LensTopologyEdge, ...] = self._build_edges(source_rules)
-        self._adjacency: dict[str, set[str]] = {key: set() for key in self._specs}
-        for edge in effective_edges:
+        self._edges: tuple[LensTopologyEdge, ...] = self._build_edges(
+            source_rules
+        )
+        self._adjacency: dict[str, set[str]] = {
+            key: set() for key in self._specs
+        }
+        for edge in self._edges:
             self._adjacency[edge.left_key].add(edge.right_key)
             self._adjacency[edge.right_key].add(edge.left_key)
         self._bridge_candidates = self._build_bridge_candidates()
