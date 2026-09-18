@@ -35,10 +35,24 @@ class AIReleaseManager:
         governance: AIShellGovernance,
         *,
         gate: AIReleaseGate | None = None,
+        expected_tool_catalog_digest: str | None = None,
+        expected_effect_digest: str | None = None,
+        expected_code_revision: str | None = None,
     ) -> None:
+        for name, value in (
+            ("expected_tool_catalog_digest", expected_tool_catalog_digest),
+            ("expected_effect_digest", expected_effect_digest),
+        ):
+            if value is not None and len(value) != 64:
+                raise ValueError(f"{name} must be SHA-256 hex")
+        if expected_code_revision is not None and not expected_code_revision:
+            raise ValueError("expected_code_revision may not be empty")
         self.registry = registry
         self.governance = governance
         self.gate = gate or AIReleaseGate()
+        self.expected_tool_catalog_digest = expected_tool_catalog_digest
+        self.expected_effect_digest = expected_effect_digest
+        self.expected_code_revision = expected_code_revision
 
     def prepare(
         self,
@@ -51,9 +65,9 @@ class AIReleaseManager:
         current_policy = self.governance.current_policy()
         gate = self.gate.inspect(
             evidence,
-            expected_tool_catalog_digest=evidence.tool_catalog_digest,
-            expected_effect_digest=evidence.effect_digest,
-            expected_code_revision=evidence.code_revision,
+            expected_tool_catalog_digest=self.expected_tool_catalog_digest,
+            expected_effect_digest=self.expected_effect_digest,
+            expected_code_revision=self.expected_code_revision,
         )
         if target_policy is None:
             if evidence.policy_fingerprint != current_policy.fingerprint:
