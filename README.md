@@ -78,6 +78,7 @@ For ARM64 hosts, use Docker/Compose normally; Docker selects the ARM64 variant o
 ```bash
 docker buildx build --platform linux/arm64 -t skeleton:arm64 .
 docker buildx build --platform linux/arm64 -f backend/Dockerfile --target production -t skeleton-backend:arm64 .
+docker buildx build --platform linux/arm64 -f frontend/Dockerfile --target production -t skeleton-frontend:arm64 ./frontend
 ```
 
 The ARM64 workflow is intentionally separate from the main x86 CI so ARM-native compatibility failures are visible without making every general-purpose test job depend on emulation.
