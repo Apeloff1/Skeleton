@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import threading
-from typing import Iterable
+from typing import Iterable, Protocol
 
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.model_admission import (
@@ -213,6 +213,22 @@ class RuntimeTrustEpoch:
         return hashlib.sha256(raw).hexdigest()
 
 
+class DurableRuntimeTrustPinStore(Protocol):
+    def pin(
+        self,
+        scope: str,
+        epoch: RuntimeTrustEpoch,
+        *,
+        reason: str = "startup pin",
+    ) -> object: ...
+
+    def require(
+        self,
+        scope: str,
+        epoch_digest: str,
+    ) -> object: ...
+
+
 @dataclass(frozen=True)
 class RuntimeTrustReport:
     allowed: bool
@@ -251,9 +267,17 @@ class AIRuntimeTrustGuard:
         model_requirements: Iterable[ModelAdmissionRequirement] = (),
         assurance: AIExecutionAssuranceInspector | None = None,
         expected_epoch_digest: str = "",
+        durable_store: DurableRuntimeTrustPinStore | None = None,
+        durable_scope: str = "",
     ) -> None:
         if not isinstance(surface, RuntimeTrustSurface):
             raise ValueError("surface must be RuntimeTrustSurface")
+        if (durable_store is None) != (not durable_scope):
+            raise ValueError(
+                "durable_store and durable_scope must be configured together"
+            )
+        if durable_scope and len(durable_scope) > 128:
+            raise ValueError("durable_scope too long")
         if (release_guard is None) != (release_expectation is None):
             raise ValueError(
                 "release_guard and release_expectation must be configured together"
@@ -317,6 +341,8 @@ class AIRuntimeTrustGuard:
         self.model_admission = model_admission
         self.model_requirements = requirements
         self.assurance = assurance
+        self.durable_store = durable_store
+        self.durable_scope = durable_scope
         self._expected_epoch_digest = _sha256(
             "expected_epoch_digest",
             expected_epoch_digest,
@@ -401,6 +427,12 @@ class AIRuntimeTrustGuard:
         report = self.inspect()
         if not report.allowed:
             raise RuntimeError("; ".join(report.reasons))
+        if self.durable_store is not None:
+            assert report.epoch is not None
+            self.durable_store.require(
+                self.durable_scope,
+                report.epoch.digest,
+            )
         return report
 
     def pin(self) -> RuntimeTrustReport:
@@ -411,6 +443,12 @@ class AIRuntimeTrustGuard:
             if not report.allowed:
                 raise RuntimeError("; ".join(report.reasons))
             assert report.epoch is not None
+            if self.durable_store is not None:
+                self.durable_store.pin(
+                    self.durable_scope,
+                    report.epoch,
+                    reason="AI shell worker startup",
+                )
             if not self._expected_epoch_digest:
                 self._expected_epoch_digest = report.epoch.digest
                 return RuntimeTrustReport(
