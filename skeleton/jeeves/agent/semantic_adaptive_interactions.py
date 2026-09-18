@@ -1,0 +1,238 @@
+"""Adaptive third-order cross-lens interaction rules for Jeeves."""
+
+from __future__ import annotations
+
+from .semantic_frontier import LensInteractionKind, LensInteractionRule
+
+
+def adaptive_interaction_rules() -> tuple[LensInteractionRule, ...]:
+    return (
+        LensInteractionRule(
+            "shot_scale_transition", "focalization", LensInteractionKind.CONDITIONS,
+            "Shot scale changes visible detail while focalization controls whose informational access organizes the presentation.",
+            "Does the scale shift change information access, focal access, or both?",
+            "Matched scale changes should alter visible detail even when focalization remains fixed.",
+            tangent_axis_hint="cinematic",
+        ),
+        LensInteractionRule(
+            "sound_perspective_mismatch", "point_of_audition", LensInteractionKind.CONFLICTS,
+            "A point-of-audition reading predicts character-relative sound, while persistent audiovisual mismatch can imply a different access model.",
+            "Which observer position best explains both auditory filtering and visible viewpoint?",
+            "Independent sound-source or viewpoint evidence should eliminate at least one access model.",
+            tangent_axis_hint="cinematic",
+        ),
+        LensInteractionRule(
+            "narrator_knowledge_boundary", "unreliable_narrator", LensInteractionKind.CONDITIONS,
+            "Apparent knowledge violations can reflect unreliability, viewpoint change, or a broader narrator knowledge model.",
+            "Is the contradiction about truthfulness or about what the narrator could know?",
+            "Independent perspective anchors should distinguish unreliable report from expanded narrator access.",
+            tangent_axis_hint="literary",
+        ),
+        LensInteractionRule(
+            "lexical_register_drift", "heteroglossia_register", LensInteractionKind.REINFORCES,
+            "Register drift provides a sequential signal that distinct social or discourse voices are entering or changing.",
+            "Does register change align with a stable voice, audience, or discourse-state boundary?",
+            "Repeated boundaries should reproduce similar register transitions.",
+            tangent_axis_hint="literary",
+        ),
+        LensInteractionRule(
+            "equilibrium_break", "metagame", LensInteractionKind.REINFORCES,
+            "Metagame adaptation supplies the population response expected after a strategic equilibrium is disrupted.",
+            "Which rule, payoff, or information change altered best responses?",
+            "A true break should trigger persistent strategy redistribution rather than transient experimentation.",
+            tangent_axis_hint="ludic",
+        ),
+        LensInteractionRule(
+            "exploit_patch_cycle", "speedrun_exploit_semantics", LensInteractionKind.CONDITIONS,
+            "An exploit-patch cycle distinguishes a one-off sequence break from an adaptive family of mechanic-level exploits.",
+            "Did the intervention remove the underlying exploit mechanism or only one route through it?",
+            "Mechanism-preserving patches should predict nearby exploit variants.",
+            tangent_axis_hint="ludic",
+        ),
+        LensInteractionRule(
+            "unresolved_thread_pressure", "setup_payoff_latency", LensInteractionKind.REINFORCES,
+            "Unresolved-thread pressure rises with setup salience and elapsed payoff latency.",
+            "Which open setup remains active enough to constrain plausible continuation?",
+            "High-salience long-latency setups should be more likely to receive explicit resolution or abandonment.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "perspective_handoff", "focalization", LensInteractionKind.REINFORCES,
+            "Perspective handoff is a temporal transition between focalization regimes.",
+            "Which knowledge enters or leaves the accessible evidence set at the handoff?",
+            "A true handoff should create a reproducible access discontinuity while shared world constraints persist.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "sign_referent_decoupling", "codebook_ambiguity", LensInteractionKind.CONDITIONS,
+            "Referent drift can masquerade as codebook ambiguity when a stable sign is decoded against an obsolete mapping.",
+            "Did the mapping convention change, the referent change, or are multiple codebooks still live?",
+            "Independent grounding should reduce ambiguity if referent drift is the main cause.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "convention_shift", "semantic_drift_regime", LensInteractionKind.REINFORCES,
+            "A community convention shift is one mechanism for a semantic drift regime.",
+            "Is the changed meaning distributed across a population and time window rather than isolated usage?",
+            "Cohort-aware usage should reveal a stable transition boundary when convention change is real.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "attentional_switch_cost", "event_boundary_segmentation", LensInteractionKind.CONDITIONS,
+            "Event boundaries can trigger task-set changes that impose a transient attentional switching cost.",
+            "Does the performance drop follow the boundary because the active task set changed?",
+            "Matched boundaries without task-set change should produce less switch cost.",
+            tangent_axis_hint="memory",
+        ),
+        LensInteractionRule(
+            "source_confusion", "source_monitoring", LensInteractionKind.REINFORCES,
+            "Source confusion is the error pattern predicted when source-monitoring processes fail while content memory survives.",
+            "Is content recall accurate while speaker, location, or acquisition route is misassigned?",
+            "Source-specific cues should selectively improve provenance accuracy.",
+            tangent_axis_hint="memory",
+        ),
+        LensInteractionRule(
+            "modal_force_shift", "scope_ambiguity", LensInteractionKind.CONDITIONS,
+            "Changing modal force can alter truth conditions independently of ambiguity about modal scope.",
+            "Did force change, scope change, or both across the restatement?",
+            "Explicit force and scope annotation should separate the two distortion channels.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "quotation_context_loss", "framing_by_omission", LensInteractionKind.REINFORCES,
+            "Quotation context loss is a localized form of framing by omitted qualifiers, referents, or contrast classes.",
+            "Which omitted context materially changes the quoted proposition or pragmatic force?",
+            "Restoring the specific omitted context should reduce the interpretation shift.",
+            tangent_axis_hint="semantic",
+        ),
+        LensInteractionRule(
+            "coordination_failure_mode", "common_knowledge_gap", LensInteractionKind.CONDITIONS,
+            "Missing common knowledge is one specific coordination failure among timing, incentives, trust, and role mismatch.",
+            "Does public grounding repair the failure while other coordination conditions remain fixed?",
+            "A knowledge-limited failure should improve after public grounding without payoff changes.",
+            tangent_axis_hint="social",
+        ),
+        LensInteractionRule(
+            "information_cascade", "status_cascade", LensInteractionKind.CONDITIONS,
+            "Observed public choices and actor status can separately or jointly amplify imitation.",
+            "Would actors still follow if prior choices were visible but source status were hidden?",
+            "Removing one channel should reveal whether cascade pressure comes from informational inference or prestige.",
+            tangent_axis_hint="social",
+        ),
+        LensInteractionRule(
+            "regime_duration", "regime_switch_forecast", LensInteractionKind.REINFORCES,
+            "Regime-switch models gain structure when transition hazard depends on dwell time.",
+            "Is the next-state probability memoryless or conditional on time already spent in the regime?",
+            "Duration-aware models should improve held-out transition likelihood when dwell dependence is real.",
+            tangent_axis_hint="temporal",
+        ),
+        LensInteractionRule(
+            "event_order_uncertainty", "event_time_processing_time", LensInteractionKind.REINFORCES,
+            "Late processing can obscure event order, while partial-order reasoning preserves only justified precedence constraints.",
+            "Which ordering comes from event timestamps and which from ingestion order?",
+            "Correct event-time anchors should reduce valid linearizations without relying on processing order.",
+            tangent_axis_hint="temporal",
+        ),
+        LensInteractionRule(
+            "graceful_degradation", "fault_containment_boundary", LensInteractionKind.REINFORCES,
+            "Fault containment should preserve prioritized service boundaries that graceful degradation can exploit.",
+            "Which capabilities are expected to survive inside the containment boundary?",
+            "Injected local faults should reduce optional capability before core service when both mechanisms work.",
+            tangent_axis_hint="system",
+        ),
+        LensInteractionRule(
+            "load_shedding", "queue_backpressure", LensInteractionKind.REINFORCES,
+            "Load shedding is an explicit control response to arrival rates that exceed sustainable service capacity.",
+            "Which admitted-work threshold keeps queue growth and tail latency bounded?",
+            "Activating shedding should cap protected queue or latency metrics while rejection rises.",
+            tangent_axis_hint="system",
+        ),
+        LensInteractionRule(
+            "negative_control_probe", "backdoor_confounding", LensInteractionKind.REINFORCES,
+            "Negative controls can expose bias pathways left open by a proposed confounding adjustment set.",
+            "Should this control share the bias path while lacking the target causal path?",
+            "Residual negative-control association should weaken confidence in the proposed adjustment strategy.",
+            tangent_axis_hint="causal",
+        ),
+        LensInteractionRule(
+            "positivity_overlap", "partial_identification_bounds", LensInteractionKind.REINFORCES,
+            "Support violations naturally widen the set of effects compatible with observed data and weaker extrapolation assumptions.",
+            "Where does missing treatment overlap force extrapolation rather than identification?",
+            "Restricting the target population to overlap regions should narrow uncertainty attributable to positivity failure.",
+            tangent_axis_hint="causal",
+        ),
+        LensInteractionRule(
+            "conditional_entropy_residual", "mutual_information_gain", LensInteractionKind.REINFORCES,
+            "Conditional entropy describes remaining uncertainty while mutual information scores how much a candidate observation can remove.",
+            "Which candidate observation removes the largest share of residual uncertainty?",
+            "Higher conditional information gain should produce larger posterior entropy reduction on average.",
+            tangent_axis_hint="information",
+        ),
+        LensInteractionRule(
+            "compression_invariance", "lossy_summary_budget", LensInteractionKind.CONDITIONS,
+            "A lossy summary is acceptable only for tasks whose required relations remain invariant under the compression.",
+            "Which downstream relation must survive this summary budget?",
+            "Task errors should rise specifically when compression removes non-invariant distinctions.",
+            tangent_axis_hint="information",
+        ),
+        LensInteractionRule(
+            "algorithmic_nondeterminism", "concurrency_interleaving", LensInteractionKind.CONDITIONS,
+            "Concurrency interleavings are one source of execution nondeterminism among random seeds and external state.",
+            "Does constraining the scheduler remove the divergent output?",
+            "Scheduler control should eliminate variance caused specifically by race-sensitive interleavings.",
+            tangent_axis_hint="computational",
+        ),
+        LensInteractionRule(
+            "serialization_boundary", "interface_contract_drift", LensInteractionKind.REINFORCES,
+            "Serialization can be the concrete boundary where an evolving contract loses or reinterprets fields.",
+            "Which semantic distinction is present before serialization but absent or changed after decoding?",
+            "Version-aware round-trip tests should expose contract drift localized to the wire representation.",
+            tangent_axis_hint="computational",
+        ),
+        LensInteractionRule(
+            "uncertainty_miscalibration", "calibration_gap_monitor", LensInteractionKind.REINFORCES,
+            "A calibration gap can be conditioned on evidence quality, novelty, or domain support to diagnose uncertainty miscalibration.",
+            "Does uncertainty widen appropriately in lower-support conditions?",
+            "Support-stratified calibration should expose overconfidence concentrated in novel or weak-evidence cases.",
+            tangent_axis_hint="metacognitive",
+        ),
+        LensInteractionRule(
+            "adversarial_self_check", "search_diversity_audit", LensInteractionKind.REINFORCES,
+            "A self-check is useful when it creates a structurally distinct alternative rather than a paraphrased objection.",
+            "Does the counterargument imply a different mechanism and discriminating observation?",
+            "Structurally diverse self-checks should produce more decision-relevant falsifiers.",
+            tangent_axis_hint="adversarial",
+        ),
+        LensInteractionRule(
+            "prior_sensitivity", "model_mixture_uncertainty", LensInteractionKind.CONDITIONS,
+            "Prior sensitivity within models and uncertainty across models are distinct contributors to posterior instability.",
+            "Does conclusion variance come mainly from prior choice or model-class choice?",
+            "Separate prior and model sweeps should localize the dominant source of posterior spread.",
+            tangent_axis_hint="probabilistic",
+        ),
+        LensInteractionRule(
+            "multiplicity_correction", "stopping_rule_sensitivity", LensInteractionKind.REINFORCES,
+            "Repeated testing across hypotheses and repeated peeking across time compound opportunity for false discovery.",
+            "How many effective hypotheses and stopping opportunities were available?",
+            "Jointly valid sequential/multiplicity control should reduce false discoveries under adaptive search.",
+            tangent_axis_hint="probabilistic",
+        ),
+        LensInteractionRule(
+            "out_of_distribution", "covariate_shift", LensInteractionKind.CONDITIONS,
+            "Covariate shift may remain inside historical support, while out-of-distribution cases exceed validated support.",
+            "Is target input density merely reweighted or does it enter unsupported regions?",
+            "Importance weighting should help in-support shift but not unsupported extrapolation.",
+            tangent_axis_hint="predictive",
+        ),
+        LensInteractionRule(
+            "forecast_combination_diversity", "model_mixture_uncertainty", LensInteractionKind.REINFORCES,
+            "Model-mixture uncertainty is most useful when component forecasts contribute genuinely distinct error structure.",
+            "How correlated are component errors after conditioning on common data and features?",
+            "Combination gains should shrink as component error dependence approaches one.",
+            tangent_axis_hint="predictive",
+        ),
+    )
+
+
+def adaptive_interaction_keys() -> tuple[tuple[str, str], ...]:
+    return tuple(rule.key for rule in adaptive_interaction_rules())
