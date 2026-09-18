@@ -320,6 +320,38 @@ class AssociativeMemoryMesh:
                     self._ngrams[(namespace.key, gram)] += 1
         return tuple(edges)
 
+    def observe_higher_order_sequence(
+        self,
+        namespace: MemoryNamespace,
+        card_ids: Sequence[str],
+        *,
+        minimum_order: int = 3,
+    ) -> int:
+        """Record higher-order n-grams without replaying pairwise graph edges.
+
+        observe_sequence remains the authoritative path for adjacent temporal
+        edges and order-2 n-grams. This edge-free path lets a streaming
+        acquisition loop extend order-3+ sequence memory without artificially
+        inflating pair frequencies each time the rolling window grows.
+        """
+        if not isinstance(namespace, MemoryNamespace):
+            raise TypeError("namespace must be MemoryNamespace")
+        minimum = positive_int("minimum_order", minimum_order, maximum=5)
+        if minimum < 3:
+            raise AgentContractError("higher-order sequence minimum_order must be at least 3")
+        ids = tuple(str(item) for item in card_ids if str(item))
+        maximum = min(self.policy.ngram_max_order, len(ids))
+        if maximum < minimum:
+            return 0
+        updates = 0
+        with self._lock:
+            for order in range(minimum, maximum + 1):
+                for start in range(0, len(ids) - order + 1):
+                    gram = ids[start : start + order]
+                    self._ngrams[(namespace.key, gram)] += 1
+                    updates += 1
+        return updates
+
     def observe_juxtaposition(
         self,
         namespace: MemoryNamespace,
