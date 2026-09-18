@@ -13,10 +13,8 @@ on:
     - cron: '41 4 * * 0'
 
 concurrency:
-  # PR runs stay per-PR. Main/scheduled/manual runs are full-repository scans,
-  # so the newest ref-scoped run safely supersedes older main generations.
-  group: artifact-policy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: artifact-policy-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -28,10 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      # PR validation remains incremental. Push/schedule/manual validation is
-      # deliberately full-repository so ref-level concurrency can coalesce
-      # superseded main runs without skipping artifact-policy evidence.
-      ARTIFACT_BASE: ${{ github.event.pull_request.base.sha }}
+      ARTIFACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
