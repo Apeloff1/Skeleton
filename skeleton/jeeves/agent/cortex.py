@@ -470,6 +470,9 @@ class JeevesCortex:
             if not self.config.preserve_run_worlds:
                 self._runs.pop(result.run_id, None)
                 self._checkpoint_cache.pop(result.run_id, None)
+                self._checkpoint_assessments.pop(result.run_id, None)
+        if not self.config.preserve_run_worlds:
+            self.world_model.discard(state.scope)
         return report
 
     def report(self, run_id: str) -> CortexRunReport | None:
