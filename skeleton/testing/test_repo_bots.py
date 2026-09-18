@@ -30,15 +30,13 @@ def test_redact_secrets_removes_common_credentials():
     assert "Bearer abcdef" not in clean
 
 
-def test_test_environment_drops_repository_and_model_credentials(monkeypatch, tmp_path):
-    from skeleton.automation.repo_bots import _test_env
+def test_generated_python_validation_is_non_executing_and_rejects_syntax():
+    from skeleton.automation.repo_bots import validate_generated_files
 
-    monkeypatch.setenv("GITHUB_TOKEN", "secret")
-    monkeypatch.setenv("GH_TOKEN", "secret")
-    monkeypatch.setenv("MODEL_API_KEY", "secret")
-    env = _test_env(tmp_path)
-
-    assert "GITHUB_TOKEN" not in env
-    assert "GH_TOKEN" not in env
-    assert "MODEL_API_KEY" not in env
-    assert env["PYTHONPATH"] == str(tmp_path)
+    validate_generated_files({
+        "files": [{"path": "skeleton/good.py", "content": "x = 1\n"}]
+    })
+    with pytest.raises(RuntimeError, match="generated Python is invalid"):
+        validate_generated_files({
+            "files": [{"path": "skeleton/bad.py", "content": "def broken(:\n"}]
+        })
