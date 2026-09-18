@@ -492,6 +492,12 @@ from .semantic_research_bridge import (
     SemanticTopologyResearchUpdate,
 )
 
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    SemanticLearningScope,
+    SemanticScopePoolSnapshot,
+)
+
 from .semantic_topology_learning import (
     LearnedTopologyRule,
     SemanticTopologyLearningLab,
