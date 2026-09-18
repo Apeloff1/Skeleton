@@ -314,6 +314,28 @@ def test_unknown_schema_version_fails_closed():
     assert empty.assets == ()
 
 
+def test_from_bytes_lineage_iterable_is_hard_bounded():
+    def endless_lineage():
+        index = 0
+        while True:
+            yield LineageStep(
+                step=index,
+                operator="noop",
+                input_digest="",
+                output_digest="0" * 64,
+                parameters=(),
+            )
+            index += 1
+
+    with pytest.raises(LineageError, match="lineage exceeds step bound"):
+        AssetRecord.from_bytes(
+            asset_id="bounded-lineage",
+            kind="image",
+            data=b"asset-bytes",
+            lineage=endless_lineage(),
+        )
+
+
 def test_typed_asset_record_rejects_invalid_content_metadata_and_release_flag():
     record = AssetRecord.from_bytes(
         asset_id="typed-asset",
