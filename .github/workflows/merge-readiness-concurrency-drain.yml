@@ -9,6 +9,13 @@ on:
 
 permissions: {}
 
+concurrency:
+  # Keep this one-shot tombstone workflow isolated from active Merge Readiness
+  # groups while still giving the repository-wide concurrency audit an explicit
+  # top-level identity.
+  group: merge-readiness-legacy-drain-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   tombstone:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}
