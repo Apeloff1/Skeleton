@@ -105,7 +105,9 @@ def test_normalize_sdist_removes_archive_metadata_nondeterminism(tmp_path: Path)
     assert members[1].mode == 0o644
 
 
-def test_emit_provenance_is_deterministic_and_hashes_release_inputs(tmp_path: Path) -> None:
+def test_emit_provenance_is_deterministic_and_hashes_release_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     artifacts = tmp_path / "dist"
     artifacts.mkdir()
     wheel = artifacts / "skeleton-16.0.0-py3-none-any.whl"
@@ -114,6 +116,7 @@ def test_emit_provenance_is_deterministic_and_hashes_release_inputs(tmp_path: Pa
     sbom.write_text('{"bomFormat":"CycloneDX"}\n', encoding="utf-8")
     build_lock = tmp_path / "requirements-build.txt"
     build_lock.write_text("build==1.3.0\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
 
     first = tmp_path / "first.json"
     first_sums = tmp_path / "first.sha256"
@@ -123,7 +126,7 @@ def test_emit_provenance_is_deterministic_and_hashes_release_inputs(tmp_path: Pa
         checksums=str(first_sums),
         source_commit=COMMIT,
         source_date_epoch="1700000000",
-        input=[str(build_lock)],
+        input=[build_lock.name],
         sbom_ref=[str(sbom)],
     )
     assert release_provenance.emit_provenance(args) == 0
@@ -197,6 +200,26 @@ def test_invalid_source_identity_fails_closed() -> None:
     with pytest.raises(ValueError):
         release_provenance._validate_epoch("-1")
 
+
+def test_emit_provenance_rejects_absolute_input_names(tmp_path: Path) -> None:
+    artifacts = tmp_path / "dist"
+    artifacts.mkdir()
+    (artifacts / "skeleton.whl").write_bytes(b"artifact")
+    build_lock = tmp_path / "requirements-build.txt"
+    build_lock.write_text("build==1.3.0\n", encoding="utf-8")
+
+    args = argparse.Namespace(
+        artifacts_dir=str(artifacts),
+        output=str(tmp_path / "provenance.json"),
+        checksums=str(tmp_path / "SHA256SUMS"),
+        source_commit=COMMIT,
+        source_date_epoch="1700000000",
+        input=[str(build_lock)],
+        sbom_ref=[],
+    )
+    with pytest.raises(ValueError, match="repository-relative POSIX"):
+        release_provenance.emit_provenance(args)
+
 def test_schema_version_1_callers_are_unchanged(tmp_path: Path) -> None:
     assert release_provenance.SCHEMA_VERSION == 1
     artifacts = tmp_path / "dist"
@@ -254,7 +277,9 @@ def test_evidence_loader_does_not_require_preexisting_pythonpath() -> None:
         sys.modules.update(original_modules)
 
 
-def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) -> None:
+def test_evidence_adapter_gates_missing_tests_and_binds_digests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     artifacts = tmp_path / "dist"
     artifacts.mkdir()
     wheel = artifacts / "skeleton-16.0.0-py3-none-any.whl"
@@ -263,6 +288,7 @@ def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) 
     sbom.write_text('{"bomFormat":"CycloneDX"}\n', encoding="utf-8")
     build_lock = tmp_path / "requirements-build.txt"
     build_lock.write_text("build==1.3.0\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
     provenance_path = tmp_path / "provenance.json"
     checksums = tmp_path / "SHA256SUMS"
     emit_args = argparse.Namespace(
@@ -271,7 +297,7 @@ def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) 
         checksums=str(checksums),
         source_commit=COMMIT,
         source_date_epoch="1700000000",
-        input=[str(build_lock)],
+        input=[build_lock.name],
         sbom_ref=[str(sbom)],
     )
     assert release_provenance.emit_provenance(emit_args) == 0
