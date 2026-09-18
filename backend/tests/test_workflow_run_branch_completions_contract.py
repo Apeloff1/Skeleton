@@ -36,6 +36,22 @@ def test_rejects_workflow_run_without_all_branch_globs() -> None:
     assert "every completing head" in messages
 
 
+def test_pr_automation_may_exclude_only_main_from_workflow_run() -> None:
+    source = AUTOMATION.read_text(encoding="utf-8")
+    messages = "\n".join(violations_for_text(AUTOMATION.name, source))
+    assert "every completing head" not in messages
+
+
+def test_rejects_pr_automation_broader_branch_exclusion() -> None:
+    source = _replace_once(
+        AUTOMATION.read_text(encoding="utf-8"),
+        "    branches-ignore:\n      - main\n",
+        "    branches-ignore:\n      - main\n      - release/**\n",
+    )
+    messages = "\n".join(violations_for_text(AUTOMATION.name, source))
+    assert "every completing head" in messages
+
+
 def test_rejects_automation_identity_from_first_pull_request_only() -> None:
     source = AUTOMATION.read_text(encoding="utf-8")
     source = _replace_once(
