@@ -91,14 +91,33 @@ class AIShellService:
         self.state.transition(AIServicePhase.READY)
         return report
 
+    def _release_digest(self) -> str:
+        return "" if self._release_report is None else self._release_report.evidence_digest
+
+    def _require_release_current(self) -> None:
+        if self.release_guard is None or self.release_expectation is None:
+            return
+        report = self.release_guard.inspect(self.release_expectation)
+        self._release_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason="AI release/channel drift detected",
+            )
+        raise RuntimeError("AI release/channel verification failed")
+
     def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
 
     def review(self, session: AIShellSession) -> tuple[AIReviewBundle, AIReviewView]:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
         bundle = self.orchestrator.review(session)
         proposal = bundle.planning.response.proposal
         self.governance.require_not_quarantined(
@@ -139,6 +158,7 @@ class AIShellService:
 
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         proposal = review.planning.response.proposal
@@ -171,6 +191,7 @@ class AIShellService:
             plan_pin=pin,
             preconditions_digest="" if preconditions is None else preconditions.digest,
             approval_id=approval_id,
+            release_evidence_digest=self._release_digest(),
             ttl_seconds=ttl_seconds,
         )
 
@@ -191,6 +212,7 @@ class AIShellService:
 
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -211,6 +233,7 @@ class AIShellService:
             plan_pin=pin,
             preconditions_digest=precondition_digest,
             approval_id=approval_id,
+            release_evidence_digest=self._release_digest(),
         )
         result = self.execute(
             session,
@@ -232,6 +255,7 @@ class AIShellService:
     ) -> AIExecutionBundle:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
         proposal = review.planning.response.proposal
         pin = self._pins.get(session.session_id)
         if review.compiled is not None:
