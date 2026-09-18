@@ -13,6 +13,7 @@ from skeleton.jeeves.agent.semantic_lens_topology import SemanticLensTopology
 from skeleton.jeeves.agent.semantic_lenses import (
     SemanticFinding,
     SemanticObservation,
+    SemanticRole,
 )
 from skeleton.jeeves.agent.semantic_maximal import MaximalSemanticRegistry
 from skeleton.jeeves.agent.semantic_plane import (
@@ -27,6 +28,17 @@ from skeleton.jeeves.agent.semantic_topology_learning import (
     TopologyBridgeTrial,
 )
 from skeleton.jeeves.agent.types import AgentContractError
+
+
+def test_system_role_is_available_to_system_oriented_lenses() -> None:
+    registry = MaximalSemanticRegistry()
+
+    assert SemanticRole.SYSTEM.value == "system"
+    assert registry.get("mechanics_dynamics_aesthetics").role is SemanticRole.SYSTEM
+    assert any(
+        spec.role is SemanticRole.SYSTEM
+        for spec in registry.all()
+    )
 
 
 def _system():
