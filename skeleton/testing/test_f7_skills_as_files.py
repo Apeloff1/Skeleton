@@ -292,3 +292,92 @@ def test_atomic_write_cleans_unique_temp_when_replace_fails(
 
     assert not target.exists()
     assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
+
+def test_atomic_write_orders_file_sync_replace_and_directory_sync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    bank = _bank(tmp_path)
+    events: list[str] = []
+    real_replace = skills_files_module.os.replace
+
+    def record_fsync(_fd):
+        events.append("file-fsync")
+
+    def record_replace(source, target):
+        events.append("replace")
+        real_replace(source, target)
+
+    def record_directory_sync(_path):
+        events.append("directory-fsync")
+
+    monkeypatch.setattr(skills_files_module.os, "fsync", record_fsync)
+    monkeypatch.setattr(skills_files_module.os, "replace", record_replace)
+    monkeypatch.setattr(
+        skills_files_module,
+        "_fsync_parent_directory",
+        record_directory_sync,
+    )
+
+    bank.upsert_skill(SkillSpec(skill_id="safe", instructions="bounded"))
+
+    assert events == ["file-fsync", "replace", "directory-fsync"]
+
+
+def test_parent_directory_sync_closes_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    if skills_files_module.os.name == "nt":
+        pytest.skip("directory fsync is intentionally skipped on Windows")
+
+    target = tmp_path / "skills" / "safe.json"
+    target.parent.mkdir(parents=True)
+    events: list[tuple[str, object]] = []
+    directory_fd = 991
+
+    def fake_open(path, flags):
+        events.append(("open", (Path(path), flags)))
+        return directory_fd
+
+    def fake_fsync(fd):
+        events.append(("fsync", fd))
+
+    def fake_close(fd):
+        events.append(("close", fd))
+
+    monkeypatch.setattr(skills_files_module.os, "open", fake_open)
+    monkeypatch.setattr(skills_files_module.os, "fsync", fake_fsync)
+    monkeypatch.setattr(skills_files_module.os, "close", fake_close)
+
+    skills_files_module._fsync_parent_directory(target)
+
+    assert events[0][0] == "open"
+    assert events[0][1][0] == target.parent
+    assert events[1:] == [("fsync", directory_fd), ("close", directory_fd)]
+
+
+def test_directory_sync_failure_reports_failure_without_claiming_rollback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    bank = _bank(tmp_path)
+    target = bank.skill_path("safe")
+
+    def fail_directory_sync(_path):
+        raise OSError("directory fsync failed after replace")
+
+    monkeypatch.setattr(
+        skills_files_module,
+        "_fsync_parent_directory",
+        fail_directory_sync,
+    )
+
+    with pytest.raises(OSError, match="directory fsync failed after replace"):
+        bank.upsert_skill(SkillSpec(skill_id="safe", instructions="bounded"))
+
+    assert target.exists()
+    assert json.loads(target.read_text(encoding="utf-8"))["skill_id"] == "safe"
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
