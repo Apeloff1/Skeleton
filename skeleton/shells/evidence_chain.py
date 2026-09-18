@@ -227,6 +227,8 @@ class ContentAddressedEvidenceChain:
                     and current_revision >= revision
                 ):
                     return node
+                if current_revision == revision and current == head:
+                    raise
                 continue
         raise EvidenceConflict("evidence head CAS retry budget exhausted")
 
