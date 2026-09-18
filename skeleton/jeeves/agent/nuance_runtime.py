@@ -29,11 +29,18 @@ from typing import Any, Mapping, Sequence
 
 from .cognition import ContextCompiler, ContextPacket, ContextSection, RunScratchpad
 from .context_pipeline import ContextResolution, LayeredContextResolver
+from .interpretive_science import ScientificLensLab
+from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
 from .perpendicular_semantics import PerpendicularExpansionPlan, PerpendicularExpansionPlanner
 from .relational_memory import RelationKind, RelationTrace, SequenceObservation
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
+from .semantic_fusion_runtime import (
+    SemanticForecastFusionEngine,
+    SemanticForecastFusionSnapshot,
+)
+from .semantic_governance import SemanticLensGovernanceBridge, SemanticLensGovernanceSnapshot
 from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
 from .semantic_tangent_bridge import SemanticRestartPacket, SemanticTangentBridge
@@ -86,6 +93,8 @@ class NuanceFrame:
     captured_card_id: str | None
     fingerprint: str
     relation_sequence: SequenceObservation | None = None
+    lens_governance: SemanticLensGovernanceSnapshot | None = None
+    semantic_domain: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +107,8 @@ class NuanceUpdate:
     fingerprint: str
     perpendicular_plan: PerpendicularExpansionPlan | None = None
     relational_hypothesis_ids: tuple[str, ...] = ()
+    hypergraph: SemanticHypergraphSnapshot | None = None
+    forecast_fusion: SemanticForecastFusionSnapshot | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +227,10 @@ class ScientificNuanceRuntime:
         tangent_bridge: SemanticTangentBridge | None = None,
         uncertainty_router: FrontierUncertaintyRouter | None = None,
         perpendicular_planner: PerpendicularExpansionPlanner | None = None,
+        lens_lab: ScientificLensLab | None = None,
+        lens_governance: SemanticLensGovernanceBridge | None = None,
+        lens_hypergraph: SemanticLensHypergraph | None = None,
+        forecast_fusion_engine: SemanticForecastFusionEngine | None = None,
         policy: NuanceRuntimePolicy | None = None,
     ) -> None:
         if not isinstance(resolver, LayeredContextResolver):
@@ -229,6 +244,19 @@ class ScientificNuanceRuntime:
         self.tangent_bridge = tangent_bridge or SemanticTangentBridge()
         self.uncertainty_router = uncertainty_router or FrontierUncertaintyRouter()
         self.perpendicular_planner = perpendicular_planner or PerpendicularExpansionPlanner(self.semantic_registry)
+        if lens_governance is not None and lens_lab is not None and lens_governance.lab is not lens_lab:
+            raise ValueError("lens_governance and lens_lab must share one ScientificLensLab")
+        self.lens_governance = lens_governance or SemanticLensGovernanceBridge(lab=lens_lab)
+        self.lens_lab = self.lens_governance.lab
+        self.lens_hypergraph = lens_hypergraph or SemanticLensHypergraph()
+        self.forecast_fusion_engine = (
+            forecast_fusion_engine
+            or SemanticForecastFusionEngine(self.semantic_registry)
+        )
+        if self.forecast_fusion_engine.registry is not self.semantic_registry:
+            raise ValueError(
+                "forecast_fusion_engine must share the semantic registry"
+            )
         self.policy = policy or NuanceRuntimePolicy()
         self._frames: dict[str, NuanceFrame] = {}
         self._updates: dict[str, NuanceUpdate] = {}
@@ -263,6 +291,7 @@ class ScientificNuanceRuntime:
         *,
         context_tags: Sequence[str] = (),
         requested_lenses: Sequence[str] = (),
+        semantic_domain: str | None = None,
         capture_interaction: bool | None = None,
         interaction_provenance: Sequence[str] = (),
         interaction_metadata: Mapping[str, Any] | None = None,
@@ -299,6 +328,11 @@ class ScientificNuanceRuntime:
             max_lenses=self.policy.max_lenses,
             max_per_family=self.policy.max_lenses_per_family,
             minimum_rare_when_supported=self.policy.minimum_rare_lenses_when_supported,
+        )
+        governance = self.lens_governance.assess(
+            selection,
+            observations,
+            domain=semantic_domain,
         )
         uncertainty = self.uncertainty_router.recommend(
             " ".join([query, *(item.content for item in context.items[:8])]),
@@ -355,6 +389,8 @@ class ScientificNuanceRuntime:
                 "context": context.fingerprint,
                 "observations": [item.fingerprint for item in observations],
                 "lenses": [item.key for item in selection.lenses],
+                "lens_governance": governance.fingerprint,
+                "semantic_domain": governance.domain,
                 "uncertainty": [item.lens.value for item in uncertainty],
                 "captured_card": captured.card_id if captured else None,
                 "relation_sequence": relation_sequence.fingerprint if relation_sequence else None,
@@ -371,6 +407,8 @@ class ScientificNuanceRuntime:
             captured_card_id=captured.card_id if captured else None,
             fingerprint=fingerprint,
             relation_sequence=relation_sequence,
+            lens_governance=governance,
+            semantic_domain=governance.domain,
         )
         self._frames[frame_id] = frame
         return frame
@@ -510,6 +548,19 @@ class ScientificNuanceRuntime:
         forecasts = self.predictive_model.propose(validated, composition=composition)
         for forecast in forecasts:
             self.prediction_ledger.add(forecast)
+        calibration_weights = (
+            frame.lens_governance.predictive_weights
+            if frame.lens_governance is not None
+            else {}
+        )
+        hypergraph = self.lens_hypergraph.build(
+            validated,
+            calibration_weights=calibration_weights,
+        )
+        forecast_fusion = self.forecast_fusion_engine.fuse(
+            forecasts,
+            governance=frame.lens_governance,
+        )
         tangents = list(
             self.tangent_bridge.ingest(
                 validated,
@@ -542,6 +593,8 @@ class ScientificNuanceRuntime:
                 "tangents": [item.fingerprint for item in tangent_tuple],
                 "perpendicular_plan": perpendicular_plan.fingerprint,
                 "relational_hypotheses": [item.fingerprint for item in relational_hypotheses],
+                "hypergraph": hypergraph.fingerprint,
+                "forecast_fusion": forecast_fusion.fingerprint,
             }
         )
         update = NuanceUpdate(
@@ -553,6 +606,8 @@ class ScientificNuanceRuntime:
             fingerprint=fingerprint,
             perpendicular_plan=perpendicular_plan,
             relational_hypothesis_ids=tuple(item.relation_id for item in relational_hypotheses),
+            hypergraph=hypergraph,
+            forecast_fusion=forecast_fusion,
         )
         self._updates[frame.frame_id] = update
         return update
@@ -591,12 +646,97 @@ class ScientificNuanceRuntime:
         *,
         outcome: bool,
         observation_id: str | None = None,
+        domain: str | None = None,
+        independent_run: str | None = None,
+        negative_control: bool = False,
     ) -> SemanticForecast:
-        return self.prediction_ledger.resolve(
+        if (domain is None) != (independent_run is None):
+            raise NuanceRuntimeError(
+                "domain and independent_run must be supplied together for lens calibration"
+            )
+        if domain is not None and not str(domain).strip():
+            raise NuanceRuntimeError("calibration domain must be non-empty")
+        if independent_run is not None and not str(independent_run).strip():
+            raise NuanceRuntimeError("calibration independent_run must be non-empty")
+        if not isinstance(negative_control, bool):
+            raise NuanceRuntimeError("negative_control must be boolean")
+        resolved = self.prediction_ledger.resolve(
             forecast_id,
             outcome=outcome,
             observation_id=observation_id,
         )
+        if domain is not None and independent_run is not None:
+            findings_by_id = {
+                finding.finding_id: finding
+                for update in self._updates.values()
+                for finding in update.findings
+            }
+            for finding_id in resolved.source_finding_ids:
+                finding = findings_by_id.get(finding_id)
+                if finding is None:
+                    continue
+                self.lens_lab.record_finding_outcome(
+                    finding,
+                    probability_value=resolved.probability,
+                    outcome=outcome,
+                    domain=domain,
+                    independent_run=independent_run,
+                    negative_control=negative_control,
+                )
+        return resolved
+
+    def lens_science_summary(self) -> Mapping[str, Any]:
+        statuses = {
+            key: status.value
+            for key, status in self.lens_lab.status_map().items()
+        }
+        hypergraphs = [
+            update.hypergraph
+            for update in self._updates.values()
+            if update.hypergraph is not None
+        ]
+        fusions = [
+            update.forecast_fusion
+            for update in self._updates.values()
+            if update.forecast_fusion is not None
+        ]
+        fusion_groups = [
+            group
+            for snapshot in fusions
+            for group in snapshot.fusions
+        ]
+        return {
+            "frame_count": len(self._frames),
+            "update_count": len(self._updates),
+            "open_forecasts": len(self.prediction_ledger.open()),
+            "resolved_forecasts": len(self.prediction_ledger.resolved()),
+            "calibrated_lens_count": len(statuses),
+            "lens_statuses": statuses,
+            "lens_lab_fingerprint": self.lens_lab.fingerprint,
+            "governance_fingerprint": self.lens_governance.fingerprint,
+            "hypergraph_count": len(hypergraphs),
+            "latest_hypergraph_fingerprint": (
+                hypergraphs[-1].fingerprint if hypergraphs else None
+            ),
+            "forecast_fusion_snapshot_count": len(fusions),
+            "forecast_fusion_group_count": len(fusion_groups),
+            "forecast_fusion_abstention_count": sum(
+                group.result.abstain for group in fusion_groups
+            ),
+            "forecast_fusion_engine_fingerprint": (
+                self.forecast_fusion_engine.fingerprint
+            ),
+            "invariants": {
+                "semantic_lenses_remain_interpretive": True,
+                "factual_assertion_from_lens_alone_forbidden": True,
+                "causal_assertion_from_lens_alone_forbidden": True,
+                "predictive_weight_requires_recorded_outcomes": True,
+                "hypergraph_never_creates_evidence": True,
+                "forecast_fusion_requires_textually_identical_targets": True,
+                "forecast_fusion_never_merges_multi_lens_interactions": True,
+                "forecast_fusion_can_abstain_on_dependence_or_conflict": True,
+            },
+        }
 
     def frame(self, frame_id: str) -> NuanceFrame | None:
         return self._frames.get(str(frame_id))
@@ -611,6 +751,9 @@ class ScientificNuanceRuntime:
                 "frames": [(key, value.fingerprint) for key, value in sorted(self._frames.items())],
                 "updates": [(key, value.fingerprint) for key, value in sorted(self._updates.items())],
                 "prediction_ledger": self.prediction_ledger.fingerprint,
+                "lens_lab": self.lens_lab.fingerprint,
+                "lens_governance": self.lens_governance.fingerprint,
+                "forecast_fusion_engine": self.forecast_fusion_engine.fingerprint,
                 "tangent_graph": self.tangent_bridge.graph.fingerprint,
             }
         )
@@ -696,22 +839,78 @@ class ScientificContextCompiler:
         return tuple(sorted(tags))
 
     def _workbench_section(self, frame: NuanceFrame) -> ContextSection:
-        lenses = [
-            {
-                "key": spec.key,
-                "family": spec.family.value,
-                "role": spec.role.value,
-                "activation": round(
-                    float(frame.lens_selection.activation_scores.get(spec.key, 0.0)),
-                    8,
-                ),
-                "rare": spec.rare,
-                "questions": list(spec.asks[: self.policy.maximum_lens_questions]),
-                "predicts": spec.predicts,
-                "failure_mode": spec.failure_mode,
-            }
-            for spec in frame.lens_selection.lenses
-        ]
+        governance_by_lens = {
+            item.lens_key: item
+            for item in (
+                frame.lens_governance.records
+                if frame.lens_governance is not None
+                else ()
+            )
+        }
+        lenses = []
+        for spec in frame.lens_selection.lenses:
+            governed = governance_by_lens.get(spec.key)
+            decision = governed.decision if governed is not None else None
+            lenses.append(
+                {
+                    "key": spec.key,
+                    "family": spec.family.value,
+                    "role": spec.role.value,
+                    "activation": round(
+                        float(frame.lens_selection.activation_scores.get(spec.key, 0.0)),
+                        8,
+                    ),
+                    "rare": spec.rare,
+                    "matched_cues": list(governed.matched_cues) if governed else [],
+                    "scientific_grade": (
+                        decision.grade.value if decision else "interpretive"
+                    ),
+                    "scientific_status": (
+                        decision.scientific_status.value if decision else "shadow"
+                    ),
+                    "declared_maturity": (
+                        governed.declared_maturity if governed else None
+                    ),
+                    "transfer_warning": (
+                        governed.transfer_warning if governed else ""
+                    ),
+                    "lineage": list(governed.lineage) if governed else [],
+                    "permissions": (
+                        [item.value for item in decision.permissions]
+                        if decision
+                        else []
+                    ),
+                    "governance_reasons": (
+                        list(decision.reasons[:3]) if decision else []
+                    ),
+                    "global_predictive_weight": round(
+                        decision.predictive_weight if decision else 0.0,
+                        8,
+                    ),
+                    "predictive_weight": round(
+                        (
+                            governed.domain_predictive_weight
+                            if governed
+                            and governed.domain_predictive_weight is not None
+                            else decision.predictive_weight
+                            if decision
+                            else 0.0
+                        ),
+                        8,
+                    ),
+                    "domain_status": (
+                        governed.domain_status if governed else "unspecified"
+                    ),
+                    "decision_feature_authorized": (
+                        decision.decision_feature_authorized if decision else False
+                    ),
+                    "factual_assertion_authorized": False,
+                    "causal_assertion_authorized": False,
+                    "questions": list(spec.asks[: self.policy.maximum_lens_questions]),
+                    "predicts": spec.predicts,
+                    "failure_mode": spec.failure_mode,
+                }
+            )
         uncertainty = [
             {
                 "lens": item.lens.value,
@@ -735,10 +934,18 @@ class ScientificContextCompiler:
                 "relational_transitions_are_scored_before_learning": True,
                 "uncertainty_lenses_require_their_stated_assumptions": True,
                 "predictions_must_be_falsifiable_and_scored_later": True,
+                "lens_predictive_influence_is_empirically_gated": True,
+                "lens_hypergraphs_never_create_evidence": True,
             },
             "frame_id": frame.frame_id,
             "frame_fingerprint": frame.fingerprint,
             "context_fingerprint": frame.context.fingerprint,
+            "semantic_domain": frame.semantic_domain,
+            "lens_governance_fingerprint": (
+                frame.lens_governance.fingerprint
+                if frame.lens_governance is not None
+                else None
+            ),
             "lenses": lenses,
             "uncertainty": uncertainty,
             "relation_sequence": None
@@ -759,6 +966,13 @@ class ScientificContextCompiler:
                     "role": row["role"],
                     "activation": row["activation"],
                     "rare": row["rare"],
+                    "scientific_grade": row["scientific_grade"],
+                    "scientific_status": row["scientific_status"],
+                    "declared_maturity": row["declared_maturity"],
+                    "global_predictive_weight": row["global_predictive_weight"],
+                    "predictive_weight": row["predictive_weight"],
+                    "domain_status": row["domain_status"],
+                    "decision_feature_authorized": row["decision_feature_authorized"],
                 }
                 for row in lenses
             ]
@@ -780,6 +994,11 @@ class ScientificContextCompiler:
                     "frame_id": frame.frame_id,
                     "frame_fingerprint": frame.fingerprint,
                     "context_fingerprint": frame.context.fingerprint,
+                    "lens_governance_fingerprint": (
+                        frame.lens_governance.fingerprint
+                        if frame.lens_governance is not None
+                        else None
+                    ),
                     "lens_keys": [item.key for item in frame.lens_selection.lenses],
                     "uncertainty_lenses": [
                         item.lens.value
@@ -815,10 +1034,16 @@ class ScientificContextCompiler:
             raise NuanceRuntimeError(
                 "scientific context compiler must share the runtime MemoryManager"
             )
+        domain_value = goal.metadata.get("domain")
         frame = self.nuance.prepare(
             namespace,
             self._query(task_instruction, goal, current_step),
             context_tags=self._context_tags(goal, plan, current_step),
+            semantic_domain=(
+                domain_value
+                if isinstance(domain_value, str) and domain_value.strip()
+                else None
+            ),
             capture_interaction=False,
         )
         layered = frame.context.sections(
@@ -851,10 +1076,16 @@ class ScientificContextCompiler:
         provenance: Sequence[str] = (),
         metadata: Mapping[str, Any] | None = None,
     ) -> InteractionCard:
+        domain_value = dict(metadata or {}).get("domain")
         frame = self.nuance.prepare(
             namespace,
             content,
             context_tags=context_tags,
+            semantic_domain=(
+                domain_value
+                if isinstance(domain_value, str) and domain_value.strip()
+                else None
+            ),
             capture_interaction=True,
             interaction_provenance=provenance,
             interaction_metadata={
