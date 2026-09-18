@@ -503,3 +503,28 @@ def test_general_convex_toi_tie_break_is_canonical() -> None:
 
     assert event is not None
     assert {event.body_a, event.body_b} == {"a", "m"}
+
+
+
+def test_separating_translation_can_dominate_angular_sweep_bound() -> None:
+    moving = _dynamic(
+        "moving",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(-2.0, 0.0, 0.0),
+    )
+    target = _static(
+        "target",
+        BoxShape(Vec3(0.5, 0.5, 0.5)),
+        Vec3(2.0, 0.0, 0.0),
+    )
+    moving.linear_velocity = Vec3(-5.0, 0.0, 0.0)
+    moving.angular_velocity = Vec3(0.0, 0.0, 1.0)
+
+    hit = convex_time_of_impact(
+        moving,
+        target,
+        0.5,
+        max_iterations=8,
+    )
+
+    assert hit is None
