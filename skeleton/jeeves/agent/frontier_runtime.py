@@ -59,6 +59,7 @@ from .semantic_plane import (
     SemanticPlaneSnapshot,
 )
 from .semantic_topology_learning import (
+    TopologyBridgePrediction,
     TopologyBridgeReport,
     TopologyBridgeTrial,
 )
@@ -351,11 +352,40 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             negative_control=negative_control,
         )
 
+    def declare_semantic_topology_prediction(
+        self,
+        prediction: TopologyBridgePrediction,
+    ) -> TopologyBridgePrediction:
+        """Declare a topology bridge prediction before observing its outcome."""
+
+        return self.semantic_plane.declare_topology_bridge_prediction(
+            prediction
+        )
+
+    def resolve_semantic_topology_prediction(
+        self,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeReport:
+        """Resolve one declared topology bridge prediction exactly once."""
+
+        return self.semantic_plane.resolve_topology_bridge_prediction(
+            prediction_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            outcome_evidence_ids=outcome_evidence_ids,
+            metadata=metadata,
+        )
+
     def record_semantic_topology_trial(
         self,
         trial: TopologyBridgeTrial,
     ) -> TopologyBridgeReport:
-        """Record a governed topology-bridge validation trial."""
+        """Import a resolved trial whose prediction is already in custody."""
 
         return self.semantic_plane.record_topology_bridge_trial(trial)
 
