@@ -311,6 +311,18 @@ def test_workflow_run_trigger_surface_is_bounded() -> None:
         assert f"- {workflow_name}" not in workflow
 
 
+def test_workflow_concurrency_coalesces_superseded_pr_failures() -> None:
+    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
+
+    assert (
+        "group: repair-intake-${{ github.event.workflow_run.workflow_id }}-"
+        "${{ join(github.event.workflow_run.pull_requests.*.number, '-') || "
+        "github.event.workflow_run.head_sha }}"
+    ) in workflow
+    assert "cancel-in-progress: true" in workflow
+    assert "github.event.workflow_run.pull_requests[0]" not in workflow
+
+
 def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
     workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
 
