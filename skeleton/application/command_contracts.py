@@ -108,6 +108,60 @@ def require_text(
     return value
 
 
+def require_mapping(
+    payload: Mapping[str, Any],
+    key: str,
+    default: Optional[Mapping[str, Any]] = None,
+    *,
+    optional: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """Return a JSON object; reject strings, arrays, and other stand-ins."""
+
+    if default is not None and (isinstance(default, (str, bytes, list, tuple)) or not isinstance(default, Mapping)):
+        raise CommandError("invalid_argument", f"{key} default must be an object")
+    if key not in payload:
+        if optional:
+            return dict(default) if isinstance(default, Mapping) else default
+        return dict(default or {})
+    value = payload[key]
+    if optional and value is None:
+        return None
+    if isinstance(value, (str, bytes, list, tuple)) or not isinstance(value, Mapping):
+        raise CommandError("invalid_argument", f"{key} must be an object")
+    return dict(value)
+
+
+def require_list(
+    payload: Mapping[str, Any],
+    key: str,
+    default: Optional[list[Any]] = None,
+    *,
+    optional: bool = True,
+    item_type: type | tuple[type, ...] | None = None,
+) -> Optional[list[Any]]:
+    """Return a JSON array; reject strings that would otherwise iterate as characters."""
+
+    if default is not None and not isinstance(default, (list, tuple)):
+        raise CommandError("invalid_argument", f"{key} default must be an array")
+    if key not in payload:
+        if optional:
+            return list(default) if isinstance(default, (list, tuple)) else default
+        return list(default or [])
+    value = payload[key]
+    if optional and value is None:
+        return None
+    if not isinstance(value, (list, tuple)):
+        raise CommandError("invalid_argument", f"{key} must be an array")
+    items = list(value)
+    if item_type is not None:
+        for item in items:
+            if isinstance(item, bool) and item_type in {int, (int,)}:
+                raise CommandError("invalid_argument", f"{key} items must be integers")
+            if not isinstance(item, item_type):
+                raise CommandError("invalid_argument", f"{key} items have the wrong type")
+    return items
+
+
 @dataclass(frozen=True)
 class CommandSpec:
     """Transport-neutral description of one supported operation family."""

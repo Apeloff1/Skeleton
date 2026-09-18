@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -66,17 +66,51 @@ def _float_field(
 def _text_field(
     payload: Dict[str, Any],
     key: str,
-    default: str = "",
+    default: Optional[str] = "",
     *,
     allowed: tuple[str, ...] | None = None,
-) -> str:
+    optional: bool = False,
+) -> Optional[str]:
     from skeleton.application.command_contracts import CommandError, require_text
 
     try:
-        value = require_text(payload, key, default, allowed=allowed)
+        value = require_text(payload, key, default, optional=optional, allowed=allowed)
     except CommandError as exc:
         raise _payload_error(exc) from exc
+    if optional:
+        return value
     return str(value or "")
+
+
+def _mapping_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: dict[str, Any] | None = None,
+    *,
+    optional: bool = True,
+) -> dict[str, Any] | None:
+    from skeleton.application.command_contracts import CommandError, require_mapping
+
+    try:
+        return require_mapping(payload, key, default, optional=optional)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _list_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: list[Any] | None = None,
+    *,
+    optional: bool = True,
+    item_type: type | tuple[type, ...] | None = None,
+) -> list[Any] | None:
+    from skeleton.application.command_contracts import CommandError, require_list
+
+    try:
+        return require_list(payload, key, default, optional=optional, item_type=item_type)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
 
 
 def _bool_field(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
@@ -163,8 +197,8 @@ async def retrieval_query(request: Dict[str, Any], state=Depends(_state)) -> Dic
     quad = genesis.handles.get("quad")
     if quad is None:
         raise HTTPException(status_code=503, detail="quad retriever not wired")
-    query = str(request.get("query", ""))
-    if not query.strip():
+    query = _text_field(request, "query", "").strip()
+    if not query:
         raise HTTPException(status_code=422, detail="query is required")
     k = _int_field(request, "k", 8, minimum=1)
     results = quad.retrieve(query, k=k, use_cache=_bool_field(request, "use_cache", True))
@@ -191,13 +225,13 @@ async def retrieval_ingest(request: Dict[str, Any], state=Depends(_state)) -> Di
     quad = genesis.handles.get("quad")
     if quad is None:
         raise HTTPException(status_code=503, detail="quad retriever not wired")
-    doc_id = str(request.get("doc_id", "")).strip()
-    text = str(request.get("text", "")).strip()
+    doc_id = _text_field(request, "doc_id", "").strip()
+    text = _text_field(request, "text", "").strip()
     if not doc_id or not text:
         raise HTTPException(status_code=422, detail="doc_id and text are required")
     chunks = quad.ingest_document(
         doc_id, text,
-        metadata=request.get("metadata"),
+        metadata=_mapping_field(request, "metadata", None, optional=True),
         salience=_float_field(request, "salience", 0.5, minimum=0.0),
     )
     return {"doc_id": doc_id, "chunks": chunks, "status": "ingested"}
@@ -213,8 +247,17 @@ async def retrieval_feedback(request: Dict[str, Any], state=Depends(_state)) -> 
     if quad is None:
         raise HTTPException(status_code=503, detail="quad retriever not wired")
 
-    used = request.get("used_planes", request.get("used"))
-    return record_plane_feedback(quad, used, all_planes=request.get("all_planes"))
+    if "used_planes" in request:
+        used = _list_field(request, "used_planes", None, optional=True, item_type=str)
+    elif "used" in request:
+        used = _list_field(request, "used", None, optional=True, item_type=str)
+    else:
+        used = None
+    return record_plane_feedback(
+        quad,
+        used,
+        all_planes=_list_field(request, "all_planes", None, optional=True, item_type=str),
+    )
 
 
 @router.get("/capabilities")
@@ -327,6 +370,90 @@ async def application_sidecar_route_audit() -> Dict[str, Any]:
     return sidecar_route_audit_snapshot()
 
 
+@router.get("/application/domains/audit/{path:path}")
+async def application_gate_domain_audit_row(path: str) -> Dict[str, Any]:
+    """Return one gate-domain audit row by documented path."""
+    from skeleton.application import get_gate_domain_audit_row
+
+    try:
+        return get_gate_domain_audit_row(f"/{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/domains/audit")
+async def application_gate_domain_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --domain-audit``."""
+    from skeleton.application import gate_domain_audit_snapshot
+
+    return gate_domain_audit_snapshot()
+
+
+@router.get("/application/cortex/audit/{method}/{path:path}")
+async def application_cortex_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one unmounted cortex-route audit row by method and path."""
+    from skeleton.application import get_cortex_route_audit_row
+
+    try:
+        return get_cortex_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/cortex/audit")
+async def application_cortex_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --cortex-audit``."""
+    from skeleton.application import cortex_route_audit_snapshot
+
+    return cortex_route_audit_snapshot()
+
+
+@router.get("/application/mounted/audit/{method}/{path:path}")
+async def application_mounted_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one mounted sidecar-router audit row by method and path."""
+    from skeleton.application import get_mounted_route_audit_row
+
+    try:
+        return get_mounted_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/mounted/audit")
+async def application_mounted_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --mounted-audit``."""
+    from skeleton.application import mounted_route_audit_snapshot
+
+    return mounted_route_audit_snapshot()
+
+
+@router.get("/application/main-cli/audit/{command_id}")
+async def application_main_cli_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one main-CLI audit row by command name."""
+    from skeleton.application import get_main_cli_audit_row
+
+    try:
+        return get_main_cli_audit_row(command_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/main-cli/audit")
+async def application_main_cli_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --main-cli-audit``."""
+    from skeleton.application import main_cli_audit_snapshot
+
+    return main_cli_audit_snapshot()
+
+
 @router.get("/application/planes/audit/{plane_id}")
 async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
     """Return one F-15 plane audit row by stable ID."""
@@ -424,38 +551,43 @@ async def application_capabilities() -> Dict[str, Any]:
 @router.post("/jeeves/session")
 async def jeeves_session(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     jeeves = _require(state.jeeves, "Jeeves")
-    raw_mode = request.get("mode", "tutoring")
-    mode = SessionMode.TUTORING
-    for m in SessionMode:
-        if m.value == raw_mode:
-            mode = m
-            break
-    session = jeeves.open_session(request.get("user_id", "anonymous"), mode=mode)
+    raw_mode = _text_field(request, "mode", "tutoring", allowed=tuple(item.value for item in SessionMode))
+    mode = SessionMode(raw_mode)
+    session = jeeves.open_session(_text_field(request, "user_id", "anonymous"), mode=mode)
     return {"session_id": session.session_id, "mode": session.mode.value, "status": "created"}
 
 
 @router.post("/jeeves/interact")
 async def jeeves_interact(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     jeeves = _require(state.jeeves, "Jeeves")
-    reply = jeeves.ask(request.get("session_id", ""), request.get("input", ""), context=request.get("context"))
-    return {"response": reply, "session_id": request.get("session_id")}
+    session_id = _text_field(request, "session_id", "")
+    reply = jeeves.ask(
+        session_id,
+        _text_field(request, "input", ""),
+        context=_mapping_field(request, "context", None, optional=True),
+    )
+    return {"response": reply, "session_id": session_id}
 
 
 @router.post("/jeeves/review")
 async def jeeves_review(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.jeeves, "Jeeves").review_code(request.get("session_id", ""), request.get("code", ""))
+    return _require(state.jeeves, "Jeeves").review_code(
+        _text_field(request, "session_id", ""),
+        _text_field(request, "code", ""),
+    )
 
 
 @router.post("/jeeves/bind-era")
 async def jeeves_bind_era(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    pack = _require(state.jeeves, "Jeeves").bind_era(request.get("era", "extraction_now"))
+    pack = _require(state.jeeves, "Jeeves").bind_era(_text_field(request, "era", "extraction_now"))
     return {"era": pack["era"], "primary_dps": pack["primary_dps"], "status": "bound"}
 
 
 @router.post("/jeeves/advise")
 async def jeeves_advise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _require(state.jeeves, "Jeeves").advise(
-        request.get("session_id", ""), request.get("telemetry") or {},
+        _text_field(request, "session_id", ""),
+        _mapping_field(request, "telemetry", {}, optional=False) or {},
     )
 
 
@@ -473,9 +605,9 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 @router.post("/memory/query")
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     result = _require(state.memory_trinity, "Memory").query_unified(
-        request.get("query", ""),
+        _text_field(request, "query", ""),
         top_k_per_tier=_int_field(request, "top_k", 3, minimum=1),
-        metadata_filter=request.get("metadata_filter"),
+        metadata_filter=_mapping_field(request, "metadata_filter", None, optional=True),
     )
     body: Dict[str, Any] = {
         "facts": [r.chunk.text for r in result.facts],
@@ -486,10 +618,8 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
         "provenance": result.provenance_chain,
     }
     # F-3: when turns are supplied, run rot-triggered compaction on them.
-    constraints = request.get("constraints")
-    if constraints is not None and not isinstance(constraints, (list, tuple)):
-        constraints = None
-    compaction = compact_turns(request.get("turns"), constraints=constraints)
+    constraints = _list_field(request, "constraints", None, optional=True)
+    compaction = compact_turns(_list_field(request, "turns", None, optional=True), constraints=constraints)
     if compaction is not None:
         body["compaction"] = compaction
     return body
@@ -503,16 +633,16 @@ async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
 @router.post("/swarm/agent")
 async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     agent = _require(state.mesh, "Swarm").join(
-        set(request.get("specialisations", [])),
+        set(_list_field(request, "specialisations", [], optional=False, item_type=str) or []),
         weight=_float_field(request, "weight", 1.0, minimum=0.0),
-        metadata=request.get("metadata"),
+        metadata=_mapping_field(request, "metadata", None, optional=True),
     )
     return {"agent_id": str(agent.agent_id), "status": "registered"}
 
 
 @router.post("/swarm/route")
 async def swarm_route(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    agent = _require(state.mesh, "Swarm").route(request.get("capability", ""))
+    agent = _require(state.mesh, "Swarm").route(_text_field(request, "capability", ""))
     return {"agent_id": str(agent.agent_id), "load": agent.load}
 
 
@@ -529,12 +659,12 @@ async def swarm_submit(
     if dag is None:
         dag = SwarmDag()
         state.swarm_dag = dag
-    task_id = request.get("id") or request.get("task_id")
+    task_id = _text_field(request, "task_id", "") or _text_field(request, "id", "")
     if not task_id:
         raise HTTPException(status_code=400, detail="missing task id")
-    capability = request.get("capability", "")
-    payload = request.get("payload", {})
-    deps = request.get("deps") or []
+    capability = _text_field(request, "capability", "")
+    payload = _mapping_field(request, "payload", {}, optional=False) or {}
+    deps = _list_field(request, "deps", [], optional=False) or []
     try:
         dag.submit(str(task_id), str(capability), payload, list(deps))
     except SubmitError as exc:
@@ -567,12 +697,12 @@ async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    description = request.get("description", "")
+    description = _text_field(request, "description", "")
     spec = _require(state.npc_pipeline, "NPC pipeline").run(
         description,
-        name=request.get("name"),
+        name=_text_field(request, "name", "") or None,
         dialogue_beats=_int_field(request, "dialogue_beats", 3, minimum=1),
-        params=request.get("params"),
+        params=_mapping_field(request, "params", None, optional=True),
     )
     return {
         "npc": spec.to_dict(),
@@ -583,10 +713,10 @@ async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    description = request.get("description", "")
+    description = _text_field(request, "description", "")
     spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
         description,
-        title=request.get("title", "untitled"),
+        title=_text_field(request, "title", "untitled"),
         max_level=_int_field(request, "max_level", 50, minimum=1),
         curve=_text_field(request, "curve", "quadratic"),
         currency=_text_field(request, "currency", "gold"),
@@ -600,8 +730,8 @@ async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) ->
 
 @router.post("/pipeline/animation")
 async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    actions = request.get("actions")
-    description = request.get("description", "humanoid")
+    actions = _list_field(request, "actions", None, optional=True, item_type=str)
+    description = _text_field(request, "description", "humanoid")
     spec = _require(state.animation_pipeline, "Animation pipeline").run(
         description,
         actions=tuple(actions) if actions else ("idle", "walk", "run", "attack"),
@@ -616,10 +746,14 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
 @router.post("/forge/blueprint")
 async def forge_blueprint(request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "blueprint"))) -> Dict[str, Any]:
     forge = _require(state.forge, "Forge")
-    bp = forge.new_blueprint(request.get("name", "unnamed"))
-    for comp in request.get("components", []):
+    bp = forge.new_blueprint(_text_field(request, "name", "unnamed"))
+    for comp in _list_field(request, "components", [], optional=False) or []:
+        if not isinstance(comp, dict):
+            raise HTTPException(status_code=422, detail="components items must be objects")
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
-    for wire in request.get("wires", []):
+    for wire in _list_field(request, "wires", [], optional=False) or []:
+        if not isinstance(wire, dict):
+            raise HTTPException(status_code=422, detail="wires items must be objects")
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
     problems = bp.validate()
     return {"blueprint_id": bp.blueprint_id, "valid": not problems, "problems": problems, "status": "created"}
@@ -631,10 +765,14 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
     if replay is not None:
         return replay  # type: ignore[return-value]
     forge = _require(state.forge, "Forge")
-    bp = forge.new_blueprint(request.get("name", "unnamed"))
-    for comp in request.get("components", []):
+    bp = forge.new_blueprint(_text_field(request, "name", "unnamed"))
+    for comp in _list_field(request, "components", [], optional=False) or []:
+        if not isinstance(comp, dict):
+            raise HTTPException(status_code=422, detail="components items must be objects")
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
-    for wire in request.get("wires", []):
+    for wire in _list_field(request, "wires", [], optional=False) or []:
+        if not isinstance(wire, dict):
+            raise HTTPException(status_code=422, detail="wires items must be objects")
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
     repair = _bool_field(request, "repair", False)
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
@@ -642,7 +780,7 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
 
     artefact = forge.materialise(
         bp,
-        era=request.get("era", "extraction_now"),
+        era=_text_field(request, "era", "extraction_now"),
         target=_text_field(request, "target", "json", allowed=MATERIALISE_TARGETS),
         repair=repair,
         max_rounds=max_rounds,
@@ -678,8 +816,8 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
 
     forge = _require(state.forge, "Forge")
-    name = request.get("name", "extraction")
-    era = request.get("era", "extraction_now")
+    name = _text_field(request, "name", "extraction")
+    era = _text_field(request, "era", "extraction_now")
     target = _text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS)
     bp = default_library().build(forge, name)
     repair = _bool_field(request, "repair", target == "godot")
@@ -700,7 +838,8 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
 @router.post("/intelligence/reason")
 async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _require(state.intelligence, "Intelligence").reason(
-        query=request.get("query", ""), context=request.get("context")
+        query=_text_field(request, "query", ""),
+        context=_mapping_field(request, "context", None, optional=True),
     )
 
 
@@ -708,8 +847,8 @@ async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) ->
 async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     fortress = _require(state.resilience, "Resilience")
     sanitized, report = fortress.process_input(
-        raw_input=request.get("input", ""),
-        user_id=request.get("user_id", "anonymous"),
+        raw_input=_text_field(request, "input", ""),
+        user_id=_text_field(request, "user_id", "anonymous"),
     )
     level = getattr(report.level, "name", None) or getattr(report.level, "value", str(report.level))
     return {
@@ -732,7 +871,7 @@ async def context_snapshot(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/context/command")
 async def context_command(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.cockpit, "Cockpit").apply(request.get("command", ""))
+    return _require(state.cockpit, "Cockpit").apply(_text_field(request, "command", ""))
 
 
 @router.post("/gameforge/run")
@@ -744,8 +883,8 @@ async def gameforge_run(http_request: Request, request: Dict[str, Any], state=De
 
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
-        request.get("vision", ""),
-        era=request.get("era"),
+        _text_field(request, "vision", ""),
+        era=_text_field(request, "era", "") or None,
         archetype=_text_field(request, "archetype", "extraction"),
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
     )
@@ -767,13 +906,14 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     from skeleton.context.questionnaire import intake
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
 
-    taken = intake(request.get("answers") or {})
+    answers = _mapping_field(request, "answers", {}, optional=False) or {}
+    taken = intake(answers)
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
         taken.vision,
         era=taken.era,
-        answers=request.get("answers") or {},
-        project_root=request.get("project_root"),
+        answers=answers,
+        project_root=_text_field(request, "project_root", None, optional=True),
         overwrite=_bool_field(request, "overwrite", False),
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
         archetype=_text_field(request, "archetype", "extraction"),

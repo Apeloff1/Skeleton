@@ -222,3 +222,98 @@ def test_http_ingest_and_include_files_reject_coerced_types() -> None:
     with pytest.raises(HTTPException):
         asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
 
+
+def test_require_mapping_rejects_string_and_array_stand_ins() -> None:
+    from skeleton.application.command_contracts import require_mapping
+
+    assert require_mapping({}, "metadata_filter", None, optional=True) is None
+    assert require_mapping({"answers": {"era": "now"}}, "answers", {}, optional=False) == {"era": "now"}
+    for value in ("{}", [], ("a",), 1, True):
+        with pytest.raises(CommandError) as exc_info:
+            require_mapping({"answers": value}, "answers", {}, optional=False)
+        assert exc_info.value.code == "invalid_argument"
+
+
+def test_require_list_rejects_string_iterables_and_bool_ints() -> None:
+    from skeleton.application.command_contracts import require_list
+
+    assert require_list({}, "deps", [], optional=False) == []
+    assert require_list({"deps": ["a", "b"]}, "deps", [], optional=False, item_type=str) == ["a", "b"]
+    with pytest.raises(CommandError):
+        require_list({"deps": "ab"}, "deps", [], optional=False)
+    with pytest.raises(CommandError):
+        require_list({"xs": [True]}, "xs", [], optional=False, item_type=int)
+
+
+def test_memory_and_run_commands_reject_coerced_objects() -> None:
+    service = build_runtime_command_service(_State())
+    ok = service.execute("memory", {"query": "hello", "metadata_filter": {"plane": "facts"}})
+    assert ok.ok is True
+
+    for payload in (
+        {"query": "hello", "metadata_filter": ["facts"]},
+        {"query": "hello", "metadata_filter": "facts"},
+        {"query": 12},
+    ):
+        result = service.execute("memory", payload)
+        assert result.ok is False
+        assert result.to_payload()["error"]["code"] == "invalid_argument"
+
+    answers = service.execute("run", {"answers": {"seed": 1}})
+    assert answers.ok is True
+    for payload in ({"answers": []}, {"answers": "nope"}):
+        result = service.execute("run", payload)
+        assert result.ok is False
+
+
+def test_http_jeeves_session_and_hot_strings_fail_closed() -> None:
+    from skeleton.jeeves.core import SessionMode
+    from skeleton.api import routes
+
+    class _Session:
+        session_id = "s-1"
+        mode = SessionMode.TUTORING
+
+    class _Jeeves:
+        def open_session(self, user_id, mode=None):
+            self.user_id = user_id
+            self.mode = mode
+            return _Session()
+
+    class _HttpState:
+        jeeves = _Jeeves()
+        intelligence = type("I", (), {"reason": staticmethod(lambda query, context=None: {"query": query, "context": context})})()
+        resilience = type(
+            "R",
+            (),
+            {
+                "process_input": staticmethod(
+                    lambda raw_input, user_id: (
+                        raw_input,
+                        type("Rep", (), {"level": type("L", (), {"name": "LOW"})(), "confidence": 1.0, "action_taken": "allow"})(),
+                    )
+                )
+            },
+        )()
+
+    created = asyncio.run(routes.jeeves_session({"user_id": "api-user"}, _HttpState()))
+    assert created["mode"] == "tutoring"
+    with pytest.raises(HTTPException) as bad_mode:
+        asyncio.run(routes.jeeves_session({"mode": "chat"}, _HttpState()))
+    assert bad_mode.value.status_code == 422
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.jeeves_session({"mode": True}, _HttpState()))
+
+    reasoned = asyncio.run(routes.intelligence_reason({"query": "why", "context": {"k": 1}}, _HttpState()))
+    assert reasoned["query"] == "why"
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.intelligence_reason({"query": 1}, _HttpState()))
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.intelligence_reason({"query": "why", "context": ["no"]}, _HttpState()))
+
+    sanitised = asyncio.run(routes.resilience_sanitise({"input": "hello"}, _HttpState()))
+    assert sanitised["sanitized"] == "hello"
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.resilience_sanitise({"input": 9}, _HttpState()))
+
+

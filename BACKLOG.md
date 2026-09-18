@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-17 (F-18 pipeline RAG + F-19 route audit + F-17 boot/export audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-18 (F-28..F-35 mapping/list payloads + domain/cortex/mounted/main-CLI audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,10 +31,12 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-17. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+Updated 2026-09-18. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
 F-13 economic/cascade reconciliation, F-14 speculative RAG, F-15
 organism/social/galaxy plane audit, F-16 capability discovery, F-17 genesis/export structural audits, F-18
-pipeline speculative RAG, and F-19 main-router API route audit are
+pipeline speculative RAG, F-19 main-router API route audit, F-20..F-21 payload/HMAC
+audits, F-22..F-27 text/CLI/template/sidecar audits, and F-28..F-35 mapping/list
+plus domain/cortex/mounted/main-CLI audits are
 **landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
@@ -59,6 +61,10 @@ pipeline speculative RAG, and F-19 main-router API route audit are
 | F-17 Genesis/export structural audits | #1019 | import-free boot-phase and manifest export-drift snapshots |
 | F-18 Pipeline speculative RAG | #1019 | NPC/logic/animation `.run()` planning prefetch; HTTP reuses the sidecar |
 | F-19 Main-router API route audit | #1019 | import-free API_ROUTES vs routes.py + charter/protected lock |
+| F-20 Fail-closed bool/int payloads | #1019 | require_bool/require_int on shared command + HTTP hot paths |
+| F-21 HMAC open-prefix audit | #1019 | DEFAULT_OPEN_PREFIXES vs API_ROUTES; probe-only open surface |
+| F-22..F-27 Float/text + CLI/template/sidecar | #1019 | require_float/require_text; developer CLI, templates, GameForge/command sidecars |
+| F-28..F-35 Mapping/list + domain/cortex/mounted/main-CLI | #1019 | require_mapping/require_list; SessionMode; gate domains; unmounted cortex; create_app mounts; main CLI |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -97,6 +103,8 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
 reconciliation, F-12 cortex persistence, F-14 speculative RAG, F-15
 organism/social/galaxy plane audit, F-16 capability discovery, F-17
-genesis/export structural audits, F-18 pipeline speculative RAG, and F-19
-main-router API route audit are landed in code. The former CI-1..CI-3
+genesis/export structural audits, F-18 pipeline speculative RAG, F-19
+main-router API route audit, F-20..F-27 payload types and CLI/HMAC/sidecar
+audits, and F-28..F-35 mapping/list plus domain/cortex/mounted/main-CLI audits
+are landed in code. The former CI-1..CI-3
 blockers are resolved on main; the remaining structural queue is F-11.

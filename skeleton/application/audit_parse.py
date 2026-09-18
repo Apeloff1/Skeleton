@@ -219,10 +219,10 @@ def _is_require_charter(node: ast.AST) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "require_charter"
 
 
-def _decorator_route(decorator: ast.AST) -> tuple[str, str] | None:
+def _decorator_route(decorator: ast.AST, *, owner_names: tuple[str, ...] = ("router",)) -> tuple[str, str] | None:
     if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
         return None
-    if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != "router":
+    if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id not in owner_names:
         return None
     method = _HTTP_METHODS.get(decorator.func.attr.lower())
     if method is None or not decorator.args:
@@ -418,21 +418,34 @@ def _normalize_handler_path(path: str) -> str:
     return full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
 
 
-def module_router_handlers(module: str, *, source: str = "") -> list[dict[str, object]]:
+def module_router_handlers(
+    module: str,
+    *,
+    source: str = "",
+    owner_names: tuple[str, ...] = ("router",),
+    mount_prefix: str = "/api/v1",
+    join_router_prefix: bool = False,
+) -> list[dict[str, object]]:
     tree = parse_module_tree(module)
     if tree is None or not isinstance(tree, ast.Module):
         return []
+    router_prefix = api_router_prefix(module) if join_router_prefix else ""
     rows: list[dict[str, object]] = []
     seen: set[tuple[str, str]] = set()
     for node in tree.body:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for decorator in node.decorator_list:
-            parsed = _decorator_route(decorator)
+            parsed = _decorator_route(decorator, owner_names=owner_names)
             if parsed is None:
                 continue
             method, path = parsed
-            full_path = _normalize_handler_path(path)
+            full_path = (
+                _normalize_handler_path(path)
+                if path.startswith(_API_PREFIX)
+                else join_url_paths(mount_prefix, router_prefix, path)
+            )
+            full_path = full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
             key = (method, full_path)
             if key in seen:
                 continue
@@ -601,3 +614,265 @@ def architecture_cli_commands() -> list[dict[str, object]]:
             }
         )
     return rows
+
+
+def join_url_paths(*parts: str) -> str:
+    pieces: list[str] = []
+    for part in parts:
+        if not isinstance(part, str):
+            continue
+        text = part.strip()
+        if not text or text == "/":
+            continue
+        pieces.append(text.strip("/"))
+    if not pieces:
+        return "/"
+    return "/" + "/".join(piece for piece in pieces if piece)
+
+
+def api_router_prefix(module: str, owner: str = "router") -> str:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return ""
+    for node in tree.body:
+        target: str | None = None
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            target = node.targets[0].id
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target = node.target.id
+            value = node.value
+        if target != owner or not isinstance(value, ast.Call):
+            continue
+        func = value.func
+        is_api_router = (isinstance(func, ast.Name) and func.id == "APIRouter") or (
+            isinstance(func, ast.Attribute) and func.attr == "APIRouter"
+        )
+        if not is_api_router:
+            continue
+        for keyword in value.keywords:
+            if (
+                keyword.arg == "prefix"
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ):
+                return keyword.value.value
+        return ""
+    return ""
+
+
+def create_app_included_routers() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.api.server")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    aliases: dict[str, str] = {}
+    rows: list[dict[str, object]] = []
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                aliases[alias.asname or alias.name] = node.module
+        if not isinstance(node, ast.FunctionDef) or node.name != "create_app":
+            continue
+        for stmt in ast.walk(node):
+            if isinstance(stmt, ast.ImportFrom) and stmt.module:
+                for alias in stmt.names:
+                    aliases[alias.asname or alias.name] = stmt.module
+            if not isinstance(stmt, ast.Call) or not isinstance(stmt.func, ast.Attribute):
+                continue
+            if stmt.func.attr != "include_router" or not stmt.args:
+                continue
+            router_arg = stmt.args[0]
+            if not isinstance(router_arg, ast.Name):
+                continue
+            prefix = ""
+            for keyword in stmt.keywords:
+                if (
+                    keyword.arg == "prefix"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    prefix = keyword.value.value
+            rows.append(
+                {
+                    "name": router_arg.id,
+                    "module": aliases.get(router_arg.id, ""),
+                    "prefix": prefix,
+                }
+            )
+    return rows
+
+
+_SKIP_MOUNTED_MODULES = frozenset({"skeleton.api.routes", "skeleton.api.gameforge_routes"})
+
+
+def mounted_router_handlers() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for mount in create_app_included_routers():
+        module = str(mount["module"] or "")
+        if not module or module in _SKIP_MOUNTED_MODULES:
+            continue
+        for row in module_router_handlers(
+            module,
+            source=module.rsplit(".", 1)[-1],
+            mount_prefix=str(mount["prefix"] or ""),
+            join_router_prefix=True,
+        ):
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    return rows
+
+
+def cortex_route_handlers() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.api.cortex_routes")
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "register_routes":
+            continue
+        for child in node.body:
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in child.decorator_list:
+                parsed = _decorator_route(decorator, owner_names=("app",))
+                if parsed is None:
+                    continue
+                method, path = parsed
+                full_path = _normalize_handler_path(path) if path.startswith(_API_PREFIX) else path
+                full_path = full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
+                key = (method, full_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append(
+                    {
+                        "method": method,
+                        "path": full_path,
+                        "handler": child.name,
+                        "module": "skeleton.api.cortex_routes",
+                        "source": "cortex",
+                        "charter_gated": _depends_named(child, "require_charter"),
+                        "seal_gated": _depends_named(child, "require_seal"),
+                    }
+                )
+        break
+    return rows
+
+
+def assigned_str_pairs(tree: ast.AST | None, name: str) -> list[tuple[str, str]]:
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    for node in tree.body:
+        value: ast.AST | None = None
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            value = node.value
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    value = node.value
+        if value is None:
+            continue
+        if not isinstance(value, (ast.Tuple, ast.List)):
+            return []
+        pairs: list[tuple[str, str]] = []
+        for element in value.elts:
+            if not isinstance(element, (ast.Tuple, ast.List)) or len(element.elts) < 2:
+                continue
+            left, right = element.elts[0], element.elts[1]
+            if (
+                isinstance(left, ast.Constant)
+                and isinstance(left.value, str)
+                and isinstance(right, ast.Constant)
+                and isinstance(right.value, str)
+            ):
+                pairs.append((left.value, right.value))
+        return pairs
+    return []
+
+
+def gate_domain_map() -> list[tuple[str, str]]:
+    return assigned_str_pairs(parse_module_tree("skeleton.api.middleware"), "DEFAULT_DOMAIN_MAP")
+
+
+def matching_gate_domain(path: str, domains: list[tuple[str, str]] | None = None) -> str | None:
+    mapping = list(domains) if domains is not None else gate_domain_map()
+    mapping.sort(key=lambda item: len(item[0]), reverse=True)
+    for prefix, domain in mapping:
+        if prefix and path_matches_open_prefix(path, prefix):
+            return domain
+    return None
+
+
+def _cmd_compare_values(node: ast.Compare) -> list[str]:
+    if not node.ops or not node.comparators:
+        return []
+    left = node.left
+    if not isinstance(left, ast.Name) or left.id != "cmd":
+        return []
+    comparator = node.comparators[0]
+    op = node.ops[0]
+    if isinstance(op, ast.Eq) and isinstance(comparator, ast.Constant) and isinstance(comparator.value, str):
+        return [comparator.value]
+    if isinstance(op, ast.In) and isinstance(comparator, (ast.Tuple, ast.List, ast.Set)):
+        return [
+            element.value
+            for element in comparator.elts
+            if isinstance(element, ast.Constant) and isinstance(element.value, str)
+        ]
+    return []
+
+
+def main_cli_dispatch_commands() -> dict[str, list[str]]:
+    tree = parse_module_tree("skeleton.__main__")
+    if tree is None or not isinstance(tree, ast.Module):
+        return {"commands": [], "aliases": []}
+    names: list[str] = []
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "main":
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Compare):
+                continue
+            for value in _cmd_compare_values(child):
+                if value in seen:
+                    continue
+                seen.add(value)
+                if value.startswith("-"):
+                    aliases.append(value)
+                else:
+                    names.append(value)
+        break
+    return {"commands": names, "aliases": aliases}
+
+
+def main_cli_help_commands() -> list[str]:
+    tree = parse_module_tree("skeleton.__main__")
+    if tree is None:
+        return []
+    doc = ast.get_docstring(tree) or ""
+    names: list[str] = []
+    in_commands = False
+    for line in doc.splitlines():
+        stripped = line.strip()
+        if stripped == "Commands:":
+            in_commands = True
+            continue
+        if not in_commands:
+            continue
+        if not stripped:
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent != 4:
+            continue
+        token = stripped.split()[0]
+        if token and token[0].isalpha():
+            names.append(token)
+    return names

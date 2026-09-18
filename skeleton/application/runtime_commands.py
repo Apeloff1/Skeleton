@@ -11,6 +11,8 @@ from .command_contracts import (
     CommandService,
     require_bool,
     require_int,
+    require_list,
+    require_mapping,
     require_text,
 )
 
@@ -56,6 +58,10 @@ _CAPABILITY_VIEW_FLAGS = (
     "cli_audit",
     "template_audit",
     "sidecar_audit",
+    "domain_audit",
+    "cortex_audit",
+    "mounted_audit",
+    "main_cli_audit",
 )
 
 
@@ -91,6 +97,22 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["main_cli_audit"]:
+            from .main_cli_audit import get_main_cli_audit_row, main_cli_audit_snapshot
+
+            return _lookup_row(payload, "command_id", get_main_cli_audit_row, main_cli_audit_snapshot)
+        if flags["mounted_audit"]:
+            from .mounted_route_audit import get_mounted_route_audit_row, mounted_route_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_mounted_route_audit_row, mounted_route_audit_snapshot)
+        if flags["cortex_audit"]:
+            from .cortex_route_audit import cortex_route_audit_snapshot, get_cortex_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_cortex_route_audit_row, cortex_route_audit_snapshot)
+        if flags["domain_audit"]:
+            from .gate_domain_audit import gate_domain_audit_snapshot, get_gate_domain_audit_row
+
+            return _lookup_row(payload, "path", get_gate_domain_audit_row, gate_domain_audit_snapshot)
         if flags["sidecar_audit"]:
             from .sidecar_route_audit import get_sidecar_route_audit_row, sidecar_route_audit_snapshot
 
@@ -139,14 +161,14 @@ def _memory_handler(state: Any):
         memory = getattr(state, "memory_trinity", None)
         if memory is None:
             raise CommandError("unavailable", "memory service is not initialized")
-        query = str(payload.get("query", "")).strip()
+        query = require_text(payload, "query", "").strip()
         if not query:
             raise CommandError("invalid_argument", "query is required")
         top_k = require_int(payload, "top_k", 3, minimum=1)
         result = memory.query_unified(
             query,
             top_k_per_tier=top_k,
-            metadata_filter=payload.get("metadata_filter"),
+            metadata_filter=require_mapping(payload, "metadata_filter", None, optional=True),
         )
         return {
             "facts": [item.chunk.text for item in result.facts],
@@ -165,7 +187,7 @@ def _tool_handler(state: Any):
         registry = getattr(state, "registry", None)
         if registry is None:
             raise CommandError("unavailable", "tool registry is not initialized")
-        action = str(payload.get("action", "list")).strip().lower()
+        action = require_text(payload, "action", "list").strip().lower()
         if action != "list":
             raise CommandError(
                 "unsupported_operation",
@@ -182,7 +204,7 @@ def _tool_handler(state: Any):
 
 def _admin_handler(state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
-        action = str(payload.get("action", "summary")).strip().lower()
+        action = require_text(payload, "action", "summary").strip().lower()
         if action != "summary":
             raise CommandError(
                 "unsupported_operation",
@@ -206,11 +228,9 @@ def _run_handler(state: Any):
         gameforge = getattr(state, "gameforge", None)
         if gameforge is None:
             raise CommandError("unavailable", "GameForge runtime is not initialized")
-        answers = payload.get("answers", {})
-        if not isinstance(answers, Mapping):
-            raise CommandError("invalid_argument", "answers must be an object")
+        answers = require_mapping(payload, "answers", {}, optional=False)
         spec = gameforge.run(
-            dict(answers),
+            answers,
             title=require_text(payload, "title", None, optional=True),
             target=require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS),
             repair=require_bool(payload, "repair", False),

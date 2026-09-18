@@ -24,6 +24,10 @@ Commands:
                 Use `capabilities --cli-audit` for developer CLI vs CLI_COMMANDS drift
                 Use `capabilities --template-audit` for scaffold TEMPLATES drift
                 Use `capabilities --sidecar-audit` for GameForge/command sidecar routes
+                Use `capabilities --domain-audit` for gate-domain vs API_ROUTES mapping
+                Use `capabilities --cortex-audit` for unmounted cortex register_routes
+                Use `capabilities --mounted-audit` for create_app swarm/cockpit mounts
+                Use `capabilities --main-cli-audit` for python -m skeleton help vs dispatch
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -56,6 +60,10 @@ def _cmd_capabilities(rest: List[str]) -> int:
         developer_cli_audit_snapshot,
         template_audit_snapshot,
         sidecar_route_audit_snapshot,
+        gate_domain_audit_snapshot,
+        cortex_route_audit_snapshot,
+        mounted_route_audit_snapshot,
+        main_cli_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -69,6 +77,10 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "cli_audit": {"--cli-audit", "cli-audit", "--cli_audit", "cli_audit"},
         "template_audit": {"--template-audit", "template-audit", "--template_audit", "template_audit"},
         "sidecar_audit": {"--sidecar-audit", "sidecar-audit", "--sidecar_audit", "sidecar_audit"},
+        "domain_audit": {"--domain-audit", "domain-audit", "--domain_audit", "domain_audit"},
+        "cortex_audit": {"--cortex-audit", "cortex-audit", "--cortex_audit", "cortex_audit"},
+        "mounted_audit": {"--mounted-audit", "mounted-audit", "--mounted_audit", "mounted_audit"},
+        "main_cli_audit": {"--main-cli-audit", "main-cli-audit", "--main_cli_audit", "main_cli_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -80,7 +92,15 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "sidecar_audit":
+    if view == "main_cli_audit":
+        payload = main_cli_audit_snapshot()
+    elif view == "mounted_audit":
+        payload = mounted_route_audit_snapshot()
+    elif view == "cortex_audit":
+        payload = cortex_route_audit_snapshot()
+    elif view == "domain_audit":
+        payload = gate_domain_audit_snapshot()
+    elif view == "sidecar_audit":
         payload = sidecar_route_audit_snapshot()
     elif view == "template_audit":
         payload = template_audit_snapshot()

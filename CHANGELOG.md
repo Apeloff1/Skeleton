@@ -4,6 +4,30 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-18 — F-28..F-35 mapping/list payloads and domain/cortex/mounted/main-CLI audits
+
+- Shared `require_mapping` / `require_list` reject strings, tuples-as-objects,
+  and bool-as-int list items. Memory `metadata_filter` and run `answers` use
+  them. HTTP retrieval metadata, Jeeves context/telemetry, swarm payload/deps,
+  pipeline params/actions, forge components/wires, and GameForge answers fail
+  closed the same way.
+- Remaining hot strings (`forge` name/era, intelligence query, sanitise
+  input, swarm task id, intake `project_root`, memory turns) use `require_text`
+  / `require_list`. Jeeves `mode` is fail-closed against live `SessionMode`
+  values.
+- Additive `gate_domain_audit` reports `DEFAULT_DOMAIN_MAP` versus
+  `architecture.API_ROUTES`. Documented paths stay mapped; unused prefixes such
+  as `/cockpit` and `/cortex` stay visible.
+- Additive `cortex_route_audit` reports unmounted `register_routes` handlers.
+  They remain outside `create_app` and outside API_ROUTES.
+- Additive `mounted_route_audit` reports swarm-family and cockpit routers
+  mounted by `create_app`, skipping main-router and GameForge sidecars.
+- Additive `main_cli_audit` reports `python -m skeleton` help versus `main()`
+  dispatch. `-h`/`--help` stay aliases of `help`.
+- Identical payloads through `--domain-audit` / `--cortex-audit` /
+  `--mounted-audit` / `--main-cli-audit`, matching HTTP audit routes, and the
+  shared `capabilities` command.
+
 ## 2026-09-17 — F-22..F-27 fail-closed numbers/text and CLI/template/sidecar audits
 
 - Shared `require_float` / `require_text` reject bools, numeric strings, NaN/inf,
