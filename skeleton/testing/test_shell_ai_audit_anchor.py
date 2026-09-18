@@ -54,7 +54,7 @@ def test_audit_anchor_digest_stable():
         fp("e"),
         fp("l"),
         fp("b"),
-        123.0,
+        observed_at=123.0,
     )
     assert len(anchor.digest) == 64
     assert anchor.digest == anchor.digest
@@ -71,7 +71,7 @@ def test_audit_anchor_optional_release_and_sandbox():
         fp("e"),
         "",
         "",
-        0.0,
+        observed_at=0.0,
     )
     assert anchor.release_evidence_digest == ""
     assert anchor.sandbox_binding_digest == ""
@@ -87,6 +87,7 @@ def test_audit_anchor_optional_release_and_sandbox():
         ("session_evidence_digest", "bad"),
         ("release_evidence_digest", "bad"),
         ("sandbox_binding_digest", "bad"),
+        ("execution_attempt_authority_digest", "bad"),
     ],
 )
 def test_audit_anchor_digest_validation(field, value):
@@ -338,3 +339,63 @@ def test_signed_anchor_chain_hash_validation():
     )
     with pytest.raises(ValueError, match="chain_node_hash"):
         SignedAIAuditAnchor(anchor, signature, "bad")
+
+
+def test_audit_anchor_execution_attempt_binding_changes_digest():
+    first = AIAuditAnchor(
+        1,
+        "session",
+        fp("c"),
+        fp("p"),
+        fp("j"),
+        fp("r"),
+        fp("e"),
+        execution_attempt_id="seal-a",
+        execution_attempt_authority_digest=fp("a"),
+    )
+    second = replace(
+        first,
+        execution_attempt_id="seal-b",
+        execution_attempt_authority_digest=fp("b"),
+    )
+    assert first.digest != second.digest
+
+
+@pytest.mark.parametrize(
+    "attempt_id,authority_digest",
+    [
+        ("seal", ""),
+        ("", fp("a")),
+        ("x" * 257, fp("a")),
+    ],
+)
+def test_audit_anchor_execution_attempt_fields_are_paired(
+    attempt_id,
+    authority_digest,
+):
+    with pytest.raises(ValueError):
+        AIAuditAnchor(
+            1,
+            "session",
+            fp("c"),
+            fp("p"),
+            fp("j"),
+            fp("r"),
+            fp("e"),
+            execution_attempt_id=attempt_id,
+            execution_attempt_authority_digest=authority_digest,
+        )
+
+
+def test_audit_anchor_execution_attempt_round_trip():
+    store = make_store()
+    item = append(
+        store,
+        execution_attempt_id="seal-1",
+        execution_attempt_authority_digest=fp("a"),
+    )
+    loaded = store.snapshot()[0]
+    assert loaded.anchor.execution_attempt_id == "seal-1"
+    assert loaded.anchor.execution_attempt_authority_digest == fp("a")
+    assert loaded.anchor.digest == item.anchor.digest
+    assert store.verify()
