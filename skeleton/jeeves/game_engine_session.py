@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .game_engine_input import (
+    InputDevice,
     InputNormalizer,
     NormalizedInput,
     RawInputSample,
@@ -44,6 +45,7 @@ from .game_engine_runtime import (
     RoutedEngineSandbox,
 )
 from .game_engine_timing import (
+    MAX_ADVANCE_NS,
     ClockSnapshot,
     DeterministicGameClock,
     TimingFrame,
@@ -52,6 +54,7 @@ from .game_engine_timing import (
 SESSION_SCHEMA_VERSION = 1
 MAX_SESSION_INPUTS_PER_ADVANCE = 256
 MAX_SESSION_HISTORY = 100_000
+MAX_REPLAY_TAPE_BYTES = 32 * 1024 * 1024
 
 
 def _canonical(value: object) -> str:
@@ -917,6 +920,631 @@ class DeterministicGameLoop:
                 else "replay final authority diverged"
             ),
         )
+
+
+def _sha256_text(
+    value: object,
+    label: str,
+) -> str:
+    if (
+        not isinstance(
+            value,
+            str,
+        )
+        or len(value) != 64
+    ):
+        raise GameEngineLabError(
+            f"{label} must be a SHA-256 hex digest"
+        )
+    try:
+        int(
+            value,
+            16,
+        )
+    except ValueError as exc:
+        raise GameEngineLabError(
+            f"{label} must be a SHA-256 hex digest"
+        ) from exc
+    return value.lower()
+
+
+def _sample_from_document(
+    value: object,
+) -> RawInputSample:
+    if not isinstance(
+        value,
+        dict,
+    ):
+        raise GameEngineLabError(
+            "replay input sample must be an object"
+        )
+    expected = {
+        "tick",
+        "player",
+        "device",
+        "buttons",
+        "move",
+        "aim",
+        "triggers",
+        "pointer",
+        "motion",
+        "touch_active",
+    }
+    if set(value) != expected:
+        raise GameEngineLabError(
+            "replay input sample schema mismatch"
+        )
+
+    def pair(
+        name: str,
+    ) -> tuple[object, object]:
+        row = value[
+            name
+        ]
+        if (
+            not isinstance(
+                row,
+                list,
+            )
+            or len(row) != 2
+        ):
+            raise GameEngineLabError(
+                f"replay input {name} must contain two values"
+            )
+        return (
+            row[0],
+            row[1],
+        )
+
+    motion = value[
+        "motion"
+    ]
+    if (
+        not isinstance(
+            motion,
+            list,
+        )
+        or len(motion) != 3
+    ):
+        raise GameEngineLabError(
+            "replay input motion must contain three values"
+        )
+    move = pair(
+        "move"
+    )
+    aim = pair(
+        "aim"
+    )
+    triggers = pair(
+        "triggers"
+    )
+    pointer = pair(
+        "pointer"
+    )
+    try:
+        device = InputDevice(
+            value[
+                "device"
+            ]
+        )
+        buttons = InputButton(
+            value[
+                "buttons"
+            ]
+        )
+        return RawInputSample(
+            tick=value[
+                "tick"
+            ],
+            player=value[
+                "player"
+            ],
+            device=device,
+            buttons=buttons,
+            move_x=move[0],
+            move_y=move[1],
+            aim_x=aim[0],
+            aim_y=aim[1],
+            left_trigger=
+                triggers[0],
+            right_trigger=
+                triggers[1],
+            pointer_x=
+                pointer[0],
+            pointer_y=
+                pointer[1],
+            motion_x=
+                motion[0],
+            motion_y=
+                motion[1],
+            motion_z=
+                motion[2],
+            touch_active=
+                value[
+                    "touch_active"
+                ],
+        )
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+    ) as exc:
+        raise GameEngineLabError(
+            "replay input sample is malformed"
+        ) from exc
+
+
+def _replay_advance_document(
+    value: ReplayAdvance,
+) -> dict[str, object]:
+    return {
+        "delta_ns":
+            value.delta_ns,
+        "samples": [
+            _sample_document(
+                sample
+            )
+            for sample
+            in value.samples
+        ],
+        "result_digest":
+            value.result_digest,
+        "chain_digest":
+            value.chain_digest,
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class ReplayTape:
+    schema_version: int
+    era: EngineEra
+    tree_digest: str
+    advances: tuple[
+        ReplayAdvance,
+        ...,
+    ]
+    final_chain_digest: str
+    final_machine_digest: str
+    final_clock_digest: str
+    digest: str
+
+    def identity_document(
+        self,
+    ) -> dict[str, object]:
+        return {
+            "schema_version":
+                self.schema_version,
+            "engine_era":
+                self.era.value,
+            "tree_digest":
+                self.tree_digest,
+            "advances": [
+                _replay_advance_document(
+                    item
+                )
+                for item
+                in self.advances
+            ],
+            "final_chain_digest":
+                self.final_chain_digest,
+            "final_machine_digest":
+                self.final_machine_digest,
+            "final_clock_digest":
+                self.final_clock_digest,
+        }
+
+    def document(
+        self,
+    ) -> dict[str, object]:
+        value = (
+            self.identity_document()
+        )
+        value[
+            "digest"
+        ] = self.digest
+        return value
+
+
+def build_replay_tape(
+    loop: DeterministicGameLoop,
+) -> ReplayTape:
+    verification = (
+        loop.verify_replay()
+    )
+    if not verification.passed:
+        raise GameEngineLabError(
+            (
+                "cannot build replay tape from divergent session: "
+                + verification.detail
+            )
+        )
+    advances = loop.history
+    identity = {
+        "schema_version":
+            SESSION_SCHEMA_VERSION,
+        "engine_era":
+            loop.era.value,
+        "tree_digest":
+            loop.sandbox.tree.digest,
+        "advances": [
+            _replay_advance_document(
+                item
+            )
+            for item
+            in advances
+        ],
+        "final_chain_digest":
+            loop.chain_digest,
+        "final_machine_digest":
+            loop.machine.fingerprint(),
+        "final_clock_digest":
+            loop.clock.fingerprint(),
+    }
+    return ReplayTape(
+        SESSION_SCHEMA_VERSION,
+        loop.era,
+        loop.sandbox.tree.digest,
+        advances,
+        loop.chain_digest,
+        loop.machine.fingerprint(),
+        loop.clock.fingerprint(),
+        _digest(
+            identity
+        ),
+    )
+
+
+def serialize_replay_tape(
+    tape: ReplayTape,
+) -> bytes:
+    if (
+        _digest(
+            tape.identity_document()
+        )
+        != tape.digest
+    ):
+        raise GameEngineLabError(
+            "replay tape digest mismatch"
+        )
+    data = (
+        _canonical(
+            tape.document()
+        )
+        + "\n"
+    ).encode(
+        "utf-8"
+    )
+    if (
+        len(data)
+        > MAX_REPLAY_TAPE_BYTES
+    ):
+        raise GameEngineLabError(
+            "replay tape exceeds bounded byte size"
+        )
+    return data
+
+
+def parse_replay_tape(
+    data: bytes,
+) -> ReplayTape:
+    if (
+        not isinstance(
+            data,
+            bytes,
+        )
+        or not data
+        or len(data)
+        > MAX_REPLAY_TAPE_BYTES
+    ):
+        raise GameEngineLabError(
+            "replay tape bytes outside bounds"
+        )
+    try:
+        value = json.loads(
+            data.decode(
+                "utf-8"
+            )
+        )
+    except (
+        UnicodeError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise GameEngineLabError(
+            "replay tape is malformed"
+        ) from exc
+    if not isinstance(
+        value,
+        dict,
+    ):
+        raise GameEngineLabError(
+            "replay tape root must be an object"
+        )
+    expected = {
+        "schema_version",
+        "engine_era",
+        "tree_digest",
+        "advances",
+        "final_chain_digest",
+        "final_machine_digest",
+        "final_clock_digest",
+        "digest",
+    }
+    if set(value) != expected:
+        raise GameEngineLabError(
+            "replay tape schema mismatch"
+        )
+    if (
+        type(
+            value[
+                "schema_version"
+            ]
+        )
+        is not int
+        or value[
+            "schema_version"
+        ]
+        != SESSION_SCHEMA_VERSION
+    ):
+        raise GameEngineLabError(
+            "replay tape schema version mismatch"
+        )
+    try:
+        era = EngineEra(
+            value[
+                "engine_era"
+            ]
+        )
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise GameEngineLabError(
+            "replay tape engine era invalid"
+        ) from exc
+    tree_digest = _sha256_text(
+        value[
+            "tree_digest"
+        ],
+        "replay tree digest",
+    )
+    final_chain = _sha256_text(
+        value[
+            "final_chain_digest"
+        ],
+        "replay final chain digest",
+    )
+    final_machine = _sha256_text(
+        value[
+            "final_machine_digest"
+        ],
+        "replay final machine digest",
+    )
+    final_clock = _sha256_text(
+        value[
+            "final_clock_digest"
+        ],
+        "replay final clock digest",
+    )
+    tape_digest = _sha256_text(
+        value[
+            "digest"
+        ],
+        "replay tape digest",
+    )
+    rows = value[
+        "advances"
+    ]
+    if (
+        not isinstance(
+            rows,
+            list,
+        )
+        or len(rows)
+        > MAX_SESSION_HISTORY
+    ):
+        raise GameEngineLabError(
+            "replay advance inventory outside bounds"
+        )
+    advances: list[
+        ReplayAdvance
+    ] = []
+    for row in rows:
+        if (
+            not isinstance(
+                row,
+                dict,
+            )
+            or set(row)
+            != {
+                "delta_ns",
+                "samples",
+                "result_digest",
+                "chain_digest",
+            }
+        ):
+            raise GameEngineLabError(
+                "replay advance schema mismatch"
+            )
+        delta = row[
+            "delta_ns"
+        ]
+        if (
+            type(delta) is not int
+            or not 0
+            <= delta
+            <= MAX_ADVANCE_NS
+        ):
+            raise GameEngineLabError(
+                "replay delta outside bounded range"
+            )
+        sample_rows = row[
+            "samples"
+        ]
+        if (
+            not isinstance(
+                sample_rows,
+                list,
+            )
+            or len(
+                sample_rows
+            )
+            > MAX_SESSION_INPUTS_PER_ADVANCE
+        ):
+            raise GameEngineLabError(
+                "replay input inventory outside bounds"
+            )
+        advances.append(
+            ReplayAdvance(
+                delta,
+                tuple(
+                    _sample_from_document(
+                        sample
+                    )
+                    for sample
+                    in sample_rows
+                ),
+                _sha256_text(
+                    row[
+                        "result_digest"
+                    ],
+                    "replay result digest",
+                ),
+                _sha256_text(
+                    row[
+                        "chain_digest"
+                    ],
+                    "replay chain digest",
+                ),
+            )
+        )
+    tape = ReplayTape(
+        SESSION_SCHEMA_VERSION,
+        era,
+        tree_digest,
+        tuple(
+            advances
+        ),
+        final_chain,
+        final_machine,
+        final_clock,
+        tape_digest,
+    )
+    if (
+        _digest(
+            tape.identity_document()
+        )
+        != tape.digest
+    ):
+        raise GameEngineLabError(
+            "replay tape digest mismatch"
+        )
+    return tape
+
+
+def verify_replay_tape(
+    sandbox: RoutedEngineSandbox,
+    tape: ReplayTape,
+) -> ReplayVerification:
+    if (
+        tape.schema_version
+        != SESSION_SCHEMA_VERSION
+        or tape.era
+        is not sandbox.era
+        or tape.tree_digest
+        != sandbox.tree.digest
+    ):
+        raise GameEngineLabError(
+            "replay tape does not match sandbox authority"
+        )
+    if (
+        _digest(
+            tape.identity_document()
+        )
+        != tape.digest
+    ):
+        raise GameEngineLabError(
+            "replay tape digest mismatch"
+        )
+    loop = DeterministicGameLoop(
+        sandbox
+    )
+    for index, expected in enumerate(
+        tape.advances
+    ):
+        try:
+            actual = loop.advance(
+                expected.delta_ns,
+                expected.samples,
+            )
+        except Exception as exc:
+            return ReplayVerification(
+                False,
+                index,
+                loop.chain_digest,
+                loop.machine.fingerprint(),
+                loop.clock.fingerprint(),
+                index,
+                (
+                    "tape replay raised "
+                    + type(
+                        exc
+                    ).__name__
+                    + ": "
+                    + str(
+                        exc
+                    )
+                ),
+            )
+        if (
+            actual.digest
+            != expected.result_digest
+            or actual.chain_digest
+            != expected.chain_digest
+        ):
+            return ReplayVerification(
+                False,
+                index + 1,
+                loop.chain_digest,
+                loop.machine.fingerprint(),
+                loop.clock.fingerprint(),
+                index,
+                "tape replay evidence diverged",
+            )
+    machine_digest = (
+        loop.machine.fingerprint()
+    )
+    clock_digest = (
+        loop.clock.fingerprint()
+    )
+    passed = (
+        loop.chain_digest
+        == tape.final_chain_digest
+        and machine_digest
+        == tape.final_machine_digest
+        and clock_digest
+        == tape.final_clock_digest
+    )
+    return ReplayVerification(
+        passed,
+        len(
+            tape.advances
+        ),
+        loop.chain_digest,
+        machine_digest,
+        clock_digest,
+        (
+            None
+            if passed
+            else len(
+                tape.advances
+            )
+        ),
+        (
+            "replay tape matched"
+            if passed
+            else "replay tape final authority diverged"
+        ),
+    )
 
 
 def build_game_loop(
