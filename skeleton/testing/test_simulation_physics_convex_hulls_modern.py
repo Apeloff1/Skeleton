@@ -234,11 +234,13 @@ def test_hull_rejects_duplicate_vertices() -> None:
 
 def test_hull_rejects_degenerate_triangle() -> None:
     hull = _cube_hull()
-    faces = list(hull.faces)
-    faces[0] = (0, 1, 5)  # Collinear on one cube edge/face diagonal arrangement.
+    vertices = list(hull.vertices)
+    # Move vertex 2 onto the edge from 0 to 1 so face (0, 2, 1)
+    # contains three distinct but geometrically collinear vertices.
+    vertices[2] = Vec3(0.0, -1.0, -1.0)
 
-    with pytest.raises(PhysicsValidationError):
-        ConvexHullShape(hull.vertices, tuple(faces))
+    with pytest.raises(PhysicsValidationError, match="degenerate"):
+        ConvexHullShape(tuple(vertices), hull.faces)
 
 
 def test_hull_vertex_bound_fails_before_expensive_topology_work() -> None:
