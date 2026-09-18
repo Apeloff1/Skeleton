@@ -782,8 +782,11 @@ def memory_pair_next_flip_probability(
     known_singletons = _count("known_singletons", known_singletons)
     if total_pairs <= 0 or removed_pairs > total_pairs:
         raise ProbabilityError("invalid memory-game pair counts")
-    face_down_unknown = 2 * (total_pairs - removed_pairs) - known_singletons
-    if face_down_unknown <= 0:
+    remaining_cards = 2 * (total_pairs - removed_pairs)
+    if known_singletons > remaining_cards:
+        raise ProbabilityError("known_singletons exceeds remaining face-down cards")
+    face_down_unknown = remaining_cards - known_singletons
+    if face_down_unknown == 0:
         value = 0.0
     elif targeting_known_singleton:
         value = 1.0 / face_down_unknown
@@ -811,6 +814,7 @@ def categorical_entropy(probabilities: Sequence[float], *, base: float = 2.0) ->
     values = [probability("probability", value) for value in probabilities]
     if not values or not math.isclose(sum(values), 1.0, rel_tol=1e-9, abs_tol=1e-9):
         raise ProbabilityError("categorical probabilities must be non-empty and sum to one")
+    base = finite_number("entropy base", base)
     if base <= 1:
         raise ProbabilityError("entropy base must exceed one")
     denominator = math.log(base)
@@ -823,6 +827,7 @@ def surprisal_probability(
     provenance: Sequence[str] = (),
 ) -> ProbabilityAssessment:
     p = probability("event_probability", event_probability)
+    base = finite_number("surprisal base", base)
     if base <= 1:
         raise ProbabilityError("surprisal base must exceed one")
     surprise = math.inf if p == 0.0 else -math.log(p) / math.log(base)
@@ -851,6 +856,8 @@ def expected_information_gain(
     for weight, posterior in posterior_scenarios:
         w = probability("scenario_weight", weight)
         posterior_values = [probability("posterior", value) for value in posterior]
+        if len(posterior_values) != len(prior_values):
+            raise ProbabilityError("posterior scenarios must use the same state space as the prior")
         if not posterior_values or not math.isclose(sum(posterior_values), 1.0, rel_tol=1e-9, abs_tol=1e-9):
             raise ProbabilityError("each posterior scenario must sum to one")
         weighted_entropy += w * categorical_entropy(posterior_values)
