@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -21,6 +22,13 @@ from typing import Any, Callable
 LIVE_STATUSES = ("queued", "in_progress", "waiting", "pending", "requested")
 PR_RUN_EVENTS = frozenset({"pull_request", "dynamic"})
 BASE_RETRYABLE = frozenset({0, 429, 500, 502, 503, 504})
+COMMIT_OID_RE = re.compile(r"^[0-9a-f]{40}$")
+COMMIT_PULLS_PAGE_SIZE = 100
+MAX_COMMIT_PULLS_PAGES = 10
+RUN_PAGE_SIZE = 100
+MAX_RUN_PAGES = 10
+PR_COMMITS_PAGE_SIZE = 100
+MAX_PR_COMMIT_PAGES = 3
 
 
 @dataclass(frozen=True)
@@ -84,6 +92,48 @@ def _repo_full_name(obj: Any) -> str:
     return str((obj or {}).get("full_name") or "")
 
 
+def canonical_commit_oid(value: str) -> str:
+    """Return a lowercase 40-hex Git commit OID, or fail closed.
+
+    Privileged workflow_run identity must be an immutable full SHA. Whitespace,
+    abbreviations, and non-hex values are rejected so they cannot degrade into
+    an ambiguous commits/history lookup.
+    """
+    if not isinstance(value, str):
+        raise RuntimeError("workflow_run head SHA must be a 40-character hex commit OID")
+    oid = value.casefold()
+    if COMMIT_OID_RE.fullmatch(oid) is None:
+        raise RuntimeError("workflow_run head SHA must be a 40-character hex commit OID")
+    return oid
+
+
+def list_commit_associated_pulls(api: GitHubApi, repo: str, sha: str) -> list[dict[str, Any]]:
+    """Return every PR GitHub associates with a commit, or fail closed.
+
+    ``/commits/{sha}/pulls`` is paginated. A single first page can hide later
+    same-head PRs, so identity recovery must scan a bounded complete prefix.
+    Abbreviated or malformed SHAs are rejected before lookup.
+    """
+    if not repo or not sha:
+        raise RuntimeError("incomplete commit identity for PR association")
+    sha = canonical_commit_oid(sha)
+    quoted_sha = urllib.parse.quote(sha, safe="")
+    items: list[dict[str, Any]] = []
+    for page in range(1, MAX_COMMIT_PULLS_PAGES + 1):
+        query = urllib.parse.urlencode(
+            {"per_page": COMMIT_PULLS_PAGE_SIZE, "page": page}
+        )
+        status, payload, _ = api.request(f"/repos/{repo}/commits/{quoted_sha}/pulls?{query}")
+        if status != 200 or not isinstance(payload, list):
+            raise RuntimeError(
+                f"failed to resolve PR associations for {sha}: HTTP {status}"
+            )
+        items.extend(item for item in payload if isinstance(item, dict))
+        if len(payload) < COMMIT_PULLS_PAGE_SIZE:
+            return items
+    raise RuntimeError("commit PR association exceeded bounded identity scan")
+
+
 def _retryable(status: int, payload: Any) -> bool:
     if status in BASE_RETRYABLE:
         return True
@@ -105,9 +155,9 @@ def _retry_delay(headers: dict[str, str], attempt: int) -> float:
 
 def list_runs(api: GitHubApi, repo: str, status_name: str) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
-    for page in range(1, 11):
+    for page in range(1, MAX_RUN_PAGES + 1):
         query = urllib.parse.urlencode(
-            {"status": status_name, "per_page": 100, "page": page}
+            {"status": status_name, "per_page": RUN_PAGE_SIZE, "page": page}
         )
         status, payload, _ = api.request(f"/repos/{repo}/actions/runs?{query}")
         if status != 200 or not isinstance(payload, dict):
@@ -116,9 +166,11 @@ def list_runs(api: GitHubApi, repo: str, status_name: str) -> list[dict[str, Any
         if not isinstance(batch, list):
             raise RuntimeError(f"malformed {status_name} workflow run payload")
         runs.extend(item for item in batch if isinstance(item, dict))
-        if len(batch) < 100:
-            break
-    return runs
+        if len(batch) < RUN_PAGE_SIZE:
+            return runs
+    raise RuntimeError(
+        f"live {status_name} run listing exceeded bounded identity scan"
+    )
 
 
 def fetch_pr(api: GitHubApi, repo: str, pr_number: int) -> dict[str, Any]:
@@ -131,19 +183,22 @@ def fetch_pr(api: GitHubApi, repo: str, pr_number: int) -> dict[str, Any]:
 def list_pr_commit_shas(api: GitHubApi, repo: str, pr_number: int) -> set[str]:
     shas: set[str] = set()
     # GitHub caps pull-request commits at 250; three 100-entry pages cover it.
-    for page in range(1, 4):
-        query = urllib.parse.urlencode({"per_page": 100, "page": page})
+    for page in range(1, MAX_PR_COMMIT_PAGES + 1):
+        query = urllib.parse.urlencode({"per_page": PR_COMMITS_PAGE_SIZE, "page": page})
         status, payload, _ = api.request(
             f"/repos/{repo}/pulls/{pr_number}/commits?{query}"
         )
         if status != 200 or not isinstance(payload, list):
             raise RuntimeError(f"failed to list PR #{pr_number} commits: HTTP {status}")
         for commit in payload:
-            if isinstance(commit, dict) and commit.get("sha"):
-                shas.add(str(commit["sha"]))
-        if len(payload) < 100:
-            break
-    return shas
+            if not isinstance(commit, dict) or not commit.get("sha"):
+                continue
+            shas.add(canonical_commit_oid(str(commit["sha"])))
+        if len(payload) < PR_COMMITS_PAGE_SIZE:
+            return shas
+    raise RuntimeError(
+        f"PR #{pr_number} commit listing exceeded bounded identity scan"
+    )
 
 
 def explicit_pr_link(run: dict[str, Any], pr_number: int) -> bool:
@@ -162,15 +217,16 @@ def commit_links_pr(
 ) -> bool:
     if not sha:
         return False
+    try:
+        sha = canonical_commit_oid(sha)
+    except RuntimeError:
+        return False
     if sha in cache:
         return cache[sha]
-    status, payload, _ = api.request(f"/repos/{repo}/commits/{sha}/pulls")
-    if status != 200 or not isinstance(payload, list):
-        cache[sha] = False
-        return False
+    pulls = list_commit_associated_pulls(api, repo, sha)
     linked = any(
         isinstance(pull, dict) and int(pull.get("number") or 0) == pr_number
-        for pull in payload
+        for pull in pulls
     )
     cache[sha] = linked
     return linked
@@ -211,17 +267,26 @@ def belongs_to_pr(
     ):
         return False
 
-    sha = str(run.get("head_sha") or "")
+    try:
+        sha = canonical_commit_oid(str(run.get("head_sha") or ""))
+    except RuntimeError:
+        return False
+    live_head_sha = str(head.get("sha") or "")
+    try:
+        live_head_oid = canonical_commit_oid(live_head_sha) if live_head_sha else ""
+    except RuntimeError:
+        live_head_oid = ""
     trusted_event_shas = {
-        value
+        value.casefold()
         for value in (
             context.event_head_sha,
             context.event_before_sha,
-            str(head.get("sha") or ""),
+            live_head_oid,
         )
         if value
     }
-    if sha in trusted_event_shas or sha in known_pr_shas:
+    folded_known = {item.casefold() for item in known_pr_shas}
+    if sha in trusted_event_shas or sha in folded_known:
         return True
 
     return commit_links_pr(
@@ -284,6 +349,7 @@ def cancel_run(api: GitHubApi, repo: str, run_id: int) -> CancelResult:
 
 
 def build_context_from_env() -> DrainContext:
+    before = os.environ.get("EVENT_BEFORE_SHA", "")
     return DrainContext(
         repo=os.environ["REPO"],
         current_run_id=int(os.environ["CURRENT_RUN_ID"]),
@@ -291,8 +357,8 @@ def build_context_from_env() -> DrainContext:
         event_action=os.environ["PR_ACTION"],
         event_head_repo=os.environ["EVENT_HEAD_REPO"],
         event_head_ref=os.environ["EVENT_HEAD_REF"],
-        event_head_sha=os.environ["EVENT_HEAD_SHA"],
-        event_before_sha=os.environ.get("EVENT_BEFORE_SHA", ""),
+        event_head_sha=canonical_commit_oid(os.environ["EVENT_HEAD_SHA"]),
+        event_before_sha=canonical_commit_oid(before) if before else "",
         default_branch=os.environ["DEFAULT_BRANCH"],
     )
 
@@ -316,7 +382,10 @@ def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
         raise RuntimeError("pull request is no longer same-repository")
 
     state = str(pr.get("state") or "")
-    authoritative_sha = str(head.get("sha") or "") if state == "open" else ""
+    if state == "open":
+        authoritative_sha = canonical_commit_oid(str(head.get("sha") or ""))
+    else:
+        authoritative_sha = ""
     known_pr_shas = list_pr_commit_shas(api, context.repo, context.pr_number)
     known_pr_shas.update(
         value
@@ -349,7 +418,10 @@ def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
                 continue
             seen_ids.add(run_id)
             inspected += 1
-            run_sha = str(run.get("head_sha") or "")
+            try:
+                run_sha = canonical_commit_oid(str(run.get("head_sha") or ""))
+            except RuntimeError:
+                continue
             if state != "open" or run_sha != authoritative_sha:
                 selected.append(run)
 

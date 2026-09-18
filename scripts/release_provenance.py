@@ -11,6 +11,7 @@ import argparse
 import gzip
 import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import platform
@@ -19,6 +20,7 @@ import sys
 import tarfile
 import tempfile
 import tomllib
+import types
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -26,6 +28,7 @@ SCHEMA_VERSION = 1
 _CYCLONEDX_SPEC = "1.6"
 _COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40,64}$")
 _DEP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
+_OBSERVED_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._:-]*)=(.+)$")
 
 
 def _sha256(path: Path) -> str:
@@ -64,12 +67,26 @@ def _package_version(name: str) -> str:
         return "unavailable"
 
 
+def _canonical_provenance_name(path: Path) -> str:
+    """Return a stable repository-relative POSIX name for release evidence."""
+
+    name = path.as_posix()
+    if path.is_absolute() or "\\" in name:
+        raise ValueError("provenance input names must be repository-relative POSIX paths")
+    parts = name.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(
+            "provenance input names must not contain empty, dot, or parent path segments"
+        )
+    return name
+
+
 def _file_record(path: Path, *, root: Path | None = None) -> dict[str, Any]:
     resolved = path.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(path)
     if root is None:
-        name = path.as_posix()
+        name = _canonical_provenance_name(path)
     else:
         name = resolved.relative_to(root.resolve()).as_posix()
     return {"name": name, "sha256": _sha256(resolved), "size": resolved.stat().st_size}
@@ -264,6 +281,158 @@ def compare_provenance(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ensure_namespace(name: str, path: Path) -> None:
+    """Register a package without executing its ``__init__`` (avoids pydantic)."""
+
+    if name in sys.modules:
+        return
+    module = types.ModuleType(name)
+    module.__path__ = [str(path)]  # type: ignore[attr-defined]
+    module.__file__ = str(path / "__init__.py")
+    module.__package__ = name
+    sys.modules[name] = module
+
+
+def _load_file_module(name: str, file_path: Path) -> types.ModuleType:
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
+    spec = importlib.util.spec_from_file_location(name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(name)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_release_evidence():
+    """Import the evidence gate without loading ``skeleton.__init__``.
+
+    Reproducible Release pytest has neither PYTHONPATH nor pydantic. A normal
+    ``import skeleton.release.evidence`` executes the root package, which
+    imports settings and fails. Load kernel.errors and evidence.py by path.
+    """
+
+    root = Path(__file__).resolve().parents[1]
+    evidence_path = root / "skeleton" / "release" / "evidence.py"
+    errors_path = root / "skeleton" / "kernel" / "errors.py"
+    if not evidence_path.is_file() or not errors_path.is_file():
+        raise ValueError(
+            "release evidence commands require the skeleton.release.evidence package"
+        )
+    try:
+        _ensure_namespace("skeleton", root / "skeleton")
+        _ensure_namespace("skeleton.kernel", root / "skeleton" / "kernel")
+        _ensure_namespace("skeleton.release", root / "skeleton" / "release")
+        _load_file_module("skeleton.kernel.errors", errors_path)
+        return _load_file_module("skeleton.release.evidence", evidence_path)
+    except Exception as exc:
+        raise ValueError(
+            "release evidence commands require the skeleton.release.evidence package"
+        ) from exc
+
+
+def _load_json_records(paths: Iterable[str]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for item in paths:
+        payload = json.loads(Path(item).read_text(encoding="utf-8"))
+        if isinstance(payload, list):
+            records.extend(payload)
+        elif isinstance(payload, dict):
+            records.append(payload)
+        else:
+            raise ValueError(f"{item} must contain a JSON object or list of objects")
+    return records
+
+
+def _load_observed_artifacts(values: Iterable[str]) -> dict[str, bytes]:
+    observed: dict[str, bytes] = {}
+    for item in values:
+        match = _OBSERVED_RE.fullmatch(item)
+        if not match:
+            raise ValueError("observed artifact must use artifact_id=path")
+        artifact_id, raw_path = match.group(1), match.group(2)
+        path = Path(raw_path)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        observed[artifact_id] = path.read_bytes()
+    return observed
+
+
+def emit_release_evidence(args: argparse.Namespace) -> int:
+    """Write a separate release-ready evidence document from v1 provenance."""
+
+    release_evidence = _load_release_evidence()
+    provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
+    if provenance.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("evidence adapter requires a SCHEMA_VERSION 1 provenance document")
+    test_evidence = _load_json_records(args.test_evidence)
+    eval_evidence = _load_json_records(args.eval_evidence)
+    asset_provenance: list[dict[str, Any]] = []
+    if args.asset_provenance:
+        asset_payload = json.loads(Path(args.asset_provenance).read_text(encoding="utf-8"))
+        if isinstance(asset_payload, dict) and "assets" in asset_payload:
+            assets = asset_payload["assets"]
+            if not isinstance(assets, list):
+                raise ValueError("asset provenance assets must be a list")
+            asset_provenance = assets
+        elif isinstance(asset_payload, list):
+            asset_provenance = asset_payload
+        else:
+            raise ValueError("asset provenance must be a list or an assets manifest object")
+
+    try:
+        evidence = release_evidence.from_v1_provenance(
+            provenance,
+            test_evidence=test_evidence,
+            eval_evidence=eval_evidence,
+            asset_provenance=asset_provenance,
+        )
+        serialized = release_evidence.serialize_evidence(evidence)
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(serialized + "\n", encoding="utf-8")
+        observed = _load_observed_artifacts(args.observed)
+        result = release_evidence.evaluate_release_ready(
+            evidence,
+            expected_commit=args.source_commit,
+            observed_artifacts=observed or None,
+        )
+    except release_evidence.ReleaseEvidenceError as exc:
+        raise ValueError(str(exc)) from exc
+    print(json.dumps(result.to_payload(), indent=2, sort_keys=True))
+    if args.gate and not result.release_ready:
+        print("release evidence is not release-ready", file=sys.stderr)
+        for reason in result.reasons:
+            print(reason, file=sys.stderr)
+        return 1
+    return 0
+
+
+def gate_release_evidence(args: argparse.Namespace) -> int:
+    """Fail closed unless the evidence document is release-ready."""
+
+    release_evidence = _load_release_evidence()
+    observed = _load_observed_artifacts(args.observed)
+    try:
+        result = release_evidence.evaluate_release_ready(
+            Path(args.evidence).read_text(encoding="utf-8"),
+            expected_commit=args.source_commit,
+            observed_artifacts=observed or None,
+        )
+    except release_evidence.ReleaseEvidenceError as exc:
+        raise ValueError(str(exc)) from exc
+    print(json.dumps(result.to_payload(), indent=2, sort_keys=True))
+    if not result.release_ready:
+        print("release evidence is not release-ready", file=sys.stderr)
+        for reason in result.reasons:
+            print(reason, file=sys.stderr)
+        return 1
+    print("release-ready")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -296,6 +465,42 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("left")
     compare.add_argument("right")
     compare.set_defaults(func=compare_provenance)
+    evidence = subparsers.add_parser(
+        "evidence",
+        help="write a separate release-ready evidence document from SCHEMA_VERSION 1 provenance",
+    )
+    evidence.add_argument("--provenance", required=True)
+    evidence.add_argument("--output", required=True)
+    evidence.add_argument("--source-commit", required=True)
+    evidence.add_argument("--test-evidence", action="append", default=[])
+    evidence.add_argument("--eval-evidence", action="append", default=[])
+    evidence.add_argument("--asset-provenance", default=None)
+    evidence.add_argument(
+        "--observed",
+        action="append",
+        default=[],
+        help="bind exact artifact bytes as artifact_id=path",
+    )
+    evidence.add_argument(
+        "--gate",
+        action="store_true",
+        help="fail closed unless the adapted evidence is release-ready",
+    )
+    evidence.set_defaults(func=emit_release_evidence)
+
+    gate = subparsers.add_parser(
+        "gate",
+        help="classify a release evidence document; missing evidence fails closed",
+    )
+    gate.add_argument("--evidence", required=True)
+    gate.add_argument("--source-commit", required=True)
+    gate.add_argument(
+        "--observed",
+        action="append",
+        default=[],
+        help="bind exact artifact bytes as artifact_id=path",
+    )
+    gate.set_defaults(func=gate_release_evidence)
     return parser
 
 

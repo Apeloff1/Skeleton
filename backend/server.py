@@ -1925,8 +1925,8 @@ class CodeAnalyzer:
                 
         except SyntaxError as e:
             analysis.issues.append({"type": "syntax_error", "line": e.lineno, "message": str(e.msg)})
-        except Exception as e:
-            analysis.issues.append({"type": "analysis_error", "message": str(e)})
+        except Exception:
+            analysis.issues.append({"type": "analysis_error", "message": "analysis_failed"})
         return analysis
 
 class ExecutionContext:
@@ -2016,9 +2016,9 @@ class PythonExecutor(CodeExecutor):
             finally:
                 os.unlink(temp_file)
                 
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         
         ctx.end()
         result.metrics.execution_time_ms = ctx.elapsed_ms
@@ -2119,9 +2119,9 @@ class CppExecutor(CodeExecutor):
         except asyncio.TimeoutError:
             result.status = ExecutionStatus.TIMEOUT
             result.error = f"Timeout after {ctx.request.timeout_seconds}s"
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         finally:
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
@@ -2181,9 +2181,9 @@ class CExecutor(CppExecutor):
             result.output = stdout.decode()
             result.status = ExecutionStatus.SUCCESS if run_process.returncode == 0 else ExecutionStatus.ERROR
             
-        except Exception as e:
+        except Exception:
             result.status = ExecutionStatus.ERROR
-            result.error = str(e)
+            result.error = "execution_failed"
         finally:
             if temp_dir: shutil.rmtree(temp_dir, ignore_errors=True)
         
@@ -2389,7 +2389,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 entry["status"] = "failed"
                 entry["completed_at"] = time.time()
-                entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+                entry["error"] = "boot_task_failed"
                 logger.warning(f"[stagger] {label} failed: {e}")
         task = asyncio.create_task(_runner(), name=f"kick:{label}")
         _BOOT_TASKS.append(task)
@@ -3221,6 +3221,8 @@ app = FastAPI(
     version=SYSTEM_VERSION,
     lifespan=lifespan
 )
+from core.http_errors import install_public_error_handlers as _install_public_error_handlers
+_install_public_error_handlers(app)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 # CORS origins configurable via env (required by deployment pipeline).
@@ -3342,8 +3344,9 @@ async def health_ready():
         await _aio.wait_for(_db.command("ping"), timeout=4.0)
         checks["mongo"] = {"ok": True, "latency_ms_lt": 4000}
     except Exception as e:
+        logger.warning("health probe failed (mongo): %s", type(e).__name__)
         checks["mongo"] = {"ok": False, "soft": True, "warming": True,
-                           "error": str(e)[:200],
+                           "error": "probe_failed",
                            "note": "DB warming/unreachable — readiness not failed (soft check)"}
 
     # 2) AI key
@@ -3352,7 +3355,8 @@ async def health_ready():
         if not ai_service.api_key:
             checks["ai_key"]["note"] = "AI features will fall back to deterministic generators"
     except Exception as e:
-        checks["ai_key"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (ai_key): %s", type(e).__name__)
+        checks["ai_key"] = {"ok": False, "error": "probe_failed"}
 
     # 3) Vault writable (galaxy-studio)
     try:
@@ -3363,7 +3367,8 @@ async def health_ready():
         os.remove(test_path)
         checks["vault_galaxy"] = {"ok": True, "path": _vault_dir}
     except Exception as e:
-        checks["vault_galaxy"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (vault_galaxy): %s", type(e).__name__)
+        checks["vault_galaxy"] = {"ok": False, "error": "probe_failed"}
         overall_ok = False
 
     # 4) Build-vault writable
@@ -3375,7 +3380,8 @@ async def health_ready():
         os.remove(test_path)
         checks["vault_builds"] = {"ok": True, "path": str(_bv.BUILDS_ROOT)}
     except Exception as e:
-        checks["vault_builds"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (vault_builds): %s", type(e).__name__)
+        checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
         overall_ok = False
 
     _probe_event("readiness", "ok" if overall_ok else "degraded",
@@ -3409,7 +3415,8 @@ async def health_startup():
         from core import build_vault as _bv  # noqa
         checks["vault_module"] = {"ok": True}
     except Exception as e:
-        checks["vault_module"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (vault_module): %s", type(e).__name__)
+        checks["vault_module"] = {"ok": False, "error": "probe_failed"}
 
     overall = all(c["ok"] for c in checks.values())
     _probe_event("startup", "ok" if overall else "pending")
@@ -3441,7 +3448,8 @@ async def health_vault():
         zip_count = len(os.listdir(os.path.join(_gv, "zips"))) if os.path.isdir(os.path.join(_gv, "zips")) else 0
         out["checks"]["galaxy_vault"] = {"ok": True, "path": _gv, "zips": zip_count}
     except Exception as e:
-        out["checks"]["galaxy_vault"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (galaxy_vault): %s", type(e).__name__)
+        out["checks"]["galaxy_vault"] = {"ok": False, "error": "probe_failed"}
         overall = False
 
     # Build vault (shards)
@@ -3455,7 +3463,8 @@ async def health_vault():
         build_count = len([x for x in os.listdir(root) if os.path.isdir(os.path.join(root, x))])
         out["checks"]["build_vault"] = {"ok": True, "path": root, "builds": build_count}
     except Exception as e:
-        out["checks"]["build_vault"] = {"ok": False, "error": str(e)[:200]}
+        logger.warning("health probe failed (build_vault): %s", type(e).__name__)
+        out["checks"]["build_vault"] = {"ok": False, "error": "probe_failed"}
         overall = False
 
     # Disk free
@@ -3472,7 +3481,8 @@ async def health_vault():
             overall = False
             out["checks"]["disk_pressure"] = {"ok": False, "free_pct": out["disk"]["free_pct"]}
     except Exception as e:
-        out["disk"] = {"error": str(e)[:200]}
+        logger.warning("health probe failed (disk): %s", type(e).__name__)
+        out["disk"] = {"error": "probe_failed"}
 
     out["status"] = "ok" if overall else "degraded"
     _probe_event("vault", "ok" if overall else "degraded")
@@ -3496,21 +3506,24 @@ async def health_deep():
             import json as _json
             ready = _json.loads(ready.body)
     except Exception as e:
-        ready = {"status": "error", "error": str(e)[:200]}
+        logger.warning("health probe failed (ready): %s", type(e).__name__)
+        ready = {"status": "error", "error": "probe_failed"}
     try:
         startup = await health_startup()
         if hasattr(startup, "body"):
             import json as _json
             startup = _json.loads(startup.body)
     except Exception as e:
-        startup = {"status": "error", "error": str(e)[:200]}
+        logger.warning("health probe failed (startup): %s", type(e).__name__)
+        startup = {"status": "error", "error": "probe_failed"}
     try:
         vault = await health_vault()
         if hasattr(vault, "body"):
             import json as _json
             vault = _json.loads(vault.body)
     except Exception as e:
-        vault = {"status": "error", "error": str(e)[:200]}
+        logger.warning("health probe failed (vault): %s", type(e).__name__)
+        vault = {"status": "error", "error": "probe_failed"}
     return {
         "live": live, "ready": ready, "startup": startup, "vault": vault,
         "ts": time.time(),
@@ -4839,7 +4852,8 @@ try:
             from core.databases import core_db as _c, content_db as _t
             return await boot_index_audit([_c, _t])
         except Exception as e:
-            return {"error": str(e)}
+            logger.warning("index audit failed: %s", type(e).__name__)
+            return {"error": "index_audit_failed"}
 
     @app.get("/api/metrics")
     async def _metrics_endpoint():

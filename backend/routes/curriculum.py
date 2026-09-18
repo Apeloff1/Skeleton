@@ -211,8 +211,8 @@ async def get_unified_curriculum_index():
                 "learning_path":  "/api/education/learning-path",
             },
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "version": "1.0.0", "classes": [], "reading_tracks": []}
+    except Exception:
+        return {"error": "curriculum_unavailable", "version": "1.0.0", "classes": [], "reading_tracks": []}
 
 
 

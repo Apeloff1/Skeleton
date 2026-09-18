@@ -2,7 +2,9 @@ name: PR Hygiene
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
+    # Classification is a pure function of the PR diff. Metadata-only edits,
+    # draft-state changes, and close events cannot change size/area/risk labels.
+    types: [opened, reopened, synchronize]
 
 concurrency:
   group: pr-hygiene-${{ github.event.pull_request.number }}
@@ -16,12 +18,12 @@ jobs:
   classify:
     name: Classify pull request
     if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       issues: write
-      pull-requests: write
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}

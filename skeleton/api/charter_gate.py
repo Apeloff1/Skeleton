@@ -17,19 +17,24 @@ from skeleton.kernel.governance import Decision, get_governance
 def require_charter(domain: str, action: str, *, default_weight: int = 0):
     """Dependency factory: seal first, then charter decide for (domain, action)."""
 
+    if isinstance(default_weight, bool) or not isinstance(default_weight, int):
+        raise TypeError("default_weight must be an integer")
+
     def _gate(
         attester: str = Depends(require_seal),
         x_gf_actor_weight: Optional[str] = Header(default=None, alias="x-gf-actor-weight"),
     ) -> str:
         weight = default_weight
-        if x_gf_actor_weight is not None and str(x_gf_actor_weight).strip() != "":
-            try:
-                weight = int(x_gf_actor_weight)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"error": "invalid_actor_weight", "value": x_gf_actor_weight},
-                ) from None
+        if x_gf_actor_weight is not None:
+            raw = str(x_gf_actor_weight).strip()
+            if raw:
+                signed = raw[0] == "-" and raw[1:].isdigit()
+                if not (raw.isdigit() or signed):
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": "invalid_actor_weight"},
+                    )
+                weight = int(raw)
         decision: Decision = get_governance().decide(domain, action, weight)
         if not decision.permitted:
             raise HTTPException(

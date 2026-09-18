@@ -11,6 +11,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+IDEMPOTENCY_HEADER = "Idempotency-Key"
+_IDEMPOTENCY_HEADER_ALIASES = frozenset({"idempotency-key", "x-idempotency-key"})
+
 
 @dataclass
 class IdempotencyEntry:
@@ -37,10 +40,15 @@ class IdempotencyGuard:
         self._misses = 0
 
     def _extract_key(self, headers: Dict[str, str]) -> Optional[str]:
-        """Extract idempotency key from headers."""
-        for key in ("Idempotency-Key", "X-Idempotency-Key", "idempotency-key"):
-            if key in headers:
-                return headers[key]
+        """Extract idempotency key from headers.
+
+        Starlette lower-cases header names, so lookups must be
+        case-insensitive. Canonical ``Idempotency-Key`` and the
+        ``X-Idempotency-Key`` alias both resolve.
+        """
+        for key, value in headers.items():
+            if key.lower() in _IDEMPOTENCY_HEADER_ALIASES:
+                return value
         return None
 
     def replay(self, headers: Dict[str, str]) -> Optional[Any]:

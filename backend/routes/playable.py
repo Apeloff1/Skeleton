@@ -187,7 +187,6 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
     if not EMERGENT_LLM_KEY:
         return {"content": "", "error": "EMERGENT_LLM_KEY not configured", "model": None, "provider": None}
     sid = f"playable-{uuid.uuid4().hex[:8]}"
-    last_err = None
     for i, model in enumerate(ensemble):
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
@@ -198,9 +197,9 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
             content = resp.content if hasattr(resp, "content") else str(resp)
             return {"content": content, "model": model, "provider": provider,
                     "latency_ms": int((time.time() - t0) * 1000), "attempts": i + 1}
-        except Exception as e:  # provider error → next in ensemble
-            last_err = str(e)
-    return {"content": "", "error": f"all models failed: {last_err}", "model": None, "provider": None}
+        except Exception:  # provider error → next in ensemble
+            pass
+    return {"content": "", "error": "llm_request_failed", "model": None, "provider": None}
 
 
 # process-wide cap on concurrent LLM calls (smooths provider load + thread pool under bursts)
@@ -454,9 +453,9 @@ async def _run_job(job_id: str, coro):
         out["job_id"] = job_id
         out["job_status"] = "done"
         await _db.playable_jobs.update_one({"job_id": job_id}, {"$set": out}, upsert=True)
-    except Exception as e:
+    except Exception:
         await _db.playable_jobs.update_one(
-            {"job_id": job_id}, {"$set": {"job_status": "error", "error": str(e)}}, upsert=True)
+            {"job_id": job_id}, {"$set": {"job_status": "error", "error": "generation_failed"}}, upsert=True)
 
 
 @router.post("/generate/async")

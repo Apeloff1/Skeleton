@@ -49,6 +49,25 @@ class SkeletonError(Exception):
             "context": self.context,
         }
 
+    def public_payload(self) -> Dict[str, Any]:
+        """Client-safe envelope: no cause chain and no 5xx internals."""
+        status = http_status_for(self)
+        if status >= 500:
+            return {
+                "error": type(self).__name__,
+                "code": self.code,
+                "severity": self.severity.value,
+                "message": "internal server error",
+                "context": {},
+            }
+        return {
+            "error": type(self).__name__,
+            "code": self.code,
+            "severity": self.severity.value,
+            "message": self.message,
+            "context": dict(self.context),
+        }
+
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"{type(self).__name__}(code={self.code!r}, message={self.message!r})"
 

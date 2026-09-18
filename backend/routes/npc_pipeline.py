@@ -23,6 +23,7 @@ import json
 
 # Import LLM service
 from services.game_llm_service import get_game_llm_service
+from core.http_errors import internal_http_error
 
 router = APIRouter(prefix="/api/npc-pipeline", tags=["Text-to-NPC Pipeline v15.5"])
 
@@ -589,7 +590,7 @@ async def generate_npc(request: NPCGenerationRequest):
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("NPC generation failed", e) from None
 
 @router.post("/dialogue/generate")
 async def generate_dialogue_response(request: DialogueGenerationRequest):
@@ -740,7 +741,7 @@ async def ai_generate_npc(request: AIGenerationRequest):
             return await generate_npc(fallback_request)
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI NPC generation failed: {str(e)}")
+        raise internal_http_error("AI NPC generation failed", e) from None
 
 
 @router.post("/ai/dialogue")
@@ -780,7 +781,7 @@ async def ai_generate_dialogue(request: AIDialogueRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI dialogue generation failed: {str(e)}")
+        raise internal_http_error("AI dialogue generation failed", e) from None
 
 
 @router.post("/ai/behavior")
@@ -817,7 +818,7 @@ async def ai_generate_behavior(npc_type: str, behavior_style: str = "defensive")
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI behavior generation failed: {str(e)}")
+        raise internal_http_error("AI behavior generation failed", e) from None
 
 
 @router.post("/ai/quest")
@@ -870,4 +871,4 @@ async def ai_generate_npc_quest(
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI quest generation failed: {str(e)}")
+        raise internal_http_error("AI quest generation failed", e) from None

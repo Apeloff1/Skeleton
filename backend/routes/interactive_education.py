@@ -12,6 +12,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 from datetime import datetime
@@ -218,7 +219,7 @@ async def call_education_ai(prompt: str, system_prompt: str) -> str:
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+        raise internal_http_error("Education AI request failed", e) from None
 
 # ============================================================================
 # EDUCATION ENDPOINTS
@@ -399,7 +400,7 @@ Format as JSON:
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Education request failed", e) from None
 
 @router.post("/assess")
 async def skill_assessment(request: SkillAssessmentRequest):
@@ -463,7 +464,7 @@ Make questions practical and test real understanding, not just memorization."""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Education request failed", e) from None
 
 @router.post("/learning-path")
 async def generate_learning_path(request: LearningPathRequest):
@@ -510,7 +511,7 @@ Format as a detailed curriculum with clear progression."""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Education request failed", e) from None
 
 @router.post("/code-review")
 async def ai_code_review(request: CodeReviewRequest):
@@ -553,7 +554,7 @@ Be encouraging but honest. Adjust complexity of feedback for {request.skill_leve
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Education request failed", e) from None
 
 @router.get("/achievements")
 async def get_achievements():

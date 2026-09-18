@@ -11,6 +11,7 @@ extracted from the text, so the knowledge graph self-populates.
 
 from __future__ import annotations
 
+import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
@@ -195,6 +196,10 @@ class QuadRetriever:
             if (item := self._normalize_result(plane_name, raw)) is not None
         ]
 
+    def _emit_cache_hit(self, query: str, hits: int) -> None:
+        if self._bus:
+            self._bus.emit("retrieval.cache_hit", {"query": query, "hits": hits})
+
     def _finish_inflight(self, cache_key: str, flight: Event) -> None:
         """Release waiters for a cache key without disturbing a newer flight."""
         with self._state_lock:
@@ -204,6 +209,7 @@ class QuadRetriever:
 
     def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
         """Query registered planes concurrently and fuse deterministic results."""
+        t0 = time.perf_counter()
         with self._state_lock:
             generation = self._cache_generation
             plane_items = tuple(self._planes.items())
@@ -214,6 +220,7 @@ class QuadRetriever:
             if cached is not None:
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
+                self._emit_cache_hit(query, len(cached))
                 return list(cached)
 
         with self._state_lock:
@@ -233,6 +240,7 @@ class QuadRetriever:
             if cached is not None:
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
+                self._emit_cache_hit(query, len(cached))
                 return list(cached)
 
             # A topology/ingestion generation change can intentionally prevent
@@ -248,6 +256,7 @@ class QuadRetriever:
                 if cached is not None:
                     with self._state_lock:
                         self._stats["cache_hits"] += 1
+                    self._emit_cache_hit(query, len(cached))
                     return list(cached)
 
             results_by_plane: Dict[str, List[ScoredResult]] = {}
@@ -308,6 +317,16 @@ class QuadRetriever:
                         self._cache.put(cache_key, tuple(fused))
 
             if self._bus:
+                elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                self._bus.emit(
+                    "retrieval.completed",
+                    {
+                        "query": query,
+                        "results": len(fused),
+                        "elapsed_ms": round(elapsed_ms, 3),
+                        "planes": {plane: len(hits) for plane, hits in results_by_plane.items()},
+                    },
+                )
                 self._bus.emit(
                     "retrieval.quad.query",
                     {
@@ -373,6 +392,10 @@ class QuadRetriever:
 
         if self._bus:
             self._bus.emit(
+                "retrieval.ingested",
+                {"doc_id": doc_id, "chunks": chunks},
+            )
+            self._bus.emit(
                 "retrieval.quad.ingested",
                 {
                     "doc_id": doc_id,
@@ -383,6 +406,39 @@ class QuadRetriever:
             )
 
         return chunks
+
+    def ingest_fact(
+        self,
+        subject: str,
+        predicate: str,
+        obj: str,
+        confidence: float = 1.0,
+        provenance: str = "",
+    ) -> None:
+        """Insert one structured triple into KAG (lazy-register the plane)."""
+
+        del confidence, provenance
+
+        with self._state_lock:
+            kag = self._planes.get("kag")
+            if kag is None:
+                from skeleton.retrieval.kag import KAGRetriever
+
+                kag = KAGRetriever()
+                self._planes["kag"] = kag
+            self._cache_generation += 1
+            self._cache.clear()
+
+        added = 0
+        if hasattr(kag, "graph"):
+            kag.graph.add(subject, predicate, obj)
+            added = 1
+
+        with self._state_lock:
+            if added:
+                self._stats["triples_extracted"] += added
+            self._cache_generation += 1
+            self._cache.clear()
 
     def stats(self) -> Dict[str, Any]:
         with self._state_lock:

@@ -94,6 +94,13 @@ def _ct_hex_eq(a: str, b: str) -> bool:
         return False
 
 
+def _require_ttl_secs(ttl_secs: object) -> int:
+    """Reject bools and non-ints; ``int(True)`` must not become a 1-second TTL."""
+    if isinstance(ttl_secs, bool) or not isinstance(ttl_secs, int):
+        raise ValueError("ttl_secs must be an integer")
+    return ttl_secs
+
+
 def mint_seal(
     attester: str,
     ttl_secs: int = DEFAULT_TTL_SECS,
@@ -111,7 +118,7 @@ def mint_seal(
     if not attester:
         return None
     ts = int(now if now is not None else time.time())
-    expiry = ts + int(ttl_secs)
+    expiry = ts + _require_ttl_secs(ttl_secs)
 
     if principal:
         ring = load_keyring(secret=secret)

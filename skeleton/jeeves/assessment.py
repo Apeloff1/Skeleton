@@ -47,10 +47,13 @@ def _unit_interval(name: str, value: Any) -> float:
 def _skill_id(value: Any) -> str:
     if not isinstance(value, str) or not value.strip():
         raise AssessmentError("skill_id must be a non-empty string")
-    if len(value) > MAX_SKILL_ID_CHARS:
-        raise AssessmentError("skill_id is too long",
-                              context={"max_chars": MAX_SKILL_ID_CHARS})
-    return value
+    normalized = value.strip()
+    if len(normalized) > MAX_SKILL_ID_CHARS:
+        raise AssessmentError(
+            "skill_id is too long",
+            context={"max_chars": MAX_SKILL_ID_CHARS},
+        )
+    return normalized
 
 
 class BloomLevel(str, Enum):
@@ -164,8 +167,24 @@ class AssessmentEngine:
     def observe(self, evidence: InteractionEvidence) -> SkillModel:
         if not isinstance(evidence, InteractionEvidence):
             raise AssessmentError("evidence must be InteractionEvidence")
-        skill = self.register(evidence.skill_id)
+
+        # First observation must be one atomic mutation. Historically observe()
+        # delegated to register(), which sampled the clock once while creating a
+        # skill and then sampled it again before applying evidence. A failure on
+        # that second read left a zero-attempt skill behind. Validate capacity,
+        # sample time once, then publish a new skill only after those operations
+        # have succeeded.
+        skill = self._skills.get(evidence.skill_id)
+        if skill is None and len(self._skills) >= self._max_skills:
+            raise AssessmentError(
+                "skill capacity reached",
+                context={"max_skills": self._max_skills},
+            )
         now = self._time()
+        if skill is None:
+            skill = SkillModel(skill_id=evidence.skill_id, last_updated=now)
+            self._skills[evidence.skill_id] = skill
+
         # A custom or suspended clock can move backwards. Never turn that into
         # negative decay (which would incorrectly increase mastery).
         elapsed = max(0.0, now - skill.last_updated)
@@ -209,7 +228,10 @@ class AssessmentEngine:
     def weakest(self, n: int = 3) -> Tuple[SkillModel, ...]:
         if isinstance(n, bool) or not isinstance(n, int) or n < 0:
             raise AssessmentError("n must be a non-negative integer")
-        items = sorted(self._skills.values(), key=lambda s: s.mastery * s.confidence)
+        items = sorted(
+            self._skills.values(),
+            key=lambda s: (s.mastery * s.confidence, s.skill_id),
+        )
         return tuple(items[:n])
 
 

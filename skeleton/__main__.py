@@ -15,6 +15,42 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
+                Use `capabilities --lifecycle` for resolvable/loaded status
+                Use `capabilities --plane-audit` for the F-15 plane audit
+                Use `capabilities --boot-audit` for the genesis/BOOT_PHASES audit
+                Use `capabilities --export-audit` for manifest export drift
+                Use `capabilities --route-audit` for main-router API_ROUTES drift
+                Use `capabilities --hmac-audit` for HMAC open-prefix vs API_ROUTES drift
+                Use `capabilities --cli-audit` for developer CLI vs CLI_COMMANDS drift
+                Use `capabilities --template-audit` for scaffold TEMPLATES drift
+                Use `capabilities --sidecar-audit` for GameForge/command sidecar routes
+                Use `capabilities --domain-audit` for gate-domain vs API_ROUTES mapping
+                Use `capabilities --cortex-audit` for unmounted cortex register_routes
+                Use `capabilities --mounted-audit` for create_app swarm/cockpit mounts
+                Use `capabilities --main-cli-audit` for python -m skeleton help vs dispatch
+                Use `capabilities --app-audit` for create_app inline GET / and /cortex/status
+                Use `capabilities --charter-audit` for require_charter domain/action pairs
+                Use `capabilities --contract-audit` for CommandSpec vs runtime register
+                Use `capabilities --live-hmac-audit` for HMAC prefixes vs live handlers
+                Use `capabilities --nested-audit` for nested include_router mounts
+                Use `capabilities --env-audit` for SKELETON_OWN / HMAC env flags
+                Use `capabilities --view-audit` for capability-view flag inventory
+                Use `capabilities --idempotency-audit` for IdempotencyGuard handlers
+                Use `capabilities --seal-audit` for live require_seal versus HMAC open
+                Use `capabilities --admit-audit` for WriteAdmit mutating methods
+                Use `capabilities --limit-audit` for SKELETON_GATE_* body/header limits
+                Use `capabilities --shared-audit` for status/config shared-command mapping
+                Use `capabilities --stack-audit` for install_gate middleware order
+                Use `capabilities --allow-audit` for MATERIALISE_TARGETS / curve allow-lists
+                Use `capabilities --version-audit` for advertised version identity
+                Use `capabilities --authz-audit` for mutating vs auth_required
+                Use `capabilities --dev-audit` for opt-in public-dev HMAC prefixes
+                Use `capabilities --token-audit` for SKELETON_PUBLIC_DEV_SURFACES tokens
+                Use `capabilities --mode-audit` for SessionMode core vs llm_core identity
+                Use `capabilities --codename-audit` for advertised codename identity
+                Use `capabilities --cver-audit` for command CONTRACT_VERSION identity
+                Use `capabilities --ttl-audit` for HMAC/idempotency TTL identity
+    invoke      Execute the versioned unified request envelope
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -25,7 +61,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 def _cmd_contracts(_rest: List[str]) -> int:
@@ -35,25 +71,247 @@ def _cmd_contracts(_rest: List[str]) -> int:
     return 0
 
 
-def _cmd_capabilities(_rest: List[str]) -> int:
-    from skeleton.application import capability_manifest
+def _cmd_capabilities(rest: List[str]) -> int:
+    from skeleton.application import (
+        capability_lifecycle_snapshot,
+        capability_manifest,
+        export_audit_snapshot,
+        genesis_boot_audit_snapshot,
+        plane_audit_snapshot,
+        api_route_audit_snapshot,
+        hmac_open_audit_snapshot,
+        developer_cli_audit_snapshot,
+        template_audit_snapshot,
+        sidecar_route_audit_snapshot,
+        gate_domain_audit_snapshot,
+        cortex_route_audit_snapshot,
+        mounted_route_audit_snapshot,
+        main_cli_audit_snapshot,
+        app_route_audit_snapshot,
+        charter_audit_snapshot,
+        contract_audit_snapshot,
+        live_hmac_audit_snapshot,
+        nested_router_audit_snapshot,
+        env_flag_audit_snapshot,
+        capability_view_audit_snapshot,
+        idempotency_audit_snapshot,
+        seal_audit_snapshot,
+        admit_write_audit_snapshot,
+        gate_limit_audit_snapshot,
+        cli_shared_audit_snapshot,
+        gate_stack_audit_snapshot,
+        allow_list_audit_snapshot,
+        version_audit_snapshot,
+        authz_audit_snapshot,
+        open_dev_audit_snapshot,
+        dev_token_audit_snapshot,
+        session_mode_audit_snapshot,
+        codename_audit_snapshot,
+        contract_version_audit_snapshot,
+        ttl_audit_snapshot,
+    )
 
-    print(json.dumps(capability_manifest(), indent=2, default=str))
+    flags = {item.strip().lower() for item in rest if item.strip()}
+    aliases = {
+        "lifecycle": {"--lifecycle", "lifecycle"},
+        "plane_audit": {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"},
+        "boot_audit": {"--boot-audit", "boot-audit", "--boot_audit", "boot_audit"},
+        "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
+        "route_audit": {"--route-audit", "route-audit", "--route_audit", "route_audit"},
+        "hmac_audit": {"--hmac-audit", "hmac-audit", "--hmac_audit", "hmac_audit"},
+        "cli_audit": {"--cli-audit", "cli-audit", "--cli_audit", "cli_audit"},
+        "template_audit": {"--template-audit", "template-audit", "--template_audit", "template_audit"},
+        "sidecar_audit": {"--sidecar-audit", "sidecar-audit", "--sidecar_audit", "sidecar_audit"},
+        "domain_audit": {"--domain-audit", "domain-audit", "--domain_audit", "domain_audit"},
+        "cortex_audit": {"--cortex-audit", "cortex-audit", "--cortex_audit", "cortex_audit"},
+        "mounted_audit": {"--mounted-audit", "mounted-audit", "--mounted_audit", "mounted_audit"},
+        "main_cli_audit": {"--main-cli-audit", "main-cli-audit", "--main_cli_audit", "main_cli_audit"},
+        "app_audit": {"--app-audit", "app-audit", "--app_audit", "app_audit"},
+        "charter_audit": {"--charter-audit", "charter-audit", "--charter_audit", "charter_audit"},
+        "contract_audit": {"--contract-audit", "contract-audit", "--contract_audit", "contract_audit"},
+        "live_hmac_audit": {"--live-hmac-audit", "live-hmac-audit", "--live_hmac_audit", "live_hmac_audit"},
+        "nested_audit": {"--nested-audit", "nested-audit", "--nested_audit", "nested_audit"},
+        "env_audit": {"--env-audit", "env-audit", "--env_audit", "env_audit"},
+        "view_audit": {"--view-audit", "view-audit", "--view_audit", "view_audit"},
+        "idempotency_audit": {"--idempotency-audit", "idempotency-audit", "--idempotency_audit", "idempotency_audit"},
+        "seal_audit": {"--seal-audit", "seal-audit", "--seal_audit", "seal_audit"},
+        "admit_audit": {"--admit-audit", "admit-audit", "--admit_audit", "admit_audit"},
+        "limit_audit": {"--limit-audit", "limit-audit", "--limit_audit", "limit_audit"},
+        "shared_audit": {"--shared-audit", "shared-audit", "--shared_audit", "shared_audit"},
+        "stack_audit": {"--stack-audit", "stack-audit", "--stack_audit", "stack_audit"},
+        "allow_audit": {"--allow-audit", "allow-audit", "--allow_audit", "allow_audit"},
+        "version_audit": {"--version-audit", "version-audit", "--version_audit", "version_audit"},
+        "authz_audit": {"--authz-audit", "authz-audit", "--authz_audit", "authz_audit"},
+        "dev_audit": {"--dev-audit", "dev-audit", "--dev_audit", "dev_audit"},
+        "token_audit": {"--token-audit", "token-audit", "--token_audit", "token_audit"},
+        "mode_audit": {"--mode-audit", "mode-audit", "--mode_audit", "mode_audit"},
+        "codename_audit": {"--codename-audit", "codename-audit", "--codename_audit", "codename_audit"},
+        "cver_audit": {"--cver-audit", "cver-audit", "--cver_audit", "cver_audit"},
+        "ttl_audit": {"--ttl-audit", "ttl-audit", "--ttl_audit", "ttl_audit"},
+    }
+    allowed = set().union(*aliases.values())
+    unknown = flags - allowed
+    if unknown:
+        print(f"Unknown capabilities option: {sorted(unknown)[0]}")
+        return 2
+    selected = [name for name, names in aliases.items() if flags & names]
+    if len(selected) > 1:
+        print(f"{' and '.join(selected)} are mutually exclusive")
+        return 2
+    view = selected[0] if selected else ""
+    if view == "ttl_audit":
+        payload = ttl_audit_snapshot()
+    elif view == "cver_audit":
+        payload = contract_version_audit_snapshot()
+    elif view == "codename_audit":
+        payload = codename_audit_snapshot()
+    elif view == "mode_audit":
+        payload = session_mode_audit_snapshot()
+    elif view == "token_audit":
+        payload = dev_token_audit_snapshot()
+    elif view == "dev_audit":
+        payload = open_dev_audit_snapshot()
+    elif view == "authz_audit":
+        payload = authz_audit_snapshot()
+    elif view == "version_audit":
+        payload = version_audit_snapshot()
+    elif view == "allow_audit":
+        payload = allow_list_audit_snapshot()
+    elif view == "stack_audit":
+        payload = gate_stack_audit_snapshot()
+    elif view == "shared_audit":
+        payload = cli_shared_audit_snapshot()
+    elif view == "limit_audit":
+        payload = gate_limit_audit_snapshot()
+    elif view == "admit_audit":
+        payload = admit_write_audit_snapshot()
+    elif view == "seal_audit":
+        payload = seal_audit_snapshot()
+    elif view == "idempotency_audit":
+        payload = idempotency_audit_snapshot()
+    elif view == "view_audit":
+        payload = capability_view_audit_snapshot()
+    elif view == "env_audit":
+        payload = env_flag_audit_snapshot()
+    elif view == "nested_audit":
+        payload = nested_router_audit_snapshot()
+    elif view == "live_hmac_audit":
+        payload = live_hmac_audit_snapshot()
+    elif view == "contract_audit":
+        payload = contract_audit_snapshot()
+    elif view == "charter_audit":
+        payload = charter_audit_snapshot()
+    elif view == "app_audit":
+        payload = app_route_audit_snapshot()
+    elif view == "main_cli_audit":
+        payload = main_cli_audit_snapshot()
+    elif view == "mounted_audit":
+        payload = mounted_route_audit_snapshot()
+    elif view == "cortex_audit":
+        payload = cortex_route_audit_snapshot()
+    elif view == "domain_audit":
+        payload = gate_domain_audit_snapshot()
+    elif view == "sidecar_audit":
+        payload = sidecar_route_audit_snapshot()
+    elif view == "template_audit":
+        payload = template_audit_snapshot()
+    elif view == "cli_audit":
+        payload = developer_cli_audit_snapshot()
+    elif view == "hmac_audit":
+        payload = hmac_open_audit_snapshot()
+    elif view == "route_audit":
+        payload = api_route_audit_snapshot()
+    elif view == "export_audit":
+        payload = export_audit_snapshot()
+    elif view == "boot_audit":
+        payload = genesis_boot_audit_snapshot()
+    elif view == "plane_audit":
+        payload = plane_audit_snapshot()
+    elif view == "lifecycle":
+        payload = capability_lifecycle_snapshot()
+    else:
+        payload = capability_manifest()
+    print(json.dumps(payload, indent=2, default=str))
     return 0
+
+
+def _boot_runtime_if_needed(state: Any, command: str) -> None:
+    if command in {"run", "tool", "memory", "admin", "retrieve", "plan", "evidence"} and state.genesis is None:
+        from skeleton.genesis import Genesis
+
+        state.wire_from_genesis(Genesis(seed=42).boot())
+
+
+def _print_contract_error(*, command: str, code: str, message: str, exit_code: int, correlation_id: str = "") -> int:
+    from skeleton.application import CONTRACT_VERSION, SCHEMA_VERSION, SUPPORTED_MODE
+
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "contract_version": CONTRACT_VERSION,
+        "command": command,
+        "ok": False,
+        "mode": SUPPORTED_MODE,
+        "correlation_id": correlation_id,
+        "error": {"code": code, "message": message},
+    }
+    print(json.dumps(payload, indent=2))
+    return exit_code
+
+
+def _cmd_invoke(rest: List[str]) -> int:
+    from skeleton.api.server import get_state
+    from skeleton.application import CommandError, invoke_unified, normalize_request
+
+    if not rest:
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invoke envelope JSON is required",
+            exit_code=2,
+        )
+    raw_payload = " ".join(rest).strip()
+    try:
+        decoded = json.loads(raw_payload)
+    except json.JSONDecodeError:
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invalid JSON payload",
+            exit_code=2,
+        )
+    if not isinstance(decoded, dict):
+        return _print_contract_error(
+            command="",
+            code="invalid_argument",
+            message="invoke envelope must be a JSON object",
+            exit_code=2,
+        )
+
+    try:
+        request = normalize_request(decoded)
+    except CommandError:
+        result = invoke_unified(None, decoded)
+        print(json.dumps(result.to_payload(), indent=2, default=str))
+        return result.exit_code
+
+    state = get_state()
+    _boot_runtime_if_needed(state, request.command)
+    result = invoke_unified(state, decoded)
+    print(json.dumps(result.to_payload(), indent=2, default=str))
+    return result.exit_code
 
 
 def _cmd_shared_command(rest: List[str]) -> int:
     from skeleton.api.server import get_state
-    from skeleton.application import CONTRACT_VERSION, build_runtime_command_service
+    from skeleton.application import build_runtime_command_service
 
     if not rest:
-        print(json.dumps({
-            "contract_version": CONTRACT_VERSION,
-            "command": "",
-            "ok": False,
-            "error": {"code": "invalid_command", "message": "command name is required"},
-        }, indent=2))
-        return 2
+        return _print_contract_error(
+            command="",
+            code="invalid_command",
+            message="command name is required",
+            exit_code=2,
+        )
 
     command = rest[0].strip().lower()
     payload = {}
@@ -61,29 +319,24 @@ def _cmd_shared_command(rest: List[str]) -> int:
         raw_payload = " ".join(rest[1:]).strip()
         try:
             decoded = json.loads(raw_payload)
-        except json.JSONDecodeError as exc:
-            print(json.dumps({
-                "contract_version": CONTRACT_VERSION,
-                "command": command,
-                "ok": False,
-                "error": {"code": "invalid_argument", "message": f"invalid JSON payload: {exc.msg}"},
-            }, indent=2))
-            return 2
+        except json.JSONDecodeError:
+            return _print_contract_error(
+                command=command,
+                code="invalid_argument",
+                message="invalid JSON payload",
+                exit_code=2,
+            )
         if not isinstance(decoded, dict):
-            print(json.dumps({
-                "contract_version": CONTRACT_VERSION,
-                "command": command,
-                "ok": False,
-                "error": {"code": "invalid_argument", "message": "command payload must be a JSON object"},
-            }, indent=2))
-            return 2
+            return _print_contract_error(
+                command=command,
+                code="invalid_argument",
+                message="command payload must be a JSON object",
+                exit_code=2,
+            )
         payload = decoded
 
     state = get_state()
-    if command in {"run", "tool", "memory", "admin"} and state.genesis is None:
-        from skeleton.genesis import Genesis
-
-        state.wire_from_genesis(Genesis(seed=42).boot())
+    _boot_runtime_if_needed(state, command)
 
     result = build_runtime_command_service(state).execute(command, payload)
     print(json.dumps(result.to_payload(), indent=2, default=str))
@@ -264,6 +517,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
+    if cmd == "invoke": return _cmd_invoke(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])

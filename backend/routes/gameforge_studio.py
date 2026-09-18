@@ -45,8 +45,8 @@ def _try(path: str, attr: str):
     try:
         mod = __import__(path, fromlist=[attr])
         return getattr(mod, attr)
-    except Exception as e:  # noqa: BLE001
-        _IMPORT_ERR[path] = f"{type(e).__name__}: {e}"[:160]
+    except Exception:  # noqa: BLE001
+        _IMPORT_ERR[path] = "import_failed"
         return None
 
 
@@ -161,8 +161,8 @@ async def _auto_research(topic: str) -> dict:
         dispatch_to_rooms("auto_research", {"topic": topic, "api": api_key})
         return {"topic": topic, "known": False, "acquired": bool(summary), "api": api_key,
                 "summary": summary, "jury": adjudication}
-    except Exception as e:  # noqa: BLE001
-        return {"topic": topic, "known": False, "acquired": False, "error": f"{type(e).__name__}"}
+    except Exception:  # noqa: BLE001
+        return {"topic": topic, "known": False, "acquired": False, "error": "auto_research_failed"}
 
 
 # ── Boardroom ledger (persistent) ─────────────────────────────────────────────
@@ -216,8 +216,8 @@ async def questionnaire_questions():
     try:
         from gameforge.snowball.questionnaire_runner import QUESTIONS
         return {"ok": True, "questions": QUESTIONS}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"[:120]}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "questionnaire_unavailable"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -596,8 +596,8 @@ def _persist_gamefile(game_name: str, filename: str, content: str, meta: dict) -
     try:
         _db()["gameforge_gamefiles"].insert_one(dict(doc))
         return {"ok": True}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"[:120]}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "persist_failed"}
 
 
 @router.post("/boardroom/submit")
@@ -772,8 +772,8 @@ async def jeeves_knowledge():
         st = status(_db())
         kb = list(_db()["jeeves_knowledge"].find({}, {"_id": 0}).limit(60))
         return {"ok": True, "status": st, "knowledge": kb}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"[:160]}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "jeeves_knowledge_failed"}
 
 
 @router.post("/jeeves/train")
@@ -782,8 +782,8 @@ async def jeeves_train():
     try:
         from gameforge.jeeves.jeeves_self_training import train_at_launch
         return train_at_launch(_db())
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"[:160]}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "jeeves_train_failed"}
 
 
 @router.post("/jeeves/command")

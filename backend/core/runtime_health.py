@@ -61,8 +61,8 @@ def _gc_stats() -> dict[str, Any]:
             "collections": sum(int(g.get("collections", 0)) for g in s),
             "objects":     len(gc.get_objects()) if os.environ.get("RUNTIME_GC_DEEP") else None,
         }
-    except Exception as e:  # noqa: BLE001
-        return {"error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        return {"error": "probe_failed"}
 
 
 def _asyncio_stats() -> dict[str, Any]:
@@ -83,8 +83,8 @@ async def _mongo_ping() -> dict[str, Any]:
         return {"ok": True, "rtt_ms": round((time.perf_counter() - t0) * 1000.0, 2)}
     except asyncio.TimeoutError:
         return {"ok": False, "error": "timeout"}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "error": "probe_failed"}
 
 
 async def snapshot() -> dict[str, Any]:
@@ -100,15 +100,15 @@ async def snapshot() -> dict[str, Any]:
     try:
         from core import tunnel_watchdog as _tw
         tunnel = _tw.snapshot()
-    except Exception as e:  # noqa: BLE001
-        tunnel = {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        tunnel = {"ok": False, "error": "probe_failed"}
 
     ff: dict[str, Any] = {"ok": True}
     try:
         from core import feature_flags as _ff
         ff = await _ff.health()
-    except Exception as e:  # noqa: BLE001
-        ff = {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    except Exception:  # noqa: BLE001
+        ff = {"ok": False, "error": "probe_failed"}
 
     return {
         "ok": True,

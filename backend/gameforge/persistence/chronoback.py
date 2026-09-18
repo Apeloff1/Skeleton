@@ -153,8 +153,8 @@ class Chronoback:
         if self.manifest_path.exists():
             try:
                 manifest = json.loads(self.manifest_path.read_text())
-            except Exception as e:
-                return {"ok": False, "error": f"manifest_corrupt: {e}"}
+            except Exception:
+                return {"ok": False, "error": "manifest_corrupt"}
         bad = []
         good = 0
         for name, meta in (manifest.get("shards") or {}).items():

@@ -57,6 +57,19 @@ def test_root_open_prefix_is_exact_only() -> None:
         ("/api/v1/cortex/status", "cognition"),
         ("/api/v1/health", "observability"),
         ("/api/v1/metrics", "observability"),
+        ("/api/v1/application", "application"),
+        ("/api/v1/application/capabilities", "application"),
+        ("/api/v1/application/capabilities/lifecycle", "application"),
+        ("/api/v1/application/planes/audit", "application"),
+        ("/api/v1/application/planes/audit/galaxy", "application"),
+        ("/api/v1/application/genesis/audit", "application"),
+        ("/api/v1/application/genesis/audit/galaxy", "application"),
+        ("/api/v1/application/capabilities/export-audit", "application"),
+        ("/api/v1/application/capabilities/export-audit/cortex", "application"),
+        ("/api/v1/application/routes/audit", "application"),
+        ("/api/v1/application/routes/audit/POST/api/v1/pipeline/npc", "application"),
+        ("/api/v1/application/hmac/audit", "application"),
+        ("/api/v1/application/hmac/audit/GET/api/v1/health", "application"),
         ("/cortex/status", "cognition"),
         ("/cockpit", "interface"),
         ("/openapi.json", "interface"),
@@ -71,6 +84,7 @@ def test_governance_domain_matches_exact_routes_and_children(path: str, expected
     [
         "/api/v1/forge-admin",
         "/api/v1/cortexual",
+        "/api/v1/application-admin",
         "/api/governance-backdoor",
         "/api/courtroom",
         "/cockpit-admin",
@@ -221,3 +235,15 @@ def test_non_positive_body_limit_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="positive"):
         BodyBoundMiddleware(app, max_body_bytes=0)
+
+
+def test_bool_and_float_body_limit_fails_closed() -> None:
+    async def app(_scope, _receive, _send) -> None:
+        raise AssertionError("app must not run")
+
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=True)
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=False)
+    with pytest.raises(TypeError, match="integer"):
+        BodyBoundMiddleware(app, max_body_bytes=1.5)

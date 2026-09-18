@@ -106,8 +106,8 @@ for _label, _loader in _SUBROUTERS:
     try:
         router.include_router(_loader())
         _MOUNTED.append(_label)
-    except Exception as e:  # noqa: BLE001 — degrade, never crash boot
-        _FAILED[_label] = f"{type(e).__name__}: {e}"[:160]
+    except Exception:  # noqa: BLE001 — degrade, never crash boot
+        _FAILED[_label] = "import_failed"
 
 
 @router.get("/rooms")
@@ -242,8 +242,8 @@ async def gameforge_activate():
         try:
             out = await _aio.wait_for(_aio.to_thread(runner), timeout=25)
             results[name] = {"ok": True, "result": _trim(out)}
-        except Exception as e:  # noqa: BLE001
-            results[name] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:180]}
+        except Exception:  # noqa: BLE001
+            results[name] = {"ok": False, "error": "activation_failed"}
     activated = sum(1 for r in results.values() if r["ok"])
     return {
         "activated": activated,
@@ -330,8 +330,8 @@ async def gameforge_architecture():
         try:
             probe()
             report[name] = "live"
-        except Exception as e:  # noqa: BLE001
-            report[name] = f"unavailable: {type(e).__name__}"
+        except Exception:  # noqa: BLE001
+            report[name] = "unavailable"
     live = sum(1 for v in report.values() if v == "live")
     return {"live": live, "total": len(_ARCHITECTURE_PROBES), "modules": report}
 
@@ -370,9 +370,9 @@ async def gameforge_health():
         from gameforge.rooms.full_room_registry import all_rooms
 
         report["rooms"] = len(all_rooms())
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         report["ok"] = False
-        report["rooms_error"] = f"{type(e).__name__}: {e}"[:160]
+        report["rooms_error"] = "rooms_unavailable"
     if _FAILED:
         report["ok"] = False
     status = 200 if report["ok"] else 207
