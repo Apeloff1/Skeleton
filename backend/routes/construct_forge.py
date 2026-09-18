@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from core import construct_forge as cf
+from core.http_errors import public_http_error
 
 # Two sibling forges sharing one engine (kind="construct" | "material").
 construct_router = APIRouter(prefix="/api/galaxy-studio/constructs", tags=["construct-forge"])
@@ -75,7 +76,7 @@ def _make_router(router: APIRouter, kind: str) -> None:
         try:
             return cf.save_construct(spec, req.construct_id)
         except ValueError as e:
-            raise HTTPException(409, str(e))
+            raise public_http_error(409, "construct_conflict", e) from None
 
     @router.get("/list")
     def list_saved(era: str | None = None, build_id: str | None = None,

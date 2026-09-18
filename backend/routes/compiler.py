@@ -98,8 +98,8 @@ def analyze_python_code(code: str) -> Dict[str, Any]:
             "lines": len(code.splitlines()),
             "complexity": len(functions) + len(classes) * 2
         }
-    except SyntaxError as e:
-        return {"error": str(e), "functions": [], "classes": [], "imports": []}
+    except SyntaxError:
+        return {"error": "syntax_error", "functions": [], "classes": [], "imports": []}
 
 
 def run_sanitizers(code: str, sanitizer_ids: List[str]) -> List[Dict[str, Any]]:

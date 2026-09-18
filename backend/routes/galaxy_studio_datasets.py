@@ -265,5 +265,5 @@ def generate_datasets(build: dict, title: str, genre: str) -> Dict[str, str]:
             build["dataset_files"] = len(files)
             build["dataset_records"] = sum(len(d["entries"]) for d in DATASETS)
     except Exception as e:
-        print(f"[GALAXY datasets] generation failed: {e}")
+        print(f"[GALAXY datasets] generation failed ({type(e).__name__})")
     return files
