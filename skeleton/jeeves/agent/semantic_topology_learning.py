@@ -470,6 +470,131 @@ class TopologyBridgeTrial:
 
 
 @dataclass(frozen=True, slots=True)
+class SemanticTopologyLearningState:
+    """Versioned durable state for one topology-learning contract."""
+
+    schema_version: int
+    contract_fingerprint: str
+    predictions: tuple[TopologyBridgePrediction, ...] = ()
+    trials: tuple[TopologyBridgeTrial, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.schema_version != 1:
+            raise AgentContractError(
+                "unsupported semantic topology learning state version"
+            )
+        contract = str(self.contract_fingerprint).strip()
+        if not contract:
+            raise AgentContractError(
+                "topology learning state contract fingerprint is required"
+            )
+        object.__setattr__(self, "contract_fingerprint", contract)
+
+        predictions = tuple(
+            sorted(
+                tuple(self.predictions),
+                key=lambda item: item.prediction_id,
+            )
+        )
+        if any(
+            not isinstance(item, TopologyBridgePrediction)
+            for item in predictions
+        ):
+            raise AgentContractError(
+                "topology learning state predictions are invalid"
+            )
+        prediction_ids = [item.prediction_id for item in predictions]
+        if len(prediction_ids) != len(set(prediction_ids)):
+            raise AgentContractError(
+                "topology learning state has duplicate prediction ids"
+            )
+
+        trials = tuple(
+            sorted(
+                tuple(self.trials),
+                key=lambda item: item.trial_id,
+            )
+        )
+        if any(not isinstance(item, TopologyBridgeTrial) for item in trials):
+            raise AgentContractError(
+                "topology learning state trials are invalid"
+            )
+        trial_ids = [item.trial_id for item in trials]
+        if len(trial_ids) != len(set(trial_ids)):
+            raise AgentContractError(
+                "topology learning state has duplicate trial ids"
+            )
+        object.__setattr__(self, "predictions", predictions)
+        object.__setattr__(self, "trials", trials)
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "schema_version": self.schema_version,
+                "contract": self.contract_fingerprint,
+                "predictions": [
+                    item.fingerprint for item in self.predictions
+                ],
+                "trials": [item.fingerprint for item in self.trials],
+            }
+        )
+
+    def as_json(self) -> dict[str, Any]:
+        return json_safe(
+            {
+                "schema_version": self.schema_version,
+                "contract_fingerprint": self.contract_fingerprint,
+                "predictions": [
+                    item.as_json() for item in self.predictions
+                ],
+                "trials": [item.as_json() for item in self.trials],
+                "fingerprint": self.fingerprint,
+            }
+        )
+
+    @classmethod
+    def from_json(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "SemanticTopologyLearningState":
+        if not isinstance(payload, Mapping):
+            raise TypeError(
+                "topology learning state payload must be a mapping"
+            )
+        raw_predictions = payload.get("predictions", ())
+        raw_trials = payload.get("trials", ())
+        if not isinstance(raw_predictions, (list, tuple)):
+            raise AgentContractError(
+                "topology learning predictions payload must be a sequence"
+            )
+        if not isinstance(raw_trials, (list, tuple)):
+            raise AgentContractError(
+                "topology learning trials payload must be a sequence"
+            )
+        state = cls(
+            schema_version=int(payload.get("schema_version", 0)),
+            contract_fingerprint=str(
+                payload.get("contract_fingerprint", "")
+            ),
+            predictions=tuple(
+                TopologyBridgePrediction.from_json(item)
+                for item in raw_predictions
+            ),
+            trials=tuple(
+                TopologyBridgeTrial.from_json(item)
+                for item in raw_trials
+            ),
+        )
+        supplied = payload.get("fingerprint")
+        if supplied is not None and str(supplied) != state.fingerprint:
+            raise AgentContractError(
+                "topology learning state fingerprint mismatch"
+            )
+        return state
+
+
+@dataclass(frozen=True, slots=True)
 class TopologyBridgePolicy:
     minimum_trials: int = 8
     minimum_independent_runs: int = 4
