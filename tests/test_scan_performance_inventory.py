@@ -113,7 +113,7 @@ def _mini_repo(tmp_path: Path) -> Path:
 
 
 def test_task_identity_is_stable() -> None:
-    assert inventory.TASK_KEY == "reserve-S029-scan-performance-audit"
+    assert inventory.TASK_ID == "reserve-S029-scan-performance-audit"
     assert inventory.CONFLICT_DOMAIN == "repo.readonly.scan_performance"
     assert inventory.INVENTORY_VERSION == 1
     assert inventory.EVIDENCE_KIND == "structural"

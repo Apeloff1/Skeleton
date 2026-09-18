@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 
-TASK_KEY = "reserve-S029-scan-performance-audit"
+TASK_ID = "reserve-S029-scan-performance-audit"
 CONFLICT_DOMAIN = "repo.readonly.scan_performance"
 INVENTORY_VERSION = 1
 EVIDENCE_KIND = "structural"
@@ -828,7 +828,7 @@ def inventory_report(repo_root: Path) -> dict[str, object]:
     if not records:
         raise ScanPerformanceInventoryError("scanner coverage failure: zero Python files classified")
     payload = {
-        "task_key": TASK_KEY,
+        "task_key": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "inventory_version": INVENTORY_VERSION,
         "evidence_kind": EVIDENCE_KIND,
@@ -847,7 +847,7 @@ def report_from_records(records: list[ScannerRecord]) -> dict[str, object]:
     if not records:
         raise ScanPerformanceInventoryError("scanner coverage failure: zero Python files classified")
     return {
-        "task_key": TASK_KEY,
+        "task_key": TASK_ID,
         "conflict_domain": CONFLICT_DOMAIN,
         "inventory_version": INVENTORY_VERSION,
         "evidence_kind": EVIDENCE_KIND,
