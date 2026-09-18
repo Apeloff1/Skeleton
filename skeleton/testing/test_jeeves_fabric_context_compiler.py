@@ -580,6 +580,48 @@ def test_memory_adapter_parent_scope_cannot_read_session_private_records() -> No
     }
 
 
+def test_identical_content_from_independent_providers_preserves_both_provenance_paths() -> None:
+    fingerprint = stable_fingerprint("shared canonical content")
+    left = _external_record(
+        content="shared canonical content",
+        fingerprint=fingerprint,
+        source_ref="shared-ref-a",
+        provider="provider-a",
+    )
+    right = _external_record(
+        content="shared canonical content",
+        fingerprint=fingerprint,
+        source_ref="shared-ref-b",
+        provider="provider-b",
+    )
+
+    packed = CognitiveContextFabric._dedupe((left, right))
+
+    assert len(packed) == 2
+    assert {record.source_provider for record in packed} == {"provider-a", "provider-b"}
+
+
+def test_equal_rank_same_source_conflict_is_order_invariant() -> None:
+    left = _external_record(
+        content="left version",
+        fingerprint="1" * 64,
+        source_ref="conflicted-ref",
+        provider="provider-a",
+    )
+    right = _external_record(
+        content="right version",
+        fingerprint="f" * 64,
+        source_ref="conflicted-ref",
+        provider="provider-a",
+    )
+
+    forward = CognitiveContextFabric._dedupe((left, right))
+    reverse = CognitiveContextFabric._dedupe((right, left))
+
+    assert forward == reverse
+    assert forward == [right]
+
+
 def test_memory_adapter_fetch_order_is_deterministic_and_respects_token_budget() -> None:
     clock = TickClock()
     namespace = _namespace()
