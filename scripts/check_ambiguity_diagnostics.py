@@ -20,7 +20,7 @@ from typing import Mapping, NamedTuple, Sequence
 
 
 SCHEMA_VERSION = 1
-TASK_KEY = "reserve-S035-ambiguity-diagnostics-spec"
+TASK_ID = "reserve-S035-ambiguity-diagnostics-spec"
 CONFLICT_DOMAIN = "creator.spec.ambiguity"
 
 KIND_AMBIGUITY = "ambiguity"

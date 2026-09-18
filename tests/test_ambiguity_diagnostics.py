@@ -14,7 +14,7 @@ from scripts.check_ambiguity_diagnostics import (
     KIND_AMBIGUITY,
     KIND_MISSING_CONSTRAINT,
     SCHEMA_VERSION,
-    TASK_KEY,
+    TASK_ID,
     aggregate_disposition,
     catalog_integrity_errors,
     main,
@@ -51,7 +51,7 @@ def _doc(**overrides):
 
 def test_closed_catalog_is_versioned_and_unique() -> None:
     assert SCHEMA_VERSION == 1
-    assert TASK_KEY == "reserve-S035-ambiguity-diagnostics-spec"
+    assert TASK_ID == "reserve-S035-ambiguity-diagnostics-spec"
     assert CONFLICT_DOMAIN == "creator.spec.ambiguity"
     assert DOCUMENT_FIELDS == {"schema_version", "request_id", "diagnostics"}
     assert len(CATEGORIES) == len(set(CATEGORIES)) == 15
