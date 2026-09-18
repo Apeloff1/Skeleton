@@ -710,6 +710,12 @@ class ModelRouter:
             if isinstance(metadata, ProviderMetadata)
             else ProviderMetadata.from_mapping(metadata)
         )
+        # Fail before touching ModelRuntime. A rejected duplicate provider must
+        # not leak a newly named adapter into the runtime registry.
+        if parsed.provider_id in self._providers and not replace:
+            raise ProviderMetadataError(
+                f"provider already registered: {parsed.provider_id}"
+            )
         if not hasattr(adapter, "name") or not hasattr(adapter, "capabilities"):
             raise ProviderMetadataError("adapter must declare name and capabilities")
         adapter_name = _require_normalized_text(adapter.name, "adapter name")
@@ -739,10 +745,6 @@ class ModelRouter:
         elif existing_runtime is not adapter:
             raise ProviderMetadataError(
                 f"adapter name already registered with a different adapter: {adapter_name}"
-            )
-        if parsed.provider_id in self._providers and not replace:
-            raise ProviderMetadataError(
-                f"provider already registered: {parsed.provider_id}"
             )
         self._providers[parsed.provider_id] = parsed
         return parsed
