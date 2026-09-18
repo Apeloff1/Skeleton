@@ -371,3 +371,31 @@ def test_ai_service_release_configuration_must_be_paired(tmp_path):
             governance,
             release_expectation=expectation,
         )
+
+
+def test_ai_service_live_channel_drift_degrades_ready_worker(tmp_path):
+    policy = AIShellPolicy()
+    guard, expectation, _, channels, _ = release_environment(policy)
+    orchestrator, diagnostics, governance = service_components(tmp_path, policy)
+    service = AIShellService(
+        orchestrator,
+        diagnostics,
+        governance,
+        release_guard=guard,
+        release_expectation=expectation,
+    )
+    service.start()
+    assert service.state.phase is AIServicePhase.READY
+    revision, state = channels.current("production")
+    channels.backend.compare_and_swap(
+        channels.namespace,
+        "production",
+        expected_revision=revision,
+        value=replace(state, evidence_digest=fp("x")),
+    )
+    from skeleton.shells.ai.types import AIIntent
+
+    with pytest.raises(RuntimeError, match="release/channel"):
+        service.new_session(AIIntent("i", "inspect"))
+    assert service.state.phase is AIServicePhase.DEGRADED
+    assert service.status().to_dict()["release"]["allowed"] is False
