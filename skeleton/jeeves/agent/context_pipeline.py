@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 from typing import Any, Callable, Mapping, Sequence
 
+from .associative_memory import AssociationHit, AssociativeMemoryMesh
 from .cognition import ContextCompiler, ContextPacket, ContextSection, RunScratchpad
 from .context_repository import ContextRepository, RetrievalHit
 from .evidence import EvidenceLedger
@@ -156,10 +157,14 @@ class ContextSourceAdapter:
 @dataclass(frozen=True, slots=True)
 class ResolutionPolicy:
     card_limit: int = 12
+    association_seed_limit: int = 6
+    association_limit_per_seed: int = 4
     memory_limit: int = 10
     repository_limit: int = 12
     source_limit_per_tier: int = 16
     minimum_item_score: float = 0.18
+    minimum_association_score: float = 0.28
+    association_boost_cap: float = 0.24
     stop_coverage: float = 0.78
     stop_confidence: float = 0.74
     stop_trust: float = 0.62
@@ -168,9 +173,25 @@ class ResolutionPolicy:
     max_total_chars: int = 28_000
 
     def __post_init__(self) -> None:
-        for name in ("card_limit", "memory_limit", "repository_limit", "source_limit_per_tier", "max_total_chars"):
+        for name in (
+            "card_limit",
+            "association_seed_limit",
+            "association_limit_per_seed",
+            "memory_limit",
+            "repository_limit",
+            "source_limit_per_tier",
+            "max_total_chars",
+        ):
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=2_000_000))
-        for name in ("minimum_item_score", "stop_coverage", "stop_confidence", "stop_trust", "minimum_deep_gain"):
+        for name in (
+            "minimum_item_score",
+            "minimum_association_score",
+            "association_boost_cap",
+            "stop_coverage",
+            "stop_confidence",
+            "stop_trust",
+            "minimum_deep_gain",
+        ):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
         if not isinstance(self.maximum_tier, ContextTier):
             object.__setattr__(self, "maximum_tier", ContextTier(int(self.maximum_tier)))
@@ -268,12 +289,14 @@ class LayeredContextResolver:
         cards: MemoryGameIndex,
         memory: MemoryManager,
         repository: ContextRepository | None = None,
+        associations: AssociativeMemoryMesh | None = None,
         adapters: Sequence[ContextSourceAdapter] = (),
         policy: ResolutionPolicy | None = None,
     ) -> None:
         self.cards = cards
         self.memory = memory
         self.repository = repository
+        self.associations = associations
         self.adapters = tuple(sorted(adapters, key=lambda item: (item.tier, item.priority, item.name)))
         self.policy = policy or ResolutionPolicy()
 
@@ -329,6 +352,45 @@ class LayeredContextResolver:
             trust=hit.card.trust,
             evidence_ids=hit.card.provenance,
             metadata={"activation": hit.activation, "lexical": hit.lexical, "context_match": hit.context_match},
+        )
+
+    def _associative_item(self, seed: CardHit, hit: AssociationHit) -> ResolvedItem | None:
+        """Convert an association into an L0 item without inflating target trust.
+
+        The relation may improve retrieval priority, but the target card keeps
+        its own trust and retrieval probability.  This is the core safety
+        boundary between associative memory and factual memory.
+        """
+        edge = hit.association
+        target = self.cards.store.get(edge.target_card_id)
+        if target is None:
+            return None
+        target_retrieval = self.cards.predicted_retrieval(target)
+        boost = min(
+            self.policy.association_boost_cap,
+            self.policy.association_boost_cap * seed.score * hit.score,
+        )
+        score = min(1.0, 0.55 * seed.score + 0.25 * target_retrieval + boost)
+        confidence = min(1.0, 0.50 * target_retrieval + 0.50 * hit.posterior_strength)
+        return ResolvedItem(
+            item_id=target.card_id,
+            tier=ContextTier.INDEX_CARD,
+            source=f"associative:{edge.kind.value}",
+            content=target.content,
+            score=score,
+            confidence=confidence,
+            trust=target.trust,
+            evidence_ids=target.provenance,
+            metadata={
+                "associative": True,
+                "seed_card_id": seed.card.card_id,
+                "association_id": edge.association_id,
+                "association_kind": edge.kind.value,
+                "association_score": hit.score,
+                "association_posterior_strength": hit.posterior_strength,
+                "target_retrieval_probability": target_retrieval,
+                "trust_inherited_from_target_only": True,
+            },
         )
 
     @staticmethod
@@ -401,16 +463,58 @@ class LayeredContextResolver:
             stages.append(ResolutionStage(tier, source, True, hit_count, coverage, confidence, trust, gain, stop, reason))
             return stop
 
-        # L0: cue-card/memory-game layer. This always runs first.
+        # L0a: direct cue-card/memory-game lookup always runs first.
         card_hits = self.cards.search(namespace, text, context_tags=context_tags, limit=self.policy.card_limit)
         items.extend(self._card_item(hit) for hit in card_hits if hit.score >= self.policy.minimum_item_score)
+
+        # L0b: relational expansion.  Associations can surface a correction,
+        # juxtaposed context, or temporal neighbor before expensive stores are
+        # queried.  They never modify the target card's factual trust.
+        association_count = 0
+        if self.associations is not None:
+            direct_ids = {hit.card.card_id for hit in card_hits}
+            best_associative: dict[str, ResolvedItem] = {}
+            for seed in card_hits[: self.policy.association_seed_limit]:
+                neighbors = self.associations.neighbors(
+                    namespace,
+                    seed.card.card_id,
+                    limit=self.policy.association_limit_per_seed,
+                )
+                for neighbor in neighbors:
+                    if neighbor.score < self.policy.minimum_association_score:
+                        continue
+                    if neighbor.association.target_card_id in direct_ids:
+                        continue
+                    item = self._associative_item(seed, neighbor)
+                    if item is None or item.score < self.policy.minimum_item_score:
+                        continue
+                    prior = best_associative.get(item.item_id)
+                    if prior is None or (item.score, item.confidence, item.item_id) > (
+                        prior.score,
+                        prior.confidence,
+                        prior.item_id,
+                    ):
+                        best_associative[item.item_id] = item
+            associative_items = sorted(
+                best_associative.values(),
+                key=lambda item: (item.score, item.confidence, item.item_id),
+                reverse=True,
+            )
+            association_count = len(associative_items)
+            items.extend(associative_items)
+
         card_native_ready = self.cards.fast_path_ready(text, card_hits)
-        stop = measure(ContextTier.INDEX_CARD, "memory_game", len(card_hits), "fast cue-card lookup")
-        if card_native_ready and stop:
-            coverage, missing = self._coverage(text, items)
-            confidence, trust = self._aggregate(items)
-            fingerprint = stable_fingerprint({"query": text, "items": [(x.item_id, x.score) for x in items], "stages": [(s.tier, s.stop_after) for s in stages]})
-            return ContextResolution(text, tuple(items), tuple(stages), ContextTier.INDEX_CARD, True, coverage, confidence, trust, missing, fingerprint)
+        stop = measure(
+            ContextTier.INDEX_CARD,
+            "memory_game+associative_mesh" if self.associations is not None else "memory_game",
+            len(card_hits) + association_count,
+            "fast cue-card lookup with bounded relational expansion",
+        )
+        # Direct cards are still required as anchors.  Associations are allowed
+        # to complete an otherwise partial L0 answer when the aggregate
+        # coverage/confidence/trust threshold is met.
+        if card_hits and stop and (card_native_ready or association_count > 0):
+            return self._finish(text, items, stages, ContextTier.INDEX_CARD, True)
 
         if max_tier >= ContextTier.SCOPED_MEMORY:
             # Search the retriever without touching access counters. The native
