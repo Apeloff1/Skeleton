@@ -316,7 +316,6 @@ def _cast_convex(
     target: RigidBody,
 ) -> CapsuleCastHit | None:
     fraction = 0.0
-    last_point = position
     last_normal = Vec3.zero()
 
     for _ in range(settings.cast_iterations):
@@ -363,7 +362,6 @@ def _cast_convex(
                 normal,
             )
 
-        last_point = result.point_b
         last_normal = result.normal
         gap = result.distance - settings.skin_width
         obstacle_normal = -result.normal
@@ -763,12 +761,12 @@ class KinematicCharacterController:
             horizontal,
             ignore=ignore,
         )
-        if forward_hit is None:
-            advanced = elevated + horizontal
-        else:
-            if forward_hit.fraction <= _CHARACTER_EPSILON:
-                return None
-            advanced = elevated + horizontal * forward_hit.fraction
+        if forward_hit is not None:
+            # A valid step must clear the blocking geometry at step height.
+            # Partial elevated progress can otherwise misclassify tall walls as
+            # climbable curbs.
+            return None
+        advanced = elevated + horizontal
 
         down_distance = (
             self.settings.step_height
@@ -883,10 +881,14 @@ class KinematicCharacterController:
         if remaining.length_squared() <= self.settings.minimum_move_distance**2:
             remaining = Vec3.zero()
 
-        snap = self._ground_probe(
-            world,
-            position,
-            ignore=ignore,
+        snap = (
+            None
+            if displacement.dot(self.settings.up) > _CHARACTER_EPSILON
+            else self._ground_probe(
+                world,
+                position,
+                ignore=ignore,
+            )
         )
         if snap is not None:
             snap_move = (
@@ -899,7 +901,8 @@ class KinematicCharacterController:
             ground_normal = snap.normal
             ground_body = snap.body_id
             hits.append(snap)
-        elif not grounded:
+        else:
+            grounded = False
             ground_normal = None
             ground_body = None
 
