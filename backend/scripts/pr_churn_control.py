@@ -35,6 +35,11 @@ class Retirement:
     target_number: int
 
 
+@dataclass(frozen=True, slots=True)
+class ReverseSyncRetirement:
+    number: int
+
+
 class GitHubApi:
     def __init__(self, token: str, *, sleep: Callable[[float], None] = time.sleep):
         self._token = token
@@ -139,6 +144,67 @@ def _label_names(pr: dict[str, Any]) -> set[str]:
         if isinstance(label, dict) and label.get("name"):
             names.add(str(label["name"]).strip().lower())
     return names
+
+
+def _is_protected_sync_base(ref: str) -> bool:
+    normalized = ref.strip()
+    return normalized in _PROTECTED_SYNC_BASES or normalized.startswith("release/")
+
+
+def eligible_reverse_sync(
+    pr: dict[str, Any],
+    *,
+    repo: str,
+    default_branch: str,
+    trusted_author: str,
+) -> tuple[bool, str]:
+    """Return whether an automation-created reverse sync PR may be retired.
+
+    This is intentionally narrower than title-pattern matching. The PR must be
+    owner-authored, same-repository, use the default branch as its head, target
+    a non-protected non-default branch, and match the exact automation title
+    and body templates. Ordinary feature/release PRs are therefore out of
+    scope even when they happen to merge the default branch into another ref.
+    """
+    if str(pr.get("state") or "").lower() != "open":
+        return False, "sync PR is not open"
+    if bool(pr.get("draft")):
+        return False, "sync PR is draft"
+    if bool(pr.get("merged")) or pr.get("merged_at"):
+        return False, "sync PR is already merged"
+    if _author_login(pr).lower() != trusted_author.lower():
+        return False, "sync PR author is not trusted"
+    if _label_names(pr) & PRESERVE_LABELS:
+        return False, "sync PR carries an explicit preserve label"
+
+    head = pr.get("head") or {}
+    base = pr.get("base") or {}
+    if _repo_full_name(head.get("repo")) != repo:
+        return False, "sync PR head is not same-repository"
+    if _repo_full_name(base.get("repo")) not in {"", repo}:
+        return False, "sync PR base is not same-repository"
+
+    head_ref = str(head.get("ref") or "")
+    base_ref = str(base.get("ref") or "")
+    if head_ref != default_branch:
+        return False, "sync PR head is not the default branch"
+    if not base_ref or base_ref == default_branch:
+        return False, "sync PR does not target a non-default branch"
+    if _is_protected_sync_base(base_ref):
+        return False, "sync PR targets a protected long-lived branch"
+
+    expected_title = f"{_SYNC_TITLE_PREFIX}{base_ref} from {default_branch}"
+    if str(pr.get("title") or "").strip() != expected_title:
+        return False, "sync PR title does not match the automation contract"
+
+    expected_body = (
+        f"Automated stale-branch refresh. Merge current `{default_branch}` "
+        "into this branch without rewriting branch history."
+    )
+    if str(pr.get("body") or "").strip() != expected_body:
+        return False, "sync PR body does not match the automation contract"
+
+    return True, "exact trusted reverse-sync automation"
 
 
 def _trusted_open_source(
@@ -271,7 +337,6 @@ def list_open_prs(
         query = urllib.parse.urlencode(
             {
                 "state": "open",
-                "base": default_branch,
                 "sort": "created",
                 "direction": "desc",
                 "per_page": PAGE_SIZE,
@@ -349,6 +414,40 @@ def build_retirement_plan(
     return list(claims.values())
 
 
+def build_reverse_sync_plan(
+    prs: Iterable[dict[str, Any]],
+    *,
+    repo: str,
+    default_branch: str,
+    trusted_author: str,
+    max_mutations: int,
+) -> list[ReverseSyncRetirement]:
+    """Build a deterministic plan for exact automation reverse-sync PRs."""
+    eligible: list[dict[str, Any]] = []
+    for pr in prs:
+        if not isinstance(pr, dict):
+            continue
+        allowed, _ = eligible_reverse_sync(
+            pr,
+            repo=repo,
+            default_branch=default_branch,
+            trusted_author=trusted_author,
+        )
+        if allowed:
+            eligible.append(pr)
+
+    eligible.sort(
+        key=lambda pr: (
+            str(pr.get("created_at") or ""),
+            int(pr.get("number") or 0),
+        )
+    )
+    return [
+        ReverseSyncRetirement(number=int(pr["number"]))
+        for pr in eligible[:max_mutations]
+    ]
+
+
 def fetch_pr(api: GitHubApi, repo: str, number: int) -> dict[str, Any]:
     status, payload, _ = _request_with_retry(api, f"/repos/{repo}/pulls/{number}")
     if status != 200 or not isinstance(payload, dict):
@@ -372,7 +471,7 @@ def close_pr(api: GitHubApi, repo: str, number: int) -> str:
         refreshed = fetch_pr(api, repo, number)
         if str(refreshed.get("state") or "").lower() == "closed":
             return "already-closed"
-    raise RuntimeError(f"failed to close superseded PR #{number}: HTTP {status}")
+    raise RuntimeError(f"failed to close PR #{number}: HTTP {status}")
 
 
 def _bounded_mutation_limit(raw: object) -> int:
@@ -399,21 +498,56 @@ def execute(
         raise RuntimeError("missing trusted author")
 
     open_prs = list_open_prs(api, repo=repo, default_branch=default_branch)
-    plan = build_retirement_plan(
+    reverse_sync_plan = build_reverse_sync_plan(
         open_prs,
         repo=repo,
         default_branch=default_branch,
         trusted_author=trusted_author,
         max_mutations=max_mutations,
     )
+    remaining = max(0, max_mutations - len(reverse_sync_plan))
+    plan = build_retirement_plan(
+        open_prs,
+        repo=repo,
+        default_branch=default_branch,
+        trusted_author=trusted_author,
+        max_mutations=remaining,
+    ) if remaining else []
 
     totals = {
         "open_scanned": len(open_prs),
+        "reverse_sync_planned": len(reverse_sync_plan),
+        "reverse_sync_closed": 0,
+        "reverse_sync_already_closed": 0,
+        "reverse_sync_revalidation_skipped": 0,
         "planned": len(plan),
         "closed": 0,
         "already_closed": 0,
         "revalidation_skipped": 0,
     }
+
+    for sync in reverse_sync_plan:
+        fresh = fetch_pr(api, repo, sync.number)
+        allowed, reason = eligible_reverse_sync(
+            fresh,
+            repo=repo,
+            default_branch=default_branch,
+            trusted_author=trusted_author,
+        )
+        if not allowed:
+            totals["reverse_sync_revalidation_skipped"] += 1
+            print(
+                "skip reverse-sync retirement after revalidation: "
+                f"pr=#{sync.number} reason={reason}"
+            )
+            continue
+
+        outcome = close_pr(api, repo, sync.number)
+        if outcome == "closed":
+            totals["reverse_sync_closed"] += 1
+        else:
+            totals["reverse_sync_already_closed"] += 1
+        print(f"retired reverse-sync PR: pr=#{sync.number} outcome={outcome}")
 
     for retirement in plan:
         # Re-read both PRs immediately before mutation. The current source must
@@ -481,7 +615,19 @@ def main() -> int:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write("## PR churn control\n")
             handle.write(
-                f"- Open default-base PRs scanned: {totals['open_scanned']}\n"
+                f"- Open PRs scanned: {totals['open_scanned']}\n"
+            )
+            handle.write(
+                "- Exact reverse-sync PRs planned: "
+                f"{totals['reverse_sync_planned']}\n"
+            )
+            handle.write(
+                "- Exact reverse-sync PRs closed: "
+                f"{totals['reverse_sync_closed']}\n"
+            )
+            handle.write(
+                "- Reverse-sync revalidation skips: "
+                f"{totals['reverse_sync_revalidation_skipped']}\n"
             )
             handle.write(f"- Explicit retirements planned: {totals['planned']}\n")
             handle.write(f"- PRs closed: {totals['closed']}\n")
@@ -493,10 +639,12 @@ def main() -> int:
                 f"{totals['revalidation_skipped']}\n"
             )
             handle.write(
-                "- Policy: only newer, owner-authored, same-repository PRs that "
-                "use an explicit `Supersedes #…` directive may retire older open PRs. "
-                "Draft/validation sources, foreign heads, foreign authors, and "
-                "preserve-labeled targets are never retired.\n"
+                "- Policy: newer trusted default-base PRs may retire older PRs "
+                "only through an explicit `Supersedes #…` directive. In addition, "
+                "the exact owner-authored reverse-sync automation template may be "
+                "retired when it uses the default branch as head and targets a "
+                "non-protected branch. Drafts, foreign repositories/authors, "
+                "protected bases, and preserve-labeled PRs are never retired.\n"
             )
     return 0
 
