@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 WORKFLOW = Path(".github/workflows/merge-readiness-concurrency-drain.yml")
-CURRENT_MAIN_SHA = "03b175d3ffbb2c32cee230ec90c5d12a32bdfa59"
+CURRENT_MAIN_SHA = "ca257df6a2b4170cc9bdca501a96a5ae57d31bdd"
 
 
 def test_legacy_merge_readiness_tombstones_are_bounded_and_read_only() -> None:
@@ -11,15 +11,16 @@ def test_legacy_merge_readiness_tombstones_are_bounded_and_read_only() -> None:
     assert "permissions: {}" in workflow
     assert "group: merge-readiness-${{ matrix.sha }}" in workflow
     assert "cancel-in-progress: true" in workflow
-    assert "runs-on: ubuntu-24.04-arm" in workflow
+    assert "runs-on: ubuntu-latest" in workflow
+    assert "runs-on: ubuntu-24.04-arm" not in workflow
     assert "timeout-minutes: 2" in workflow
     assert "workflow_dispatch:" in workflow
     assert "paths:" in workflow
     assert "merge-readiness-concurrency-drain.yml" in workflow
 
     shas = re.findall(r"^          - ([0-9a-f]{40})$", workflow, flags=re.MULTILINE)
-    assert len(shas) == 9
-    assert len(set(shas)) == 9
+    assert len(shas) == 6
+    assert len(set(shas)) == 6
     assert CURRENT_MAIN_SHA not in shas
 
 
