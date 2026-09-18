@@ -140,6 +140,8 @@ class ReplayAdvance:
         RawInputSample,
         ...,
     ]
+    machine_digest: str
+    clock_digest: str
     result_digest: str
     chain_digest: str
 
@@ -185,6 +187,12 @@ class DeterministicGameLoop:
         self.input = InputNormalizer(
             self.era
         )
+        self._genesis_machine_digest = (
+            self.machine.fingerprint()
+        )
+        self._genesis_clock_digest = (
+            self.clock.fingerprint()
+        )
         self._genesis_digest = _digest(
             {
                 "schema_version":
@@ -194,9 +202,9 @@ class DeterministicGameLoop:
                 "tree_digest":
                     sandbox.tree.digest,
                 "machine_digest":
-                    self.machine.fingerprint(),
+                    self._genesis_machine_digest,
                 "clock_digest":
-                    self.clock.fingerprint(),
+                    self._genesis_clock_digest,
             }
         )
         self._chain_digest = (
@@ -651,6 +659,8 @@ class DeterministicGameLoop:
             ReplayAdvance(
                 delta_ns,
                 raw_samples,
+                machine_digest,
+                clock_digest,
                 result_digest,
                 next_chain,
             )
@@ -748,15 +758,30 @@ class DeterministicGameLoop:
                 "game-loop snapshot contract mismatch"
             )
 
-        expected_chain = (
-            self._genesis_digest
-            if snapshot.history_size
-            == 0
-            else self._history[
+        if snapshot.history_size == 0:
+            expected_chain = (
+                self._genesis_digest
+            )
+            expected_machine_digest = (
+                self._genesis_machine_digest
+            )
+            expected_clock_digest = (
+                self._genesis_clock_digest
+            )
+        else:
+            checkpoint = self._history[
                 snapshot.history_size
                 - 1
-            ].chain_digest
-        )
+            ]
+            expected_chain = (
+                checkpoint.chain_digest
+            )
+            expected_machine_digest = (
+                checkpoint.machine_digest
+            )
+            expected_clock_digest = (
+                checkpoint.clock_digest
+            )
         if (
             snapshot.chain_digest
             != expected_chain
@@ -782,6 +807,15 @@ class DeterministicGameLoop:
         ):
             raise GameEngineLabError(
                 "game-loop machine snapshot malformed"
+            )
+        if (
+            machine_digest
+            != expected_machine_digest
+            or snapshot.clock_snapshot.digest
+            != expected_clock_digest
+        ):
+            raise GameEngineLabError(
+                "game-loop snapshot state does not match replay lineage"
             )
         payload = {
             "schema_version":
@@ -894,6 +928,10 @@ class DeterministicGameLoop:
                 != expected.result_digest
                 or actual.chain_digest
                 != expected.chain_digest
+                or actual.machine_digest
+                != expected.machine_digest
+                or actual.clock_digest
+                != expected.clock_digest
             ):
                 return ReplayVerification(
                     False,
@@ -1124,6 +1162,10 @@ def _replay_advance_document(
             for sample
             in value.samples
         ],
+        "machine_digest":
+            value.machine_digest,
+        "clock_digest":
+            value.clock_digest,
         "result_digest":
             value.result_digest,
         "chain_digest":
@@ -1395,6 +1437,8 @@ def parse_replay_tape(
             != {
                 "delta_ns",
                 "samples",
+                "machine_digest",
+                "clock_digest",
                 "result_digest",
                 "chain_digest",
             }
@@ -1439,6 +1483,18 @@ def parse_replay_tape(
                     )
                     for sample
                     in sample_rows
+                ),
+                _sha256_text(
+                    row[
+                        "machine_digest"
+                    ],
+                    "replay machine digest",
+                ),
+                _sha256_text(
+                    row[
+                        "clock_digest"
+                    ],
+                    "replay clock digest",
                 ),
                 _sha256_text(
                     row[
@@ -1537,6 +1593,10 @@ def verify_replay_tape(
             != expected.result_digest
             or actual.chain_digest
             != expected.chain_digest
+            or actual.machine_digest
+            != expected.machine_digest
+            or actual.clock_digest
+            != expected.clock_digest
         ):
             return ReplayVerification(
                 False,
