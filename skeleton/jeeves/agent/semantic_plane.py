@@ -1003,7 +1003,19 @@ class SemanticLensPlane:
         if len(observation_ids) != len(set(observation_ids)):
             raise AgentContractError("semantic observation ids must be unique")
 
+        (
+            learned_topology_rules,
+            topology_learning,
+        ) = self.topology_learning.evaluate()
         selection = self.select(observations, requested=requested)
+        (
+            selection,
+            learned_companion_keys,
+        ) = self._augment_with_learned_companions(
+            selection,
+            observations,
+            learned_topology_rules,
+        )
         governance = self.governance.assess(
             selection,
             observations=observations,
@@ -1027,10 +1039,6 @@ class SemanticLensPlane:
             selected_lens_keys=tuple(spec.key for spec in selection.lenses),
             maximum_axes=self.policy.max_perpendicular_axes,
         )
-        (
-            learned_topology_rules,
-            topology_learning,
-        ) = self.topology_learning.evaluate()
         composition = self.composition.compose(
             audit.accepted,
             supplemental_rules=tuple(
@@ -1125,6 +1133,7 @@ class SemanticLensPlane:
             topology=topology,
             topology_learning=topology_learning,
             learned_topology_rules=learned_topology_rules,
+            learned_companion_keys=learned_companion_keys,
             topology_bridge_candidates=topology_bridge_candidates,
         )
         fingerprint = stable_fingerprint(
@@ -1151,6 +1160,7 @@ class SemanticLensPlane:
                 "learned_topology_rules": [
                     item.fingerprint for item in learned_topology_rules
                 ],
+                "learned_companion_keys": learned_companion_keys,
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates
                 ],
@@ -1176,6 +1186,7 @@ class SemanticLensPlane:
             topology=topology,
             topology_learning=topology_learning,
             learned_topology_rules=learned_topology_rules,
+            learned_companion_keys=learned_companion_keys,
             topology_bridge_candidates=topology_bridge_candidates,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
@@ -1462,6 +1473,11 @@ class SemanticLensPlane:
                     "frontier_max_per_family": self.policy.frontier_max_per_family,
                     "topology_bridge_limit": self.policy.topology_bridge_limit,
                     "topology_bridge_minimum_score": self.policy.topology_bridge_minimum_score,
+                    "enable_learned_companions": self.policy.enable_learned_companions,
+                    "max_learned_companions": self.policy.max_learned_companions,
+                    "minimum_learned_companion_cue_support": (
+                        self.policy.minimum_learned_companion_cue_support
+                    ),
                     "require_selected": self.policy.require_selected_findings,
                     "require_overlap": self.policy.require_observation_overlap,
                     "require_observation_subset": self.policy.require_observation_subset,
