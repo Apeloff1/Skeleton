@@ -130,12 +130,18 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
         same_repo_guard = (
             "github.event.workflow_run.head_repository.full_name == github.repository"
         )
-        # Both pressure and studio are workflow_run consumers. Requiring the
-        # guard only once lets one job silently lose the trust boundary while
-        # another occurrence masks the regression.
-        if text.count(same_repo_guard) < 2:
+        if text.count(same_repo_guard) != 1:
             findings.append(
-                f"{path_name}: branch completions must reject cross-repository workflow_run heads"
+                f"{path_name}: branch completions must single-source the cross-repository "
+                "workflow_run trust boundary"
+            )
+        if (
+            "needs.pressure.result == 'success'" not in text
+            or "needs.pressure.outputs.proceed == 'true'" not in text
+        ):
+            findings.append(
+                f"{path_name}: mutation-capable studio job must depend on the successful "
+                "pressure trust gate"
             )
         if "exceeded bounded identity scan" not in text:
             findings.append(
