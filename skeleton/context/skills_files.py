@@ -48,6 +48,18 @@ def _safe_id(value: str, *, label: str = "id") -> str:
     return text
 
 
+def _fsync_parent_directory(path: Path) -> None:
+    """Persist a published directory entry on POSIX after atomic replace."""
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    dir_fd = os.open(path.parent, flags)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
     """Atomically replace JSON without a predictable temporary-file race."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +77,7 @@ def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(tmp, path)
+        _fsync_parent_directory(path)
     except BaseException:
         try:
             tmp.unlink(missing_ok=True)
