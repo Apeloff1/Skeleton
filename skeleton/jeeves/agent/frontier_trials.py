@@ -18,7 +18,14 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .evaluation import EvalResult
-from .types import AgentContractError, positive_int, probability, require_id, stable_fingerprint
+from .types import (
+    AgentContractError,
+    finite_number,
+    positive_int,
+    probability,
+    require_id,
+    stable_fingerprint,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +69,33 @@ class FrontierPassAtKCase:
     mean_estimated_tokens: float
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "case_id", require_id("case_id", self.case_id))
+        variant = str(self.variant).strip().casefold()
+        if not variant:
+            raise AgentContractError("variant must be non-empty")
+        object.__setattr__(self, "variant", variant[:128])
+        object.__setattr__(self, "k", positive_int("k", self.k, maximum=10_000_000))
+        object.__setattr__(
+            self,
+            "trials",
+            positive_int("trials", self.trials, maximum=10_000_000),
+        )
+        if (
+            isinstance(self.successes, bool)
+            or not isinstance(self.successes, int)
+            or self.successes < 0
+            or self.successes > self.trials
+        ):
+            raise AgentContractError("successes must be in [0, trials]")
+        object.__setattr__(self, "pass_at_k", probability("pass_at_k", self.pass_at_k))
+        object.__setattr__(self, "mean_score", probability("mean_score", self.mean_score))
+        for name in ("mean_model_calls", "mean_estimated_tokens"):
+            value = finite_number(name, getattr(self, name))
+            if value < 0.0:
+                raise AgentContractError(f"{name} must be non-negative")
+            object.__setattr__(self, name, value)
+
 
 @dataclass(frozen=True, slots=True)
 class FrontierTrialReport:
@@ -76,6 +110,34 @@ class FrontierTrialReport:
     mean_estimated_tokens: float
     cases: tuple[FrontierPassAtKCase, ...]
     fingerprint: str
+
+    def __post_init__(self) -> None:
+        variant = str(self.variant).strip().casefold()
+        if not variant:
+            raise AgentContractError("variant must be non-empty")
+        object.__setattr__(self, "variant", variant[:128])
+        object.__setattr__(self, "k", positive_int("k", self.k, maximum=10_000_000))
+        for name in ("case_count", "trial_count", "success_count"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise AgentContractError(f"{name} must be a non-negative integer")
+        if self.success_count > self.trial_count:
+            raise AgentContractError("success_count cannot exceed trial_count")
+        object.__setattr__(
+            self,
+            "mean_pass_at_k",
+            probability("mean_pass_at_k", self.mean_pass_at_k),
+        )
+        object.__setattr__(self, "mean_score", probability("mean_score", self.mean_score))
+        for name in ("mean_model_calls", "mean_estimated_tokens"):
+            value = finite_number(name, getattr(self, name))
+            if value < 0.0:
+                raise AgentContractError(f"{name} must be non-negative")
+            object.__setattr__(self, name, value)
+        if any(not isinstance(item, FrontierPassAtKCase) for item in self.cases):
+            raise TypeError("cases must contain FrontierPassAtKCase")
+        if len(self.cases) != self.case_count:
+            raise AgentContractError("case_count does not match cases")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +158,35 @@ class FrontierTrialComparison:
     regression_rate: float
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        for name in ("baseline_variant", "frontier_variant"):
+            value = str(getattr(self, name)).strip().casefold()
+            if not value:
+                raise AgentContractError(f"{name} must be non-empty")
+            object.__setattr__(self, name, value[:128])
+        object.__setattr__(self, "k", positive_int("k", self.k, maximum=10_000_000))
+        for name in ("matched_cases", "regressed_cases"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise AgentContractError(f"{name} must be a non-negative integer")
+        if self.regressed_cases > self.matched_cases:
+            raise AgentContractError("regressed_cases cannot exceed matched_cases")
+        for name in (
+            "baseline_mean_pass_at_k",
+            "frontier_mean_pass_at_k",
+            "baseline_mean_score",
+            "frontier_mean_score",
+            "regression_rate",
+        ):
+            object.__setattr__(self, name, probability(name, getattr(self, name)))
+        for name in (
+            "pass_at_k_delta",
+            "mean_score_delta",
+            "incremental_model_calls",
+            "incremental_estimated_tokens",
+        ):
+            object.__setattr__(self, name, finite_number(name, getattr(self, name)))
+
 
 @dataclass(frozen=True, slots=True)
 class FrontierTrialGate:
@@ -103,6 +194,19 @@ class FrontierTrialGate:
     reasons: tuple[str, ...]
     comparison_fingerprint: str
     fingerprint: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.passed, bool):
+            raise AgentContractError("passed must be boolean")
+        object.__setattr__(
+            self,
+            "reasons",
+            tuple(
+                str(reason).strip()[:2048]
+                for reason in self.reasons
+                if str(reason).strip()
+            ),
+        )
 
 
 class FrontierTrialEvaluator:
@@ -370,8 +474,14 @@ class FrontierTrialEvaluator:
         if not isinstance(comparison, FrontierTrialComparison):
             raise TypeError("comparison must be FrontierTrialComparison")
         minimum_cases = positive_int("minimum_cases", minimum_cases, maximum=1_000_000)
-        minimum_pass_delta = float(minimum_pass_at_k_delta)
-        minimum_score_delta = float(minimum_mean_score_delta)
+        minimum_pass_delta = finite_number(
+            "minimum_pass_at_k_delta",
+            minimum_pass_at_k_delta,
+        )
+        minimum_score_delta = finite_number(
+            "minimum_mean_score_delta",
+            minimum_mean_score_delta,
+        )
         maximum_regressions = probability(
             "maximum_regression_rate",
             maximum_regression_rate,
