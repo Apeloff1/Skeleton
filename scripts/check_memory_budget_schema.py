@@ -6,9 +6,9 @@ truncation/fallback enums. Unknown budget kinds, unknown budget object
 fields, unknown enums, missing evidence, and non-positive limits fail
 closed.
 
-This is ``rag.spec.bounded_retrieval`` (task ``reserve-S057-memory-budget-review``),
-not the S121 retrieval-surface inventory (``rag.readonly.surface_inventory``).
-Finding prefix: ``memory-budget``.
+This is ``rag.spec.bounded_retrieval`` (task ``reserve-S057-memory-budget-review``).
+It does not inventory retrieval surfaces or classify adapters. Finding prefix:
+``memory-budget``.
 """
 
 from __future__ import annotations
