@@ -35,6 +35,7 @@ class ShapeKind(str, Enum):
     CAPSULE = "capsule"
     CYLINDER = "cylinder"
     CONVEX_HULL = "convex_hull"
+    TRIANGLE_MESH = "triangle_mesh"
 
 
 @dataclass(frozen=True, slots=True)

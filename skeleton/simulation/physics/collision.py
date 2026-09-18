@@ -17,6 +17,7 @@ from .convex import convex_penetration
 from .errors import PhysicsValidationError, UnsupportedCollisionError
 from .materials import ContactMaterial, combine_materials
 from .math3d import EPSILON, AABB, Vec3
+from .mesh import TriangleMeshShape, closest_point_on_triangle
 from .shapes import (
     BoxShape,
     CapsuleShape,
@@ -995,6 +996,86 @@ def _convex_convex(
     )
 
 
+def _mesh_sphere(
+    mesh: RigidBody,
+    sphere: RigidBody,
+) -> ContactManifold | None:
+    mesh_shape = mesh.shape
+    sphere_shape = sphere.shape
+    assert isinstance(mesh_shape, TriangleMeshShape)
+    assert isinstance(sphere_shape, SphereShape)
+
+    center = mesh.transform.inverse_transform_point(sphere.position)
+    radius = sphere_shape.radius
+    query_bounds = AABB.from_center_half_extents(
+        center,
+        Vec3.one() * radius,
+    )
+    candidates = mesh_shape.candidate_triangles(query_bounds)
+    contacts: list[tuple[float, int, Vec3, Vec3]] = []
+
+    for triangle_index in candidates:
+        first, second, third = mesh_shape.triangle_vertices(triangle_index)
+        closest, _ = closest_point_on_triangle(
+            center,
+            first,
+            second,
+            third,
+        )
+        delta = center - closest
+        distance_sq = delta.length_squared()
+        if distance_sq > radius * radius + EPSILON:
+            continue
+
+        if distance_sq > _AXIS_EPSILON_SQ:
+            distance = math.sqrt(distance_sq)
+            normal_local = delta / distance
+        else:
+            distance = 0.0
+            normal_local = mesh_shape.triangle_normal(triangle_index)
+            signed = normal_local.dot(center - first)
+            if signed < 0.0:
+                normal_local = -normal_local
+
+        penetration = max(0.0, radius - distance)
+        sphere_surface = center - normal_local * radius
+        point_local = (closest + sphere_surface) * 0.5
+        contacts.append(
+            (
+                penetration,
+                triangle_index,
+                normal_local,
+                point_local,
+            )
+        )
+
+    if not contacts:
+        return None
+
+    penetration, triangle_index, normal_local, point_local = sorted(
+        contacts,
+        key=lambda row: (
+            -row[0],
+            row[1],
+        ),
+    )[0]
+    normal = mesh.transform.transform_vector(normal_local).normalized()
+    point = mesh.transform.transform_point(point_local)
+    return ContactManifold(
+        mesh.body_id,
+        sphere.body_id,
+        normal,
+        (
+            ContactPoint(
+                point,
+                penetration,
+                f"mesh-sphere:t{triangle_index}",
+            ),
+        ),
+        _contact_material(mesh, sphere),
+    )
+
+
 def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
     """Return one deterministic bounded manifold for a supported body pair."""
 
@@ -1021,6 +1102,16 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
         result = _plane_box(b, a)
         return None if result is None else result.flipped()
     if kind_a is ShapeKind.PLANE and kind_b is ShapeKind.PLANE:
+        return None
+    if kind_a is ShapeKind.TRIANGLE_MESH and kind_b is ShapeKind.SPHERE:
+        return _mesh_sphere(a, b)
+    if kind_a is ShapeKind.SPHERE and kind_b is ShapeKind.TRIANGLE_MESH:
+        result = _mesh_sphere(b, a)
+        return None if result is None else result.flipped()
+    if (
+        kind_a is ShapeKind.TRIANGLE_MESH
+        and kind_b is ShapeKind.TRIANGLE_MESH
+    ):
         return None
 
     generic_convex = {

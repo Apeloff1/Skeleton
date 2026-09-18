@@ -50,6 +50,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_islands",
     "skeleton.testing.test_simulation_physics_joint_cache_coloring",
     "skeleton.testing.test_simulation_physics_manifolds",
+    "skeleton.testing.test_simulation_physics_mesh",
     "skeleton.testing.test_simulation_physics_obb_edges",
     "skeleton.testing.test_simulation_physics_replay",
 )
