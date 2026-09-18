@@ -848,8 +848,10 @@ class SemanticLensPlane:
             selected_lens_keys=tuple(spec.key for spec in selection.lenses),
             maximum_axes=self.policy.max_perpendicular_axes,
         )
-        learned_topology_rules = self.topology_learning.learned_rules()
-        topology_learning = self.topology_learning.snapshot()
+        (
+            learned_topology_rules,
+            topology_learning,
+        ) = self.topology_learning.evaluate()
         composition = self.composition.compose(
             audit.accepted,
             supplemental_rules=tuple(
