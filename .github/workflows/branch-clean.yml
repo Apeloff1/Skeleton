@@ -10,7 +10,9 @@ on:
 # Keep one cleanup sweep alive while main is moving rapidly. New triggers
 # coalesce behind the active worker instead of repeatedly cancelling it.
 concurrency:
-  group: branch-clean-${{ github.repository }}
+  # v2 intentionally starts a fresh lane so the corrected cleanup does not sit
+  # behind obsolete queued v1 runs. Future v2 triggers still coalesce normally.
+  group: branch-clean-v2-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -18,7 +20,8 @@ permissions: {}
 jobs:
   prune:
     name: Delete refs with no unique commits
-    runs-on: ubuntu-24.04-arm
+    # Cleanup is architecture-neutral and should not depend on the scarcer ARM lane.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
