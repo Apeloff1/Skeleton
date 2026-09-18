@@ -44,6 +44,7 @@ REF_NAME_RE = re.compile(
 )
 SAFE_IDENTITY_RE = re.compile(
     r"\bgithub\.(?:ref|sha|repository|workflow|run_id|event_name)\b"
+    r"|\bgithub\.event\.workflow_run\.(?:workflow_id|head_sha)\b"
 )
 LITERAL_RE = re.compile(r"^['\"][^'\"]*['\"]$")
 IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
