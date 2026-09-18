@@ -79,6 +79,8 @@ class WebhookSystem:
         signing_secret = secret.strip() if isinstance(secret, str) else ""
         if not signing_secret:
             signing_secret = secrets.token_urlsafe(32)
+        elif len(signing_secret.encode("utf-8")) < 16:
+            raise ValueError("webhook secret must be at least 16 bytes")
         sub = Subscription(
             sub_id=uuid.uuid4().hex[:10],
             topic=topic,
@@ -121,7 +123,11 @@ class WebhookSystem:
             d.attempts += 1
             sig = d.signature(sub.secret)
             try:
-                ok = self._sender(sub.url, d.payload, sig)
+                safe_url, _ = validate_public_https_url(
+                    sub.url,
+                    purpose="webhook endpoint",
+                )
+                ok = self._sender(safe_url, d.payload, sig)
             except Exception:  # noqa: BLE001
                 ok = False
             if ok:
