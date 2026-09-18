@@ -327,6 +327,20 @@ def test_scientific_runtime_exposes_governed_semantic_analysis() -> None:
             evidence_ids=("ev-runtime",),
             tags=("concept drift", "regime"),
         ),
+        SemanticObservation(
+            "runtime-semantic-2",
+            "Conditional accuracy degrades while covariate coverage remains.",
+            1,
+            evidence_ids=("ev-runtime",),
+            tags=("target", "mapping"),
+        ),
+        SemanticObservation(
+            "runtime-semantic-3",
+            "A later window preserves the changed predictor-target relation.",
+            2,
+            evidence_ids=("ev-runtime",),
+            tags=("drift", "relationship changed"),
+        ),
     )
     finding = SemanticFinding(
         finding_id="runtime-drift",
