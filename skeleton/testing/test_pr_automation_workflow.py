@@ -41,7 +41,12 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "types: [requested, in_progress, completed]" not in text
     assert "types: [requested]" not in text
     assert "types: [in_progress]" not in text
-    assert "- Merge Readiness" in text
+    assert "workflows:\n      - Merge Readiness" in text
+    assert "      - CI/CD" not in text
+    assert "      - Backend Quality" not in text
+    assert "      - Dependency Review" not in text
+    assert "      - Dependency Security" not in text
+    assert "      - CodeQL" not in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
     assert "branches-ignore:\n      - main" in text
