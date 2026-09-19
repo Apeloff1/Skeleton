@@ -235,6 +235,7 @@ class JvmObservabilityAccelerator:
         *,
         window_size: int,
         threshold: float = 3.0,
+        include_current: bool = False,
     ) -> list[AnomalyScanRow]:
         if not 10 <= window_size <= self.config.max_values:
             raise ValueError("window_size outside supported range")
@@ -249,6 +250,7 @@ class JvmObservabilityAccelerator:
         payload = bytearray()
         payload.extend(_INT.pack(window_size))
         payload.extend(struct.pack(">d", threshold))
+        payload.extend(struct.pack(">?", bool(include_current)))
         payload.extend(self._encode_values(old))
         payload.extend(self._encode_values(new))
         response = self._request(_OP_ANOMALY_SCAN, bytes(payload))
