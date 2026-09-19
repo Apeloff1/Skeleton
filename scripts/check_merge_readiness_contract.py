@@ -58,6 +58,11 @@ def main() -> int:
     except (OSError, UnicodeError) as exc:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
+    require(
+        "workflow_dispatch:" in text,
+        "merge-readiness must support explicit current-head verification",
+        failures,
+    )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
