@@ -22,6 +22,8 @@ MODULES = (
     "runner_v2_cli.py",
 )
 REQUIRED_WORKFLOW_PERMISSIONS = {
+    "actions": "read",
+    "checks": "read",
     "contents": "write",
     "pull-requests": "write",
     "statuses": "write",
