@@ -680,9 +680,17 @@ class DurableChainCheckpointStore:
             )
         )
         if lookup is not None:
-            return self._item_from_lookup(
+            item = self._item_from_lookup(
                 lookup
             )
+            if (
+                item.checkpoint.digest
+                != checkpoint_digest
+            ):
+                raise DurableCheckpointError(
+                    "indexed checkpoint differs from requested digest"
+                )
+            return item
 
         matches = tuple(
             item
@@ -706,6 +714,10 @@ class DurableChainCheckpointStore:
         chain_id: str,
         root_hash: str,
     ) -> SignedDurableChainCheckpoint | None:
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
         key = self._root_lookup_key(
             chain_id,
             root_hash,
@@ -718,14 +730,19 @@ class DurableChainCheckpointStore:
                 raise DurableCheckpointError(
                     "checkpoint root index chain mismatch"
                 )
-            return self._item_from_lookup(
+            item = self._item_from_lookup(
                 lookup
             )
+            if (
+                item.checkpoint.chain_id != chain_id
+                or item.checkpoint.root_hash
+                != root_hash
+            ):
+                raise DurableCheckpointError(
+                    "indexed checkpoint differs from requested root"
+                )
+            return item
 
-        root_hash = _digest(
-            "root_hash",
-            root_hash,
-        )
         matches = tuple(
             item
             for item in self.snapshot()
