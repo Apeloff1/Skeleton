@@ -352,6 +352,20 @@ class RunnerEngine:
         try:
             item = self._collect_item(target, observation)
             self.budget.consume_target()
+            collection_requests = self.transport.request_count - requests_before
+            if collection_requests > self.policy.limits.per_target_request_budget:
+                finished = _now(self.clock)
+                return _deferred_result(
+                    item,
+                    started=started,
+                    finished=finished,
+                    request_count=collection_requests,
+                    reasons=(
+                        "per_target_request_budget_exceeded:"
+                        f"{collection_requests}:"
+                        f"{self.policy.limits.per_target_request_budget}",
+                    ),
+                )
             append_evaluation_event(
                 self.index,
                 item,
@@ -420,11 +434,19 @@ class RunnerEngine:
 
     def run(self) -> RunnerReport:
         started = _now(self.clock)
-        targets = self.resolver.resolve(self.identity)
 
-        # Admission drop still produces a complete diagnostic report, but it does
-        # not collect PR evidence or publish status.
+        # A dropped event is not allowed to spend repository-read budget.  It
+        # emits a diagnostic report with an intentionally empty target set so
+        # malformed/untrusted workflow identity cannot be turned into a broad
+        # repository scan.
         if self.admission.dropped:
+            targets = TargetSet(
+                repository=self.identity.repository,
+                targets=(),
+                complete=True,
+                reason="admission_drop",
+                requests_used=0,
+            )
             finished = _now(self.clock)
             report = RunnerReport(
                 identity=self.identity,
