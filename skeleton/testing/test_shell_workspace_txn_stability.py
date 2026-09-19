@@ -427,6 +427,85 @@ def test_zero_mutation_policy_still_fails_closed(tmp_path: Path):
     assert policy.fail_on_warning
 
 
+def test_execution_journal_binds_snapshot_backup_and_command_evidence(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            ("-c", "print('evidence')"),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+
+    execution_events = manager.journal.events(
+        transaction_id=result.transaction.receipt.transaction_id,
+        kind=WorkspaceTransactionState.EXECUTING.value,
+    )
+    assert len(execution_events) == 1
+    payload = execution_events[0].payload
+    assert result.transaction.backup is not None
+    assert payload["backup_id"] == result.transaction.backup.backup_id
+    assert payload["backup_digest"] == result.transaction.backup.digest
+    assert payload["before_snapshot_digest"] == result.transaction.before.digest
+    assert payload["root_fingerprint"] == result.transaction.before.root_fingerprint
+    assert isinstance(payload["command_fingerprint"], str)
+    assert len(payload["command_fingerprint"]) == 64
+
+
+def test_recovery_candidate_reports_bound_execution_evidence():
+    journal = TransactionJournal()
+    transaction_id = "txn-evidence"
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.EXECUTING.value,
+        {
+            "backup_id": "backup-1",
+            "backup_digest": "a" * 64,
+            "before_snapshot_digest": "b" * 64,
+            "root_fingerprint": "c" * 64,
+            "command_fingerprint": "d" * 64,
+        },
+    )
+
+    candidate = TransactionRecoveryInspector(journal).candidates()[0]
+    assert candidate.needs_manual_review
+    assert not candidate.safe_to_forget
+    assert candidate.evidence_complete
+    assert candidate.backup_id == "backup-1"
+    assert candidate.backup_digest == "a" * 64
+    assert candidate.before_snapshot_digest == "b" * 64
+    assert candidate.root_fingerprint == "c" * 64
+    assert candidate.command_fingerprint == "d" * 64
+
+
+def test_recovery_candidate_marks_missing_execution_evidence_incomplete():
+    journal = TransactionJournal()
+    transaction_id = "txn-incomplete-evidence"
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.EXECUTING.value,
+        {
+            "before_snapshot_digest": "b" * 64,
+        },
+    )
+
+    candidate = TransactionRecoveryInspector(journal).candidates()[0]
+    assert candidate.needs_manual_review
+    assert not candidate.evidence_complete
+    assert candidate.backup_id == ""
+
+
 def test_recovery_treats_rejected_transaction_as_incomplete():
     journal = TransactionJournal()
     transaction_id = "txn-rejected"
