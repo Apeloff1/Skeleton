@@ -27,7 +27,8 @@ from skeleton.shells.plan_executor import PlanExecutionReport, StepExecution, St
 from skeleton.shells.receipts import ReceiptChain
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def completed_session():
