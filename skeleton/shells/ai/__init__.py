@@ -1,5 +1,11 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_pruning import DurablePruningError, DurablePruningExecutor, DurablePruningItem, DurablePruningItemKind, DurablePruningManifest, DurablePruningManualReview, DurablePruningOperation, DurablePruningPhase, DurablePruningResult
+
+from skeleton.shells.ai.durable_pruning_authorization import DurablePruningAuthorization, DurablePruningAuthorizationError, DurablePruningAuthorizationStore, DurablePruningAuthorizationVerification, SignedDurablePruningAuthorization
+
+from skeleton.shells.ai.durable_hot_floor import DurableHotFloor, DurableHotFloorError, DurableHotFloorStore, HotFloorPosition, SignedDurableHotFloor
+
 from skeleton.shells.ai.durable_verification_operator import DurableVerificationOperator, DurableVerificationOperatorChainReport, DurableVerificationOperatorError, DurableVerificationOperatorPolicy, DurableVerificationOperatorReport, DurableVerificationOperatorState, DurableVerificationRefreshReport
 
 from skeleton.shells.ai.durable_sequence_index import DurableSequenceIndexChainReport, DurableSequenceIndexError, DurableSequenceIndexFinding, DurableSequenceIndexFleetReport, DurableSequenceIndexOperator, DurableSequenceIndexPolicy, DurableSequenceIndexState
