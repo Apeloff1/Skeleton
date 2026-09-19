@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.recovery_requirements import *
+
 from skeleton.shells.ai.durable_archive import DurableArchiveEntry, DurableArchiveError, DurableArchiveManifest, DurableArchiveManifestBuilder, DurableArchiveVerification, SignedDurableArchiveManifest
 
 from skeleton.shells.ai.durable_operations import DurableChainOperationalState, DurableChainOperationsReport, DurableEvidenceOperationsError, DurableEvidenceOperationsInspector, DurableEvidenceOperationsReport, DurableOperationsFinding, DurableOperationsPolicy, DurableOperationsSeverity
