@@ -454,13 +454,45 @@ class BackupManifest:
     records: tuple[BackupRecord, ...]
     total_bytes: int
     digest: str
+    root_mode: int | None = None
+    root_mtime_ns: int | None = None
+
+    def __post_init__(self) -> None:
+        if (self.root_mode is None) != (self.root_mtime_ns is None):
+            raise ValueError("root metadata must be complete or absent")
+        if self.root_mode is not None:
+            if (
+                isinstance(self.root_mode, bool)
+                or not isinstance(self.root_mode, int)
+                or self.root_mode < 0
+            ):
+                raise ValueError("root_mode must be a non-negative integer")
+            if (
+                isinstance(self.root_mtime_ns, bool)
+                or not isinstance(self.root_mtime_ns, int)
+                or self.root_mtime_ns < 0
+            ):
+                raise ValueError("root_mtime_ns must be a non-negative integer")
 
     @property
     def by_path(self) -> Mapping[str, BackupRecord]:
         return MappingProxyType({r.path: r for r in self.records})
 
+    def integrity_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "root_fingerprint": self.root_fingerprint,
+            "records": [r.to_dict() for r in self.records],
+            "total_bytes": self.total_bytes,
+        }
+        if self.root_mode is not None and self.root_mtime_ns is not None:
+            payload["root_metadata"] = {
+                "mode": self.root_mode,
+                "mtime_ns": self.root_mtime_ns,
+            }
+        return payload
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "backup_id": self.backup_id,
             "root_fingerprint": self.root_fingerprint,
             "created_at": self.created_at,
@@ -468,6 +500,10 @@ class BackupManifest:
             "total_bytes": self.total_bytes,
             "digest": self.digest,
         }
+        if self.root_mode is not None and self.root_mtime_ns is not None:
+            value["root_mode"] = self.root_mode
+            value["root_mtime_ns"] = self.root_mtime_ns
+        return value
 
 
 @dataclass(frozen=True)
