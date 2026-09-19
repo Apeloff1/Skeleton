@@ -1147,6 +1147,15 @@ class DurableHotFloorStore:
                 raise DurableHotFloorError(
                     "hot floor cannot move backwards"
                 )
+            if (
+                current is not None
+                and sequence > previous_sequence
+                and fencing_token
+                <= current.floor.fencing_token
+            ):
+                raise DurableHotFloorError(
+                    "hot floor fencing token must increase"
+                )
             if sequence == previous_sequence:
                 if (
                     current is not None
