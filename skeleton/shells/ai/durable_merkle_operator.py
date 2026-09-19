@@ -507,12 +507,31 @@ class DurableSessionMerkleOperator:
                 recovery_report,
             )
 
-        stored = (
-            self.bundle_store
-            .get_by_finalization(
-                finalization_id
+        try:
+            stored = (
+                self.bundle_store
+                .get_by_finalization(
+                    finalization_id
+                )
             )
-        )
+        except DurableMerkleBundleStoreError as exc:
+            return DurableMerkleOperatorResult(
+                finalization_id,
+                recovery_report.session_id,
+                DurableMerkleOperatorStatus.MANUAL_REVIEW,
+                "",
+                None,
+                False,
+                False,
+                recovery_report.digest,
+                0,
+                0,
+                None,
+                (
+                    "stored Merkle bundle state is inconsistent: "
+                    f"{type(exc).__name__}",
+                ),
+            )
         if stored is None:
             return DurableMerkleOperatorResult(
                 finalization_id,
