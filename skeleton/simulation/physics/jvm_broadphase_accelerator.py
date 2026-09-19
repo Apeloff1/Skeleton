@@ -27,15 +27,20 @@ _VERSION = 1
 _OP_PING = 1
 _OP_PAIRS = 2
 _OP_SHUTDOWN = 3
+_OP_QUERY_AABBS = 4
 _STATUS_OK = 0
 _MAX_BODIES = 100_000
 _MAX_PAIRS = 1_000_000
+_MAX_QUERIES = 4096
+_MAX_QUERY_HITS = 1_000_000
 _HEADER_REQUEST = struct.Struct(">IhBq")
 _HEADER_RESPONSE = struct.Struct(">IhBBq")
 _INT = struct.Struct(">i")
 _PING = struct.Struct(">qi")
 _REQUEST_PREFIX = struct.Struct(">iid")
+_QUERY_PREFIX = struct.Struct(">iii")
 _BOX = struct.Struct(">?6d")
+_BOUNDS = struct.Struct(">6d")
 _PAIR = struct.Struct(">ii")
 
 
@@ -188,6 +193,58 @@ class JvmBroadPhaseAccelerator:
         pairs = response.payload
         self._validate_pairs(pairs, count, max_pairs)
         return pairs
+
+    def query_overlaps_many(
+        self,
+        body_bounds: Sequence[AABB],
+        queries: Sequence[AABB],
+        *,
+        max_total_hits: int = _MAX_QUERY_HITS,
+    ) -> list[list[int]]:
+        """Return stable body indices overlapping each query AABB."""
+        body_count = len(body_bounds)
+        query_count = len(queries)
+        if body_count > self.config.max_bodies:
+            raise ValueError("body count exceeds accelerator bound")
+        if not 1 <= query_count <= _MAX_QUERIES:
+            raise ValueError("query count outside accelerator bound")
+        if not 1 <= max_total_hits <= _MAX_QUERY_HITS:
+            raise ValueError("max_total_hits outside accelerator bound")
+
+        payload = bytearray(
+            _QUERY_PREFIX.pack(body_count, query_count, max_total_hits)
+        )
+        for bounds in body_bounds:
+            payload.extend(self._encode_bounds(bounds))
+        for bounds in queries:
+            payload.extend(self._encode_bounds(bounds))
+
+        response = self._request(_OP_QUERY_AABBS, bytes(payload))
+        if not isinstance(response.payload, list):
+            raise JvmBroadPhaseProtocolError("AABB query response type mismatch")
+        batches = response.payload
+        if len(batches) != query_count:
+            raise JvmBroadPhaseProtocolError("AABB query count mismatch")
+
+        total = 0
+        for hits in batches:
+            if not isinstance(hits, list):
+                raise JvmBroadPhaseProtocolError("invalid AABB hit batch")
+            previous = -1
+            for index in hits:
+                if not isinstance(index, int) or not 0 <= index < body_count:
+                    raise JvmBroadPhaseProtocolError("AABB hit index outside body range")
+                if index <= previous:
+                    raise JvmBroadPhaseProtocolError(
+                        "AABB hit indices are not strictly ordered"
+                    )
+                previous = index
+                total += 1
+                if total > max_total_hits:
+                    raise JvmBroadPhaseProtocolError(
+                        "AABB query total-hit bound exceeded"
+                    )
+        return batches
 
     def close(self) -> None:
         with self._request_lock:
@@ -365,6 +422,29 @@ class JvmBroadPhaseAccelerator:
                 except ValueError as exc:
                     raise JvmBroadPhaseProtocolError(str(exc)) from exc
             return pairs
+        if op == _OP_QUERY_AABBS:
+            query_count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
+            if not 0 <= query_count <= _MAX_QUERIES:
+                raise JvmBroadPhaseProtocolError("invalid AABB query count")
+            batches: list[list[int]] = []
+            total = 0
+            for _ in range(query_count):
+                count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
+                if not 0 <= count <= self.config.max_bodies:
+                    raise JvmBroadPhaseProtocolError("invalid AABB hit count")
+                hits: list[int] = []
+                for _ in range(count):
+                    index = _INT.unpack(
+                        self._read_exact(stream, _INT.size)
+                    )[0]
+                    hits.append(index)
+                    total += 1
+                    if total > _MAX_QUERY_HITS:
+                        raise JvmBroadPhaseProtocolError(
+                            "AABB response exceeds hard hit bound"
+                        )
+                batches.append(hits)
+            return batches
         if op == _OP_SHUTDOWN:
             return None
         raise JvmBroadPhaseProtocolError(f"unknown response operation: {op}")
@@ -379,6 +459,19 @@ class JvmBroadPhaseAccelerator:
                 raise EOFError("unexpected EOF from broad-phase accelerator")
             chunks.extend(part)
         return bytes(chunks)
+
+    @staticmethod
+    def _encode_bounds(bounds: AABB) -> bytes:
+        if not isinstance(bounds, AABB):
+            raise TypeError("spatial query bounds must be AABB")
+        return _BOUNDS.pack(
+            bounds.minimum.x,
+            bounds.minimum.y,
+            bounds.minimum.z,
+            bounds.maximum.x,
+            bounds.maximum.y,
+            bounds.maximum.z,
+        )
 
     @staticmethod
     def _validate_pairs(
