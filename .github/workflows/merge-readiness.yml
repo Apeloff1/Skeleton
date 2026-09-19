@@ -168,7 +168,7 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: PR Automation Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -187,6 +187,8 @@ jobs:
           python -m compileall -q
           skeleton/pr_automation
           skeleton/automation
+      - name: Validate auto-merge workflow contract
+        run: python scripts/check_automerge_contract.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -198,6 +200,12 @@ jobs:
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
           skeleton/testing/test_pr_automation_branch_completions.py
+          skeleton/testing/test_automerge_model.py
+          skeleton/testing/test_automerge_evidence.py
+          skeleton/testing/test_automerge_policy.py
+          skeleton/testing/test_automerge_stack.py
+          skeleton/testing/test_automerge_engine.py
+          skeleton/testing/test_automerge_contract.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_supervisor_runtime.py
