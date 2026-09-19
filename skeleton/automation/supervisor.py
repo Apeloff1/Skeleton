@@ -39,6 +39,7 @@ from .supervisor_runtime import (
     SupervisorRuntimeError,
     canonical_json,
     require_exact_head,
+    validate_fingerprint,
 )
 
 MAX_CONTEXT_BYTES = 48_000
@@ -99,8 +100,12 @@ class DelegationEnvelope:
             raise SupervisorError("unsupported delegation envelope version")
         if self.repository != self.execution.repository:
             raise SupervisorError("delegation repository/execution mismatch")
-        if len(self.snapshot_fingerprint) != 64:
-            raise SupervisorError("invalid delegation fingerprint")
+        try:
+            validate_fingerprint(self.snapshot_fingerprint)
+        except SupervisorRuntimeError as exc:
+            raise SupervisorError(
+                "invalid delegation fingerprint"
+            ) from exc
         if (
             isinstance(self.observed_at, bool)
             or not isinstance(self.observed_at, int)
