@@ -12,6 +12,7 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedJournalSequenceIndex,
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.durable_destruction import DurableDestructionLedger
 from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceGuard,
     DurableMaintenanceOperation,
@@ -203,12 +204,23 @@ def environment(
         ),
         clock=clock,
     )
+    destruction_ledger = DurableDestructionLedger(
+        backend,
+        ArtifactSigner(
+            "orphan-gc-destruction",
+            b"d" * 32,
+            clock=clock,
+        ),
+        namespace="destruction",
+        clock=clock,
+    )
     operator = DurableOrphanGCOperator(
         scanner,
         policy=(
             gc_policy
             or DurableOrphanGCPolicy()
         ),
+        destruction_ledger=destruction_ledger,
         clock=clock,
     )
     signer = ArtifactSigner(
