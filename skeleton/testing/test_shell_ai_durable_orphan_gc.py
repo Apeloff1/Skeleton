@@ -2171,4 +2171,3 @@ def test_orphan_gc_destruction_record_binds_maintenance_fence():
     )
     assert destruction.record.fencing_token == claim.fencing_token
     assert destruction.record.authority_id == result.maintenance_epoch_id
-
