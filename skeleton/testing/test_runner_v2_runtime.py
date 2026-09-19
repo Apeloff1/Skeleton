@@ -778,6 +778,17 @@ def test_transport_rate_floor():
         transport.ensure_rate_floor()
 
 
+@pytest.mark.parametrize("method_name", ["paged_list", "paged_named_list"])
+def test_transport_pagination_rejects_zero_page_bound(method_name):
+    transport = _transport(RouteOpener())
+    method = getattr(transport, method_name)
+    with pytest.raises(ValueError, match="max_pages"):
+        if method_name == "paged_list":
+            method("/items", max_pages=0)
+        else:
+            method("/checks", "check_runs", max_pages=0)
+
+
 def test_transport_paged_named_list_rejects_page_bound_over_limit():
     transport = _transport(RouteOpener(), max_pages=1)
     with pytest.raises(ValueError, match="max_pages"):
