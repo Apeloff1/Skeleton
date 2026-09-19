@@ -7,12 +7,16 @@ by the planning-only Supervisor without widening Secretary or Worker authority.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Iterable, Mapping
 
 BOT_BRANCH_PREFIX = "bot/specialist-"
 BASE_PREFIX_LENGTH = 16
 MAX_WORKER_NAME = 48
 MAX_CHECKS = 64
+MAX_ACTIVE_WORKERS = 40
+MAX_OBSERVED_PULL_REQUESTS = 256
+_WORKER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
 
 _PENDING = frozenset({"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"})
 _FAILURE = frozenset({"FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"})
@@ -60,9 +64,7 @@ def _branch_identity(value: object) -> tuple[str, str] | None:
         return None
     if any(ch not in "0123456789abcdef" for ch in base_prefix):
         return None
-    if any(not (ch.islower() or ch.isdigit() or ch == "-") for ch in worker):
-        return None
-    if worker.startswith("-") or worker.endswith("-") or "--" in worker:
+    if _WORKER_RE.fullmatch(worker) is None or "--" in worker:
         return None
     return worker, base_prefix
 
@@ -108,8 +110,10 @@ def summarize_checks(value: object) -> tuple[str, int, int, int]:
     return state, len(statuses), failures, pending
 
 
-def classify_worker_pr(pr: Mapping[str, Any]) -> DurableWorkerHealth | None:
-    """Classify one observed PR; return ``None`` for non-specialist branches."""
+def classify_worker_pr(pr: Mapping[str, Any] | object) -> DurableWorkerHealth | None:
+    """Classify one observed PR; ignore malformed or non-worker records."""
+    if not isinstance(pr, Mapping):
+        return None
     identity = _branch_identity(pr.get("headRefName"))
     if identity is None:
         return None
@@ -153,15 +157,30 @@ def classify_worker_pr(pr: Mapping[str, Any]) -> DurableWorkerHealth | None:
 
 
 def classify_worker_prs(
-    pull_requests: Iterable[Mapping[str, Any]],
+    pull_requests: Iterable[Mapping[str, Any] | object],
     *,
-    limit: int = 40,
+    limit: int = MAX_ACTIVE_WORKERS,
 ) -> dict[str, object]:
-    """Return deterministic, bounded GitHub-native worker health evidence."""
-    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
-        raise ValueError("limit must be a positive integer")
+    """Return bounded GitHub-native worker health evidence.
+
+    Only a fixed number of input records are inspected, so generators and
+    oversized iterables cannot turn planning telemetry into an unbounded
+    memory/time sink. The Supervisor observation layer is already bounded
+    below this ceiling.
+    """
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or limit <= 0
+        or limit > MAX_ACTIVE_WORKERS
+    ):
+        raise ValueError(
+            f"limit must be an integer in 1..{MAX_ACTIVE_WORKERS}"
+        )
     admitted: list[DurableWorkerHealth] = []
-    for pr in pull_requests:
+    for index, pr in enumerate(pull_requests):
+        if index >= MAX_OBSERVED_PULL_REQUESTS:
+            break
         health = classify_worker_pr(pr)
         if health is not None:
             admitted.append(health)
