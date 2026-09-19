@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -154,6 +155,7 @@ class JvmAcceleratorRegistry:
             for name in _ACCELERATOR_NAMES
         }
         self._instances: dict[str, Any] = {}
+        self._lock = threading.RLock()
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -161,7 +163,8 @@ class JvmAcceleratorRegistry:
 
     def initialized(self, name: str) -> bool:
         self._validate_name(name)
-        return name in self._instances
+        with self._lock:
+            return name in self._instances
 
     def preflight(
         self,
@@ -186,11 +189,12 @@ class JvmAcceleratorRegistry:
 
     def get(self, name: str) -> Any:
         self._validate_name(name)
-        instance = self._instances.get(name)
-        if instance is None:
-            instance = self._factories[name]()
-            self._instances[name] = instance
-        return instance
+        with self._lock:
+            instance = self._instances.get(name)
+            if instance is None:
+                instance = self._factories[name]()
+                self._instances[name] = instance
+            return instance
 
     def warm(
         self,
@@ -308,8 +312,13 @@ class JvmAcceleratorRegistry:
         return self.status(name)[name]
 
     def close(self, name: str | None = None) -> None:
-        for item in self._select(name):
-            accelerator = self._instances.pop(item, None)
+        selected = self._select(name)
+        with self._lock:
+            accelerators = [
+                (item, self._instances.pop(item, None))
+                for item in selected
+            ]
+        for _item, accelerator in accelerators:
             if accelerator is None:
                 continue
             close = getattr(accelerator, "close", None)
@@ -324,7 +333,8 @@ class JvmAcceleratorRegistry:
         output: dict[str, JvmAcceleratorRuntimeStatus] = {}
         for item in self._select(name):
             probe = preflight[item]
-            accelerator = self._instances.get(item)
+            with self._lock:
+                accelerator = self._instances.get(item)
             if accelerator is None:
                 output[item] = JvmAcceleratorRuntimeStatus(
                     name=item,
