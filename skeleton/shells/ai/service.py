@@ -562,9 +562,19 @@ class AIShellService:
                 )
                 return report
         if self.durable_lifecycle_coordinator is not None:
-            self._durable_lifecycle_reports = (
-                self._inspect_durable_lifecycle()
-            )
+            try:
+                self._durable_lifecycle_reports = (
+                    self._inspect_durable_lifecycle()
+                )
+            except Exception:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence lifecycle "
+                        "inspection failed"
+                    ),
+                )
+                return report
             if not all(
                 item.ok
                 for item in self._durable_lifecycle_reports.values()
