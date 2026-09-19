@@ -236,6 +236,15 @@ from skeleton.shells.ai.durable_merkle_store import (
     StoredDurableMerkleBundle,
     StoredDurableMerkleBundleIndex,
 )
+from skeleton.shells.ai.durable_merkle_health import (
+    DurableMerkleHealthError,
+    DurableMerkleHealthFinding,
+    DurableMerkleHealthGuard,
+    DurableMerkleHealthPolicy,
+    DurableMerkleHealthReport,
+    DurableMerkleHealthSeverity,
+)
+
 from skeleton.shells.ai.durable_merkle_operator import (
     DurableMerkleOperatorError,
     DurableMerkleOperatorResult,
