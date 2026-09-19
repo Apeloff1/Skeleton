@@ -1314,6 +1314,7 @@ class DistributedReceiptChain:
             raise DistributedReceiptCorruption(
                 "receipt restore begins before sequence one"
             )
+        seen_receipt_ids: dict[str, str] = {}
         for offset, item in enumerate(values):
             if not isinstance(item, ChainedReceipt):
                 raise TypeError(
@@ -1345,6 +1346,31 @@ class DistributedReceiptChain:
             if item.sequence > self.max_receipts:
                 raise DistributedReceiptConflict(
                     "receipt restore exceeds chain capacity"
+                )
+            prior_hash = seen_receipt_ids.get(
+                item.receipt.receipt_id
+            )
+            if (
+                prior_hash is not None
+                and prior_hash != item.receipt_hash
+            ):
+                raise DistributedReceiptConflict(
+                    "receipt restore segment reuses receipt_id for different content"
+                )
+            seen_receipt_ids[
+                item.receipt.receipt_id
+            ] = item.receipt_hash
+            existing = self.find_by_receipt_id(
+                item.receipt.receipt_id,
+                verify_chain=False,
+            )
+            if (
+                existing is not None
+                and existing.node.receipt_hash
+                != item.receipt_hash
+            ):
+                raise DistributedReceiptConflict(
+                    "receipt restore collides with existing receipt_id"
                 )
 
         floor = self.hot_floor()
