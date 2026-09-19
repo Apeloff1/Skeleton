@@ -63,6 +63,18 @@ class ContentAddressedBackupStore:
         self.manifest_root = self.storage_root / "manifests"
         self.blob_root.mkdir(exist_ok=True)
         self.manifest_root.mkdir(exist_ok=True)
+        self._require_directory(self.storage_root, "backup storage root")
+        self._require_directory(self.blob_root, "backup blob root")
+        self._require_directory(self.manifest_root, "backup manifest root")
+
+    @staticmethod
+    def _require_directory(path: Path, label: str) -> None:
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise BackupError(f"{label} is unavailable") from exc
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise BackupError(f"{label} must be a real directory")
 
     def require_external_to_workspace(self, workspace_root: Path | str) -> None:
         """Reject backup storage nested inside the workspace being protected."""
@@ -77,8 +89,10 @@ class ContentAddressedBackupStore:
     def _blob_path(self, digest: str) -> Path:
         if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             raise BackupError("invalid backup digest")
+        self._require_directory(self.blob_root, "backup blob root")
         shard = self.blob_root / digest[:2]
         shard.mkdir(exist_ok=True)
+        self._require_directory(shard, "backup blob shard")
         return shard / digest[2:]
 
     def _read_verified(self, path: Path, expected: SnapshotEntry) -> bytes:
@@ -110,7 +124,15 @@ class ContentAddressedBackupStore:
         if len(data) > self.max_blob_bytes:
             raise BackupError("blob exceeds backup bound")
         destination = self._blob_path(digest)
-        if destination.exists():
+        if destination.exists() or destination.is_symlink():
+            try:
+                metadata = destination.lstat()
+            except OSError as exc:
+                raise BackupError("existing backup blob is unavailable") from exc
+            if not stat.S_ISREG(metadata.st_mode):
+                raise BackupError("existing backup blob is not a regular file")
+            if int(metadata.st_size) != len(data):
+                raise BackupError("existing backup blob has wrong size")
             if hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
                 raise BackupError("existing backup blob is corrupt")
             return str(destination.relative_to(self.storage_root))
@@ -160,6 +182,7 @@ class ContentAddressedBackupStore:
         return data
 
     def _publish_manifest(self, manifest: BackupManifest) -> None:
+        self._require_directory(self.manifest_root, "backup manifest root")
         destination = self.manifest_root / f"{manifest.backup_id}.json"
         payload = json.dumps(
             manifest.to_dict(),
