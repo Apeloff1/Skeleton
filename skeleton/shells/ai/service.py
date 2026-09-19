@@ -443,6 +443,27 @@ class AIShellService:
                 key=lambda item: item[0],
             )
         )
+        verification_chain_map = dict(
+            durable_verification_chains
+        )
+        for surface_name, surface_chains in (
+            ("operations", durable_operations_chains),
+            ("lifecycle", durable_lifecycle_chains),
+        ):
+            for chain_id, chain in surface_chains:
+                verified_chain = verification_chain_map.get(
+                    chain_id
+                )
+                if (
+                    verified_chain is not None
+                    and verified_chain is not chain
+                ):
+                    raise ValueError(
+                        "durable verification chain object differs "
+                        f"across service {surface_name} surface: "
+                        f"{chain_id}"
+                    )
+
         durable_lifecycle_protected_roots = dict(
             durable_lifecycle_protected_roots or {}
         )
@@ -990,6 +1011,18 @@ class AIShellService:
             "AI durable evidence operations verification failed"
         )
 
+    def _durable_verification_health_for_chain(
+        self,
+        chain_id: str,
+    ):
+        report = self._durable_verification_report
+        if report is None:
+            return None
+        for item in report.chains:
+            if item.chain_id == chain_id:
+                return item if item.ok else None
+        return None
+
     def _inspect_durable_lifecycle(
         self,
     ) -> dict[str, DurableLifecycleReport]:
@@ -1012,6 +1045,11 @@ class AIShellService:
                 ),
                 capacity=(
                     self.durable_lifecycle_capacities.get(
+                        chain_id
+                    )
+                ),
+                verified_head=(
+                    self._durable_verification_health_for_chain(
                         chain_id
                     )
                 ),
