@@ -10,7 +10,7 @@ from skeleton.shells.ai.recovery_requirements import *
 
 from skeleton.shells.ai.durable_archive import DurableArchiveEntry, DurableArchiveError, DurableArchiveManifest, DurableArchiveManifestBuilder, DurableArchiveVerification, SignedDurableArchiveManifest
 
-from skeleton.shells.ai.durable_archive_store import ArchiveBackedHistoricalChain, DurableArchivedNode, DurableArchivedNodeType, DurableArchiveHead, DurableArchiveRepository, DurableArchiveRootIndex, DurableArchiveStoreError, DurableArchiveStoreReport, StoredDurableArchive
+from skeleton.shells.ai.durable_archive_store import ArchiveBackedHistoricalChain, DurableArchivedNode, DurableArchivedNodeType, DurableArchiveHead, DurableArchiveRepository, DurableArchiveRootIndex, DurableArchiveRootReplica, DurableArchiveRootResolution, DurableArchiveStoreError, DurableArchiveStoreReport, StoredDurableArchive
 
 from skeleton.shells.ai.durable_operations import DurableChainOperationalState, DurableChainOperationsReport, DurableEvidenceOperationsError, DurableEvidenceOperationsInspector, DurableEvidenceOperationsReport, DurableOperationsFinding, DurableOperationsPolicy, DurableOperationsSeverity
 
@@ -19,6 +19,8 @@ from skeleton.shells.ai.durable_retention import DurableRetentionError, DurableR
 from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain, DurableChainCheckpoint, DurableChainCheckpointStore, DurableCheckpointError, DurableCheckpointVerification, SignedDurableChainCheckpoint
 
 from skeleton.shells.ai.durable_compaction import DurableCompactionError, DurableCompactionPlanner, DurableCompactionPolicy, DurableCompactionReadiness, DurableCompactionRootCoverage, DurableCompactionState
+
+from skeleton.shells.ai.durable_compaction_certificate import DurableCompactionCertificate, DurableCompactionCertificateError, DurableCompactionCertificateHead, DurableCompactionCertificateStore, DurableCompactionCertificateVerification, SignedDurableCompactionCertificate
 
 from skeleton.shells.ai.durable_health import DurableRecoveryHealthError, DurableRecoveryHealthFinding, DurableRecoveryHealthGuard, DurableRecoveryHealthPolicy, DurableRecoveryHealthReport, DurableRecoveryHealthSeverity
 
