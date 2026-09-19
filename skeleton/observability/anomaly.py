@@ -115,7 +115,15 @@ class AnomalyDetector:
     - Seasonal: time-series decomposition
     """
 
-    def __init__(self, bus: Optional[EventBus] = None, window_size: int = 100, strategy: str = "statistical"):
+    def __init__(
+        self,
+        bus: Optional[EventBus] = None,
+        window_size: int = 100,
+        strategy: str = "statistical",
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self._bus = bus
         self._window_size = window_size
         self._strategy = strategy
@@ -123,6 +131,14 @@ class AnomalyDetector:
         self._adaptive = AdaptiveThreshold()
         self._seasonal = SeasonalDecomposer()
         self._stats = {"checks": 0, "anomalies": 0, "false_positives": 0}
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+        }
 
     def observe(self, value: float, metric_name: str = "default", context: Optional[Dict[str, Any]] = None) -> Optional[AnomalyReport]:
         """Observe a value and detect anomalies."""
@@ -197,6 +213,117 @@ class AnomalyDetector:
             return report
         
         return None
+
+    def observe_many(
+        self,
+        values: List[float],
+        metric_name: str = "default",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> List[Optional[AnomalyReport]]:
+        """Observe a batch while preserving ordinary detector state semantics.
+
+        Only the statistical strategy can use the JVM fast path. Adaptive and
+        seasonal modes remain in Python because their evolving state is part of
+        the algorithm and should not be duplicated in a helper process.
+        """
+        batch = list(values)
+        if not batch:
+            return []
+        if (
+            not self._use_jvm_acceleration
+            or self._strategy != "statistical"
+            or self._window_size < 10
+        ):
+            return [
+                self.observe(value, metric_name=metric_name, context=context)
+                for value in batch
+            ]
+
+        try:
+            accelerator = self._resolve_accelerator()
+            minimum = int(getattr(accelerator, "minimum_batch_values", 1))
+            if len(batch) < minimum:
+                self._acceleration["bypassed_small_batch"] += 1
+                return [
+                    self.observe(value, metric_name=metric_name, context=context)
+                    for value in batch
+                ]
+
+            self._acceleration["attempts"] += 1
+            rows = accelerator.scan_anomalies(
+                list(self._values),
+                batch,
+                window_size=self._window_size,
+                threshold=3.0,
+                include_current=True,
+            )
+            if len(rows) != len(batch):
+                raise RuntimeError("accelerator returned the wrong anomaly row count")
+
+            reports: List[Optional[AnomalyReport]] = []
+            for value, row in zip(batch, rows):
+                self._values.append(value)
+                self._seasonal.add(value)
+                self._stats["checks"] += 1
+
+                if not row.ready or not row.anomalous:
+                    reports.append(None)
+                    continue
+
+                self._stats["anomalies"] += 1
+                threshold = 3.0 * row.stdev
+                expected_range = (row.mean - threshold, row.mean + threshold)
+                range_width = expected_range[1] - expected_range[0]
+                deviation = (
+                    abs(value - row.mean) / range_width
+                    if range_width > 0
+                    else 0
+                )
+                severity = (
+                    "critical" if deviation > 2.0
+                    else "high" if deviation > 1.0
+                    else "medium" if deviation > 0.5
+                    else "low"
+                )
+                report = AnomalyReport(
+                    timestamp=time.time(),
+                    metric_name=metric_name,
+                    observed_value=value,
+                    expected_range=expected_range,
+                    severity=severity,
+                    context=context or {},
+                )
+                if self._bus:
+                    self._bus.emit("observability.anomaly.detected", {
+                        "metric": metric_name,
+                        "value": value,
+                        "severity": severity,
+                        "strategy": self._strategy,
+                    })
+                reports.append(report)
+
+            self._acceleration["successes"] += 1
+            return reports
+        except Exception:
+            self._acceleration["fallbacks"] += 1
+            return [
+                self.observe(value, metric_name=metric_name, context=context)
+                for value in batch
+            ]
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        """Return JVM fast-path counters without changing normal stats output."""
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.observability.jvm_accelerator import get_default_accelerator
+
+            self._accelerator = get_default_accelerator()
+        return self._accelerator
 
     def feedback(self, was_anomaly: bool, confirmed: bool) -> None:
         """Provide feedback to improve detection accuracy."""
