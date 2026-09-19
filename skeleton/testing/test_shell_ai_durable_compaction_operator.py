@@ -1623,6 +1623,286 @@ def test_inspect_reports_phase_capabilities(kind):
     assert not report.safe_to_resume
 
 
+def _delete_operator_archive_record(
+    fixture,
+    workflow_id,
+):
+    stored = fixture.operator.current(
+        workflow_id
+    )
+    assert stored is not None
+    archive_id = (
+        stored.workflow.archive_id
+    )
+    key = fixture.archives._archive_key(
+        archive_id
+    )
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    assert record is not None
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+
+def _delete_operator_archive_node(
+    fixture,
+    workflow_id,
+):
+    stored = fixture.operator.current(
+        workflow_id
+    )
+    assert stored is not None
+    operation_id = (
+        stored.workflow.pruning_operation_id
+    )
+    manifest = fixture.executor.manifest(
+        operation_id
+    )
+    assert manifest is not None
+    target = next(
+        item
+        for item in reversed(
+            manifest.items
+        )
+        if fixture.backend.get(
+            fixture.chain.namespace,
+            item.node_key,
+        )
+        is not None
+    )
+    key = fixture.archives._node_key(
+        fixture.chain_id,
+        target.node_hash,
+    )
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    assert record is not None
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    return target
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepared_inspection_reports_archive_recoverable(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _ = fixture.through_prepared()
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.archive_recoverable
+    assert report.safe_to_execute
+    assert (
+        report.to_dict()[
+            "archive_recoverable"
+        ]
+        is True
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepared_inspection_blocks_execute_when_archive_record_disappears(
+    kind,
+):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _ = fixture.through_prepared()
+    _delete_operator_archive_record(
+        fixture,
+        plan.workflow_id,
+    )
+
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not report.archive_recoverable
+    assert not report.current
+    assert not report.safe_to_execute
+    assert any(
+        "archive is not recoverable"
+        in reason
+        for reason in report.reasons
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_crashed_deletion_inspection_is_resumable_while_archive_is_healthy(
+    kind,
+):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan, _ = fixture.through_prepared()
+    backend.fail_enabled = True
+    with pytest.raises(RuntimeError):
+        fixture.execute(
+            plan.workflow_id
+        )
+    backend.fail_enabled = False
+
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.archive_recoverable
+    assert report.pruning_state_consistent
+    assert report.hot_floor_consistent
+    assert report.safe_to_resume
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_crashed_deletion_inspection_blocks_resume_after_archive_node_loss(
+    kind,
+):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan, _ = fixture.through_prepared()
+    backend.fail_enabled = True
+    with pytest.raises(RuntimeError):
+        fixture.execute(
+            plan.workflow_id
+        )
+    backend.fail_enabled = False
+
+    _delete_operator_archive_node(
+        fixture,
+        plan.workflow_id,
+    )
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not report.archive_recoverable
+    assert not report.safe_to_resume
+    assert any(
+        "archive is not recoverable"
+        in reason
+        for reason in report.reasons
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_fresh_operator_observes_archive_recovery_failure_after_crash(
+    kind,
+):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan, _ = fixture.through_prepared()
+    backend.fail_enabled = True
+    with pytest.raises(RuntimeError):
+        fixture.execute(
+            plan.workflow_id
+        )
+    backend.fail_enabled = False
+    _delete_operator_archive_node(
+        fixture,
+        plan.workflow_id,
+    )
+
+    fresh_executor = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        fixture.floor_store,
+        namespace=f"{kind}-pruning",
+        max_items=100,
+        clock=lambda: fixture.now[0],
+    )
+    fresh = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fresh_executor,
+        namespace=f"{kind}-operator",
+        clock=lambda: fixture.now[0],
+    )
+    report = fresh.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not report.archive_recoverable
+    assert not report.safe_to_resume
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_completed_workflow_inspection_detects_lost_archive(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _, result = (
+        fixture.through_complete()
+    )
+    assert result.ok
+    healthy = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert healthy.archive_recoverable
+
+    _delete_operator_archive_record(
+        fixture,
+        plan.workflow_id,
+    )
+    degraded = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not degraded.archive_recoverable
+    assert not degraded.current
+    assert any(
+        "archive is not recoverable"
+        in reason
+        for reason in degraded.reasons
+    )
+
+
 @pytest.mark.parametrize(
     "kind",
     ["journal", "receipts"],
