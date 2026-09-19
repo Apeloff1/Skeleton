@@ -6,6 +6,8 @@ from skeleton.shells.ai.recovery_requirements import *
 
 from skeleton.shells.ai.durable_archive import DurableArchiveEntry, DurableArchiveError, DurableArchiveManifest, DurableArchiveManifestBuilder, DurableArchiveVerification, SignedDurableArchiveManifest
 
+from skeleton.shells.ai.durable_archive_store import ArchiveBackedHistoricalChain, DurableArchivedNode, DurableArchivedNodeType, DurableArchiveHead, DurableArchiveRepository, DurableArchiveRootIndex, DurableArchiveStoreError, DurableArchiveStoreReport, StoredDurableArchive
+
 from skeleton.shells.ai.durable_operations import DurableChainOperationalState, DurableChainOperationsReport, DurableEvidenceOperationsError, DurableEvidenceOperationsInspector, DurableEvidenceOperationsReport, DurableOperationsFinding, DurableOperationsPolicy, DurableOperationsSeverity
 
 from skeleton.shells.ai.durable_retention import DurableRetentionError, DurableRetentionPlan, DurableRetentionPlanner, DurableRetentionPolicy, DurableRetentionState, ProtectedHistoricalRoot
