@@ -158,12 +158,15 @@ class WorkerCapacityCatalog:
             live=liveness.get(identity.worker_id)
             if live is None:
                 live=LivenessView(identity.worker_id,identity.generation,WorkerLiveness.UNKNOWN,None,None,False,0)
+            raw_weight=weights.get(identity.worker_id,0)
+            if isinstance(raw_weight,bool) or not isinstance(raw_weight,int) or raw_weight<0:
+                raise ValueError("active worker weight must be a non-negative integer")
             views.append(CapacityView(
                 worker_id=identity.worker_id,
                 generation=identity.generation,
                 capacity=self.get(identity.worker_id),
                 inflight=live.inflight,
-                active_weight=max(0,int(weights.get(identity.worker_id,0))),
+                active_weight=raw_weight,
                 liveness=live.liveness,
             ))
         return FleetCapacity(tuple(sorted(views,key=lambda item:item.worker_id)))
