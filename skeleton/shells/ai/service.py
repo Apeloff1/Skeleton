@@ -162,6 +162,7 @@ class AIShellService:
         durable_verification_chains: tuple[tuple[str, object], ...] = (),
         durable_readiness_guard: DurableEvidenceReadinessGuard | None = None,
         durable_readiness_reconcile_on_start: bool = False,
+        durable_readiness_reconcile_after_internal_writes: bool = False,
         durable_readiness_reconcile_after_finalization: bool = False,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
@@ -401,6 +402,13 @@ class AIShellService:
                 "durable_readiness_reconcile_on_start must be bool"
             )
         if not isinstance(
+            durable_readiness_reconcile_after_internal_writes,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_after_internal_writes must be bool"
+            )
+        if not isinstance(
             durable_readiness_reconcile_after_finalization,
             bool,
         ):
@@ -601,6 +609,9 @@ class AIShellService:
         self.durable_readiness_guard = durable_readiness_guard
         self.durable_readiness_reconcile_on_start = (
             durable_readiness_reconcile_on_start
+        )
+        self.durable_readiness_reconcile_after_internal_writes = (
+            durable_readiness_reconcile_after_internal_writes
         )
         self.durable_readiness_reconcile_after_finalization = (
             durable_readiness_reconcile_after_finalization
@@ -1234,6 +1245,60 @@ class AIShellService:
                 )
         return report
 
+    def _maintain_readiness_after_internal_write(
+        self,
+        *,
+        stage: str,
+    ) -> DurableEvidenceReadinessReport | None:
+        """Best-effort refresh after a trusted service-owned evidence write.
+
+        The completed stage is never converted into an exception solely
+        because readiness maintenance failed.  This prevents duplicate model
+        calls, approvals, or process retries.  Failure degrades the service so
+        the next authority-bearing operation is blocked until reconciliation.
+        """
+        if (
+            self.durable_readiness_guard is None
+            or not self.durable_readiness_reconcile_after_internal_writes
+        ):
+            return None
+        if not stage or len(stage) > 64:
+            raise ValueError(
+                "invalid durable readiness maintenance stage"
+            )
+        try:
+            report = self.durable_readiness_guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+            self._durable_readiness_report = report
+            if report.ready:
+                return report
+        except Exception:
+            report = None
+
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness "
+                    f"maintenance failed after {stage}"
+                ),
+            )
+        return report
+
     def _post_execution_durable_readiness(
         self,
     ) -> tuple[
@@ -1412,7 +1477,42 @@ class AIShellService:
                 self.orchestrator.compiler.effects,
                 self.governance.current_policy(),
             )
+        self._maintain_readiness_after_internal_write(
+            stage="review",
+        )
         return bundle, view
+
+    def approve(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approved_by: str,
+        ttl_seconds: float = 300.0,
+    ):
+        """Approve through the service boundary and maintain durable readiness."""
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        approval = self.orchestrator.approve(
+            session,
+            review,
+            principal=principal,
+            approved_by=approved_by,
+            ttl_seconds=ttl_seconds,
+        )
+        self._maintain_readiness_after_internal_write(
+            stage="approval",
+        )
+        return approval
 
     def _validate_human_approval(
         self,
@@ -2224,7 +2324,7 @@ class AIShellService:
             approval=approval,
         )
         try:
-            return self.orchestrator.execute(
+            result = self.orchestrator.execute(
                 session,
                 review,
                 context=context,
@@ -2242,6 +2342,16 @@ class AIShellService:
                     else self._authority_health_report.policy_digest
                 ),
             )
+        except BaseException:
+            self._maintain_readiness_after_internal_write(
+                stage="execution_failure",
+            )
+            raise
+        else:
+            self._maintain_readiness_after_internal_write(
+                stage="execution",
+            )
+            return result
         finally:
             if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
                 self._pins.pop(session.session_id, None)
