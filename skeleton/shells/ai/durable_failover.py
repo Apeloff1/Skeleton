@@ -31,6 +31,11 @@ from skeleton.shells.ai.durable_replica_consensus import (
     DurableReplicaConsensusEvaluator,
     DurableReplicaConsensusReport,
 )
+from skeleton.shells.ai.durable_replica_consensus_history import (
+    DurableReplicaConsensusHistoryError,
+    DurableReplicaConsensusHistoryStore,
+    StoredDurableReplicaConsensusEpoch,
+)
 from skeleton.shells.ai.durable_replica_fleet import (
     DurableReplicaFleet,
     DurableReplicaFleetError,
@@ -1174,6 +1179,7 @@ class DurableFailoverCoordinator:
         fleet: DurableReplicaFleet | None = None,
         maintenance: DurableMaintenanceStore | None = None,
         consensus: DurableReplicaConsensusEvaluator | None = None,
+        consensus_history: DurableReplicaConsensusHistoryStore | None = None,
     ) -> None:
         if not isinstance(
             manager,
@@ -1249,9 +1255,27 @@ class DurableFailoverCoordinator:
             raise ValueError(
                 "replica consensus requires a failover fleet"
             )
+        if (
+            consensus_history is not None
+            and not isinstance(
+                consensus_history,
+                DurableReplicaConsensusHistoryStore,
+            )
+        ):
+            raise TypeError(
+                "consensus_history must be DurableReplicaConsensusHistoryStore"
+            )
+        if (
+            consensus_history is not None
+            and consensus is None
+        ):
+            raise ValueError(
+                "consensus history requires replica consensus"
+            )
         self.fleet = fleet
         self.maintenance = maintenance
         self.consensus = consensus
+        self.consensus_history = consensus_history
 
     def _maintenance_resources(
         self,
@@ -1405,6 +1429,71 @@ class DurableFailoverCoordinator:
     ) -> DurableReplicaConsensusReport | None:
         return self._consensus_report()
 
+    def _consensus_source_chains(
+        self,
+    ):
+        return (
+            self.manager.journal.source,
+            self.manager.receipts.source,
+        )
+
+    def _record_consensus_history(
+        self,
+        report: DurableReplicaConsensusReport | None,
+    ) -> StoredDurableReplicaConsensusEpoch | None:
+        if self.consensus_history is None:
+            return None
+        if report is None:
+            raise DurableFailoverTicketError(
+                "consensus history requires live replica consensus"
+            )
+        journal_chain, receipt_chain = (
+            self._consensus_source_chains()
+        )
+        try:
+            return self.consensus_history.record(
+                report,
+                journal_chain=journal_chain,
+                receipt_chain=receipt_chain,
+            )
+        except DurableReplicaConsensusHistoryError as exc:
+            raise DurableFailoverTicketError(
+                "replica consensus history rejected failover state"
+            ) from exc
+
+    def _require_consensus_history(
+        self,
+        report: DurableReplicaConsensusReport | None,
+    ) -> StoredDurableReplicaConsensusEpoch | None:
+        if self.consensus_history is None:
+            return None
+        if report is None:
+            raise DurableFailoverTicketError(
+                "consensus history requires live replica consensus"
+            )
+        journal_chain, receipt_chain = (
+            self._consensus_source_chains()
+        )
+        try:
+            return self.consensus_history.require_current(
+                report,
+                journal_chain=journal_chain,
+                receipt_chain=receipt_chain,
+            )
+        except DurableReplicaConsensusHistoryError as exc:
+            raise DurableFailoverTicketError(
+                "replica consensus history is not current"
+            ) from exc
+
+    def consensus_history_current(
+        self,
+    ) -> StoredDurableReplicaConsensusEpoch | None:
+        if self.consensus_history is None:
+            return None
+        return self.consensus_history.current(
+            self.source_id
+        )
+
     def _require_ticket_fleet(
         self,
         ticket: DurableFailoverTicket,
@@ -1520,6 +1609,9 @@ class DurableFailoverCoordinator:
         consensus_report = self._consensus_report(
             fleet_report
         )
+        self._record_consensus_history(
+            consensus_report
+        )
         if self.maintenance is not None:
             report = self.manager.require_promotion_ready()
             self._require_maintenance(
@@ -1568,9 +1660,12 @@ class DurableFailoverCoordinator:
         fleet_report = self._require_ticket_fleet(
             ticket
         )
-        self._require_ticket_consensus(
+        consensus_report = self._require_ticket_consensus(
             ticket,
             fleet_report,
+        )
+        self._require_consensus_history(
+            consensus_report
         )
         return self.registry.claim(
             ticket,
@@ -1625,9 +1720,12 @@ class DurableFailoverCoordinator:
         fleet_report = self._require_ticket_fleet(
             ticket
         )
-        self._require_ticket_consensus(
+        consensus_report = self._require_ticket_consensus(
             ticket,
             fleet_report,
+        )
+        self._require_consensus_history(
+            consensus_report
         )
         report = self.manager.require_promotion_ready()
         self._require_maintenance(
