@@ -19,8 +19,15 @@ from typing import Callable
 from skeleton.shells.ai.durable_failover import (
     DurableFailoverCoordinator,
     DurableFailoverPhase,
+    DurableFailoverTicketError,
     SignedDurableFailoverTicket,
     StoredDurableFailover,
+)
+from skeleton.shells.ai.durable_replica_consensus import (
+    DurableReplicaConsensusReport,
+)
+from skeleton.shells.ai.durable_replica_consensus_history import (
+    StoredDurableReplicaConsensusEpoch,
 )
 from skeleton.shells.ai.durable_replica_fleet import (
     DurableReplicaFleet,
@@ -39,6 +46,8 @@ class DurableFailoverOperatorState(str, Enum):
     NEEDS_SYNC = "needs_sync"
     QUORUM_BLOCKED = "quorum_blocked"
     TARGET_BLOCKED = "target_blocked"
+    CONSENSUS_BLOCKED = "consensus_blocked"
+    HISTORY_BLOCKED = "history_blocked"
     CLAIMED = "claimed"
     APPLIED = "applied"
     CANCELLED = "cancelled"
@@ -94,6 +103,8 @@ class DurableFailoverOperatorReport:
     ticket_id: str
     policy_digest: str
     reason: str = ""
+    consensus: DurableReplicaConsensusReport | None = None
+    consensus_history: StoredDurableReplicaConsensusEpoch | None = None
 
     def __post_init__(self) -> None:
         for name in ("source_id", "target_id"):
@@ -162,6 +173,26 @@ class DurableFailoverOperatorReport:
             )
         if len(self.reason) > 2048:
             raise ValueError("operator reason too long")
+        if (
+            self.consensus is not None
+            and not isinstance(
+                self.consensus,
+                DurableReplicaConsensusReport,
+            )
+        ):
+            raise TypeError(
+                "consensus must be DurableReplicaConsensusReport"
+            )
+        if (
+            self.consensus_history is not None
+            and not isinstance(
+                self.consensus_history,
+                StoredDurableReplicaConsensusEpoch,
+            )
+        ):
+            raise TypeError(
+                "consensus_history must be StoredDurableReplicaConsensusEpoch"
+            )
 
     @property
     def can_issue(self) -> bool:
@@ -212,6 +243,16 @@ class DurableFailoverOperatorReport:
             "reason": self.reason,
             "can_issue": self.can_issue,
             "terminal": self.terminal,
+            "consensus": (
+                None
+                if self.consensus is None
+                else self.consensus.to_dict()
+            ),
+            "consensus_history": (
+                None
+                if self.consensus_history is None
+                else self.consensus_history.to_dict()
+            ),
         }
         if include_digest:
             data["digest"] = self.digest
@@ -449,6 +490,39 @@ class DurableFailoverOperator:
                         "selected target is not fleet-ready"
                     )
 
+        consensus_report = None
+        consensus_history = None
+        if (
+            failover is None
+            and state
+            is DurableFailoverOperatorState.READY
+            and self.coordinator.consensus is not None
+        ):
+            try:
+                consensus_report = (
+                    self.coordinator.consensus_report()
+                )
+            except DurableFailoverTicketError as exc:
+                state = (
+                    DurableFailoverOperatorState
+                    .CONSENSUS_BLOCKED
+                )
+                reason = str(exc)[:2048]
+            else:
+                try:
+                    consensus_history = (
+                        self.coordinator
+                        .verify_consensus_history_current(
+                            consensus_report
+                        )
+                    )
+                except DurableFailoverTicketError as exc:
+                    state = (
+                        DurableFailoverOperatorState
+                        .HISTORY_BLOCKED
+                    )
+                    reason = str(exc)[:2048]
+
         return DurableFailoverOperatorReport(
             self.coordinator.source_id,
             self.coordinator.target_id,
@@ -460,6 +534,8 @@ class DurableFailoverOperator:
             ticket_id,
             self.policy.digest,
             reason,
+            consensus_report,
+            consensus_history,
         )
 
     def synchronize(
