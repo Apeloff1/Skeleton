@@ -101,6 +101,20 @@ class ExecutionIdentityTests(unittest.TestCase):
                 }
             )
 
+    def test_from_mapping_rejects_non_string_identity_fields(self) -> None:
+        with self.assertRaises(
+            runtime.SupervisorRuntimeError
+        ):
+            runtime.ExecutionIdentity.from_mapping(
+                {
+                    "GITHUB_REPOSITORY": REPO,
+                    "GITHUB_SHA": BASE,
+                    "GITHUB_RUN_ID": 7,
+                    "GITHUB_RUN_ATTEMPT": "1",
+                    "SUPERVISOR_DEFAULT_BRANCH": "main",
+                }
+            )
+
     def test_from_mapping_prefers_supervisor_base(self) -> None:
         value = runtime.ExecutionIdentity.from_mapping(
             {
@@ -729,6 +743,9 @@ class WorkerResultEvidenceTests(unittest.TestCase):
             "pull_request": 42,
             "changed_lines": 17,
             "proposal_digest": "a" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+            "execution_fingerprint": "c" * 64,
         })
         result = runtime.parse_worker_result(
             payload + "\n",
@@ -783,7 +800,9 @@ class WorkerResultEvidenceTests(unittest.TestCase):
         payload = json.dumps({
             "status": "existing-pr",
             "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
             "pull_request": 7,
+            "supervisor_snapshot_fingerprint": "b" * 64,
             "provider_raw_output": "must-not-propagate",
             "token": "must-not-propagate",
         })
@@ -791,6 +810,63 @@ class WorkerResultEvidenceTests(unittest.TestCase):
         self.assertNotIn("provider_raw_output", result)
         self.assertNotIn("token", result)
         self.assertEqual(result["pull_request"], 7)
+
+    def test_existing_pr_evidence_binds_worker_namespace_and_snapshot(self) -> None:
+        custody = runtime.WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint="b" * 64,
+            execution=execution(),
+        )
+        payload = json.dumps({
+            "status": "existing-pr",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            "pull_request": 7,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+        })
+        evidence = runtime.parse_worker_result(
+            payload,
+            worker="root-cause",
+        )
+        runtime.validate_worker_evidence_custody(evidence, custody)
+
+        altered = dict(evidence)
+        altered["supervisor_snapshot_fingerprint"] = "c" * 64
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.validate_worker_evidence_custody(altered, custody)
+
+    def test_existing_pr_requires_positive_pr_and_canonical_branch(self) -> None:
+        for payload in (
+            {
+                "status": "existing-pr",
+                "bot": "root-cause",
+                "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+                "pull_request": 0,
+                "supervisor_snapshot_fingerprint": "b" * 64,
+            },
+            {
+                "status": "existing-pr",
+                "bot": "root-cause",
+                "branch": "bot/specialist-security-auditor-aaaaaaaaaaaaaaaa",
+                "pull_request": 7,
+                "supervisor_snapshot_fingerprint": "b" * 64,
+            },
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(runtime.SupervisorRuntimeError):
+                    runtime.parse_worker_result(
+                        json.dumps(payload),
+                        worker="root-cause",
+                    )
+
+    def test_no_change_rejects_cross_status_custody_fields(self) -> None:
+        payload = json.dumps({
+            "status": "no-change",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
 
     def test_rejects_negative_numeric_evidence(self) -> None:
         payload = json.dumps({
