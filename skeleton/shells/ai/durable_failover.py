@@ -26,6 +26,11 @@ from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceStore,
     SignedDurableMaintenanceEpoch,
 )
+from skeleton.shells.ai.durable_replica_consensus import (
+    DurableReplicaConsensusError,
+    DurableReplicaConsensusEvaluator,
+    DurableReplicaConsensusReport,
+)
 from skeleton.shells.ai.durable_replica_fleet import (
     DurableReplicaFleet,
     DurableReplicaFleetError,
@@ -93,6 +98,8 @@ class DurableFailoverTicket:
     receipt_root: str
     fleet_state_digest: str = ""
     fleet_policy_digest: str = ""
+    consensus_state_digest: str = ""
+    consensus_policy_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -209,6 +216,37 @@ class DurableFailoverTicket:
             raise ValueError(
                 "fleet failover digests must be configured together"
             )
+        object.__setattr__(
+            self,
+            "consensus_state_digest",
+            _digest(
+                "consensus_state_digest",
+                self.consensus_state_digest,
+                optional=True,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "consensus_policy_digest",
+            _digest(
+                "consensus_policy_digest",
+                self.consensus_policy_digest,
+                optional=True,
+            ),
+        )
+        if bool(self.consensus_state_digest) != bool(
+            self.consensus_policy_digest
+        ):
+            raise ValueError(
+                "consensus failover digests must be configured together"
+            )
+        if (
+            self.consensus_state_digest
+            and not self.fleet_state_digest
+        ):
+            raise ValueError(
+                "consensus failover commitments require fleet commitments"
+            )
 
     @staticmethod
     def derive_id(
@@ -223,6 +261,8 @@ class DurableFailoverTicket:
         receipt_root: str,
         fleet_state_digest: str = "",
         fleet_policy_digest: str = "",
+        consensus_state_digest: str = "",
+        consensus_policy_digest: str = "",
     ) -> str:
         raw = json.dumps(
             {
@@ -238,6 +278,8 @@ class DurableFailoverTicket:
                 "receipt_root": receipt_root,
                 "fleet_state_digest": fleet_state_digest,
                 "fleet_policy_digest": fleet_policy_digest,
+                "consensus_state_digest": consensus_state_digest,
+                "consensus_policy_digest": consensus_policy_digest,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -263,6 +305,8 @@ class DurableFailoverTicket:
             "receipt_root": self.receipt_root,
             "fleet_state_digest": self.fleet_state_digest,
             "fleet_policy_digest": self.fleet_policy_digest,
+            "consensus_state_digest": self.consensus_state_digest,
+            "consensus_policy_digest": self.consensus_policy_digest,
         }
 
     @property
@@ -437,6 +481,16 @@ class DurableFailoverAuthority:
             raise ValueError(
                 "fleet_state_digest and fleet_policy_digest must be paired"
             )
+        if bool(consensus_state_digest) != bool(
+            consensus_policy_digest
+        ):
+            raise ValueError(
+                "consensus_state_digest and consensus_policy_digest must be paired"
+            )
+        if consensus_state_digest and not fleet_state_digest:
+            raise ValueError(
+                "consensus commitments require fleet commitments"
+            )
         fleet_state_digest = _digest(
             "fleet_state_digest",
             fleet_state_digest,
@@ -445,6 +499,16 @@ class DurableFailoverAuthority:
         fleet_policy_digest = _digest(
             "fleet_policy_digest",
             fleet_policy_digest,
+            optional=True,
+        )
+        consensus_state_digest = _digest(
+            "consensus_state_digest",
+            consensus_state_digest,
+            optional=True,
+        )
+        consensus_policy_digest = _digest(
+            "consensus_policy_digest",
+            consensus_policy_digest,
             optional=True,
         )
         report = manager.require_promotion_ready()
@@ -476,6 +540,8 @@ class DurableFailoverAuthority:
             receipt_root=receipt_root,
             fleet_state_digest=fleet_state_digest,
             fleet_policy_digest=fleet_policy_digest,
+            consensus_state_digest=consensus_state_digest,
+            consensus_policy_digest=consensus_policy_digest,
         )
         ticket = DurableFailoverTicket(
             1,
@@ -493,6 +559,8 @@ class DurableFailoverAuthority:
             receipt_root,
             fleet_state_digest,
             fleet_policy_digest,
+            consensus_state_digest,
+            consensus_policy_digest,
         )
         signature = self.signer.sign(
             FAILOVER_ARTIFACT_TYPE,
@@ -502,6 +570,9 @@ class DurableFailoverAuthority:
                 "source_id": source_id,
                 "target_id": target_id,
                 "expires_at": repr(expires_at),
+                "consensus_state_digest": (
+                    consensus_state_digest
+                ),
             },
         )
         return SignedDurableFailoverTicket(
@@ -555,6 +626,11 @@ class DurableFailoverAuthority:
             != ticket.target_id
             or metadata.get("expires_at")
             != repr(ticket.expires_at)
+            or metadata.get(
+                "consensus_state_digest",
+                "",
+            )
+            != ticket.consensus_state_digest
         ):
             raise DurableFailoverTicketError(
                 "failover ticket signed metadata mismatch"
@@ -1095,6 +1171,7 @@ class DurableFailoverCoordinator:
         target_id: str,
         fleet: DurableReplicaFleet | None = None,
         maintenance: DurableMaintenanceStore | None = None,
+        consensus: DurableReplicaConsensusEvaluator | None = None,
     ) -> None:
         if not isinstance(
             manager,
@@ -1156,8 +1233,23 @@ class DurableFailoverCoordinator:
             raise TypeError(
                 "maintenance must be DurableMaintenanceStore"
             )
+        if (
+            consensus is not None
+            and not isinstance(
+                consensus,
+                DurableReplicaConsensusEvaluator,
+            )
+        ):
+            raise TypeError(
+                "consensus must be DurableReplicaConsensusEvaluator"
+            )
+        if consensus is not None and fleet is None:
+            raise ValueError(
+                "replica consensus requires a failover fleet"
+            )
         self.fleet = fleet
         self.maintenance = maintenance
+        self.consensus = consensus
 
     def _maintenance_resources(
         self,
@@ -1284,6 +1376,33 @@ class DurableFailoverCoordinator:
                 "replica fleet quorum is not ready"
             ) from exc
 
+    def _consensus_report(
+        self,
+        fleet_report=None,
+    ) -> DurableReplicaConsensusReport | None:
+        if self.consensus is None:
+            return None
+        if fleet_report is None:
+            fleet_report = self._fleet_report()
+        if fleet_report is None:
+            raise DurableFailoverTicketError(
+                "replica consensus requires available fleet state"
+            )
+        try:
+            return self.consensus.require_consensus(
+                fleet_report,
+                target_id=self.target_id,
+            )
+        except DurableReplicaConsensusError as exc:
+            raise DurableFailoverTicketError(
+                "replica root consensus is not promotion ready"
+            ) from exc
+
+    def consensus_report(
+        self,
+    ) -> DurableReplicaConsensusReport | None:
+        return self._consensus_report()
+
     def _require_ticket_fleet(
         self,
         ticket: DurableFailoverTicket,
@@ -1321,6 +1440,72 @@ class DurableFailoverCoordinator:
             )
         return report
 
+    def _require_ticket_consensus(
+        self,
+        ticket: DurableFailoverTicket,
+        fleet_report=None,
+    ) -> DurableReplicaConsensusReport | None:
+        report = self._consensus_report(
+            fleet_report
+        )
+        if report is None:
+            if (
+                ticket.consensus_state_digest
+                or ticket.consensus_policy_digest
+            ):
+                raise DurableFailoverTicketError(
+                    "failover ticket requires unavailable replica consensus"
+                )
+            return None
+        if (
+            not ticket.consensus_state_digest
+            or not ticket.consensus_policy_digest
+        ):
+            raise DurableFailoverTicketError(
+                "consensus-enabled failover ticket lacks consensus commitments"
+            )
+        if (
+            ticket.consensus_state_digest
+            != report.state_digest
+        ):
+            raise DurableFailoverTicketError(
+                "live replica consensus state differs from failover ticket"
+            )
+        if (
+            ticket.consensus_policy_digest
+            != report.consensus_policy_digest
+        ):
+            raise DurableFailoverTicketError(
+                "live replica consensus policy differs from failover ticket"
+            )
+        selected = report.selected
+        if selected is None:
+            raise DurableFailoverTicketError(
+                "live replica consensus has no selected head"
+            )
+        if (
+            ticket.journal_sequence
+            != selected.head.journal_sequence
+            or ticket.journal_root
+            != selected.head.journal_root
+        ):
+            raise DurableFailoverTicketError(
+                "failover journal head differs from replica consensus"
+            )
+        if (
+            ticket.receipt_sequence
+            != selected.head.receipt_sequence
+            or ticket.receipt_root
+            != selected.head.receipt_root
+        ):
+            raise DurableFailoverTicketError(
+                "failover receipt head differs from replica consensus"
+            )
+        report.require_target(
+            self.target_id
+        )
+        return report
+
     def issue(
         self,
         *,
@@ -1330,6 +1515,9 @@ class DurableFailoverCoordinator:
         ) = None,
     ) -> SignedDurableFailoverTicket:
         fleet_report = self._fleet_report()
+        consensus_report = self._consensus_report(
+            fleet_report
+        )
         if self.maintenance is not None:
             report = self.manager.require_promotion_ready()
             self._require_maintenance(
@@ -1351,6 +1539,16 @@ class DurableFailoverCoordinator:
                 if fleet_report is None
                 else fleet_report.policy_digest
             ),
+            consensus_state_digest=(
+                ""
+                if consensus_report is None
+                else consensus_report.state_digest
+            ),
+            consensus_policy_digest=(
+                ""
+                if consensus_report is None
+                else consensus_report.consensus_policy_digest
+            ),
         )
 
     def claim(
@@ -1365,7 +1563,13 @@ class DurableFailoverCoordinator:
             source_id=self.source_id,
             target_id=self.target_id,
         )
-        self._require_ticket_fleet(ticket)
+        fleet_report = self._require_ticket_fleet(
+            ticket
+        )
+        self._require_ticket_consensus(
+            ticket,
+            fleet_report,
+        )
         return self.registry.claim(
             ticket,
             consumer_id=consumer_id,
@@ -1416,7 +1620,13 @@ class DurableFailoverCoordinator:
             source_id=self.source_id,
             target_id=self.target_id,
         )
-        self._require_ticket_fleet(ticket)
+        fleet_report = self._require_ticket_fleet(
+            ticket
+        )
+        self._require_ticket_consensus(
+            ticket,
+            fleet_report,
+        )
         report = self.manager.require_promotion_ready()
         self._require_maintenance(
             report,
