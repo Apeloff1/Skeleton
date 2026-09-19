@@ -133,12 +133,18 @@ class ToolchainAuthorityPolicy:
         object.__setattr__(
             self,
             "allow_effects",
-            frozenset(str(value) for value in self.allow_effects),
+            frozenset(
+                value.value if hasattr(value, "value") else str(value)
+                for value in self.allow_effects
+            ),
         )
         object.__setattr__(
             self,
             "deny_effects",
-            frozenset(str(value) for value in self.deny_effects),
+            frozenset(
+                value.value if hasattr(value, "value") else str(value)
+                for value in self.deny_effects
+            ),
         )
         object.__setattr__(self, "required_tags", frozenset(self.required_tags))
         object.__setattr__(self, "denied_tags", frozenset(self.denied_tags))
