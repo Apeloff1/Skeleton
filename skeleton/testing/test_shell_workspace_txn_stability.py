@@ -367,6 +367,65 @@ def test_rollback_restores_parent_directory_mtime_after_created_child(tmp_path: 
     assert result.transaction.rollback.final_snapshot_digest == result.transaction.before.digest
 
 
+def test_directory_to_file_type_change_restores_parent_before_children(tmp_path: Path):
+    root, _, plane = _manager(tmp_path)
+    parent = root / "tree"
+    parent.mkdir()
+    child = parent / "child.txt"
+    child.write_text("before", encoding="utf-8")
+
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            (
+                "-c",
+                (
+                    "from pathlib import Path; "
+                    "p=Path('tree/child.txt'); p.unlink(); "
+                    "Path('tree').rmdir(); "
+                    "Path('tree').write_text('replacement')"
+                ),
+            ),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+
+    assert result.rolled_back
+    assert result.transaction.rollback is not None
+    assert result.transaction.rollback.ok
+    assert parent.is_dir()
+    assert child.read_text(encoding="utf-8") == "before"
+
+
+def test_file_to_directory_type_change_removes_children_before_parent_restore(tmp_path: Path):
+    root, _, plane = _manager(tmp_path)
+    target = root / "node"
+    target.write_text("before", encoding="utf-8")
+
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            (
+                "-c",
+                (
+                    "from pathlib import Path; "
+                    "p=Path('node'); p.unlink(); p.mkdir(); "
+                    "Path('node/child.txt').write_text('created')"
+                ),
+            ),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+
+    assert result.rolled_back
+    assert result.transaction.rollback is not None
+    assert result.transaction.rollback.ok
+    assert target.is_file()
+    assert target.read_text(encoding="utf-8") == "before"
+
+
 def test_reverse_rename_restores_original_file_mode_and_mtime(tmp_path: Path):
     root, _, plane = _manager(tmp_path)
     original = root / "old.txt"
