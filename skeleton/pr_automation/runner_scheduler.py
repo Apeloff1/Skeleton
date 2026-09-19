@@ -18,7 +18,6 @@ from typing import Iterable, Mapping, Sequence
 from .core import Decision, Evaluation, evaluate
 from .runner_contracts import (
     AdmissionDecision,
-    CheckState,
     PriorityBand,
     RunBudget,
     RunnerPolicy,
