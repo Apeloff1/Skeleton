@@ -476,6 +476,58 @@ def test_partial_backup_refuses_full_snapshot_reconstruction(tmp_path: Path):
         manager.backup_store.reconstruct_snapshot(manifest)
 
 
+def test_transaction_aborts_if_workspace_drifts_during_backup(
+    tmp_path: Path,
+    monkeypatch,
+):
+    root, manager, plane = _manager(tmp_path)
+    (root / "baseline.txt").write_text("baseline", encoding="utf-8")
+    must_not_run = root / "command-ran.txt"
+    original_create = manager.backup_store.create_manifest
+
+    def create_then_drift(workspace_root, snapshot, *, paths=None):
+        manifest = original_create(
+            workspace_root,
+            snapshot,
+            paths=paths,
+        )
+        (root / "external-drift.txt").write_text(
+            "concurrent",
+            encoding="utf-8",
+        )
+        return manifest
+
+    monkeypatch.setattr(
+        manager.backup_store,
+        "create_manifest",
+        create_then_drift,
+    )
+
+    with pytest.raises(RuntimeError, match="workspace changed"):
+        plane.execute(
+            ToolchainInvocation(
+                "test.read",
+                (
+                    "-c",
+                    (
+                        "from pathlib import Path; "
+                        "Path('command-ran.txt').write_text('bad')"
+                    ),
+                ),
+                cwd=root,
+                timeout=1.0,
+            )
+        )
+
+    assert not must_not_run.exists()
+    assert (root / "external-drift.txt").exists()
+    events = manager.journal.events()
+    assert events[-1].kind == WorkspaceTransactionState.ABORTED.value
+    assert WorkspaceTransactionState.EXECUTING.value not in {
+        event.kind for event in events
+    }
+
+
 def test_backup_manifest_publication_is_atomic_and_parseable(tmp_path: Path):
     root, manager, _ = _manager(tmp_path)
     snapshot = manager.scanner.scan(root)
