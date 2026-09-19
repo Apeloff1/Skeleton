@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skeleton.shells.toolchains import build, container, dotnet, git, go, jvm, node, posix, python, rust
+from skeleton.shells.toolchains import archive, artifact, build, container, data, dotnet, git, go, infrastructure, jvm, node, posix, python, quality, rust
 from skeleton.shells.toolchains.catalog import ToolchainCatalog
 from skeleton.shells.toolchains.types import LogicalCommandContract
 
@@ -17,6 +17,11 @@ _MODULES = (
     build,
     container,
     posix,
+    infrastructure,
+    data,
+    artifact,
+    archive,
+    quality,
 )
 
 
