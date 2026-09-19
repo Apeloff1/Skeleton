@@ -900,6 +900,15 @@ class DurablePruningExecutor:
         auth = authorization.authorization
         floor = chain.hot_floor()
         if (
+            floor.sequence
+            != auth.previous_floor_sequence
+            or floor.root_hash
+            != auth.previous_floor_root
+        ):
+            raise DurablePruningError(
+                "authorization previous floor differs from live chain"
+            )
+        if (
             auth.cutoff_sequence
             <= floor.sequence
         ):
@@ -910,6 +919,10 @@ class DurablePruningExecutor:
             auth.cutoff_sequence
             - floor.sequence
         )
+        if delete_count != auth.delete_count:
+            raise DurablePruningError(
+                "authorization delete count differs from live floor interval"
+            )
         if (
             delete_count > self.max_items
             or delete_count
@@ -980,8 +993,8 @@ class DurablePruningExecutor:
             auth.authorization_id,
             auth.current_sequence,
             auth.current_root,
-            floor.sequence,
-            floor.root_hash,
+            auth.previous_floor_sequence,
+            auth.previous_floor_root,
             auth.cutoff_sequence,
             auth.cutoff_root,
             auth.archive_id,
@@ -1641,14 +1654,13 @@ class DurablePruningExecutor:
             auth.chain_id,
             self.hot_floors,
         )
-        floor_before = chain.hot_floor()
         operation_id = self.derive_operation_id(
             auth.authorization_id,
             previous_floor_sequence=(
-                floor_before.sequence
+                auth.previous_floor_sequence
             ),
             previous_floor_root=(
-                floor_before.root_hash
+                auth.previous_floor_root
             ),
         )
         manifest = self.manifest(
