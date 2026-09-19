@@ -58,6 +58,9 @@ class SemanticRole(str, Enum):
     INTERPRETATION = "interpretation"
     ADVERSARIAL_READING = "adversarial_reading"
     PLAYER_MODEL = "player_model"
+    SYSTEM = "system"
+    SOCIAL = "social"
+    TEMPORAL = "temporal"
     META = "meta"
 
 
