@@ -374,29 +374,28 @@ def remote_branch_exists(
     return bool(raw.strip())
 
 
-def find_open_pr_for_head(
+def _open_pull_requests(
     repository: str,
-    branch: str,
-) -> dict[str, Any] | None:
-    """Return the unique open PR using the deterministic worker branch."""
+) -> list[dict[str, Any]]:
+    """Return a bounded same-repository view of open pull requests.
+
+    The REST payload includes head repository identity, unlike a branch-name-only
+    lookup. This prevents a fork from suppressing an autonomous worker merely by
+    choosing a colliding head branch name.
+    """
     validate_repository(repository)
-    validate_branch(branch)
     try:
         raw = subprocess.check_output(
             [
                 "gh",
-                "pr",
-                "list",
-                "--repo",
-                repository,
-                "--state",
-                "open",
-                "--head",
-                branch,
-                "--limit",
-                "2",
-                "--json",
-                "number,url,headRefName,baseRefName,isDraft",
+                "api",
+                "-X",
+                "GET",
+                f"repos/{repository}/pulls",
+                "-f",
+                "state=open",
+                "-f",
+                "per_page=100",
             ],
             text=True,
             stderr=subprocess.DEVNULL,
@@ -410,13 +409,65 @@ def find_open_pr_for_head(
         json.JSONDecodeError,
     ) as exc:
         raise SupervisorRuntimeError(
-            "unable to inspect active worker pull requests"
+            "unable to inspect active pull requests"
         ) from exc
+
     if not isinstance(value, list):
         raise SupervisorRuntimeError(
             "active pull request query returned invalid shape"
         )
-    records = [item for item in value if isinstance(item, dict)]
+    if len(value) >= 100:
+        raise SupervisorRuntimeError(
+            "active pull request set exceeds bounded query"
+        )
+
+    records: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        head = item.get("head")
+        base = item.get("base")
+        if not isinstance(head, dict) or not isinstance(base, dict):
+            continue
+        head_repo = head.get("repo")
+        if not isinstance(head_repo, dict):
+            continue
+        if head_repo.get("full_name") != repository:
+            continue
+        head_ref = head.get("ref")
+        base_ref = base.get("ref")
+        number = item.get("number")
+        if (
+            not isinstance(head_ref, str)
+            or not isinstance(base_ref, str)
+            or isinstance(number, bool)
+            or not isinstance(number, int)
+        ):
+            continue
+        records.append(
+            {
+                "number": number,
+                "url": item.get("html_url"),
+                "headRefName": head_ref,
+                "baseRefName": base_ref,
+                "isDraft": bool(item.get("draft", False)),
+                "updatedAt": item.get("updated_at"),
+            }
+        )
+    return records
+
+
+def find_open_pr_for_head(
+    repository: str,
+    branch: str,
+) -> dict[str, Any] | None:
+    """Return the unique same-repository open PR using an exact worker branch."""
+    validate_branch(branch)
+    records = [
+        item
+        for item in _open_pull_requests(repository)
+        if item["headRefName"] == branch
+    ]
     if len(records) > 1:
         raise SupervisorRuntimeError(
             "multiple open pull requests share worker branch"
@@ -428,60 +479,18 @@ def find_open_pr_for_worker(
     repository: str,
     worker: str,
 ) -> dict[str, Any] | None:
-    """Return the unique active PR owned by a specialist namespace.
-
-    A specialist is intentionally single-flight across Supervisor runs.  If an
-    earlier PR is still open, the next scheduled run must converge on it rather
-    than publishing a second competing repair from a newer base.
-    """
-    validate_repository(repository)
+    """Return the unique same-repository PR owned by a specialist namespace."""
     prefix = worker_branch_prefix(worker)
-    try:
-        raw = subprocess.check_output(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--repo",
-                repository,
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,url,headRefName,baseRefName,isDraft,updatedAt",
-            ],
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=30,
-        )
-        value = json.loads(raw)
-    except (
-        OSError,
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        json.JSONDecodeError,
-    ) as exc:
-        raise SupervisorRuntimeError(
-            "unable to inspect active specialist pull requests"
-        ) from exc
-    if not isinstance(value, list):
-        raise SupervisorRuntimeError(
-            "active specialist pull request query returned invalid shape"
-        )
     records = [
         item
-        for item in value
-        if isinstance(item, dict)
-        and isinstance(item.get("headRefName"), str)
-        and item["headRefName"].startswith(prefix)
+        for item in _open_pull_requests(repository)
+        if item["headRefName"].startswith(prefix)
     ]
     if len(records) > 1:
         raise SupervisorRuntimeError(
             "specialist has multiple active autonomous pull requests"
         )
     return records[0] if records else None
-
 
 def proposal_digest(
     *,
