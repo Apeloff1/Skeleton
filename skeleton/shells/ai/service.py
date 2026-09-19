@@ -10,6 +10,10 @@ from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
 from skeleton.shells.ai.assurance_binding import AssuranceBinding
 from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
 from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.durable_health import (
+    DurableRecoveryHealthGuard,
+    DurableRecoveryHealthReport,
+)
 from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttempt,
@@ -48,6 +52,7 @@ class AIServiceStatus:
     release: dict[str, object] | None = None
     runtime_trust: dict[str, object] | None = None
     authority_health: dict[str, object] | None = None
+    durable_recovery: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -62,6 +67,8 @@ class AIServiceStatus:
             data["runtime_trust"] = dict(self.runtime_trust)
         if self.authority_health is not None:
             data["authority_health"] = dict(self.authority_health)
+        if self.durable_recovery is not None:
+            data["durable_recovery"] = dict(self.durable_recovery)
         return data
 
 
@@ -83,6 +90,8 @@ class AIShellService:
         execution_fences: AIExecutionFenceManager | None = None,
         execution_attempts: AIExecutionAttemptStore | None = None,
         worker_id: str = "",
+        durable_recovery_guard: DurableRecoveryHealthGuard | None = None,
+        durable_recovery_ids: tuple[str, ...] = (),
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -96,6 +105,28 @@ class AIShellService:
             raise ValueError(
                 "distributed execution evidence requires a valid worker_id"
             )
+        durable_recovery_ids = tuple(durable_recovery_ids)
+        if durable_recovery_guard is None and durable_recovery_ids:
+            raise ValueError(
+                "durable recovery ids require a durable recovery guard"
+            )
+        if durable_recovery_guard is not None and not isinstance(
+            durable_recovery_guard,
+            DurableRecoveryHealthGuard,
+        ):
+            raise TypeError(
+                "durable_recovery_guard must be DurableRecoveryHealthGuard"
+            )
+        if len(durable_recovery_ids) != len(set(durable_recovery_ids)):
+            raise ValueError("duplicate durable recovery finalization_id")
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 256
+            for item in durable_recovery_ids
+        ):
+            raise ValueError("invalid durable recovery finalization_id")
+        durable_recovery_ids = tuple(sorted(durable_recovery_ids))
         self.orchestrator = orchestrator
         self.diagnostics = diagnostics
         self.governance = governance
@@ -108,9 +139,12 @@ class AIShellService:
         self.execution_fences = execution_fences
         self.execution_attempts = execution_attempts
         self.worker_id = worker_id
+        self.durable_recovery_guard = durable_recovery_guard
+        self.durable_recovery_ids = durable_recovery_ids
         self._release_report: StartupReleaseReport | None = None
         self._runtime_trust_report: RuntimeTrustReport | None = None
         self._authority_health_report: AuthorityHealthReport | None = None
+        self._durable_recovery_report: DurableRecoveryHealthReport | None = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
         self.stale_guard = AIPlanStaleGuard()
@@ -154,6 +188,18 @@ class AIShellService:
                 self.state.transition(
                     AIServicePhase.FAILED,
                     reason="AI authority dependency health failed",
+                )
+                return report
+        if self.durable_recovery_guard is not None:
+            self._durable_recovery_report = (
+                self.durable_recovery_guard.inspect(
+                    self.durable_recovery_ids
+                )
+            )
+            if not self._durable_recovery_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI durable recovery verification failed",
                 )
                 return report
         self.state.transition(AIServicePhase.READY)
@@ -218,11 +264,30 @@ class AIShellService:
             raise RuntimeError("AI authority dependency health failed") from None
         self._authority_health_report = report
 
+    def _require_durable_recovery_current(self) -> None:
+        if self.durable_recovery_guard is None:
+            return
+        report = self.durable_recovery_guard.inspect(
+            self.durable_recovery_ids
+        )
+        self._durable_recovery_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason="AI durable recovery evidence drift detected",
+            )
+        raise RuntimeError(
+            "AI durable recovery verification failed"
+        )
+
     def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_durable_recovery_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
 
     def review(self, session: AIShellSession) -> tuple[AIReviewBundle, AIReviewView]:
@@ -230,6 +295,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_durable_recovery_current()
         bundle = self.orchestrator.review(session)
         proposal = bundle.planning.response.proposal
         self.governance.require_not_quarantined(
@@ -324,6 +390,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_durable_recovery_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -440,6 +507,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_durable_recovery_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         proposal = review.planning.response.proposal
@@ -520,6 +588,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_durable_recovery_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -913,6 +982,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_durable_recovery_current()
         if self.execution_fences is not None and not execution_fenced:
             raise RuntimeError("distributed execution fence was not verified")
         self._require_assurance(
@@ -987,5 +1057,10 @@ class AIShellService:
                 None
                 if self._authority_health_report is None
                 else self._authority_health_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_recovery_report is None
+                else self._durable_recovery_report.to_dict()
             ),
         )
