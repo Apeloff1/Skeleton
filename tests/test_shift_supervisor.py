@@ -1,5 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
+from core.shift_supervisor.models import PlanItem
+from core.shift_supervisor.plan_api import PlanQueueAPI
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 from core.shift_supervisor.secretary import SecretaryBot
 from core.shift_supervisor.shift_manager import SMBShiftManager
@@ -63,6 +67,18 @@ def test_manager_tracks_overtime_task_context_and_calls_model():
     start = datetime(2026, 9, 16, 0, 0, tzinfo=timezone.utc)
 
     manager.clock_in("night-1", "night", at=start)
+    store.add_items(
+        [
+            PlanItem(
+                id="task-42",
+                title="bounded work",
+                description="claimed from canonical queue",
+                priority=90,
+                target_team="night",
+            )
+        ]
+    )
+    assert PlanQueueAPI(store).claim_next("night-1")["id"] == "task-42"
     worker = manager.heartbeat(
         "night-1",
         status="working",
@@ -76,6 +92,47 @@ def test_manager_tracks_overtime_task_context_and_calls_model():
     assert worker.overtime_task_ids == ["task-42"]
     assert len(model.calls) == 1
     assert revision.actor == "shift-manager"
+
+
+
+def test_worker_events_are_monotonic_and_cannot_rewind_status():
+    store = InMemoryPlanStore()
+    manager = SMBShiftManager(store=store, model=FakeModel([]))
+    start = datetime(2026, 9, 16, 8, 0, tzinfo=timezone.utc)
+    manager.clock_in("night-1", "night", at=start)
+    manager.heartbeat(
+        "night-1",
+        status="idle",
+        at=start + timedelta(minutes=10),
+    )
+
+    with pytest.raises(ValueError, match="precedes canonical"):
+        manager.heartbeat(
+            "night-1",
+            status="idle",
+            at=start + timedelta(minutes=5),
+        )
+    with pytest.raises(ValueError, match="precedes canonical"):
+        manager.clock_out(
+            "night-1",
+            at=start + timedelta(minutes=5),
+        )
+
+    worker = store.snapshot_workers()[0]
+    assert worker.status == "idle"
+    assert worker.last_heartbeat_at == start + timedelta(minutes=10)
+
+
+def test_manager_policy_minutes_reject_bool_and_coercible_values():
+    store = InMemoryPlanStore()
+    with pytest.raises(ValueError):
+        SMBShiftManager(store=store, model=FakeModel([]), normal_shift_minutes=True)
+    with pytest.raises(ValueError):
+        SMBShiftManager(
+            store=store,
+            model=FakeModel([]),
+            overtime_soft_limit_minutes=1.5,
+        )
 
 
 def test_manager_ignores_direct_delegation_even_for_matching_worker():
