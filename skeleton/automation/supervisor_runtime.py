@@ -313,13 +313,28 @@ def _safe_component(value: str, *, fallback: str) -> str:
     return cleaned[:48] or fallback
 
 
+def worker_branch_prefix(worker: str) -> str:
+    """Return the deterministic namespace owned by one registered specialist."""
+    if not isinstance(worker, str) or not worker:
+        raise SupervisorRuntimeError("invalid worker identity")
+    component = _safe_component(worker, fallback="worker")
+    return validate_branch(
+        f"bot/specialist-{component}-",
+        label="worker branch prefix",
+    )
+
+
 def deterministic_worker_branch(custody: WorkerCustody) -> str:
-    """Derive a stable branch so replayed equivalent work converges."""
-    worker = _safe_component(custody.worker, fallback="worker")
+    """Derive one stable branch per worker and immutable default-branch base.
+
+    Snapshot identity remains in custody and PR evidence, but not in the branch
+    name. Repository observations can change while the default branch is still
+    the same commit; converging those observations onto one worker branch avoids
+    duplicate autonomous PRs for the same source base.
+    """
     branch = (
-        f"bot/specialist-{worker}-"
-        f"{custody.execution.base_sha[:12]}-"
-        f"{custody.snapshot_fingerprint[:12]}"
+        f"{worker_branch_prefix(custody.worker)}"
+        f"{custody.execution.base_sha[:16]}"
     )
     if len(branch.encode("utf-8")) > MAX_BRANCH_BYTES:
         raise SupervisorRuntimeError(
@@ -405,6 +420,65 @@ def find_open_pr_for_head(
     if len(records) > 1:
         raise SupervisorRuntimeError(
             "multiple open pull requests share worker branch"
+        )
+    return records[0] if records else None
+
+
+def find_open_pr_for_worker(
+    repository: str,
+    worker: str,
+) -> dict[str, Any] | None:
+    """Return the unique active PR owned by a specialist namespace.
+
+    A specialist is intentionally single-flight across Supervisor runs.  If an
+    earlier PR is still open, the next scheduled run must converge on it rather
+    than publishing a second competing repair from a newer base.
+    """
+    validate_repository(repository)
+    prefix = worker_branch_prefix(worker)
+    try:
+        raw = subprocess.check_output(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repository,
+                "--state",
+                "open",
+                "--limit",
+                "100",
+                "--json",
+                "number,url,headRefName,baseRefName,isDraft,updatedAt",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+        value = json.loads(raw)
+    except (
+        OSError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+    ) as exc:
+        raise SupervisorRuntimeError(
+            "unable to inspect active specialist pull requests"
+        ) from exc
+    if not isinstance(value, list):
+        raise SupervisorRuntimeError(
+            "active specialist pull request query returned invalid shape"
+        )
+    records = [
+        item
+        for item in value
+        if isinstance(item, dict)
+        and isinstance(item.get("headRefName"), str)
+        and item["headRefName"].startswith(prefix)
+    ]
+    if len(records) > 1:
+        raise SupervisorRuntimeError(
+            "specialist has multiple active autonomous pull requests"
         )
     return records[0] if records else None
 
@@ -646,6 +720,7 @@ __all__ = [
     "canonical_json",
     "deterministic_worker_branch",
     "find_open_pr_for_head",
+    "find_open_pr_for_worker",
     "proposal_digest",
     "remote_branch_exists",
     "remote_default_head",
@@ -663,4 +738,5 @@ __all__ = [
     "validate_run_id",
     "validate_sha",
     "validate_staged_paths",
+    "worker_branch_prefix",
 ]
