@@ -20,6 +20,9 @@ from skeleton.shells.ai.durable_checkpoint import (
     DurableChainCheckpointStore,
     SignedDurableChainCheckpoint,
 )
+from skeleton.shells.ai.durable_verification_health import (
+    DurableChainVerificationHealth,
+)
 
 
 class DurableRetentionState(str, Enum):
@@ -428,6 +431,7 @@ class DurableRetentionPlanner:
         *,
         protected_roots: tuple[str, ...] = (),
         capacity: int | None = None,
+        verified_head: DurableChainVerificationHealth | None = None,
     ) -> DurableRetentionPlan:
         if not chain_id or len(chain_id) > 128:
             raise ValueError("invalid chain_id")
@@ -438,11 +442,6 @@ class DurableRetentionPlanner:
             raise TypeError(
                 "chain does not support retention verification"
             )
-        if not chain.verify():
-            raise DurableRetentionError(
-                "cannot plan retention for invalid chain"
-            )
-
         head = chain.head()
         current_sequence = int(
             head.sequence
@@ -450,6 +449,36 @@ class DurableRetentionPlanner:
         current_root = str(
             head.root_hash
         )
+        if verified_head is None:
+            if not chain.verify():
+                raise DurableRetentionError(
+                    "cannot plan retention for invalid chain"
+                )
+        else:
+            if not isinstance(
+                verified_head,
+                DurableChainVerificationHealth,
+            ):
+                raise TypeError(
+                    "verified_head must be DurableChainVerificationHealth"
+                )
+            if not verified_head.ok:
+                raise DurableRetentionError(
+                    "verified durable chain head is not healthy"
+                )
+            if verified_head.chain_id != chain_id:
+                raise DurableRetentionError(
+                    "verified durable chain head chain_id mismatch"
+                )
+            if (
+                verified_head.current_sequence
+                != current_sequence
+                or verified_head.current_root
+                != current_root
+            ):
+                raise DurableRetentionError(
+                    "verified durable chain head differs from live head"
+                )
         chain_capacity = self._capacity(
             chain,
             capacity,
