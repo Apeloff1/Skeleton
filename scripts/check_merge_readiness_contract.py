@@ -14,10 +14,29 @@ GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1
 REQUIRED_NEEDS = (
     "quarantine_policy",
     "unit",
+    "shell_stability",
     "integration_smoke",
     "quality_security",
     "pr_automation",
 )
+SHELL_STABILITY_TESTS = (
+    "skeleton/testing/test_shell_runner.py",
+    "skeleton/testing/test_shell_executor.py",
+    "skeleton/testing/test_shell_arguments_environment.py",
+    "skeleton/testing/test_shell_capabilities_registry.py",
+    "skeleton/testing/test_shell_limits_retry_circuit.py",
+    "skeleton/testing/test_shell_toolchain_factory.py",
+    "skeleton/testing/test_shell_toolchain_policy_digest.py",
+    "skeleton/testing/test_shell_toolchain_contract_matrix.py",
+    "skeleton/testing/test_shell_extended_toolchain_contract_matrix.py",
+    "skeleton/testing/test_shell_toolchain_compiler_execution.py",
+    "skeleton/testing/test_shell_toolchain_attestation.py",
+    "skeleton/testing/test_shell_toolchain_transactional.py",
+    "skeleton/testing/test_shell_workspace_provenance.py",
+    "skeleton/testing/test_shell_workspace_transaction_state_matrix.py",
+    "skeleton/testing/test_shell_workspace_txn_stability.py",
+)
+
 PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation.py",
     "skeleton/testing/test_pr_automation_ruleset.py",
@@ -58,7 +77,11 @@ def main() -> int:
     except (OSError, UnicodeError) as exc:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
-    require("workflow_dispatch:" in text, "merge-readiness must support explicit current-head verification", failures)
+    require(
+        "workflow_dispatch:" in text,
+        "merge-readiness must support explicit current-head verification",
+        failures,
+    )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
@@ -91,8 +114,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
-        "all five Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 6,
+        "all six Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(
@@ -116,6 +139,42 @@ def main() -> int:
         "Mongo service port must use explicit quoted list syntax",
         failures,
     )
+
+    shell_stability = job_block(text, "shell_stability")
+    require(bool(shell_stability), "shell stability validation job missing", failures)
+    require(
+        "name: Shell Stability" in shell_stability,
+        "stable Shell Stability job name missing",
+        failures,
+    )
+    require(
+        "python -m compileall -q skeleton/shells" in shell_stability,
+        "shell execution package compilation gate missing",
+        failures,
+    )
+    require(
+        '"pytest>=8,<9"' in shell_stability
+        and '"pydantic>=2.5,<3"' in shell_stability
+        and '"pydantic-settings>=2.1,<3"' in shell_stability,
+        "shell stability runtime must include pydantic settings dependencies",
+        failures,
+    )
+    require(
+        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in shell_stability,
+        "shell stability tests must disable ambient pytest plugins",
+        failures,
+    )
+    require(
+        "--noconftest" in shell_stability,
+        "shell stability tests must avoid unrelated conftest state",
+        failures,
+    )
+    for test_path in SHELL_STABILITY_TESTS:
+        require(
+            test_path in shell_stability,
+            f"Shell Stability gate missing {test_path}",
+            failures,
+        )
 
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)
@@ -166,8 +225,9 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, quarantine/security/secret gates, focused PR automation "
-        "contracts, and explicit fail-closed result aggregation are aligned."
+        "non-cancelling main verification, quarantine/security/secret gates, merge-blocking shell "
+        "stability and focused PR automation contracts, and explicit fail-closed result aggregation "
+        "are aligned."
     )
     return 0
 
