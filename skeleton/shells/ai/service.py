@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import uuid
 
 from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval
@@ -513,7 +514,7 @@ class AIShellService:
             )
             change_id = (
                 "auto-finalization-"
-                + __import__("hashlib").sha256(
+                + hashlib.sha256(
                     change_material.encode()
                 ).hexdigest()[:32]
             )
