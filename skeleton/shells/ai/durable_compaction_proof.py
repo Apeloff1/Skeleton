@@ -503,6 +503,8 @@ class DurableCompactionProofBuilder:
         signature: SignedArtifact,
         *,
         label: str,
+        expected_type: str,
+        expected_digest: str,
         reasons: list[str],
     ) -> bool:
         if signer is None:
@@ -512,12 +514,22 @@ class DurableCompactionProofBuilder:
             return False
         try:
             signer.verify(signature)
-            return True
         except ArtifactSignatureError:
             reasons.append(
                 f"{label} signature verification failed"
             )
             return False
+        if signature.artifact_type != expected_type:
+            reasons.append(
+                f"{label} signature artifact type mismatch"
+            )
+            return False
+        if signature.artifact_digest != expected_digest:
+            reasons.append(
+                f"{label} signature artifact digest mismatch"
+            )
+            return False
+        return True
 
     @staticmethod
     def _compare(
@@ -581,30 +593,40 @@ class DurableCompactionProofBuilder:
                 self.reservation_signer,
                 reservation.signature,
                 label="reservation",
+                expected_type="durable-compaction-reservation",
+                expected_digest=reservation.reservation.digest,
                 reasons=reasons,
             ),
             self._component_signature(
                 self.certificate_signer,
                 certificate.signature,
                 label="certificate",
+                expected_type="durable-compaction-readiness",
+                expected_digest=certificate.certificate.digest,
                 reasons=reasons,
             ),
             self._component_signature(
                 self.authorization_signer,
                 authorization.signature,
                 label="authorization",
+                expected_type="durable-pruning-authorization",
+                expected_digest=authorization.authorization.digest,
                 reasons=reasons,
             ),
             self._component_signature(
                 self.archive_signer,
                 archive.signature,
                 label="archive",
+                expected_type="durable-archive-manifest",
+                expected_digest=archive.manifest.digest,
                 reasons=reasons,
             ),
             self._component_signature(
                 self.floor_signer,
                 pruning.floor.signature,
                 label="hot floor",
+                expected_type="durable-hot-floor",
+                expected_digest=pruning.floor.floor.digest,
                 reasons=reasons,
             ),
         )
