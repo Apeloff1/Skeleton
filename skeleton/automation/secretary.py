@@ -22,6 +22,10 @@ from pathlib import Path
 from typing import Any
 
 from .advanced_bots import ADVANCED_BOTS
+from .build_authority import (
+    BuildAuthorization,
+    BuildAuthorityError,
+)
 from .bot_manager import (
     load_state,
     record_result,
@@ -32,6 +36,7 @@ from .free_model import redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
+    canonical_json,
     require_exact_head,
     require_remote_base_unchanged,
     sanitized_worker_env,
@@ -227,8 +232,13 @@ def decode_delegation(
     repository: str,
     expected_execution: ExecutionIdentity,
     now: int | None = None,
-) -> tuple[str, str, ExecutionIdentity, int]:
-    """Decode and bind a version-2 cross-job Supervisor custody envelope."""
+) -> tuple[
+    str,
+    str,
+    ExecutionIdentity,
+    BuildAuthorization | None,
+]:
+    """Decode and bind a version-3 cross-job Supervisor custody envelope."""
     if not encoded or len(encoded) > MAX_ENCODED_ENVELOPE:
         raise SecretaryAdmissionError(
             "invalid supervisor delegation size"
@@ -261,13 +271,13 @@ def decode_delegation(
         "plan",
         "execution",
         "execution_fingerprint",
-        "approved_build_count",
+        "build_authorization",
     }
     if not isinstance(value, dict) or set(value) != expected_fields:
         raise SecretaryAdmissionError(
             "invalid supervisor delegation shape"
         )
-    if value.get("version") != 2:
+    if value.get("version") != 3:
         raise SecretaryAdmissionError(
             "unsupported supervisor delegation"
         )
@@ -345,16 +355,28 @@ def decode_delegation(
             "supervisor execution fingerprint mismatch"
         )
 
-    approved_build_count = value.get("approved_build_count")
-    if (
-        isinstance(approved_build_count, bool)
-        or not isinstance(approved_build_count, int)
-        or approved_build_count < 0
-        or approved_build_count > 40
-    ):
-        raise SecretaryAdmissionError("invalid approved build count")
+    raw_build = value.get("build_authorization")
+    build_authorization: BuildAuthorization | None = None
+    if raw_build is not None:
+        try:
+            build_authorization = BuildAuthorization.from_payload(
+                raw_build
+            )
+        except BuildAuthorityError as exc:
+            raise SecretaryAdmissionError(
+                "invalid build authorization"
+            ) from exc
+        if build_authorization.repository != repository:
+            raise SecretaryAdmissionError(
+                "cross-repository build authorization rejected"
+            )
 
-    return plan, fingerprint, envelope_execution, approved_build_count
+    return (
+        plan,
+        fingerprint,
+        envelope_execution,
+        build_authorization,
+    )
 
 
 def _supervisor_provenance(
@@ -386,9 +408,9 @@ def _supervisor_provenance(
 def route(
     plan: str,
     due: list[str],
-    approved_build_count: int = 0,
+    build_authorization: BuildAuthorization | None = None,
 ) -> list[str]:
-    """Score due specialists while keeping build authority deterministic."""
+    """Score due specialists while keeping feature build authority deterministic."""
     text = plan.lower()
     due_set = set(due)
     registered = {spec.name for spec in ADVANCED_BOTS}
@@ -398,13 +420,18 @@ def route(
     for spec in ADVANCED_BOTS:
         if spec.name not in due_set:
             continue
-        if spec.name == "feature-builder" and approved_build_count <= 0:
-            continue
-        score = sum(
-            1
-            for word in KEYWORDS.get(spec.name, ())
-            if word in text
-        )
+        if spec.name == "feature-builder":
+            if build_authorization is None:
+                continue
+            # Build routing is authorized by repository state, not by model
+            # wording. It wins one bounded slot whenever an approved task exists.
+            score = 100
+        else:
+            score = sum(
+                1
+                for word in KEYWORDS.get(spec.name, ())
+                if word in text
+            )
         if score:
             scored.append(
                 (
@@ -466,6 +493,7 @@ def _dispatch_one(
     *,
     supervisor_fingerprint: str,
     execution: ExecutionIdentity,
+    build_authorization: BuildAuthorization | None = None,
 ) -> dict[str, Any]:
     """Run one worker in a detached worktree rooted at the admitted base."""
     repo_root = Path.cwd().resolve()
@@ -522,6 +550,21 @@ def _dispatch_one(
                     "PYTHONDONTWRITEBYTECODE": "1",
                 }
             )
+            if name == "feature-builder":
+                if build_authorization is None:
+                    raise SecretaryAdmissionError(
+                        "feature-builder missing build authorization"
+                    )
+                env["SUPERVISOR_BUILD_AUTHORIZATION_B64"] = (
+                    base64.b64encode(
+                        canonical_json(
+                            build_authorization.as_dict()
+                        )
+                    ).decode("ascii")
+                )
+                env["SUPERVISOR_BUILD_TASK_DIGEST"] = (
+                    build_authorization.task_digest
+                )
 
             process = subprocess.run(
                 [
@@ -566,6 +609,7 @@ def dispatch(
     assignments: list[str],
     supervisor_fingerprint: str,
     execution: ExecutionIdentity,
+    build_authorization: BuildAuthorization | None = None,
 ) -> list[dict[str, Any]]:
     """Dispatch registered workers with strict assignment and isolation budgets."""
     registered = {spec.name for spec in ADVANCED_BOTS}
@@ -599,6 +643,7 @@ def dispatch(
                 name,
                 supervisor_fingerprint=supervisor_fingerprint,
                 execution=execution,
+                build_authorization=build_authorization,
             )
         )
     return results
@@ -624,7 +669,7 @@ def main() -> int:
             plan,
             supervisor_fingerprint,
             envelope_execution,
-            approved_build_count,
+            build_authorization,
         ) = decode_delegation(
             args.delegation_b64,
             repository=execution.repository,
@@ -641,7 +686,7 @@ def main() -> int:
         supervisor_fingerprint = _supervisor_provenance(
             execution
         )
-        approved_build_count = 0
+        build_authorization = None
 
     if not plan:
         raise SecretaryAdmissionError(
@@ -657,7 +702,7 @@ def main() -> int:
     assignments = route(
         plan,
         due,
-        approved_build_count=approved_build_count,
+        build_authorization=build_authorization,
     )
 
     print(
@@ -675,7 +720,16 @@ def main() -> int:
                 ],
                 "specialists_due": due,
                 "assignments": assignments,
-                "approved_build_count": approved_build_count,
+                "build_issue_number": (
+                    build_authorization.issue_number
+                    if build_authorization is not None
+                    else None
+                ),
+                "build_task_digest": (
+                    build_authorization.task_digest
+                    if build_authorization is not None
+                    else None
+                ),
                 "worker_isolation": "detached-worktree",
             },
             indent=2,
@@ -692,6 +746,7 @@ def main() -> int:
         assignments,
         supervisor_fingerprint,
         execution,
+        build_authorization=build_authorization,
     )
     for result in results:
         record_result(
