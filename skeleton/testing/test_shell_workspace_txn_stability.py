@@ -394,3 +394,45 @@ def test_recovery_terminal_states_match_state_machine():
         transaction_id = f"terminal-{index}"
         journal.append(transaction_id, state, {})
         assert TransactionRecoveryInspector(journal).candidates() == ()
+
+
+def test_transaction_rejects_command_cwd_outside_protected_root(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    with pytest.raises(ValueError, match="inside the protected workspace"):
+        plane.execute(
+            ToolchainInvocation(
+                "test.read",
+                ("-c", "print('outside')"),
+                cwd=outside,
+                timeout=1.0,
+            )
+        )
+
+    assert manager.journal.length() == 0
+    assert root.exists()
+
+
+def test_transaction_manager_binds_missing_cwd_to_root(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    command = manager.executor.runner.policy.executables["test.read"]
+    assert command == str(Path(sys.executable).resolve())
+
+    from skeleton.shells.runner import ShellCommand
+
+    result = manager.execute(
+        root,
+        ShellCommand(
+            "test.read",
+            ("-c", "print('root-bound')"),
+            cwd=None,
+            timeout=1.0,
+        ),
+        policy=zero_mutation_policy(),
+    )
+
+    assert result.accepted
+    assert result.execution.result.stdout_text().strip() == "root-bound"
+    assert result.execution.final_receipt.command == "test.read"
