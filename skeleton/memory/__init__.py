@@ -26,6 +26,7 @@ from skeleton.memory.vector import HashEmbedder, VectorEntry, VectorStore
 from skeleton.memory.jvm_vector_accelerator import (
     JvmVectorAccelerator,
     JvmVectorConfig,
+    VectorAcceleratorStatus,
     JvmVectorError,
     JvmVectorProtocolError,
     JvmVectorTimeout,
@@ -43,6 +44,7 @@ __all__ = [
     "VectorEntry",
     "JvmVectorAccelerator",
     "JvmVectorConfig",
+    "VectorAcceleratorStatus",
     "JvmVectorError",
     "JvmVectorUnavailable",
     "JvmVectorProtocolError",
