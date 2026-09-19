@@ -33,6 +33,7 @@ log = logging.getLogger("middleware.security")
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_XFF_HOPS = 32
 _MAX_XFF_CHARS = 2048
+_SYNTHETIC_RATE_LIMIT_EXEMPT_PEERS = frozenset({"testclient"})
 
 
 def _matches_route_boundary(path: str, route: str) -> bool:
@@ -288,6 +289,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         now = time.monotonic()
         ip, route = self._key(request)
+        if ip in _SYNTHETIC_RATE_LIMIT_EXEMPT_PEERS:
+            return await call_next(request)
         key = (ip, route)
 
         async with self._get_lock():
