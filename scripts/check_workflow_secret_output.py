@@ -31,13 +31,29 @@ SECRET_NAME_RE = re.compile(
 SHELL_VAR_RE = re.compile(
     r"\$(?:\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\}|(?P<plain>[A-Za-z_][A-Za-z0-9_]*))"
 )
+POWERSHELL_ENV_RE = re.compile(
+    r"\$env:(?P<name>[A-Za-z_][A-Za-z0-9_]*)",
+    re.IGNORECASE,
+)
 OUTPUT_COMMAND_RE = re.compile(
-    r"^\s*(?P<cmd>echo|printf|printenv|env|set|tee)\b(?P<rest>.*)$",
+    r"^\s*(?P<cmd>echo|printf|printenv|env|set|tee|cat|export|declare|typeset)\b(?P<rest>.*)$",
+    re.IGNORECASE,
+)
+POWERSHELL_SINK_RE = re.compile(
+    r"\b(?:Write-Host|Write-Output|Out-Host)\b",
+    re.IGNORECASE,
+)
+POWERSHELL_ENV_DUMP_RE = re.compile(
+    r"^\s*(?:Get-ChildItem|gci|dir)\s+(?:-Path\s+)?Env:\s*$",
     re.IGNORECASE,
 )
 INLINE_RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run:\s*(?P<body>.+?)\s*$")
 BLOCK_RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run:\s*[>|][0-9+-]*\s*$")
-XTRACE_RE = re.compile(r"^\s*(?:set\s+(?:-[A-Za-z]*x[A-Za-z]*|-o\s+xtrace)|(?:ba|z|k|c|da)?sh\s+-[A-Za-z]*x[A-Za-z]*)\b", re.IGNORECASE)
+XTRACE_RE = re.compile(
+    r"^\s*(?:set\s+(?:-[A-Za-z]*x[A-Za-z]*|-o\s+xtrace)|(?:ba|z|k|c|da)?sh\s+-[A-Za-z]*x[A-Za-z]*)\b",
+    re.IGNORECASE,
+)
+OPTION_ONLY_RE = re.compile(r"^(?:--?[A-Za-z0-9][A-Za-z0-9-]*\s*)+$")
 
 
 class WorkflowSecretOutputScanError(RuntimeError):
@@ -48,6 +64,10 @@ def _secretish_var(name: str) -> bool:
     return bool(SECRET_NAME_RE.search(name))
 
 
+def _options_only(rest: str) -> bool:
+    return bool(rest and OPTION_ONLY_RE.fullmatch(rest))
+
+
 def command_violation(command: str) -> str | None:
     """Return one high-confidence reason for a dangerous shell command."""
     stripped = command.strip()
@@ -55,6 +75,17 @@ def command_violation(command: str) -> str | None:
         return None
     if XTRACE_RE.match(stripped):
         return "shell xtrace is forbidden because it can expose expanded secrets"
+    if POWERSHELL_ENV_DUMP_RE.match(stripped):
+        return "PowerShell environment enumeration exposes the process environment"
+
+    powershell_sink = bool(POWERSHELL_SINK_RE.search(stripped))
+    if powershell_sink and SECRET_CONTEXT_RE.search(stripped):
+        return "workflow output command exposes GitHub secret context"
+    if powershell_sink:
+        for variable in POWERSHELL_ENV_RE.finditer(stripped):
+            name = variable.group("name")
+            if _secretish_var(name):
+                return f"workflow output command exposes secret-like variable {name}"
 
     match = OUTPUT_COMMAND_RE.match(stripped)
     if not match:
@@ -62,12 +93,17 @@ def command_violation(command: str) -> str | None:
 
     cmd = match.group("cmd").lower()
     rest = match.group("rest").strip()
-    if cmd == "env" and (not rest or rest.startswith(("|", ">", "2>"))):
+    if cmd == "env" and (not rest or _options_only(rest) or rest.startswith(("|", ">", "2>"))):
         return "workflow output command env exposes the process environment"
     if cmd == "set" and (not rest or rest.startswith(("|", ">", "2>"))):
         return "workflow output command set exposes shell variables"
-    if cmd == "printenv" and not rest:
+    if cmd == "printenv" and (not rest or _options_only(rest)):
         return "workflow output command printenv exposes the process environment"
+    if cmd in {"export", "declare", "typeset"} and re.fullmatch(
+        r"-(?:[A-Za-z]*p[A-Za-z]*|[A-Za-z]*x[A-Za-z]*)",
+        rest,
+    ):
+        return f"workflow output command {cmd} exposes exported shell variables"
 
     if SECRET_CONTEXT_RE.search(stripped):
         return "workflow output command exposes GitHub secret context"
@@ -181,7 +217,7 @@ def main() -> int:
 
     print(
         f"Workflow secret-output safety passed across {scanned} workflows: "
-        "no direct secret log sinks or xtrace found."
+        "no direct secret log sinks, environment dumps, or xtrace found."
     )
     return 0
 
