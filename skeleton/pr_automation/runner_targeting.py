@@ -288,7 +288,11 @@ class TargetResolver:
             f"/repos/{repository}/pulls?state=open&sort=updated&direction=asc",
             max_pages=pages,
         )
-        return items[:limit], complete or len(items) >= limit
+        # Completeness means the resolver observed the full open-PR inventory,
+        # not merely that it filled its target budget. If pagination hit its
+        # bound, or if a complete page contains more candidates than this run
+        # is allowed to retain, preserve that saturation as incomplete.
+        return items[:limit], complete and len(items) <= limit
 
     def _associated_by_sha(
         self,
