@@ -16,6 +16,8 @@ import os
 import time
 
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ["EXPO_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_BACKEND_URL") else \

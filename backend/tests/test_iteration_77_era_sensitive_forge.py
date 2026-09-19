@@ -14,6 +14,8 @@ import os
 import time
 
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = (

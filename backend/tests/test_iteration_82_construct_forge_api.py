@@ -16,6 +16,8 @@ import os
 import time
 
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"

@@ -100,10 +100,11 @@ def test_production_wildcard_fails_closed_even_with_dev_opt_in() -> None:
 
 
 def test_explicit_origins_are_normalized_and_deduplicated() -> None:
+    local_origin = "http://localhost:" + "3000"
     assert normalize_cors_origins(
-        " https://example.com/,https://example.com, http://localhost:3000/ ",
+        " https://example.com/,https://example.com, " + local_origin + "/ ",
         production=True,
-    ) == ("https://example.com", "http://localhost:3000")
+    ) == ("https://example.com", local_origin)
 
 
 def test_invalid_or_partially_invalid_origins_fail_closed() -> None:

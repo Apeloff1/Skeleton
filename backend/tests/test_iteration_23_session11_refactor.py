@@ -1,6 +1,8 @@
 """Iteration 23 — Session 11.1 refactor regression + Live-Ops XP wiring."""
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ.get('EXPO_BACKEND_URL', 'https://gemini-game-craft.preview.emergentagent.com').rstrip('/')

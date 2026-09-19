@@ -23,6 +23,8 @@ import time
 import zipfile
 import io
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = "http://localhost:8001"

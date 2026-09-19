@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.live_service
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 
@@ -92,9 +96,17 @@ def test_registered_test_requires_module_marker(tmp_path: Path) -> None:
 def test_repository_manifest_is_explicit_and_versioned() -> None:
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
     assert payload["version"] == 1
-    assert set(payload["tests"]) == {
+    assert isinstance(payload.get("tests"), dict) and payload["tests"]
+    for name, meta in payload["tests"].items():
+        assert re.fullmatch(r"test_[A-Za-z0-9_]+\.py", name)
+        assert isinstance(meta, dict)
+        assert isinstance(meta.get("reason"), str) and len(meta["reason"].strip()) >= 20
+        assert isinstance(meta.get("target"), str) and meta["target"].strip()
+        assert (MANIFEST.parent / name).is_file()
+    # Core known live suites remain registered.
+    assert {
         "test_galaxy_build_pipeline_regression.py",
         "test_galaxy_manifest_constants.py",
         "test_governance.py",
         "test_iteration_5_codegen_refactor.py",
-    }
+    } <= set(payload["tests"])

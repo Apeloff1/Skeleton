@@ -6,6 +6,8 @@ and that voting still affects leaderboard rankings.
 import os
 import time
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")

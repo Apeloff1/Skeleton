@@ -9,6 +9,8 @@ Tests:
 """
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL")

@@ -20,6 +20,8 @@ import os
 import time
 import uuid
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or \

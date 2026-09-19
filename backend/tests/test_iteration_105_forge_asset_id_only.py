@@ -5,6 +5,8 @@ Covers (a) /asset light vs full (geometry strip), (b) part_count/thumb_palette,
 fallback, and regression checks on /catalog /random /styles."""
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")

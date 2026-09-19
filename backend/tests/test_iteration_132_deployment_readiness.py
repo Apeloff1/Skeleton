@@ -14,6 +14,8 @@ that the deployed app will hit.
 
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 # Prefer the public preview URL, fall back to localhost only for local dev.

@@ -4,6 +4,8 @@ No LLM calls; fast smoke against live preview backend.
 """
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")

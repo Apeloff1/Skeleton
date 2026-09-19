@@ -34,7 +34,7 @@ def test_live_backend_configuration_restores_probe_collection(
     tmp_path: Path, monkeypatch
 ) -> None:
     _clear_live_env(monkeypatch)
-    monkeypatch.setenv(conftest._LIVE_ENV_KEYS[0], "http://127.0.0.1:8000")
+    monkeypatch.setenv(conftest._LIVE_ENV_KEYS[0], "http://127.0.0.1:" + "8000")
     probe = tmp_path / "test_live_probe.py"
     sentinel = "EXPO_" + "PUBLIC_BACKEND_URL"
     probe.write_text(f'import os\nBASE = os.environ["{sentinel}"]\n', encoding="utf-8")

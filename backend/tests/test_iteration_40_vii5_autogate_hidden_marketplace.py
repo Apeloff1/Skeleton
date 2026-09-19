@@ -8,6 +8,8 @@ After hide-exclusion test, RESTORES the playable so catalogue isn't degraded.
 from __future__ import annotations
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = (

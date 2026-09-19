@@ -10,6 +10,8 @@ Plus regression: telemetry/critical/recent, hub/expansions/installed, tournament
 import os
 import base64
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = (

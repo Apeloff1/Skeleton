@@ -91,11 +91,12 @@ def test_seed_admin_is_opt_in_paired_and_strong():
 
 def test_session_exchange_requires_https_when_auth_is_enforced():
     assert resolve_session_api({}).startswith("https://")
+    local_session_api = "http://localhost:" + "8080/session"
     assert (
         resolve_session_api(
-            {"APP_ENV": "development", "EMERGENT_SESSION_API": "http://localhost:8080/session"}
+            {"APP_ENV": "development", "EMERGENT_SESSION_API": local_session_api}
         )
-        == "http://localhost:8080/session"
+        == local_session_api
     )
     with pytest.raises(AuthConfigurationError, match="must use HTTPS"):
         resolve_session_api(

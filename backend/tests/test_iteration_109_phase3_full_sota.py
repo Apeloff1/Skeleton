@@ -3,6 +3,8 @@ axis-tree groupings, 22 tools, per-build Style Pack persistence, and pipeline
 honouring applied pack axes."""
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")

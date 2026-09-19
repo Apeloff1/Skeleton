@@ -9,6 +9,8 @@ Covers:
 """
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_PUBLIC_BACKEND_URL") else \

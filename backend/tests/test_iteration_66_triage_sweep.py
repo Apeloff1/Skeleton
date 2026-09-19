@@ -6,6 +6,8 @@ Only reads / lists / overviews. Report status code + small response sample.
 """
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")

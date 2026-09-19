@@ -9,6 +9,8 @@ Targets the PUBLIC preview backend (EXPO_PUBLIC_BACKEND_URL).
 import os
 import re
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get(

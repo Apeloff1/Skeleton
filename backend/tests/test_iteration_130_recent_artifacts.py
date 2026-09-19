@@ -3,6 +3,8 @@ Validates the new endpoint that powers the Hub's RecentArtifactsStrip,
 plus a light regression smoke on adjacent binary endpoints."""
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")

@@ -16,6 +16,8 @@ scientific realism in /api/worldforge endpoints:
 import os
 import re
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")

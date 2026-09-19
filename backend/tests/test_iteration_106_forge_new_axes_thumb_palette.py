@@ -6,6 +6,8 @@ and DNA/asset determinism with the new axes.
 import os
 import re
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")

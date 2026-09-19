@@ -16,6 +16,8 @@ import os
 import uuid
 
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE_URL = os.environ.get(

@@ -13,6 +13,8 @@ import statistics
 import zipfile
 import io
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
