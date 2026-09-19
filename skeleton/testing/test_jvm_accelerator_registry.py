@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -142,6 +145,41 @@ def test_get_initializes_only_requested_accelerator(tmp_path: Path) -> None:
     assert factory_calls["physics"] == 0
     assert registry.get("vector") is vector
     assert factory_calls["vector"] == 1
+
+
+def test_concurrent_get_constructs_one_accelerator_instance(tmp_path: Path) -> None:
+    source = tmp_path / "vector.java"
+    source.write_text("// test source\n", encoding="utf-8")
+    created: list[_FakeAccelerator] = []
+    created_lock = threading.Lock()
+    start = threading.Barrier(12)
+
+    def factory() -> _FakeAccelerator:
+        with created_lock:
+            instance = _FakeAccelerator(f"vector-{len(created)}")
+            created.append(instance)
+        time.sleep(0.02)
+        return instance
+
+    registry = JvmAcceleratorRegistry(
+        factories={"vector": factory},
+        config_providers={
+            "vector": lambda: SimpleNamespace(
+                java_binary=sys.executable,
+                source=source,
+            )
+        },
+    )
+
+    def get_vector() -> object:
+        start.wait()
+        return registry.get("vector")
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        instances = list(pool.map(lambda _index: get_vector(), range(12)))
+
+    assert len(created) == 1
+    assert all(instance is created[0] for instance in instances)
 
 
 def test_warm_all_starts_each_helper_and_surfaces_runtime_counters(tmp_path: Path) -> None:
