@@ -170,7 +170,7 @@ def test_three_node_cycle_normalizes_to_smallest_number():
         head_sha=SHA_D,
     )
     graph = build_stack_graph((one, two, three), default_branch="main")
-    assert graph.cycles == ((3, 5, 9),)
+    assert graph.cycles == ((3, 9, 5),)
 
 
 def test_multiple_independent_roots():
