@@ -32,6 +32,16 @@ from skeleton.shells.ai.durable_checkpoint import (
     DurableCheckpointIndexState,
     DurableCheckpointLookupIndex,
 )
+from skeleton.shells.ai.durable_checkpoint_repair import (
+    CheckpointIndexRepairAction,
+    CheckpointIndexRepairBatchReport,
+    CheckpointIndexRepairError,
+    CheckpointIndexRepairPlan,
+    CheckpointIndexRepairPolicy,
+    CheckpointIndexRepairResult,
+    CheckpointIndexRepairState,
+    DurableCheckpointIndexRepairCoordinator,
+)
 from skeleton.shells.ai.durable_compaction import (
     DurableCompactionError,
     DurableCompactionPlanner,
@@ -82,6 +92,14 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "CheckpointIndexRepairAction": CheckpointIndexRepairAction,
+    "CheckpointIndexRepairBatchReport": CheckpointIndexRepairBatchReport,
+    "CheckpointIndexRepairError": CheckpointIndexRepairError,
+    "CheckpointIndexRepairPlan": CheckpointIndexRepairPlan,
+    "CheckpointIndexRepairPolicy": CheckpointIndexRepairPolicy,
+    "CheckpointIndexRepairResult": CheckpointIndexRepairResult,
+    "CheckpointIndexRepairState": CheckpointIndexRepairState,
+    "DurableCheckpointIndexRepairCoordinator": DurableCheckpointIndexRepairCoordinator,
     "DurableCheckpointIndexHealth": DurableCheckpointIndexHealth,
     "DurableCheckpointIndexState": DurableCheckpointIndexState,
     "DurableCheckpointLookupIndex": DurableCheckpointLookupIndex,
@@ -1349,5 +1367,121 @@ def test_archive_backed_chain_satisfies_incremental_surface():
             )
         )
         for method in required
+    )
+
+def test_checkpoint_repair_action_wire_values_are_stable():
+    assert {
+        item.value
+        for item in CheckpointIndexRepairAction
+    } == {
+        "none",
+        "repair_missing",
+        "block_registry",
+        "block_corrupt",
+        "block_limit",
+    }
+
+
+def test_checkpoint_repair_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in CheckpointIndexRepairState
+    } == {
+        "healthy",
+        "planned",
+        "repaired",
+        "already_repaired",
+        "blocked",
+        "stale",
+    }
+
+
+def test_checkpoint_repair_coordinator_constructor_contract():
+    signature = inspect.signature(
+        DurableCheckpointIndexRepairCoordinator
+    )
+    assert {
+        "checkpoints",
+        "policy",
+        "clock",
+    }.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "inspect",
+        "apply",
+        "repair",
+        "repair_batch",
+    ],
+)
+def test_checkpoint_repair_coordinator_public_methods(method):
+    assert callable(
+        getattr(
+            DurableCheckpointIndexRepairCoordinator,
+            method,
+            None,
+        )
+    )
+
+
+def test_checkpoint_repair_error_is_runtime_error():
+    assert issubclass(
+        CheckpointIndexRepairError,
+        RuntimeError,
+    )
+
+
+def test_checkpoint_repair_plan_exposes_derived_properties():
+    assert isinstance(
+        CheckpointIndexRepairPlan.missing_count,
+        property,
+    )
+    assert isinstance(
+        CheckpointIndexRepairPlan.executable,
+        property,
+    )
+    assert isinstance(
+        CheckpointIndexRepairPlan.blocked,
+        property,
+    )
+
+
+def test_checkpoint_repair_result_exposes_derived_properties():
+    assert isinstance(
+        CheckpointIndexRepairResult.ok,
+        property,
+    )
+    assert isinstance(
+        CheckpointIndexRepairResult.mutated,
+        property,
+    )
+
+
+def test_checkpoint_repair_batch_exposes_derived_properties():
+    assert isinstance(
+        CheckpointIndexRepairBatchReport.ok,
+        property,
+    )
+    assert isinstance(
+        CheckpointIndexRepairBatchReport.repaired,
+        property,
+    )
+    assert isinstance(
+        CheckpointIndexRepairBatchReport.blocked,
+        property,
+    )
+
+
+def test_checkpoint_repair_policy_public_shape():
+    signature = inspect.signature(
+        CheckpointIndexRepairPolicy
+    )
+    assert tuple(signature.parameters) == (
+        "auto_repair_missing",
+        "max_repairs_per_chain",
+        "max_chains_per_batch",
+        "require_registry_valid",
     )
 
