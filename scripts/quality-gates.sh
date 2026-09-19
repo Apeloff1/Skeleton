@@ -49,6 +49,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_generated_code_sandbox.py \
   skeleton/testing/test_scanner_integrity.py \
   skeleton/testing/test_defense_plane.py \
+  skeleton/testing/test_incident_containment.py \
   skeleton/testing/test_automation_control_plane.py \
   skeleton/testing/test_pr_automation_operator_safety.py \
   skeleton/testing/test_outbound_url_resolution_security.py \
