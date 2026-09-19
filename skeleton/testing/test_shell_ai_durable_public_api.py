@@ -1097,4 +1097,3 @@ def test_durable_lifecycle_error_is_runtime_error_public_contract():
         DurableLifecycleError,
         RuntimeError,
     )
-
