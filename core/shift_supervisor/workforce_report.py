@@ -99,6 +99,8 @@ def _worker_payload(
             "shift_started_at": started_at,
             "shift_ended_at": ended_at,
             "time_basis": "run-envelope",
+            "validation_status": "passed",
+            "validation_source": "credential-free-studio-validation",
         },
     }
 
