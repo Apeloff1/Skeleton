@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -19,8 +20,7 @@ from skeleton.shells.ai.signed_artifact import (
 )
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def signer(clock=lambda: 10.0) -> ArtifactSigner:
