@@ -164,7 +164,7 @@ class WorkspaceScanner:
                 kind,
                 0,
                 stat.S_IMODE(metadata.st_mode),
-                int(metadata.st_mtime_ns),
+                0,
                 device=int(metadata.st_dev),
                 inode=int(metadata.st_ino),
             )
@@ -181,7 +181,7 @@ class WorkspaceScanner:
                 kind,
                 int(metadata.st_size),
                 stat.S_IMODE(metadata.st_mode),
-                int(metadata.st_mtime_ns),
+                0,
                 link_target=os.fsdecode(target),
                 device=int(metadata.st_dev),
                 inode=int(metadata.st_ino),
