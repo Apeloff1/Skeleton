@@ -16,12 +16,13 @@ concurrency:
   group: repo-bots-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   bot:
+    permissions:
+      contents: write
+      pull-requests: write
     name: ${{ matrix.bot }}
     runs-on: ubuntu-latest
     timeout-minutes: 20

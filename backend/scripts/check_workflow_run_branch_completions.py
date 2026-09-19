@@ -9,6 +9,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 ALL_BRANCH_GLOBS = 'branches:\n      - "*"\n      - "**"'
 WORKFLOW_RUN_TRIGGER_RE = re.compile(r"(?m)^  workflow_run:\s*(?:#.*)?$")
+QUEUE_WORKFLOW_RUN_JOB_IF_RE = re.compile(
+    r"(?m)^    if:\s*>-\s*\n(?P<body>(?:      [^\n]*\n)+)"
+)
 HINT_ARRAY_EXPR = "toJSON(github.event.workflow_run.pull_requests.*.number)"
 COMMIT_OID_PATTERN = r"^[0-9a-f]{40}$"
 AUTOMATION_WORKFLOW = "pr-automation-index.yml"
@@ -41,7 +44,6 @@ def _is_named(path_name: str, expected: str) -> bool:
     return path_name == expected or path_name.endswith(expected)
 
 
-
 def _workflow_run_trigger_block(text: str) -> str:
     match = WORKFLOW_RUN_TRIGGER_RE.search(text)
     if match is None:
@@ -50,15 +52,17 @@ def _workflow_run_trigger_block(text: str) -> str:
     next_trigger = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*(?:#.*)?$", tail)
     return tail if next_trigger is None else tail[: next_trigger.start()]
 
+
 def violations_for_text(path_name: str, text: str) -> list[str]:
     findings: list[str] = []
     if WORKFLOW_RUN_TRIGGER_RE.search(text) is None:
         return findings
 
-    has_all_branch_globs = ALL_BRANCH_GLOBS in text
+    workflow_run_block = _workflow_run_trigger_block(text)
+    has_all_branch_globs = ALL_BRANCH_GLOBS in workflow_run_block
     automation_main_only_exclusion = False
     if _is_named(path_name, AUTOMATION_WORKFLOW):
-        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(text)
+        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(workflow_run_block)
         if match is not None:
             ignored = [
                 line.removeprefix("      - ").strip().strip("'\\\"")
@@ -67,12 +71,22 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
             ]
             automation_main_only_exclusion = ignored == ["main"]
 
-    workflow_run_block = _workflow_run_trigger_block(text)
+    queue_workflow_run_conditions = [
+        match.group("body")
+        for match in QUEUE_WORKFLOW_RUN_JOB_IF_RE.finditer(text)
+        if "github.event_name != 'workflow_run'" in match.group("body")
+    ]
     queue_default_branch_only = (
         _is_named(path_name, QUEUE_DRAIN_WORKFLOW)
         and "branches: [main]" in workflow_run_block
-        and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
-        in text
+        and bool(queue_workflow_run_conditions)
+        and all(
+            "github.event.workflow_run.head_repository.full_name == github.repository"
+            in condition
+            and "github.event.workflow_run.head_branch == github.event.repository.default_branch"
+            in condition
+            for condition in queue_workflow_run_conditions
+        )
     )
 
     if (
