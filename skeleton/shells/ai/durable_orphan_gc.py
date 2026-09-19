@@ -40,6 +40,10 @@ from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceOperation,
     DurableMaintenanceResource,
 )
+from skeleton.shells.ai.durable_root_protection import (
+    DurableRootProtected,
+    DurableRootProtectionStore,
+)
 from skeleton.shells.ai.durable_orphan_scan import (
     DurableOrphanNodeKind,
     DurableOrphanNodeRecord,
@@ -755,6 +759,7 @@ class DurableOrphanGCOperator:
         *,
         policy: DurableOrphanGCPolicy | None = None,
         destruction_ledger: DurableDestructionLedger | None = None,
+        root_protections: DurableRootProtectionStore | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         if not isinstance(
@@ -789,7 +794,18 @@ class DurableOrphanGCOperator:
             raise TypeError(
                 "clock must be callable"
             )
+        if (
+            root_protections is not None
+            and not isinstance(
+                root_protections,
+                DurableRootProtectionStore,
+            )
+        ):
+            raise TypeError(
+                "root_protections must be DurableRootProtectionStore"
+            )
         self.destruction_ledger = destruction_ledger
+        self.root_protections = root_protections
         self._clock = clock
 
     @staticmethod
@@ -1184,12 +1200,20 @@ class DurableOrphanGCOperator:
             raise ValueError(
                 "max_targets outside GC policy"
             )
+        candidates = report.safe_delete_candidates
+        if self.root_protections is not None:
+            candidates = tuple(
+                item
+                for item in candidates
+                if not self.root_protections.is_protected(
+                    report.chain_id,
+                    item.node_hash,
+                )
+            )
         targets = tuple(
             DurableOrphanDeleteTarget
             .from_scan_record(item)
-            for item in report.safe_delete_candidates[
-                :limit
-            ]
+            for item in candidates[:limit]
         )
         now = _timestamp(
             "GC plan clock",
@@ -1325,6 +1349,16 @@ class DurableOrphanGCOperator:
         chain: object,
         target: DurableOrphanDeleteTarget,
     ):
+        if self.root_protections is not None:
+            try:
+                self.root_protections.require_unprotected(
+                    target.chain_id,
+                    target.node_hash,
+                )
+            except DurableRootProtected as exc:
+                raise DurableOrphanGCManualReview(
+                    "orphan candidate acquired durable root protection"
+                ) from exc
         record = chain.backend.get(
             target.backend_namespace,
             target.backend_key,
