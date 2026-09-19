@@ -450,6 +450,11 @@ class DurableVerificationReport:
         object.__setattr__(self, "reasons", tuple(self.reasons))
 
     @property
+    def unverified_tail_items(self) -> int:
+        """Backward-compatible name for the pending tail size."""
+        return self.tail_items
+
+    @property
     def valid(self) -> bool:
         return self.status in {
             DurableVerificationStatus.CURRENT,
@@ -463,6 +468,11 @@ class DurableVerificationReport:
             DurableVerificationStatus.NO_CURSOR,
             DurableVerificationStatus.FULL_REQUIRED,
         }
+
+    @property
+    def verified_item_count(self) -> int:
+        """Backward-compatible name for the verified segment size."""
+        return self.segment_items
 
     @property
     def digest(self) -> str:
@@ -499,6 +509,11 @@ class DurableVerificationResult:
     report: DurableVerificationReport
     cursor: SignedDurableVerificationCursor | None
     published: bool
+
+    @property
+    def item(self) -> SignedDurableVerificationCursor | None:
+        """Backward-compatible alias for the published/current cursor."""
+        return self.cursor
 
     @property
     def valid(self) -> bool:
