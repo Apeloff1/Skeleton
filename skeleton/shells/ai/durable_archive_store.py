@@ -268,6 +268,72 @@ class DurableArchiveRootIndex:
 
 
 @dataclass(frozen=True)
+class DurableArchiveRootResolution:
+    chain_id: str
+    root_hash: str
+    sequence: int
+    archive_id: str
+    archive_manifest_digest: str
+    replica_index: int
+
+    def __post_init__(self) -> None:
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        object.__setattr__(
+            self,
+            "root_hash",
+            _digest(
+                "root_hash",
+                self.root_hash,
+            ),
+        )
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence < 0
+        ):
+            raise ValueError(
+                "archive root resolution sequence must be non-negative"
+            )
+        _identity(
+            "archive_id",
+            self.archive_id,
+            maximum=256,
+        )
+        object.__setattr__(
+            self,
+            "archive_manifest_digest",
+            _digest(
+                "archive_manifest_digest",
+                self.archive_manifest_digest,
+            ),
+        )
+        if (
+            isinstance(self.replica_index, bool)
+            or not isinstance(self.replica_index, int)
+            or self.replica_index < 0
+        ):
+            raise ValueError(
+                "replica_index must be non-negative integer"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "root_hash": self.root_hash,
+            "sequence": self.sequence,
+            "archive_id": self.archive_id,
+            "archive_manifest_digest": (
+                self.archive_manifest_digest
+            ),
+            "replica_index": self.replica_index,
+        }
+
+
+@dataclass(frozen=True)
 class DurableArchiveHead:
     chain_id: str
     sequence: int
@@ -1389,17 +1455,15 @@ class DurableArchiveRepository:
             previous = node_hash
         return nodes
 
-    def snapshot_at(
+    def resolve_root(
         self,
         chain_id: str,
         root_hash: str,
-    ) -> tuple[object, ...]:
+    ) -> DurableArchiveRootResolution:
         root_hash = _digest(
             "root_hash",
             root_hash,
         )
-        if root_hash == GENESIS_HASH:
-            return ()
         index = self.root_index(
             chain_id,
             root_hash,
@@ -1408,9 +1472,10 @@ class DurableArchiveRepository:
             raise DurableArchiveStoreError(
                 "historical root is not archived"
             )
-
         failures: list[str] = []
-        for replica in index.replicas:
+        for position, replica in enumerate(
+            index.replicas
+        ):
             try:
                 stored = self.get(
                     replica.archive_id
@@ -1425,6 +1490,12 @@ class DurableArchiveRepository:
                 ):
                     raise DurableArchiveStoreError(
                         "root replica manifest digest mismatch"
+                    )
+                if not self.verify_archive(
+                    stored
+                ):
+                    raise DurableArchiveStoreError(
+                        "archive replica failed verification"
                     )
                 if (
                     index.sequence
@@ -1462,16 +1533,72 @@ class DurableArchiveRepository:
                     raise DurableArchiveStoreError(
                         "archive replica does not terminate at root"
                     )
-                return nodes
+                return DurableArchiveRootResolution(
+                    chain_id,
+                    root_hash,
+                    index.sequence,
+                    replica.archive_id,
+                    replica.archive_manifest_digest,
+                    position,
+                )
             except Exception as exc:
                 failures.append(
                     f"{replica.archive_id}:"
                     f"{type(exc).__name__}"
                 )
         raise DurableArchiveStoreError(
-            "all archive replicas failed historical reconstruction: "
+            "all archive replicas failed historical resolution: "
             + ",".join(failures)
         )
+
+    def snapshot_at(
+        self,
+        chain_id: str,
+        root_hash: str,
+    ) -> tuple[object, ...]:
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return ()
+        resolution = self.resolve_root(
+            chain_id,
+            root_hash,
+        )
+        stored = self.get(
+            resolution.archive_id
+        )
+        if stored is None:
+            raise DurableArchiveStoreError(
+                "resolved archive replica disappeared"
+            )
+        nodes = self._stored_nodes(
+            stored,
+            through_sequence=(
+                resolution.sequence
+            ),
+        )
+        terminal = str(
+            getattr(
+                nodes[-1],
+                "event_hash",
+                getattr(
+                    nodes[-1],
+                    "receipt_hash",
+                    getattr(
+                        nodes[-1],
+                        "node_hash",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if terminal != root_hash:
+            raise DurableArchiveStoreError(
+                "resolved archive replica changed during read"
+            )
+        return nodes
 
     def verify_root(
         self,
