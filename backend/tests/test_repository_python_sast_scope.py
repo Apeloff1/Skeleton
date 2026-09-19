@@ -257,4 +257,3 @@ def test_repository_python_sast_redacts_bootstrap_exception_detail(
     error = capsys.readouterr().err
     assert "Repository Python SAST bootstrap failed: RuntimeError" in error
     assert "sensitive bootstrap detail" not in error
-
