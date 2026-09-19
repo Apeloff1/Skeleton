@@ -505,6 +505,41 @@ class DurableChainCheckpointStore:
                 "item must be SignedDurableChainCheckpoint"
             )
         reasons: list[str] = []
+        if not self._chain.verify():
+            reasons.append(
+                "checkpoint registry chain failed integrity"
+            )
+        else:
+            try:
+                canonical = next(
+                    (
+                        current
+                        for current in self.snapshot()
+                        if (
+                            current.chain_node_hash
+                            == item.chain_node_hash
+                            and current.checkpoint.digest
+                            == item.checkpoint.digest
+                            and current.signature
+                            == item.signature
+                        )
+                    ),
+                    None,
+                )
+            except (
+                EvidenceCorruption,
+                ValueError,
+                TypeError,
+                KeyError,
+            ):
+                canonical = None
+                reasons.append(
+                    "checkpoint registry could not be reconstructed"
+                )
+            if canonical is None:
+                reasons.append(
+                    "checkpoint is not committed in canonical registry"
+                )
         try:
             self.signer.verify(
                 item.signature
