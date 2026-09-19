@@ -139,6 +139,20 @@ class ArgumentPolicy:
                 i += 1
                 continue
             if option_mode and token.startswith("-") and token != "-":
+                # A command grammar may have an explicit literal dash-prefixed
+                # token in its positional prefix (for example python -m or a
+                # standalone --version contract). Only a concrete choices
+                # allowlist may claim such a token; pattern-based or
+                # unconstrained positionals must never turn unknown options
+                # into positional data.
+                positional_index = len(positional_values)
+                if positional_index < len(self.positional):
+                    literal = self.positional[positional_index]
+                    if literal.choices and token in literal.choices:
+                        positional_values.append(token)
+                        i += 1
+                        continue
+
                 option_name = token
                 inline_value: str | None = None
                 if "=" in token:
