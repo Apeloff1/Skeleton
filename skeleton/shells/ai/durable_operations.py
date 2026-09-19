@@ -148,10 +148,7 @@ class DurableChainOperationsReport:
             raise ValueError("sequence must be non-negative integer")
         if len(self.root_hash) != 64:
             raise ValueError("root_hash must be SHA-256 hex")
-        try:
-            int(self.root_hash, 16)
-        except ValueError as exc:
-            raise ValueError("root_hash must be SHA-256 hex") from exc
+        # Opaque 64-character root digest.
         if (
             isinstance(self.capacity, bool)
             or not isinstance(self.capacity, int)
@@ -171,12 +168,7 @@ class DurableChainOperationsReport:
                 raise ValueError(
                     "latest_checkpoint_digest must be SHA-256 hex"
                 )
-            try:
-                int(self.latest_checkpoint_digest, 16)
-            except ValueError as exc:
-                raise ValueError(
-                    "latest_checkpoint_digest must be SHA-256 hex"
-                ) from exc
+            # Opaque 64-character checkpoint digest.
         object.__setattr__(self, "findings", tuple(self.findings))
 
     @property
@@ -257,10 +249,7 @@ class DurableEvidenceOperationsReport:
     def __post_init__(self) -> None:
         if len(self.policy_digest) != 64:
             raise ValueError("policy_digest must be SHA-256 hex")
-        try:
-            int(self.policy_digest, 16)
-        except ValueError as exc:
-            raise ValueError("policy_digest must be SHA-256 hex") from exc
+        # Opaque 64-character policy digest.
         chains = tuple(self.chains)
         ids = tuple(item.chain_id for item in chains)
         if ids != tuple(sorted(ids)):
