@@ -1,0 +1,163 @@
+name: Auto-Merge Control Plane
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "observe, direct, or native"
+        required: false
+        default: "direct"
+        type: choice
+        options:
+          - observe
+          - direct
+          - native
+      max_merges:
+        description: "Maximum root merges in this reconciliation"
+        required: false
+        default: "3"
+        type: string
+  workflow_run:
+    workflows:
+      - "Merge Readiness"
+    types:
+      - completed
+  schedule:
+    - cron: "4-59/5 * * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/automerge-control-plane.yml"
+      - "skeleton/pr_automation/automerge_*.py"
+      - "scripts/check_automerge_contract.py"
+      - "skeleton/testing/test_automerge_*.py"
+
+concurrency:
+  group: automerge-control-plane-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  validate:
+    name: Auto-Merge Policy Validation
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.event == 'pull_request'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Compile auto-merge control plane
+        run: >-
+          python -m compileall -q
+          skeleton/pr_automation/automerge_model.py
+          skeleton/pr_automation/automerge_evidence.py
+          skeleton/pr_automation/automerge_policy.py
+          skeleton/pr_automation/automerge_stack.py
+          skeleton/pr_automation/automerge_github.py
+          skeleton/pr_automation/automerge_ledger.py
+          skeleton/pr_automation/automerge_engine.py
+          skeleton/pr_automation/automerge_cli.py
+
+      - name: Validate workflow contract
+        run: python scripts/check_automerge_contract.py
+
+      - name: Run focused auto-merge regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_automerge_model.py
+          skeleton/testing/test_automerge_evidence.py
+          skeleton/testing/test_automerge_policy.py
+          skeleton/testing/test_automerge_stack.py
+          skeleton/testing/test_automerge_engine.py
+          skeleton/testing/test_automerge_contract.py
+
+  reconcile:
+    name: Auto-Merge Reconcile
+    needs:
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      checks: read
+      contents: write
+      pull-requests: write
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      AUTOMERGE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      AUTOMERGE_MODE: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'direct' }}
+      AUTOMERGE_MERGE_METHOD: "squash"
+      AUTOMERGE_MAX_MERGES: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.max_merges || '3' }}
+      AUTOMERGE_MAX_STACK_MERGES: "2"
+      AUTOMERGE_MAX_OPEN_PR_SCAN: "250"
+      AUTOMERGE_MAX_CHANGED_FILES: "250"
+      AUTOMERGE_MAX_LINE_DELTA: "20000"
+      AUTOMERGE_STABILITY_SECONDS: "30"
+      AUTOMERGE_REQUIRED_APPROVALS: "0"
+      AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"
+      AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"
+      AUTOMERGE_SAME_REPOSITORY_ONLY: "true"
+      AUTOMERGE_ALLOW_OWNER_WITHOUT_OPT_IN: "true"
+      AUTOMERGE_ALLOW_DEPENDABOT_WITHOUT_OPT_IN: "true"
+      AUTOMERGE_ALLOW_STACK_CHILD_MERGE: "true"
+      AUTOMERGE_DISPATCH_POST_MERGE: "true"
+      AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"
+      AUTOMERGE_FAIL_ON_GRAPH_ERROR: "true"
+      AUTOMERGE_POST_MERGE_WORKFLOWS: "merge-readiness.yml,queue-drain.yml"
+      AUTOMERGE_LEDGER_PATH: ".automerge/ledger.jsonl"
+      AUTOMERGE_REPORT_PATH: ".automerge/report.json"
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Reconcile merge queue from trusted default-branch code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m skeleton.pr_automation.automerge_cli             --repo "$GITHUB_REPOSITORY"             --base "$AUTOMERGE_DEFAULT_BRANCH"             --ledger "$AUTOMERGE_LEDGER_PATH"             --report-json "$AUTOMERGE_REPORT_PATH"
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: automerge-evidence-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            .automerge/ledger.jsonl
+            .automerge/report.json
