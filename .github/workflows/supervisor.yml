@@ -9,11 +9,20 @@ concurrency:
   group: repository-supervisor-${{ github.repository }}
   cancel-in-progress: false
 
-# No workflow-wide authority. Planning and mutation live in separate jobs.
+# Deny all authority by default. Read planning and write execution are separate
+# jobs with explicit scopes and an immutable execution identity.
 permissions: {}
+
+env:
+  GITHUB_REPOSITORY: ${{ github.repository }}
+  SUPERVISOR_BASE_SHA: ${{ github.sha }}
+  SUPERVISOR_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  SUPERVISOR_RUN_ID: ${{ github.run_id }}
+  SUPERVISOR_RUN_ATTEMPT: ${{ github.run_attempt }}
 
 jobs:
   plan:
+    name: Plan on immutable default-branch head
     permissions:
       actions: read
       contents: read
@@ -26,8 +35,24 @@ jobs:
       snapshot_fingerprint: ${{ steps.supervisor.outputs.snapshot_fingerprint }}
       execution_fingerprint: ${{ steps.supervisor.outputs.execution_fingerprint }}
       base_sha: ${{ steps.supervisor.outputs.base_sha }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
+      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+      SUPERVISOR_EVENT_REF: ${{ github.ref }}
+      SUPERVISOR_EXPECTED_REF: refs/heads/${{ github.event.repository.default_branch }}
     steps:
-      - name: Checkout immutable Supervisor base
+      - name: Require default-branch execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPERVISOR_DEFAULT_BRANCH"
+          test "$SUPERVISOR_EVENT_REF" = "$SUPERVISOR_EXPECTED_REF"
+
+      - name: Checkout immutable execution commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -40,34 +65,41 @@ jobs:
 
       - name: Build bounded Supervisor delegation
         id: supervisor
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          SUPERVISOR_BASE_SHA: ${{ github.sha }}
-          SUPERVISOR_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SUPERVISOR_RUN_ID: ${{ github.run_id }}
-          SUPERVISOR_RUN_ATTEMPT: ${{ github.run_attempt }}
-          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-          MODEL_NAME: ${{ vars.MODEL_NAME }}
-          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m skeleton.automation.supervisor --plan-only --emit-github-output "$GITHUB_OUTPUT"
+        run: >-
+          python -m skeleton.automation.supervisor
+          --plan-only
+          --emit-github-output "$GITHUB_OUTPUT"
 
   secretary:
+    name: Admit custody and dispatch isolated workers
     needs: plan
-    if: ${{ needs.plan.result == 'success' && needs.plan.outputs.delegation_b64 != '' }}
+    if: >-
+      ${{
+        needs.plan.result == 'success' &&
+        needs.plan.outputs.delegation_b64 != '' &&
+        needs.plan.outputs.base_sha == github.sha
+      }}
     permissions:
       contents: write
       pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
+      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+      SUPERVISOR_DELEGATION: "1"
+      SUPERVISOR_SNAPSHOT_FINGERPRINT: ${{ needs.plan.outputs.snapshot_fingerprint }}
+      SUPERVISOR_EXECUTION_FINGERPRINT: ${{ needs.plan.outputs.execution_fingerprint }}
+      SUPERVISOR_DELEGATION_B64: ${{ needs.plan.outputs.delegation_b64 }}
     steps:
-      - name: Checkout identical immutable Supervisor base
+      - name: Checkout immutable admitted commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.plan.outputs.base_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Python
@@ -75,22 +107,7 @@ jobs:
         with:
           python-version: "3.11.16"
 
-      - name: Admit delegation and dispatch isolated bounded workers
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          SUPERVISOR_BASE_SHA: ${{ needs.plan.outputs.base_sha }}
-          SUPERVISOR_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SUPERVISOR_RUN_ID: ${{ github.run_id }}
-          SUPERVISOR_RUN_ATTEMPT: ${{ github.run_attempt }}
-          SUPERVISOR_DELEGATION: "1"
-          SUPERVISOR_SNAPSHOT_FINGERPRINT: ${{ needs.plan.outputs.snapshot_fingerprint }}
-          SUPERVISOR_EXECUTION_FINGERPRINT: ${{ needs.plan.outputs.execution_fingerprint }}
-          SUPERVISOR_DELEGATION_B64: ${{ needs.plan.outputs.delegation_b64 }}
-          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-          MODEL_NAME: ${{ vars.MODEL_NAME }}
-          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m skeleton.automation.secretary --delegation-b64 "$SUPERVISOR_DELEGATION_B64"
+      - name: Admit delegation and dispatch bounded workers
+        run: >-
+          python -m skeleton.automation.secretary
+          --delegation-b64 "$SUPERVISOR_DELEGATION_B64"
