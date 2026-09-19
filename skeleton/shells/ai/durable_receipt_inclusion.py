@@ -315,6 +315,133 @@ class DurableReceiptInclusionVerification:
         }
 
 
+@dataclass(frozen=True)
+class DurableReceiptInclusionBatchResult:
+    chain_id: str
+    current_sequence: int
+    current_root: str
+    items: tuple[DurableReceiptInclusion, ...]
+    verifications: tuple[
+        DurableReceiptInclusionVerification,
+        ...,
+    ]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "chain_id",
+            _identity("chain_id", self.chain_id, maximum=128),
+        )
+        if (
+            isinstance(self.current_sequence, bool)
+            or not isinstance(self.current_sequence, int)
+            or self.current_sequence < 0
+        ):
+            raise ValueError(
+                "current_sequence must be non-negative integer"
+            )
+        object.__setattr__(
+            self,
+            "current_root",
+            _digest("current_root", self.current_root),
+        )
+        object.__setattr__(self, "items", tuple(self.items))
+        object.__setattr__(
+            self,
+            "verifications",
+            tuple(self.verifications),
+        )
+        if len(self.items) != len(self.verifications):
+            raise ValueError(
+                "batch items/verifications length mismatch"
+            )
+        receipt_ids = tuple(
+            item.receipt_id
+            for item in self.items
+        )
+        if len(receipt_ids) != len(set(receipt_ids)):
+            raise ValueError(
+                "batch contains duplicate receipt_id"
+            )
+        for item, verification in zip(
+            self.items,
+            self.verifications,
+            strict=True,
+        ):
+            if item.chain_id != self.chain_id:
+                raise ValueError(
+                    "batch item chain differs from batch"
+                )
+            if verification.chain_id != self.chain_id:
+                raise ValueError(
+                    "batch verification chain differs from batch"
+                )
+            if (
+                verification.receipt_id
+                != item.receipt_id
+                or verification.receipt_hash
+                != item.receipt_hash
+                or verification.sequence
+                != item.sequence
+            ):
+                raise ValueError(
+                    "batch verification identity differs from item"
+                )
+
+    @property
+    def valid(self) -> bool:
+        return all(
+            result.valid
+            for result in self.verifications
+        )
+
+    @property
+    def verified_count(self) -> int:
+        return sum(
+            1
+            for result in self.verifications
+            if result.valid
+        )
+
+    @property
+    def invalid_count(self) -> int:
+        return len(self.verifications) - self.verified_count
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(include_digest=False),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def to_dict(
+        self,
+        *,
+        include_digest: bool = True,
+    ) -> dict[str, object]:
+        data: dict[str, object] = {
+            "chain_id": self.chain_id,
+            "current_sequence": self.current_sequence,
+            "current_root": self.current_root,
+            "valid": self.valid,
+            "verified_count": self.verified_count,
+            "invalid_count": self.invalid_count,
+            "items": [
+                item.to_dict()
+                for item in self.items
+            ],
+            "verifications": [
+                item.to_dict()
+                for item in self.verifications
+            ],
+        }
+        if include_digest:
+            data["digest"] = self.digest
+        return data
+
+
 class DurableReceiptInclusionError(RuntimeError):
     pass
 
@@ -329,6 +456,7 @@ class DurableReceiptInclusionAuthority:
         proof_store: DurableHistoricalProofStore | None = None,
         policy: DurableReceiptInclusionPolicy | None = None,
         clock: Callable[[], float] = time.time,
+        max_batch_items: int = 512,
     ) -> None:
         if not isinstance(proofs, DurableHistoricalProofAuthority):
             raise TypeError(
@@ -350,10 +478,19 @@ class DurableReceiptInclusionAuthority:
             )
         if not callable(clock):
             raise TypeError("clock must be callable")
+        if (
+            isinstance(max_batch_items, bool)
+            or not isinstance(max_batch_items, int)
+            or max_batch_items <= 0
+        ):
+            raise ValueError(
+                "max_batch_items must be positive integer"
+            )
         self.proofs = proofs
         self.proof_store = proof_store
         self.policy = policy or DurableReceiptInclusionPolicy()
         self._clock = clock
+        self.max_batch_items = max_batch_items
 
     @staticmethod
     def _require_chain(chain: object) -> DistributedReceiptChain:
@@ -493,16 +630,17 @@ class DurableReceiptInclusionAuthority:
             float(created_at),
         )
 
-    def verify(
+    def _verify_internal(
         self,
         item: DurableReceiptInclusion,
-        chain: object,
+        chain: DistributedReceiptChain,
+        *,
+        ancestor_override: bool | None = None,
     ) -> DurableReceiptInclusionVerification:
         if not isinstance(item, DurableReceiptInclusion):
             raise TypeError(
                 "item must be DurableReceiptInclusion"
             )
-        chain = self._require_chain(chain)
         head = chain.head()
         reasons: list[str] = []
         indexed = False
@@ -598,12 +736,15 @@ class DurableReceiptInclusionAuthority:
                 "proof chain differs from inclusion"
             )
 
-        try:
-            ancestor = chain.root_is_ancestor(
-                item.receipt_hash
-            )
-        except Exception:
-            ancestor = False
+        if ancestor_override is None:
+            try:
+                ancestor = chain.root_is_ancestor(
+                    item.receipt_hash
+                )
+            except Exception:
+                ancestor = False
+        else:
+            ancestor = bool(ancestor_override)
         if (
             self.policy.require_current_ancestry
             and not ancestor
@@ -667,6 +808,21 @@ class DurableReceiptInclusionAuthority:
             tuple(reasons),
         )
 
+    def verify(
+        self,
+        item: DurableReceiptInclusion,
+        chain: object,
+    ) -> DurableReceiptInclusionVerification:
+        if not isinstance(item, DurableReceiptInclusion):
+            raise TypeError(
+                "item must be DurableReceiptInclusion"
+            )
+        chain = self._require_chain(chain)
+        return self._verify_internal(
+            item,
+            chain,
+        )
+
     def require(
         self,
         item: DurableReceiptInclusion,
@@ -681,6 +837,242 @@ class DurableReceiptInclusionAuthority:
                 result.reasons[0]
                 if result.reasons
                 else "receipt inclusion verification failed"
+            )
+            raise DurableReceiptInclusionError(
+                detail
+            )
+        return result
+
+    def _batch_receipt_ids(
+        self,
+        receipt_ids,
+    ) -> tuple[str, ...]:
+        values = tuple(receipt_ids)
+        if len(values) > self.max_batch_items:
+            raise DurableReceiptInclusionError(
+                "receipt inclusion batch exceeds configured bound"
+            )
+        normalized = tuple(
+            _identity(
+                "receipt_id",
+                value,
+                maximum=128,
+            )
+            for value in values
+        )
+        if len(normalized) != len(set(normalized)):
+            raise DurableReceiptInclusionError(
+                "receipt inclusion batch contains duplicates"
+            )
+        return normalized
+
+    def _committed_root_set(
+        self,
+        chain: DistributedReceiptChain,
+    ) -> tuple[int, str, frozenset[str]]:
+        try:
+            snapshot = chain.snapshot()
+        except Exception as exc:
+            raise DurableReceiptInclusionError(
+                "committed receipt chain snapshot failed"
+            ) from exc
+        head = chain.head()
+        roots = frozenset(
+            item.receipt_hash
+            for item in snapshot
+        )
+        return (
+            int(head.sequence),
+            str(head.root_hash),
+            roots,
+        )
+
+    def build_many(
+        self,
+        chain_id: str,
+        chain: object,
+        receipt_ids,
+    ) -> DurableReceiptInclusionBatchResult:
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=128,
+        )
+        chain = self._require_chain(chain)
+        values = self._batch_receipt_ids(
+            receipt_ids
+        )
+        (
+            current_sequence,
+            current_root,
+            committed_roots,
+        ) = self._committed_root_set(chain)
+
+        items: list[DurableReceiptInclusion] = []
+        results: list[
+            DurableReceiptInclusionVerification
+        ] = []
+        for receipt_id in values:
+            candidate = self._candidate(
+                chain,
+                receipt_id,
+            )
+            if (
+                candidate.entry.receipt_hash
+                not in committed_roots
+            ):
+                raise DurableReceiptInclusionError(
+                    "indexed receipt is not in committed chain snapshot"
+                )
+            proof = self._proof_for(
+                chain_id,
+                chain,
+                candidate,
+            )
+            if (
+                proof.proof.target_sequence
+                != candidate.entry.sequence
+                or proof.proof.target_root
+                != candidate.entry.receipt_hash
+            ):
+                raise DurableReceiptInclusionError(
+                    "receipt proof target differs from indexed candidate"
+                )
+            try:
+                self.proofs.require(
+                    proof,
+                    chain,
+                )
+            except DurableHistoricalProofError as exc:
+                raise DurableReceiptInclusionError(
+                    "receipt proof failed verification"
+                ) from exc
+            now = self._clock()
+            if (
+                isinstance(now, bool)
+                or not isinstance(now, (int, float))
+                or not math.isfinite(float(now))
+                or float(now) < 0.0
+            ):
+                raise DurableReceiptInclusionError(
+                    "receipt inclusion clock returned invalid time"
+                )
+            item = DurableReceiptInclusion(
+                1,
+                chain_id,
+                candidate.entry.receipt_id,
+                candidate.entry.receipt_fingerprint,
+                candidate.entry.receipt_hash,
+                candidate.entry.sequence,
+                proof,
+                float(now),
+            )
+            result = self._verify_internal(
+                item,
+                chain,
+                ancestor_override=True,
+            )
+            items.append(item)
+            results.append(result)
+
+        return DurableReceiptInclusionBatchResult(
+            chain_id,
+            current_sequence,
+            current_root,
+            tuple(items),
+            tuple(results),
+        )
+
+    def verify_many(
+        self,
+        items,
+        chain: object,
+    ) -> DurableReceiptInclusionBatchResult:
+        values = tuple(items)
+        if len(values) > self.max_batch_items:
+            raise DurableReceiptInclusionError(
+                "receipt inclusion batch exceeds configured bound"
+            )
+        if any(
+            not isinstance(
+                item,
+                DurableReceiptInclusion,
+            )
+            for item in values
+        ):
+            raise TypeError(
+                "all batch items must be DurableReceiptInclusion"
+            )
+        chain = self._require_chain(chain)
+        chain_ids = {
+            item.chain_id
+            for item in values
+        }
+        if len(chain_ids) > 1:
+            raise DurableReceiptInclusionError(
+                "receipt inclusion batch mixes chain identities"
+            )
+        chain_id = (
+            next(iter(chain_ids))
+            if chain_ids
+            else "receipts"
+        )
+        receipt_ids = tuple(
+            item.receipt_id
+            for item in values
+        )
+        if len(receipt_ids) != len(set(receipt_ids)):
+            raise DurableReceiptInclusionError(
+                "receipt inclusion batch contains duplicates"
+            )
+        (
+            current_sequence,
+            current_root,
+            committed_roots,
+        ) = self._committed_root_set(chain)
+        results = tuple(
+            self._verify_internal(
+                item,
+                chain,
+                ancestor_override=(
+                    item.receipt_hash
+                    in committed_roots
+                ),
+            )
+            for item in values
+        )
+        return DurableReceiptInclusionBatchResult(
+            chain_id,
+            current_sequence,
+            current_root,
+            values,
+            results,
+        )
+
+    def require_many(
+        self,
+        items,
+        chain: object,
+    ) -> DurableReceiptInclusionBatchResult:
+        result = self.verify_many(
+            items,
+            chain,
+        )
+        if not result.valid:
+            first = next(
+                (
+                    verification
+                    for verification
+                    in result.verifications
+                    if not verification.valid
+                ),
+                None,
+            )
+            detail = (
+                first.reasons[0]
+                if first is not None
+                and first.reasons
+                else "receipt inclusion batch verification failed"
             )
             raise DurableReceiptInclusionError(
                 detail
