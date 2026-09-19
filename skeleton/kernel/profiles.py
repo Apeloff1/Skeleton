@@ -15,6 +15,7 @@ MobileMoE, HeRo). No paper bodies. No generated CUDA/MNN kernels.
 """
 from __future__ import annotations
 
+from importlib import import_module
 import os
 from typing import Any, Dict, Tuple
 
@@ -77,6 +78,61 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "hold": ("skeleton.kernel.hold",),
     "sfence": ("skeleton.kernel.fence",),
     "storm": ("skeleton.kernel.storm",),
+}
+
+_ROSTER_IMPORTERS = {
+    "skeleton.kernel.admission": lambda: import_module("skeleton.kernel.admission"),
+    "skeleton.kernel.affinity": lambda: import_module("skeleton.kernel.affinity"),
+    "skeleton.kernel.backpressure": lambda: import_module("skeleton.kernel.backpressure"),
+    "skeleton.kernel.batch": lambda: import_module("skeleton.kernel.batch"),
+    "skeleton.kernel.bloom": lambda: import_module("skeleton.kernel.bloom"),
+    "skeleton.kernel.breaker": lambda: import_module("skeleton.kernel.breaker"),
+    "skeleton.kernel.bulkhead": lambda: import_module("skeleton.kernel.bulkhead"),
+    "skeleton.kernel.clocks": lambda: import_module("skeleton.kernel.clocks"),
+    "skeleton.kernel.election": lambda: import_module("skeleton.kernel.election"),
+    "skeleton.kernel.fair_queue": lambda: import_module("skeleton.kernel.fair_queue"),
+    "skeleton.kernel.fence": lambda: import_module("skeleton.kernel.fence"),
+    "skeleton.kernel.fuse": lambda: import_module("skeleton.kernel.fuse"),
+    "skeleton.kernel.gossip": lambda: import_module("skeleton.kernel.gossip"),
+    "skeleton.kernel.hold": lambda: import_module("skeleton.kernel.hold"),
+    "skeleton.kernel.isolate": lambda: import_module("skeleton.kernel.isolate"),
+    "skeleton.kernel.krouter": lambda: import_module("skeleton.kernel.krouter"),
+    "skeleton.kernel.leases": lambda: import_module("skeleton.kernel.leases"),
+    "skeleton.kernel.merkle_log": lambda: import_module("skeleton.kernel.merkle_log"),
+    "skeleton.kernel.ops": lambda: import_module("skeleton.kernel.ops"),
+    "skeleton.kernel.ops.block": lambda: import_module("skeleton.kernel.ops.block"),
+    "skeleton.kernel.ops.catalog": lambda: import_module("skeleton.kernel.ops.catalog"),
+    "skeleton.kernel.ops.dma": lambda: import_module("skeleton.kernel.ops.dma"),
+    "skeleton.kernel.ops.embed": lambda: import_module("skeleton.kernel.ops.embed"),
+    "skeleton.kernel.ops.gpu": lambda: import_module("skeleton.kernel.ops.gpu"),
+    "skeleton.kernel.orchestrator": lambda: import_module("skeleton.kernel.orchestrator"),
+    "skeleton.kernel.pack": lambda: import_module("skeleton.kernel.pack"),
+    "skeleton.kernel.page": lambda: import_module("skeleton.kernel.page"),
+    "skeleton.kernel.pin": lambda: import_module("skeleton.kernel.pin"),
+    "skeleton.kernel.pipeline": lambda: import_module("skeleton.kernel.pipeline"),
+    "skeleton.kernel.prefetch": lambda: import_module("skeleton.kernel.prefetch"),
+    "skeleton.kernel.prefix": lambda: import_module("skeleton.kernel.prefix"),
+    "skeleton.kernel.priority": lambda: import_module("skeleton.kernel.priority"),
+    "skeleton.kernel.quota": lambda: import_module("skeleton.kernel.quota"),
+    "skeleton.kernel.radix": lambda: import_module("skeleton.kernel.radix"),
+    "skeleton.kernel.ram": lambda: import_module("skeleton.kernel.ram"),
+    "skeleton.kernel.ram.check": lambda: import_module("skeleton.kernel.ram.check"),
+    "skeleton.kernel.reclaim": lambda: import_module("skeleton.kernel.reclaim"),
+    "skeleton.kernel.saga": lambda: import_module("skeleton.kernel.saga"),
+    "skeleton.kernel.sandbox": lambda: import_module("skeleton.kernel.sandbox"),
+    "skeleton.kernel.scheduler": lambda: import_module("skeleton.kernel.scheduler"),
+    "skeleton.kernel.slo": lambda: import_module("skeleton.kernel.slo"),
+    "skeleton.kernel.speculate": lambda: import_module("skeleton.kernel.speculate"),
+    "skeleton.kernel.split": lambda: import_module("skeleton.kernel.split"),
+    "skeleton.kernel.stock": lambda: import_module("skeleton.kernel.stock"),
+    "skeleton.kernel.stock_live": lambda: import_module("skeleton.kernel.stock_live"),
+    "skeleton.kernel.storm": lambda: import_module("skeleton.kernel.storm"),
+    "skeleton.kernel.supervisor": lambda: import_module("skeleton.kernel.supervisor"),
+    "skeleton.kernel.throttle": lambda: import_module("skeleton.kernel.throttle"),
+    "skeleton.kernel.tile": lambda: import_module("skeleton.kernel.tile"),
+    "skeleton.kernel.vclock": lambda: import_module("skeleton.kernel.vclock"),
+    "skeleton.kernel.watchdog": lambda: import_module("skeleton.kernel.watchdog"),
+    "skeleton.kernel.work_queue": lambda: import_module("skeleton.kernel.work_queue"),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {
@@ -165,7 +221,7 @@ def card(*, caps: Dict[str, Any] | None = None) -> Dict[str, Any]:
         ok = True
         for mod in ROSTER[k]:
             try:
-                __import__(mod)
+                _ROSTER_IMPORTERS[mod]()
             except Exception:
                 ok = False
         (present if ok else missing).append(k)

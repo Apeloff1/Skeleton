@@ -14,6 +14,33 @@ from types import ModuleType
 
 from .capability_manifest import CAPABILITIES, CAPABILITY_MANIFEST_VERSION, get_capability
 
+_CAPABILITY_IMPORTERS = {
+    "application": ("skeleton.application", lambda: import_module("skeleton.application")),
+    "gameforge": ("skeleton.forge", lambda: import_module("skeleton.forge")),
+    "cortex": ("skeleton.cortex", lambda: import_module("skeleton.cortex")),
+    "jeeves": ("skeleton.jeeves", lambda: import_module("skeleton.jeeves")),
+    "organism": ("skeleton.organism", lambda: import_module("skeleton.organism")),
+    "social": ("skeleton.social", lambda: import_module("skeleton.social")),
+    "galaxy": ("skeleton.galaxy", lambda: import_module("skeleton.galaxy")),
+    "kernel": ("skeleton.kernel", lambda: import_module("skeleton.kernel")),
+    "memory": ("skeleton.memory", lambda: import_module("skeleton.memory")),
+    "intelligence": ("skeleton.intelligence", lambda: import_module("skeleton.intelligence")),
+    "swarm": ("skeleton.swarm", lambda: import_module("skeleton.swarm")),
+    "resilience": ("skeleton.resilience", lambda: import_module("skeleton.resilience")),
+    "observability": ("skeleton.observability", lambda: import_module("skeleton.observability")),
+    "api": ("skeleton.api", lambda: import_module("skeleton.api")),
+    "developer": ("skeleton.developer", lambda: import_module("skeleton.developer")),
+    "deploy": ("skeleton.deploy", lambda: import_module("skeleton.deploy")),
+    "testing": ("skeleton.testing", lambda: import_module("skeleton.testing")),
+    "pipelines": ("skeleton.pipelines", lambda: import_module("skeleton.pipelines")),
+    "vault": ("skeleton.vault", lambda: import_module("skeleton.vault")),
+    "retrieval": ("skeleton.retrieval", lambda: import_module("skeleton.retrieval")),
+    "agents": ("skeleton.agents", lambda: import_module("skeleton.agents")),
+    "context": ("skeleton.context", lambda: import_module("skeleton.context")),
+    "config": ("skeleton.config", lambda: import_module("skeleton.config")),
+    "content": ("skeleton.content", lambda: import_module("skeleton.content")),
+}
+
 
 class CapabilityLoadError(RuntimeError):
     """Raised when a curated capability cannot be imported."""
@@ -48,7 +75,10 @@ class CapabilityLoader:
             if cached is not None:
                 return cached
             try:
-                module = import_module(capability.module)
+                expected_module, importer = _CAPABILITY_IMPORTERS[capability.id]
+                if capability.module != expected_module:
+                    raise RuntimeError("capability manifest/import allowlist mismatch")
+                module = importer()
             except Exception as exc:
                 raise CapabilityLoadError(capability.id) from exc
             self._loaded[capability.id] = module

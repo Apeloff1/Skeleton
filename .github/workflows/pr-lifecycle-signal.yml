@@ -6,7 +6,7 @@ on:
     types: [closed]
 
 # Closed-PR lifecycle signals wake the default-branch drainer immediately.
-# Superseded synchronize heads are already reclaimed by queue-drain's bounded
+# Superseded PR-head updates are already reclaimed by queue-drain's bounded
 # five-minute sweep, so duplicating every push here only creates control-plane
 # run records. The signal job itself never needs runner capacity.
 concurrency:
