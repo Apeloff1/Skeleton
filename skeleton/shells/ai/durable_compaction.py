@@ -528,28 +528,39 @@ class DurableCompactionPlanner:
                 "retention prefix would leave less than minimum live tail"
             )
         else:
-            index = None
+            resolution = None
             try:
-                index = self.archives.root_index(
+                resolution = self.archives.resolve_root(
                     retention.chain_id,
                     cutoff_root,
                 )
+            except DurableArchiveStoreError as exc:
+                if self.archives.root_index(
+                    retention.chain_id,
+                    cutoff_root,
+                ) is None:
+                    state = DurableCompactionState.ARCHIVE_MISSING
+                    reasons.append(
+                        "retention cutoff root is not present in archive repository"
+                    )
+                else:
+                    state = DurableCompactionState.ARCHIVE_INVALID
+                    reasons.append(
+                        "archive root resolution failed: "
+                        f"{type(exc).__name__}"
+                    )
             except Exception as exc:
+                state = DurableCompactionState.ARCHIVE_INVALID
                 reasons.append(
-                    "archive root index lookup raised "
+                    "archive root resolution raised "
                     f"{type(exc).__name__}"
                 )
-            if index is None:
-                state = DurableCompactionState.ARCHIVE_MISSING
-                reasons.append(
-                    "retention cutoff root is not present in archive repository"
-                )
-            else:
-                archive_id = index.archive_id
+            if resolution is not None:
+                archive_id = resolution.archive_id
                 archive_manifest_digest = (
-                    index.archive_manifest_digest
+                    resolution.archive_manifest_digest
                 )
-                if index.sequence != cutoff_sequence:
+                if resolution.sequence != cutoff_sequence:
                     state = DurableCompactionState.ARCHIVE_INVALID
                     reasons.append(
                         "archive cutoff sequence differs from retention plan"
