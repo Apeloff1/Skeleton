@@ -283,7 +283,7 @@ def test_journal_incremental_verification_uses_indexed_range():
     assert view.root_lookup_calls == 2
     assert view.segment_calls == 0
     assert view.verify_calls == before_full
-    assert result.cursor.cursor.verified_items == 2
+    assert result.cursor.cursor.segment_items == 2
     assert store.latest("journal").item == result.cursor
 
 
@@ -319,7 +319,7 @@ def test_receipt_incremental_verification_uses_indexed_range():
     assert view.root_lookup_calls == 2
     assert view.segment_calls == 0
     assert view.verify_calls == before_full
-    assert result.cursor.cursor.verified_items == 3
+    assert result.cursor.cursor.segment_items == 3
 
 
 def test_legacy_journal_view_keeps_segment_fallback():
@@ -969,7 +969,7 @@ def test_indexed_journal_tail_segment_digest_matches_verified_items():
         "journal",
         IndexedJournalView(raw),
     )
-    assert result.cursor.cursor.verified_items == len(appended)
+    assert result.cursor.cursor.segment_items == len(appended)
     assert len(result.cursor.cursor.segment_digest) == 64
 
 
@@ -997,7 +997,7 @@ def test_indexed_receipt_tail_segment_digest_matches_verified_items():
         "receipts",
         IndexedReceiptView(raw),
     )
-    assert result.cursor.cursor.verified_items == len(appended)
+    assert result.cursor.cursor.segment_items == len(appended)
     assert len(result.cursor.cursor.segment_digest) == 64
 
 
