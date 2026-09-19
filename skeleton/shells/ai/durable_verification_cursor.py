@@ -708,6 +708,164 @@ class DurableVerificationCursorStore:
             item,
         )
 
+    def lineage(
+        self,
+        chain_id: str,
+        *,
+        max_items: int = 4096,
+    ) -> tuple[SignedDurableVerificationCursor, ...]:
+        """Return the signed cursor lineage from oldest to newest."""
+        chain_id = _chain_id(chain_id)
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        latest = self.latest(chain_id)
+        if latest is None:
+            return ()
+
+        reverse: list[
+            SignedDurableVerificationCursor
+        ] = []
+        seen: set[str] = set()
+        current = latest.item
+        while True:
+            digest = current.cursor.digest
+            if digest in seen:
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage contains a cycle"
+                )
+            seen.add(digest)
+            reverse.append(current)
+            if len(reverse) > max_items:
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage exceeds bounded audit window"
+                )
+            previous_digest = (
+                current.cursor.previous_cursor_digest
+            )
+            if not previous_digest:
+                break
+            previous = self.get(
+                previous_digest
+            )
+            if previous is None:
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage predecessor is missing"
+                )
+            if (
+                previous.cursor.chain_id
+                != chain_id
+            ):
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage crosses chain identity"
+                )
+            current = previous
+
+        lineage = tuple(reversed(reverse))
+        if not lineage:
+            return ()
+        if lineage[0].cursor.previous_cursor_digest:
+            raise DurableVerificationCursorError(
+                "verification cursor lineage does not begin at origin"
+            )
+        if (
+            lineage[0].cursor.mode
+            is not DurableVerificationMode.FULL
+        ):
+            raise DurableVerificationCursorError(
+                "verification cursor lineage origin is not a full verification"
+            )
+
+        previous = lineage[0]
+        for child in lineage[1:]:
+            parent_cursor = previous.cursor
+            child_cursor = child.cursor
+            if (
+                child_cursor.previous_cursor_digest
+                != parent_cursor.digest
+            ):
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage digest link mismatch"
+                )
+            if (
+                child_cursor.sequence
+                < parent_cursor.sequence
+            ):
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage sequence regressed"
+                )
+            if (
+                child_cursor.sequence
+                == parent_cursor.sequence
+                and child_cursor.root_hash
+                != parent_cursor.root_hash
+            ):
+                raise DurableVerificationCursorError(
+                    "verification cursor lineage forked at equal sequence"
+                )
+            if (
+                child_cursor.mode
+                is DurableVerificationMode.INCREMENTAL
+            ):
+                if (
+                    child_cursor.sequence
+                    <= parent_cursor.sequence
+                ):
+                    raise DurableVerificationCursorError(
+                        "incremental cursor lineage must advance sequence"
+                    )
+                if (
+                    child_cursor.segment_start_root
+                    != parent_cursor.root_hash
+                ):
+                    raise DurableVerificationCursorError(
+                        "incremental cursor lineage start root mismatch"
+                    )
+                expected_items = (
+                    child_cursor.sequence
+                    - parent_cursor.sequence
+                )
+                if (
+                    child_cursor.segment_items
+                    != expected_items
+                ):
+                    raise DurableVerificationCursorError(
+                        "incremental cursor lineage segment count mismatch"
+                    )
+            previous = child
+
+        head = latest.item.cursor
+        if (
+            lineage[-1].cursor.digest
+            != head.digest
+        ):
+            raise DurableVerificationCursorError(
+                "verification cursor lineage does not end at canonical head"
+            )
+        return lineage
+
+    def verify_lineage(
+        self,
+        chain_id: str,
+        *,
+        max_items: int = 4096,
+    ) -> bool:
+        try:
+            self.lineage(
+                chain_id,
+                max_items=max_items,
+            )
+        except (
+            DurableVerificationCursorError,
+            ValueError,
+            TypeError,
+        ):
+            return False
+        return True
+
     def publish(
         self,
         item: SignedDurableVerificationCursor,
@@ -1245,6 +1403,25 @@ class DurableIncrementalVerifier:
             chain_id,
             chain,
             latest,
+        )
+
+    def full_verify(
+        self,
+        chain_id: str,
+        chain: IncrementallyVerifiableChain,
+    ) -> DurableVerificationResult:
+        """Explicitly perform and publish a stable full-chain verification."""
+        chain_id = _chain_id(chain_id)
+        if not isinstance(
+            chain,
+            IncrementallyVerifiableChain,
+        ):
+            raise TypeError(
+                "chain does not implement incremental verification protocol"
+            )
+        return self._publish_full(
+            chain_id,
+            chain,
         )
 
     def require_current(
