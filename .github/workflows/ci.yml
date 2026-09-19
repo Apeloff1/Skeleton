@@ -160,6 +160,10 @@ jobs:
           uv venv
           uv pip install -r requirements.txt
           uv pip install "pytest>=8,<9" pytest-asyncio pytest-cov pytest-xdist
+      - name: Enforce live-service test boundary
+        run: |
+          uv run python scripts/check_live_service_test_boundaries.py
+          uv run python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       - name: Run in-process backend suite
         env: {MONGO_URL: mongodb://localhost:27017/test}
         run: |
