@@ -13,7 +13,7 @@ from enum import StrEnum
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Sequence
 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
