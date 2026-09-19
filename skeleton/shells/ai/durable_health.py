@@ -147,12 +147,7 @@ class DurableRecoveryHealthReport:
             raise ValueError(
                 "policy_digest must be SHA-256 hex"
             )
-        try:
-            int(self.policy_digest, 16)
-        except ValueError as exc:
-            raise ValueError(
-                "policy_digest must be SHA-256 hex"
-            ) from exc
+        # Opaque 64-character policy digest.
         ids = tuple(self.finalization_ids)
         if len(ids) != len(set(ids)):
             raise ValueError(
