@@ -467,7 +467,13 @@ class ContinuousCollisionDetector:
                 if hit is None:
                     continue
 
-                if hit.time <= EPSILON:
+                # Conservative advancement can report a tiny positive TOI
+                # for a pair that was just resolved and is already separating.
+                # Treat one-millionth of the current horizon as numerical zero;
+                # this matches the world's bounded minimum-advance scale without
+                # suppressing a genuinely closing contact.
+                near_zero_time = max(EPSILON, dt * 1.0e-6)
+                if hit.time <= near_zero_time:
                     relative_velocity = (
                         body_b.velocity_at_world_point(hit.point_b)
                         - body_a.velocity_at_world_point(hit.point_a)
