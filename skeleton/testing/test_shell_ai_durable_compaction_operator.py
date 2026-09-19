@@ -43,6 +43,13 @@ from skeleton.shells.ai.durable_compaction_lineage_health import (
     CompactionLineageHealthPolicy,
     CompactionLineageHealthSeverity,
 )
+from skeleton.shells.ai.durable_compaction_maintenance import (
+    CompactionMaintenanceFinding,
+    CompactionMaintenancePolicy,
+    CompactionMaintenanceSeverity,
+    DurableCompactionMaintenanceError,
+    DurableCompactionMaintenanceGuard,
+)
 from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionExecution,
     DurableCompactionOperator,
@@ -3473,3 +3480,660 @@ def test_lineage_fleet_mixed_manual_review_denies_even_with_incomplete_tolerance
     )
     assert not report.allowed
     assert report.manual_review == 1
+
+
+def maintenance_guard(
+    fixture,
+    *,
+    lineage_policy=None,
+    maintenance_policy=None,
+):
+    return DurableCompactionMaintenanceGuard(
+        lineage_guard(
+            fixture,
+            lineage_policy,
+        ),
+        maintenance_policy,
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_complete_history_is_allowed(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = maintenance_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert report.allowed
+    assert report.errors == 0
+    assert report.total_floors == 1
+    assert report.unclaimed_floors == 0
+    assert report.chains[0].ok
+    assert report.chains[0].claimed_floor_ids == (
+        fixture.operator.current(
+            plan.workflow_id
+        ).workflow.floor_id,
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_orphan_floor_is_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    first_floor = fixture.floor_store.floor_at(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=workflow.cutoff_sequence + 1,
+        root_hash=fp("maintenance-orphan-root"),
+        archive_id="maintenance-orphan-archive",
+        archive_manifest_digest=fp(
+            "maintenance-orphan-archive"
+        ),
+        compaction_certificate_id=fp(
+            "maintenance-orphan-certificate"
+        ),
+        pruning_authorization_id=fp(
+            "maintenance-orphan-authorization"
+        ),
+        operation_id=fp(
+            "maintenance-orphan-operation"
+        ),
+        fencing_token=(
+            first_floor.floor.fencing_token + 1
+        ),
+        expected_previous_sequence=(
+            workflow.cutoff_sequence
+        ),
+        expected_previous_root=(
+            workflow.cutoff_root
+        ),
+    )
+    report = maintenance_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert not report.allowed
+    assert report.unclaimed_floors == 1
+    assert any(
+        item.code
+        == "maintenance.floor_without_workflow"
+        for item in report.chains[0].findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_can_disable_floor_coverage_policy(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    first_floor = fixture.floor_store.floor_at(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=workflow.cutoff_sequence + 1,
+        root_hash=fp("maintenance-uncovered-root"),
+        archive_id="maintenance-uncovered-archive",
+        archive_manifest_digest=fp(
+            "maintenance-uncovered-archive"
+        ),
+        compaction_certificate_id=fp(
+            "maintenance-uncovered-certificate"
+        ),
+        pruning_authorization_id=fp(
+            "maintenance-uncovered-authorization"
+        ),
+        operation_id=fp(
+            "maintenance-uncovered-operation"
+        ),
+        fencing_token=(
+            first_floor.floor.fencing_token + 1
+        ),
+        expected_previous_sequence=(
+            workflow.cutoff_sequence
+        ),
+        expected_previous_root=(
+            workflow.cutoff_root
+        ),
+    )
+    guard = maintenance_guard(
+        fixture,
+        maintenance_policy=CompactionMaintenancePolicy(
+            require_floor_workflow_coverage=False,
+        ),
+    )
+    report = guard.require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert report.allowed
+    assert report.unclaimed_floors == 1
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_incomplete_workflow_default_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    report = maintenance_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert not report.allowed
+    assert not report.lineage.allowed
+    assert report.total_floors == 0
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_incomplete_workflow_can_be_tolerated(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    guard = maintenance_guard(
+        fixture,
+        lineage_policy=CompactionLineageHealthPolicy(
+            max_incomplete=1,
+        ),
+    )
+    report = guard.require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert report.allowed
+    assert report.lineage.incomplete == 1
+    assert report.total_floors == 0
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_manual_review_never_allowed(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            stored.workflow,
+            certificate_digest=fp(
+                "maintenance-conflict"
+            ),
+        ),
+    )
+    report = maintenance_guard(
+        fixture,
+        lineage_policy=CompactionLineageHealthPolicy(
+            max_incomplete=10,
+        ),
+    ).inspect(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert not report.allowed
+    assert report.lineage.manual_review == 1
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_unchecked_workflow_chain_is_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = maintenance_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,),
+        ("other-chain",),
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "maintenance.workflow_chain_unchecked"
+        for item in report.findings
+    )
+
+
+def test_compaction_maintenance_requires_nonempty_chain_set_by_default():
+    fixture = OperatorFixture()
+    plan = fixture.plan()
+    report = maintenance_guard(
+        fixture,
+        lineage_policy=CompactionLineageHealthPolicy(
+            max_incomplete=1,
+        ),
+    ).inspect(
+        (plan.workflow_id,),
+        (),
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "maintenance.empty_chain_set"
+        for item in report.findings
+    )
+
+
+def test_compaction_maintenance_can_allow_empty_chain_set():
+    fixture = OperatorFixture()
+    guard = maintenance_guard(
+        fixture,
+        maintenance_policy=CompactionMaintenancePolicy(
+            require_nonempty_chains=False,
+        ),
+    )
+    report = guard.require(
+        (),
+        (),
+    )
+    assert report.allowed
+    assert report.chains == ()
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_corrupt_floor_history_is_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    history_key = fixture.floor_store._history_key(
+        workflow.floor_id
+    )
+    record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        history_key,
+    )
+    payload = dict(record.value)
+    floor_payload = dict(
+        payload["floor"]
+    )
+    floor_payload["archive_id"] = (
+        "maintenance-tampered-archive"
+    )
+    payload["floor"] = floor_payload
+    fixture.backend.compare_and_swap(
+        fixture.floor_store.namespace,
+        history_key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    report = maintenance_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "maintenance.floor_history_invalid"
+        for item in report.chains[0].findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_missing_floor_history_is_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    floor = fixture.floor_store.floor_at(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=workflow.cutoff_sequence + 1,
+        root_hash=fp("maintenance-next-root"),
+        archive_id="maintenance-next-archive",
+        archive_manifest_digest=fp(
+            "maintenance-next-archive"
+        ),
+        compaction_certificate_id=fp(
+            "maintenance-next-certificate"
+        ),
+        pruning_authorization_id=fp(
+            "maintenance-next-authorization"
+        ),
+        operation_id=fp(
+            "maintenance-next-operation"
+        ),
+        fencing_token=floor.floor.fencing_token + 1,
+        expected_previous_sequence=(
+            workflow.cutoff_sequence
+        ),
+        expected_previous_root=workflow.cutoff_root,
+    )
+    history_key = fixture.floor_store._history_key(
+        workflow.floor_id
+    )
+    index_key = fixture.floor_store._sequence_key(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    history_record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        history_key,
+    )
+    index_record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        index_key,
+    )
+    fixture.backend.delete(
+        fixture.floor_store.namespace,
+        history_key,
+        expected_revision=history_record.revision,
+    )
+    fixture.backend.delete(
+        fixture.floor_store.namespace,
+        index_key,
+        expected_revision=index_record.revision,
+    )
+    report = maintenance_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert not report.allowed
+
+
+@pytest.mark.parametrize(
+    "chain_ids",
+    [
+        ("journal", "journal"),
+        ("",),
+        ("x" * 129,),
+    ],
+)
+def test_compaction_maintenance_chain_id_validation(chain_ids):
+    fixture = OperatorFixture()
+    guard = maintenance_guard(fixture)
+    with pytest.raises(ValueError):
+        guard.inspect(
+            (),
+            chain_ids,
+        )
+
+
+def test_compaction_maintenance_chain_bound():
+    fixture = OperatorFixture()
+    guard = maintenance_guard(
+        fixture,
+        maintenance_policy=CompactionMaintenancePolicy(
+            max_chains=1,
+            require_nonempty_chains=False,
+        ),
+    )
+    with pytest.raises(
+        DurableCompactionMaintenanceError,
+        match="chain bound",
+    ):
+        guard.inspect(
+            (),
+            ("a", "b"),
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_chains": 0},
+        {"max_chains": True},
+        {"max_findings": 0},
+        {"max_findings": True},
+        {"require_nonempty_chains": "yes"},
+        {"require_floor_workflow_coverage": "yes"},
+        {"reject_duplicate_floor_claims": "yes"},
+    ],
+)
+def test_compaction_maintenance_policy_validation(kwargs):
+    with pytest.raises(ValueError):
+        CompactionMaintenancePolicy(
+            **kwargs
+        )
+
+
+def test_compaction_maintenance_policy_digest_is_stable():
+    one = CompactionMaintenancePolicy(
+        max_chains=10,
+        max_findings=20,
+        require_nonempty_chains=False,
+        require_floor_workflow_coverage=False,
+        reject_duplicate_floor_claims=False,
+    )
+    two = CompactionMaintenancePolicy(
+        max_chains=10,
+        max_findings=20,
+        require_nonempty_chains=False,
+        require_floor_workflow_coverage=False,
+        reject_duplicate_floor_claims=False,
+    )
+    assert one.digest == two.digest
+    assert len(one.digest) == 64
+
+
+def test_compaction_maintenance_policy_digest_changes():
+    assert (
+        CompactionMaintenancePolicy().digest
+        != CompactionMaintenancePolicy(
+            require_floor_workflow_coverage=False,
+        ).digest
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_report_digest_is_stable(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    guard = maintenance_guard(fixture)
+    first = guard.require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    second = guard.require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    assert first == second
+    assert first.digest == second.digest
+    assert first.to_dict()["digest"] == first.digest
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_report_serializes_chain_coverage(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = maintenance_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    data = report.to_dict()
+    assert data["allowed"] is True
+    assert data["total_floors"] == 1
+    assert data["unclaimed_floors"] == 0
+    assert data["chains"][0]["ok"] is True
+    assert (
+        data["chains"][0]["floor_count"]
+        == 1
+    )
+
+
+def test_compaction_maintenance_finding_validation():
+    finding = CompactionMaintenanceFinding(
+        CompactionMaintenanceSeverity.WARNING,
+        "maintenance.test",
+        "warning",
+        "journal",
+        fp("workflow"),
+        fp("floor"),
+    )
+    assert (
+        finding.to_dict()["severity"]
+        == "warning"
+    )
+    with pytest.raises(ValueError):
+        CompactionMaintenanceFinding(
+            CompactionMaintenanceSeverity.ERROR,
+            "",
+            "message",
+        )
+    with pytest.raises(ValueError):
+        CompactionMaintenanceFinding(
+            CompactionMaintenanceSeverity.ERROR,
+            "code",
+            "",
+        )
+    with pytest.raises(ValueError):
+        CompactionMaintenanceFinding(
+            CompactionMaintenanceSeverity.ERROR,
+            "code",
+            "message",
+            floor_id="bad",
+        )
+
+
+def test_compaction_maintenance_guard_requires_lineage_guard():
+    with pytest.raises(
+        TypeError,
+        match="lineage",
+    ):
+        DurableCompactionMaintenanceGuard(
+            object()
+        )
+
+
+def test_compaction_maintenance_guard_requires_policy_type():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        TypeError,
+        match="policy",
+    ):
+        DurableCompactionMaintenanceGuard(
+            lineage_guard(fixture),
+            object(),
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_require_raises_when_denied(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    with pytest.raises(
+        DurableCompactionMaintenanceError,
+    ):
+        maintenance_guard(
+            fixture
+        ).require(
+            (plan.workflow_id,),
+            (fixture.chain_id,),
+        )
+
+
+def test_compaction_maintenance_max_findings_bound():
+    fixture = OperatorFixture()
+    plan = fixture.plan()
+    guard = maintenance_guard(
+        fixture,
+        maintenance_policy=CompactionMaintenancePolicy(
+            max_findings=1,
+        ),
+    )
+    # An incomplete lineage creates multiple findings across lineage and
+    # maintenance accounting, exceeding this deliberately tiny cap.
+    with pytest.raises(
+        DurableCompactionMaintenanceError,
+        match="finding bound",
+    ):
+        guard.inspect(
+            (plan.workflow_id,),
+            ("other-chain",),
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_current_floor_is_covered_by_workflow(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    report = maintenance_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    current = fixture.floor_store.current(
+        fixture.chain_id
+    )
+    assert current.floor.floor_id == workflow.floor_id
+    assert (
+        current.floor.floor_id
+        in report.chains[0].claimed_floor_ids
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_history_digest_is_in_report(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = maintenance_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    chain = report.chains[0]
+    data = chain.to_dict()
+    assert (
+        data["history"]["digest"]
+        == chain.history.digest
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_maintenance_lineage_floor_claim_matches_history(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = maintenance_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,),
+        (fixture.chain_id,),
+    )
+    lineage_floor = (
+        report.lineage.reports[0]
+        .hot_floor.artifact_id
+    )
+    history_ids = {
+        item.floor.floor_id
+        for item in report.chains[0]
+        .history.floors
+    }
+    assert lineage_floor in history_ids
