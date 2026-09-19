@@ -49,6 +49,7 @@ from skeleton.shells.evidence_chain import (
     ContentAddressedEvidenceChain,
     EvidenceNode,
 )
+from skeleton.shells.sequence_index import SequenceIndexBackfillBatch
 from skeleton.shells.receipts import (
     ChainedReceipt,
     ExecutionReceipt,
@@ -1693,6 +1694,158 @@ class DurableArchiveRepository:
         if index.chain_id != chain_id or index.root_hash != root_hash:
             raise DurableArchiveStoreError("archive root index identity mismatch")
         return index
+
+    def backfill_sequence_indexes_batch(
+        self,
+        chain_id: str,
+        *,
+        end_sequence: int | None = None,
+        end_root: str = "",
+        max_items: int = 1024,
+    ) -> SequenceIndexBackfillBatch:
+        _identity("chain_id", chain_id, maximum=128)
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        head = self.latest(chain_id)
+        if head is None:
+            if end_sequence not in (None, 0):
+                raise ValueError(
+                    "archive backfill end_sequence exceeds empty archive"
+                )
+            if end_root and end_root != GENESIS_HASH:
+                raise DurableArchiveStoreError(
+                    "empty archive backfill root must be genesis"
+                )
+            return SequenceIndexBackfillBatch(
+                0,
+                GENESIS_HASH,
+                None,
+                None,
+                0,
+                0,
+                0,
+                GENESIS_HASH,
+                True,
+            )
+        target = (
+            head.sequence
+            if end_sequence is None
+            else end_sequence
+        )
+        if (
+            isinstance(target, bool)
+            or not isinstance(target, int)
+            or target < 0
+            or target > head.sequence
+        ):
+            raise ValueError(
+                "archive backfill end_sequence outside archived range"
+            )
+        if target == 0:
+            if end_root and end_root != GENESIS_HASH:
+                raise DurableArchiveStoreError(
+                    "zero-sequence archive backfill root must be genesis"
+                )
+            return SequenceIndexBackfillBatch(
+                0,
+                GENESIS_HASH,
+                None,
+                None,
+                0,
+                0,
+                0,
+                GENESIS_HASH,
+                True,
+            )
+
+        stored = self.get(head.archive_id)
+        if (
+            stored is None
+            or not self.verify_archive(stored)
+        ):
+            raise DurableArchiveStoreError(
+                "archive backfill lacks verified head archive"
+            )
+        if target > len(stored.node_hashes):
+            raise DurableArchiveStoreError(
+                "archive backfill exceeds head archive payload"
+            )
+        expected_end_root = stored.node_hashes[
+            target - 1
+        ]
+        if end_root:
+            end_root = _digest(
+                "end_root",
+                end_root,
+            )
+            if end_root != expected_end_root:
+                raise DurableArchiveStoreError(
+                    "archive backfill root/sequence mismatch"
+                )
+        else:
+            end_root = expected_end_root
+
+        requested_end_sequence = target
+        requested_end_root = end_root
+        start = max(
+            1,
+            target - max_items + 1,
+        )
+        indexed = 0
+        already_indexed = 0
+        for sequence in range(
+            target,
+            start - 1,
+            -1,
+        ):
+            expected_root = stored.node_hashes[
+                sequence - 1
+            ]
+            entry = self.sequence_index(
+                chain_id,
+                sequence,
+            )
+            if entry is None:
+                self._put_sequence_index(
+                    DurableArchiveSequenceIndex(
+                        chain_id,
+                        sequence,
+                        expected_root,
+                    )
+                )
+                indexed += 1
+            elif entry.root_hash != expected_root:
+                raise DurableArchiveStoreError(
+                    "archive backfill found conflicting sequence index"
+                )
+            else:
+                already_indexed += 1
+
+        next_sequence = start - 1
+        next_root = (
+            GENESIS_HASH
+            if next_sequence == 0
+            else stored.node_hashes[
+                next_sequence - 1
+            ]
+        )
+        return SequenceIndexBackfillBatch(
+            requested_end_sequence,
+            requested_end_root,
+            start,
+            requested_end_sequence,
+            indexed,
+            already_indexed,
+            next_sequence,
+            next_root,
+            next_sequence == 0,
+        )
 
     def inspect_sequence_indexes(
         self,
@@ -3389,6 +3542,157 @@ class ArchiveBackedHistoricalChain:
                 "historical indexed range terminal root mismatch"
             )
         return items
+
+    def backfill_sequence_indexes_batch(
+        self,
+        *,
+        end_sequence: int | None = None,
+        end_root: str = "",
+        max_items: int = 1024,
+    ) -> SequenceIndexBackfillBatch:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        head = self.head()
+        target = (
+            int(head.sequence)
+            if end_sequence is None
+            else end_sequence
+        )
+        if (
+            isinstance(target, bool)
+            or not isinstance(target, int)
+            or target < 0
+            or target > int(head.sequence)
+        ):
+            raise ValueError(
+                "historical backfill end_sequence outside committed range"
+            )
+        if target == 0:
+            if end_root and end_root != GENESIS_HASH:
+                raise DurableArchiveStoreError(
+                    "zero-sequence historical backfill root must be genesis"
+                )
+            return SequenceIndexBackfillBatch(
+                0,
+                GENESIS_HASH,
+                None,
+                None,
+                0,
+                0,
+                0,
+                GENESIS_HASH,
+                True,
+            )
+        if not end_root:
+            if target != int(head.sequence):
+                raise ValueError(
+                    "historical backfill requires explicit root for non-head sequence"
+                )
+            end_root = str(head.root_hash)
+        end_root = _digest(
+            "end_root",
+            end_root,
+        )
+        if (
+            self._sequence_for_root_live_or_archive(
+                end_root
+            )
+            != target
+        ):
+            raise DurableArchiveStoreError(
+                "historical backfill root/sequence mismatch"
+            )
+
+        floor = self._active_floor()
+        if floor is None:
+            live_backfill = getattr(
+                self.live_chain,
+                "backfill_sequence_indexes_batch",
+                None,
+            )
+            if callable(live_backfill):
+                try:
+                    return live_backfill(
+                        end_sequence=target,
+                        end_root=end_root,
+                        max_items=max_items,
+                    )
+                except Exception:
+                    pass
+            return self.archives.backfill_sequence_indexes_batch(
+                self.chain_id,
+                end_sequence=target,
+                end_root=end_root,
+                max_items=max_items,
+            )
+
+        floor_sequence = int(floor.sequence)
+        floor_root = str(floor.root_hash)
+        if target <= floor_sequence:
+            return self.archives.backfill_sequence_indexes_batch(
+                self.chain_id,
+                end_sequence=target,
+                end_root=end_root,
+                max_items=max_items,
+            )
+
+        live_budget = min(
+            max_items,
+            target - floor_sequence,
+        )
+        live_batch = (
+            self.live_chain
+            .backfill_sequence_indexes_batch(
+                end_sequence=target,
+                end_root=end_root,
+                max_items=live_budget,
+            )
+        )
+        if live_batch.next_sequence > floor_sequence:
+            return live_batch
+        if live_batch.next_sequence < floor_sequence:
+            raise DurableArchiveStoreError(
+                "live sequence-index backfill crossed trusted hot floor"
+            )
+        if live_batch.next_root != floor_root:
+            raise DurableArchiveStoreError(
+                "live sequence-index backfill did not terminate at hot floor"
+            )
+        remaining = (
+            max_items - live_batch.covered_items
+        )
+        if remaining <= 0:
+            return live_batch
+
+        cold_batch = (
+            self.archives
+            .backfill_sequence_indexes_batch(
+                self.chain_id,
+                end_sequence=floor_sequence,
+                end_root=floor_root,
+                max_items=remaining,
+            )
+        )
+        return SequenceIndexBackfillBatch(
+            live_batch.requested_end_sequence,
+            live_batch.requested_end_root,
+            cold_batch.covered_start_sequence,
+            live_batch.requested_end_sequence,
+            live_batch.indexed + cold_batch.indexed,
+            (
+                live_batch.already_indexed
+                + cold_batch.already_indexed
+            ),
+            cold_batch.next_sequence,
+            cold_batch.next_root,
+            cold_batch.complete_to_genesis,
+        )
 
     @staticmethod
     def _merge_index_health(
