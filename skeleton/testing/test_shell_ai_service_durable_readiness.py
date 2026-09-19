@@ -161,6 +161,8 @@ class ServiceEnvironment:
         tmp_path,
         *,
         reconcile_on_start=False,
+        reconcile_after_internal_writes=False,
+        reconcile_after_finalization=False,
         readiness_policy=None,
         journal_capacity=100,
         receipt_capacity=100,
@@ -254,8 +256,10 @@ class ServiceEnvironment:
                         },
                         cwd_roots=(root,),
                     )
-                )
-            )
+                ),
+                receipts=self.receipts,
+            ),
+            receipts=self.receipts,
         )
         shell.start()
         planner = AIPlanner(
@@ -277,6 +281,7 @@ class ServiceEnvironment:
                 effects_value,
             ),
             shell_service=shell,
+            journal=self.journal,
         )
         self.service = AIShellService(
             orchestrator,
@@ -294,6 +299,12 @@ class ServiceEnvironment:
             durable_readiness_guard=self.readiness,
             durable_readiness_reconcile_on_start=(
                 reconcile_on_start
+            ),
+            durable_readiness_reconcile_after_internal_writes=(
+                reconcile_after_internal_writes
+            ),
+            durable_readiness_reconcile_after_finalization=(
+                reconcile_after_finalization
             ),
         )
 
@@ -1073,3 +1084,292 @@ def test_multiple_drift_recovery_cycles_are_supported(tmp_path):
         report = env.service.reconcile_durable_readiness()
         assert report.ready
         assert env.service.state.phase is AIServicePhase.READY
+
+def test_review_self_drift_blocks_later_seal_without_internal_refresh(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=False,
+    )
+    env.append(1)
+    env.service.start()
+    session = env.service.new_session(
+        AIIntent(
+            "self-drift",
+            "review creates journal evidence",
+        )
+    )
+    review, _ = env.service.review(session)
+    assert env.service.state.phase is AIServicePhase.READY
+    assert (
+        env.service.status()
+        .durable_readiness["ready"]
+        is True
+    )
+    from skeleton.shells.ai.execution_seal import ExecutionSealAuthority
+
+    with pytest.raises(
+        RuntimeError,
+        match="readiness",
+    ):
+        env.service.seal_review(
+            session,
+            review,
+            principal="alice",
+            authority=ExecutionSealAuthority(
+                b"k" * 32
+            ),
+        )
+    assert env.service.state.phase is AIServicePhase.DEGRADED
+
+
+def test_review_internal_refresh_keeps_seal_path_ready(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(1)
+    env.service.start()
+    session = env.service.new_session(
+        AIIntent(
+            "self-refresh",
+            "review refreshes durable evidence",
+        )
+    )
+    before_root = env.journal.root_hash()
+    review, _ = env.service.review(session)
+    assert env.journal.root_hash() != before_root
+    assert env.service.state.phase is AIServicePhase.READY
+    assert (
+        env.service.status()
+        .durable_readiness["ready"]
+        is True
+    )
+
+    from skeleton.shells.ai.execution_seal import ExecutionSealAuthority
+
+    seal = env.service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=ExecutionSealAuthority(
+            b"k" * 32
+        ),
+    )
+    assert seal.session_id == session.session_id
+    assert env.service.state.phase is AIServicePhase.READY
+
+
+def test_internal_review_refresh_records_verification_mutation(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(1)
+    env.service.start()
+    session = env.service.new_session(
+        AIIntent(
+            "review-refresh",
+            "capture readiness mutation",
+        )
+    )
+    env.service.review(session)
+    readiness = env.service.status().durable_readiness
+    assert readiness["ready"] is True
+    assert (
+        "verification_full_refresh"
+        in readiness["mutations"]
+    )
+
+
+def test_unsealed_execution_internal_refresh_keeps_next_session_ready(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(1)
+    env.service.start()
+    session = env.service.new_session(
+        AIIntent(
+            "execute-refresh",
+            "run command with durable refresh",
+        )
+    )
+    review, _ = env.service.review(session)
+    result = env.service.execute(
+        session,
+        review,
+        context=__import__(
+            "skeleton.shells.execution_context",
+            fromlist=["ExecutionContext"],
+        ).ExecutionContext(
+            "ctx",
+            principal="alice",
+        ),
+    )
+    assert result.ok
+    assert env.service.state.phase is AIServicePhase.READY
+    assert env.receipts.length() >= 2
+    next_session = env.service.new_session(
+        AIIntent(
+            "next-after-execute",
+            "service remains ready",
+        )
+    )
+    assert next_session.intent.intent_id == "next-after-execute"
+
+
+def test_internal_execution_refresh_tracks_latest_chain_heads(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(1)
+    env.service.start()
+    session = env.service.new_session(
+        AIIntent(
+            "head-refresh",
+            "bind latest durable heads",
+        )
+    )
+    review, _ = env.service.review(session)
+    from skeleton.shells.execution_context import ExecutionContext
+
+    env.service.execute(
+        session,
+        review,
+        context=ExecutionContext(
+            "ctx",
+            principal="alice",
+        ),
+    )
+    verification = (
+        env.service.status()
+        .durable_readiness["verification"]
+    )
+    by_id = {
+        item["chain_id"]: item
+        for item in verification["chains"]
+    }
+    assert (
+        by_id["journal"]["current_root"]
+        == env.journal.root_hash()
+    )
+    assert (
+        by_id["receipts"]["current_root"]
+        == env.receipts.root_hash()
+    )
+
+
+def test_internal_write_reconcile_flag_must_be_bool(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+    )
+    with pytest.raises(
+        ValueError,
+        match="internal_writes",
+    ):
+        AIShellService(
+            env.service.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            durable_operations_inspector=env.operations,
+            durable_operations_chains=env.entries,
+            durable_readiness_guard=env.readiness,
+            durable_readiness_reconcile_after_internal_writes="yes",
+        )
+
+
+def test_post_finalization_reconcile_flag_must_be_bool(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+    )
+    with pytest.raises(
+        ValueError,
+        match="after_finalization",
+    ):
+        AIShellService(
+            env.service.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            durable_operations_inspector=env.operations,
+            durable_operations_chains=env.entries,
+            durable_readiness_guard=env.readiness,
+            durable_readiness_reconcile_after_finalization="yes",
+        )
+
+
+def test_internal_refresh_does_not_repair_preexisting_external_drift(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(2)
+    env.service.start()
+
+    # Drift exists before the review stage begins, so the pre-stage readiness
+    # check must block before the model is called. Internal write maintenance
+    # is not a general-purpose external auto-healer.
+    key = env.journal._sequence_key(1)
+    record = env.backend.get(
+        "journal",
+        key,
+    )
+    env.backend.delete(
+        "journal",
+        key,
+        expected_revision=record.revision,
+    )
+    session = env.service.new_session(
+        AIIntent(
+            "preexisting-drift",
+            "must not auto-heal external drift",
+        )
+    )
+    with pytest.raises(RuntimeError):
+        env.service.review(session)
+    assert env.service.state.phase is AIServicePhase.DEGRADED
+    assert env.journal._sequence_index(1) is None
+
+
+def test_internal_refresh_supports_multiple_review_execute_cycles(tmp_path):
+    env = ServiceEnvironment(
+        tmp_path,
+        reconcile_on_start=True,
+        reconcile_after_internal_writes=True,
+    )
+    env.append(1)
+    env.service.start()
+    from skeleton.shells.execution_context import ExecutionContext
+
+    for index in range(3):
+        session = env.service.new_session(
+            AIIntent(
+                f"cycle-{index}",
+                "review and execute with write-aware refresh",
+            )
+        )
+        review, _ = env.service.review(session)
+        result = env.service.execute(
+            session,
+            review,
+            context=ExecutionContext(
+                f"ctx-{index}",
+                principal="alice",
+            ),
+        )
+        assert result.ok
+        assert env.service.state.phase is AIServicePhase.READY
+        assert (
+            env.service.status()
+            .durable_readiness["ready"]
+            is True
+        )
+
