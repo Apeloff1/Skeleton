@@ -1,6 +1,7 @@
 name: Merge Readiness
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -14,14 +15,14 @@ on:
 permissions:
   contents: read
 
-# Merge Readiness validates the repository's current integration state rather
-# than serving as the archival security record for every historical main SHA.
-# Collapse superseded PR and main-branch runs so rapid merge waves cannot pin
-# runner capacity behind stale integration evidence. Secret/malware/provenance
-# workflows retain their separate evidence policies.
+# Merge Readiness validates the repository's current integration state while
+# preserving one canonical result for every main head SHA. Superseded PR runs
+# may cancel, but a newer main push must not erase verification evidence for an
+# older main head. Secret/malware/provenance workflows retain their separate
+# evidence policies.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11.16"
