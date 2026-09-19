@@ -1,5 +1,30 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_replica_consensus import (
+    REPLICA_CONSENSUS_ARTIFACT_TYPE,
+    DurableReplicaConsensusAuthority,
+    DurableReplicaConsensusCandidate,
+    DurableReplicaConsensusCertificate,
+    DurableReplicaConsensusError,
+    DurableReplicaConsensusEvaluator,
+    DurableReplicaConsensusFinding,
+    DurableReplicaConsensusHead,
+    DurableReplicaConsensusPolicy,
+    DurableReplicaConsensusReport,
+    DurableReplicaConsensusVote,
+    DurableReplicaConsensusVoteState,
+    SignedDurableReplicaConsensusCertificate,
+)
+from skeleton.shells.ai.durable_replica_consensus_history import (
+    DurableReplicaConsensusEpoch,
+    DurableReplicaConsensusEquivocation,
+    DurableReplicaConsensusHistoryError,
+    DurableReplicaConsensusHistoryHead,
+    DurableReplicaConsensusHistoryStore,
+    DurableReplicaConsensusRollback,
+    StoredDurableReplicaConsensusEpoch,
+)
+
 from skeleton.shells.ai.durable_session_journal import DurableSessionJournalCommit, DurableSessionJournalConflict, DurableSessionJournalCorruption, DurableSessionJournalHead, DurableSessionJournalManifest, DurableSessionJournalStore, StoredDurableSessionJournal
 from skeleton.shells.ai.durable_proof_window import PROOF_ARTIFACT_TYPE, DurableHistoricalProofAuthority, DurableHistoricalProofError, DurableHistoricalProofIndex, DurableHistoricalProofStore, DurableHistoricalProofVerification, DurableHistoricalProofWindow, ProofWindowChain, SignedDurableHistoricalProofWindow
 from skeleton.shells.ai.durable_proof_window_operator import DurableProofWindowFleetReport, DurableProofWindowFinding, DurableProofWindowOperator, DurableProofWindowOperatorError, DurableProofWindowPolicy, DurableProofWindowReport, DurableProofWindowState, DurableProofWindowTarget
