@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
@@ -122,12 +121,12 @@ class InMemoryPlanStore:
             item.owner = worker_id
             item.status = "assigned"
             item.updated_at = now
-            self._items[item.id] = replace(item)
+            self._items[item.id] = clone_plan_item(item)
 
             worker.current_task_id = item.id
             worker.status = "working"
             worker.last_heartbeat_at = now
-            self._workers[worker_id] = replace(worker)
+            self._workers[worker_id] = clone_worker_state(worker)
             return clone_plan_item(item)
 
     def finish_claim(
@@ -155,15 +154,15 @@ class InMemoryPlanStore:
             item.updated_at = now
             if outcome == "queued":
                 item.owner = None
-            self._items[item.id] = replace(item)
+            self._items[item.id] = clone_plan_item(item)
 
             if worker.current_task_id == item_id:
                 worker.current_task_id = None
                 if worker.status != "offline":
                     worker.status = "idle"
                 worker.last_heartbeat_at = now
-                self._workers[worker_id] = replace(worker)
-            return replace(item)
+                self._workers[worker_id] = clone_worker_state(worker)
+            return clone_plan_item(item)
 
     def append_revision(self, revision: PlanRevision) -> None:
         with self._lock:
