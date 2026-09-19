@@ -183,7 +183,10 @@ jobs:
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - name: Compile automation package
-        run: python -m compileall -q skeleton/pr_automation
+        run: >-
+          python -m compileall -q
+          skeleton/pr_automation
+          skeleton/automation
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -195,6 +198,9 @@ jobs:
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
           skeleton/testing/test_pr_automation_branch_completions.py
+          tests/test_autonomous_supervisor.py
+          tests/test_supervisor_runtime.py
+          backend/tests/test_supervisor_workflow_contract.py
 
   readiness:
     name: Merge Readiness
