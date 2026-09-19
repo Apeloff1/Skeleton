@@ -26,6 +26,7 @@ from skeleton.shells.ai.durable_compaction import (
 from skeleton.shells.ai.durable_compaction_certificate import (
     DurableCompactionCertificateStore,
 )
+from skeleton.shells.ai.durable_destruction import DurableDestructionLedger
 from skeleton.shells.ai.durable_hot_floor import (
     DurableHotFloorError,
     DurableHotFloorStore,
@@ -274,10 +275,21 @@ class Fixture:
             operator_id="operator",
             max_delete_items=max_items,
         )
+        self.destruction_ledger = DurableDestructionLedger(
+            self.backend,
+            signer(
+                "destruction",
+                b"d",
+                clock=lambda: self.now[0],
+            ),
+            namespace=f"{kind}-destruction",
+            clock=lambda: self.now[0],
+        )
         self.executor = DurablePruningExecutor(
             self.backend,
             self.authorization_store,
             self.floor_store,
+            destruction_ledger=self.destruction_ledger,
             namespace=f"{kind}-pruning",
             max_items=max_items,
             clock=lambda: self.now[0],
