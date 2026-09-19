@@ -412,6 +412,35 @@ class DurableArchiveRepository:
         )
 
     @staticmethod
+    def _record_digest(
+        *,
+        manifest_digest: str,
+        checkpoint_digest: str,
+        node_hashes: tuple[str, ...],
+        stored_at: float,
+    ) -> str:
+        raw = json.dumps(
+            {
+                "manifest_digest": _digest(
+                    "manifest_digest",
+                    manifest_digest,
+                ),
+                "checkpoint_digest": _digest(
+                    "checkpoint_digest",
+                    checkpoint_digest,
+                ),
+                "node_hashes": [
+                    _digest("node_hash", item)
+                    for item in node_hashes
+                ],
+                "stored_at": float(stored_at),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    @staticmethod
     def _archive_key(archive_id: str) -> str:
         return "archive:" + _hash_key(
             _identity("archive_id", archive_id, maximum=256)
@@ -883,9 +912,21 @@ class DurableArchiveRepository:
         if not isinstance(chain, CheckpointableEvidenceChain):
             raise TypeError("chain must satisfy CheckpointableEvidenceChain")
 
-        verification = self._builder.require(item, checkpoint, chain)
+        try:
+            verification = self._builder.require(
+                item,
+                checkpoint,
+                chain,
+            )
+        except Exception as exc:
+            raise DurableArchiveStoreError(
+                "archive failed live-chain verification: "
+                f"{type(exc).__name__}"
+            ) from exc
         if not verification.valid:
-            raise DurableArchiveStoreError("archive failed live-chain verification")
+            raise DurableArchiveStoreError(
+                "archive failed live-chain verification"
+            )
         self._verify_manifest_signature(item)
         self._verify_checkpoint_authority(checkpoint)
 
@@ -952,11 +993,22 @@ class DurableArchiveRepository:
             or float(now) < 0.0
         ):
             raise DurableArchiveStoreError("archive store clock is invalid")
+        node_hashes = tuple(
+            node.node_hash
+            for node in archived_nodes
+        )
+        record_digest = self._record_digest(
+            manifest_digest=manifest.digest,
+            checkpoint_digest=checkpoint.checkpoint.digest,
+            node_hashes=node_hashes,
+            stored_at=float(now),
+        )
         record_value = {
             "manifest": item.to_dict(),
             "checkpoint": checkpoint.to_dict(),
-            "node_hashes": [node.node_hash for node in archived_nodes],
+            "node_hashes": list(node_hashes),
             "stored_at": float(now),
+            "record_digest": record_digest,
         }
         archive_key = self._archive_key(manifest.archive_id)
         fresh_write = self._put_immutable(
@@ -1024,12 +1076,27 @@ class DurableArchiveRepository:
             raise DurableArchiveStoreError("stored archive node_hashes shape invalid")
         manifest = self._manifest(dict(manifest_raw))
         checkpoint = self._checkpoint(dict(checkpoint_raw))
+        node_hashes = tuple(
+            str(item)
+            for item in node_hashes_raw
+        )
+        stored_at = float(raw["stored_at"])
+        expected_record_digest = self._record_digest(
+            manifest_digest=manifest.manifest.digest,
+            checkpoint_digest=checkpoint.checkpoint.digest,
+            node_hashes=node_hashes,
+            stored_at=stored_at,
+        )
+        if str(raw.get("record_digest", "")) != expected_record_digest:
+            raise DurableArchiveStoreError(
+                "archive record digest mismatch"
+            )
         stored = StoredDurableArchive(
             revision,
             manifest,
             checkpoint,
-            tuple(str(item) for item in node_hashes_raw),
-            float(raw["stored_at"]),
+            node_hashes,
+            stored_at,
         )
         self._verify_manifest_signature(manifest)
         self._verify_checkpoint_authority(checkpoint)
