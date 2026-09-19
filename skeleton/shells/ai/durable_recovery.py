@@ -13,6 +13,10 @@ from enum import Enum
 import hashlib
 import json
 
+from skeleton.shells.ai.durable_archive_store import (
+    ArchiveBackedHistoricalChain,
+    DurableArchiveRepository,
+)
 from skeleton.shells.ai.execution_evidence import (
     AIExecutionEvidenceStore,
     SignedAIExecutionEvidence,
@@ -254,16 +258,62 @@ class DurableSessionRecoveryVerifier:
         journal,
         receipt_chain,
         execution_evidence: AIExecutionEvidenceStore | None = None,
+        journal_archive: DurableArchiveRepository | None = None,
+        journal_chain_id: str = "",
+        receipt_archive: DurableArchiveRepository | None = None,
+        receipt_chain_id: str = "",
     ) -> None:
+        if (journal_archive is None) != (not journal_chain_id):
+            raise ValueError(
+                "journal_archive and journal_chain_id must be configured together"
+            )
+        if (receipt_archive is None) != (not receipt_chain_id):
+            raise ValueError(
+                "receipt_archive and receipt_chain_id must be configured together"
+            )
+        if journal_archive is not None and not isinstance(
+            journal_archive,
+            DurableArchiveRepository,
+        ):
+            raise TypeError(
+                "journal_archive must be DurableArchiveRepository"
+            )
+        if receipt_archive is not None and not isinstance(
+            receipt_archive,
+            DurableArchiveRepository,
+        ):
+            raise TypeError(
+                "receipt_archive must be DurableArchiveRepository"
+            )
         self.finalizations = finalizations
         self.recovery_checkpoints = recovery_checkpoints
         self.session_evidence = session_evidence
-        self.journal = journal
-        self.receipt_chain = receipt_chain
+        self.journal = (
+            journal
+            if journal_archive is None
+            else ArchiveBackedHistoricalChain(
+                journal_chain_id,
+                journal,
+                journal_archive,
+            )
+        )
+        self.receipt_chain = (
+            receipt_chain
+            if receipt_archive is None
+            else ArchiveBackedHistoricalChain(
+                receipt_chain_id,
+                receipt_chain,
+                receipt_archive,
+            )
+        )
         self.execution_evidence = execution_evidence
+        self.journal_archive = journal_archive
+        self.journal_chain_id = journal_chain_id
+        self.receipt_archive = receipt_archive
+        self.receipt_chain_id = receipt_chain_id
         self.integrity_verifier = SessionEvidenceIntegrityVerifier(
-            journal,
-            receipt_chain,
+            self.journal,
+            self.receipt_chain,
         )
 
     @staticmethod
