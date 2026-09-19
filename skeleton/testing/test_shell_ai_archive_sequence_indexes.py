@@ -229,7 +229,11 @@ class Fixture:
             0,
             -1,
         ):
-            item = self.chain.get_by_sequence(sequence)
+            # The floor becomes active as soon as its boundary node is
+            # removed.  Pruning setup must therefore use the immutable prefix
+            # captured before activation instead of asking the hot chain to
+            # read history that has already crossed the signed floor.
+            item = self.prefix[sequence - 1]
             digest = node_hash(item)
             key = (
                 self.chain._event_key(digest)
