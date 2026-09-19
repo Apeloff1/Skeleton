@@ -59,6 +59,28 @@ def full_grant():
     )
 
 
+@pytest.mark.parametrize("value", [0, -1, True, float("nan"), float("inf")])
+def test_executor_config_rejects_invalid_long_running_threshold(value):
+    with pytest.raises(ValueError):
+        ExecutorConfig(long_running_threshold_seconds=value)
+
+
+@pytest.mark.parametrize("value", [-1, True, float("nan"), float("inf")])
+def test_executor_config_rejects_invalid_retry_sleep_bound(value):
+    with pytest.raises(ValueError):
+        ExecutorConfig(max_retry_sleep_seconds=value)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_executor_config_rejects_invalid_large_output_threshold(value):
+    with pytest.raises(ValueError):
+        ExecutorConfig(large_output_threshold_bytes=value)
+
+
+def test_executor_config_allows_zero_retry_sleep():
+    assert ExecutorConfig(max_retry_sleep_seconds=0).max_retry_sleep_seconds == 0
+
+
 def test_executor_records_audit_telemetry_and_receipt(tmp_path):
     audit = MemoryAuditSink()
     telemetry = ShellTelemetry()
