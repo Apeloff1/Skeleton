@@ -11,7 +11,10 @@ from skeleton.shells.ai.distributed_journal import (
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.durable_archive import DurableArchiveManifestBuilder
-from skeleton.shells.ai.durable_archive_store import DurableArchiveRepository
+from skeleton.shells.ai.durable_archive_store import (
+    DurableArchiveIndexState,
+    DurableArchiveRepository,
+)
 from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
 from skeleton.shells.ai.durable_compaction import (
     DurableCompactionPlanner,
@@ -906,3 +909,398 @@ def test_lifecycle_error_is_runtime_error():
         DurableLifecycleError,
         RuntimeError,
     )
+
+def prepared_archive_fixture():
+    fixture = build_components()
+    (
+        backend,
+        journal,
+        checkpoints,
+        _,
+        _,
+        archives,
+        _,
+        coordinator,
+    ) = fixture
+    append_events(journal, 6)
+    coordinator.prepare(
+        "journal",
+        journal,
+    )
+    append_events(
+        journal,
+        2,
+        start=6,
+    )
+    ready = coordinator.prepare(
+        "journal",
+        journal,
+    )
+    assert ready.archive is not None
+    assert ready.checkpoint is not None
+    return (
+        fixture,
+        ready,
+    )
+
+
+def test_lifecycle_ready_report_includes_healthy_archive_index_health():
+    (
+        _,
+        ready,
+    ) = prepared_archive_fixture()
+    assert (
+        ready.state
+        is DurableLifecycleState.COMPACTION_READY
+    )
+    assert ready.archive_index_health is not None
+    assert (
+        ready.archive_index_health.state
+        is DurableArchiveIndexState.HEALTHY
+    )
+    assert ready.archive_index_health.healthy
+
+
+def test_lifecycle_serializes_archive_index_health():
+    (
+        _,
+        ready,
+    ) = prepared_archive_fixture()
+    data = ready.to_dict()
+    assert (
+        data["archive_index_health"]["state"]
+        == "healthy"
+    )
+    assert (
+        data["archive_index_health"]["archive_id"]
+        == ready.archive.manifest.archive_id
+    )
+
+
+def test_lifecycle_blocks_compaction_when_archive_root_index_missing():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    archives = fixture[5]
+    coordinator = fixture[7]
+    root = ready.archive.manifest.entries[0].root_hash
+    key = archives._root_key(
+        "journal",
+        root,
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    backend.delete(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    report = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert report.state is DurableLifecycleState.BLOCKED
+    assert not report.ok
+    assert report.archive_index_health is not None
+    assert (
+        report.archive_index_health.state
+        is DurableArchiveIndexState.DEGRADED
+    )
+    assert report.archive_index_health.repairable
+    assert any(
+        "requires repair" in reason
+        for reason in report.reasons
+    )
+
+
+def test_lifecycle_returns_to_ready_after_archive_index_repair():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    archives = fixture[5]
+    coordinator = fixture[7]
+    root = ready.archive.manifest.entries[0].root_hash
+    key = archives._root_key(
+        "journal",
+        root,
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    backend.delete(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    blocked = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert blocked.state is DurableLifecycleState.BLOCKED
+
+    archives.repair_indexes(
+        ready.archive.manifest.archive_id
+    )
+    restored = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert (
+        restored.state
+        is DurableLifecycleState.COMPACTION_READY
+    )
+    assert restored.ok
+    assert restored.archive_index_health.healthy
+
+
+def test_lifecycle_blocks_invalid_archive_root_index():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    archives = fixture[5]
+    coordinator = fixture[7]
+    root = ready.archive.manifest.entries[0].root_hash
+    key = archives._root_key(
+        "journal",
+        root,
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    raw = dict(record.value)
+    raw["sequence"] = int(
+        raw["sequence"]
+    ) + 1
+    backend.compare_and_swap(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+    report = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert report.state is DurableLifecycleState.BLOCKED
+    assert (
+        report.archive_index_health.state
+        is DurableArchiveIndexState.INVALID
+    )
+    assert not report.archive_index_health.repairable
+    assert any(
+        "invalid" in reason
+        for reason in report.reasons
+    )
+
+
+def test_lifecycle_blocks_missing_archive_head_until_repair():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    archives = fixture[5]
+    coordinator = fixture[7]
+    key = archives._head_key(
+        "journal"
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    backend.delete(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    blocked = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert blocked.state is DurableLifecycleState.BLOCKED
+    assert (
+        blocked.archive_index_health
+        .head_repair_required
+    )
+
+    archives.repair_indexes(
+        ready.archive.manifest.archive_id
+    )
+    restored = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert restored.ok
+    assert restored.archive_index_health.healthy
+
+
+def test_lifecycle_exact_checkpoint_lookup_repairs_missing_digest_index():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    checkpoints = fixture[2]
+    coordinator = fixture[7]
+    checkpoint = ready.checkpoint
+    key = checkpoints._digest_lookup_key(
+        checkpoint.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    assert backend.get(
+        checkpoints._namespace,
+        key,
+    ) is None
+
+    report = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert report.checkpoint == checkpoint
+    assert backend.get(
+        checkpoints._namespace,
+        key,
+    ) is not None
+    assert checkpoints.verify()
+
+
+def test_lifecycle_checkpoint_lookup_rejects_conflicting_exact_index():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    checkpoints = fixture[2]
+    coordinator = fixture[7]
+
+    append_events(
+        journal,
+        1,
+        start=8,
+    )
+    other = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    checkpoint = ready.checkpoint
+    key = checkpoints._digest_lookup_key(
+        checkpoint.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.compare_and_swap(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+        value=checkpoints._lookup_for(
+            other
+        ).to_dict(),
+    )
+    with pytest.raises(
+        DurableLifecycleError,
+        match="canonical lookup failed",
+    ):
+        coordinator.inspect(
+            "journal",
+            journal,
+        )
+
+
+def test_lifecycle_report_digest_changes_with_archive_index_health():
+    (
+        fixture,
+        ready,
+    ) = prepared_archive_fixture()
+    backend = fixture[0]
+    journal = fixture[1]
+    archives = fixture[5]
+    coordinator = fixture[7]
+    root = ready.archive.manifest.entries[0].root_hash
+    key = archives._root_key(
+        "journal",
+        root,
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    backend.delete(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    degraded = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert degraded.digest != ready.digest
+    assert (
+        degraded.archive_index_health.digest
+        != ready.archive_index_health.digest
+    )
+
+
+def test_archive_index_health_is_none_before_archive_exists():
+    fixture = build_components(
+        max_events=100,
+        target_utilization=0.8,
+    )
+    journal = fixture[1]
+    coordinator = fixture[7]
+    append_events(journal, 2)
+    report = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert report.state is DurableLifecycleState.HEALTHY
+    assert report.archive is None
+    assert report.archive_index_health is None
+
+
+def test_archive_required_state_has_no_archive_index_health():
+    fixture = build_components()
+    journal = fixture[1]
+    coordinator = fixture[7]
+    append_events(journal, 6)
+    coordinator.prepare(
+        "journal",
+        journal,
+    )
+    append_events(
+        journal,
+        2,
+        start=6,
+    )
+    report = coordinator.inspect(
+        "journal",
+        journal,
+    )
+    assert report.state is DurableLifecycleState.ARCHIVE_REQUIRED
+    assert report.archive_index_health is None
