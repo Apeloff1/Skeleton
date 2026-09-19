@@ -286,6 +286,7 @@ def test_nonstrict_warm_redacts_exception_payload(tmp_path: Path) -> None:
     assert statuses["vector"].last_error == "RuntimeError"
     assert "super-secret-value" not in (statuses["vector"].last_error or "")
 
+
 def test_strict_warm_raises_aggregated_registry_error(tmp_path: Path) -> None:
     registry, _instances, _factory_calls = _registry(
         tmp_path,
