@@ -195,11 +195,11 @@ class ProductControlPlane:
         p = next((x for x in pending if x["operation_id"] == operation_id), None); r = next((x for x in receipts if x["operation_id"] == operation_id), None)
         binding = self.executors.resolve(p["capability_id"], p["action"]) if p else None
         projection = asdict(evidence)
-        # Preserve the evidence-derived boolean under an explicit key while
-        # retaining the established public lifecycle contract where "pending"
-        # is the pending operation projection or None.
+        # Preserve the established lifecycle contract: "pending" is the
+        # evidence-derived boolean. The optional operation projection remains
+        # available under the explicit "pending_operation" key.
         projection["pending_present"] = evidence.pending
-        projection["pending"] = p
+        projection["pending"] = evidence.pending
         projection["pending_operation"] = p
         projection["executor"] = (
             {
