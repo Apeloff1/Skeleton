@@ -1301,12 +1301,16 @@ class DurableIncrementalVerifier:
                     "indexed tail verification failed"
                 ) from exc
         else:
-            segment = self._bounded_tail_segment(
-                chain,
-                cursor,
-                sequence,
-                root_hash,
-            )
+            try:
+                segment = chain.snapshot_segment(
+                    cursor.root_hash,
+                    root_hash,
+                    max_items=self.policy.max_tail_items,
+                )
+            except Exception as exc:
+                raise DurableVerificationCursorError(
+                    "hash-linked tail verification failed"
+                ) from exc
 
         expected = sequence - cursor.sequence
         if len(segment) != expected:
