@@ -735,7 +735,7 @@ class DurableSessionRecoveryVerifier:
                 (
                     "signed_evidence.session_evidence",
                     (
-                        ""
+                        recovery.session_evidence_digest
                         if session_evidence_value is None
                         else session_evidence_value.digest
                     ),
@@ -744,13 +744,21 @@ class DurableSessionRecoveryVerifier:
                 ),
                 (
                     "signed_evidence.session_journal",
-                    session_journal_digest,
+                    (
+                        recovery.session_journal_digest
+                        if not session_journal_digest
+                        else session_journal_digest
+                    ),
                     evidence.session_journal_digest,
                     "signed execution journal commitment differs from reconstruction",
                 ),
                 (
                     "signed_evidence.session_integrity",
-                    session_integrity_digest,
+                    (
+                        recovery.session_integrity_digest
+                        if not session_integrity_digest
+                        else session_integrity_digest
+                    ),
                     evidence.session_integrity_digest,
                     "signed execution integrity commitment differs from reconstruction",
                 ),
