@@ -493,6 +493,101 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             )
 
 
+class DurableWorkerHealthTests(unittest.TestCase):
+    def test_open_specialist_pr_becomes_durable_health_evidence(self) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(),
+            pull_requests=(
+                {
+                    "number": 17,
+                    "headRefName": (
+                        "bot/specialist-security-auditor-"
+                        "0123456789abcdef"
+                    ),
+                    "baseRefName": "main",
+                    "isDraft": False,
+                    "mergeStateStatus": "BLOCKED",
+                },
+                {
+                    "number": 18,
+                    "headRefName": "feature/human-work",
+                    "baseRefName": "main",
+                    "isDraft": False,
+                    "mergeStateStatus": "CLEAN",
+                },
+            ),
+            workflow_runs=(),
+        )
+        health = supervisor.durable_worker_health(snapshot)
+        self.assertTrue(health["non_authoritative"])
+        self.assertEqual(health["source"], "github-open-pull-requests")
+        self.assertEqual(health["active_count"], 1)
+        self.assertEqual(
+            health["active_workers"],
+            [{
+                "worker": "security-auditor",
+                "pull_request": 17,
+                "base_prefix": "0123456789abcdef",
+                "is_draft": False,
+                "merge_state": "BLOCKED",
+            }],
+        )
+
+    def test_malformed_bot_branch_is_not_durable_evidence(self) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(),
+            pull_requests=(
+                {
+                    "number": 17,
+                    "headRefName": "bot/specialist-root-cause-not-a-sha",
+                    "isDraft": False,
+                    "mergeStateStatus": "BLOCKED",
+                },
+            ),
+            workflow_runs=(),
+        )
+        health = supervisor.durable_worker_health(snapshot)
+        self.assertEqual(health["active_count"], 0)
+        self.assertEqual(health["active_workers"], [])
+
+    def test_durable_health_is_deterministically_sorted(self) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(),
+            pull_requests=(
+                {
+                    "number": 22,
+                    "headRefName": (
+                        "bot/specialist-security-auditor-"
+                        "aaaaaaaaaaaaaaaa"
+                    ),
+                    "isDraft": True,
+                    "mergeStateStatus": "UNKNOWN",
+                },
+                {
+                    "number": 21,
+                    "headRefName": (
+                        "bot/specialist-root-cause-"
+                        "bbbbbbbbbbbbbbbb"
+                    ),
+                    "isDraft": False,
+                    "mergeStateStatus": "CLEAN",
+                },
+            ),
+            workflow_runs=(),
+        )
+        workers = supervisor.durable_worker_health(snapshot)["active_workers"]
+        self.assertEqual(
+            [item["worker"] for item in workers],
+            ["root-cause", "security-auditor"],
+        )
+
+
 class BuildAuthorityTests(unittest.TestCase):
     def test_unapproved_issue_body_is_not_delegated_as_build_authority(
         self,
