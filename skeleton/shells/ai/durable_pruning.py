@@ -45,6 +45,10 @@ from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceStore,
     SignedDurableMaintenanceEpoch,
 )
+from skeleton.shells.ai.durable_destruction_health import (
+    DurableDestructionHealthError,
+    DurableDestructionHealthGuard,
+)
 from skeleton.shells.ai.durable_destruction import (
     DurableDestructionConflict,
     DurableDestructionCorruption,
@@ -737,6 +741,7 @@ class DurablePruningExecutor:
         *,
         maintenance: DurableMaintenanceStore | None = None,
         destruction_ledger: DurableDestructionLedger | None = None,
+        destruction_health: DurableDestructionHealthGuard | None = None,
         namespace: str = "shell-ai-durable-pruning-operations",
         lease_ttl_seconds: float = 60.0,
         max_items: int = 100_000,
@@ -820,6 +825,24 @@ class DurablePruningExecutor:
             raise TypeError(
                 "destruction_ledger must be DurableDestructionLedger"
             )
+        if (
+            destruction_health is not None
+            and not isinstance(
+                destruction_health,
+                DurableDestructionHealthGuard,
+            )
+        ):
+            raise TypeError(
+                "destruction_health must be DurableDestructionHealthGuard"
+            )
+        if (
+            destruction_health is not None
+            and destruction_health.ledger
+            is not destruction_ledger
+        ):
+            raise ValueError(
+                "destruction_health must guard the configured destruction_ledger"
+            )
         self.backend = backend
         self.authorizations = authorizations
         self.hot_floors = hot_floors
@@ -847,6 +870,7 @@ class DurablePruningExecutor:
         self.archives = archives
         self.maintenance = maintenance
         self.destruction_ledger = destruction_ledger
+        self.destruction_health = destruction_health
         self.namespace = namespace
         self.lease_ttl_seconds = float(
             lease_ttl_seconds
@@ -856,6 +880,22 @@ class DurablePruningExecutor:
             max_cas_retries
         )
         self._clock = clock
+
+    def _require_destruction_health(
+        self,
+        chain_id: str,
+    ) -> None:
+        if self.destruction_health is None:
+            return
+        try:
+            self.destruction_health.require(
+                (chain_id,)
+            )
+        except DurableDestructionHealthError as exc:
+            raise DurablePruningManualReview(
+                "destruction evidence health blocks pruning: "
+                + str(exc)
+            ) from exc
 
     def maintenance_resource(
         self,
@@ -2324,6 +2364,9 @@ class DurablePruningExecutor:
         ) = None,
     ) -> DurablePruningResult:
         auth = authorization.authorization
+        self._require_destruction_health(
+            auth.chain_id
+        )
         self._require_floor_configuration(
             chain,
             auth.chain_id,
