@@ -43,6 +43,12 @@ concurrency:
 
 jobs:
   evaluate:
+    # A cancelled Merge Readiness completion is a tombstone for a superseded
+    # PR generation, not useful merge evidence. Skip it before allocating a
+    # runner. The scheduled reconciliation remains the durable fallback.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled'
     permissions:
       contents: write
       pull-requests: write
