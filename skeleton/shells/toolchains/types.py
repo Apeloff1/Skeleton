@@ -14,6 +14,68 @@ from skeleton.shells.environment import EnvironmentPolicy
 from skeleton.shells.registry import ExecutableSpec
 
 
+def _value_constraint_dict(value: object) -> dict[str, object]:
+    return {
+        "pattern": getattr(value, "pattern"),
+        "choices": sorted(getattr(value, "choices")),
+        "min_length": getattr(value, "min_length"),
+        "max_length": getattr(value, "max_length"),
+    }
+
+
+def _argument_policy_dict(policy: ArgumentPolicy) -> dict[str, object]:
+    return {
+        "options": {
+            name: {
+                "name": rule.name,
+                "takes_value": rule.takes_value,
+                "repeatable": rule.repeatable,
+                "value": _value_constraint_dict(rule.value),
+            }
+            for name, rule in sorted(policy.options.items())
+        },
+        "positional": [
+            _value_constraint_dict(value)
+            for value in policy.positional
+        ],
+        "variadic": (
+            None
+            if policy.variadic is None
+            else _value_constraint_dict(policy.variadic)
+        ),
+        "min_positionals": policy.min_positionals,
+        "max_positionals": policy.max_positionals,
+        "allow_double_dash": policy.allow_double_dash,
+        "allow_option_equals": policy.allow_option_equals,
+        "deny_tokens": sorted(policy.deny_tokens),
+        "deny_patterns": list(policy.deny_patterns),
+        "max_total_args": policy.max_total_args,
+        "max_total_bytes": policy.max_total_bytes,
+        "allow_unknown_options": policy.allow_unknown_options,
+    }
+
+
+def _environment_policy_dict(policy: EnvironmentPolicy) -> dict[str, object]:
+    return {
+        "rules": {
+            key: {
+                "pattern": rule.pattern,
+                "choices": sorted(rule.choices),
+                "max_bytes": rule.max_bytes,
+                "allow_empty": rule.allow_empty,
+            }
+            for key, rule in sorted(policy.rules.items())
+        },
+        "inherited": sorted(policy.inherited),
+        "required": sorted(policy.required),
+        "fixed": {
+            key: policy.fixed[key]
+            for key in sorted(policy.fixed)
+        },
+        "max_total_bytes": policy.max_total_bytes,
+    }
+
+
 class CommandEffect(str, Enum):
     READ = "read"
     WRITE = "write"
@@ -90,6 +152,8 @@ class LogicalCommandContract:
             "effects": sorted(effect.value for effect in self.effects),
             "risk": self.risk.value,
             "tags": sorted(self.tags),
+            "arguments": _argument_policy_dict(self.arguments),
+            "environment": _environment_policy_dict(self.environment),
             "environment_keys": list(self.environment.allowed_keys()),
         }
 
