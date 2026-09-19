@@ -56,15 +56,35 @@ def test_cancellation_wait_returns_true_after_cancel():
     assert token.wait(0)
 
 
-def test_cancellation_wait_rejects_negative_timeout():
+@pytest.mark.parametrize("timeout", [-1, True, float("nan"), float("inf"), "1"])
+def test_cancellation_wait_rejects_invalid_timeout(timeout):
     with pytest.raises(ValueError):
-        CancellationToken().wait(-1)
+        CancellationToken().wait(timeout)
 
 
 def test_cancellation_detail_is_bounded():
     token = CancellationToken()
     with pytest.raises(ValueError):
         token.cancel(detail="x" * 513)
+
+
+@pytest.mark.parametrize("detail", ["bad\x00detail", 123])
+def test_cancellation_rejects_invalid_detail(detail):
+    with pytest.raises(ValueError):
+        CancellationToken().cancel(detail=detail)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_cancellation_registry_rejects_invalid_capacity(value):
+    with pytest.raises(ValueError):
+        CancellationRegistry(max_tokens=value)
+
+
+@pytest.mark.parametrize("key", ["", "   ", "bad\x00key", 123])
+def test_cancellation_registry_rejects_invalid_key(key):
+    registry = CancellationRegistry()
+    with pytest.raises(ValueError):
+        registry.create(key)
 
 
 def test_cancellation_registry_create_get_require():
