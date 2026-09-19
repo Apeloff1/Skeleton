@@ -32,7 +32,7 @@ from skeleton.shells.workspace_txn.lease import (
     WorkspaceLeaseHeartbeat,
     WorkspaceLeaseRegistry,
 )
-from skeleton.shells.workspace_txn.journal import TransactionJournal
+from skeleton.shells.workspace_txn.journal import JournalPersistenceError, TransactionJournal
 from skeleton.shells.workspace_txn.recovery import TransactionRecoveryInspector
 from skeleton.shells.workspace_txn.scanner import WorkspaceScanner, snapshot_digest
 from skeleton.shells.workspace_txn.transaction import (
@@ -79,6 +79,7 @@ def _manager(
     *,
     config: TransactionConfig | None = None,
     backup_inside_workspace: bool = False,
+    journal: TransactionJournal | None = None,
 ):
     root = tmp_path / "workspace"
     root.mkdir()
@@ -99,6 +100,7 @@ def _manager(
         compiled.executor,
         scanner=WorkspaceScanner(),
         backup_store=ContentAddressedBackupStore(backup),
+        journal=journal,
         config=config,
     )
     plane = TransactionalToolchainExecutionPlane(
@@ -178,6 +180,154 @@ def test_transaction_survives_command_longer_than_original_lease_ttl(tmp_path: P
     )
     assert result.ok
     assert result.transaction.execution.result.stdout_text().strip() == "alive"
+
+
+def test_durable_journal_round_trip_preserves_hash_chain(tmp_path: Path):
+    path = tmp_path / "transaction.jsonl"
+    journal = TransactionJournal(storage_path=path)
+    first = journal.append(
+        "txn-1",
+        WorkspaceTransactionState.CREATED.value,
+        {"correlation_id": "corr-1"},
+    )
+    second = journal.append(
+        "txn-1",
+        WorkspaceTransactionState.EXECUTING.value,
+        {"backup_id": "backup-1"},
+    )
+
+    reopened = TransactionJournal(storage_path=path)
+
+    assert reopened.durable
+    assert reopened.verify()
+    assert reopened.length() == 2
+    assert reopened.root_hash() == second.event_hash
+    assert reopened.events()[0].event_hash == first.event_hash
+
+
+def test_durable_journal_repairs_only_truncated_final_append(tmp_path: Path):
+    path = tmp_path / "transaction.jsonl"
+    journal = TransactionJournal(storage_path=path)
+    journal.append(
+        "txn-1",
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    with path.open("ab") as handle:
+        handle.write(b'{"sequence":2')
+        handle.flush()
+        os.fsync(handle.fileno())
+
+    reopened = TransactionJournal(storage_path=path)
+
+    assert reopened.recovered_truncated_tail
+    assert reopened.length() == 1
+    assert path.read_bytes().endswith(b"\n")
+    reopened.append(
+        "txn-1",
+        WorkspaceTransactionState.LEASED.value,
+        {},
+    )
+    assert TransactionJournal(storage_path=path).length() == 2
+
+
+def test_durable_journal_rejects_corrupted_complete_record(tmp_path: Path):
+    path = tmp_path / "transaction.jsonl"
+    journal = TransactionJournal(storage_path=path)
+    journal.append(
+        "txn-1",
+        WorkspaceTransactionState.CREATED.value,
+        {"value": "before"},
+    )
+    raw = path.read_text(encoding="utf-8")
+    path.write_text(
+        raw.replace('"before"', '"after"'),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(JournalPersistenceError, match="hash-chain"):
+        TransactionJournal(storage_path=path)
+
+
+def test_durable_journal_rejects_oversized_event_before_persisting(tmp_path: Path):
+    path = tmp_path / "transaction.jsonl"
+    journal = TransactionJournal(
+        storage_path=path,
+        max_record_bytes=256,
+    )
+
+    with pytest.raises(JournalPersistenceError, match="record byte bound"):
+        journal.append(
+            "txn-1",
+            WorkspaceTransactionState.CREATED.value,
+            {"payload": "x" * 512},
+        )
+
+    assert journal.length() == 0
+    assert not path.exists()
+
+
+def test_transaction_rejects_durable_journal_inside_workspace(tmp_path: Path):
+    root = tmp_path / "workspace"
+    root.mkdir()
+    journal = TransactionJournal(storage_path=root / "transaction.jsonl")
+    root.rmdir()
+    root, manager, plane = _manager(
+        tmp_path,
+        journal=journal,
+    )
+    journal.storage_path = root / "transaction.jsonl"
+
+    with pytest.raises(JournalPersistenceError, match="outside"):
+        plane.execute(
+            ToolchainInvocation(
+                "test.read",
+                ("-c", "print('must-not-run')"),
+                cwd=root,
+                timeout=1.0,
+            )
+        )
+
+    assert manager.journal.length() == 0
+    assert not (root / "transaction.jsonl").exists()
+
+
+def test_restart_recovery_resolves_durable_journal_and_backup(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    (root / "state.txt").write_text("stable", encoding="utf-8")
+    before = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, before)
+    path = tmp_path / "recovery.jsonl"
+    journal = TransactionJournal(storage_path=path)
+    transaction_id = "txn-restart"
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.EXECUTING.value,
+        {
+            "backup_id": manifest.backup_id,
+            "backup_digest": manifest.digest,
+            "before_snapshot_digest": before.digest,
+            "root_fingerprint": before.root_fingerprint,
+            "command_fingerprint": "d" * 64,
+        },
+    )
+
+    restarted = TransactionJournal(storage_path=path)
+    inspector = TransactionRecoveryInspector(restarted)
+    candidate = inspector.candidates()[0]
+    evidence = inspector.resolve_evidence(
+        candidate,
+        ContentAddressedBackupStore(manager.backup_store.storage_root),
+    )
+
+    assert candidate.evidence_complete
+    assert evidence.verified
+    assert evidence.before.digest == before.digest
 
 
 def test_backup_store_inside_workspace_is_rejected_before_execution(tmp_path: Path):
