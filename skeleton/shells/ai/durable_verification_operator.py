@@ -41,7 +41,6 @@ class DurableVerificationOperatorState(str, Enum):
 class DurableVerificationOperatorPolicy:
     max_chains: int = 32
     max_lineage_items: int = 4096
-    require_lineage: bool = True
 
     def __post_init__(self) -> None:
         for name in (
@@ -57,14 +56,6 @@ class DurableVerificationOperatorPolicy:
                 raise ValueError(
                     f"{name} must be positive integer"
                 )
-        if not isinstance(
-            self.require_lineage,
-            bool,
-        ):
-            raise ValueError(
-                "require_lineage must be bool"
-            )
-
     @property
     def digest(self) -> str:
         raw = json.dumps(
@@ -79,9 +70,6 @@ class DurableVerificationOperatorPolicy:
             "max_chains": self.max_chains,
             "max_lineage_items": (
                 self.max_lineage_items
-            ),
-            "require_lineage": (
-                self.require_lineage
             ),
         }
 
@@ -642,10 +630,7 @@ class DurableVerificationOperator:
             else lineage[-1].cursor.digest
         )
 
-        if (
-            self.policy.require_lineage
-            and not lineage_valid
-        ):
+        if not lineage_valid:
             state = (
                 DurableVerificationOperatorState.LINEAGE_INVALID
             )
