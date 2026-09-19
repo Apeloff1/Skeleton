@@ -542,12 +542,18 @@ def sort_decisions_for_execution(
         DecisionKind.HOLD: 3,
         DecisionKind.IGNORE: 4,
     }
+    risk_rank = {
+        RiskTier.LOW: 0,
+        RiskTier.MEDIUM: 1,
+        RiskTier.HIGH: 2,
+        RiskTier.CRITICAL: 3,
+    }
     return tuple(
         sorted(
             decisions,
             key=lambda item: (
                 rank[item.kind],
-                item.risk_tier.value,
+                risk_rank[item.risk_tier],
                 item.pr_number,
             ),
         )
