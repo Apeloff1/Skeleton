@@ -43,6 +43,12 @@ concurrency:
 
 jobs:
   evaluate:
+    # A cancelled Merge Readiness completion is a tombstone for a superseded
+    # PR generation, not useful merge evidence. Skip it before allocating a
+    # runner. The scheduled reconciliation remains the durable fallback.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled'
     permissions:
       contents: write
       pull-requests: write
@@ -66,6 +72,9 @@ jobs:
       PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
       PR_AUTOMATION_MAX_MUTATIONS: "1"
       PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
+      SKELETON_AUTOMATION_PAUSED: ${{ vars.SKELETON_AUTOMATION_PAUSED }}
+      SKELETON_AUTOMATION_QUARANTINED: ${{ vars.SKELETON_AUTOMATION_QUARANTINED }}
+      SKELETON_AUTOMATION_HOLD_REASON: ${{ vars.SKELETON_AUTOMATION_HOLD_REASON }}
 
     steps:
       - name: Checkout trusted default branch
@@ -115,6 +124,14 @@ jobs:
           WORKFLOW_RUN_PR_HINTS: ${{ github.event_name == 'workflow_run' && toJSON(github.event.workflow_run.pull_requests.*.number) || '[]' }}
           WORKFLOW_RUN_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
           WORKFLOW_RUN_HEAD_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          WORKFLOW_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.run_attempt || '' }}
+          WORKFLOW_RUN_WORKFLOW_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.workflow_id || '' }}
+          WORKFLOW_RUN_NAME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || '' }}
+          WORKFLOW_RUN_STATUS: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.status || '' }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || '' }}
+          WORKFLOW_RUN_EVENT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.event || '' }}
+          WORKFLOW_RUN_HEAD_REPOSITORY: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_repository.full_name || '' }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           INPUT_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}
         run: |
