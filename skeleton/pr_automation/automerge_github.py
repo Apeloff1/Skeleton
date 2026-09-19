@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import time
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
