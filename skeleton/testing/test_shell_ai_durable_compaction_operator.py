@@ -5078,4 +5078,3 @@ def test_maintenance_resource_matches_live_chain_head(kind):
     assert value.sequence == head.sequence
     assert value.root_hash == head.root_hash
     assert len(value.state_digest) == 64
-
