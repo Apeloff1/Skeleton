@@ -35,7 +35,8 @@ from skeleton.shells.ai.startup_release import (
 )
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def surface(
