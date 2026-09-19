@@ -32,7 +32,6 @@ from skeleton.pr_automation.runner_evidence import (
     stale_reviewers,
 )
 from skeleton.testing.runner_v2_test_support import (
-    BASE_CHECKS,
     NOW,
     SHA_A,
     SHA_B,
