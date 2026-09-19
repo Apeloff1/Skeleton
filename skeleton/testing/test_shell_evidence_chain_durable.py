@@ -337,3 +337,488 @@ def test_durable_receipt_capacity():
     durable.append(receipt())
     with pytest.raises(RuntimeError):
         durable.append(receipt(correlation="two"))
+
+def historical_chain(count=5):
+    backend = InMemoryFencedStore()
+    chain = ContentAddressedEvidenceChain(
+        backend,
+        namespace="historical-evidence",
+        max_events=100,
+    )
+    items = tuple(
+        chain.append(
+            "event",
+            {"index": index},
+        )
+        for index in range(count)
+    )
+    return backend, chain, items
+
+
+def test_evidence_sequence_for_genesis():
+    _, chain, _ = historical_chain(1)
+    assert chain.sequence_for_root(
+        GENESIS_HASH
+    ) == 0
+
+
+def test_evidence_sequence_for_committed_root():
+    _, chain, items = historical_chain(4)
+    assert chain.sequence_for_root(
+        items[2].node_hash
+    ) == 3
+
+
+def test_evidence_sequence_for_unknown_root_fails():
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(
+        EvidenceCorruption,
+        match="missing",
+    ):
+        chain.sequence_for_root(
+            "f" * 64
+        )
+
+
+def test_evidence_snapshot_at_genesis():
+    _, chain, _ = historical_chain(3)
+    assert chain.snapshot_at(
+        GENESIS_HASH
+    ) == ()
+
+
+def test_evidence_snapshot_at_historical_root():
+    _, chain, items = historical_chain(5)
+    assert chain.snapshot_at(
+        items[2].node_hash
+    ) == items[:3]
+
+
+def test_evidence_snapshot_at_current_root_matches_snapshot():
+    _, chain, items = historical_chain(5)
+    assert chain.snapshot_at(
+        items[-1].node_hash
+    ) == chain.snapshot()
+
+
+@pytest.mark.parametrize("root", ["", "bad", "a" * 63, "a" * 65])
+def test_evidence_snapshot_at_validates_root_shape(root):
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(ValueError, match="root_hash"):
+        chain.snapshot_at(root)
+
+
+def test_evidence_verify_root_accepts_historical_prefix():
+    _, chain, items = historical_chain(5)
+    assert chain.verify_root(
+        items[1].node_hash
+    )
+    assert chain.verify_root(
+        items[3].node_hash
+    )
+
+
+def test_evidence_verify_root_accepts_genesis():
+    _, chain, _ = historical_chain(2)
+    assert chain.verify_root(
+        GENESIS_HASH
+    )
+
+
+def test_evidence_verify_root_rejects_unknown():
+    _, chain, _ = historical_chain(2)
+    assert not chain.verify_root(
+        "f" * 64
+    )
+
+
+def test_evidence_root_is_ancestor_for_committed_prefix():
+    _, chain, items = historical_chain(5)
+    assert chain.root_is_ancestor(
+        items[0].node_hash
+    )
+    assert chain.root_is_ancestor(
+        items[3].node_hash
+    )
+    assert chain.root_is_ancestor(
+        items[-1].node_hash
+    )
+
+
+def test_evidence_genesis_is_always_ancestor():
+    _, chain, _ = historical_chain(0)
+    assert chain.root_is_ancestor(
+        GENESIS_HASH
+    )
+
+
+def test_evidence_orphan_valid_node_is_not_committed_ancestor():
+    backend, chain, items = historical_chain(2)
+    orphan_hash = ContentAddressedEvidenceChain.node_digest(
+        GENESIS_HASH,
+        1,
+        "orphan",
+        {"value": "orphan"},
+    )
+    orphan = EvidenceNode(
+        1,
+        GENESIS_HASH,
+        orphan_hash,
+        "orphan",
+        {"value": "orphan"},
+    )
+    backend.put_if_absent(
+        "historical-evidence",
+        f"node:{orphan_hash}",
+        orphan,
+    )
+    assert chain.verify_root(orphan_hash)
+    assert not chain.root_is_ancestor(
+        orphan_hash
+    )
+    assert items
+
+
+def test_evidence_snapshot_segment_from_genesis():
+    _, chain, items = historical_chain(4)
+    assert chain.snapshot_segment(
+        GENESIS_HASH,
+        items[2].node_hash,
+    ) == items[:3]
+
+
+def test_evidence_snapshot_segment_between_roots():
+    _, chain, items = historical_chain(6)
+    assert chain.snapshot_segment(
+        items[1].node_hash,
+        items[4].node_hash,
+    ) == items[2:5]
+
+
+def test_evidence_snapshot_segment_defaults_to_head():
+    _, chain, items = historical_chain(4)
+    assert chain.snapshot_segment(
+        items[1].node_hash
+    ) == items[2:]
+
+
+def test_evidence_snapshot_segment_same_root_empty():
+    _, chain, items = historical_chain(3)
+    assert chain.snapshot_segment(
+        items[1].node_hash,
+        items[1].node_hash,
+    ) == ()
+
+
+def test_evidence_snapshot_segment_end_before_start_rejected():
+    _, chain, items = historical_chain(4)
+    with pytest.raises(
+        EvidenceCorruption,
+        match="precedes",
+    ):
+        chain.snapshot_segment(
+            items[3].node_hash,
+            items[1].node_hash,
+        )
+
+
+def test_evidence_snapshot_segment_equal_sequence_fork_rejected():
+    backend, chain, items = historical_chain(2)
+    orphan_hash = ContentAddressedEvidenceChain.node_digest(
+        GENESIS_HASH,
+        1,
+        "orphan",
+        {"value": 9},
+    )
+    backend.put_if_absent(
+        "historical-evidence",
+        f"node:{orphan_hash}",
+        EvidenceNode(
+            1,
+            GENESIS_HASH,
+            orphan_hash,
+            "orphan",
+            {"value": 9},
+        ),
+    )
+    with pytest.raises(
+        EvidenceCorruption,
+        match="equal segment sequence",
+    ):
+        chain.snapshot_segment(
+            orphan_hash,
+            items[0].node_hash,
+        )
+
+
+def test_evidence_snapshot_segment_nonancestor_rejected():
+    backend, chain, items = historical_chain(3)
+    orphan_hash = ContentAddressedEvidenceChain.node_digest(
+        GENESIS_HASH,
+        1,
+        "orphan",
+        {"value": 10},
+    )
+    backend.put_if_absent(
+        "historical-evidence",
+        f"node:{orphan_hash}",
+        EvidenceNode(
+            1,
+            GENESIS_HASH,
+            orphan_hash,
+            "orphan",
+            {"value": 10},
+        ),
+    )
+    with pytest.raises(
+        EvidenceCorruption,
+    ):
+        chain.snapshot_segment(
+            orphan_hash,
+            items[-1].node_hash,
+        )
+
+
+@pytest.mark.parametrize("bound", [0, -1, True, 1.5])
+def test_evidence_segment_bound_validation(bound):
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(
+        ValueError,
+        match="max_items",
+    ):
+        chain.snapshot_segment(
+            GENESIS_HASH,
+            max_items=bound,
+        )
+
+
+def test_evidence_segment_enforces_distance_bound():
+    _, chain, _ = historical_chain(5)
+    with pytest.raises(
+        EvidenceConflict,
+        match="bounded",
+    ):
+        chain.snapshot_segment(
+            GENESIS_HASH,
+            max_items=4,
+        )
+
+
+def test_evidence_verify_segment_true_for_valid_tail():
+    _, chain, items = historical_chain(4)
+    assert chain.verify_segment(
+        items[0].node_hash,
+        items[-1].node_hash,
+    )
+
+
+def test_evidence_verify_segment_false_for_bound_exhaustion():
+    _, chain, _ = historical_chain(5)
+    assert not chain.verify_segment(
+        GENESIS_HASH,
+        max_items=4,
+    )
+
+
+def test_evidence_verify_segment_false_for_invalid_root_shape():
+    _, chain, _ = historical_chain(1)
+    assert not chain.verify_segment(
+        "bad",
+    )
+
+
+def test_historical_node_tamper_breaks_snapshot_at():
+    backend, chain, items = historical_chain(4)
+    target = items[1]
+    record = backend.get(
+        "historical-evidence",
+        f"node:{target.node_hash}",
+    )
+    backend.compare_and_swap(
+        "historical-evidence",
+        f"node:{target.node_hash}",
+        expected_revision=record.revision,
+        value=replace(
+            target,
+            payload={"index": 99},
+        ),
+    )
+    with pytest.raises(
+        EvidenceCorruption,
+        match="digest",
+    ):
+        chain.snapshot_at(
+            items[2].node_hash
+        )
+    assert not chain.verify_root(
+        items[2].node_hash
+    )
+
+
+def test_historical_missing_node_breaks_snapshot_at():
+    backend, chain, items = historical_chain(3)
+    target = items[1]
+    record = backend.get(
+        "historical-evidence",
+        f"node:{target.node_hash}",
+    )
+    backend.delete(
+        "historical-evidence",
+        f"node:{target.node_hash}",
+        expected_revision=record.revision,
+    )
+    with pytest.raises(
+        EvidenceCorruption,
+        match="missing",
+    ):
+        chain.snapshot_at(
+            items[-1].node_hash
+        )
+
+
+def test_historical_helpers_survive_fresh_chain_reader():
+    backend, chain, items = historical_chain(4)
+    fresh = ContentAddressedEvidenceChain(
+        backend,
+        namespace="historical-evidence",
+        max_events=100,
+    )
+    assert fresh.snapshot_at(
+        items[2].node_hash
+    ) == items[:3]
+    assert fresh.root_is_ancestor(
+        items[1].node_hash
+    )
+    assert fresh.snapshot_segment(
+        items[0].node_hash,
+        items[-1].node_hash,
+    ) == items[1:]
+    assert fresh.root_hash() == chain.root_hash()
+
+
+def test_historical_prefix_remains_valid_after_later_append():
+    _, chain, items = historical_chain(3)
+    historical_root = items[-1].node_hash
+    chain.append(
+        "event",
+        {"index": 3},
+    )
+    chain.append(
+        "event",
+        {"index": 4},
+    )
+    assert chain.verify_root(
+        historical_root
+    )
+    assert chain.root_is_ancestor(
+        historical_root
+    )
+    assert chain.snapshot_at(
+        historical_root
+    ) == items
+
+
+def test_segment_terminal_tamper_is_detected():
+    backend, chain, items = historical_chain(3)
+    terminal = items[-1]
+    record = backend.get(
+        "historical-evidence",
+        f"node:{terminal.node_hash}",
+    )
+    backend.compare_and_swap(
+        "historical-evidence",
+        f"node:{terminal.node_hash}",
+        expected_revision=record.revision,
+        value=replace(
+            terminal,
+            previous_hash=GENESIS_HASH,
+        ),
+    )
+    with pytest.raises(
+        EvidenceCorruption,
+    ):
+        chain.snapshot_segment(
+            items[0].node_hash,
+            terminal.node_hash,
+        )
+
+
+def test_sequence_for_root_rejects_bad_shape():
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(ValueError):
+        chain.sequence_for_root("bad")
+
+
+def test_root_is_ancestor_rejects_bad_shape():
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(ValueError):
+        chain.root_is_ancestor("bad")
+
+
+def test_segment_validates_start_shape():
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(ValueError, match="start_exclusive_root"):
+        chain.snapshot_segment("bad")
+
+
+def test_segment_validates_end_shape():
+    _, chain, _ = historical_chain(1)
+    with pytest.raises(ValueError, match="end_inclusive_root"):
+        chain.snapshot_segment(
+            GENESIS_HASH,
+            "bad",
+        )
+
+
+def test_snapshot_at_detects_cycle():
+    backend, chain, items = historical_chain(2)
+    second = items[-1]
+    record = backend.get(
+        "historical-evidence",
+        f"node:{second.node_hash}",
+    )
+    # The digest will fail first for this synthetic cycle, which is still a
+    # valid fail-closed outcome for historical reconstruction.
+    backend.compare_and_swap(
+        "historical-evidence",
+        f"node:{second.node_hash}",
+        expected_revision=record.revision,
+        value=replace(
+            second,
+            previous_hash=second.node_hash,
+        ),
+    )
+    with pytest.raises(EvidenceCorruption):
+        chain.snapshot_at(second.node_hash)
+
+
+def test_historical_prefix_sequence_is_contiguous():
+    _, chain, items = historical_chain(8)
+    prefix = chain.snapshot_at(
+        items[5].node_hash
+    )
+    assert tuple(
+        item.sequence
+        for item in prefix
+    ) == (1, 2, 3, 4, 5, 6)
+
+
+def test_segment_sequence_starts_after_trusted_root():
+    _, chain, items = historical_chain(8)
+    segment = chain.snapshot_segment(
+        items[2].node_hash,
+        items[6].node_hash,
+    )
+    assert tuple(
+        item.sequence
+        for item in segment
+    ) == (4, 5, 6, 7)
+    assert (
+        segment[0].previous_hash
+        == items[2].node_hash
+    )
+    assert (
+        segment[-1].node_hash
+        == items[6].node_hash
+    )
+
