@@ -17,6 +17,12 @@ ADVANCED_BOTS = (
     AdvancedBot("root-cause", "repeated CI failures", "medium", 6),
     AdvancedBot("dependency-guardian", "dependency/security alerts", "high", 8),
     AdvancedBot("regression-hunter", "new failing tests or flaky jobs", "medium", 6),
+    AdvancedBot(
+        "feature-builder",
+        "maintainer-approved feature or implementation work",
+        "medium",
+        10,
+    ),
     AdvancedBot("architecture-reviewer", "large PR or subsystem drift", "low", 4),
     AdvancedBot("security-auditor", "security/code-scanning signal", "high", 5),
     AdvancedBot("performance-sentinel", "benchmark or timeout regression", "medium", 5),
@@ -28,7 +34,27 @@ ADVANCED_BOTS = (
     AdvancedBot("api-contract", "API/schema contract drift", "high", 6),
 )
 
-BLOCKED_PREFIXES = (".github/", ".git/", ".env", "secrets/", "deploy/")
+# Specialist workers are intentionally unable to rewrite their own authority,
+# workflow permissions, deployment surface, or repository secret boundary.
+BLOCKED_PREFIXES = (
+    ".github/",
+    ".git/",
+    ".env",
+    "secrets/",
+    "deploy/",
+    # Autonomous workers cannot rewrite the automation/security authority plane.
+    "skeleton/automation/",
+    "skeleton/pr_automation/",
+    "skeleton/security/",
+    "skeleton/build/",
+    # Nor may they weaken the canonical merge/unit runners or their own custody
+    # regression suite. These exact file paths are represented as prefixes so
+    # the shared path checks remain single-sourced and fail closed.
+    "tests/run_unit.py",
+    "tests/test_autonomous_supervisor.py",
+    "tests/test_supervisor_runtime.py",
+    "tests/test_cross_subsystem_integration.py",
+)
 SAFE_PREFIXES = ("skeleton/", "tests/", "docs/")
 
 
