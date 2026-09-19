@@ -61,9 +61,21 @@ class ResilientAIPlanner:
         if not planners:
             raise ValueError("at least one AI planner is required")
         self.planners = tuple(planners)
-        self.health = health or ProviderHealthRegistry(clock=clock)
-        self.circuits = circuits or ModelCircuitRegistry(clock=clock)
-        self.rate_limiter = rate_limiter or AIModelRateLimiter(clock=clock)
+        self.health = (
+            health
+            if health is not None
+            else ProviderHealthRegistry(clock=clock)
+        )
+        self.circuits = (
+            circuits
+            if circuits is not None
+            else ModelCircuitRegistry(clock=clock)
+        )
+        self.rate_limiter = (
+            rate_limiter
+            if rate_limiter is not None
+            else AIModelRateLimiter(clock=clock)
+        )
         self._clock = clock
 
     def ordered(self) -> tuple[AIPlanner, ...]:
