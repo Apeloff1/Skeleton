@@ -20,9 +20,17 @@ class AISealedFinalizedExecution:
     finalized: FinalizedAIExecutionEvidence
     execution_attempt: AIExecutionAttempt | None = None
     durable_readiness: DurableEvidenceReadinessReport | None = None
+    post_execution_maintenance_attempted: bool = False
     post_execution_maintenance_error: str = ""
 
     def __post_init__(self) -> None:
+        if not isinstance(
+            self.post_execution_maintenance_attempted,
+            bool,
+        ):
+            raise ValueError(
+                "post_execution_maintenance_attempted must be bool"
+            )
         if len(self.post_execution_maintenance_error) > 512:
             raise ValueError(
                 "post_execution_maintenance_error too long"
@@ -70,6 +78,9 @@ class AISealedFinalizedExecution:
                 None
                 if self.durable_readiness is None
                 else self.durable_readiness.to_dict()
+            ),
+            "post_execution_maintenance_attempted": (
+                self.post_execution_maintenance_attempted
             ),
             "post_execution_maintenance_ok": (
                 self.post_execution_maintenance_ok
