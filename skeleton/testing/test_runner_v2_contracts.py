@@ -188,6 +188,17 @@ def test_unique_text_enforces_bound():
         ("per_target_request_budget", 0),
         ("minimum_rate_remaining", 0),
         ("retry_ceiling_seconds", 0),
+        ("max_targets", 1.5),
+        ("max_requests", 1.5),
+        ("max_graphql_requests", 1.5),
+        ("max_pages", 1.5),
+        ("max_response_bytes", 1.5),
+        ("max_changed_files", 1.5),
+        ("max_events_exported", 1.5),
+        ("deadline_seconds", 1.5),
+        ("per_target_request_budget", 1.5),
+        ("minimum_rate_remaining", 1.5),
+        ("retry_ceiling_seconds", 1.5),
     ],
 )
 def test_runner_limits_require_positive_values(field, value):
@@ -195,19 +206,19 @@ def test_runner_limits_require_positive_values(field, value):
         replace(limits(), **{field: value})
 
 
-@pytest.mark.parametrize("value", [-1, True])
+@pytest.mark.parametrize("value", [-1, True, 1.5])
 def test_runner_limits_mutations_non_negative(value):
     with pytest.raises(ValueError):
         replace(limits(), max_mutations=value)
 
 
-@pytest.mark.parametrize("value", [-1, True])
+@pytest.mark.parametrize("value", [-1, True, 1.5])
 def test_runner_limits_queue_threshold_non_negative(value):
     with pytest.raises(ValueError):
         replace(limits(), queue_pressure_threshold=value)
 
 
-@pytest.mark.parametrize("value", [-1, 11, True])
+@pytest.mark.parametrize("value", [-1, 11, True, 1.5])
 def test_runner_limits_retry_attempt_bound(value):
     with pytest.raises(ValueError):
         replace(limits(), retry_attempts=value)
