@@ -3343,15 +3343,12 @@ class ArchiveBackedHistoricalChain:
                 None,
             )
             if callable(live_method):
-                try:
-                    return str(
-                        live_method(
-                            sequence,
-                            repair_missing=repair_missing,
-                        )
+                return str(
+                    live_method(
+                        sequence,
+                        repair_missing=repair_missing,
                     )
-                except Exception:
-                    pass
+                )
             return self.archives.root_for_sequence(
                 self.chain_id,
                 sequence,
@@ -3437,11 +3434,7 @@ class ArchiveBackedHistoricalChain:
                             "live indexed historical lookup failed above floor: "
                             f"{type(live_error).__name__}"
                         ) from live_error
-                    node = self.archives.get_by_sequence(
-                        self.chain_id,
-                        sequence,
-                        repair_missing=repair_missing,
-                    )
+                    raise
             else:
                 node = self.archives.get_by_sequence(
                     self.chain_id,
@@ -3617,14 +3610,11 @@ class ArchiveBackedHistoricalChain:
                 None,
             )
             if callable(live_backfill):
-                try:
-                    return live_backfill(
-                        end_sequence=target,
-                        end_root=end_root,
-                        max_items=max_items,
-                    )
-                except Exception:
-                    pass
+                return live_backfill(
+                    end_sequence=target,
+                    end_root=end_root,
+                    max_items=max_items,
+                )
             return self.archives.backfill_sequence_indexes_batch(
                 self.chain_id,
                 end_sequence=target,
