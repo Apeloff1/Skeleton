@@ -12,7 +12,7 @@ single-shot.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
@@ -40,6 +40,12 @@ class MutationError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class BranchObservation:
+    head_sha: str | None
+    protected: bool | None
+
+
 def _time(clock: Callable[[], datetime] | None = None) -> datetime:
     moment = (clock or utcnow)()
     if moment.tzinfo is None:
@@ -62,17 +68,36 @@ def _branch_payload(
     return payload
 
 
+def observe_branch(
+    transport: BudgetedGitHubTransport,
+    repository: str,
+    branch: str,
+) -> BranchObservation:
+    try:
+        payload = _branch_payload(transport, repository, branch)
+    except RunnerTransportError:
+        return BranchObservation(head_sha=None, protected=None)
+    commit = payload.get("commit")
+    sha = commit.get("sha") if isinstance(commit, Mapping) else None
+    head_sha: str | None = None
+    if isinstance(sha, str):
+        candidate = sha.casefold()
+        if valid_sha(candidate):
+            head_sha = candidate
+    raw_protected = payload.get("protected")
+    protected = raw_protected if isinstance(raw_protected, bool) else None
+    return BranchObservation(
+        head_sha=head_sha,
+        protected=protected,
+    )
+
+
 def branch_protected(
     transport: BudgetedGitHubTransport,
     repository: str,
     branch: str,
 ) -> bool | None:
-    try:
-        payload = _branch_payload(transport, repository, branch)
-    except RunnerTransportError:
-        return None
-    value = payload.get("protected")
-    return value if isinstance(value, bool) else None
+    return observe_branch(transport, repository, branch).protected
 
 
 def branch_head(
@@ -80,16 +105,7 @@ def branch_head(
     repository: str,
     branch: str,
 ) -> str | None:
-    try:
-        payload = _branch_payload(transport, repository, branch)
-    except RunnerTransportError:
-        return None
-    commit = payload.get("commit")
-    sha = commit.get("sha") if isinstance(commit, Mapping) else None
-    if not isinstance(sha, str):
-        return None
-    sha = sha.casefold()
-    return sha if valid_sha(sha) else None
+    return observe_branch(transport, repository, branch).head_sha
 
 
 def _reviews_valid(
@@ -315,16 +331,13 @@ class MergeTransaction:
 
         try:
             current = self.collector.refresh_policy_fields(item.snapshot)
-            observed_base = branch_head(
+            branch_state = observe_branch(
                 self.transport,
                 item.snapshot.core.repository,
                 item.snapshot.core.base_ref,
             )
-            protected = branch_protected(
-                self.transport,
-                item.snapshot.core.repository,
-                item.snapshot.core.base_ref,
-            )
+            observed_base = branch_state.head_sha
+            protected = branch_state.protected
             observation = self._fresh_observation(
                 item.snapshot.core.repository
             )
@@ -482,11 +495,13 @@ def transaction_diagnostics(
 
 
 __all__ = [
+    "BranchObservation",
     "MergeTransaction",
     "MutationError",
     "append_receipt_event",
     "branch_head",
     "branch_protected",
+    "observe_branch",
     "compute_preconditions",
     "compute_transaction_preconditions",
     "mutation_retriable",
