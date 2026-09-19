@@ -14,11 +14,23 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedJournalCorruption,
     DistributedJournalHead,
 )
+from skeleton.shells.ai.durable_archive_repair import (
+    ArchiveIndexRepairAction,
+    ArchiveIndexRepairBatchReport,
+    ArchiveIndexRepairError,
+    ArchiveIndexRepairPlan,
+    ArchiveIndexRepairPolicy,
+    ArchiveIndexRepairResult,
+    ArchiveIndexRepairState,
+    DurableArchiveIndexRepairCoordinator,
+)
 from skeleton.shells.ai.durable_archive_store import (
     ArchiveBackedHistoricalChain,
     DurableArchivedNode,
     DurableArchivedNodeType,
     DurableArchiveHead,
+    DurableArchiveIndexHealth,
+    DurableArchiveIndexState,
     DurableArchiveRepository,
     DurableArchiveRootIndex,
     DurableArchiveRootReplica,
@@ -92,6 +104,16 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "ArchiveIndexRepairAction": ArchiveIndexRepairAction,
+    "ArchiveIndexRepairBatchReport": ArchiveIndexRepairBatchReport,
+    "ArchiveIndexRepairError": ArchiveIndexRepairError,
+    "ArchiveIndexRepairPlan": ArchiveIndexRepairPlan,
+    "ArchiveIndexRepairPolicy": ArchiveIndexRepairPolicy,
+    "ArchiveIndexRepairResult": ArchiveIndexRepairResult,
+    "ArchiveIndexRepairState": ArchiveIndexRepairState,
+    "DurableArchiveIndexHealth": DurableArchiveIndexHealth,
+    "DurableArchiveIndexRepairCoordinator": DurableArchiveIndexRepairCoordinator,
+    "DurableArchiveIndexState": DurableArchiveIndexState,
     "CheckpointIndexRepairAction": CheckpointIndexRepairAction,
     "CheckpointIndexRepairBatchReport": CheckpointIndexRepairBatchReport,
     "CheckpointIndexRepairError": CheckpointIndexRepairError,
@@ -1483,4 +1505,159 @@ def test_checkpoint_repair_policy_public_shape():
         "max_repairs_per_chain",
         "max_chains_per_batch",
         "require_registry_valid",
+    )
+
+def test_archive_index_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableArchiveIndexState
+    } == {
+        "healthy",
+        "degraded",
+        "invalid",
+    }
+
+
+def test_archive_repair_action_wire_values_are_stable():
+    assert {
+        item.value
+        for item in ArchiveIndexRepairAction
+    } == {
+        "none",
+        "repair_missing",
+        "block_archive",
+        "block_corrupt",
+        "block_limit",
+    }
+
+
+def test_archive_repair_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in ArchiveIndexRepairState
+    } == {
+        "healthy",
+        "repaired",
+        "already_repaired",
+        "blocked",
+        "stale",
+    }
+
+
+def test_archive_repair_policy_public_shape():
+    signature = inspect.signature(
+        ArchiveIndexRepairPolicy
+    )
+    assert tuple(signature.parameters) == (
+        "auto_repair_missing",
+        "max_repairs_per_archive",
+        "max_archives_per_batch",
+    )
+
+
+def test_archive_repair_coordinator_constructor_contract():
+    signature = inspect.signature(
+        DurableArchiveIndexRepairCoordinator
+    )
+    assert {
+        "archives",
+        "policy",
+        "clock",
+    }.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "inspect",
+        "apply",
+        "repair",
+        "repair_batch",
+    ],
+)
+def test_archive_repair_coordinator_public_methods(method):
+    assert callable(
+        getattr(
+            DurableArchiveIndexRepairCoordinator,
+            method,
+            None,
+        )
+    )
+
+
+def test_archive_repair_error_is_runtime_error():
+    assert issubclass(
+        ArchiveIndexRepairError,
+        RuntimeError,
+    )
+
+
+def test_archive_index_health_public_shape():
+    signature = inspect.signature(
+        DurableArchiveIndexHealth
+    )
+    assert tuple(signature.parameters) == (
+        "archive_id",
+        "chain_id",
+        "state",
+        "archive_valid",
+        "expected_root_indexes",
+        "root_indexes_present",
+        "replica_bindings_present",
+        "missing_root_indexes",
+        "missing_replica_roots",
+        "corrupt_root_indexes",
+        "head_repair_required",
+        "head_valid",
+    )
+
+
+def test_archive_repair_plan_properties_are_public():
+    assert isinstance(
+        ArchiveIndexRepairPlan.repair_units,
+        property,
+    )
+    assert isinstance(
+        ArchiveIndexRepairPlan.executable,
+        property,
+    )
+    assert isinstance(
+        ArchiveIndexRepairPlan.blocked,
+        property,
+    )
+
+
+def test_archive_repair_result_properties_are_public():
+    assert isinstance(
+        ArchiveIndexRepairResult.ok,
+        property,
+    )
+    assert isinstance(
+        ArchiveIndexRepairResult.mutated,
+        property,
+    )
+
+
+def test_archive_repair_batch_properties_are_public():
+    assert isinstance(
+        ArchiveIndexRepairBatchReport.ok,
+        property,
+    )
+    assert isinstance(
+        ArchiveIndexRepairBatchReport.repaired_units,
+        property,
+    )
+    assert isinstance(
+        ArchiveIndexRepairBatchReport.blocked,
+        property,
+    )
+
+
+def test_archive_repository_exposes_index_health():
+    assert callable(
+        getattr(
+            DurableArchiveRepository,
+            "inspect_indexes",
+            None,
+        )
     )
