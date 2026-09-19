@@ -15,6 +15,8 @@ STATE = Path(".skeleton-bot-state.json")
 MAX_CONCURRENT = 3
 COOLDOWN_SECONDS = 6 * 60 * 60
 FAILURE_THRESHOLD = 3
+MAX_HISTORY = 32
+MAX_HISTORY_AGE_SECONDS = 7 * 24 * 60 * 60
 
 
 @dataclass(frozen=True)
@@ -246,6 +248,35 @@ def record_worker_outcome(
             and evidence.get("status") in SUCCESSFUL_WORKER_STATUSES
         )
     record_result(state, name, success, now=now)
+
+
+
+def bounded_health_summary(
+    state: object,
+    *,
+    now: float | None = None,
+) -> dict[str, object]:
+    """Return non-authoritative health telemetry safe for planning context."""
+    moment = time.time() if now is None else float(now)
+    normalized = normalize_state(state)
+    workers: list[dict[str, object]] = []
+    for name in sorted(normalized):
+        item = normalized[name]
+        last_run = float(item["last_run"])
+        age = None if last_run <= 0 else max(0, int(moment - last_run))
+        workers.append({
+            "name": name,
+            "enabled": bool(item["enabled"]),
+            "failures": int(item["failures"]),
+            "circuit_open": bool(item["circuit_open"]),
+            "seconds_since_last_run": age,
+        })
+    return {
+        "version": 1,
+        "non_authoritative": True,
+        "worker_count": len(workers),
+        "workers": workers,
+    }
 
 
 def main() -> int:
