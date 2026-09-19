@@ -1873,7 +1873,7 @@ class DurableMaintenanceStore:
             resource_id
         )
         try:
-            self.backend.acquire_lease(
+            lease = self.backend.acquire_lease(
                 self.lease_namespace,
                 key,
                 owner=(
@@ -1886,11 +1886,14 @@ class DurableMaintenanceStore:
             return True
         except Exception:
             return True
-        # A successful probe proves no other active lease.  Release by
-        # retrieving the only lease is backend-specific, so acquire a durable
-        # probe directly and release it in the same call path instead.
-        # Re-acquire is not possible while held; callers should use
-        # assert_available() below for mutating logic.
+        try:
+            self.backend.release_lease(
+                lease
+            )
+        except Exception:
+            # If a supposedly free resource cannot release the probe, treat
+            # availability as unknown/busy rather than fail open.
+            return True
         return False
 
     def assert_available(
