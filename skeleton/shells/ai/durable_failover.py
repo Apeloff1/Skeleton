@@ -111,21 +111,6 @@ class DurableFailoverTicket:
             raise ValueError(
                 "failover source_id and target_id must differ"
             )
-        if fleet is not None and not isinstance(
-            fleet,
-            DurableReplicaFleet,
-        ):
-            raise TypeError(
-                "fleet must be DurableReplicaFleet"
-            )
-        if (
-            fleet is not None
-            and fleet.source_id != self.source_id
-        ):
-            raise ValueError(
-                "failover fleet source_id mismatch"
-            )
-        self.fleet = fleet
         for name in ("issued_at", "expires_at"):
             value = getattr(self, name)
             if (
@@ -1139,6 +1124,21 @@ class DurableFailoverCoordinator:
             raise ValueError(
                 "failover source_id and target_id must differ"
             )
+        if fleet is not None and not isinstance(
+            fleet,
+            DurableReplicaFleet,
+        ):
+            raise TypeError(
+                "fleet must be DurableReplicaFleet"
+            )
+        if (
+            fleet is not None
+            and fleet.source_id != self.source_id
+        ):
+            raise ValueError(
+                "failover fleet source_id mismatch"
+            )
+        self.fleet = fleet
 
     def _fleet_report(self):
         if self.fleet is None:
