@@ -324,7 +324,7 @@ class ScannerHarness:
         for rule in self._rules:
             try:
                 result = rule.probe(self.root)
-            except BaseException as exc:
+            except Exception as exc:
                 # Never include raw exception text: it may contain paths, URLs,
                 # credentials, request data, or environment-derived values.
                 findings.append(
