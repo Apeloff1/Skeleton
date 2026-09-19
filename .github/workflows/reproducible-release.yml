@@ -9,6 +9,8 @@ on:
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
       - "scripts/testing/test_release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   push:
@@ -20,6 +22,8 @@ on:
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
       - "scripts/testing/test_release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   workflow_dispatch:
@@ -68,15 +72,20 @@ jobs:
       - name: Install pinned build toolchain
         run: python -m pip install --disable-pip-version-check -r source-a/requirements-build.txt
 
-      - name: Run release provenance regression tests
+      - name: Run release evidence regression tests
         env:
           PYTHONPATH: source-a
         run: |
+          set -euo pipefail
           python -m pip install --disable-pip-version-check \
             "pytest==8.4.2" \
             "pydantic==2.13.5" \
             "pydantic-settings==2.15.0"
-          python -m pytest -q source-a/scripts/testing/test_release_provenance.py
+          mkdir -p source-a/release-meta
+          python -m pytest -q \
+            source-a/scripts/testing/test_release_provenance.py \
+            source-a/skeleton/testing/test_release_evidence.py \
+            --junitxml=source-a/release-meta/release-tests.xml
 
       - name: Build release A
         working-directory: source-a
@@ -150,6 +159,83 @@ jobs:
             source-a/release-meta/release-provenance.json \
             source-b/release-meta/release-provenance.json
           diff -u source-a/release-meta/SHA256SUMS source-b/release-meta/SHA256SUMS
+          printf '{"source_commit":"%s","result":"pass","check":"byte-for-byte-reproducibility"}\n' \
+            "$GITHUB_SHA" > source-a/release-meta/reproducibility-eval.json
+
+      - name: Bind tests, evaluation and artifact bytes into release evidence
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("release-meta")
+
+          def evidence_record(evidence_id: str, name: str) -> dict[str, str]:
+              path = root / name
+              payload = path.read_bytes()
+              return {
+                  "evidence_id": evidence_id,
+                  "name": name,
+                  "sha256": hashlib.sha256(payload).hexdigest(),
+                  "result": "pass",
+              }
+
+          (root / "test-evidence.json").write_text(
+              json.dumps(
+                  [evidence_record("release-tests", "release-tests.xml")],
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          (root / "eval-evidence.json").write_text(
+              json.dumps(
+                  [
+                      evidence_record(
+                          "reproducibility-eval",
+                          "reproducibility-eval.json",
+                      )
+                  ],
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          mapfile -t artifact_names < <(
+            find dist -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort
+          )
+          if (( ${#artifact_names[@]} == 0 )); then
+            echo "release artifact inventory is empty" >&2
+            exit 1
+          fi
+          observed=()
+          for name in "${artifact_names[@]}"; do
+            observed+=(--observed "${name}=dist/${name}")
+          done
+
+          python scripts/release_provenance.py evidence \
+            --provenance release-meta/release-provenance.json \
+            --output release-meta/release-evidence.json \
+            --source-commit "$GITHUB_SHA" \
+            --test-evidence release-meta/test-evidence.json \
+            --eval-evidence release-meta/eval-evidence.json \
+            --gate \
+            "${observed[@]}"
+
+          python scripts/release_provenance.py gate \
+            --evidence release-meta/release-evidence.json \
+            --source-commit "$GITHUB_SHA" \
+            "${observed[@]}"
 
       - name: Publish verified release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
