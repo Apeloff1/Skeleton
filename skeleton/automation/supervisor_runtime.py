@@ -34,7 +34,7 @@ BRANCH_RE = re.compile(
     r"^(?!/)(?!.*//)(?!.*\.\.)(?!.*@\{)"
     r"[A-Za-z0-9._/-]{1,180}(?<![./])$"
 )
-_COMPONENT_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+WORKER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
 MAX_CANONICAL_JSON_BYTES = 256_000
 MAX_BRANCH_BYTES = 220
 
@@ -112,6 +112,15 @@ def validate_branch(value: object, *, label: str = "branch") -> str:
         raise SupervisorRuntimeError(f"invalid {label}")
     if value.endswith(".lock"):
         raise SupervisorRuntimeError(f"invalid {label}")
+    return value
+
+
+def validate_worker_name(value: object) -> str:
+    """Validate the canonical specialist identity used in custody and branches."""
+    if not isinstance(value, str) or WORKER_RE.fullmatch(value) is None:
+        raise SupervisorRuntimeError("invalid worker identity")
+    if "--" in value:
+        raise SupervisorRuntimeError("invalid worker identity")
     return value
 
 
@@ -199,12 +208,7 @@ class WorkerCustody:
     execution: ExecutionIdentity
 
     def __post_init__(self) -> None:
-        if (
-            not isinstance(self.worker, str)
-            or not self.worker
-            or _COMPONENT_RE.sub("-", self.worker) != self.worker
-        ):
-            raise SupervisorRuntimeError("invalid worker identity")
+        validate_worker_name(self.worker)
         validate_fingerprint(self.snapshot_fingerprint)
 
     @property
@@ -308,16 +312,9 @@ def require_remote_base_unchanged(execution: ExecutionIdentity) -> None:
         )
 
 
-def _safe_component(value: str, *, fallback: str) -> str:
-    cleaned = _COMPONENT_RE.sub("-", value).strip(".-")
-    return cleaned[:48] or fallback
-
-
 def worker_branch_prefix(worker: str) -> str:
     """Return the deterministic namespace owned by one registered specialist."""
-    if not isinstance(worker, str) or not worker:
-        raise SupervisorRuntimeError("invalid worker identity")
-    component = _safe_component(worker, fallback="worker")
+    component = validate_worker_name(worker)
     return validate_branch(
         f"bot/specialist-{component}-",
         label="worker branch prefix",
@@ -864,5 +861,6 @@ __all__ = [
     "validate_sha",
     "validate_staged_paths",
     "validate_worker_evidence_custody",
+    "validate_worker_name",
     "worker_branch_prefix",
 ]
