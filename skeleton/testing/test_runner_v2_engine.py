@@ -171,6 +171,8 @@ def test_engine_queue_pressure_defers_mutation(tmp_path):
     assert result.state is WorkState.DEFERRED
     assert "queue_pressure" in result.reasons
     assert transport.put_calls == []
+    assert transport.post_calls[-1][1]["state"] == "pending"
+    assert "queue_pressure" in transport.post_calls[-1][1]["description"]
 
 
 def test_engine_mutation_budget_zero_defers_ready_pr(tmp_path):
