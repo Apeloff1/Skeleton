@@ -107,3 +107,22 @@ def strict_nonnegative_int(
     if maximum is not None and value > maximum:
         raise ValueError(f"{field} exceeds maximum {maximum}")
     return value
+
+
+def strict_identifier(
+    value: Any,
+    *,
+    field: str,
+    max_length: int = 200,
+) -> str:
+    """Return a bounded exact string suitable for control-plane identity."""
+    if type(value) is not str:
+        raise ValueError(f"{field} must be a string")
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{field} must not be empty")
+    if len(text) > max_length:
+        raise ValueError(f"{field} exceeds maximum length {max_length}")
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text):
+        raise ValueError(f"{field} contains control characters")
+    return text
