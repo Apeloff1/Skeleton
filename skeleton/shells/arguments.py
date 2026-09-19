@@ -68,6 +68,7 @@ class ArgumentPolicy:
     deny_patterns: tuple[str, ...] = ()
     max_total_args: int = 128
     max_total_bytes: int = 65_536
+    allow_unknown_options: bool = False
 
     def __post_init__(self) -> None:
         normalized = dict(self.options)
@@ -97,6 +98,7 @@ class ArgumentPolicy:
             max_positionals=None,
             max_total_args=max_total_args,
             max_total_bytes=max_total_bytes,
+            allow_unknown_options=True,
         )
 
     def _reject(self, command: str, detail: str) -> None:
@@ -145,7 +147,14 @@ class ArgumentPolicy:
                     option_name, inline_value = token.split("=", 1)
                 rule = self.options.get(option_name)
                 if rule is None:
-                    self._reject(command, f"option {option_name!r} is not allowed")
+                    if self.allow_unknown_options:
+                        positional_values.append(token)
+                        i += 1
+                        continue
+                    self._reject(
+                        command,
+                        f"option {option_name!r} is not allowed",
+                    )
                 if option_name in seen_options and not rule.repeatable:
                     self._reject(command, f"option {option_name!r} may not repeat")
                 seen_options.add(option_name)
