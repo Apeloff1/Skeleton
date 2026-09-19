@@ -181,14 +181,30 @@ class CustodyAndBranchTests(unittest.TestCase):
         )
 
     def test_invalid_worker_identity_is_rejected(self) -> None:
-        with self.assertRaises(
-            runtime.SupervisorRuntimeError
-        ):
-            runtime.WorkerCustody(
-                worker="../escape",
-                snapshot_fingerprint=FP,
-                execution=execution(),
-            )
+        invalid = (
+            "../escape",
+            "Root-Cause",
+            "root_cause",
+            "røøt",
+            "root--cause",
+            "-root",
+            "root-",
+            "x" * 49,
+        )
+        for worker in invalid:
+            with self.subTest(worker=worker):
+                with self.assertRaises(
+                    runtime.SupervisorRuntimeError
+                ):
+                    runtime.WorkerCustody(
+                        worker=worker,
+                        snapshot_fingerprint=FP,
+                        execution=execution(),
+                    )
+                with self.assertRaises(
+                    runtime.SupervisorRuntimeError
+                ):
+                    runtime.worker_branch_prefix(worker)
 
 
 class CanonicalEvidenceTests(unittest.TestCase):
