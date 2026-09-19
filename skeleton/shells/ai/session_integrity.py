@@ -376,11 +376,13 @@ class SessionEvidenceIntegrityVerifier:
     def _journal_inclusions(
         self,
         evidence: SessionJournalEvidence,
+        snapshot=None,
     ) -> tuple[
         tuple[JournalInclusionResult, ...],
         tuple[str, ...],
     ]:
-        snapshot = self.journal.snapshot()
+        if snapshot is None:
+            snapshot = self.journal.snapshot()
         by_sequence = {
             event.sequence: event
             for event in snapshot
@@ -474,11 +476,13 @@ class SessionEvidenceIntegrityVerifier:
     def _receipt_inclusions(
         self,
         evidence: SessionExecutionEvidence,
+        snapshot=None,
     ) -> tuple[
         tuple[ReceiptInclusionResult, ...],
         tuple[str, ...],
     ]:
-        snapshot = self.receipt_chain.snapshot()
+        if snapshot is None:
+            snapshot = self.receipt_chain.snapshot()
         by_id: dict[str, list[object]] = {}
         for item in snapshot:
             by_id.setdefault(
@@ -606,6 +610,140 @@ class SessionEvidenceIntegrityVerifier:
                 )
         return tuple(results), tuple(issues)
 
+    @staticmethod
+    def _historical_snapshot(
+        chain,
+        expected_root: str,
+        *,
+        label: str,
+    ):
+        """Select a current or historical committed prefix for verification."""
+        current_ok = bool(chain.verify())
+        current_root = _sha256_hex(
+            f"{label}_root",
+            chain.root_hash(),
+        )
+        if not expected_root:
+            try:
+                snapshot = chain.snapshot()
+            except Exception as exc:
+                return (
+                    (),
+                    False,
+                    current_root,
+                    f"{label} chain snapshot failed: "
+                    f"{type(exc).__name__}",
+                )
+            return (
+                snapshot,
+                current_ok,
+                current_root,
+                (
+                    ""
+                    if current_ok
+                    else f"{label} chain failed integrity"
+                ),
+            )
+
+        expected_root = _sha256_hex(
+            f"expected_{label}_root",
+            expected_root,
+        )
+        snapshot_at = getattr(
+            chain,
+            "snapshot_at",
+            None,
+        )
+        verify_root = getattr(
+            chain,
+            "verify_root",
+            None,
+        )
+        root_is_ancestor = getattr(
+            chain,
+            "root_is_ancestor",
+            None,
+        )
+        if not (
+            callable(snapshot_at)
+            and callable(verify_root)
+            and callable(root_is_ancestor)
+        ):
+            try:
+                snapshot = chain.snapshot()
+            except Exception as exc:
+                return (
+                    (),
+                    False,
+                    current_root,
+                    f"{label} chain snapshot failed: "
+                    f"{type(exc).__name__}",
+                )
+            if current_root != expected_root:
+                return (
+                    snapshot,
+                    False,
+                    current_root,
+                    f"{label} root differs from expected root",
+                )
+            return (
+                snapshot,
+                current_ok,
+                current_root,
+                (
+                    ""
+                    if current_ok
+                    else f"{label} chain failed integrity"
+                ),
+            )
+
+        try:
+            historical = snapshot_at(
+                expected_root
+            )
+            historical_ok = bool(
+                verify_root(expected_root)
+            )
+            ancestor = bool(
+                root_is_ancestor(expected_root)
+            )
+        except Exception as exc:
+            return (
+                (),
+                False,
+                expected_root,
+                f"{label} historical root verification failed: "
+                f"{type(exc).__name__}",
+            )
+
+        if not current_ok:
+            return (
+                historical,
+                False,
+                expected_root,
+                f"{label} current chain failed integrity",
+            )
+        if not historical_ok:
+            return (
+                historical,
+                False,
+                expected_root,
+                f"{label} historical root failed integrity",
+            )
+        if not ancestor:
+            return (
+                historical,
+                False,
+                expected_root,
+                f"{label} historical root is not committed ancestor",
+            )
+        return (
+            historical,
+            True,
+            expected_root,
+            "",
+        )
+
     def verify(
         self,
         session_journal: SessionJournalEvidence,
@@ -636,65 +774,43 @@ class SessionEvidenceIntegrityVerifier:
                 "session journal/evidence identity mismatch"
             )
 
-        journal_chain_ok = bool(
-            self.journal.verify()
-        )
-        receipt_chain_ok = bool(
-            self.receipt_chain.verify()
-        )
-        journal_root = self.journal.root_hash()
-        receipt_root = (
-            self.receipt_chain.root_hash()
-        )
-        journal_root = _sha256_hex(
-            "journal_root",
+        (
+            journal_snapshot,
+            journal_chain_ok,
             journal_root,
+            journal_chain_issue,
+        ) = self._historical_snapshot(
+            self.journal,
+            expected_journal_root,
+            label="decision journal",
         )
-        receipt_root = _sha256_hex(
-            "receipt_root",
+        (
+            receipt_snapshot,
+            receipt_chain_ok,
             receipt_root,
+            receipt_chain_issue,
+        ) = self._historical_snapshot(
+            self.receipt_chain,
+            expected_receipt_root,
+            label="receipt",
         )
 
         issues: list[str] = []
-        if not journal_chain_ok:
-            issues.append(
-                "decision journal chain failed integrity"
-            )
-        if not receipt_chain_ok:
-            issues.append(
-                "receipt chain failed integrity"
-            )
-
-        if expected_journal_root:
-            expected_journal_root = _sha256_hex(
-                "expected_journal_root",
-                expected_journal_root,
-            )
-            if journal_root != expected_journal_root:
-                issues.append(
-                    "decision journal root differs "
-                    "from expected root"
-                )
-
-        if expected_receipt_root:
-            expected_receipt_root = _sha256_hex(
-                "expected_receipt_root",
-                expected_receipt_root,
-            )
-            if receipt_root != expected_receipt_root:
-                issues.append(
-                    "receipt root differs "
-                    "from expected root"
-                )
+        if journal_chain_issue:
+            issues.append(journal_chain_issue)
+        if receipt_chain_issue:
+            issues.append(receipt_chain_issue)
 
         journal_inclusions, journal_issues = (
             self._journal_inclusions(
-                session_journal
+                session_journal,
+                journal_snapshot,
             )
         )
         receipt_inclusions, receipt_issues = (
             self._receipt_inclusions(
-                session_evidence
+                session_evidence,
+                receipt_snapshot,
             )
         )
         issues.extend(journal_issues)
