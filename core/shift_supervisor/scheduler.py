@@ -10,7 +10,11 @@ from typing import Any, Mapping
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .constants import MAX_WORKER_SNAPSHOTS
+from .integrity import SupervisorIntegrityReport, audit_store, require_no_critical_integrity
 from .models import WorkerState
+from .plan_api import SquadPlanQueueAPI
+from .plan_store import InMemoryPlanStore
+from .squads import SQUAD_ROLES, SQUAD_SIZE
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
 
@@ -45,14 +49,17 @@ class SupervisorScheduler:
         secretary: SecretaryBot,
         project_context_supplier: Callable[[], dict[str, Any]],
         research_supplier: Callable[[], list[dict[str, Any]]] | None = None,
+        research_from_context: Callable[[dict[str, Any]], list[dict[str, Any]]] | None = None,
         cadence: SupervisorCadence | None = None,
     ) -> None:
         self.manager = manager
         self.secretary = secretary
         self.project_context_supplier = project_context_supplier
         self.research_supplier = research_supplier or (lambda: [])
+        self.research_from_context = research_from_context
         self.cadence = cadence or SupervisorCadence()
         self._stop = threading.Event()
+        self._last_integrity: SupervisorIntegrityReport | None = None
 
     def run_once(
         self,
@@ -85,6 +92,11 @@ class SupervisorScheduler:
             "revisions": revisions,
             "plan_items": [asdict(item) for item in items],
             "workers": [asdict(worker) for worker in workers],
+            "integrity": (
+                self._last_integrity.as_dict()
+                if self._last_integrity is not None
+                else None
+            ),
         }
 
     def _execute_cycle(
@@ -100,6 +112,11 @@ class SupervisorScheduler:
         project_context = self.project_context_supplier()
         self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
         self._rollover_daily_totals()
+        self._recover_control_plane_state()
+        self._last_integrity = self._audit_integrity()
+        if self._last_integrity is not None:
+            require_no_critical_integrity(self._last_integrity)
+
         revisions: dict[str, Any] = {}
         if run_secretary:
             revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
@@ -107,10 +124,42 @@ class SupervisorScheduler:
             revisions["manager"] = asdict(
                 self.manager.refresh_plan(
                     project_context=project_context,
-                    research=self.research_supplier(),
+                    research=self._research_for_context(project_context),
                 )
             )
+        self._last_integrity = self._audit_integrity()
+        if self._last_integrity is not None:
+            require_no_critical_integrity(self._last_integrity)
         return revisions
+
+    def _research_for_context(
+        self,
+        project_context: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        if self.research_from_context is not None:
+            return self.research_from_context(project_context)
+        return self.research_supplier()
+
+    def _recover_control_plane_state(self) -> None:
+        store = getattr(self.manager, "store", None)
+        if not isinstance(store, InMemoryPlanStore):
+            return
+        api = SquadPlanQueueAPI(
+            store,
+            overtime_soft_limit_minutes=getattr(
+                self.manager,
+                "overtime_soft_limit_minutes",
+                120,
+            ),
+        )
+        api.recover_invalid_leases()
+        api.reclaim_expired()
+
+    def _audit_integrity(self) -> SupervisorIntegrityReport | None:
+        store = getattr(self.manager, "store", None)
+        if not isinstance(store, InMemoryPlanStore):
+            return None
+        return audit_store(store)
 
     def run_forever(self) -> None:
         """Run the 15/30-minute loop without duplicating coincident snapshots.
@@ -159,7 +208,12 @@ class SupervisorScheduler:
     def _ingest_worker_snapshots(self, raw: Any) -> None:
         if not isinstance(raw, list):
             return
-        known = {worker.worker_id: worker for worker in self.manager.store.snapshot_workers()}
+
+        known = {
+            worker.worker_id: worker
+            for worker in self.manager.store.snapshot_workers()
+        }
+        accepted: list[WorkerState] = []
         for row in raw[:MAX_WORKER_SNAPSHOTS]:
             if not isinstance(row, Mapping):
                 continue
@@ -170,6 +224,13 @@ class SupervisorScheduler:
                 continue
             if status not in {"offline", "idle", "working", "blocked"}:
                 status = "offline"
+
+            metadata = (
+                dict(row.get("metadata", {}))
+                if isinstance(row.get("metadata"), Mapping)
+                else {}
+            )
+            reported_task_id = self._optional_string(row.get("current_task_id"))
             worker = WorkerState(
                 worker_id=worker_id,
                 team=team,  # type: ignore[arg-type]
@@ -177,45 +238,136 @@ class SupervisorScheduler:
                 clocked_in_at=self._parse_datetime(row.get("clocked_in_at")),
                 clocked_out_at=self._parse_datetime(row.get("clocked_out_at")),
                 last_heartbeat_at=self._parse_datetime(row.get("last_heartbeat_at")),
-                current_task_id=self._optional_string(row.get("current_task_id")),
-                normal_shift_minutes=self._nonnegative_int(row.get("normal_shift_minutes")),
+                current_task_id=None,
+                normal_shift_minutes=self._nonnegative_int(
+                    row.get("normal_shift_minutes")
+                ),
                 overtime_minutes=self._nonnegative_int(row.get("overtime_minutes")),
                 overtime_task_ids=self._string_list(row.get("overtime_task_ids")),
-                metadata=dict(row.get("metadata", {})) if isinstance(row.get("metadata"), Mapping) else {},
+                metadata=metadata,
             )
             existing = known.get(worker_id)
-            if existing is not None:
-                incoming_time = worker.last_heartbeat_at or worker.clocked_out_at or worker.clocked_in_at
-                existing_time = existing.last_heartbeat_at or existing.clocked_out_at or existing.clocked_in_at
-                if incoming_time is not None and existing_time is not None and incoming_time < existing_time:
-                    continue
+            incoming_time = (
+                worker.last_heartbeat_at
+                or worker.clocked_out_at
+                or worker.clocked_in_at
+            )
+            existing_time = (
+                (
+                    existing.last_heartbeat_at
+                    or existing.clocked_out_at
+                    or existing.clocked_in_at
+                )
+                if existing is not None
+                else None
+            )
+            if existing_time is not None and (
+                incoming_time is None or incoming_time < existing_time
+            ):
+                continue
+
+            # Worker-status issues are evidence, not assignment authority.  Only
+            # the queue/lease layer may create or replace current_task_id.
+            canonical_task_id = (
+                existing.current_task_id if existing is not None else None
+            )
+            worker.current_task_id = canonical_task_id
+            if reported_task_id != canonical_task_id and reported_task_id is not None:
+                worker.metadata["ignored_reported_task_id"] = reported_task_id[:160]
+
+            if canonical_task_id is None and worker.status == "working":
+                worker.status = "idle"
+                worker.metadata["reported_working_without_assignment"] = True
+            elif canonical_task_id is not None and worker.status in {"idle", "offline"}:
+                if existing is not None and existing.status in {"working", "blocked"}:
+                    worker.status = existing.status
+                else:
+                    worker.status = "working"
+
             worker = self._merge_daily_snapshot(existing, worker)
             self.manager.store.upsert_worker(worker)
-            self._reconcile_validated_work(worker)
             known[worker_id] = worker
+            accepted.append(worker)
 
-    def _reconcile_validated_work(self, worker: WorkerState) -> None:
-        """Close canonical plan items proven by a validated studio snapshot.
+        self._reconcile_validated_work(accepted)
 
-        Night and Idle workflows publish ``worked_on`` only after their
-        credential-free validation succeeds. Those values are canonical plan
-        IDs, so the next supervisor cycle can safely retire matching work
-        instead of repeatedly handing the same order back to another shift.
-        Unknown IDs and cross-team IDs are deliberately ignored.
+    def _reconcile_validated_work(
+        self,
+        workers: list[WorkerState],
+    ) -> None:
+        """Retire canonical work only from explicit credential-free validation.
+
+        Workforce issues are untrusted repository inputs until the reporting
+        workflow marks them as validation-passed.  Squad-stamped tasks require
+        evidence for all four canonical roles.  An external completion report
+        never supersedes a currently active owner or lease.
         """
-        worked_on = set(self._string_list(worker.metadata.get("worked_on")))
-        if not worked_on:
+        proofs: dict[str, dict[str, Any]] = {}
+        for worker in workers:
+            metadata = worker.metadata
+            if (
+                str(metadata.get("validation_status", "")).strip().lower()
+                != "passed"
+                or str(metadata.get("validation_source", "")).strip()
+                != "credential-free-studio-validation"
+            ):
+                continue
+            worked_on = self._string_list(metadata.get("worked_on"))
+            roles = {
+                str(role).strip()
+                for role in self._string_list(metadata.get("roles"))
+                if str(role).strip() in SQUAD_ROLES
+            }
+            shift_key = str(metadata.get("shift_key", "")).strip()[:160]
+            for task_id in worked_on:
+                proof = proofs.setdefault(
+                    task_id,
+                    {
+                        "worker_ids": set(),
+                        "roles": set(),
+                        "shift_keys": set(),
+                    },
+                )
+                proof["worker_ids"].add(worker.worker_id)
+                proof["roles"].update(roles)
+                if shift_key:
+                    proof["shift_keys"].add(shift_key)
+
+        if not proofs:
             return
+
         for item in self.manager.store.snapshot_items():
-            if item.id not in worked_on or item.target_team != worker.team:
+            proof = proofs.get(item.id)
+            if proof is None or item.status in {"done", "rejected"}:
                 continue
-            if item.status in {"done", "rejected"}:
+            if item.owner is not None or item.status != "queued":
+                # Live ownership is authoritative.  A late external report may
+                # not steal or finish work currently executing under a lease.
                 continue
+            if item.metadata.get("squad_size") is not None:
+                try:
+                    squad_size = int(item.metadata.get("squad_size"))
+                except (TypeError, ValueError):
+                    continue
+                if squad_size != SQUAD_SIZE:
+                    continue
+                if not set(SQUAD_ROLES).issubset(proof["roles"]):
+                    continue
+
+            workers_for_task = sorted(str(x) for x in proof["worker_ids"])[:16]
+            roles_for_task = sorted(str(x) for x in proof["roles"])[:16]
             item.status = "done"
-            item.owner = worker.worker_id
+            item.owner = workers_for_task[0] if workers_for_task else None
             metadata = dict(item.metadata)
-            metadata["completed_by_worker"] = worker.worker_id
-            metadata["completion_source"] = "validated-studio-worker-snapshot"
+            metadata.update(
+                {
+                    "completed_by_workers": workers_for_task,
+                    "completion_roles": roles_for_task,
+                    "completion_shift_keys": sorted(proof["shift_keys"])[:16],
+                    "completion_source": "validated-studio-worker-snapshot",
+                    "completion_validation": "credential-free-studio-validation",
+                }
+            )
             item.metadata = metadata
             self.manager.store.update_item(item)
 
