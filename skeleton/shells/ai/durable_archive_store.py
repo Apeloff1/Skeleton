@@ -2360,7 +2360,17 @@ class DurableArchiveRepository:
 
 
 class ArchiveBackedHistoricalChain:
-    """Read-through historical resolver over a live chain plus verified archive."""
+    """Logical full-chain reader over compacted hot storage plus archive.
+
+    When the live chain has no active hot floor, reads delegate to the live
+    chain exactly as before.  Once a signed hot floor becomes active, the
+    archived prefix through that floor is treated as immutable history and the
+    live chain supplies only the suffix after the floor.
+
+    This wrapper is intentionally read-only.  It satisfies the durable
+    checkpoint/archive read protocol without becoming an execution or mutation
+    authority.
+    """
 
     def __init__(
         self,
@@ -2377,14 +2387,184 @@ class ArchiveBackedHistoricalChain:
         self.live_chain = live_chain
         self.archives = archives
 
+    @staticmethod
+    def _node_hash(item: object) -> str:
+        value = getattr(
+            item,
+            "event_hash",
+            getattr(
+                item,
+                "receipt_hash",
+                getattr(item, "node_hash", ""),
+            ),
+        )
+        return str(value)
+
+    @staticmethod
+    def _node_sequence(item: object) -> int:
+        return int(getattr(item, "sequence"))
+
+    @staticmethod
+    def _previous_hash(item: object) -> str:
+        return str(getattr(item, "previous_hash"))
+
+    def _active_floor(self):
+        floor_method = getattr(
+            self.live_chain,
+            "hot_floor",
+            None,
+        )
+        active_method = getattr(
+            self.live_chain,
+            "_hot_floor_active",
+            None,
+        )
+        if not (
+            callable(floor_method)
+            and callable(active_method)
+        ):
+            return None
+        floor = floor_method()
+        if (
+            int(getattr(floor, "sequence", 0))
+            <= 0
+        ):
+            return None
+        if not bool(active_method(floor)):
+            return None
+        if (
+            not self.archives.verify_root(
+                self.chain_id,
+                str(floor.root_hash),
+            )
+        ):
+            raise DurableArchiveStoreError(
+                "active hot floor is not covered by a verified archive"
+            )
+        return floor
+
+    def _archive_prefix(
+        self,
+        floor,
+    ) -> tuple[object, ...]:
+        prefix = tuple(
+            self.archives.snapshot_at(
+                self.chain_id,
+                str(floor.root_hash),
+            )
+        )
+        if len(prefix) != int(floor.sequence):
+            raise DurableArchiveStoreError(
+                "archive prefix length differs from active hot floor sequence"
+            )
+        if not prefix:
+            raise DurableArchiveStoreError(
+                "non-genesis active hot floor resolved empty archive prefix"
+            )
+        if (
+            self._node_hash(prefix[-1])
+            != str(floor.root_hash)
+            or self._node_sequence(prefix[-1])
+            != int(floor.sequence)
+        ):
+            raise DurableArchiveStoreError(
+                "archive prefix terminal node differs from active hot floor"
+            )
+        return prefix
+
+    def _verify_splice(
+        self,
+        floor,
+        prefix: tuple[object, ...],
+        suffix: tuple[object, ...],
+    ) -> None:
+        if not prefix:
+            raise DurableArchiveStoreError(
+                "hot/cold splice requires archive prefix"
+            )
+        if (
+            self._node_hash(prefix[-1])
+            != str(floor.root_hash)
+            or self._node_sequence(prefix[-1])
+            != int(floor.sequence)
+        ):
+            raise DurableArchiveStoreError(
+                "hot/cold splice archive boundary mismatch"
+            )
+        if not suffix:
+            return
+        first = suffix[0]
+        if (
+            self._node_sequence(first)
+            != int(floor.sequence) + 1
+            or self._previous_hash(first)
+            != str(floor.root_hash)
+        ):
+            raise DurableArchiveStoreError(
+                "hot/cold splice live suffix does not continue archive floor"
+            )
+        expected_sequence = int(floor.sequence) + 1
+        previous = str(floor.root_hash)
+        for item in suffix:
+            if (
+                self._node_sequence(item)
+                != expected_sequence
+                or self._previous_hash(item)
+                != previous
+            ):
+                raise DurableArchiveStoreError(
+                    "hot/cold splice live suffix is not contiguous"
+                )
+            previous = self._node_hash(item)
+            expected_sequence += 1
+
     def head(self):
         return self.live_chain.head()
 
     def verify(self) -> bool:
-        return bool(self.live_chain.verify())
+        try:
+            if not bool(self.live_chain.verify()):
+                return False
+            floor = self._active_floor()
+            if floor is None:
+                return True
+            prefix = self._archive_prefix(floor)
+            suffix = tuple(self.live_chain.snapshot())
+            self._verify_splice(
+                floor,
+                prefix,
+                suffix,
+            )
+            head = self.live_chain.head()
+            return (
+                int(head.sequence)
+                == len(prefix) + len(suffix)
+                and (
+                    str(head.root_hash)
+                    == (
+                        self._node_hash(suffix[-1])
+                        if suffix
+                        else str(floor.root_hash)
+                    )
+                )
+            )
+        except Exception:
+            return False
 
     def snapshot(self):
-        return self.live_chain.snapshot()
+        floor = self._active_floor()
+        if floor is None:
+            return self.live_chain.snapshot()
+        prefix = self._archive_prefix(floor)
+        suffix = tuple(
+            self.live_chain.snapshot()
+        )
+        self._verify_splice(
+            floor,
+            prefix,
+            suffix,
+        )
+        return prefix + suffix
 
     def root_hash(self) -> str:
         if hasattr(self.live_chain, "root_hash"):
@@ -2392,31 +2572,9 @@ class ArchiveBackedHistoricalChain:
         return str(self.live_chain.head().root_hash)
 
     def length(self) -> int:
-        if hasattr(self.live_chain, "length"):
-            return int(self.live_chain.length())
         return int(self.live_chain.head().sequence)
 
-    def snapshot_at(
-        self,
-        root_hash: str,
-    ):
-        root_hash = _digest("root_hash", root_hash)
-        try:
-            return self.live_chain.snapshot_at(root_hash)
-        except Exception as live_error:
-            try:
-                return self.archives.snapshot_at(
-                    self.chain_id,
-                    root_hash,
-                )
-            except Exception as archive_error:
-                raise DurableArchiveStoreError(
-                    "historical root unavailable from live chain and archive: "
-                    f"{type(live_error).__name__}/"
-                    f"{type(archive_error).__name__}"
-                ) from archive_error
-
-    def sequence_for_root(
+    def _sequence_for_root_live_or_archive(
         self,
         root_hash: str,
     ) -> int:
@@ -2443,6 +2601,85 @@ class ArchiveBackedHistoricalChain:
             root_hash,
         )
 
+    def snapshot_at(
+        self,
+        root_hash: str,
+    ):
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return ()
+        floor = self._active_floor()
+        if floor is None:
+            try:
+                return self.live_chain.snapshot_at(
+                    root_hash
+                )
+            except Exception as live_error:
+                try:
+                    return self.archives.snapshot_at(
+                        self.chain_id,
+                        root_hash,
+                    )
+                except Exception as archive_error:
+                    raise DurableArchiveStoreError(
+                        "historical root unavailable from live chain and archive: "
+                        f"{type(live_error).__name__}/"
+                        f"{type(archive_error).__name__}"
+                    ) from archive_error
+
+        target_sequence = (
+            self._sequence_for_root_live_or_archive(
+                root_hash
+            )
+        )
+        if target_sequence <= int(floor.sequence):
+            return self.archives.snapshot_at(
+                self.chain_id,
+                root_hash,
+            )
+
+        prefix = self._archive_prefix(
+            floor
+        )
+        try:
+            suffix = tuple(
+                self.live_chain.snapshot_at(
+                    root_hash
+                )
+            )
+        except Exception as exc:
+            raise DurableArchiveStoreError(
+                "live suffix for archive-backed historical root is unavailable: "
+                f"{type(exc).__name__}"
+            ) from exc
+        self._verify_splice(
+            floor,
+            prefix,
+            suffix,
+        )
+        if (
+            not suffix
+            or self._node_hash(suffix[-1])
+            != root_hash
+            or self._node_sequence(suffix[-1])
+            != target_sequence
+        ):
+            raise DurableArchiveStoreError(
+                "archive-backed historical suffix terminal root mismatch"
+            )
+        return prefix + suffix
+
+    def sequence_for_root(
+        self,
+        root_hash: str,
+    ) -> int:
+        return self._sequence_for_root_live_or_archive(
+            root_hash
+        )
+
     def snapshot_segment(
         self,
         start_exclusive_root: str,
@@ -2450,7 +2687,8 @@ class ArchiveBackedHistoricalChain:
         *,
         max_items: int = 4096,
     ):
-        """Resolve a bounded segment from live storage or verified archive."""
+        """Resolve a bounded segment, including segments crossing hot/cold."""
+
         if (
             isinstance(max_items, bool)
             or not isinstance(max_items, int)
@@ -2468,62 +2706,241 @@ class ArchiveBackedHistoricalChain:
             end_inclusive_root
             or self.root_hash(),
         )
-
-        live_segment = getattr(
-            self.live_chain,
-            "snapshot_segment",
-            None,
+        start_sequence = (
+            self._sequence_for_root_live_or_archive(
+                start_exclusive_root
+            )
         )
-        live_error: Exception | None = None
-        if callable(live_segment):
+        end_sequence = (
+            self._sequence_for_root_live_or_archive(
+                end_inclusive_root
+            )
+        )
+        if end_sequence < start_sequence:
+            raise DurableArchiveStoreError(
+                "historical segment end precedes start"
+            )
+        distance = (
+            end_sequence - start_sequence
+        )
+        if distance > max_items:
+            raise DurableArchiveStoreError(
+                "historical segment exceeds bounded verification window"
+            )
+        if distance == 0:
+            if (
+                start_exclusive_root
+                != end_inclusive_root
+            ):
+                raise DurableArchiveStoreError(
+                    "equal historical segment sequence has different roots"
+                )
+            return ()
+
+        floor = self._active_floor()
+        if floor is None:
+            live_segment = getattr(
+                self.live_chain,
+                "snapshot_segment",
+                None,
+            )
+            live_error: Exception | None = None
+            if callable(live_segment):
+                try:
+                    return live_segment(
+                        start_exclusive_root,
+                        end_inclusive_root,
+                        max_items=max_items,
+                    )
+                except Exception as exc:
+                    live_error = exc
             try:
-                return live_segment(
+                return self.archives.snapshot_segment(
+                    self.chain_id,
                     start_exclusive_root,
                     end_inclusive_root,
                     max_items=max_items,
                 )
-            except Exception as exc:
-                live_error = exc
+            except Exception as archive_error:
+                raise DurableArchiveStoreError(
+                    "bounded historical segment unavailable from live chain "
+                    "and archive: "
+                    f"{type(live_error).__name__ if live_error else 'unsupported'}/"
+                    f"{type(archive_error).__name__}"
+                ) from archive_error
 
-        try:
+        floor_sequence = int(
+            floor.sequence
+        )
+        floor_root = str(
+            floor.root_hash
+        )
+        if end_sequence <= floor_sequence:
             return self.archives.snapshot_segment(
                 self.chain_id,
                 start_exclusive_root,
                 end_inclusive_root,
                 max_items=max_items,
             )
-        except Exception as archive_error:
+        if start_sequence >= floor_sequence:
+            return self.live_chain.snapshot_segment(
+                start_exclusive_root,
+                end_inclusive_root,
+                max_items=max_items,
+            )
+
+        archived = tuple(
+            self.archives.snapshot_segment(
+                self.chain_id,
+                start_exclusive_root,
+                floor_root,
+                max_items=(
+                    floor_sequence
+                    - start_sequence
+                ),
+            )
+        )
+        live = tuple(
+            self.live_chain.snapshot_segment(
+                floor_root,
+                end_inclusive_root,
+                max_items=(
+                    end_sequence
+                    - floor_sequence
+                ),
+            )
+        )
+        if len(archived) + len(live) != distance:
             raise DurableArchiveStoreError(
-                "bounded historical segment unavailable from live chain "
-                "and archive: "
-                f"{type(live_error).__name__ if live_error else 'unsupported'}/"
-                f"{type(archive_error).__name__}"
-            ) from archive_error
+                "hot/cold historical segment length mismatch"
+            )
+        prefix = self._archive_prefix(floor)
+        self._verify_splice(
+            floor,
+            prefix,
+            live,
+        )
+        if archived:
+            if (
+                self._node_hash(archived[-1])
+                != floor_root
+                or self._node_sequence(
+                    archived[-1]
+                )
+                != floor_sequence
+            ):
+                raise DurableArchiveStoreError(
+                    "archived cross-floor segment does not terminate at hot floor"
+                )
+        return archived + live
 
     def verify_root(
         self,
         root_hash: str,
     ) -> bool:
-        try:
-            if self.live_chain.verify_root(root_hash):
-                return True
-        except Exception:
-            pass
-        return self.archives.verify_root(
-            self.chain_id,
+        root_hash = _digest(
+            "root_hash",
             root_hash,
         )
+        try:
+            floor = self._active_floor()
+            if floor is None:
+                try:
+                    if self.live_chain.verify_root(
+                        root_hash
+                    ):
+                        return True
+                except Exception:
+                    pass
+                return self.archives.verify_root(
+                    self.chain_id,
+                    root_hash,
+                )
+
+            sequence = (
+                self._sequence_for_root_live_or_archive(
+                    root_hash
+                )
+            )
+            if sequence <= int(floor.sequence):
+                return self.archives.verify_root(
+                    self.chain_id,
+                    root_hash,
+                )
+            return bool(
+                self.archives.verify_root(
+                    self.chain_id,
+                    str(floor.root_hash),
+                )
+                and self.live_chain.verify_root(
+                    root_hash
+                )
+            )
+        except Exception:
+            return False
 
     def root_is_ancestor(
         self,
         root_hash: str,
     ) -> bool:
-        try:
-            if self.live_chain.root_is_ancestor(root_hash):
-                return True
-        except Exception:
-            pass
-        return self.archives.root_is_archived(
-            self.chain_id,
+        root_hash = _digest(
+            "root_hash",
             root_hash,
         )
+        try:
+            floor = self._active_floor()
+            if floor is None:
+                try:
+                    if self.live_chain.root_is_ancestor(
+                        root_hash
+                    ):
+                        return True
+                except Exception:
+                    pass
+                return self.archives.root_is_archived(
+                    self.chain_id,
+                    root_hash,
+                )
+
+            sequence = (
+                self._sequence_for_root_live_or_archive(
+                    root_hash
+                )
+            )
+            if sequence <= int(floor.sequence):
+                if not self.archives.verify_root(
+                    self.chain_id,
+                    root_hash,
+                ):
+                    return False
+                # A root below the floor is an ancestor iff the archive can
+                # verify the bounded segment from that root through the exact
+                # floor root.
+                if root_hash == str(floor.root_hash):
+                    return True
+                try:
+                    self.archives.snapshot_segment(
+                        self.chain_id,
+                        root_hash,
+                        str(floor.root_hash),
+                        max_items=(
+                            int(floor.sequence)
+                            - sequence
+                        ),
+                    )
+                    return True
+                except Exception:
+                    return False
+
+            return bool(
+                self.live_chain.root_is_ancestor(
+                    root_hash
+                )
+                and self.archives.verify_root(
+                    self.chain_id,
+                    str(floor.root_hash),
+                )
+            )
+        except Exception:
+            return False
+
