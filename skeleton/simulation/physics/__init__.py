@@ -102,6 +102,7 @@ from .gameplay import (
     ProjectileSolution,
 )
 from .jvm_broadphase_accelerator import (
+    BroadPhaseAcceleratorStatus,
     BroadPhaseIndexPair,
     JvmBroadPhaseAccelerator,
     JvmBroadPhaseConfig,
@@ -231,6 +232,7 @@ __all__ = [
     "IslandGraphStats",
     "IslandSolveReceipt",
     "JvmBroadPhaseAccelerator",
+    "BroadPhaseAcceleratorStatus",
     "JvmBroadPhaseConfig",
     "JvmBroadPhaseError",
     "JvmBroadPhaseUnavailable",
