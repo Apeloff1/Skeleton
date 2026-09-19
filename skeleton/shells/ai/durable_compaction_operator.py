@@ -684,6 +684,7 @@ class DurableCompactionWorkflowInspection:
     certificate_current: bool
     authorization_current: bool
     pruning_state_consistent: bool
+    archive_recoverable: bool
     live_head_matches: bool
     hot_floor_consistent: bool
     reasons: tuple[str, ...]
@@ -694,6 +695,7 @@ class DurableCompactionWorkflowInspection:
             "certificate_current",
             "authorization_current",
             "pruning_state_consistent",
+            "archive_recoverable",
             "live_head_matches",
             "hot_floor_consistent",
         ):
@@ -746,6 +748,7 @@ class DurableCompactionWorkflowInspection:
             required = (
                 required
                 and self.pruning_state_consistent
+                and self.archive_recoverable
             )
         return (
             required
@@ -766,6 +769,7 @@ class DurableCompactionWorkflowInspection:
         return (
             self.stored.workflow.resumable
             and self.pruning_state_consistent
+            and self.archive_recoverable
             and self.hot_floor_consistent
             and not self.stored.workflow.requires_manual_review
         )
@@ -785,6 +789,9 @@ class DurableCompactionWorkflowInspection:
             ),
             "pruning_state_consistent": (
                 self.pruning_state_consistent
+            ),
+            "archive_recoverable": (
+                self.archive_recoverable
             ),
             "live_head_matches": (
                 self.live_head_matches
@@ -2452,6 +2459,7 @@ class DurableCompactionOperator:
         pruning_state_consistent = (
             not workflow.pruning_operation_id
         )
+        archive_recoverable = True
         if workflow.pruning_operation_id:
             manifest = self.pruning.manifest(
                 workflow.pruning_operation_id
@@ -2472,8 +2480,26 @@ class DurableCompactionOperator:
                         operation,
                     )
                     pruning_state_consistent = True
+                    archive_report = (
+                        self.pruning
+                        .inspect_archive_recoverability(
+                            manifest
+                        )
+                    )
+                    archive_recoverable = (
+                        archive_report.recoverable
+                    )
+                    if not archive_recoverable:
+                        reasons.append(
+                            "bound pruning archive is not recoverable: "
+                            + (
+                                archive_report.reason
+                                or "archive recovery verification failed"
+                            )
+                        )
                 except Exception as exc:
                     pruning_state_consistent = False
+                    archive_recoverable = False
                     reasons.append(
                         "pruning state inspection failed: "
                         f"{type(exc).__name__}"
@@ -2518,6 +2544,7 @@ class DurableCompactionOperator:
             certificate_current,
             authorization_current,
             pruning_state_consistent,
+            archive_recoverable,
             live_head_matches,
             hot_floor_consistent,
             tuple(dict.fromkeys(reasons)),
