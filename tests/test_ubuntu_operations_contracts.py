@@ -238,6 +238,11 @@ def test_numbered_contracts_are_lazy_but_backward_compatible() -> None:
         getattr(ops, "ubuntu_contract_4051")
     with pytest.raises(ValueError, match="contract id"):
         ops.ubuntu_contract("worker", True)
+    assert "ubuntu_contract_4050" in dir(ops)
+    assert "ubuntu_contract_9000" in dir(ops)
+    assert "ubuntu_contract_4050" in ops.__all__
+    assert "ubuntu_contract_9000" in ops.__all__
+    assert len([name for name in ops.__all__ if name.startswith("ubuntu_contract_")]) == 826
 
 
 def test_ubuntu_package_is_execution_free_by_import_contract() -> None:
