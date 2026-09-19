@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -21,8 +22,7 @@ from skeleton.shells.execution_plan import ExecutionPlan, PlanStep
 from skeleton.shells.runner import ShellCommand
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def plan(
