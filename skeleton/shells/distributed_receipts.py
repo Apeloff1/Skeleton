@@ -1446,6 +1446,12 @@ class DistributedReceiptChain:
                 "receipt index has invalid value type"
             )
         entry = record.value
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and entry.sequence <= floor.sequence
+        ):
+            return None
         node = self.get_node(
             entry.receipt_hash,
         )
