@@ -36,7 +36,11 @@ def detached_json(value: Any, *, depth: int = 0) -> Any:
             raise ValueError("too many JSON mapping items")
         out: dict[str, Any] = {}
         for key, item in value.items():
+            if len(out) >= MAX_ITEMS and key not in out:
+                raise ValueError("too many JSON mapping items")
             bounded_text(key, "JSON key")
+            if key in out:
+                raise ValueError("duplicate JSON key")
             out[key] = detached_json(item, depth=depth + 1)
         return out
     if isinstance(value, (list, tuple)):

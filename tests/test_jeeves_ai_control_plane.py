@@ -1,8 +1,27 @@
 import pytest
+from collections.abc import Mapping
 
 from skeleton.jeeves.ai.contracts import Authority, ContractLedger, ContractRecord, ContractState, validate_contract
 from skeleton.jeeves.ai.evaluation import EvalLedger, EvalRecord, EvalState, validate_eval
 from skeleton.jeeves.ai.orchestration import OrchestrLedger, OrchestrRecord, OrchestrState, validate_orchestr
+
+
+class _DuplicateItemsMapping(Mapping):
+    """Adversarial Mapping whose items() violates unique-key mapping semantics."""
+
+    def __getitem__(self, key):
+        if key == "scope":
+            return "first"
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(("scope",))
+
+    def __len__(self):
+        return 1
+
+    def items(self):
+        return (("scope", "first"), ("scope", "second"))
 
 
 def test_contract_record_is_canonical_and_detached_from_input():
@@ -29,6 +48,13 @@ def test_all_planes_share_fail_closed_json_contract():
             constructor("bad", payload={"opaque": object()})
         with pytest.raises(ValueError):
             constructor("bad", payload={"nul": "a\x00b"})
+
+
+def test_all_planes_reject_adversarial_duplicate_mapping_items():
+    payload = _DuplicateItemsMapping()
+    for constructor in (ContractRecord, EvalRecord, OrchestrRecord):
+        with pytest.raises(ValueError, match="duplicate JSON key"):
+            constructor("duplicate-key", payload=payload)
 
 
 def test_all_planes_reject_excessive_nesting():
