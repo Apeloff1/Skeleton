@@ -67,6 +67,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("security middleware property regression", "test_security_middleware_properties.py"),
     ("secret hygiene", "check_secret_hygiene.py"),
     ("malware/IOC policy", "check_malware_iocs.py"),
+    ("live-service test boundary", "check_live_service_test_boundaries.py"),
+    ("live-service boundary regression", "test_live_service_test_boundaries.py"),
 )
 
 
