@@ -557,6 +557,7 @@ class DurableEvidenceReadinessGuard:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None = None,
         recovery_finalization_ids: tuple[str, ...] = (),
+        compaction_workflow_ids: tuple[str, ...] = (),
     ) -> DurableEvidenceReadinessReport:
         entries = self._entries(chains)
         mutations: list[str] = []
