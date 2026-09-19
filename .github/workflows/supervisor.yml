@@ -24,26 +24,35 @@ jobs:
     outputs:
       delegation_b64: ${{ steps.supervisor.outputs.delegation_b64 }}
       snapshot_fingerprint: ${{ steps.supervisor.outputs.snapshot_fingerprint }}
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GH_TOKEN: ${{ github.token }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-      MODEL_NAME: ${{ vars.MODEL_NAME }}
-      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      PYTHONPATH: ${{ github.workspace }}
+      execution_fingerprint: ${{ steps.supervisor.outputs.execution_fingerprint }}
+      base_sha: ${{ steps.supervisor.outputs.base_sha }}
     steps:
-      - name: Checkout trusted default branch
+      - name: Checkout immutable Supervisor base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ github.sha }}
           persist-credentials: false
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
+
       - name: Build bounded Supervisor delegation
         id: supervisor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SUPERVISOR_BASE_SHA: ${{ github.sha }}
+          SUPERVISOR_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SUPERVISOR_RUN_ID: ${{ github.run_id }}
+          SUPERVISOR_RUN_ATTEMPT: ${{ github.run_attempt }}
+          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONDONTWRITEBYTECODE: "1"
         run: python -m skeleton.automation.supervisor --plan-only --emit-github-output "$GITHUB_OUTPUT"
 
   secretary:
@@ -54,26 +63,34 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GH_TOKEN: ${{ github.token }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-      MODEL_NAME: ${{ vars.MODEL_NAME }}
-      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      PYTHONPATH: ${{ github.workspace }}
-      SUPERVISOR_DELEGATION: "1"
-      SUPERVISOR_SNAPSHOT_FINGERPRINT: ${{ needs.plan.outputs.snapshot_fingerprint }}
-      SUPERVISOR_DELEGATION_B64: ${{ needs.plan.outputs.delegation_b64 }}
     steps:
-      - name: Checkout trusted default branch
+      - name: Checkout identical immutable Supervisor base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ needs.plan.outputs.base_sha }}
           persist-credentials: false
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
-      - name: Admit delegation and dispatch bounded workers
+
+      - name: Admit delegation and dispatch isolated bounded workers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SUPERVISOR_BASE_SHA: ${{ needs.plan.outputs.base_sha }}
+          SUPERVISOR_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SUPERVISOR_RUN_ID: ${{ github.run_id }}
+          SUPERVISOR_RUN_ATTEMPT: ${{ github.run_attempt }}
+          SUPERVISOR_DELEGATION: "1"
+          SUPERVISOR_SNAPSHOT_FINGERPRINT: ${{ needs.plan.outputs.snapshot_fingerprint }}
+          SUPERVISOR_EXECUTION_FINGERPRINT: ${{ needs.plan.outputs.execution_fingerprint }}
+          SUPERVISOR_DELEGATION_B64: ${{ needs.plan.outputs.delegation_b64 }}
+          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONDONTWRITEBYTECODE: "1"
         run: python -m skeleton.automation.secretary --delegation-b64 "$SUPERVISOR_DELEGATION_B64"
