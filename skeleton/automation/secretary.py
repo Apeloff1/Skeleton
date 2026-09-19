@@ -1,16 +1,19 @@
 """Repository secretary: admit supervisor plans and route registered workers.
 
-The secretary is the delegation boundary between planning and execution.  Model
-or repository text is untrusted data; it can influence deterministic routing
-but cannot select arbitrary executables or elevate worker authority.
+The secretary is the only delegation boundary between planning and execution.
+Supervisor/model/repository text is untrusted data: it may influence bounded
+routing but cannot select an executable, Python module, permission, or token.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
 import subprocess
+import time
+from pathlib import Path
 from typing import Any
 
 from .advanced_bots import ADVANCED_BOTS
@@ -19,7 +22,9 @@ from .free_model import redact_secrets
 
 MAX_PLAN = 18_000
 MAX_ASSIGNMENTS = 3
+MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 _FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+_REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 
 KEYWORDS = {
     "root-cause": ("ci", "workflow", "build", "failure", "failed", "actions"),
@@ -37,6 +42,10 @@ KEYWORDS = {
 }
 
 
+class SecretaryAdmissionError(ValueError):
+    """Delegation failed the Secretary's trust boundary."""
+
+
 def _live_plan() -> str:
     supplied = os.environ.get("SECRETARY_PLAN", "").strip()
     if supplied:
@@ -52,13 +61,50 @@ def _live_plan() -> str:
     return redact_secrets("\n\n".join(parts))[:MAX_PLAN]
 
 
+def decode_delegation(encoded: str, *, repository: str, now: int | None = None) -> tuple[str, str]:
+    """Decode and validate the cross-job Supervisor custody envelope."""
+    if not encoded or len(encoded) > 32_000:
+        raise SecretaryAdmissionError("invalid supervisor delegation size")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+        if len(raw) > MAX_PLAN + 2_000:
+            raise SecretaryAdmissionError("supervisor delegation too large")
+        value = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SecretaryAdmissionError("invalid supervisor delegation encoding") from exc
+    if not isinstance(value, dict) or value.get("version") != 1:
+        raise SecretaryAdmissionError("unsupported supervisor delegation")
+    envelope_repo = value.get("repository")
+    if not isinstance(envelope_repo, str) or _REPOSITORY_RE.fullmatch(envelope_repo) is None:
+        raise SecretaryAdmissionError("invalid supervisor repository")
+    if envelope_repo != repository:
+        raise SecretaryAdmissionError("cross-repository supervisor delegation rejected")
+    fingerprint = value.get("snapshot_fingerprint")
+    if not isinstance(fingerprint, str) or _FINGERPRINT_RE.fullmatch(fingerprint) is None:
+        raise SecretaryAdmissionError("invalid supervisor snapshot fingerprint")
+    observed_at = value.get("observed_at")
+    current = int(time.time()) if now is None else now
+    if isinstance(observed_at, bool) or not isinstance(observed_at, int):
+        raise SecretaryAdmissionError("invalid supervisor observation time")
+    age = current - observed_at
+    if age < -300 or age > MAX_ENVELOPE_AGE_SECONDS:
+        raise SecretaryAdmissionError("stale supervisor delegation rejected")
+    plan = value.get("plan")
+    if not isinstance(plan, str):
+        raise SecretaryAdmissionError("invalid supervisor plan")
+    plan = redact_secrets(plan).strip()
+    if not plan or len(plan.encode("utf-8")) > MAX_PLAN:
+        raise SecretaryAdmissionError("invalid supervisor plan size")
+    return plan, fingerprint
+
+
 def _supervisor_provenance() -> str | None:
-    """Validate provenance when invoked through the autonomous supervisor."""
+    """Validate provenance for local/manual Supervisor delegation."""
     if os.environ.get("SUPERVISOR_DELEGATION") != "1":
         return None
     fingerprint = os.environ.get("SUPERVISOR_SNAPSHOT_FINGERPRINT", "")
     if _FINGERPRINT_RE.fullmatch(fingerprint) is None:
-        raise ValueError("invalid supervisor snapshot fingerprint")
+        raise SecretaryAdmissionError("invalid supervisor snapshot fingerprint")
     return fingerprint
 
 
@@ -79,12 +125,12 @@ def route(plan: str, due: list[str]) -> list[str]:
 def dispatch(plan: str, assignments: list[str], supervisor_fingerprint: str | None = None) -> list[dict[str, Any]]:
     registered = {spec.name for spec in ADVANCED_BOTS}
     if len(assignments) > MAX_ASSIGNMENTS:
-        raise ValueError("assignment budget exceeded")
+        raise SecretaryAdmissionError("assignment budget exceeded")
     if len(assignments) != len(set(assignments)):
-        raise ValueError("duplicate worker assignment")
+        raise SecretaryAdmissionError("duplicate worker assignment")
     unknown = set(assignments) - registered
     if unknown:
-        raise ValueError("unregistered worker assignment")
+        raise SecretaryAdmissionError("unregistered worker assignment")
     results: list[dict[str, Any]] = []
     for name in assignments:
         env = {
@@ -112,9 +158,14 @@ def dispatch(plan: str, assignments: list[str], supervisor_fingerprint: str | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", default="")
+    parser.add_argument("--delegation-b64", default="")
     args = parser.parse_args()
-    plan = redact_secrets(args.plan or _live_plan())[:MAX_PLAN]
-    supervisor_fingerprint = _supervisor_provenance()
+    repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if args.delegation_b64:
+        plan, supervisor_fingerprint = decode_delegation(args.delegation_b64, repository=repository)
+    else:
+        plan = redact_secrets(args.plan or _live_plan())[:MAX_PLAN]
+        supervisor_fingerprint = _supervisor_provenance()
     state = load_state()
     due = select_specialists_due(state)
     assignments = route(plan, due)
