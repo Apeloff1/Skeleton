@@ -146,6 +146,7 @@ class ContentAddressedBackupStore:
                         key,
                         entry.size,
                         entry.mode,
+                        entry.mtime_ns,
                     )
                 )
             elif entry.kind is WorkspaceEntryKind.SYMLINK:
@@ -163,6 +164,7 @@ class ContentAddressedBackupStore:
                         "",
                         entry.size,
                         entry.mode,
+                        entry.mtime_ns,
                         link_target=entry.link_target,
                     )
                 )
@@ -175,6 +177,7 @@ class ContentAddressedBackupStore:
                         "",
                         0,
                         entry.mode,
+                        entry.mtime_ns,
                     )
                 )
         records.sort(key=lambda record: record.path)
