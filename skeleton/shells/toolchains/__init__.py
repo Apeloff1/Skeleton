@@ -1,9 +1,16 @@
-"""Core portable toolchain contracts for the shell execution plane.
+"""Built-in portable toolchain contracts for the shell execution plane."""
 
-Language/ecosystem packs are intentionally layered above this module so the
-compiler and transactional bridge do not import the full toolchain catalog.
-"""
-
+from skeleton.shells.toolchains.all import ALL_CONTRACTS, DEFAULT_CATALOG, all_contracts, default_catalog
+from skeleton.shells.toolchains.attestation import (
+    AttestedToolchainExecutionPlane,
+    ExecutableAttestation,
+    ExecutableAttestationError,
+    ExecutableAttestationPolicy,
+    ExecutableAttestationSet,
+    ExecutableAttestor,
+    ExecutableVerification,
+    attest_compiled_toolchain,
+)
 from skeleton.shells.toolchains.catalog import ToolchainBindingError, ToolchainCatalog, ToolchainCatalogSnapshot
 from skeleton.shells.toolchains.compiler import (
     CommandEnvironmentPolicySet,
@@ -12,13 +19,6 @@ from skeleton.shells.toolchains.compiler import (
     ToolchainCompileError,
     ToolchainCompilerLimits,
     compile_toolchain,
-)
-from skeleton.shells.toolchains.execution import (
-    PreparedToolchainInvocation,
-    ToolchainExecutionPlane,
-    ToolchainExecutionResult,
-    ToolchainInvocation,
-    ToolchainInvocationError,
 )
 from skeleton.shells.toolchains.manifest import (
     AuthorityChange,
@@ -31,6 +31,15 @@ from skeleton.shells.toolchains.manifest import (
     require_no_authority_widening,
     verify_authority_manifest,
 )
+from skeleton.shells.toolchains.execution import (
+    PreparedToolchainInvocation,
+    ToolchainExecutionPlane,
+    ToolchainExecutionResult,
+    ToolchainInvocation,
+    ToolchainInvocationError,
+)
+from skeleton.shells.toolchains.profiles import ContractProfile, PROFILES, profile
+from skeleton.shells.toolchains.recipes import DEFAULT_RECIPES, RECIPES, RecipeCatalog, ToolchainRecipe, ToolchainStep
 from skeleton.shells.toolchains.transactional import (
     ToolchainMutationPolicyRouter,
     TransactionalToolchainError,
@@ -41,15 +50,56 @@ from skeleton.shells.toolchains.transactional import (
 from skeleton.shells.toolchains.types import BoundToolchain, CommandEffect, CommandRisk, LogicalCommandContract
 
 __all__ = [
-    "AuthorityChange", "AuthorityManifestDiff", "BoundToolchain", "CommandEffect",
-    "CommandEnvironmentPolicySet", "CommandRisk", "CompiledToolchain",
-    "ContractAuthorityRecord", "LogicalCommandContract", "PreparedToolchainInvocation",
-    "ToolchainAuthorityManifest", "ToolchainAuthorityPolicy", "ToolchainBindingError",
-    "ToolchainCatalog", "ToolchainCatalogSnapshot", "ToolchainCompileError",
-    "ToolchainCompilerLimits", "ToolchainExecutionPlane", "ToolchainExecutionResult",
-    "ToolchainInvocation", "ToolchainInvocationError", "ToolchainMutationPolicyRouter",
-    "TransactionalToolchainError", "TransactionalToolchainExecutionPlane",
-    "TransactionalToolchainResult", "authority_record", "build_authority_manifest",
-    "compile_toolchain", "diff_authority_manifests", "require_no_authority_widening",
-    "verify_authority_manifest", "zero_mutation_policy",
+    "ALL_CONTRACTS",
+    "DEFAULT_CATALOG",
+    "AttestedToolchainExecutionPlane",
+    "ExecutableAttestation",
+    "ExecutableAttestationError",
+    "ExecutableAttestationPolicy",
+    "ExecutableAttestationSet",
+    "ExecutableAttestor",
+    "ExecutableVerification",
+    "attest_compiled_toolchain",
+    "all_contracts",
+    "default_catalog",
+    "ToolchainBindingError",
+    "ToolchainCatalog",
+    "ToolchainCatalogSnapshot",
+    "CommandEnvironmentPolicySet",
+    "CompiledToolchain",
+    "ToolchainAuthorityPolicy",
+    "ToolchainCompileError",
+    "ToolchainCompilerLimits",
+    "compile_toolchain",
+    "PreparedToolchainInvocation",
+    "ToolchainExecutionPlane",
+    "ToolchainExecutionResult",
+    "ToolchainInvocation",
+    "ToolchainInvocationError",
+    "AuthorityChange",
+    "AuthorityManifestDiff",
+    "ContractAuthorityRecord",
+    "ToolchainAuthorityManifest",
+    "authority_record",
+    "build_authority_manifest",
+    "diff_authority_manifests",
+    "require_no_authority_widening",
+    "verify_authority_manifest",
+    "ToolchainMutationPolicyRouter",
+    "TransactionalToolchainError",
+    "TransactionalToolchainExecutionPlane",
+    "TransactionalToolchainResult",
+    "zero_mutation_policy",
+    "ContractProfile",
+    "PROFILES",
+    "profile",
+    "DEFAULT_RECIPES",
+    "RECIPES",
+    "RecipeCatalog",
+    "ToolchainRecipe",
+    "ToolchainStep",
+    "BoundToolchain",
+    "CommandEffect",
+    "CommandRisk",
+    "LogicalCommandContract",
 ]
