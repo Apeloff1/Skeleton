@@ -1986,4 +1986,3 @@ def test_resource_helpers_are_not_policy_methods():
         DurableMaintenanceResource,
         "replica",
     )
-
