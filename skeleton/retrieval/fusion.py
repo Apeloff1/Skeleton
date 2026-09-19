@@ -45,9 +45,24 @@ class ScoredResult:
 class Fuser:
     """Fuse results from multiple retrieval planes."""
 
-    def __init__(self, strategy: FusionStrategy = FusionStrategy.RRF, k: int = 60):
+    def __init__(
+        self,
+        strategy: FusionStrategy = FusionStrategy.RRF,
+        k: int = 60,
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self.strategy = strategy
         self.k = k
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+        }
 
     def fuse(self, results_by_plane: Dict[str, List[ScoredResult]], top_k: int = 10) -> List[ScoredResult]:
         """Fuse results from multiple planes into a single ranked list."""
@@ -66,13 +81,28 @@ class Fuser:
         """Reciprocal Rank Fusion across planes."""
         scores: Dict[str, float] = {}
         fragments: Dict[str, ScoredResult] = {}
+        fragment_indices: Dict[str, int] = {}
+        ordered_fragments: List[ScoredResult] = []
+        contributions: List[tuple[int, float]] = []
 
         for plane, results in results_by_plane.items():
             for rank, result in enumerate(results, 1):
                 fid = result.fragment_id
-                scores[fid] = scores.get(fid, 0) + 1.0 / (self.k + rank)
+                contribution = 1.0 / (self.k + rank)
+                scores[fid] = scores.get(fid, 0) + contribution
                 if fid not in fragments:
                     fragments[fid] = result
+                    fragment_indices[fid] = len(ordered_fragments)
+                    ordered_fragments.append(result)
+                contributions.append((fragment_indices[fid], contribution))
+
+        accelerated = self._accelerated_order(
+            ordered_fragments,
+            contributions,
+            top_k,
+        )
+        if accelerated is not None:
+            return accelerated
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
         return [fragments[fid] for fid, _ in ranked]
@@ -82,17 +112,80 @@ class Fuser:
         weights = {"rag": 1.0, "cag": 0.8, "mag": 0.7, "kag": 0.9}
         scores: Dict[str, float] = {}
         fragments: Dict[str, ScoredResult] = {}
+        fragment_indices: Dict[str, int] = {}
+        ordered_fragments: List[ScoredResult] = []
+        contributions: List[tuple[int, float]] = []
 
         for plane, results in results_by_plane.items():
             w = weights.get(plane, 0.5)
             for result in results:
                 fid = result.fragment_id
-                scores[fid] = scores.get(fid, 0) + result.score * w
+                contribution = result.score * w
+                scores[fid] = scores.get(fid, 0) + contribution
                 if fid not in fragments:
                     fragments[fid] = result
+                    fragment_indices[fid] = len(ordered_fragments)
+                    ordered_fragments.append(result)
+                contributions.append((fragment_indices[fid], contribution))
+
+        accelerated = self._accelerated_order(
+            ordered_fragments,
+            contributions,
+            top_k,
+        )
+        if accelerated is not None:
+            return accelerated
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
         return [fragments[fid] for fid, _ in ranked]
+
+    def _accelerated_order(
+        self,
+        fragments: List[ScoredResult],
+        contributions: List[tuple[int, float]],
+        top_k: int,
+    ) -> Optional[List[ScoredResult]]:
+        if (
+            not self._use_jvm_acceleration
+            or top_k <= 0
+            or not fragments
+            or not contributions
+        ):
+            return None
+        try:
+            accelerator = self._resolve_accelerator()
+            minimum = int(
+                getattr(accelerator, "minimum_contributions", 1)
+            )
+            if len(contributions) < minimum:
+                self._acceleration["bypassed_small_batch"] += 1
+                return None
+            self._acceleration["attempts"] += 1
+            hits = accelerator.aggregate_top_k(
+                len(fragments),
+                contributions,
+                min(top_k, len(fragments)),
+            )
+            self._acceleration["successes"] += 1
+            return [fragments[hit.index] for hit in hits]
+        except Exception:
+            self._acceleration["fallbacks"] += 1
+            return None
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.retrieval.jvm_fusion_accelerator import (
+                get_default_fusion_accelerator,
+            )
+
+            self._accelerator = get_default_fusion_accelerator()
+        return self._accelerator
 
     def stats(self) -> Dict[str, Any]:
         return {"strategy": self.strategy.name, "k": self.k}
