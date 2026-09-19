@@ -1574,39 +1574,20 @@ class DistributedReceiptChain:
     def length(self) -> int:
         return self.head().sequence
 
-    def _is_committed(
-        self,
-        entry: ReceiptIndexEntry,
-    ) -> bool:
-        try:
-            items = self.snapshot()
-        except DistributedReceiptCorruption:
-            return False
-        floor = self.hot_floor()
-        base_sequence = (
-            floor.sequence
-            if self._hot_floor_active(floor)
-            else 0
-        )
-        if entry.sequence <= base_sequence:
-            return False
-        offset = entry.sequence - base_sequence - 1
-        if offset < 0 or offset >= len(items):
-            return False
-        item = items[offset]
-        return (
-            item.receipt_hash == entry.receipt_hash
-            and item.receipt.receipt_id
-            == entry.receipt_id
-        )
-
-    def find_by_receipt_id(
+    def indexed_receipt(
         self,
         receipt_id: str,
         *,
-        verify_chain: bool = True,
-        repair_missing: bool = True,
+        repair_missing: bool = False,
     ) -> ReceiptInclusion | None:
+        """Resolve an indexed receipt without claiming chain commitment.
+
+        This is deliberately weaker than find_by_receipt_id. It validates the
+        immutable receipt-id index against the content-addressed node, but
+        leaves committed false. Higher layers can then prove commitment with
+        bounded signed checkpoint/proof-window evidence instead of
+        materializing the entire live chain.
+        """
         key = self._index_key(receipt_id)
         record = self.backend.get(
             self.namespace,
@@ -1615,11 +1596,6 @@ class DistributedReceiptChain:
         if record is None:
             if not repair_missing:
                 return None
-            # A worker can crash after the head CAS and before the secondary
-            # receipt-id index is written. Recover that narrow window by
-            # scanning only the committed chain, then rebuild the immutable
-            # index. This prevents a restart from appending the same receipt
-            # a second time.
             matches = tuple(
                 item
                 for item in self.snapshot()
@@ -1658,10 +1634,57 @@ class DistributedReceiptChain:
         node = self.get_node(
             entry.receipt_hash,
         )
-        committed = self._is_committed(entry)
-        inclusion = ReceiptInclusion(
+        return ReceiptInclusion(
             entry,
             node,
+            False,
+        )
+
+    def _is_committed(
+        self,
+        entry: ReceiptIndexEntry,
+    ) -> bool:
+        try:
+            items = self.snapshot()
+        except DistributedReceiptCorruption:
+            return False
+        floor = self.hot_floor()
+        base_sequence = (
+            floor.sequence
+            if self._hot_floor_active(floor)
+            else 0
+        )
+        if entry.sequence <= base_sequence:
+            return False
+        offset = entry.sequence - base_sequence - 1
+        if offset < 0 or offset >= len(items):
+            return False
+        item = items[offset]
+        return (
+            item.receipt_hash == entry.receipt_hash
+            and item.receipt.receipt_id
+            == entry.receipt_id
+        )
+
+    def find_by_receipt_id(
+        self,
+        receipt_id: str,
+        *,
+        verify_chain: bool = True,
+        repair_missing: bool = True,
+    ) -> ReceiptInclusion | None:
+        candidate = self.indexed_receipt(
+            receipt_id,
+            repair_missing=repair_missing,
+        )
+        if candidate is None:
+            return None
+        committed = self._is_committed(
+            candidate.entry
+        )
+        inclusion = ReceiptInclusion(
+            candidate.entry,
+            candidate.node,
             committed,
         )
         if verify_chain and not committed:
