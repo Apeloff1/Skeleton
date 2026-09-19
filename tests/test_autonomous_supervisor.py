@@ -525,14 +525,60 @@ class DurableWorkerHealthTests(unittest.TestCase):
         self.assertEqual(health["source"], "github-open-pull-requests")
         self.assertEqual(health["active_count"], 1)
         self.assertEqual(
+            health["classification_counts"],
+            {"awaiting-checks": 1},
+        )
+        self.assertEqual(
             health["active_workers"],
             [{
                 "worker": "security-auditor",
                 "pull_request": 17,
                 "base_prefix": "0123456789abcdef",
-                "is_draft": False,
                 "merge_state": "BLOCKED",
+                "is_draft": False,
+                "check_state": "unknown",
+                "check_total": 0,
+                "check_failures": 0,
+                "check_pending": 0,
+                "classification": "awaiting-checks",
             }],
+        )
+
+    def test_durable_health_uses_canonical_ci_classification(self) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(),
+            pull_requests=(
+                {
+                    "number": 19,
+                    "headRefName": (
+                        "bot/specialist-security-auditor-"
+                        "0123456789abcdef"
+                    ),
+                    "isDraft": False,
+                    "mergeStateStatus": "CLEAN",
+                    "statusCheckRollup": [
+                        {"status": "COMPLETED", "conclusion": "FAILURE"},
+                    ],
+                },
+            ),
+            workflow_runs=(),
+        )
+
+        health = supervisor.durable_worker_health(snapshot)
+
+        self.assertEqual(
+            health["classification_counts"],
+            {"failing-ci": 1},
+        )
+        self.assertEqual(
+            health["active_workers"][0]["classification"],
+            "failing-ci",
+        )
+        self.assertEqual(
+            health["active_workers"][0]["check_failures"],
+            1,
         )
 
     def test_malformed_bot_branch_is_not_durable_evidence(self) -> None:
