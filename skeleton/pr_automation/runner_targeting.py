@@ -26,7 +26,7 @@ from .runner_contracts import (
     valid_repository,
     valid_sha,
 )
-from .runner_transport import BudgetedGitHubTransport, RunnerTransportError
+from .runner_transport import BudgetedGitHubTransport
 
 
 class TargetingError(RuntimeError):
