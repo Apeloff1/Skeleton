@@ -29,6 +29,10 @@ from skeleton.shells.ai.durable_health import (
     DurableRecoveryHealthGuard,
     DurableRecoveryHealthReport,
 )
+from skeleton.shells.ai.durable_orphan_scan import (
+    DurableOrphanScanReport,
+    DurableOrphanScanner,
+)
 from skeleton.shells.ai.durable_retention import (
     DurableRetentionPlan,
     DurableRetentionPlanner,
@@ -62,6 +66,8 @@ class DurableOperationsPolicy:
     require_recovery_health: bool = False
     require_checkpoint_indexes: bool = False
     require_compaction_maintenance: bool = False
+    require_orphan_scan: bool = False
+    warn_on_orphan_candidates: bool = True
     max_findings: int = 512
 
     def __post_init__(self) -> None:
@@ -71,6 +77,8 @@ class DurableOperationsPolicy:
             "require_recovery_health",
             "require_checkpoint_indexes",
             "require_compaction_maintenance",
+            "require_orphan_scan",
+            "warn_on_orphan_candidates",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
@@ -93,6 +101,10 @@ class DurableOperationsPolicy:
             ),
             "require_compaction_maintenance": (
                 self.require_compaction_maintenance
+            ),
+            "require_orphan_scan": self.require_orphan_scan,
+            "warn_on_orphan_candidates": (
+                self.warn_on_orphan_candidates
             ),
             "max_findings": self.max_findings,
         }
@@ -151,6 +163,7 @@ class DurableChainOperationsReport:
     findings: tuple[DurableOperationsFinding, ...]
     verification_health: DurableChainVerificationHealth | None = None
     checkpoint_index_health: DurableCheckpointIndexHealth | None = None
+    orphan_scan: DurableOrphanScanReport | None = None
 
     def __post_init__(self) -> None:
         if not self.chain_id or len(self.chain_id) > 128:
@@ -263,6 +276,11 @@ class DurableChainOperationsReport:
                 None
                 if self.retention is None
                 else self.retention.to_dict()
+            ),
+            "orphan_scan": (
+                None
+                if self.orphan_scan is None
+                else self.orphan_scan.to_dict()
             ),
             "findings": [item.to_dict() for item in self.findings],
         }
@@ -379,6 +397,7 @@ class DurableEvidenceOperationsInspector:
         policy: DurableOperationsPolicy | None = None,
         verification_guard: DurableVerificationFleetGuard | None = None,
         compaction_maintenance: DurableCompactionMaintenanceGuard | None = None,
+        orphan_scanner: DurableOrphanScanner | None = None,
     ) -> None:
         if not isinstance(checkpoints, DurableChainCheckpointStore):
             raise TypeError("checkpoints must be DurableChainCheckpointStore")
@@ -414,11 +433,22 @@ class DurableEvidenceOperationsInspector:
             raise TypeError(
                 "compaction_maintenance must be DurableCompactionMaintenanceGuard"
             )
+        if (
+            orphan_scanner is not None
+            and not isinstance(
+                orphan_scanner,
+                DurableOrphanScanner,
+            )
+        ):
+            raise TypeError(
+                "orphan_scanner must be DurableOrphanScanner"
+            )
         self.checkpoints = checkpoints
         self.retention = retention
         self.recovery_health = recovery_health
         self.verification_guard = verification_guard
         self.compaction_maintenance = compaction_maintenance
+        self.orphan_scanner = orphan_scanner
         self.policy = policy or DurableOperationsPolicy()
 
     @staticmethod
@@ -624,6 +654,67 @@ class DurableEvidenceOperationsInspector:
                 )
             )
 
+        orphan_scan = None
+        if self.orphan_scanner is None:
+            if self.policy.require_orphan_scan:
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_orphan.scan_required",
+                        (
+                            "durable operations policy requires "
+                            "an orphan scanner"
+                        ),
+                        chain_id,
+                    )
+                )
+        else:
+            try:
+                orphan_scan = self.orphan_scanner.scan(
+                    chain_id,
+                    chain,
+                )
+                if orphan_scan.requires_manual_review:
+                    findings.append(
+                        DurableOperationsFinding(
+                            DurableOperationsSeverity.ERROR,
+                            "durable_orphan.manual_review",
+                            (
+                                "durable orphan scan found authority "
+                                "conflicts, corrupt records, or truncation"
+                            ),
+                            chain_id,
+                        )
+                    )
+                elif (
+                    orphan_scan.orphan_candidates
+                    and self.policy.warn_on_orphan_candidates
+                ):
+                    findings.append(
+                        DurableOperationsFinding(
+                            DurableOperationsSeverity.WARNING,
+                            "durable_orphan.candidates",
+                            (
+                                "durable chain has "
+                                f"{orphan_scan.orphan_candidates} "
+                                "unreachable orphan candidate(s)"
+                            ),
+                            chain_id,
+                        )
+                    )
+            except Exception as exc:
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_orphan.scan_error",
+                        (
+                            "durable orphan scan raised "
+                            f"{type(exc).__name__}"
+                        ),
+                        chain_id,
+                    )
+                )
+
         if retention_plan is not None:
             if (
                 retention_plan.state
@@ -714,6 +805,7 @@ class DurableEvidenceOperationsInspector:
             tuple(findings),
             verification_health,
             checkpoint_index_health,
+            orphan_scan,
         )
 
     def inspect(
