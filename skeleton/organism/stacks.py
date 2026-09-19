@@ -1,6 +1,7 @@
 """Stacks — last card from every plane. No DAG walk."""
 from __future__ import annotations
 
+from importlib import import_module
 from typing import Any, Dict, Optional
 from pathlib import Path
 
@@ -17,11 +18,23 @@ def _read(root: Optional[Path], name: str) -> Dict[str, Any]:
         return {}
 
 
+_STACK_IMPORTERS = {
+    ("skeleton.organism.observe", "card"): lambda: getattr(import_module("skeleton.organism.observe"), "card"),
+    ("skeleton.organism.runtime", "last"): lambda: getattr(import_module("skeleton.organism.runtime"), "last"),
+    ("skeleton.organism.context_step", "last"): lambda: getattr(import_module("skeleton.organism.context_step"), "last"),
+    ("skeleton.organism.calendar", "card"): lambda: getattr(import_module("skeleton.organism.calendar"), "card"),
+    ("skeleton.galaxy.quarantine", "card"): lambda: getattr(import_module("skeleton.galaxy.quarantine"), "card"),
+    ("skeleton.social.coverage", "coverage_card"): lambda: getattr(import_module("skeleton.social.coverage"), "coverage_card"),
+    ("skeleton.social.field", "field_card"): lambda: getattr(import_module("skeleton.social.field"), "field_card"),
+    ("skeleton.kernel.hot", "rank"): lambda: getattr(import_module("skeleton.kernel.hot"), "rank"),
+    ("skeleton.kernel.scoreboard", "card"): lambda: getattr(import_module("skeleton.kernel.scoreboard"), "card"),
+    ("skeleton.organism.caps", "card"): lambda: getattr(import_module("skeleton.organism.caps"), "card"),
+}
+
 def card(root: Optional[Path] = None) -> Dict[str, Any]:
     def _get(mod, fn, *a):
         try:
-            m = __import__(mod, fromlist=[fn])
-            return getattr(m, fn)(*a)
+            return _STACK_IMPORTERS[(mod, fn)]()(*a)
         except Exception:
             return {}
 
