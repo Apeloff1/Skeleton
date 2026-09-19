@@ -639,6 +639,10 @@ def _preflight(
     )
     branch = deterministic_worker_branch(custody)
     if active is not None:
+        if active.get("baseRefName") != execution.default_branch:
+            raise WorkerAdmissionError(
+                "active worker pull request targets an unexpected base branch"
+            )
         return branch, active
 
     exact = find_open_pr_for_head(
