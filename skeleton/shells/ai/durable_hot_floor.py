@@ -975,11 +975,11 @@ class DurableHotFloorStore:
             )
             if current is not None:
                 self._verify(current)
-                self._persist_committed(current)
                 if current.floor.chain_id != chain_id:
                     raise DurableHotFloorError(
                         "hot floor current chain mismatch"
                     )
+                self._persist_committed(current)
                 previous_sequence = (
                     current.floor.sequence
                 )
