@@ -13,7 +13,10 @@ from skeleton.shells.ai.critic import AIPlanCritic
 from skeleton.shells.ai.diagnostics import AIShellDiagnostics
 from skeleton.shells.ai.distributed_journal import DistributedAIDecisionJournal
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
-from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
+from skeleton.shells.ai.durable_checkpoint import (
+    DurableChainCheckpointStore,
+    DurableCheckpointIndexState,
+)
 from skeleton.shells.ai.durable_health import (
     DurableRecoveryHealthGuard,
     DurableRecoveryHealthPolicy,
@@ -170,6 +173,7 @@ def test_default_operations_policy():
     assert policy.block_capacity_critical
     assert not policy.require_checkpoint_above_warning
     assert not policy.require_recovery_health
+    assert not policy.require_checkpoint_indexes
     assert policy.max_findings == 512
 
 
@@ -196,6 +200,7 @@ def test_operations_policy_digest_is_stable():
         ("block_capacity_critical", 1),
         ("require_checkpoint_above_warning", "yes"),
         ("require_recovery_health", 1),
+        ("require_checkpoint_indexes", 1),
     ],
 )
 def test_operations_policy_boolean_validation(field, value):
@@ -203,6 +208,7 @@ def test_operations_policy_boolean_validation(field, value):
         block_capacity_critical=True,
         require_checkpoint_above_warning=False,
         require_recovery_health=False,
+        require_checkpoint_indexes=False,
     )
     values[field] = value
     with pytest.raises(ValueError, match="bool"):
@@ -1388,12 +1394,14 @@ def test_operations_policy_to_dict():
         block_capacity_critical=False,
         require_checkpoint_above_warning=True,
         require_recovery_health=True,
+        require_checkpoint_indexes=True,
         max_findings=9,
     )
     assert policy.to_dict() == {
         "block_capacity_critical": False,
         "require_checkpoint_above_warning": True,
         "require_recovery_health": True,
+        "require_checkpoint_indexes": True,
         "max_findings": 9,
     }
 
@@ -1409,3 +1417,621 @@ def test_operations_report_to_dict_without_digest():
     assert "digest" not in report.chains[0].to_dict(
         include_digest=False
     )
+
+def test_checkpoint_index_health_is_healthy_after_publish():
+    (
+        _,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 2)
+    checkpoints.publish(
+        "journal",
+        journal,
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    chain = report.chains[0]
+    assert (
+        chain.checkpoint_index_health.state
+        is DurableCheckpointIndexState.HEALTHY
+    )
+    assert chain.checkpoint_index_health.healthy
+    assert chain.checkpoint_index_health.missing == 0
+    assert chain.checkpoint_index_health.corrupt == 0
+    assert not any(
+        item.code.startswith(
+            "durable_checkpoint.index_"
+        )
+        for item in chain.findings
+    )
+
+
+def test_missing_checkpoint_digest_index_is_warning_by_default():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 2)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._digest_lookup_key(
+        item.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    chain = report.chains[0]
+    assert (
+        chain.checkpoint_index_health.state
+        is DurableCheckpointIndexState.DEGRADED
+    )
+    assert chain.checkpoint_index_health.repairable
+    assert chain.checkpoint_index_health.missing == 1
+    finding = next(
+        item
+        for item in chain.findings
+        if item.code
+        == "durable_checkpoint.index_repair_required"
+    )
+    assert finding.severity is DurableOperationsSeverity.WARNING
+    assert report.allowed
+
+
+def test_missing_checkpoint_root_index_is_warning_by_default():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._root_lookup_key(
+        "journal",
+        item.checkpoint.root_hash,
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    health = report.chains[0].checkpoint_index_health
+    assert health.state is DurableCheckpointIndexState.DEGRADED
+    assert health.missing_root_indexes == (
+        item.checkpoint.root_hash,
+    )
+    assert health.missing_digest_indexes == ()
+
+
+def test_strict_checkpoint_index_policy_blocks_missing_index():
+    policy = DurableOperationsPolicy(
+        require_checkpoint_indexes=True,
+    )
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture(
+        operations_policy=policy,
+    )
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._digest_lookup_key(
+        item.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    finding = next(
+        item
+        for item in report.chains[0].findings
+        if item.code
+        == "durable_checkpoint.index_repair_required"
+    )
+    assert finding.severity is DurableOperationsSeverity.ERROR
+    assert not report.allowed
+    with pytest.raises(
+        DurableEvidenceOperationsError,
+        match="indexes are incomplete",
+    ):
+        inspector.require(
+            (("journal", journal),)
+        )
+
+
+def test_corrupt_checkpoint_index_is_always_error():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 2)
+    first = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    append_events(journal, 1)
+    second = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._digest_lookup_key(
+        first.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.compare_and_swap(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+        value=checkpoints._lookup_for(
+            second
+        ).to_dict(),
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    chain = report.chains[0]
+    assert (
+        chain.checkpoint_index_health.state
+        is DurableCheckpointIndexState.INVALID
+    )
+    assert chain.checkpoint_index_health.corrupt >= 1
+    finding = next(
+        item
+        for item in chain.findings
+        if item.code
+        == "durable_checkpoint.index_invalid"
+    )
+    assert finding.severity is DurableOperationsSeverity.ERROR
+    assert not report.allowed
+
+
+def test_malformed_checkpoint_index_record_is_error():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._root_lookup_key(
+        "journal",
+        item.checkpoint.root_hash,
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.compare_and_swap(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+        value={"bad": True},
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    chain = report.chains[0]
+    assert chain.errors >= 1
+    assert not report.allowed
+    assert any(
+        item.code
+        == "durable_checkpoint.index_invalid"
+        for item in chain.findings
+    )
+
+
+def test_repair_checkpoint_indexes_restores_healthy_operations():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 2)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    keys = (
+        checkpoints._digest_lookup_key(
+            item.checkpoint.digest
+        ),
+        checkpoints._root_lookup_key(
+            "journal",
+            item.checkpoint.root_hash,
+        ),
+    )
+    for key in keys:
+        record = backend.get(
+            checkpoints._namespace,
+            key,
+        )
+        backend.delete(
+            checkpoints._namespace,
+            key,
+            expected_revision=record.revision,
+        )
+    degraded = inspector.inspect(
+        (("journal", journal),)
+    )
+    assert degraded.chains[0].warnings >= 1
+
+    assert checkpoints.repair_lookup_indexes() == 2
+    healthy = inspector.inspect(
+        (("journal", journal),)
+    )
+    assert healthy.allowed
+    assert (
+        healthy.chains[0]
+        .checkpoint_index_health
+        .state
+        is DurableCheckpointIndexState.HEALTHY
+    )
+
+
+def test_empty_checkpoint_chain_has_healthy_empty_index_health():
+    (
+        _,
+        journal,
+        _,
+        _,
+        _,
+        inspector,
+    ) = fixture()
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    health = (
+        report.chains[0]
+        .checkpoint_index_health
+    )
+    assert health.registry_valid
+    assert health.checkpoint_count == 0
+    assert health.digest_indexes_present == 0
+    assert health.root_indexes_present == 0
+    assert health.state is DurableCheckpointIndexState.HEALTHY
+
+
+def test_checkpoint_index_health_serializes_in_chain_report():
+    (
+        _,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    checkpoints.publish(
+        "journal",
+        journal,
+    )
+    data = inspector.inspect(
+        (("journal", journal),)
+    ).chains[0].to_dict()
+    health = data["checkpoint_index_health"]
+    assert health["state"] == "healthy"
+    assert health["registry_valid"] is True
+    assert health["checkpoint_count"] == 1
+    assert health["healthy"] is True
+    assert health["repairable"] is False
+
+
+def test_checkpoint_index_health_changes_chain_report_digest():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    healthy = inspector.inspect(
+        (("journal", journal),)
+    ).chains[0]
+    key = checkpoints._digest_lookup_key(
+        item.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    degraded = inspector.inspect(
+        (("journal", journal),)
+    ).chains[0]
+    assert degraded.digest != healthy.digest
+    assert degraded.checkpoint_index_health.repairable
+
+
+def test_checkpoint_index_health_is_chain_scoped():
+    (
+        _,
+        journal,
+        receipts,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    receipts.append(
+        receipt(0)
+    )
+    checkpoints.publish(
+        "journal",
+        journal,
+    )
+    checkpoints.publish(
+        "receipts",
+        receipts,
+    )
+    report = inspector.inspect(
+        (
+            ("journal", journal),
+            ("receipts", receipts),
+        )
+    )
+    by_id = {
+        item.chain_id: item
+        for item in report.chains
+    }
+    assert (
+        by_id["journal"]
+        .checkpoint_index_health
+        .checkpoint_count
+        == 1
+    )
+    assert (
+        by_id["receipts"]
+        .checkpoint_index_health
+        .checkpoint_count
+        == 1
+    )
+
+
+def test_checkpoint_registry_corruption_reports_index_inspection_error():
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    node_key = f"node:{item.chain_node_hash}"
+    record = backend.get(
+        checkpoints._namespace,
+        node_key,
+    )
+    backend.compare_and_swap(
+        checkpoints._namespace,
+        node_key,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            kind="corrupt.kind",
+        ),
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    chain = report.chains[0]
+    assert not report.allowed
+    assert any(
+        item.code in {
+            "durable_checkpoint.inspect_error",
+            "durable_checkpoint.index_invalid",
+        }
+        for item in chain.findings
+    )
+
+
+def test_policy_digest_changes_with_checkpoint_index_requirement():
+    default = DurableOperationsPolicy()
+    strict = DurableOperationsPolicy(
+        require_checkpoint_indexes=True,
+    )
+    assert default.digest != strict.digest
+
+
+def test_checkpoint_index_warning_counts_toward_finding_bound():
+    policy = DurableOperationsPolicy(
+        max_findings=1,
+    )
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture(
+        operations_policy=policy,
+    )
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._digest_lookup_key(
+        item.checkpoint.digest
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    assert report.warnings == 1
+
+
+def test_strict_index_policy_service_start_blocks_missing_index(tmp_path):
+    policy = DurableOperationsPolicy(
+        require_checkpoint_indexes=True,
+    )
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture(
+        operations_policy=policy,
+    )
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._root_lookup_key(
+        "journal",
+        item.checkpoint.root_hash,
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    service = build_service(
+        tmp_path,
+        operations_inspector=inspector,
+        operations_chains=(
+            ("journal", journal),
+        ),
+    )
+    with pytest.raises(
+        RuntimeError,
+    ):
+        service.start()
+
+
+def test_default_index_policy_service_start_allows_repairable_gap(tmp_path):
+    (
+        backend,
+        journal,
+        _,
+        checkpoints,
+        _,
+        inspector,
+    ) = fixture()
+    append_events(journal, 1)
+    item = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    key = checkpoints._root_lookup_key(
+        "journal",
+        item.checkpoint.root_hash,
+    )
+    record = backend.get(
+        checkpoints._namespace,
+        key,
+    )
+    backend.delete(
+        checkpoints._namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    service = build_service(
+        tmp_path,
+        operations_inspector=inspector,
+        operations_chains=(
+            ("journal", journal),
+        ),
+    )
+    service.start()
+    assert service.state.phase is AIServicePhase.READY
+    status = service.status()
+    assert (
+        status.durable_operations["warnings"]
+        >= 1
+    )
+
