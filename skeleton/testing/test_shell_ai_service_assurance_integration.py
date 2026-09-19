@@ -6,6 +6,7 @@ import sys
 
 import pytest
 
+from skeleton.shells.ai.approval import AIApprovalError
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector, AIExecutionAssurancePolicy, AssuranceLevel
 from skeleton.shells.ai.catalog import AIToolCatalog
 from skeleton.shells.ai.compiler import AIPlanCompiler
@@ -819,10 +820,14 @@ def test_service_status_reports_runtime_trust_and_authority_health(tmp_path):
     assert data["runtime_trust"] == {
         "ok": True,
         "kind": "runtime-trust",
+        "epoch_digest": "t" * 64,
+        "policy_digest": "h" * 64,
     }
     assert data["authority_health"] == {
         "ok": True,
         "kind": "authority-health",
+        "epoch_digest": "t" * 64,
+        "policy_digest": "h" * 64,
     }
 
 
