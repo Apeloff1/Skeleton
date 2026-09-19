@@ -217,6 +217,55 @@ def test_target_resolver_sweep_filters_base():
     assert target_numbers(result) == (1,)
 
 
+def test_target_resolver_sweep_marks_incomplete_when_target_cap_truncates():
+    transport = ScriptedTransport()
+    transport.list_map[
+        "/repos/Apeloff1/Skeleton/pulls?state=open&sort=updated&direction=asc"
+    ] = (
+        [
+            pr_payload(number=1, base_ref="main", head_ref="feature/1"),
+            pr_payload(number=2, base_ref="main", head_ref="feature/2"),
+        ],
+        True,
+    )
+    policy = replace(
+        runner_policy(),
+        limits=replace(runner_policy().limits, max_targets=1),
+    )
+    ident = identity(
+        trigger=RunTrigger.MANUAL_SWEEP,
+        explicit_pr=None,
+    )
+
+    result = TargetResolver(transport, policy).resolve(ident)
+
+    assert target_numbers(result) == (1,)
+    assert result.complete is False
+
+
+def test_target_resolver_sweep_preserves_incomplete_pagination_at_exact_cap():
+    transport = ScriptedTransport()
+    transport.list_map[
+        "/repos/Apeloff1/Skeleton/pulls?state=open&sort=updated&direction=asc"
+    ] = (
+        [pr_payload(number=1, base_ref="main", head_ref="feature/1")],
+        False,
+    )
+    policy = replace(
+        runner_policy(),
+        limits=replace(runner_policy().limits, max_targets=1),
+    )
+    ident = identity(
+        trigger=RunTrigger.MANUAL_SWEEP,
+        explicit_pr=None,
+    )
+
+    result = TargetResolver(transport, policy).resolve(ident)
+
+    assert target_numbers(result) == (1,)
+    assert result.complete is False
+
+
 def test_target_resolver_workflow_hint_requires_exact_identity():
     transport = ScriptedTransport()
     transport.get_map["/repos/Apeloff1/Skeleton/pulls/42"] = pr_payload(
