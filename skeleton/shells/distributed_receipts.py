@@ -1287,6 +1287,144 @@ class DistributedReceiptChain:
             )
         return items
 
+    def restore_segment(
+        self,
+        items: Iterable[ChainedReceipt],
+        *,
+        max_items: int = 4096,
+    ) -> DistributedReceiptHead:
+        """Restore an exact committed receipt segment onto this chain."""
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        values = tuple(items)
+        if len(values) > max_items:
+            raise DistributedReceiptConflict(
+                "receipt restore exceeds bounded segment size"
+            )
+        if not values:
+            return self.head()
+
+        previous_hash = values[0].previous_hash
+        previous_sequence = values[0].sequence - 1
+        if previous_sequence < 0:
+            raise DistributedReceiptCorruption(
+                "receipt restore begins before sequence one"
+            )
+        for offset, item in enumerate(values):
+            if not isinstance(item, ChainedReceipt):
+                raise TypeError(
+                    "receipt restore items must be ChainedReceipt"
+                )
+            expected_sequence = previous_sequence + offset + 1
+            if item.sequence != expected_sequence:
+                raise DistributedReceiptCorruption(
+                    "receipt restore sequence is not contiguous"
+                )
+            expected_previous = (
+                previous_hash
+                if offset == 0
+                else values[offset - 1].receipt_hash
+            )
+            if item.previous_hash != expected_previous:
+                raise DistributedReceiptCorruption(
+                    "receipt restore linkage mismatch"
+                )
+            expected_hash = ReceiptChain._hash(
+                item.previous_hash,
+                item.sequence,
+                item.receipt,
+            )
+            if expected_hash != item.receipt_hash:
+                raise DistributedReceiptCorruption(
+                    "receipt restore node digest mismatch"
+                )
+            if item.sequence > self.max_receipts:
+                raise DistributedReceiptConflict(
+                    "receipt restore exceeds chain capacity"
+                )
+
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and values[0].sequence <= floor.sequence
+        ):
+            raise DistributedReceiptConflict(
+                "receipt restore overlaps compacted hot floor"
+            )
+
+        for item in values:
+            for _ in range(self.max_cas_retries):
+                revision, head = self._head_revision()
+                if head.sequence >= item.sequence:
+                    try:
+                        existing_root = self.root_for_sequence(
+                            item.sequence,
+                            repair_missing=True,
+                        )
+                    except (
+                        DistributedReceiptConflict,
+                        DistributedReceiptCorruption,
+                        IndexError,
+                    ) as exc:
+                        raise DistributedReceiptConflict(
+                            "receipt restore cannot verify existing target prefix"
+                        ) from exc
+                    if existing_root != item.receipt_hash:
+                        raise DistributedReceiptConflict(
+                            "receipt restore diverges from existing target prefix"
+                        )
+                    self._put_node(item)
+                    self._put_sequence_index(item)
+                    self._put_index(item)
+                    break
+
+                if head.sequence != item.sequence - 1:
+                    raise DistributedReceiptConflict(
+                        "receipt restore target has a sequence gap"
+                    )
+                if head.root_hash != item.previous_hash:
+                    raise DistributedReceiptConflict(
+                        "receipt restore target root diverges from segment"
+                    )
+
+                self._put_node(item)
+                next_head = DistributedReceiptHead(
+                    item.sequence,
+                    item.receipt_hash,
+                )
+                try:
+                    self.backend.compare_and_swap(
+                        self.namespace,
+                        "head",
+                        expected_revision=revision,
+                        value=next_head,
+                    )
+                except DistributedStateConflict:
+                    continue
+                self._put_sequence_index(item)
+                self._put_index(item)
+                break
+            else:
+                raise DistributedReceiptConflict(
+                    "receipt restore CAS retry budget exhausted"
+                )
+
+        last = values[-1]
+        current = self.head()
+        if current.sequence < last.sequence:
+            raise DistributedReceiptCorruption(
+                "receipt restore ended before requested segment"
+            )
+        if self.root_for_sequence(last.sequence) != last.receipt_hash:
+            raise DistributedReceiptConflict(
+                "receipt restore final prefix differs from segment"
+            )
+        return current
+
     def verify_segment(
         self,
         start_exclusive_root: str,
