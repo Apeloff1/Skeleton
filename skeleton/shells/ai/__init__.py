@@ -1,5 +1,9 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.execution_obligation_recovery import *
+
+from skeleton.shells.ai.execution_obligation import *
+
 from skeleton.shells.ai.recovery_requirement_operator import *
 
 from skeleton.shells.ai.recovery_requirements import *
