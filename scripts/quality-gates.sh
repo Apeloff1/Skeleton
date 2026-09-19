@@ -200,6 +200,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_developer_tooling_security.py \
+  backend/tests/test_dependency_security_workflow_contract.py \
   backend/tests/test_incident_response_runbook.py \
   backend/tests/test_api_middleware_adversarial.py \
   backend/tests/test_api_middleware_regression_gaps.py \
