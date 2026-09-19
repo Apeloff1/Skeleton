@@ -23,6 +23,11 @@ from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableEvidenceOperationsReport,
 )
+from skeleton.shells.ai.durable_verification_health import (
+    DurableVerificationFleetError,
+    DurableVerificationFleetGuard,
+    DurableVerificationFleetReport,
+)
 from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttempt,
@@ -75,6 +80,7 @@ class AIServiceStatus:
     durable_recovery_requirements: dict[str, object] | None = None
     execution_obligations: dict[str, object] | None = None
     durable_lifecycle: dict[str, object] | None = None
+    durable_verification: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -104,6 +110,10 @@ class AIServiceStatus:
         if self.durable_lifecycle is not None:
             data["durable_lifecycle"] = dict(
                 self.durable_lifecycle
+            )
+        if self.durable_verification is not None:
+            data["durable_verification"] = dict(
+                self.durable_verification
             )
         return data
 
@@ -138,6 +148,8 @@ class AIShellService:
         durable_lifecycle_chains: tuple[tuple[str, object], ...] = (),
         durable_lifecycle_protected_roots: dict[str, tuple[str, ...]] | None = None,
         durable_lifecycle_capacities: dict[str, int] | None = None,
+        durable_verification_guard: DurableVerificationFleetGuard | None = None,
+        durable_verification_chains: tuple[tuple[str, object], ...] = (),
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -169,6 +181,67 @@ class AIShellService:
                     "execution obligation recovery must use configured "
                     "execution attempt store"
                 )
+        durable_verification_chains = tuple(
+            durable_verification_chains
+        )
+        if (
+            durable_verification_guard is None
+            and durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification chains require a durable verification guard"
+            )
+        if (
+            durable_verification_guard is not None
+            and not isinstance(
+                durable_verification_guard,
+                DurableVerificationFleetGuard,
+            )
+        ):
+            raise TypeError(
+                "durable_verification_guard must be DurableVerificationFleetGuard"
+            )
+        if (
+            durable_verification_guard is not None
+            and not durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification guard requires at least one chain"
+            )
+        if any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            for item in durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification chain entries must be (chain_id, chain) pairs"
+            )
+        verification_chain_ids = tuple(
+            item[0]
+            for item in durable_verification_chains
+        )
+        if len(verification_chain_ids) != len(
+            set(verification_chain_ids)
+        ):
+            raise ValueError(
+                "duplicate durable verification chain_id"
+            )
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 128
+            for item in verification_chain_ids
+        ):
+            raise ValueError(
+                "invalid durable verification chain_id"
+            )
+        durable_verification_chains = tuple(
+            sorted(
+                durable_verification_chains,
+                key=lambda item: item[0],
+            )
+        )
+
         durable_recovery_ids = tuple(durable_recovery_ids)
         if durable_recovery_guard is None and durable_recovery_ids:
             raise ValueError(
@@ -422,6 +495,12 @@ class AIShellService:
         self.execution_obligation_recovery = execution_obligation_recovery
         self.worker_id = worker_id
         self.durable_recovery_guard = durable_recovery_guard
+        self.durable_verification_guard = (
+            durable_verification_guard
+        )
+        self.durable_verification_chains = (
+            durable_verification_chains
+        )
         self.durable_recovery_ids = durable_recovery_ids
         self.durable_recovery_requirement_store = (
             durable_recovery_requirement_store
@@ -451,6 +530,7 @@ class AIShellService:
         self._authority_health_report: AuthorityHealthReport | None = None
         self._durable_recovery_report: DurableRecoveryHealthReport | None = None
         self._durable_operations_report: DurableEvidenceOperationsReport | None = None
+        self._durable_verification_report: DurableVerificationFleetReport | None = None
         self._durable_lifecycle_reports: dict[
             str,
             DurableLifecycleReport,
@@ -533,6 +613,35 @@ class AIShellService:
                 self.state.transition(
                     AIServicePhase.FAILED,
                     reason="AI durable recovery verification failed",
+                )
+                return report
+        if self.durable_verification_guard is not None:
+            try:
+                self._durable_verification_report = (
+                    self.durable_verification_guard.require(
+                        self.durable_verification_chains
+                    )
+                )
+            except (
+                DurableVerificationFleetError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable verification cursor "
+                        "establishment failed"
+                    ),
+                )
+                return report
+            if not self._durable_verification_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable verification fleet denied startup"
+                    ),
                 )
                 return report
         if self.durable_operations_inspector is not None:
@@ -801,6 +910,44 @@ class AIShellService:
             "AI durable recovery verification failed"
         )
 
+    def _require_durable_verification_current(self) -> None:
+        guard = self.durable_verification_guard
+        if guard is None:
+            return
+        try:
+            report = guard.require(
+                self.durable_verification_chains
+            )
+        except (
+            DurableVerificationFleetError,
+            RuntimeError,
+            ValueError,
+            TypeError,
+        ) as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable verification evidence drift detected"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable verification failed"
+            ) from exc
+        self._durable_verification_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable verification fleet denied admission"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable verification failed"
+        )
+
     def _require_durable_operations_current(self) -> None:
         if self.durable_operations_inspector is None:
             return
@@ -899,6 +1046,7 @@ class AIShellService:
         self._require_runtime_trust_current()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
@@ -910,6 +1058,7 @@ class AIShellService:
         self._require_runtime_trust_current()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         bundle = self.orchestrator.review(session)
@@ -1008,6 +1157,7 @@ class AIShellService:
         self._require_authority_health()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
@@ -1128,6 +1278,7 @@ class AIShellService:
         self._require_authority_health()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
@@ -1212,6 +1363,7 @@ class AIShellService:
         self._require_authority_health()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
@@ -1690,6 +1842,7 @@ class AIShellService:
         self._require_authority_health()
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
+        self._require_durable_verification_current()
         self._require_durable_operations_current()
         self._require_durable_lifecycle_current()
         if self.execution_fences is not None and not execution_fenced:
@@ -1803,5 +1956,10 @@ class AIShellService:
                         )
                     },
                 }
+            ),
+            (
+                None
+                if self._durable_verification_report is None
+                else self._durable_verification_report.to_dict()
             ),
         )
