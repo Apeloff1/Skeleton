@@ -514,7 +514,7 @@ class DurableEvidenceLifecycleCoordinator:
             return DurableLifecycleReport(
                 chain_id,
                 DurableLifecycleState.COMPACTION_READY,
-                DurableLifecycleAction.ARCHIVE_REUSED,
+                DurableLifecycleAction.NONE,
                 self.policy.digest,
                 plan,
                 checkpoint,
@@ -620,16 +620,21 @@ class DurableEvidenceLifecycleCoordinator:
             reasons.append(
                 "eligible signed prefix was persisted to durable archive repository"
             )
+            prepared_state = (
+                DurableLifecycleState.COMPACTION_READY
+                if (
+                    refreshed.compaction is not None
+                    and refreshed.compaction.ready
+                )
+                else (
+                    DurableLifecycleState.BLOCKED
+                    if self.policy.require_compaction_ready_after_archive
+                    else DurableLifecycleState.ARCHIVE_STORED
+                )
+            )
             return DurableLifecycleReport(
                 chain_id,
-                (
-                    DurableLifecycleState.COMPACTION_READY
-                    if (
-                        refreshed.compaction is not None
-                        and refreshed.compaction.ready
-                    )
-                    else DurableLifecycleState.ARCHIVE_STORED
-                ),
+                prepared_state,
                 DurableLifecycleAction.ARCHIVE_PERSISTED,
                 self.policy.digest,
                 refreshed.retention,
