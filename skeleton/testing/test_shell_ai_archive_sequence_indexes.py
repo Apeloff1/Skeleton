@@ -28,6 +28,7 @@ from skeleton.shells.ai.durable_sequence_index import (
 from skeleton.shells.ai.signed_artifact import ArtifactSigner
 from skeleton.shells.distributed_receipts import DistributedReceiptChain
 from skeleton.shells.receipts import ExecutionReceipt
+from skeleton.shells.sequence_index import SequenceIndexBackfillableChain
 
 
 GENESIS = "0" * 64
@@ -1216,3 +1217,434 @@ def test_archive_backed_range_validation():
             1,
             max_items=0,
         )
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_batch_backfill_repairs_in_bounded_chunks(kind):
+    fixture = Fixture(kind=kind)
+    for sequence in range(1, fixture.archived + 1):
+        key = fixture.repository._sequence_key(
+            fixture.chain_id,
+            sequence,
+        )
+        record = fixture.backend.get(
+            fixture.repository.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.repository.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+
+    first = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        max_items=2,
+    )
+    assert first.requested_end_sequence == fixture.archived
+    assert first.covered_start_sequence == fixture.archived - 1
+    assert first.covered_end_sequence == fixture.archived
+    assert first.indexed == 2
+    assert first.already_indexed == 0
+    assert first.next_sequence == fixture.archived - 2
+    assert not first.complete_to_genesis
+
+    second = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        end_sequence=first.next_sequence,
+        end_root=first.next_root,
+        max_items=2,
+    )
+    assert second.covered_end_sequence == fixture.archived - 2
+    assert second.indexed == 2
+    assert second.next_sequence == fixture.archived - 4
+
+    third = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        end_sequence=second.next_sequence,
+        end_root=second.next_root,
+        max_items=2,
+    )
+    assert third.indexed == 2
+    assert third.next_sequence == 0
+    assert third.next_root == GENESIS
+    assert third.complete_to_genesis
+
+    health = fixture.repository.inspect_sequence_indexes(
+        fixture.chain_id,
+    )
+    assert health.healthy
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_batch_backfill_counts_existing_indexes(kind):
+    fixture = Fixture(kind=kind)
+    batch = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        max_items=3,
+    )
+    assert batch.indexed == 0
+    assert batch.already_indexed == 3
+    assert batch.covered_items == 3
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_batch_backfill_rejects_wrong_root(kind):
+    fixture = Fixture(kind=kind)
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="root/sequence mismatch",
+    ):
+        fixture.repository.backfill_sequence_indexes_batch(
+            fixture.chain_id,
+            end_sequence=3,
+            end_root=node_hash(
+                fixture.prefix[0]
+            ),
+            max_items=2,
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_batch_backfill_zero_is_complete(kind):
+    fixture = Fixture(kind=kind)
+    batch = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        end_sequence=0,
+        max_items=2,
+    )
+    assert batch.requested_end_sequence == 0
+    assert batch.requested_end_root == GENESIS
+    assert batch.covered_start_sequence is None
+    assert batch.covered_end_sequence is None
+    assert batch.covered_items == 0
+    assert batch.next_sequence == 0
+    assert batch.next_root == GENESIS
+    assert batch.complete_to_genesis
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_batch_backfill_rejects_conflicting_locator(kind):
+    fixture = Fixture(kind=kind)
+    sequence = fixture.archived
+    key = fixture.repository._sequence_key(
+        fixture.chain_id,
+        sequence,
+    )
+    record = fixture.backend.get(
+        fixture.repository.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.repository.namespace,
+        key,
+        expected_revision=record.revision,
+        value=DurableArchiveSequenceIndex(
+            fixture.chain_id,
+            sequence,
+            node_hash(fixture.prefix[0]),
+        ).to_dict(),
+    )
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="conflicting sequence index",
+    ):
+        fixture.repository.backfill_sequence_indexes_batch(
+            fixture.chain_id,
+            max_items=1,
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_can_cross_floor_in_one_call(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+
+    # Remove all archive indexes.
+    for sequence in range(1, fixture.archived + 1):
+        key = fixture.repository._sequence_key(
+            fixture.chain_id,
+            sequence,
+        )
+        record = fixture.backend.get(
+            fixture.repository.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.repository.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+
+    # Remove the live suffix indexes.
+    for sequence in range(
+        fixture.archived + 1,
+        fixture.archived + fixture.tail + 1,
+    ):
+        key = fixture.chain._sequence_key(
+            sequence
+        )
+        record = fixture.backend.get(
+            fixture.chain.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.chain.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+
+    batch = fixture.historical.backfill_sequence_indexes_batch(
+        max_items=fixture.tail + 2,
+    )
+    assert batch.requested_end_sequence == (
+        fixture.archived + fixture.tail
+    )
+    assert batch.covered_items == fixture.tail + 2
+    assert batch.indexed == fixture.tail + 2
+    assert batch.next_sequence == fixture.archived - 2
+    assert batch.next_root == node_hash(
+        fixture.prefix[fixture.archived - 3]
+    )
+    assert not batch.complete_to_genesis
+
+    # The live tail is now fully repaired.
+    for sequence in range(
+        fixture.archived + 1,
+        fixture.archived + fixture.tail + 1,
+    ):
+        fixture.chain.get_by_sequence(
+            sequence,
+            repair_missing=False,
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_stops_exactly_at_floor_when_budget_matches_tail(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+    for sequence in range(
+        fixture.archived + 1,
+        fixture.archived + fixture.tail + 1,
+    ):
+        key = fixture.chain._sequence_key(
+            sequence
+        )
+        record = fixture.backend.get(
+            fixture.chain.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.chain.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+    batch = fixture.historical.backfill_sequence_indexes_batch(
+        max_items=fixture.tail,
+    )
+    assert batch.covered_items == fixture.tail
+    assert batch.next_sequence == fixture.archived
+    assert batch.next_root == fixture.floor_root
+    assert not batch.complete_to_genesis
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_below_floor_uses_archive_only(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+    sequence = fixture.archived - 1
+    key = fixture.repository._sequence_key(
+        fixture.chain_id,
+        sequence,
+    )
+    record = fixture.backend.get(
+        fixture.repository.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.repository.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    batch = fixture.historical.backfill_sequence_indexes_batch(
+        end_sequence=sequence,
+        end_root=node_hash(
+            fixture.prefix[sequence - 1]
+        ),
+        max_items=1,
+    )
+    assert batch.indexed == 1
+    assert batch.covered_start_sequence == sequence
+    assert batch.covered_end_sequence == sequence
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_requires_root_for_non_head_sequence(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+    with pytest.raises(
+        ValueError,
+        match="explicit root",
+    ):
+        fixture.historical.backfill_sequence_indexes_batch(
+            end_sequence=fixture.archived + 1,
+            max_items=1,
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_rejects_root_sequence_mismatch(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="root/sequence mismatch",
+    ):
+        fixture.historical.backfill_sequence_indexes_batch(
+            end_sequence=fixture.archived + 1,
+            end_root=node_hash(
+                fixture.suffix[-1]
+            ),
+            max_items=1,
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_archive_backed_chain_satisfies_backfillable_protocol(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+    assert isinstance(
+        fixture.historical,
+        SequenceIndexBackfillableChain,
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_batch_backfill_fresh_reader_resumes_cursor(kind):
+    fixture = Fixture(kind=kind)
+    for sequence in range(1, fixture.archived + 1):
+        key = fixture.repository._sequence_key(
+            fixture.chain_id,
+            sequence,
+        )
+        record = fixture.backend.get(
+            fixture.repository.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.repository.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+    first = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        max_items=2,
+    )
+
+    fresh = DurableArchiveRepository(
+        fixture.backend,
+        fixture.checkpoints,
+        fixture.archive_signer,
+        namespace=fixture.repository.namespace,
+        clock=lambda: 999.0,
+    )
+    second = fresh.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        end_sequence=first.next_sequence,
+        end_root=first.next_root,
+        max_items=2,
+    )
+    assert second.indexed == 2
+    assert second.covered_end_sequence == first.next_sequence
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_batch_backfill_is_idempotent_on_retry(kind):
+    fixture = Fixture(kind=kind)
+    sequence = fixture.archived
+    key = fixture.repository._sequence_key(
+        fixture.chain_id,
+        sequence,
+    )
+    record = fixture.backend.get(
+        fixture.repository.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.repository.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    first = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        max_items=1,
+    )
+    assert first.indexed == 1
+    retry = fixture.repository.backfill_sequence_indexes_batch(
+        fixture.chain_id,
+        max_items=1,
+    )
+    assert retry.indexed == 0
+    assert retry.already_indexed == 1
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_hot_cold_batch_backfill_full_repair_with_cursor_loop(kind):
+    fixture = Fixture(kind=kind)
+    fixture.activate_floor()
+
+    for sequence in range(1, fixture.archived + 1):
+        key = fixture.repository._sequence_key(
+            fixture.chain_id,
+            sequence,
+        )
+        record = fixture.backend.get(
+            fixture.repository.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.repository.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+    for sequence in range(
+        fixture.archived + 1,
+        fixture.archived + fixture.tail + 1,
+    ):
+        key = fixture.chain._sequence_key(
+            sequence
+        )
+        record = fixture.backend.get(
+            fixture.chain.namespace,
+            key,
+        )
+        fixture.backend.delete(
+            fixture.chain.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+
+    end_sequence = None
+    end_root = ""
+    batches = []
+    while True:
+        batch = fixture.historical.backfill_sequence_indexes_batch(
+            end_sequence=end_sequence,
+            end_root=end_root,
+            max_items=2,
+        )
+        batches.append(batch)
+        if batch.complete_to_genesis:
+            break
+        end_sequence = batch.next_sequence
+        end_root = batch.next_root
+
+    assert sum(
+        item.indexed
+        for item in batches
+    ) == fixture.archived + fixture.tail
+    assert fixture.historical.inspect_sequence_indexes(
+        max_items=20,
+    ).healthy
+    assert batches[-1].next_sequence == 0
+    assert batches[-1].next_root == GENESIS
+
