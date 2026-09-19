@@ -682,12 +682,34 @@ class RemoteObservationTests(unittest.TestCase):
         payload = (
             '[{"number":1,"html_url":"https://example.invalid/1",'
             '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
-            '"head":{"ref":"bot/specialist-root-cause-a",'
+            '"head":{"ref":"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
             '"repo":{"full_name":"Apeloff1/Skeleton"}},'
             '"base":{"ref":"main"}},'
             '{"number":2,"html_url":"https://example.invalid/2",'
             '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
-            '"head":{"ref":"bot/specialist-root-cause-b",'
+            '"head":{"ref":"bot/specialist-root-cause-bbbbbbbbbbbbbbbb",'
+            '"repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}}]'
+        )
+        with patch(
+            "skeleton.automation.supervisor_runtime.subprocess.check_output",
+            return_value=payload,
+        ):
+            with self.assertRaises(
+                runtime.SupervisorRuntimeError
+            ):
+                runtime.find_open_pr_for_worker(
+                    REPO,
+                    "root-cause",
+                )
+
+    def test_find_open_worker_pr_rejects_malformed_reserved_branch(
+        self,
+    ) -> None:
+        payload = (
+            '[{"number":4,"html_url":"https://example.invalid/4",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-not-a-digest",'
             '"repo":{"full_name":"Apeloff1/Skeleton"}},'
             '"base":{"ref":"main"}}]'
         )
