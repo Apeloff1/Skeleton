@@ -886,6 +886,30 @@ class PhysicsWorld:
             tick=tick,
         )
 
+    def _clamp_settled_pair_closing_velocity(self, event: TOIEvent) -> None:
+        """Remove residual normal closing speed before a CCD pair is settled."""
+        body_a = self._bodies[event.body_a]
+        body_b = self._bodies[event.body_b]
+        inverse_mass_sum = body_a.inverse_mass + body_b.inverse_mass
+        if inverse_mass_sum <= 0.0:
+            return
+        relative_normal_speed = (
+            body_b.linear_velocity - body_a.linear_velocity
+        ).dot(event.normal)
+        if relative_normal_speed >= 0.0:
+            return
+        impulse = -relative_normal_speed / inverse_mass_sum
+        if body_a.inverse_mass > 0.0:
+            body_a.linear_velocity = (
+                body_a.linear_velocity - event.normal * (impulse * body_a.inverse_mass)
+            )
+            body_a.wake()
+        if body_b.inverse_mass > 0.0:
+            body_b.linear_velocity = (
+                body_b.linear_velocity + event.normal * (impulse * body_b.inverse_mass)
+            )
+            body_b.wake()
+
     def _integrate_velocity_phase(
         self,
         dt: float,
@@ -898,6 +922,7 @@ class PhysicsWorld:
 
         remaining = dt
         events: list[TOIEvent] = []
+        settled_pairs: set[tuple[str, str]] = set()
         minimum_advance = dt * self.settings.ccd_min_advance_fraction
 
         for _ in range(self.settings.ccd_max_substeps):
@@ -905,7 +930,11 @@ class PhysicsWorld:
                 remaining = 0.0
                 break
 
-            event = self._ccd.earliest_event(self.bodies(), remaining)
+            event = self._ccd.earliest_event(
+                self.bodies(),
+                remaining,
+                ignore_pairs=frozenset(settled_pairs),
+            )
             if event is None:
                 self._advance_all_bodies(remaining)
                 remaining = 0.0
@@ -924,12 +953,24 @@ class PhysicsWorld:
                 break
 
             if advance <= minimum_advance:
+                # A pair that immediately re-enters TOI after an impact is a
+                # persistent contact, not a new useful sweep event. Resolve it
+                # once, then delegate that pair to the final discrete contact
+                # solve for the rest of this fixed step. Other pairs remain
+                # eligible for CCD, preventing one smooth contact from
+                # exhausting the global substep budget.
+                self._clamp_settled_pair_closing_velocity(event)
+                settled_pairs.add((event.body_a, event.body_b))
                 escape = min(remaining, minimum_advance)
                 self._advance_all_bodies(escape)
                 remaining = max(0.0, remaining - escape)
 
         if remaining > EPSILON:
-            pending = self._ccd.earliest_event(self.bodies(), remaining)
+            pending = self._ccd.earliest_event(
+                self.bodies(),
+                remaining,
+                ignore_pairs=frozenset(settled_pairs),
+            )
             if pending is not None:
                 raise PhysicsValidationError("CCD substep bound exceeded")
             self._advance_all_bodies(remaining)
