@@ -199,6 +199,7 @@ public final class AcceleratorMain {
             throw new ProtocolException("threshold must be in (0, 1000]");
         }
 
+        boolean includeCurrent = in.readBoolean();
         double[] history = readValues(in, windowSize);
         double[] incoming = readValues(in, MAX_VALUES);
         var window = new RollingWindow(windowSize);
@@ -208,12 +209,13 @@ public final class AcceleratorMain {
         var rows = new AnomalyRow[incoming.length];
         for (int i = 0; i < incoming.length; i++) {
             double value = incoming[i];
+            if (includeCurrent) window.add(value);
             boolean ready = window.size() >= 10;
             double mean = ready ? window.mean() : 0.0;
             double stdev = ready ? window.sampleStdDev() : 0.0;
             boolean anomaly = ready && stdev > 0.0 && Math.abs(value - mean) > threshold * stdev;
             rows[i] = new AnomalyRow(ready, anomaly, mean, stdev);
-            window.add(value);
+            if (!includeCurrent) window.add(value);
         }
 
         writeHeader(out, header.op(), STATUS_OK, header.requestId());
