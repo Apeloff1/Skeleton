@@ -1695,6 +1695,10 @@ class DurableArchiveRepository:
                     raise DurableArchiveStoreError(
                         "archive segment end root is absent from replica"
                     ) from exc
+                if index.sequence != end_position:
+                    raise DurableArchiveStoreError(
+                        "archive root index sequence differs from signed replica"
+                    )
 
                 if start_exclusive_root == GENESIS_HASH:
                     start_position = 0
