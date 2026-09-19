@@ -1051,3 +1051,123 @@ def test_compaction_error_is_runtime_error():
         DurableCompactionError,
         RuntimeError,
     )
+
+def test_compaction_readiness_falls_back_to_secondary_archive_replica():
+    (
+        backend,
+        journal,
+        checkpoints,
+        archives,
+        _,
+        _,
+        retention,
+        planner,
+        first_archive,
+    ) = journal_ready_fixture()
+
+    # Archive the later current head as a second replica for every earlier root.
+    builder = DurableArchiveManifestBuilder(
+        checkpoints,
+        archives.archive_signer,
+    )
+    second_checkpoint = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    second_archive = builder.build(
+        second_checkpoint,
+        journal,
+    )
+    archives.put(
+        second_archive,
+        second_checkpoint,
+        journal,
+    )
+    cutoff = retention.archive_through_root
+    index = archives.root_index(
+        "journal",
+        cutoff,
+    )
+    assert len(index.replicas) == 2
+
+    key = archives._archive_key(
+        first_archive.manifest.archive_id
+    )
+    record = backend.get(
+        archives.namespace,
+        key,
+    )
+    backend.delete(
+        archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    report = planner.require_ready(
+        retention,
+        journal,
+    )
+    assert report.ready
+    assert (
+        report.archive_id
+        == second_archive.manifest.archive_id
+    )
+    assert report.cutoff_archived
+
+
+def test_compaction_readiness_fails_when_all_archive_replicas_are_missing():
+    (
+        backend,
+        journal,
+        checkpoints,
+        archives,
+        _,
+        _,
+        retention,
+        planner,
+        first_archive,
+    ) = journal_ready_fixture()
+    builder = DurableArchiveManifestBuilder(
+        checkpoints,
+        archives.archive_signer,
+    )
+    second_checkpoint = checkpoints.publish(
+        "journal",
+        journal,
+    )
+    second_archive = builder.build(
+        second_checkpoint,
+        journal,
+    )
+    archives.put(
+        second_archive,
+        second_checkpoint,
+        journal,
+    )
+    for archive_id in (
+        first_archive.manifest.archive_id,
+        second_archive.manifest.archive_id,
+    ):
+        key = archives._archive_key(
+            archive_id
+        )
+        record = backend.get(
+            archives.namespace,
+            key,
+        )
+        backend.delete(
+            archives.namespace,
+            key,
+            expected_revision=record.revision,
+        )
+
+    report = planner.inspect(
+        retention,
+        journal,
+    )
+    assert (
+        report.state
+        is DurableCompactionState.ARCHIVE_INVALID
+    )
+    assert not report.ready
+
