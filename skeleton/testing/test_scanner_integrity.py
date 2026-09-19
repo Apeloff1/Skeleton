@@ -45,10 +45,10 @@ def test_clean_scan_is_complete_and_merge_safe() -> None:
 
 
 def test_scanner_exception_becomes_critical_self_failure_without_raw_message() -> None:
-    secret = "Bearer top-secret-token-value"
+    sensitive_marker = "SENSITIVE_FIXTURE_VALUE"
 
     def explode(_root: Path) -> None:
-        raise RuntimeError(f"network failed with {secret}")
+        raise RuntimeError(f"network failed with {sensitive_marker}")
 
     scanner = ScannerHarness("security-test")
     scanner.add_rule("exploding-rule", Severity.LOW, explode, "repair scanner")
@@ -61,7 +61,7 @@ def test_scanner_exception_becomes_critical_self_failure_without_raw_message() -
     assert finding.scanner_failure is True
     assert finding.severity is Severity.CRITICAL
     assert finding.message == "scanner rule failed with RuntimeError"
-    assert secret not in finding.message
+    assert sensitive_marker not in finding.message
     assert report.score() == 60.0
     with pytest.raises(ScannerIntegrityError, match="self-failure"):
         report.assert_merge_safe()
@@ -237,10 +237,10 @@ def test_vuln_scanner_rejects_duplicate_rule_name() -> None:
 
 def test_vuln_scanner_probe_exception_is_redacted_and_blocks_merge() -> None:
     scanner = VulnScanner()
-    secret = "https://signed.example.invalid/?sig=supersecret"
+    sensitive_marker = "SENSITIVE_URL_FIXTURE"
 
     def explode(_root: Path) -> None:
-        raise RuntimeError(secret)
+        raise RuntimeError(sensitive_marker)
 
     scanner.add_rule("custom-explode", "low", explode, "repair")
 
@@ -252,7 +252,7 @@ def test_vuln_scanner_probe_exception_is_redacted_and_blocks_merge() -> None:
     assert finding["scanner_failure"] is True
     assert finding["severity"] == "critical"
     assert finding["message"] == "scanner rule failed with RuntimeError"
-    assert secret not in str(card)
+    assert sensitive_marker not in str(card)
     with pytest.raises(VulnScannerError):
         scanner.assert_merge_safe()
 
