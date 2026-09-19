@@ -762,6 +762,176 @@ class DurableDestructionVerification:
         }
 
 
+class DurableDestructionIndexState(str, Enum):
+    HEALTHY = "healthy"
+    MISSING = "missing"
+    CORRUPT = "corrupt"
+    UNCOMMITTED = "uncommitted"
+
+
+@dataclass(frozen=True)
+class DurableDestructionIndexFinding:
+    operation_key: str
+    record_id: str
+    sequence: int
+    state: DurableDestructionIndexState
+    repairable: bool
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "operation_key",
+            _digest(
+                "operation_key",
+                self.operation_key,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "record_id",
+            _digest(
+                "record_id",
+                self.record_id,
+            ),
+        )
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence <= 0
+        ):
+            raise ValueError(
+                "destruction index finding sequence must be positive"
+            )
+        object.__setattr__(
+            self,
+            "state",
+            DurableDestructionIndexState(
+                self.state
+            ),
+        )
+        if not isinstance(
+            self.repairable,
+            bool,
+        ):
+            raise ValueError(
+                "repairable must be bool"
+            )
+        if len(self.reason) > 2048:
+            raise ValueError(
+                "destruction index finding reason too long"
+            )
+        if (
+            self.state
+            is DurableDestructionIndexState.HEALTHY
+            and self.reason
+        ):
+            raise ValueError(
+                "healthy destruction index may not carry reason"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "operation_key": self.operation_key,
+            "record_id": self.record_id,
+            "sequence": self.sequence,
+            "state": self.state.value,
+            "repairable": self.repairable,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class DurableDestructionIndexHealth:
+    chain_id: str
+    records: int
+    healthy_indexes: int
+    missing_indexes: int
+    corrupt_indexes: int
+    uncommitted_indexes: int
+    findings: tuple[
+        DurableDestructionIndexFinding,
+        ...,
+    ]
+
+    def __post_init__(self) -> None:
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        for name in (
+            "records",
+            "healthy_indexes",
+            "missing_indexes",
+            "corrupt_indexes",
+            "uncommitted_indexes",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        object.__setattr__(
+            self,
+            "findings",
+            tuple(self.findings),
+        )
+        if self.records != len(
+            self.findings
+        ):
+            raise ValueError(
+                "destruction index health count differs from findings"
+            )
+        if (
+            self.healthy_indexes
+            + self.missing_indexes
+            + self.corrupt_indexes
+            + self.uncommitted_indexes
+            != self.records
+        ):
+            raise ValueError(
+                "destruction index health counters do not sum to records"
+            )
+
+    @property
+    def healthy(self) -> bool:
+        return (
+            self.records == self.healthy_indexes
+        )
+
+    @property
+    def repairable(self) -> bool:
+        return all(
+            finding.state
+            is DurableDestructionIndexState.HEALTHY
+            or finding.repairable
+            for finding in self.findings
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "records": self.records,
+            "healthy_indexes": self.healthy_indexes,
+            "missing_indexes": self.missing_indexes,
+            "corrupt_indexes": self.corrupt_indexes,
+            "uncommitted_indexes": (
+                self.uncommitted_indexes
+            ),
+            "healthy": self.healthy,
+            "repairable": self.repairable,
+            "findings": [
+                item.to_dict()
+                for item in self.findings
+            ],
+        }
+
+
 class DurableDestructionError(RuntimeError):
     pass
 
@@ -1409,6 +1579,217 @@ class DurableDestructionLedger:
             chain_id
         )
 
+    def _read_operation_index(
+        self,
+        operation_key: str,
+    ) -> DurableDestructionOperationIndex | None:
+        operation_key = _digest(
+            "operation_key",
+            operation_key,
+        )
+        stored = self.backend.get(
+            self.namespace,
+            self._operation_index_key(
+                operation_key
+            ),
+        )
+        if stored is None:
+            return None
+        if not isinstance(
+            stored.value,
+            dict,
+        ):
+            raise DurableDestructionCorruption(
+                "destruction operation index must be mapping"
+            )
+        index = self._index(
+            dict(stored.value)
+        )
+        if (
+            index.operation_key
+            != operation_key
+        ):
+            raise DurableDestructionCorruption(
+                "destruction operation index key mismatch"
+            )
+        return index
+
+    @staticmethod
+    def _index_matches_record(
+        index: DurableDestructionOperationIndex,
+        item: SignedDurableDestructionRecord,
+    ) -> bool:
+        return (
+            index.chain_id
+            == item.record.chain_id
+            and index.operation_key
+            == item.operation_key
+            and index.record_id
+            == item.record_id
+            and index.record_digest
+            == item.record.digest
+            and index.sequence
+            == item.record.sequence
+        )
+
+    def inspect_operation_indexes(
+        self,
+        chain_id: str,
+    ) -> DurableDestructionIndexHealth:
+        committed = self.snapshot(
+            chain_id
+        )
+        findings: list[
+            DurableDestructionIndexFinding
+        ] = []
+        committed_ids = {
+            item.record_id
+            for item in committed
+        }
+        for item in committed:
+            try:
+                index = self._read_operation_index(
+                    item.operation_key
+                )
+            except Exception as exc:
+                findings.append(
+                    DurableDestructionIndexFinding(
+                        item.operation_key,
+                        item.record_id,
+                        item.record.sequence,
+                        DurableDestructionIndexState.CORRUPT,
+                        False,
+                        (
+                            "operation index decode failed: "
+                            f"{type(exc).__name__}"
+                        ),
+                    )
+                )
+                continue
+            if index is None:
+                findings.append(
+                    DurableDestructionIndexFinding(
+                        item.operation_key,
+                        item.record_id,
+                        item.record.sequence,
+                        DurableDestructionIndexState.MISSING,
+                        True,
+                        "operation index is missing",
+                    )
+                )
+                continue
+            if (
+                index.record_id
+                not in committed_ids
+            ):
+                findings.append(
+                    DurableDestructionIndexFinding(
+                        item.operation_key,
+                        item.record_id,
+                        item.record.sequence,
+                        DurableDestructionIndexState.UNCOMMITTED,
+                        False,
+                        "operation index points outside committed destruction history",
+                    )
+                )
+                continue
+            if not self._index_matches_record(
+                index,
+                item,
+            ):
+                findings.append(
+                    DurableDestructionIndexFinding(
+                        item.operation_key,
+                        item.record_id,
+                        item.record.sequence,
+                        DurableDestructionIndexState.CORRUPT,
+                        False,
+                        "operation index differs from committed destruction record",
+                    )
+                )
+                continue
+            findings.append(
+                DurableDestructionIndexFinding(
+                    item.operation_key,
+                    item.record_id,
+                    item.record.sequence,
+                    DurableDestructionIndexState.HEALTHY,
+                    False,
+                )
+            )
+        return DurableDestructionIndexHealth(
+            chain_id,
+            len(committed),
+            sum(
+                item.state
+                is DurableDestructionIndexState.HEALTHY
+                for item in findings
+            ),
+            sum(
+                item.state
+                is DurableDestructionIndexState.MISSING
+                for item in findings
+            ),
+            sum(
+                item.state
+                is DurableDestructionIndexState.CORRUPT
+                for item in findings
+            ),
+            sum(
+                item.state
+                is DurableDestructionIndexState.UNCOMMITTED
+                for item in findings
+            ),
+            tuple(findings),
+        )
+
+    def repair_operation_indexes(
+        self,
+        chain_id: str,
+        *,
+        max_repairs: int = 10_000,
+    ) -> DurableDestructionIndexHealth:
+        if (
+            isinstance(max_repairs, bool)
+            or not isinstance(max_repairs, int)
+            or max_repairs <= 0
+        ):
+            raise ValueError(
+                "max_repairs must be positive integer"
+            )
+        before = self.inspect_operation_indexes(
+            chain_id
+        )
+        repairable = tuple(
+            finding
+            for finding in before.findings
+            if finding.repairable
+        )
+        if len(repairable) > max_repairs:
+            raise DurableDestructionConflict(
+                "destruction index repair bound exceeded"
+            )
+        by_record = {
+            item.record_id: item
+            for item in self.snapshot(
+                chain_id
+            )
+        }
+        for finding in repairable:
+            item = by_record.get(
+                finding.record_id
+            )
+            if item is None:
+                raise DurableDestructionCorruption(
+                    "repairable destruction index references missing committed record"
+                )
+            self._put_operation_index(
+                item
+            )
+        return self.inspect_operation_indexes(
+            chain_id
+        )
+
     def find_operation(
         self,
         chain_id: str,
@@ -1751,6 +2132,10 @@ class DurableDestructionLedger:
         previous = (
             GENESIS_DIGEST
         )
+        committed_ids = {
+            item.record_id
+            for item in items
+        }
         for sequence, item in enumerate(
             items,
             start=1,
@@ -1775,15 +2160,25 @@ class DurableDestructionLedger:
                     f"sequence {sequence} signature: {exc}"
                 )
             try:
-                indexed = self.find_operation(
-                    chain_id,
-                    record.operation_kind,
-                    record.operation_id,
+                index = self._read_operation_index(
+                    item.operation_key
                 )
-                if (
-                    indexed is None
-                    or indexed.record.digest
-                    != record.digest
+                if index is None:
+                    indexes_valid = False
+                    issues.append(
+                        f"sequence {sequence} operation index missing"
+                    )
+                elif (
+                    index.record_id
+                    not in committed_ids
+                ):
+                    indexes_valid = False
+                    issues.append(
+                        f"sequence {sequence} operation index references uncommitted record"
+                    )
+                elif not self._index_matches_record(
+                    index,
+                    item,
                 ):
                     indexes_valid = False
                     issues.append(
