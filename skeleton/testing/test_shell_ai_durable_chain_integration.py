@@ -18,6 +18,15 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedAIDecisionJournal,
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.durable_archive import (
+    DurableArchiveManifestBuilder,
+)
+from skeleton.shells.ai.durable_archive_store import (
+    DurableArchiveRepository,
+)
+from skeleton.shells.ai.durable_checkpoint import (
+    DurableChainCheckpointStore,
+)
 from skeleton.shells.ai.durable_health import (
     DurableRecoveryHealthGuard,
     DurableRecoveryHealthPolicy,
@@ -2258,4 +2267,592 @@ def test_requirement_operator_constructor_types(tmp_path):
             requirements,
             object(),
         )
+
+class ForgetfulDurableChain:
+    """Delegate current-chain operations while hiding selected historical roots."""
+
+    def __init__(self, delegate, forgotten_roots):
+        self.delegate = delegate
+        self.forgotten_roots = set(forgotten_roots)
+
+    def head(self):
+        return self.delegate.head()
+
+    def verify(self):
+        return self.delegate.verify()
+
+    def snapshot(self):
+        return self.delegate.snapshot()
+
+    def root_hash(self):
+        return self.delegate.root_hash()
+
+    def length(self):
+        return self.delegate.length()
+
+    def snapshot_at(self, root_hash):
+        if root_hash in self.forgotten_roots:
+            raise KeyError(root_hash)
+        return self.delegate.snapshot_at(root_hash)
+
+    def verify_root(self, root_hash):
+        if root_hash in self.forgotten_roots:
+            return False
+        return self.delegate.verify_root(root_hash)
+
+    def root_is_ancestor(self, root_hash):
+        if root_hash in self.forgotten_roots:
+            return False
+        return self.delegate.root_is_ancestor(root_hash)
+
+
+def durable_archive_repository(env):
+    checkpoints = DurableChainCheckpointStore(
+        env.backend,
+        ArtifactSigner(
+            "archive-checkpoint",
+            b"c" * 32,
+            clock=lambda: 100.0,
+        ),
+        namespace="archive-checkpoints",
+        clock=lambda: 100.0,
+    )
+    signer = ArtifactSigner(
+        "archive-payload",
+        b"a" * 32,
+        clock=lambda: 200.0,
+    )
+    builder = DurableArchiveManifestBuilder(
+        checkpoints,
+        signer,
+        clock=lambda: 200.0,
+    )
+    repository = DurableArchiveRepository(
+        env.backend,
+        checkpoints,
+        signer,
+        namespace="archive-payloads",
+        clock=lambda: 300.0,
+    )
+    return checkpoints, builder, repository
+
+
+def archive_current_durable_chains(env):
+    checkpoints, builder, repository = (
+        durable_archive_repository(env)
+    )
+    journal_checkpoint = checkpoints.publish(
+        "decision-journal",
+        env.journal,
+    )
+    journal_archive = builder.build(
+        journal_checkpoint,
+        env.journal,
+    )
+    repository.put(
+        journal_archive,
+        journal_checkpoint,
+        env.journal,
+    )
+
+    receipt_checkpoint = checkpoints.publish(
+        "receipts",
+        env.receipts,
+    )
+    receipt_archive = builder.build(
+        receipt_checkpoint,
+        env.receipts,
+    )
+    repository.put(
+        receipt_archive,
+        receipt_checkpoint,
+        env.receipts,
+    )
+    return (
+        checkpoints,
+        builder,
+        repository,
+        journal_archive,
+        receipt_archive,
+    )
+
+
+def archive_backed_verifier(
+    env,
+    repository,
+    *,
+    journal_roots=(),
+    receipt_roots=(),
+):
+    return DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=ForgetfulDurableChain(
+            env.journal,
+            journal_roots,
+        ),
+        receipt_chain=ForgetfulDurableChain(
+            env.receipts,
+            receipt_roots,
+        ),
+        execution_evidence=env.execution_evidence,
+        journal_archive=repository,
+        journal_chain_id="decision-journal",
+        receipt_archive=repository,
+        receipt_chain_id="receipts",
+    )
+
+
+def test_archive_backed_recovery_survives_forgotten_hot_roots(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    first_session, _, _, _, first = env.execute(
+        session_id="archive-first",
+        intent_id="archive-first",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+
+    env.execute(
+        session_id="archive-second",
+        intent_id="archive-second",
+    )
+    assert env.journal.root_hash() != journal_root
+    assert env.receipts.root_hash() != receipt_root
+
+    verifier = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    )
+    report = verifier.require_verified(first_id)
+    assert report.ok
+    assert report.session_id == first_session.session_id
+    assert report.journal_root == journal_root
+    assert report.receipt_root == receipt_root
+    assert (
+        report.session_integrity_digest
+        == first.finalized.session_integrity.digest
+    )
+
+
+def test_recovery_without_archive_fails_when_hot_roots_are_forgotten(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="no-archive-first",
+        intent_id="no-archive-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    env.execute(
+        session_id="no-archive-second",
+        intent_id="no-archive-second",
+    )
+
+    verifier = DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=ForgetfulDurableChain(
+            env.journal,
+            (journal_root,),
+        ),
+        receipt_chain=ForgetfulDurableChain(
+            env.receipts,
+            (receipt_root,),
+        ),
+        execution_evidence=env.execution_evidence,
+    )
+    report = verifier.verify(finalization_id)
+    assert (
+        report.status
+        is DurableRecoveryStatus.MANUAL_REVIEW
+    )
+    assert any(
+        finding.code.startswith("session_journal")
+        or finding.code.startswith("session_integrity")
+        for finding in report.findings
+    )
+
+
+def test_archive_backed_health_guard_allows_verified_historical_execution(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="health-archive-first",
+        intent_id="health-archive-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+    env.execute(
+        session_id="health-archive-second",
+        intent_id="health-archive-second",
+    )
+
+    verifier = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    )
+    guard = DurableRecoveryHealthGuard(
+        verifier,
+        DurableRecoveryHealthPolicy(
+            require_nonempty=True,
+            minimum_verified=1,
+            max_incomplete=0,
+            max_finalizations=16,
+        ),
+    )
+    health = guard.require((finalization_id,))
+    assert health.allowed
+    assert health.verified == 1
+    assert health.manual_review == 0
+
+
+def test_archive_backed_health_guard_denies_tampered_archived_journal(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="tamper-archive-first",
+        intent_id="tamper-archive-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+    env.execute(
+        session_id="tamper-archive-second",
+        intent_id="tamper-archive-second",
+    )
+
+    archived_event = repository.snapshot_at(
+        "decision-journal",
+        journal_root,
+    )[-1]
+    node_key = repository._node_key(
+        "decision-journal",
+        archived_event.event_hash,
+    )
+    record = env.backend.get(
+        repository.namespace,
+        node_key,
+    )
+    raw = dict(record.value)
+    payload = dict(raw["payload"])
+    payload["summary"] = "tampered archive event"
+    raw["payload"] = payload
+    env.backend.compare_and_swap(
+        repository.namespace,
+        node_key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+
+    verifier = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    )
+    report = verifier.verify(finalization_id)
+    assert (
+        report.status
+        is DurableRecoveryStatus.MANUAL_REVIEW
+    )
+
+
+def test_archive_backed_health_guard_denies_tampered_archived_receipt(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="tamper-receipt-first",
+        intent_id="tamper-receipt-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+    env.execute(
+        session_id="tamper-receipt-second",
+        intent_id="tamper-receipt-second",
+    )
+
+    archived_receipt = repository.snapshot_at(
+        "receipts",
+        receipt_root,
+    )[-1]
+    node_key = repository._node_key(
+        "receipts",
+        archived_receipt.receipt_hash,
+    )
+    record = env.backend.get(
+        repository.namespace,
+        node_key,
+    )
+    raw = dict(record.value)
+    payload = dict(raw["payload"])
+    receipt_payload = dict(payload["receipt"])
+    receipt_payload["stdout_bytes"] += 1
+    payload["receipt"] = receipt_payload
+    raw["payload"] = payload
+    env.backend.compare_and_swap(
+        repository.namespace,
+        node_key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+
+    verifier = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    )
+    report = verifier.verify(finalization_id)
+    assert (
+        report.status
+        is DurableRecoveryStatus.MANUAL_REVIEW
+    )
+
+
+def test_archive_backed_recovery_uses_fresh_repository_reader(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="fresh-archive-first",
+        intent_id="fresh-archive-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    checkpoints, _, repository, _, _ = archive_current_durable_chains(env)
+    env.execute(
+        session_id="fresh-archive-second",
+        intent_id="fresh-archive-second",
+    )
+
+    fresh = DurableArchiveRepository(
+        env.backend,
+        checkpoints,
+        ArtifactSigner(
+            "archive-payload",
+            b"a" * 32,
+            clock=lambda: 999.0,
+        ),
+        namespace=repository.namespace,
+        clock=lambda: 999.0,
+    )
+    report = archive_backed_verifier(
+        env,
+        fresh,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    ).require_verified(finalization_id)
+    assert report.ok
+
+
+def test_archive_backed_recovery_reconstructs_original_session_journal_only(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    first_session, _, _, _, first = env.execute(
+        session_id="journal-isolation-first",
+        intent_id="journal-isolation-first",
+    )
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+    env.execute(
+        session_id="journal-isolation-second",
+        intent_id="journal-isolation-second",
+    )
+
+    verifier = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    )
+    journal_evidence = verifier._session_journal(
+        first_session.session_id,
+        journal_root,
+    )
+    assert journal_evidence.events
+    archived_prefix = repository.snapshot_at(
+        "decision-journal",
+        journal_root,
+    )
+    expected = tuple(
+        event
+        for event in archived_prefix
+        if event.session_id == first_session.session_id
+    )
+    assert tuple(
+        item.event_hash
+        for item in journal_evidence.events
+    ) == tuple(
+        item.event_hash
+        for item in expected
+    )
+
+
+def test_archive_backed_recovery_constructor_requires_chain_id_with_archive(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+    with pytest.raises(
+        ValueError,
+        match="journal_archive",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            journal_archive=repository,
+        )
+    with pytest.raises(
+        ValueError,
+        match="receipt_archive",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            receipt_chain_id="receipts",
+        )
+
+
+def test_archive_backed_recovery_constructor_validates_repository_type(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        TypeError,
+        match="journal_archive",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            journal_archive=object(),
+            journal_chain_id="decision-journal",
+        )
+    with pytest.raises(
+        TypeError,
+        match="receipt_archive",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            receipt_archive=object(),
+            receipt_chain_id="receipts",
+        )
+
+
+def test_archive_repository_keeps_first_finalization_verifiable_after_three_later_runs(
+    tmp_path,
+):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="long-lived-first",
+        intent_id="long-lived-first",
+    )
+    finalization_id = first.finalized.finalization.finalization_id
+    journal_root = first.finalized.checkpoint.journal_root
+    receipt_root = first.finalized.checkpoint.receipt_root
+    _, _, repository, _, _ = archive_current_durable_chains(env)
+
+    for index in range(3):
+        env.execute(
+            session_id=f"long-lived-later-{index}",
+            intent_id=f"long-lived-later-{index}",
+        )
+
+    report = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(journal_root,),
+        receipt_roots=(receipt_root,),
+    ).require_verified(finalization_id)
+    assert report.ok
+    assert report.journal_root == journal_root
+    assert report.receipt_root == receipt_root
+
+
+def test_archive_repository_can_add_later_prefix_without_breaking_first_recovery(
+    tmp_path,
+):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="multi-archive-first",
+        intent_id="multi-archive-first",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    first_journal_root = first.finalized.checkpoint.journal_root
+    first_receipt_root = first.finalized.checkpoint.receipt_root
+    checkpoints, builder, repository, _, _ = (
+        archive_current_durable_chains(env)
+    )
+
+    _, _, _, _, second = env.execute(
+        session_id="multi-archive-second",
+        intent_id="multi-archive-second",
+    )
+    second_journal_checkpoint = checkpoints.publish(
+        "decision-journal",
+        env.journal,
+    )
+    second_journal_archive = builder.build(
+        second_journal_checkpoint,
+        env.journal,
+    )
+    repository.put(
+        second_journal_archive,
+        second_journal_checkpoint,
+        env.journal,
+    )
+    second_receipt_checkpoint = checkpoints.publish(
+        "receipts",
+        env.receipts,
+    )
+    second_receipt_archive = builder.build(
+        second_receipt_checkpoint,
+        env.receipts,
+    )
+    repository.put(
+        second_receipt_archive,
+        second_receipt_checkpoint,
+        env.receipts,
+    )
+
+    second_id = second.finalized.finalization.finalization_id
+    second_journal_root = second.finalized.checkpoint.journal_root
+    second_receipt_root = second.finalized.checkpoint.receipt_root
+
+    first_report = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(first_journal_root,),
+        receipt_roots=(first_receipt_root,),
+    ).require_verified(first_id)
+    second_report = archive_backed_verifier(
+        env,
+        repository,
+        journal_roots=(second_journal_root,),
+        receipt_roots=(second_receipt_root,),
+    ).require_verified(second_id)
+    assert first_report.ok
+    assert second_report.ok
 
