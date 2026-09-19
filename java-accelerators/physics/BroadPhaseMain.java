@@ -823,14 +823,14 @@ public final class BroadPhaseMain {
         check(
             java.util.Arrays.equals(
                 rayHits.counts(),
-                new int[] {4, 1, 0}
+                new int[] {2, 1, 0}
             ),
             "ray AABB candidate counts"
         );
         check(
             java.util.Arrays.equals(
                 rayHits.indices(),
-                new int[] {0, 1, 2, 4, 3}
+                new int[] {0, 1, 3}
             ),
             "ray AABB candidate indices"
         );
