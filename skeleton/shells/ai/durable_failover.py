@@ -19,6 +19,10 @@ import time
 from typing import Callable
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
+from skeleton.shells.ai.durable_replica_fleet import (
+    DurableReplicaFleet,
+    DurableReplicaFleetError,
+)
 from skeleton.shells.ai.durable_replication import (
     DurableEvidenceReplicaManager,
     DurableEvidenceReplicationReport,
@@ -80,6 +84,8 @@ class DurableFailoverTicket:
     journal_root: str
     receipt_sequence: int
     receipt_root: str
+    fleet_state_digest: str = ""
+    fleet_policy_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -105,6 +111,21 @@ class DurableFailoverTicket:
             raise ValueError(
                 "failover source_id and target_id must differ"
             )
+        if fleet is not None and not isinstance(
+            fleet,
+            DurableReplicaFleet,
+        ):
+            raise TypeError(
+                "fleet must be DurableReplicaFleet"
+            )
+        if (
+            fleet is not None
+            and fleet.source_id != self.source_id
+        ):
+            raise ValueError(
+                "failover fleet source_id mismatch"
+            )
+        self.fleet = fleet
         for name in ("issued_at", "expires_at"):
             value = getattr(self, name)
             if (
@@ -172,6 +193,30 @@ class DurableFailoverTicket:
                 self.receipt_root,
             ),
         )
+        object.__setattr__(
+            self,
+            "fleet_state_digest",
+            _digest(
+                "fleet_state_digest",
+                self.fleet_state_digest,
+                optional=True,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "fleet_policy_digest",
+            _digest(
+                "fleet_policy_digest",
+                self.fleet_policy_digest,
+                optional=True,
+            ),
+        )
+        if bool(self.fleet_state_digest) != bool(
+            self.fleet_policy_digest
+        ):
+            raise ValueError(
+                "fleet failover digests must be configured together"
+            )
 
     @staticmethod
     def derive_id(
@@ -184,6 +229,8 @@ class DurableFailoverTicket:
         replication_report_digest: str,
         journal_root: str,
         receipt_root: str,
+        fleet_state_digest: str = "",
+        fleet_policy_digest: str = "",
     ) -> str:
         raw = json.dumps(
             {
@@ -197,6 +244,8 @@ class DurableFailoverTicket:
                 ),
                 "journal_root": journal_root,
                 "receipt_root": receipt_root,
+                "fleet_state_digest": fleet_state_digest,
+                "fleet_policy_digest": fleet_policy_digest,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -220,6 +269,8 @@ class DurableFailoverTicket:
             "journal_root": self.journal_root,
             "receipt_sequence": self.receipt_sequence,
             "receipt_root": self.receipt_root,
+            "fleet_state_digest": self.fleet_state_digest,
+            "fleet_policy_digest": self.fleet_policy_digest,
         }
 
     @property
@@ -355,6 +406,8 @@ class DurableFailoverAuthority:
         source_id: str,
         target_id: str,
         ttl_seconds: float = 60.0,
+        fleet_state_digest: str = "",
+        fleet_policy_digest: str = "",
     ) -> SignedDurableFailoverTicket:
         if not isinstance(
             manager,
@@ -386,6 +439,22 @@ class DurableFailoverAuthority:
             raise ValueError(
                 "ttl_seconds outside supported range"
             )
+        if bool(fleet_state_digest) != bool(
+            fleet_policy_digest
+        ):
+            raise ValueError(
+                "fleet_state_digest and fleet_policy_digest must be paired"
+            )
+        fleet_state_digest = _digest(
+            "fleet_state_digest",
+            fleet_state_digest,
+            optional=True,
+        )
+        fleet_policy_digest = _digest(
+            "fleet_policy_digest",
+            fleet_policy_digest,
+            optional=True,
+        )
         report = manager.require_promotion_ready()
         (
             journal_sequence,
@@ -413,6 +482,8 @@ class DurableFailoverAuthority:
             replication_report_digest=report.digest,
             journal_root=journal_root,
             receipt_root=receipt_root,
+            fleet_state_digest=fleet_state_digest,
+            fleet_policy_digest=fleet_policy_digest,
         )
         ticket = DurableFailoverTicket(
             1,
@@ -428,6 +499,8 @@ class DurableFailoverAuthority:
             journal_root,
             receipt_sequence,
             receipt_root,
+            fleet_state_digest,
+            fleet_policy_digest,
         )
         signature = self.signer.sign(
             FAILOVER_ARTIFACT_TYPE,
@@ -1028,6 +1101,7 @@ class DurableFailoverCoordinator:
         *,
         source_id: str,
         target_id: str,
+        fleet: DurableReplicaFleet | None = None,
     ) -> None:
         if not isinstance(
             manager,
@@ -1066,16 +1140,76 @@ class DurableFailoverCoordinator:
                 "failover source_id and target_id must differ"
             )
 
+    def _fleet_report(self):
+        if self.fleet is None:
+            return None
+        try:
+            return self.fleet.require_quorum(
+                target_id=self.target_id
+            )
+        except DurableReplicaFleetError as exc:
+            raise DurableFailoverTicketError(
+                "replica fleet quorum is not ready"
+            ) from exc
+
+    def _require_ticket_fleet(
+        self,
+        ticket: DurableFailoverTicket,
+    ):
+        report = self._fleet_report()
+        if report is None:
+            if (
+                ticket.fleet_state_digest
+                or ticket.fleet_policy_digest
+            ):
+                raise DurableFailoverTicketError(
+                    "failover ticket requires unavailable fleet verification"
+                )
+            return None
+        if (
+            not ticket.fleet_state_digest
+            or not ticket.fleet_policy_digest
+        ):
+            raise DurableFailoverTicketError(
+                "fleet failover ticket lacks fleet commitments"
+            )
+        if (
+            ticket.fleet_state_digest
+            != report.state_digest
+        ):
+            raise DurableFailoverTicketError(
+                "live replica fleet state differs from failover ticket"
+            )
+        if (
+            ticket.fleet_policy_digest
+            != report.policy_digest
+        ):
+            raise DurableFailoverTicketError(
+                "live replica fleet policy differs from failover ticket"
+            )
+        return report
+
     def issue(
         self,
         *,
         ttl_seconds: float = 60.0,
     ) -> SignedDurableFailoverTicket:
+        fleet_report = self._fleet_report()
         return self.authority.issue(
             self.manager,
             source_id=self.source_id,
             target_id=self.target_id,
             ttl_seconds=ttl_seconds,
+            fleet_state_digest=(
+                ""
+                if fleet_report is None
+                else fleet_report.state_digest
+            ),
+            fleet_policy_digest=(
+                ""
+                if fleet_report is None
+                else fleet_report.policy_digest
+            ),
         )
 
     def claim(
@@ -1090,6 +1224,7 @@ class DurableFailoverCoordinator:
             source_id=self.source_id,
             target_id=self.target_id,
         )
+        self._require_ticket_fleet(ticket)
         return self.registry.claim(
             ticket,
             consumer_id=consumer_id,
@@ -1137,6 +1272,7 @@ class DurableFailoverCoordinator:
             source_id=self.source_id,
             target_id=self.target_id,
         )
+        self._require_ticket_fleet(ticket)
         report = self.manager.require_promotion_ready()
         return self.registry.applied(
             ticket,
