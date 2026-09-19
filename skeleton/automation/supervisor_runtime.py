@@ -841,6 +841,20 @@ def sanitized_worker_env(
         "GIT_CONFIG_SYSTEM",
         "GIT_DIR",
         "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+        "GIT_CONFIG_NOSYSTEM",
+        "GIT_EDITOR",
+        "GIT_SEQUENCE_EDITOR",
+        "GIT_PAGER",
+        "GIT_PROXY_COMMAND",
+        "GIT_ALLOW_PROTOCOL",
+        "GIT_PROTOCOL_FROM_USER",
+        "GIT_TERMINAL_PROMPT",
+        "GIT_CURL_VERBOSE",
         "GIT_INDEX_FILE",
         "GIT_OBJECT_DIRECTORY",
         "GIT_ALTERNATE_OBJECT_DIRECTORIES",
@@ -864,6 +878,7 @@ def sanitized_worker_env(
             or key.startswith("GIT_CONFIG_KEY_")
             or key.startswith("GIT_CONFIG_VALUE_")
             or key.startswith("DYLD_")
+            or key.startswith("GIT_TRACE")
         ):
             result.pop(key, None)
     return result
