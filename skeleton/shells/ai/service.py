@@ -297,6 +297,19 @@ class AIShellService:
         ):
             raise ValueError("invalid durable recovery finalization_id")
         durable_recovery_ids = tuple(sorted(durable_recovery_ids))
+        if (
+            durable_verification_guard is not None
+            and durable_operations_inspector is not None
+        ):
+            if (
+                durable_operations_inspector.verification_guard
+                is not durable_verification_guard
+            ):
+                raise ValueError(
+                    "durable operations inspector must use configured "
+                    "durable verification guard"
+                )
+
         durable_operations_chains = tuple(
             durable_operations_chains
         )
