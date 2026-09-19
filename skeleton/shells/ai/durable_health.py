@@ -17,9 +17,11 @@ import json
 from typing import Iterable
 
 from skeleton.shells.ai.durable_recovery import (
+    DurableRecoveryFinding,
     DurableRecoveryStatus,
     DurableSessionRecoveryReport,
     DurableSessionRecoveryVerifier,
+    RecoveryFindingSeverity,
 )
 
 
@@ -324,6 +326,47 @@ class DurableRecoveryHealthGuard:
             )
         return tuple(sorted(values))
 
+    def _verify_one(
+        self,
+        finalization_id: str,
+    ) -> DurableSessionRecoveryReport:
+        try:
+            return self.verifier.verify(
+                finalization_id
+            )
+        except Exception as exc:
+            # Health admission is a fail-closed operational boundary. A
+            # backend/probe exception is represented as manual-review evidence
+            # so lifecycle callers receive a deterministic denial report.
+            return DurableSessionRecoveryReport(
+                finalization_id,
+                "",
+                DurableRecoveryStatus.MANUAL_REVIEW,
+                "",
+                None,
+                None,
+                None,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                None,
+                (
+                    DurableRecoveryFinding(
+                        "durable_health.probe_error",
+                        RecoveryFindingSeverity.CORRUPTION,
+                        (
+                            "durable recovery verifier raised "
+                            f"{type(exc).__name__}"
+                        ),
+                    ),
+                ),
+            )
+
     def inspect(
         self,
         finalization_ids: Iterable[str],
@@ -333,7 +376,7 @@ class DurableRecoveryHealthGuard:
             maximum=self.policy.max_finalizations,
         )
         reports = tuple(
-            self.verifier.verify(item)
+            self._verify_one(item)
             for item in ids
         )
         findings: list[
