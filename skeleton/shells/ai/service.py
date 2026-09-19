@@ -23,6 +23,11 @@ from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableEvidenceOperationsReport,
 )
+from skeleton.shells.ai.durable_readiness import (
+    DurableEvidenceReadinessError,
+    DurableEvidenceReadinessGuard,
+    DurableEvidenceReadinessReport,
+)
 from skeleton.shells.ai.durable_verification_health import (
     DurableVerificationFleetError,
     DurableVerificationFleetGuard,
@@ -81,6 +86,7 @@ class AIServiceStatus:
     execution_obligations: dict[str, object] | None = None
     durable_lifecycle: dict[str, object] | None = None
     durable_verification: dict[str, object] | None = None
+    durable_readiness: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -114,6 +120,10 @@ class AIServiceStatus:
         if self.durable_verification is not None:
             data["durable_verification"] = dict(
                 self.durable_verification
+            )
+        if self.durable_readiness is not None:
+            data["durable_readiness"] = dict(
+                self.durable_readiness
             )
         return data
 
@@ -150,6 +160,8 @@ class AIShellService:
         durable_lifecycle_capacities: dict[str, int] | None = None,
         durable_verification_guard: DurableVerificationFleetGuard | None = None,
         durable_verification_chains: tuple[tuple[str, object], ...] = (),
+        durable_readiness_guard: DurableEvidenceReadinessGuard | None = None,
+        durable_readiness_reconcile_on_start: bool = False,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -370,6 +382,40 @@ class AIShellService:
                 key=lambda item: item[0],
             )
         )
+        if (
+            durable_readiness_guard is not None
+            and not isinstance(
+                durable_readiness_guard,
+                DurableEvidenceReadinessGuard,
+            )
+        ):
+            raise TypeError(
+                "durable_readiness_guard must be DurableEvidenceReadinessGuard"
+            )
+        if not isinstance(
+            durable_readiness_reconcile_on_start,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_on_start must be bool"
+            )
+        if durable_readiness_guard is not None:
+            if durable_operations_inspector is None:
+                raise ValueError(
+                    "durable readiness requires a durable operations inspector"
+                )
+            if not durable_operations_chains:
+                raise ValueError(
+                    "durable readiness requires durable operations chains"
+                )
+            if (
+                durable_readiness_guard.operations
+                is not durable_operations_inspector
+            ):
+                raise ValueError(
+                    "durable readiness guard must use configured "
+                    "durable operations inspector"
+                )
         durable_operations_protected_roots = dict(
             durable_operations_protected_roots or {}
         )
@@ -544,6 +590,10 @@ class AIShellService:
         )
         self.durable_operations_inspector = durable_operations_inspector
         self.durable_operations_chains = durable_operations_chains
+        self.durable_readiness_guard = durable_readiness_guard
+        self.durable_readiness_reconcile_on_start = (
+            durable_readiness_reconcile_on_start
+        )
         self.durable_operations_protected_roots = (
             durable_operations_protected_roots
         )
@@ -565,6 +615,7 @@ class AIShellService:
         self._durable_recovery_report: DurableRecoveryHealthReport | None = None
         self._durable_operations_report: DurableEvidenceOperationsReport | None = None
         self._durable_verification_report: DurableVerificationFleetReport | None = None
+        self._durable_readiness_report: DurableEvidenceReadinessReport | None = None
         self._durable_lifecycle_reports: dict[
             str,
             DurableLifecycleReport,
@@ -700,6 +751,43 @@ class AIShellService:
                     AIServicePhase.FAILED,
                     reason=(
                         "AI durable evidence operations "
+                        "verification failed"
+                    ),
+                )
+                return report
+        if self.durable_readiness_guard is not None:
+            try:
+                self._durable_readiness_report = (
+                    self.durable_readiness_guard.require_ready(
+                        self.durable_operations_chains,
+                        protected_roots=(
+                            self.durable_operations_protected_roots
+                        ),
+                        recovery_finalization_ids=(
+                            self.durable_recovery_ids
+                            if (
+                                self.durable_operations_inspector
+                                is not None
+                                and self.durable_operations_inspector
+                                .recovery_health is not None
+                            )
+                            else ()
+                        ),
+                        reconcile=(
+                            self.durable_readiness_reconcile_on_start
+                        ),
+                    )
+                )
+            except (
+                DurableEvidenceReadinessError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence readiness "
                         "verification failed"
                     ),
                 )
@@ -1011,6 +1099,105 @@ class AIShellService:
             "AI durable evidence operations verification failed"
         )
 
+    def _require_durable_readiness_current(self) -> None:
+        guard = self.durable_readiness_guard
+        if guard is None:
+            return
+        try:
+            report = guard.inspect(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "inspection failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness verification failed"
+            ) from exc
+        self._durable_readiness_report = report
+        if report.ready:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness drift detected"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable evidence readiness verification failed"
+        )
+
+    def reconcile_durable_readiness(
+        self,
+    ) -> DurableEvidenceReadinessReport:
+        guard = self.durable_readiness_guard
+        if guard is None:
+            raise RuntimeError(
+                "durable evidence readiness guard is not configured"
+            )
+        try:
+            report = guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness reconciliation failed"
+            ) from exc
+        self._durable_readiness_report = report
+        if not report.ready:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation incomplete"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness reconciliation incomplete"
+            )
+        return report
+
     def _durable_verification_health_for_chain(
         self,
         chain_id: str,
@@ -1099,6 +1286,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
 
@@ -1111,6 +1299,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         bundle = self.orchestrator.review(session)
         proposal = bundle.planning.response.proposal
@@ -1210,6 +1399,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
@@ -1331,6 +1521,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
@@ -1416,6 +1607,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
@@ -1895,6 +2087,7 @@ class AIShellService:
         self._require_durable_recovery_current()
         self._require_durable_verification_current()
         self._require_durable_operations_current()
+        self._require_durable_readiness_current()
         self._require_durable_lifecycle_current()
         if self.execution_fences is not None and not execution_fenced:
             raise RuntimeError("distributed execution fence was not verified")
@@ -2012,5 +2205,10 @@ class AIShellService:
                 None
                 if self._durable_verification_report is None
                 else self._durable_verification_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_readiness_report is None
+                else self._durable_readiness_report.to_dict()
             ),
         )
