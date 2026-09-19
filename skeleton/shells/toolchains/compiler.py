@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from skeleton.shells.arguments import ArgumentPolicySet
 from skeleton.shells.capabilities import CapabilityGrant, ShellCapability
@@ -21,8 +21,10 @@ from skeleton.shells.executor import ExecutorConfig, ShellExecutor
 from skeleton.shells.receipts import ReceiptChain
 from skeleton.shells.runner import ShellPolicy, ShellRunner
 from skeleton.shells.toolchains.catalog import ToolchainCatalog
-from skeleton.shells.toolchains.profiles import ContractProfile
 from skeleton.shells.toolchains.types import CommandRisk, LogicalCommandContract
+
+if TYPE_CHECKING:
+    from skeleton.shells.toolchains.profiles import ContractProfile
 
 
 _RISK_ORDER = {
