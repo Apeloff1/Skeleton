@@ -57,7 +57,7 @@ def test_generated_request_id_corpus_is_always_bounded_and_header_safe() -> None
             assert canonical == decoded
             assert legacy == decoded
         else:
-            assert len(canonical) == 32
+            assert len(canonical) == 16
             assert len(legacy) == 16
 
 
@@ -140,6 +140,35 @@ def test_generated_route_lookalikes_match_only_exact_or_child_api_paths() -> Non
 
         assert api_middleware._matches_path_prefix(path, "/api") is expected
         assert legacy_security._matches_route_boundary(path, "/api") is expected
+
+
+def test_starlette_testclient_peer_does_not_consume_legacy_rate_limit_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        async def app(_scope, _receive, _send) -> None:
+            return None
+
+        async def call_next(_request: Request) -> Response:
+            return Response(status_code=204)
+
+        limiter_type = legacy_security.RateLimitMiddleware
+        limiter_type._buckets.clear()
+        limiter_type._lock = None
+        limiter_type._saturation_rejections = 0
+        middleware = limiter_type(app, rps=0.000001, burst=1, max_buckets=1)
+
+        for _ in range(256):
+            response = await middleware.dispatch(
+                _request(peer="testclient"),
+                call_next,
+            )
+            assert response.status_code == 204
+
+        assert limiter_type._buckets == {}
+        assert limiter_type._saturation_rejections == 0
+
+    asyncio.run(scenario())
 
 
 def test_high_cardinality_generated_identities_keep_legacy_limiter_bounded(
