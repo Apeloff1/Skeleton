@@ -22,6 +22,7 @@ from .character_motor import (
 )
 from .collision import (
     ContactManifold,
+    MAX_BROAD_PHASE_QUERY_HITS,
     SweepAndPruneBroadPhase,
     detect_collision,
     generate_manifolds,
@@ -266,14 +267,24 @@ class PhysicsStepReceipt:
 
 
 class PhysicsWorld:
-    def __init__(self, settings: PhysicsSettings | None = None) -> None:
+    def __init__(
+        self,
+        settings: PhysicsSettings | None = None,
+        *,
+        use_jvm_broadphase: bool = False,
+        broad_phase_accelerator: object | None = None,
+    ) -> None:
         if settings is not None and not isinstance(settings, PhysicsSettings):
             raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
         self._joints: dict[str, JointConstraint] = {}
         self._tick = 0
-        self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
+        self._broad_phase = SweepAndPruneBroadPhase(
+            max_pairs=self.settings.max_pairs,
+            use_jvm_acceleration=use_jvm_broadphase,
+            accelerator=broad_phase_accelerator,
+        )
         self._solver = SequentialImpulseSolver(
             velocity_iterations=self.settings.velocity_iterations,
             position_iterations=self.settings.position_iterations,
@@ -375,6 +386,10 @@ class PhysicsWorld:
         self._joint_cache.remove_joint(joint_id)
         return joint
 
+    def broad_phase_acceleration_stats(self) -> dict[str, int | bool]:
+        """Return optional JVM broad-phase counters without changing physics state."""
+        return self._broad_phase.acceleration_stats()
+
     def contacts(self) -> tuple[ContactManifold, ...]:
         return self._last_manifolds
 
@@ -412,6 +427,19 @@ class PhysicsWorld:
                 matches.append(body.body_id)
         return tuple(matches)
 
+    def query_aabb_many(
+        self,
+        bounds: tuple[AABB, ...],
+        *,
+        max_total_hits: int = MAX_BROAD_PHASE_QUERY_HITS,
+    ) -> tuple[tuple[str, ...], ...]:
+        """Batch finite-body AABB queries with optional JVM acceleration."""
+        return self._broad_phase.query_aabbs(
+            self.bodies(),
+            tuple(bounds),
+            max_total_hits=max_total_hits,
+        )
+
     def raycast(
         self,
         ray: Ray,
@@ -426,6 +454,34 @@ class PhysicsWorld:
             if (hit := raycast_body(ray, body)) is not None
         ]
         return sort_hits(hits)
+
+    def raycast_many(
+        self,
+        rays: tuple[Ray, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+        max_total_candidates: int = MAX_BROAD_PHASE_QUERY_HITS,
+    ) -> tuple[tuple[RayHit, ...], ...]:
+        """Batch raycasts with optional JVM coarse-AABB candidate filtering."""
+        batch = tuple(rays)
+        if not batch:
+            return ()
+        candidate_batches = self._broad_phase.ray_candidate_ids(
+            self.bodies(),
+            batch,
+            max_total_candidates=max_total_candidates,
+        )
+        ignored = set(ignore)
+        output: list[tuple[RayHit, ...]] = []
+        for ray, candidate_ids in zip(batch, candidate_batches):
+            hits = [
+                hit
+                for body_id in candidate_ids
+                if body_id not in ignored
+                if (hit := raycast_body(ray, self._bodies[body_id])) is not None
+            ]
+            output.append(sort_hits(hits))
+        return tuple(output)
 
     def raycast_closest(
         self,

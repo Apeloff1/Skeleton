@@ -88,6 +88,7 @@ CANONICAL_PREFIXES = (
 )
 
 FIRST_PARTY_PREFIXES = (
+    "java-accelerators/",
     "scripts/",
     "tests/",
     "docs/",
