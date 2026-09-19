@@ -101,6 +101,7 @@ class DurableMaintenanceOperation(str, Enum):
     SEQUENCE_MIGRATION = "sequence_migration"
     REPLICATION_REPAIR = "replication_repair"
     HOT_FLOOR_REPAIR = "hot_floor_repair"
+    ORPHAN_GC = "orphan_gc"
 
 
 class DurableMaintenanceState(str, Enum):
@@ -177,6 +178,24 @@ class DurableMaintenancePolicy:
                 self.require_state_commitments
             ),
         }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+
+@dataclass(frozen=True)
+class DurableMaintenanceResource:
+    resource_id: str
+    resource_kind: str
+    sequence: int
+    root_hash: str
+    state_digest: str = ""
 
     @classmethod
     def from_chain(
@@ -385,24 +404,6 @@ class DurableMaintenancePolicy:
             combined_root,
             state_digest,
         )
-
-    @property
-    def digest(self) -> str:
-        raw = json.dumps(
-            self.to_dict(),
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-        return hashlib.sha256(raw).hexdigest()
-
-
-@dataclass(frozen=True)
-class DurableMaintenanceResource:
-    resource_id: str
-    resource_kind: str
-    sequence: int
-    root_hash: str
-    state_digest: str = ""
 
     def __post_init__(self) -> None:
         _identity(
