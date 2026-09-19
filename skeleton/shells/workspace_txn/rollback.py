@@ -180,6 +180,34 @@ class WorkspaceRollback:
             if not symlink:
                 raise
 
+    @staticmethod
+    def _restore_root_metadata(
+        root: Path,
+        manifest: BackupManifest,
+    ) -> RollbackActionResult | None:
+        if manifest.root_mode is None or manifest.root_mtime_ns is None:
+            return None
+        action = RollbackAction(
+            RollbackActionKind.RESTORE_METADATA,
+            ".",
+        )
+        try:
+            os.chmod(root, manifest.root_mode)
+            os.utime(
+                root,
+                ns=(manifest.root_mtime_ns, manifest.root_mtime_ns),
+            )
+        except OSError as exc:
+            return RollbackActionResult(
+                action,
+                RollbackActionState.FAILED,
+                str(exc),
+            )
+        return RollbackActionResult(
+            action,
+            RollbackActionState.APPLIED,
+        )
+
     def _restore_record(
         self,
         root: Path,
@@ -366,10 +394,24 @@ class WorkspaceRollback:
         # child create/remove/rename can dirty an ancestor directory again.
         for action in directory_metadata:
             applied.append(self._apply_one(root_path, action, manifest))
+        root_metadata_result = self._restore_root_metadata(root_path, manifest)
+        if root_metadata_result is not None:
+            applied.append(root_metadata_result)
         results = tuple(applied)
         final = self.scanner.scan(root_path)
         finished = datetime.now(timezone.utc).isoformat()
         verified = final.digest == before.digest
+        if manifest.root_mode is not None and manifest.root_mtime_ns is not None:
+            try:
+                root_metadata = root_path.stat()
+            except OSError:
+                verified = False
+            else:
+                verified = (
+                    verified
+                    and stat.S_IMODE(root_metadata.st_mode) == manifest.root_mode
+                    and int(root_metadata.st_mtime_ns) == manifest.root_mtime_ns
+                )
         return RollbackReport(
             started,
             finished,
