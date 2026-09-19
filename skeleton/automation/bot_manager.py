@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+import math
 import os
-import time
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from .advanced_bots import ADVANCED_BOTS
 STATE = Path(".skeleton-bot-state.json")
 MAX_CONCURRENT = 3
 COOLDOWN_SECONDS = 6 * 60 * 60
+FAILURE_THRESHOLD = 3
 
 
 @dataclass(frozen=True)
@@ -34,20 +36,82 @@ SPECIALIST_BOTS = {bot.name: bot.trigger for bot in ADVANCED_BOTS}
 DEFAULT_BOTS = {**BASE_BOTS, **SPECIALIST_BOTS}
 
 
+def _default_state() -> dict[str, dict]:
+    return {
+        name: asdict(BotHealth(name))
+        for name in DEFAULT_BOTS
+    }
+
+
+def _normalize_item(name: str, value: object) -> dict:
+    default = asdict(BotHealth(name))
+    if not isinstance(value, dict):
+        return default
+
+    enabled = value.get("enabled", True)
+    circuit_open = value.get("circuit_open", False)
+    failures = value.get("failures", 0)
+    last_run = value.get("last_run", 0.0)
+
+    if not isinstance(enabled, bool):
+        enabled = True
+    if not isinstance(circuit_open, bool):
+        circuit_open = False
+    if (
+        isinstance(failures, bool)
+        or not isinstance(failures, int)
+        or failures < 0
+    ):
+        failures = 0
+    if (
+        isinstance(last_run, bool)
+        or not isinstance(last_run, (int, float))
+        or not math.isfinite(float(last_run))
+        or float(last_run) < 0
+    ):
+        last_run = 0.0
+
+    return {
+        "name": name,
+        "enabled": enabled,
+        "failures": failures,
+        "last_run": float(last_run),
+        "circuit_open": circuit_open,
+    }
+
+
+def normalize_state(value: object) -> dict[str, dict]:
+    """Keep only registered bot state with bounded primitive fields."""
+    source = value if isinstance(value, dict) else {}
+    return {
+        name: _normalize_item(name, source.get(name))
+        for name in DEFAULT_BOTS
+    }
+
+
 def load_state() -> dict[str, dict]:
+    if STATE.is_symlink():
+        return _default_state()
     if not STATE.exists():
-        return {name: asdict(BotHealth(name)) for name in DEFAULT_BOTS}
+        return _default_state()
     try:
         data = json.loads(STATE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return _default_state()
+    return normalize_state(data)
 
 
 def save_state(state: dict[str, dict]) -> None:
-    """Atomically publish bot state without a predictable temporary path."""
+    """Atomically publish normalized bot state without a predictable temp path."""
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    rendered = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    rendered = (
+        json.dumps(
+            normalize_state(state),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     fd, raw_tmp = tempfile.mkstemp(
         prefix=f".{STATE.name}.",
         suffix=".tmp",
@@ -56,7 +120,12 @@ def save_state(state: dict[str, dict]) -> None:
     )
     tmp = Path(raw_tmp)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+        with os.fdopen(
+            fd,
+            "w",
+            encoding="utf-8",
+            newline="\n",
+        ) as handle:
             handle.write(rendered)
             handle.flush()
             os.fsync(handle.fileno())
@@ -68,37 +137,77 @@ def save_state(state: dict[str, dict]) -> None:
             raise
 
 
-def _due_from(names: list[str], state: dict[str, dict], now: float) -> list[str]:
-    due = []
+def _due_from(
+    names: list[str],
+    state: dict[str, dict],
+    now: float,
+) -> list[str]:
+    due: list[str] = []
+    normalized = normalize_state(state)
     for name in names:
-        item = state.get(name, asdict(BotHealth(name)))
-        if item.get("enabled", True) and not item.get("circuit_open", False):
-            if now - float(item.get("last_run", 0)) >= COOLDOWN_SECONDS:
-                due.append(name)
+        item = normalized.get(
+            name,
+            asdict(BotHealth(name)),
+        )
+        if (
+            item["enabled"]
+            and not item["circuit_open"]
+            and now - float(item["last_run"]) >= COOLDOWN_SECONDS
+        ):
+            due.append(name)
     return due
 
 
-def select_due(state: dict[str, dict], now: float | None = None) -> list[str]:
-    now = time.time() if now is None else now
-    return _due_from(list(DEFAULT_BOTS), state, now)[:MAX_CONCURRENT]
+def select_due(
+    state: dict[str, dict],
+    now: float | None = None,
+) -> list[str]:
+    moment = time.time() if now is None else now
+    return _due_from(
+        list(DEFAULT_BOTS),
+        state,
+        moment,
+    )[:MAX_CONCURRENT]
 
 
-def select_specialists_due(state: dict[str, dict], now: float | None = None) -> list[str]:
-    """Return an independent specialist lane for the secretary."""
-    now = time.time() if now is None else now
-    return _due_from(list(SPECIALIST_BOTS), state, now)[:MAX_CONCURRENT]
+def select_specialists_due(
+    state: dict[str, dict],
+    now: float | None = None,
+) -> list[str]:
+    """Return every due specialist; Secretary applies the assignment cap.
+
+    Truncating this list before routing biases selection toward registry order and
+    can starve a high-signal specialist such as security-auditor.  The Secretary
+    is the correct layer for the final MAX_ASSIGNMENTS bound.
+    """
+    moment = time.time() if now is None else now
+    return _due_from(
+        list(SPECIALIST_BOTS),
+        state,
+        moment,
+    )
 
 
-def record_result(state: dict[str, dict], name: str, success: bool, now: float | None = None) -> None:
-    now = time.time() if now is None else now
-    item = state.setdefault(name, asdict(BotHealth(name)))
-    item["last_run"] = now
+def record_result(
+    state: dict[str, dict],
+    name: str,
+    success: bool,
+    now: float | None = None,
+) -> None:
+    if name not in DEFAULT_BOTS:
+        raise ValueError("cannot record unregistered bot")
+    moment = time.time() if now is None else now
+    normalized = normalize_state(state)
+    state.clear()
+    state.update(normalized)
+    item = state[name]
+    item["last_run"] = float(moment)
     if success:
         item["failures"] = 0
         item["circuit_open"] = False
     else:
-        item["failures"] = int(item.get("failures", 0)) + 1
-        if item["failures"] >= 3:
+        item["failures"] = int(item["failures"]) + 1
+        if item["failures"] >= FAILURE_THRESHOLD:
             item["circuit_open"] = True
 
 
@@ -107,7 +216,19 @@ def main() -> int:
     due = select_due(state)
     specialists = select_specialists_due(state)
     save_state(state)
-    print(json.dumps({"due": due, "specialists_due": specialists, "bot_count": len(DEFAULT_BOTS), "specialist_count": len(SPECIALIST_BOTS), "max_concurrent": MAX_CONCURRENT}, indent=2))
+    print(
+        json.dumps(
+            {
+                "due": due,
+                "specialists_due": specialists,
+                "bot_count": len(DEFAULT_BOTS),
+                "specialist_count": len(SPECIALIST_BOTS),
+                "max_concurrent": MAX_CONCURRENT,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
