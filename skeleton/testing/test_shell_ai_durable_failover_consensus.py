@@ -1491,4 +1491,3 @@ def test_operator_ready_report_consensus_head_matches_replication_head():
         selected.head.receipt_root
         == report.replication.receipts.source_root
     )
-
