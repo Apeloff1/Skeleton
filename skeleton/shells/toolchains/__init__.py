@@ -10,6 +10,17 @@ from skeleton.shells.toolchains.compiler import (
     ToolchainCompilerLimits,
     compile_toolchain,
 )
+from skeleton.shells.toolchains.manifest import (
+    AuthorityChange,
+    AuthorityManifestDiff,
+    ContractAuthorityRecord,
+    ToolchainAuthorityManifest,
+    authority_record,
+    build_authority_manifest,
+    diff_authority_manifests,
+    require_no_authority_widening,
+    verify_authority_manifest,
+)
 from skeleton.shells.toolchains.execution import (
     PreparedToolchainInvocation,
     ToolchainExecutionPlane,
@@ -40,6 +51,15 @@ __all__ = [
     "ToolchainExecutionResult",
     "ToolchainInvocation",
     "ToolchainInvocationError",
+    "AuthorityChange",
+    "AuthorityManifestDiff",
+    "ContractAuthorityRecord",
+    "ToolchainAuthorityManifest",
+    "authority_record",
+    "build_authority_manifest",
+    "diff_authority_manifests",
+    "require_no_authority_widening",
+    "verify_authority_manifest",
     "ContractProfile",
     "PROFILES",
     "profile",
