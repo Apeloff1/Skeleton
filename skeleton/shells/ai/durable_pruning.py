@@ -2088,6 +2088,26 @@ class DurablePruningExecutor:
                 floor,
                 live_verified,
             )
+        except DurablePruningManualReview as exc:
+            if operation is not None and (
+                not operation.complete
+                and not operation.requires_manual_review
+            ):
+                try:
+                    operation = self._update_operation(
+                        operation,
+                        phase=(
+                            DurablePruningPhase
+                            .MANUAL_REVIEW
+                        ),
+                        fencing_token=(
+                            lease.fencing_token
+                        ),
+                        last_error=str(exc),
+                    )
+                except Exception:
+                    pass
+            raise
         except (
             DurablePruningAuthorizationError,
             DurableHotFloorError,
