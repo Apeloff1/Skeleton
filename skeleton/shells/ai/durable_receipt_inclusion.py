@@ -79,6 +79,10 @@ class DurableReceiptInclusionPolicy:
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
+        if not self.require_current_ancestry:
+            raise ValueError(
+                "require_current_ancestry is a mandatory security invariant"
+            )
         if self.cache_built_proof and not self.allow_build_proof:
             raise ValueError(
                 "cache_built_proof requires allow_build_proof"
