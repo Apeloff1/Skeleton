@@ -49,6 +49,10 @@ from skeleton.shells.ai.planner import AIPlanner
 from skeleton.shells.ai.policy import AIShellPolicy, AutonomyMode
 from skeleton.shells.ai.policy_store import AIPolicyStore
 from skeleton.shells.ai.protocol import AIModelResponse
+from skeleton.shells.ai.recovery_requirement_operator import (
+    DurableRecoveryRequirementOperator,
+    RecoveryRequirementOperatorError,
+)
 from skeleton.shells.ai.recovery_requirements import (
     DurableRecoveryRequirementStore,
 )
@@ -1840,4 +1844,418 @@ def test_manifest_generation_is_live_in_status_after_adoption(tmp_path):
     assert requirement_status["manifest_digest"] == (
         requirements.require("prod").manifest.digest
     )
+
+def recovery_requirement_operator(env, requirements):
+    return DurableRecoveryRequirementOperator(
+        requirements,
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=DistributedAIDecisionJournal(
+                env.backend,
+                namespace="decision-journal",
+            ),
+            receipt_chain=DistributedReceiptChain(
+                env.backend,
+                namespace="receipts",
+            ),
+            execution_evidence=env.execution_evidence,
+        ),
+    )
+
+
+def test_requirement_operator_allows_addition_of_missing_proof(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+
+    plan = operator.require_plan(
+        "prod",
+        (finalization_id, "missing-proof"),
+    )
+    assert plan.allowed
+    assert plan.additions == ("missing-proof",)
+    assert plan.removals == ()
+    assert plan.removal_checks == ()
+
+    applied = operator.apply(
+        plan,
+        change_id="discover-missing",
+        reason="new terminal execution requires recovery proof",
+    )
+    assert applied.manifest.finalization_ids == tuple(
+        sorted((finalization_id, "missing-proof"))
+    )
+
+
+def test_requirement_operator_refuses_removal_of_incomplete_proof(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(
+        env,
+        ids=("missing-proof",),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.plan("prod", ())
+    assert not plan.allowed
+    assert plan.removals == ("missing-proof",)
+    assert len(plan.removal_checks) == 1
+    check = plan.removal_checks[0]
+    assert check.status is DurableRecoveryStatus.INCOMPLETE
+    assert not check.removable
+    with pytest.raises(
+        RecoveryRequirementOperatorError,
+        match="may not be retired",
+    ):
+        operator.require_plan("prod", ())
+
+
+def test_requirement_operator_allows_verified_removal(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+
+    plan = operator.require_plan("prod", ())
+    assert plan.allowed
+    assert plan.removals == (finalization_id,)
+    assert plan.removal_checks[0].status is DurableRecoveryStatus.VERIFIED
+    assert plan.removal_checks[0].removable
+
+    applied = operator.apply(
+        plan,
+        change_id="archive-proof",
+        reason="verified proof moved to governed long-term archive",
+    )
+    assert applied.manifest.finalization_ids == ()
+    assert applied.manifest.generation == 2
+
+
+def test_requirement_operator_rechecks_proof_before_removal(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan("prod", ())
+    assert plan.allowed
+
+    record = env.backend.get(
+        env.session_evidence.namespace,
+        session.session_id,
+    )
+    env.backend.compare_and_swap(
+        env.session_evidence.namespace,
+        session.session_id,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            plan_fingerprint=fp("corrupted-after-plan"),
+        ),
+    )
+
+    with pytest.raises(
+        RecoveryRequirementOperatorError,
+        match="may not be retired",
+    ):
+        operator.apply(
+            plan,
+            change_id="unsafe-retire",
+            reason="must fail after evidence corruption",
+        )
+    assert requirements.require(
+        "prod"
+    ).manifest.finalization_ids == (finalization_id,)
+
+
+def test_requirement_operator_fences_concurrent_manifest_change(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan(
+        "prod",
+        (finalization_id, "new-proof"),
+    )
+
+    requirements.add(
+        "prod",
+        ("other-proof",),
+        expected_generation=1,
+        change_id="concurrent",
+        reason="another operator updated requirements",
+    )
+    with pytest.raises(
+        RecoveryRequirementOperatorError,
+        match="generation is stale",
+    ):
+        operator.apply(
+            plan,
+            change_id="lost-race",
+            reason="must not overwrite concurrent change",
+        )
+
+
+def test_requirement_operator_rejects_no_change_apply(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan(
+        "prod",
+        (finalization_id,),
+    )
+    assert plan.allowed
+    assert not plan.changed
+    with pytest.raises(
+        RecoveryRequirementOperatorError,
+        match="contains no change",
+    ):
+        operator.apply(
+            plan,
+            change_id="noop",
+            reason="noop",
+        )
+
+
+def test_requirement_operator_plan_digest_is_stable(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    first = operator.plan(
+        "prod",
+        (finalization_id, "new-proof"),
+    )
+    second = operator.plan(
+        "prod",
+        ("new-proof", finalization_id),
+    )
+    assert first == second
+    assert first.digest == second.digest
+
+
+def test_requirement_operator_plan_serializes_removal_proof(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan("prod", ())
+    data = plan.to_dict()
+    assert data["allowed"] is True
+    assert data["changed"] is True
+    assert data["removals"] == [finalization_id]
+    assert data["removal_checks"][0]["status"] == "verified"
+    assert len(data["removal_checks"][0]["report_digest"]) == 64
+    assert data["digest"] == plan.digest
+
+
+def test_requirement_operator_missing_scope_is_explicit_error(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(
+        env,
+        scope="prod",
+        ids=(),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    with pytest.raises(
+        RecoveryRequirementOperatorError,
+        match="not initialized",
+    ):
+        operator.plan("missing", ())
+
+
+def test_requirement_operator_rejects_duplicate_desired_ids(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env)
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    with pytest.raises(ValueError, match="duplicate"):
+        operator.plan(
+            "prod",
+            ("same", "same"),
+        )
+
+
+def test_requirement_operator_add_then_service_adopts_new_requirement(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="first",
+        intent_id="first",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(first_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.ready()
+
+    _, _, _, _, second = env.execute(
+        session_id="second",
+        intent_id="second",
+    )
+    second_id = second.finalized.finalization.finalization_id
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan(
+        "prod",
+        (first_id, second_id),
+    )
+    operator.apply(
+        plan,
+        change_id="require-second",
+        reason="second execution is now governed",
+    )
+
+    restarted.new_session(
+        make_intent(intent_id="after-operator"),
+        session_id="after-operator",
+    )
+    assert restarted.state.ready()
+    assert restarted.durable_recovery_ids == tuple(
+        sorted((first_id, second_id))
+    )
+
+
+def test_requirement_operator_removal_then_clean_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.require_plan("prod", ())
+    operator.apply(
+        plan,
+        change_id="retire-finalization",
+        reason="verified evidence retention lifecycle completed",
+    )
+
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.ready()
+    assert restarted.durable_recovery_ids == ()
+
+
+def test_requirement_operator_cannot_retire_manual_review_evidence(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+
+    record = env.backend.get(
+        env.session_evidence.namespace,
+        session.session_id,
+    )
+    env.backend.compare_and_swap(
+        env.session_evidence.namespace,
+        session.session_id,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            plan_fingerprint=fp("tampered"),
+        ),
+    )
+    operator = recovery_requirement_operator(
+        env,
+        requirements,
+    )
+    plan = operator.plan("prod", ())
+    assert not plan.allowed
+    assert (
+        plan.removal_checks[0].status
+        is DurableRecoveryStatus.MANUAL_REVIEW
+    )
+    assert not plan.removal_checks[0].removable
+
+
+def test_requirement_operator_constructor_types(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env)
+    verifier = durable_verifier(env)
+    with pytest.raises(TypeError, match="store"):
+        DurableRecoveryRequirementOperator(
+            object(),
+            verifier,
+        )
+    with pytest.raises(TypeError, match="verifier"):
+        DurableRecoveryRequirementOperator(
+            requirements,
+            object(),
+        )
 
