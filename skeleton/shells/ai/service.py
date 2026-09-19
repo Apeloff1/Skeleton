@@ -164,10 +164,6 @@ class AIShellService:
             raise ValueError(
                 "durable operations inspector requires at least one chain"
             )
-        operation_chain_ids = tuple(
-            item[0]
-            for item in durable_operations_chains
-        )
         if any(
             not isinstance(item, tuple)
             or len(item) != 2
@@ -176,6 +172,10 @@ class AIShellService:
             raise ValueError(
                 "durable operations chain entries must be (chain_id, chain) pairs"
             )
+        operation_chain_ids = tuple(
+            item[0]
+            for item in durable_operations_chains
+        )
         if len(operation_chain_ids) != len(
             set(operation_chain_ids)
         ):
