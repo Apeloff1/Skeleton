@@ -432,7 +432,12 @@ class DurableCompactionLineageAuditor:
                 self._state(
                     expected=expected,
                     present=False,
-                    verified=not expected,
+                    # Missing artifacts that are not required yet are benign,
+                    # but they are not "verified": verification is meaningful
+                    # only for a present artifact.  Keep absence and validity
+                    # as separate dimensions so the state invariant remains
+                    # fail-closed.
+                    verified=False,
                 ),
             )
         try:
@@ -595,7 +600,12 @@ class DurableCompactionLineageAuditor:
                 self._state(
                     expected=expected,
                     present=False,
-                    verified=not expected,
+                    # Missing artifacts that are not required yet are benign,
+                    # but they are not "verified": verification is meaningful
+                    # only for a present artifact.  Keep absence and validity
+                    # as separate dimensions so the state invariant remains
+                    # fail-closed.
+                    verified=False,
                 ),
             )
         try:
@@ -984,7 +994,12 @@ class DurableCompactionLineageAuditor:
                 self._state(
                     expected=expected,
                     present=False,
-                    verified=not expected,
+                    # Missing artifacts that are not required yet are benign,
+                    # but they are not "verified": verification is meaningful
+                    # only for a present artifact.  Keep absence and validity
+                    # as separate dimensions so the state invariant remains
+                    # fail-closed.
+                    verified=False,
                 ),
             )
         try:
@@ -1158,7 +1173,12 @@ class DurableCompactionLineageAuditor:
                 self._state(
                     expected=expected,
                     present=False,
-                    verified=not expected,
+                    # Missing artifacts that are not required yet are benign,
+                    # but they are not "verified": verification is meaningful
+                    # only for a present artifact.  Keep absence and validity
+                    # as separate dimensions so the state invariant remains
+                    # fail-closed.
+                    verified=False,
                 ),
             )
         try:
