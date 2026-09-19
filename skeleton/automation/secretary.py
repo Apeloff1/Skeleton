@@ -29,7 +29,7 @@ from .build_authority import (
 )
 from .bot_manager import (
     load_state,
-    record_result,
+    record_worker_outcome,
     save_state,
     select_specialists_due,
 )
@@ -784,10 +784,9 @@ def main() -> int:
         build_authorization=build_authorization,
     )
     for result in results:
-        record_result(
+        record_worker_outcome(
             state,
-            result["bot"],
-            result["returncode"] == 0,
+            result,
         )
     save_state(state)
 
