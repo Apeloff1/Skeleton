@@ -14,6 +14,10 @@ import hashlib
 from typing import Iterable
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
+from skeleton.shells.ai.durable_hot_floor import (
+    DurableHotFloorStore,
+    HotFloorPosition,
+)
 from skeleton.shells.ai.store_protocol import VersionedStateBackend
 from skeleton.shells.receipts import (
     ChainedReceipt,
@@ -246,6 +250,8 @@ class DistributedReceiptChain:
         namespace: str = "shell-receipts",
         max_receipts: int = 100_000,
         max_cas_retries: int = 32,
+        hot_floor_store: DurableHotFloorStore | None = None,
+        hot_floor_chain_id: str = "",
     ) -> None:
         if not namespace or len(namespace) > 128:
             raise ValueError("invalid receipt namespace")
@@ -269,6 +275,47 @@ class DistributedReceiptChain:
         self.namespace = namespace
         self.max_receipts = max_receipts
         self.max_cas_retries = max_cas_retries
+        if (hot_floor_store is None) != (not hot_floor_chain_id):
+            raise ValueError(
+                "hot_floor_store and hot_floor_chain_id must be configured together"
+            )
+        if hot_floor_store is not None and not isinstance(
+            hot_floor_store,
+            DurableHotFloorStore,
+        ):
+            raise TypeError(
+                "hot_floor_store must be DurableHotFloorStore"
+            )
+        if hot_floor_chain_id and len(hot_floor_chain_id) > 128:
+            raise ValueError("hot_floor_chain_id too long")
+        self.hot_floor_store = hot_floor_store
+        self.hot_floor_chain_id = hot_floor_chain_id
+
+    def hot_floor(self) -> HotFloorPosition:
+        if self.hot_floor_store is None:
+            return HotFloorPosition.genesis()
+        return self.hot_floor_store.position(
+            self.hot_floor_chain_id
+        )
+
+    def _hot_floor_active(
+        self,
+        floor: HotFloorPosition | None = None,
+    ) -> bool:
+        floor = floor or self.hot_floor()
+        if floor.sequence == 0:
+            return False
+        return self.backend.get(
+            self.namespace,
+            self._node_key(floor.root_hash),
+        ) is None
+
+    def hot_length(self) -> int:
+        head = self.head()
+        floor = self.hot_floor()
+        if self._hot_floor_active(floor):
+            return max(0, head.sequence - floor.sequence)
+        return head.sequence
 
     @staticmethod
     def _node_key(receipt_hash: str) -> str:
@@ -367,6 +414,14 @@ class DistributedReceiptChain:
         if sequence > head.sequence:
             raise IndexError(
                 "receipt sequence is beyond committed head"
+            )
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence <= floor.sequence
+        ):
+            raise DistributedReceiptConflict(
+                "receipt sequence was compacted from hot storage"
             )
         current_hash = head.root_hash
         current_sequence = head.sequence
@@ -512,7 +567,16 @@ class DistributedReceiptChain:
 
         for _ in range(self.max_cas_retries):
             revision, head = self._head_revision()
-            if head.sequence >= self.max_receipts:
+            floor = self.hot_floor()
+            live_receipts = max(
+                0,
+                head.sequence - (
+                    floor.sequence
+                    if self._hot_floor_active(floor)
+                    else 0
+                ),
+            )
+            if live_receipts >= self.max_receipts:
                 raise RuntimeError(
                     "receipt chain capacity exhausted"
                 )
@@ -622,6 +686,14 @@ class DistributedReceiptChain:
             raise IndexError(
                 "receipt sequence is beyond committed head"
             )
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence <= floor.sequence
+        ):
+            raise DistributedReceiptConflict(
+                "receipt sequence was compacted from hot storage"
+            )
         entry = self._sequence_index(sequence)
         if entry is None:
             if not repair_missing:
@@ -644,6 +716,19 @@ class DistributedReceiptChain:
     ) -> str:
         if sequence == 0:
             return GENESIS_HASH
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence == floor.sequence
+        ):
+            return floor.root_hash
+        if (
+            self._hot_floor_active(floor)
+            and sequence < floor.sequence
+        ):
+            raise DistributedReceiptConflict(
+                "receipt root sequence was compacted from hot storage"
+            )
         return self.get_by_sequence(
             sequence,
             repair_missing=repair_missing,
@@ -781,12 +866,19 @@ class DistributedReceiptChain:
         head = self.head()
         if head.sequence == 0:
             return ()
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
         current_hash = head.root_hash
         expected_sequence = head.sequence
         reverse: list[ChainedReceipt] = []
         seen: set[str] = set()
 
         while current_hash != GENESIS_HASH:
+            if (
+                floor_active
+                and current_hash == floor.root_hash
+            ):
+                break
             if current_hash in seen:
                 raise DistributedReceiptCorruption(
                     "receipt chain contains a cycle"
@@ -805,14 +897,21 @@ class DistributedReceiptChain:
                     "receipt chain sequence underflow"
                 )
 
-        if expected_sequence != 0:
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        if expected_sequence != expected_base:
             raise DistributedReceiptCorruption(
-                "receipt chain terminated before genesis"
+                "receipt chain terminated before trusted hot floor"
             )
         items = tuple(reversed(reverse))
-        if len(items) != head.sequence:
+        if len(items) != (
+            head.sequence - expected_base
+        ):
             raise DistributedReceiptCorruption(
-                "receipt snapshot length differs from head"
+                "receipt snapshot length differs from live suffix"
             )
         return items
 
@@ -827,6 +926,26 @@ class DistributedReceiptChain:
         )
         if root_hash == GENESIS_HASH:
             return ()
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        if floor_active and root_hash == floor.root_hash:
+            return ()
+        if floor_active:
+            try:
+                target_sequence = self.sequence_for_root(
+                    root_hash
+                )
+            except (
+                DistributedReceiptConflict,
+                DistributedReceiptCorruption,
+            ) as exc:
+                raise DistributedReceiptCorruption(
+                    "historical receipt root is below compacted hot floor"
+                ) from exc
+            if target_sequence < floor.sequence:
+                raise DistributedReceiptCorruption(
+                    "historical receipt root is below compacted hot floor"
+                )
         root_item = self.get_node(root_hash)
         expected_sequence = root_item.sequence
         current_hash = root_hash
@@ -834,6 +953,11 @@ class DistributedReceiptChain:
         seen: set[str] = set()
 
         while current_hash != GENESIS_HASH:
+            if (
+                floor_active
+                and current_hash == floor.root_hash
+            ):
+                break
             if current_hash in seen:
                 raise DistributedReceiptCorruption(
                     "historical receipt chain contains a cycle"
@@ -852,9 +976,14 @@ class DistributedReceiptChain:
                     "historical receipt sequence underflow"
                 )
 
-        if expected_sequence != 0:
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        if expected_sequence != expected_base:
             raise DistributedReceiptCorruption(
-                "historical receipt chain terminated before genesis"
+                "historical receipt chain did not reach trusted hot floor"
             )
         items = tuple(reversed(reverse))
         if not items or items[-1].receipt_hash != root_hash:
@@ -874,8 +1003,24 @@ class DistributedReceiptChain:
             ValueError,
         ):
             return False
-        previous = GENESIS_HASH
-        for sequence, item in enumerate(items, start=1):
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        if floor_active and root_hash == floor.root_hash:
+            return True
+        previous = (
+            floor.root_hash
+            if floor_active
+            else GENESIS_HASH
+        )
+        start_sequence = (
+            floor.sequence + 1
+            if floor_active
+            else 1
+        )
+        for sequence, item in enumerate(
+            items,
+            start=start_sequence,
+        ):
             if (
                 item.sequence != sequence
                 or item.previous_hash != previous
@@ -901,6 +1046,12 @@ class DistributedReceiptChain:
         )
         if root_hash == GENESIS_HASH:
             return True
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and root_hash == floor.root_hash
+        ):
+            return True
         if not self.verify_root(root_hash):
             return False
         try:
@@ -922,6 +1073,12 @@ class DistributedReceiptChain:
         )
         if root_hash == GENESIS_HASH:
             return 0
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and root_hash == floor.root_hash
+        ):
+            return floor.sequence
         return self.get_node(root_hash).sequence
 
     def snapshot_segment(
@@ -1059,10 +1216,21 @@ class DistributedReceiptChain:
         ):
             return False
 
-        previous = GENESIS_HASH
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        previous = (
+            floor.root_hash
+            if floor_active
+            else GENESIS_HASH
+        )
+        start_sequence = (
+            floor.sequence + 1
+            if floor_active
+            else 1
+        )
         for sequence, item in enumerate(
             items,
-            start=1,
+            start=start_sequence,
         ):
             if (
                 item.sequence != sequence
@@ -1078,11 +1246,24 @@ class DistributedReceiptChain:
                 return False
             previous = item.receipt_hash
 
-        return (
-            head.sequence == len(items)
-            and head.root_hash == (
-                previous if items else GENESIS_HASH
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        expected_root = (
+            previous
+            if items
+            else (
+                floor.root_hash
+                if floor_active
+                else GENESIS_HASH
             )
+        )
+        return (
+            head.sequence
+            == expected_base + len(items)
+            and head.root_hash == expected_root
         )
 
     def root_hash(self) -> str:
@@ -1099,9 +1280,18 @@ class DistributedReceiptChain:
             items = self.snapshot()
         except DistributedReceiptCorruption:
             return False
-        if entry.sequence > len(items):
+        floor = self.hot_floor()
+        base_sequence = (
+            floor.sequence
+            if self._hot_floor_active(floor)
+            else 0
+        )
+        if entry.sequence <= base_sequence:
             return False
-        item = items[entry.sequence - 1]
+        offset = entry.sequence - base_sequence - 1
+        if offset < 0 or offset >= len(items):
+            return False
+        item = items[offset]
         return (
             item.receipt_hash == entry.receipt_hash
             and item.receipt.receipt_id
