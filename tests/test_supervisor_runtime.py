@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import tempfile
 import unittest
@@ -603,12 +602,17 @@ class RemoteObservationTests(unittest.TestCase):
     def test_find_open_worker_pr_filters_namespace(
         self,
     ) -> None:
-        payload = json_bytes = (
-            '[{"number":1,"headRefName":"feature/x"},'
-            '{"number":2,"headRefName":'
-            '"bot/specialist-root-cause-aaaaaaaaaaaaaaaa"}]'
+        payload = (
+            '[{"number":1,"html_url":"https://example.invalid/1",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"feature/x","repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}},'
+            '{"number":2,"html_url":"https://example.invalid/2",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
+            '"repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}}]'
         )
-        del json_bytes
         with patch(
             "skeleton.automation.supervisor_runtime.subprocess.check_output",
             return_value=payload,
@@ -622,15 +626,70 @@ class RemoteObservationTests(unittest.TestCase):
             2,
         )
 
+    def test_find_open_worker_pr_ignores_fork_collision(
+        self,
+    ) -> None:
+        payload = (
+            '[{"number":3,"html_url":"https://example.invalid/3",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
+            '"repo":{"full_name":"attacker/fork"}},'
+            '"base":{"ref":"main"}}]'
+        )
+        with patch(
+            "skeleton.automation.supervisor_runtime.subprocess.check_output",
+            return_value=payload,
+        ):
+            result = runtime.find_open_pr_for_worker(
+                REPO,
+                "root-cause",
+            )
+        self.assertIsNone(result)
+
     def test_find_open_worker_pr_fails_closed_on_duplicates(
         self,
     ) -> None:
         payload = (
-            '[{"number":1,"headRefName":'
-            '"bot/specialist-root-cause-a"},'
-            '{"number":2,"headRefName":'
-            '"bot/specialist-root-cause-b"}]'
+            '[{"number":1,"html_url":"https://example.invalid/1",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-a",'
+            '"repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}},'
+            '{"number":2,"html_url":"https://example.invalid/2",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-b",'
+            '"repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}}]'
         )
+        with patch(
+            "skeleton.automation.supervisor_runtime.subprocess.check_output",
+            return_value=payload,
+        ):
+            with self.assertRaises(
+                runtime.SupervisorRuntimeError
+            ):
+                runtime.find_open_pr_for_worker(
+                    REPO,
+                    "root-cause",
+                )
+
+    def test_open_pr_query_fails_closed_at_bound(
+        self,
+    ) -> None:
+        item = {
+            "number": 1,
+            "html_url": "https://example.invalid/1",
+            "draft": False,
+            "updated_at": "2026-09-19T00:00:00Z",
+            "head": {
+                "ref": "feature/x",
+                "repo": {"full_name": REPO},
+            },
+            "base": {"ref": "main"},
+        }
+        import json
+
+        payload = json.dumps([item] * 100)
         with patch(
             "skeleton.automation.supervisor_runtime.subprocess.check_output",
             return_value=payload,
