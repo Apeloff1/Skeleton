@@ -19,14 +19,7 @@ def test_phase_gates_100_phases():
 
 
 def test_phase_gates_pass_on_clean_build():
-    manifest = _manifest()
-    out = pg.build(
-        manifest,
-        {
-            "forged": manifest["capacity"]["assets_forged"],
-            "families": ["snowball"],
-        },
-    )
+    out = pg.build(_manifest())
     assert out["all_gates_green"] is True
     assert out["pass_pct"] == 100
     assert out["bands_passed"] == 8

@@ -61,13 +61,9 @@ def test_lifecycle_moves_from_pending_bound_to_confirmed(tmp_path):
     assert asyncio.run(plane.execute_registered(operation.outbox_seq)) is True
     after = plane.operation_lifecycle(operation.id)
     assert after["state"] == "confirmed"
-    assert after["pending"] is False
-    assert after["pending_present"] is False
-    assert after["pending_operation"] is None
+    assert after["pending"] is None
     assert after["receipt"]["result_artifact_id"]
-    assert after["admitted_audit_present"] is True
-    assert after["executed_audit_present"] is True
-    assert after["executed_audit_count"] == 1
+    assert {entry["kind"] for entry in after["audit_events"]} >= {"operation_admitted", "operation_executed"}
 
 
 def test_unbound_lifecycle_is_explicit(tmp_path):

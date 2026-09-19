@@ -35,11 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          issue=$(
-            gh issue list --repo "$REPO" --state all --search "${ISSUE_TITLE} in:title" --limit 100 --json number,title |
-              jq -r --arg title "$ISSUE_TITLE" '.[] | select(.title == $title) | .number' |
-              head -n 1
-          )
+          issue=$(gh issue list --repo "$REPO" --state all --search "${ISSUE_TITLE} in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -n 1)
           if [[ -z "$issue" ]]; then
             issue=$(gh api --method POST "repos/${REPO}/issues" \
               -f title="$ISSUE_TITLE" \

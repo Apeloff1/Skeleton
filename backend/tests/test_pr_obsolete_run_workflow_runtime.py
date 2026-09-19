@@ -61,4 +61,4 @@ def test_lifecycle_signal_wakes_immediate_drain_only_on_close() -> None:
 
     assert "types: [closed]" in text
     assert "synchronize" not in text
-    assert "Superseded PR-head updates are already reclaimed by queue-drain" in text
+    assert "Superseded synchronize heads are already reclaimed by queue-drain" in text

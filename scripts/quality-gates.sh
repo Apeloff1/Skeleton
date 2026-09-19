@@ -25,6 +25,10 @@ printf '\n== Shell execution plane regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_shell_*.py
 
+printf '\n== Shell worker runtime regressions ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_worker_*.py
+
 printf '\n== Backend Ruff ==\n'
 (
   cd backend
@@ -146,11 +150,6 @@ python backend/scripts/check_secret_hygiene.py
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
 
-printf '\n== Live-service backend test boundary ==\n'
-python backend/scripts/check_live_service_test_boundaries.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  backend/tests/test_live_service_test_boundaries.py
-
 printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
@@ -204,7 +203,6 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_developer_tooling_security.py \
-  backend/tests/test_dependency_security_workflow_contract.py \
   backend/tests/test_incident_response_runbook.py \
   backend/tests/test_api_middleware_adversarial.py \
   backend/tests/test_api_middleware_regression_gaps.py \

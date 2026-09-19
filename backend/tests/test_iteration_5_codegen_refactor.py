@@ -17,8 +17,6 @@ calls; local does not.
 """
 import time
 import pytest
-
-pytestmark = pytest.mark.live_service
 import requests
 
 LOCAL_URL = "http://localhost:8001"

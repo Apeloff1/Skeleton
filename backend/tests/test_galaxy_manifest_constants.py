@@ -8,8 +8,6 @@ galaxy_studio_constants module. Guards against:
 import httpx
 import pytest
 
-pytestmark = pytest.mark.live_service
-
 BASE = "http://localhost:8001"
 
 

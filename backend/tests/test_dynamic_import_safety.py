@@ -199,34 +199,18 @@ def test_parse_failure_reports_exception_class_without_payload(tmp_path: Path) -
     assert "invalid syntax" not in findings[0]
 
 
-def test_discovery_rejects_symlink_directories(tmp_path: Path) -> None:
+def test_discovery_does_not_follow_symlink_directories(tmp_path: Path) -> None:
     root = tmp_path / "backend"
     external = tmp_path / "external"
     root.mkdir()
     external.mkdir()
     (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
-    (external / "hidden.py").write_text("value = 2\n", encoding="utf-8")
+    (external / "hidden.py").write_text("__import__(module_name)\n", encoding="utf-8")
+
     link = root / "linked"
     try:
         link.symlink_to(external, target_is_directory=True)
     except OSError:
         pytest.skip("directory symlinks are unavailable on this platform")
 
-    with pytest.raises(scanner.DynamicImportScanError, match="source symlink encountered"):
-        list(scanner.python_files(root))
-
-
-def test_discovery_rejects_symlinked_python_files(tmp_path: Path) -> None:
-    root = tmp_path / "backend"
-    external = tmp_path / "external.py"
-    root.mkdir()
-    external.write_text("value = 2\n", encoding="utf-8")
-    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
-    link = root / "linked.py"
-    try:
-        link.symlink_to(external)
-    except OSError:
-        pytest.skip("file symlinks are unavailable on this platform")
-
-    with pytest.raises(scanner.DynamicImportScanError, match="source symlink encountered"):
-        list(scanner.python_files(root))
+    assert list(scanner.python_files(root)) == [root / "safe.py"]

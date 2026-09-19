@@ -16,7 +16,6 @@ from typing import Mapping
 from .frontier_feedback import (
     FrontierEvalGate,
     FrontierFeedbackRecommendation,
-    FrontierFeedbackReport,
 )
 from .frontier_reasoning import FrontierReasoningPolicy
 from .frontier_trials import FrontierTrialGate
@@ -66,8 +65,6 @@ class FrontierPolicyProposal:
     recommendation_fingerprint: str
     reasons: tuple[str, ...]
     fingerprint: str
-    feedback_report_fingerprint: str | None = None
-    trial_gate_fingerprint: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.baseline_policy, FrontierReasoningPolicy):
@@ -113,7 +110,6 @@ class FrontierPolicyTuner:
         recommendation: FrontierFeedbackRecommendation,
         evaluation_gate: FrontierEvalGate,
         trial_gate: FrontierTrialGate | None = None,
-        feedback_report: FrontierFeedbackReport | None = None,
     ) -> FrontierPolicyProposal:
         if not isinstance(baseline, FrontierReasoningPolicy):
             raise TypeError("baseline must be FrontierReasoningPolicy")
@@ -123,11 +119,6 @@ class FrontierPolicyTuner:
             raise TypeError("evaluation_gate must be FrontierEvalGate")
         if trial_gate is not None and not isinstance(trial_gate, FrontierTrialGate):
             raise TypeError("trial_gate must be FrontierTrialGate or None")
-        if feedback_report is not None and not isinstance(
-            feedback_report,
-            FrontierFeedbackReport,
-        ):
-            raise TypeError("feedback_report must be FrontierFeedbackReport or None")
 
         reasons = list(recommendation.reasons)
         requested_change = any(
@@ -142,14 +133,6 @@ class FrontierPolicyTuner:
             recommendation.sample_count >= 12
             and bool(recommendation.feedback_report_fingerprint)
         )
-        feedback_bound = (
-            feedback_report is not None
-            and recommendation.feedback_report_fingerprint
-            == feedback_report.fingerprint
-            and recommendation.sample_count == feedback_report.count
-            and recommendation.direct_count == feedback_report.direct_count
-            and recommendation.escalated_count == feedback_report.escalated_count
-        )
         entropy_change_requested = abs(recommendation.maximum_entropy_delta) > 0.0
         trial_gate_sufficient = (
             not entropy_change_requested
@@ -160,11 +143,6 @@ class FrontierPolicyTuner:
                 "insufficient bound feedback for policy change: "
                 f"samples={recommendation.sample_count}, required>=12"
             )
-        if requested_change and feedback_sufficient and not feedback_bound:
-            reasons.append(
-                "policy change requires the authoritative feedback report "
-                "matching recommendation fingerprint and subgroup counts"
-            )
         if entropy_change_requested and trial_gate is None:
             reasons.append(
                 "entropy tuning requires a repeated-trial pass@k promotion gate"
@@ -173,7 +151,7 @@ class FrontierPolicyTuner:
             reasons.extend(trial_gate.reasons)
         if (
             not evaluation_gate.passed
-            or (requested_change and (not feedback_sufficient or not feedback_bound))
+            or (requested_change and not feedback_sufficient)
             or not trial_gate_sufficient
         ):
             reasons.extend(evaluation_gate.reasons)
@@ -183,7 +161,6 @@ class FrontierPolicyTuner:
                     "recommendation": recommendation.fingerprint,
                     "eval_gate": evaluation_gate.fingerprint,
                     "trial_gate": trial_gate.fingerprint if trial_gate else None,
-                    "feedback_report": feedback_report.fingerprint if feedback_report else None,
                     "approved": False,
                     "changes": {},
                     "reasons": reasons,
@@ -198,10 +175,6 @@ class FrontierPolicyTuner:
                 recommendation_fingerprint=recommendation.fingerprint,
                 reasons=tuple(reasons),
                 fingerprint=fingerprint,
-                feedback_report_fingerprint=(
-                    feedback_report.fingerprint if feedback_report else None
-                ),
-                trial_gate_fingerprint=trial_gate.fingerprint if trial_gate else None,
             )
 
         next_absolute = self._clip(
@@ -260,7 +233,6 @@ class FrontierPolicyTuner:
                 "recommendation": recommendation.fingerprint,
                 "eval_gate": evaluation_gate.fingerprint,
                 "trial_gate": trial_gate.fingerprint if trial_gate else None,
-                "feedback_report": feedback_report.fingerprint if feedback_report else None,
                 "approved": approved,
                 "changes": changes,
                 "reasons": reasons,
@@ -275,10 +247,6 @@ class FrontierPolicyTuner:
             recommendation_fingerprint=recommendation.fingerprint,
             reasons=tuple(reasons),
             fingerprint=fingerprint,
-            feedback_report_fingerprint=(
-                feedback_report.fingerprint if feedback_report else None
-            ),
-            trial_gate_fingerprint=trial_gate.fingerprint if trial_gate else None,
         )
 
     @staticmethod

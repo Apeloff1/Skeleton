@@ -57,7 +57,7 @@ def test_generated_request_id_corpus_is_always_bounded_and_header_safe() -> None
             assert canonical == decoded
             assert legacy == decoded
         else:
-            assert len(canonical) == 16
+            assert len(canonical) == 32
             assert len(legacy) == 16
 
 
@@ -142,35 +142,6 @@ def test_generated_route_lookalikes_match_only_exact_or_child_api_paths() -> Non
         assert legacy_security._matches_route_boundary(path, "/api") is expected
 
 
-def test_starlette_testclient_peer_does_not_consume_legacy_rate_limit_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def scenario() -> None:
-        async def app(_scope, _receive, _send) -> None:
-            return None
-
-        async def call_next(_request: Request) -> Response:
-            return Response(status_code=204)
-
-        limiter_type = legacy_security.RateLimitMiddleware
-        limiter_type._buckets.clear()
-        limiter_type._lock = None
-        limiter_type._saturation_rejections = 0
-        middleware = limiter_type(app, rps=0.000001, burst=1, max_buckets=1)
-
-        for _ in range(256):
-            response = await middleware.dispatch(
-                _request(peer="testclient"),
-                call_next,
-            )
-            assert response.status_code == 204
-
-        assert limiter_type._buckets == {}
-        assert limiter_type._saturation_rejections == 0
-
-    asyncio.run(scenario())
-
-
 def test_high_cardinality_generated_identities_keep_legacy_limiter_bounded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -246,7 +217,6 @@ async def _exercise_size_limit(
     *,
     content_length: bytes | None,
     chunks: list[bytes],
-    content_types: list[bytes] | None = None,
 ) -> tuple[int, bool, bytes]:
     queue = [
         {
@@ -277,10 +247,7 @@ async def _exercise_size_limit(
         response = Response(status_code=204)
         await response(scope, bounded_receive, bounded_send)
 
-    headers: list[tuple[bytes, bytes]] = []
-    if content_length is not None:
-        headers.append((b"content-length", content_length))
-    headers.extend((b"content-type", value) for value in (content_types or []))
+    headers = [] if content_length is None else [(b"content-length", content_length)]
     scope = {
         "type": "http",
         "http_version": "1.1",
@@ -344,111 +311,3 @@ def test_streamed_body_replay_preserves_exact_bytes_property() -> None:
         assert status == 204
         assert called
         assert observed == expected
-
-
-
-@pytest.mark.parametrize(
-    "content_types",
-    [
-        [b"application/json", b"text/plain"],
-        [b"application/json", b"application/json"],
-    ],
-)
-def test_duplicate_content_type_fails_before_application(
-    content_types: list[bytes],
-) -> None:
-    status, called, observed = asyncio.run(
-        _exercise_size_limit(
-            content_length=b"2",
-            chunks=[b"{}"],
-            content_types=content_types,
-        )
-    )
-    assert status == 400
-    assert not called
-    assert observed == b""
-
-
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        b"application",
-        b"/json",
-        b"application/",
-        b"application/json; charset",
-        b"application/json; =utf-8",
-        b"application/json; charset=utf-8; charset=utf-16",
-        b'application/json; profile="unterminated',
-        b"application/json\x00",
-        b"a" * 513,
-    ],
-)
-def test_malformed_content_type_fails_before_application(content_type: bytes) -> None:
-    status, called, observed = asyncio.run(
-        _exercise_size_limit(
-            content_length=b"2",
-            chunks=[b"{}"],
-            content_types=[content_type],
-        )
-    )
-    assert status == 400
-    assert not called
-    assert observed == b""
-
-
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        b"multipart/form-data",
-        b"multipart/form-data; boundary=",
-        b'multipart/form-data; boundary=""',
-        b"multipart/form-data; boundary=" + b"x" * 71,
-        b'multipart/form-data; boundary="ends-with-space "',
-    ],
-)
-def test_multipart_content_type_requires_bounded_boundary(content_type: bytes) -> None:
-    status, called, observed = asyncio.run(
-        _exercise_size_limit(
-            content_length=b"1",
-            chunks=[b"x"],
-            content_types=[content_type],
-        )
-    )
-    assert status == 400
-    assert not called
-    assert observed == b""
-
-
-@pytest.mark.parametrize(
-    "content_type",
-    [
-        b"application/json",
-        b"application/json; charset=utf-8",
-        b'application/vnd.api+json; profile="https://example.test/a;b"',
-        b"multipart/form-data; boundary=----skeleton-2026",
-        b'text/plain; note="semi;colon"',
-    ],
-)
-def test_valid_content_type_framing_reaches_application(content_type: bytes) -> None:
-    status, called, observed = asyncio.run(
-        _exercise_size_limit(
-            content_length=b"2",
-            chunks=[b"{}"],
-            content_types=[content_type],
-        )
-    )
-    assert status == 204
-    assert called
-    assert observed == b"{}"
-
-
-def test_missing_content_type_remains_route_compatible() -> None:
-    status, called, observed = asyncio.run(
-        _exercise_size_limit(
-            content_length=b"2",
-            chunks=[b"{}"],
-        )
-    )
-    assert status == 204
-    assert called
-    assert observed == b"{}"

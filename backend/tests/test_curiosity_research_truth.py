@@ -34,13 +34,7 @@ def test_unverified_locator_cannot_bind_source_to_claim():
     async def search(inquiry, questions):
         return [{
             "source": "paper-a", "locator": "doi:example", "kind": "primary_empirical",
-            "independence_group": "lab-a", "quality": 0.95,
-            "claim_bindings": [{
-                "claim": claim,
-                "supports": True,
-                "binding_method": "measurement_record",
-                "evidence_span": claim,
-            }],
+            "independence_group": "lab-a", "quality": 0.95, "supports_claims": [claim],
             "verified_locator": False, "reproducible": True,
         }]
     researcher = EnsembleCuriosityResearcher(agreeing_model, source_search=search, models=("a", "b"))
@@ -53,14 +47,7 @@ def test_verified_locator_binds_only_exact_named_claim():
     async def search(inquiry, questions):
         return [{
             "source": "paper-a", "locator": "doi:example", "kind": "primary_empirical",
-            "independence_group": "lab-a", "quality": 0.9,
-            "claim_bindings": [{
-                "claim": claim,
-                "supports": True,
-                "binding_method": "measurement_record",
-                "evidence_span": claim,
-            }],
-            "supports_claims": ["Different claim"],
+            "independence_group": "lab-a", "quality": 0.9, "supports_claims": [claim, "Different claim"],
             "verified_locator": True, "reproducible": True, "peer_reviewed": True,
         }]
     researcher = EnsembleCuriosityResearcher(agreeing_model, source_search=search, models=("a", "b"))

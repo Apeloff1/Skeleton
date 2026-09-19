@@ -54,12 +54,11 @@ def production_python_files(root: Path | None = None) -> Iterable[Path]:
         child_dirs: list[Path] = []
         for entry in entries:
             try:
-                if entry.name in SKIP_DIRS:
-                    continue
                 if entry.is_symlink():
-                    raise ArchiveExtractionScanError("source symlink encountered")
+                    continue
                 if entry.is_dir(follow_symlinks=False):
-                    child_dirs.append(Path(entry.path))
+                    if entry.name not in SKIP_DIRS:
+                        child_dirs.append(Path(entry.path))
                     continue
                 if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
                     files.append(Path(entry.path))

@@ -11,7 +11,6 @@ OWNER_DRAIN = ROOT / "scripts" / "drain_actions_queue.sh"
 CONTROL_PLANE_PATHS = {
     ".github/workflows/actions-housekeeping-cli.yml",
     ".github/workflows/branch-clean.yml",
-    ".github/workflows/branch-archive.yml",
     ".github/workflows/branch-flow.yml",
     ".github/workflows/branch-repair-100.yml",
     ".github/workflows/merge-readiness.yml",
