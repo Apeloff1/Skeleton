@@ -1,5 +1,42 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_replication import (
+    DurableChainReplicationReport,
+    DurableChainReplicator,
+    DurableEvidenceReplicaManager,
+    DurableEvidenceReplicationReport,
+    DurableEvidenceReplicationRun,
+    DurableReplicaState,
+    DurableReplicationBatch,
+    DurableReplicationError,
+    DurableReplicationPolicy,
+    DurableReplicationRun,
+)
+from skeleton.shells.ai.durable_failover import (
+    FAILOVER_ARTIFACT_TYPE,
+    DurableFailoverAuthority,
+    DurableFailoverConflict,
+    DurableFailoverCoordinator,
+    DurableFailoverPhase,
+    DurableFailoverRecord,
+    DurableFailoverRegistry,
+    DurableFailoverTicket,
+    DurableFailoverTicketError,
+    SignedDurableFailoverTicket,
+    StoredDurableFailover,
+)
+from skeleton.shells.ai.durable_replica_fleet import (
+    DurableReplicaFleet,
+    DurableReplicaFleetError,
+    DurableReplicaFleetFinding,
+    DurableReplicaFleetMember,
+    DurableReplicaFleetMemberReport,
+    DurableReplicaFleetMemberRun,
+    DurableReplicaFleetPolicy,
+    DurableReplicaFleetReport,
+    DurableReplicaFleetRun,
+)
+
 from skeleton.shells.ai.durable_pruning import DurablePruningError, DurablePruningExecutor, DurablePruningItem, DurablePruningItemKind, DurablePruningManifest, DurablePruningManualReview, DurablePruningOperation, DurablePruningPhase, DurablePruningResult
 
 from skeleton.shells.ai.durable_pruning_authorization import DurablePruningAuthorization, DurablePruningAuthorizationError, DurablePruningAuthorizationStore, DurablePruningAuthorizationVerification, SignedDurablePruningAuthorization
