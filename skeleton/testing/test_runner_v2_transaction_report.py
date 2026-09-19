@@ -19,7 +19,7 @@ from scripts.check_runner_v2_contract import (
     _workflow_findings,
     check as check_runner_contract,
 )
-from skeleton.pr_automation.core import Decision, Mode
+from skeleton.pr_automation.core import Decision
 from skeleton.pr_automation.index import EventIndex
 from skeleton.pr_automation.runner_contracts import (
     MutationIntent,
