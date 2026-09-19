@@ -482,11 +482,11 @@ def test_post_finalize_refresh_tracks_terminal_journal_head(tmp_path):
         for item in verification.chains
     }
     assert (
-        by_id["journal"].current_root
+        by_id["journal"].live_root
         == env.journal.root_hash()
     )
     assert (
-        by_id["receipts"].current_root
+        by_id["receipts"].live_root
         == env.receipts.root_hash()
     )
 
@@ -972,8 +972,8 @@ def test_post_finalize_cursor_heads_match_chain_heads(tmp_path):
             for entry in verification.chains
             if entry.chain_id == chain_id
         )
-        assert item.current_sequence == chain.head().sequence
-        assert item.current_root == chain.head().root_hash
+        assert item.live_sequence == chain.head().sequence
+        assert item.live_root == chain.head().root_hash
 
 
 def test_post_finalize_sequence_indexes_remain_healthy(tmp_path):
