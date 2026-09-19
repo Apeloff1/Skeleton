@@ -720,7 +720,7 @@ class DurableEvidenceReadinessGuard:
                 )
             )
             verification_report = (
-                verification_refresh.after
+                verification_refresh.audit_after
             )
             mutations.append(
                 "verification_full_refresh"
