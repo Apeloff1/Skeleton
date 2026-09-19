@@ -22,6 +22,9 @@ on:
       - "Merge Readiness"
     types:
       - completed
+    branches:
+      - "*"
+      - "**"
   schedule:
     - cron: "4-59/5 * * * *"
   push:
