@@ -433,6 +433,143 @@ class DurableHotFloorHistoryIndex:
         }
 
 
+@dataclass(frozen=True)
+class DurableHotFloorHistoryReport:
+    chain_id: str
+    floors: tuple[SignedDurableHotFloor, ...]
+    current_floor_id: str
+    current_sequence: int
+    current_root: str
+    complete_to_genesis: bool
+    issues: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        floors = tuple(self.floors)
+        object.__setattr__(
+            self,
+            "floors",
+            floors,
+        )
+        object.__setattr__(
+            self,
+            "issues",
+            tuple(self.issues),
+        )
+        if floors:
+            if (
+                not self.current_floor_id
+                or len(self.current_floor_id) != 64
+            ):
+                raise ValueError(
+                    "history report requires current floor id"
+                )
+            if (
+                isinstance(self.current_sequence, bool)
+                or not isinstance(self.current_sequence, int)
+                or self.current_sequence <= 0
+            ):
+                raise ValueError(
+                    "history current_sequence must be positive"
+                )
+            _digest(
+                "current_root",
+                self.current_root,
+            )
+        else:
+            if self.current_floor_id:
+                raise ValueError(
+                    "empty history may not carry current floor id"
+                )
+            if self.current_sequence != 0:
+                raise ValueError(
+                    "empty history must use sequence zero"
+                )
+            if self.current_root != GENESIS_HASH:
+                raise ValueError(
+                    "empty history must use genesis root"
+                )
+        if not isinstance(
+            self.complete_to_genesis,
+            bool,
+        ):
+            raise ValueError(
+                "complete_to_genesis must be bool"
+            )
+        if any(
+            not isinstance(issue, str)
+            or not issue
+            or len(issue) > 2048
+            for issue in self.issues
+        ):
+            raise ValueError(
+                "invalid hot floor history issue"
+            )
+
+    @property
+    def ok(self) -> bool:
+        return (
+            self.complete_to_genesis
+            and not self.issues
+        )
+
+    @property
+    def floor_count(self) -> int:
+        return len(self.floors)
+
+    @property
+    def oldest_sequence(self) -> int:
+        if not self.floors:
+            return 0
+        return self.floors[0].floor.sequence
+
+    @property
+    def newest_sequence(self) -> int:
+        if not self.floors:
+            return 0
+        return self.floors[-1].floor.sequence
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(include_digest=False),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def to_dict(
+        self,
+        *,
+        include_digest: bool = True,
+    ) -> dict[str, object]:
+        data: dict[str, object] = {
+            "chain_id": self.chain_id,
+            "ok": self.ok,
+            "floor_count": self.floor_count,
+            "oldest_sequence": self.oldest_sequence,
+            "newest_sequence": self.newest_sequence,
+            "current_floor_id": self.current_floor_id,
+            "current_sequence": self.current_sequence,
+            "current_root": self.current_root,
+            "complete_to_genesis": (
+                self.complete_to_genesis
+            ),
+            "floors": [
+                item.to_dict()
+                for item in self.floors
+            ],
+            "issues": list(self.issues),
+        }
+        if include_digest:
+            data["digest"] = self.digest
+        return data
+
+
 class DurableHotFloorError(RuntimeError):
     pass
 
@@ -1102,6 +1239,154 @@ class DurableHotFloorStore:
         raise DurableHotFloorError(
             "hot floor CAS retry budget exhausted"
         )
+
+    def inspect_history(
+        self,
+        chain_id: str,
+        *,
+        max_floors: int = 1024,
+    ) -> DurableHotFloorHistoryReport:
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=128,
+        )
+        if (
+            isinstance(max_floors, bool)
+            or not isinstance(max_floors, int)
+            or max_floors <= 0
+        ):
+            raise ValueError(
+                "max_floors must be positive integer"
+            )
+        current = self.current(chain_id)
+        if current is None:
+            return DurableHotFloorHistoryReport(
+                chain_id,
+                (),
+                "",
+                0,
+                GENESIS_HASH,
+                True,
+                (),
+            )
+
+        reverse: list[
+            SignedDurableHotFloor
+        ] = []
+        issues: list[str] = []
+        seen_ids: set[str] = set()
+        cursor = current
+        complete = False
+
+        for _ in range(max_floors):
+            floor = cursor.floor
+            if floor.floor_id in seen_ids:
+                issues.append(
+                    "hot floor history contains a cycle"
+                )
+                break
+            seen_ids.add(floor.floor_id)
+            reverse.append(cursor)
+
+            if floor.previous_sequence == 0:
+                if (
+                    floor.previous_root_hash
+                    != GENESIS_HASH
+                ):
+                    issues.append(
+                        "oldest hot floor does not terminate at genesis root"
+                    )
+                else:
+                    complete = True
+                break
+
+            try:
+                previous = self.floor_at(
+                    chain_id,
+                    floor.previous_sequence,
+                )
+            except Exception as exc:
+                issues.append(
+                    "historical floor lookup raised "
+                    f"{type(exc).__name__}"
+                )
+                break
+            if previous is None:
+                issues.append(
+                    "historical floor is missing at previous sequence"
+                )
+                break
+            previous_floor = previous.floor
+            if (
+                previous_floor.root_hash
+                != floor.previous_root_hash
+            ):
+                issues.append(
+                    "historical floor root does not match successor previous root"
+                )
+                break
+            if (
+                previous_floor.sequence
+                >= floor.sequence
+            ):
+                issues.append(
+                    "historical floor sequence is not strictly increasing"
+                )
+                break
+            if (
+                previous_floor.fencing_token
+                >= floor.fencing_token
+            ):
+                issues.append(
+                    "hot floor fencing token is not strictly increasing"
+                )
+                break
+            if (
+                previous_floor.committed_at
+                > floor.committed_at
+            ):
+                issues.append(
+                    "hot floor commit time moves backwards"
+                )
+                break
+            cursor = previous
+        else:
+            issues.append(
+                "hot floor history exceeds traversal bound"
+            )
+
+        floors = tuple(reversed(reverse))
+        return DurableHotFloorHistoryReport(
+            chain_id,
+            floors,
+            current.floor.floor_id,
+            current.floor.sequence,
+            current.floor.root_hash,
+            complete,
+            tuple(issues),
+        )
+
+    def require_history(
+        self,
+        chain_id: str,
+        *,
+        max_floors: int = 1024,
+    ) -> DurableHotFloorHistoryReport:
+        report = self.inspect_history(
+            chain_id,
+            max_floors=max_floors,
+        )
+        if not report.ok:
+            detail = (
+                report.issues[0]
+                if report.issues
+                else "hot floor history is incomplete"
+            )
+            raise DurableHotFloorError(
+                detail
+            )
+        return report
 
     def require_position(
         self,
