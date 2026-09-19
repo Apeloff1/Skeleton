@@ -9,7 +9,7 @@ SPECS = (
     OperationSpec(
         logical_name="jvm.java_version",
         executable_key="java",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
@@ -19,7 +19,7 @@ SPECS = (
     OperationSpec(
         logical_name="jvm.javac_version",
         executable_key="javac",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
@@ -96,7 +96,7 @@ SPECS = (
     OperationSpec(
         logical_name="jvm.mvn_version",
         executable_key="mvn",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
@@ -184,7 +184,7 @@ SPECS = (
     OperationSpec(
         logical_name="jvm.gradle_version",
         executable_key="gradle",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
