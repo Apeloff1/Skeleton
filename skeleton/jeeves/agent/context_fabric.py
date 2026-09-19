@@ -47,12 +47,18 @@ class DeepContextRecord:
     def __post_init__(self) -> None:
         if not isinstance(self.source_tier, SourceTier):
             object.__setattr__(self, "source_tier", SourceTier(str(self.source_tier)))
-        for name in ("source_ref", "source_fingerprint"):
-            value = str(getattr(self, name)).strip()
-            if not value:
-                raise AgentContractError(f"{name} cannot be empty")
-            object.__setattr__(self, name, value[:2048])
-        object.__setattr__(self, "content", str(self.content))
+        source_ref = str(self.source_ref).strip()
+        if not source_ref:
+            raise AgentContractError("source_ref cannot be empty")
+        object.__setattr__(self, "source_ref", source_ref[:2048])
+        source_fingerprint = str(self.source_fingerprint).strip().lower()
+        if not source_fingerprint:
+            raise AgentContractError("source_fingerprint cannot be empty")
+        object.__setattr__(self, "source_fingerprint", source_fingerprint[:2048])
+        content = str(self.content)
+        object.__setattr__(self, "content", content)
+        if not isinstance(self.canonical, bool):
+            raise AgentContractError("canonical must be boolean")
         object.__setattr__(
             self,
             "source_provider",
@@ -60,8 +66,29 @@ class DeepContextRecord:
         )
         for name in ("trust", "confidence", "salience"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
-        object.__setattr__(self, "token_estimate", positive_int("token_estimate", max(1, self.token_estimate), maximum=10_000_000))
-        object.__setattr__(self, "tags", tuple(sorted({str(value).casefold().strip() for value in self.tags if str(value).strip()})))
+        token_estimate = positive_int(
+            "token_estimate",
+            self.token_estimate,
+            maximum=10_000_000,
+        )
+        minimum_token_estimate = max(1, (len(content) + 3) // 4)
+        if token_estimate < minimum_token_estimate:
+            raise AgentContractError(
+                "token_estimate understates context content size"
+            )
+        object.__setattr__(self, "token_estimate", token_estimate)
+        tags = tuple(
+            sorted(
+                {
+                    str(value).casefold().strip()
+                    for value in self.tags
+                    if str(value).strip()
+                }
+            )
+        )
+        if len(tags) > 64 or any(len(tag) > 128 for tag in tags):
+            raise AgentContractError("invalid context tags")
+        object.__setattr__(self, "tags", tags)
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
 
@@ -106,7 +133,19 @@ class ContextFabricPolicy:
     def __post_init__(self) -> None:
         for name in ("fast_limit", "associative_limit", "deep_limit", "maximum_tokens", "minimum_fast_hits_before_skip_deep", "lens_limit"):
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1_000_000))
-        object.__setattr__(self, "minimum_deep_trust", probability("minimum_deep_trust", self.minimum_deep_trust))
+        object.__setattr__(
+            self,
+            "minimum_deep_trust",
+            probability("minimum_deep_trust", self.minimum_deep_trust),
+        )
+        for name in (
+            "always_rehydrate_index_hits",
+            "broad_search_on_conflict",
+            "broad_search_on_fast_fallback",
+            "index_deep_results",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise AgentContractError(f"{name} must be boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +161,72 @@ class ContextFabricResult:
     broad_search_used: bool
     token_estimate: int
     fingerprint: str
+
+    def __post_init__(self) -> None:
+        namespace_key = str(self.namespace_key).strip()
+        if not namespace_key or len(namespace_key) > 2048:
+            raise AgentContractError("namespace_key is invalid")
+        object.__setattr__(self, "namespace_key", namespace_key)
+
+        query = str(self.query)
+        if len(query) > 256_000:
+            raise AgentContractError("context fabric query is too large")
+        object.__setattr__(self, "query", query)
+
+        if not isinstance(self.fast_recall, RecallPacket):
+            raise AgentContractError("fast_recall must be RecallPacket")
+        if not isinstance(self.lenses, LensBundle):
+            raise AgentContractError("lenses must be LensBundle")
+
+        governance = tuple(self.lens_governance)
+        if any(not isinstance(item, LensGovernanceDecision) for item in governance):
+            raise AgentContractError(
+                "lens_governance must contain LensGovernanceDecision values"
+            )
+        object.__setattr__(self, "lens_governance", governance)
+
+        records = tuple(self.records)
+        if any(not isinstance(item, DeepContextRecord) for item in records):
+            raise AgentContractError(
+                "records must contain DeepContextRecord values"
+            )
+        object.__setattr__(self, "records", records)
+
+        stale = tuple(
+            sorted({str(value).strip() for value in self.stale_card_ids if str(value).strip()})
+        )
+        unresolved = tuple(
+            sorted(
+                {
+                    str(value).strip()
+                    for value in self.unresolved_source_refs
+                    if str(value).strip()
+                }
+            )
+        )
+        object.__setattr__(self, "stale_card_ids", stale)
+        object.__setattr__(self, "unresolved_source_refs", unresolved)
+
+        if not isinstance(self.broad_search_used, bool):
+            raise AgentContractError("broad_search_used must be boolean")
+        if (
+            isinstance(self.token_estimate, bool)
+            or not isinstance(self.token_estimate, int)
+            or self.token_estimate < 0
+        ):
+            raise AgentContractError("token_estimate must be a non-negative integer")
+        expected_tokens = sum(record.token_estimate for record in records)
+        if self.token_estimate != expected_tokens:
+            raise AgentContractError(
+                "token_estimate does not match packed context records"
+            )
+
+        fingerprint = str(self.fingerprint).strip().lower()
+        if len(fingerprint) != 64 or any(
+            character not in "0123456789abcdef" for character in fingerprint
+        ):
+            raise AgentContractError("fabric fingerprint must be sha256 hex")
+        object.__setattr__(self, "fingerprint", fingerprint)
 
     def render_payload(self) -> list[dict[str, Any]]:
         return [
@@ -170,7 +275,7 @@ class RepositoryContextAdapter:
             if entry.key not in refs and entry.entry_id not in refs:
                 continue
             record = self._record(entry)
-            if records and used + record.token_estimate > max_tokens:
+            if used + record.token_estimate > max_tokens:
                 continue
             records.append(record)
             used += record.token_estimate
@@ -210,7 +315,7 @@ class RepositoryContextAdapter:
             trust=entry.trust,
             confidence=entry.confidence,
             salience=entry.salience,
-            token_estimate=max(1, len(entry.content) // 4),
+            token_estimate=max(1, (len(entry.content) + 3) // 4),
             source_provider=f"context-repository:{entry.namespace.key}",
             tags=entry.tags,
             metadata={
@@ -232,6 +337,15 @@ class MemoryManagerAdapter:
         self.namespace = namespace
         self.source_provider = f"memory-store:{namespace.key}"
 
+    def supports_source_provider(self, source_provider: str) -> bool:
+        provider = str(source_provider).strip()
+        if not provider:
+            return True
+        return provider in {
+            f"memory-store:{self.namespace.key}",
+            f"memory-store:{self.namespace.parent().key}",
+        }
+
     def fetch_refs(
         self,
         namespace_key: str,
@@ -240,17 +354,22 @@ class MemoryManagerAdapter:
         max_records: int,
         max_tokens: int,
     ) -> tuple[DeepContextRecord, ...]:
-        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+        parent = self.namespace.parent()
+        if namespace_key == self.namespace.key:
+            allowed_namespaces = {self.namespace.key, parent.key}
+        elif namespace_key == parent.key:
+            allowed_namespaces = {parent.key}
+        else:
             return ()
-        refs = {str(value) for value in source_refs}
+        refs = tuple(dict.fromkeys(str(value) for value in source_refs))
         records: list[DeepContextRecord] = []
         used = 0
         for source_ref in refs:
             record = self.manager.store.get(source_ref)
-            if record is None:
+            if record is None or record.namespace.key not in allowed_namespaces:
                 continue
             item = self._record(record)
-            if records and used + item.token_estimate > max_tokens:
+            if used + item.token_estimate > max_tokens:
                 continue
             records.append(item)
             used += item.token_estimate
@@ -266,20 +385,27 @@ class MemoryManagerAdapter:
         max_records: int,
         max_tokens: int,
     ) -> tuple[DeepContextRecord, ...]:
-        if namespace_key not in {self.namespace.key, self.namespace.parent().key}:
+        parent = self.namespace.parent()
+        if namespace_key == self.namespace.key:
+            search_namespace = self.namespace
+            include_parent = True
+        elif namespace_key == parent.key:
+            search_namespace = parent
+            include_parent = False
+        else:
             return ()
         hits = self.manager.retriever.search(
-            self.namespace,
+            search_namespace,
             query,
             limit=max_records,
             minimum_trust=0.0,
-            include_parent=True,
+            include_parent=include_parent,
         )
         records: list[DeepContextRecord] = []
         used = 0
         for hit in hits:
             item = self._record(hit.record)
-            if records and used + item.token_estimate > max_tokens:
+            if used + item.token_estimate > max_tokens:
                 continue
             records.append(item)
             used += item.token_estimate
@@ -296,7 +422,7 @@ class MemoryManagerAdapter:
             trust=record.trust,
             confidence=record.trust,
             salience=record.salience,
-            token_estimate=max(1, len(record.content) // 4),
+            token_estimate=max(1, (len(record.content) + 3) // 4),
             source_provider=f"memory-store:{record.namespace.key}",
             tags=record.tags,
             metadata={
@@ -321,6 +447,8 @@ class CallableContextAdapter:
     ) -> None:
         self.source_tier = source_tier if isinstance(source_tier, SourceTier) else SourceTier(str(source_tier))
         self.source_provider = str(source_provider).strip()[:512]
+        if not callable(fetcher) or not callable(searcher):
+            raise TypeError("context adapter fetcher/searcher must be callable")
         self._fetcher = fetcher
         self._searcher = searcher
 
@@ -334,7 +462,7 @@ class CallableContextAdapter:
     ) -> tuple[DeepContextRecord, ...]:
         values = tuple(self._fetcher(namespace_key, source_refs, max_records, max_tokens))
         self._validate(values)
-        return values[:max_records]
+        return self._bounded(values, max_records=max_records, max_tokens=max_tokens)
 
     def search(
         self,
@@ -346,7 +474,25 @@ class CallableContextAdapter:
     ) -> tuple[DeepContextRecord, ...]:
         values = tuple(self._searcher(namespace_key, query, max_records, max_tokens))
         self._validate(values)
-        return values[:max_records]
+        return self._bounded(values, max_records=max_records, max_tokens=max_tokens)
+
+    @staticmethod
+    def _bounded(
+        values: Sequence[DeepContextRecord],
+        *,
+        max_records: int,
+        max_tokens: int,
+    ) -> tuple[DeepContextRecord, ...]:
+        records: list[DeepContextRecord] = []
+        used = 0
+        for value in values:
+            if len(records) >= max_records:
+                break
+            if used + value.token_estimate > max_tokens:
+                continue
+            records.append(value)
+            used += value.token_estimate
+        return tuple(records)
 
     def _validate(self, values: Sequence[DeepContextRecord]) -> None:
         if any(not isinstance(value, DeepContextRecord) for value in values):
@@ -380,6 +526,20 @@ class CognitiveContextFabric:
             bucket = self._adapters.setdefault(tier, [])
             if all(existing is not adapter for existing in bucket):
                 bucket.append(adapter)
+
+    @staticmethod
+    def _adapter_supports_provider(
+        adapter: ContextStoreAdapter,
+        source_provider: str,
+    ) -> bool:
+        provider = str(source_provider).strip()
+        if not provider:
+            return True
+        checker = getattr(adapter, "supports_source_provider", None)
+        if callable(checker):
+            return bool(checker(provider))
+        adapter_provider = str(getattr(adapter, "source_provider", "")).strip()
+        return bool(adapter_provider) and adapter_provider == provider
 
     def unregister(
         self,
@@ -448,8 +608,8 @@ class CognitiveContextFabric:
 
         records: list[DeepContextRecord] = []
         stale: set[str] = set()
-        resolved_refs: set[str] = set()
-        canonical_fingerprints: dict[tuple[SourceTier, str], set[str]] = {}
+        resolved_sources: set[tuple[SourceTier, str, str]] = set()
+        canonical_fingerprints: dict[tuple[SourceTier, str, str], set[str]] = {}
         budget_remaining = self.policy.maximum_tokens
 
         # Targeted canonical rehydration comes before any broad retrieval.
@@ -476,7 +636,10 @@ class CognitiveContextFabric:
                             for hit in fast.all_hits
                             for card in (hit.card,)
                             if card.source_tier is tier
-                            and (not card.source_provider or card.source_provider == adapter_provider)
+                            and self._adapter_supports_provider(
+                                adapter,
+                                card.source_provider,
+                            )
                         )
                     )
                     if not eligible_refs:
@@ -490,15 +653,18 @@ class CognitiveContextFabric:
                     for record in fetched:
                         if record.trust < self.policy.minimum_deep_trust:
                             continue
-                        if records and record.token_estimate > budget_remaining:
+                        if record.token_estimate > budget_remaining:
                             continue
                         records.append(record)
                         budget_remaining = max(0, budget_remaining - record.token_estimate)
-                        resolved_refs.add(record.source_ref)
                         source_key = (
                             record.source_tier,
                             record.source_provider,
                             record.source_ref,
+                        )
+                        resolved_sources.add(source_key)
+                        resolved_sources.add(
+                            (record.source_tier, "", record.source_ref)
                         )
                         canonical_fingerprints.setdefault(source_key, set()).add(record.source_fingerprint)
                         # Legacy cards without a provider are wildcards and may
@@ -536,7 +702,13 @@ class CognitiveContextFabric:
                 for tier, values in adapters.items()
                 for adapter in values
             ]
-            ordered_adapters.sort(key=lambda item: (item[0].value, type(item[1]).__name__))
+            ordered_adapters.sort(
+                key=lambda item: (
+                    item[0].value,
+                    str(getattr(item[1], "source_provider", "")),
+                    type(item[1]).__name__,
+                )
+            )
             for tier, adapter in ordered_adapters:
                 if budget_remaining <= 0:
                     break
@@ -549,11 +721,20 @@ class CognitiveContextFabric:
                 for record in found:
                     if record.trust < self.policy.minimum_deep_trust:
                         continue
-                    if records and record.token_estimate > budget_remaining:
+                    if record.token_estimate > budget_remaining:
                         continue
                     records.append(record)
                     budget_remaining = max(0, budget_remaining - record.token_estimate)
-                    resolved_refs.add(record.source_ref)
+                    resolved_sources.add(
+                        (
+                            record.source_tier,
+                            record.source_provider,
+                            record.source_ref,
+                        )
+                    )
+                    resolved_sources.add(
+                        (record.source_tier, "", record.source_ref)
+                    )
 
         packed = self._dedupe(records)[: self.policy.deep_limit]
         if self.policy.index_deep_results:
@@ -564,7 +745,15 @@ class CognitiveContextFabric:
                 {
                     hit.card.source_ref
                     for hit in fast.all_hits
-                    if hit.card.source_ref not in resolved_refs and bool(adapters.get(hit.card.source_tier))
+                    if (
+                        (
+                            hit.card.source_tier,
+                            hit.card.source_provider,
+                            hit.card.source_ref,
+                        )
+                        not in resolved_sources
+                        and bool(adapters.get(hit.card.source_tier))
+                    )
                 }
             )
         )
@@ -576,7 +765,15 @@ class CognitiveContextFabric:
                 "fast": fast.fingerprint,
                 "lenses": lens_bundle.fingerprint,
                 "lens_governance": [decision.fingerprint for decision in lens_governance],
-                "records": [(record.source_tier.value, record.source_ref, record.source_fingerprint) for record in packed],
+                "records": [
+                    (
+                        record.source_tier.value,
+                        record.source_provider,
+                        record.source_ref,
+                        record.source_fingerprint,
+                    )
+                    for record in packed
+                ],
                 "stale": sorted(stale),
                 "unresolved": unresolved,
                 "broad": broad,
@@ -635,45 +832,49 @@ class CognitiveContextFabric:
 
     @staticmethod
     def _dedupe(records: Sequence[DeepContextRecord]) -> list[DeepContextRecord]:
-        by_key: dict[tuple[SourceTier, str], DeepContextRecord] = {}
-        by_fingerprint: dict[str, DeepContextRecord] = {}
-        for record in records:
-            key = (record.source_tier, record.source_ref)
-            prior = by_key.get(key)
-            if prior is None or (
-                record.canonical,
-                record.trust,
-                record.confidence,
-                record.salience,
-            ) > (
-                prior.canonical,
-                prior.trust,
-                prior.confidence,
-                prior.salience,
-            ):
-                by_key[key] = record
-        for record in by_key.values():
-            prior = by_fingerprint.get(record.source_fingerprint)
-            if prior is None or (
-                record.canonical,
-                record.trust,
-                record.confidence,
-                record.salience,
-            ) > (
-                prior.canonical,
-                prior.trust,
-                prior.confidence,
-                prior.salience,
-            ):
-                by_fingerprint[record.source_fingerprint] = record
-        values = list(by_fingerprint.values())
-        values.sort(
-            key=lambda record: (
+        by_key: dict[tuple[SourceTier, str, str], DeepContextRecord] = {}
+        by_fingerprint: dict[tuple[SourceTier, str, str], DeepContextRecord] = {}
+
+        def rank(record: DeepContextRecord) -> tuple[Any, ...]:
+            return (
                 record.canonical,
                 record.trust,
                 record.confidence,
                 record.salience,
                 -record.token_estimate,
+                record.source_fingerprint,
+            )
+
+        for record in records:
+            key = (record.source_tier, record.source_provider, record.source_ref)
+            prior = by_key.get(key)
+            if prior is None or rank(record) > rank(prior):
+                by_key[key] = record
+
+        # Identical canonical content may be duplicated under multiple refs from
+        # one provider, but independent providers remain distinct provenance.
+        for record in by_key.values():
+            fingerprint_key = (
+                record.source_tier,
+                record.source_provider,
+                record.source_fingerprint,
+            )
+            prior = by_fingerprint.get(fingerprint_key)
+            if prior is None or (
+                rank(record),
+                record.source_ref,
+            ) > (
+                rank(prior),
+                prior.source_ref,
+            ):
+                by_fingerprint[fingerprint_key] = record
+
+        values = list(by_fingerprint.values())
+        values.sort(
+            key=lambda record: (
+                rank(record),
+                record.source_tier.value,
+                record.source_provider,
                 record.source_ref,
             ),
             reverse=True,
