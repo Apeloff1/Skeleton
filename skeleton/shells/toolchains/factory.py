@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from skeleton.shells.arguments import ArgumentPolicy, OptionRule, ValueConstraint
 from skeleton.shells.capabilities import ShellCapability
@@ -22,6 +22,26 @@ from skeleton.shells.toolchains.constraints import (
     URL_HTTPS,
 )
 from skeleton.shells.toolchains.types import CommandEffect, CommandRisk, LogicalCommandContract
+
+
+@dataclass(frozen=True)
+class PrefixBoundArgumentPolicy(ArgumentPolicy):
+    """Argument grammar that additionally requires an exact leading argv prefix."""
+
+    required_prefix: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        prefix = tuple(self.required_prefix)
+        if any(not isinstance(token, str) or not token for token in prefix):
+            raise ValueError("required argv prefix tokens must be non-empty strings")
+        object.__setattr__(self, "required_prefix", prefix)
+
+    def validate(self, command: str, args: Sequence[str]) -> tuple[str, ...]:
+        values = tuple(args)
+        if self.required_prefix and values[: len(self.required_prefix)] != self.required_prefix:
+            self._reject(command, "required logical command prefix is missing or reordered")
+        return super().validate(command, values)
 
 
 _CONSTRAINTS = {
@@ -189,7 +209,13 @@ def _argument_policy(spec: OperationSpec) -> ArgumentPolicy:
     variadic = None if spec.variadic is None else constraint(spec.variadic)
     if maximum is None and variadic is None:
         maximum = len(positional)
-    return ArgumentPolicy(
+    required_prefix = (
+        (spec.subcommand,)
+        if spec.subcommand is not None
+        else tuple(spec.fixed_prefix)
+    )
+    return PrefixBoundArgumentPolicy(
+        required_prefix=required_prefix,
         options=option_rules,
         positional=tuple(positional),
         variadic=variadic,
