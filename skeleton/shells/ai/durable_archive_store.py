@@ -2943,4 +2943,3 @@ class ArchiveBackedHistoricalChain:
             )
         except Exception:
             return False
-
