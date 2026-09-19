@@ -442,6 +442,149 @@ class DistributedAIDecisionJournal:
             for event in current
         )
 
+    def sequence_for_root(
+        self,
+        root_hash: str,
+    ) -> int:
+        root_hash = _sha256_hex(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return 0
+        return self.get_event(root_hash).sequence
+
+    def snapshot_segment(
+        self,
+        start_exclusive_root: str,
+        end_inclusive_root: str = "",
+        *,
+        max_items: int = 4096,
+    ) -> tuple[AIDecisionEvent, ...]:
+        """Verify and return only the chain segment after a trusted root."""
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        start_exclusive_root = _sha256_hex(
+            "start_exclusive_root",
+            start_exclusive_root,
+        )
+        head = self.head()
+        end_inclusive_root = _sha256_hex(
+            "end_inclusive_root",
+            end_inclusive_root or head.root_hash,
+        )
+        start_sequence = self.sequence_for_root(
+            start_exclusive_root
+        )
+        end_sequence = self.sequence_for_root(
+            end_inclusive_root
+        )
+        if end_sequence < start_sequence:
+            raise DistributedJournalCorruption(
+                "segment end precedes trusted start"
+            )
+        distance = end_sequence - start_sequence
+        if distance > max_items:
+            raise DistributedJournalConflict(
+                "decision journal segment exceeds bounded verification window"
+            )
+        if distance == 0:
+            if end_inclusive_root != start_exclusive_root:
+                raise DistributedJournalCorruption(
+                    "equal segment sequence has different roots"
+                )
+            return ()
+
+        current_hash = end_inclusive_root
+        expected_sequence = end_sequence
+        reverse: list[AIDecisionEvent] = []
+        seen: set[str] = set()
+        while current_hash != start_exclusive_root:
+            if len(reverse) >= max_items:
+                raise DistributedJournalConflict(
+                    "decision journal segment exceeds bounded verification window"
+                )
+            if current_hash == GENESIS_HASH:
+                raise DistributedJournalCorruption(
+                    "trusted segment start is not an ancestor"
+                )
+            if current_hash in seen:
+                raise DistributedJournalCorruption(
+                    "decision journal segment contains a cycle"
+                )
+            seen.add(current_hash)
+            event = self.get_event(current_hash)
+            if event.sequence != expected_sequence:
+                raise DistributedJournalCorruption(
+                    "decision journal segment sequence is not contiguous"
+                )
+            reverse.append(event)
+            current_hash = event.previous_hash
+            expected_sequence -= 1
+
+        if expected_sequence != start_sequence:
+            raise DistributedJournalCorruption(
+                "decision journal segment did not reach expected start sequence"
+            )
+        events = tuple(reversed(reverse))
+        previous = start_exclusive_root
+        sequence = start_sequence + 1
+        for event in events:
+            if (
+                event.sequence != sequence
+                or event.previous_hash != previous
+            ):
+                raise DistributedJournalCorruption(
+                    "decision journal segment linkage mismatch"
+                )
+            expected = AIDecisionJournal._hash(
+                previous,
+                sequence,
+                event.kind,
+                event.observed_at,
+                event.session_id,
+                event.intent_id,
+                event.proposal_id,
+                event.summary,
+                event.data,
+            )
+            if expected != event.event_hash:
+                raise DistributedJournalCorruption(
+                    "decision journal segment digest mismatch"
+                )
+            previous = event.event_hash
+            sequence += 1
+        if previous != end_inclusive_root:
+            raise DistributedJournalCorruption(
+                "decision journal segment end root mismatch"
+            )
+        return events
+
+    def verify_segment(
+        self,
+        start_exclusive_root: str,
+        end_inclusive_root: str = "",
+        *,
+        max_items: int = 4096,
+    ) -> bool:
+        try:
+            self.snapshot_segment(
+                start_exclusive_root,
+                end_inclusive_root,
+                max_items=max_items,
+            )
+        except (
+            DistributedJournalConflict,
+            DistributedJournalCorruption,
+            ValueError,
+        ):
+            return False
+        return True
+
     def verify(self) -> bool:
         try:
             events = self.snapshot()
