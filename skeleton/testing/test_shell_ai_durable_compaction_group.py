@@ -183,6 +183,104 @@ class FailTargetOnceOperator(
         )
 
 
+class ArchiveLossTargetOperator(
+    DurableCompactionOperator
+):
+    def __init__(
+        self,
+        *args,
+        target_chain="receipts",
+        **kwargs,
+    ):
+        super().__init__(
+            *args,
+            **kwargs,
+        )
+        self.target_chain = target_chain
+        self.fail_enabled = False
+        self.failed = False
+
+    def execute(
+        self,
+        workflow_id,
+        retention,
+        chain,
+        **kwargs,
+    ):
+        stored = self.current(
+            workflow_id
+        )
+        if (
+            self.fail_enabled
+            and not self.failed
+            and stored is not None
+            and stored.workflow.chain_id
+            == self.target_chain
+        ):
+            self.failed = True
+            archive_id = (
+                stored.workflow.archive_id
+            )
+            key = (
+                self.pruning.archives
+                ._archive_key(archive_id)
+            )
+            record = self.backend.get(
+                self.pruning.archives.namespace,
+                key,
+            )
+            assert record is not None
+            self.backend.delete(
+                self.pruning.archives.namespace,
+                key,
+                expected_revision=record.revision,
+            )
+        return super().execute(
+            workflow_id,
+            retention,
+            chain,
+            **kwargs,
+        )
+
+
+class FailReceiptDeleteOnceBackend(
+    InMemoryFencedStore
+):
+    def __init__(self):
+        super().__init__()
+        self.fail_enabled = False
+        self.fail_after = 1
+        self.receipt_delete_calls = 0
+        self.failed = False
+
+    def delete(
+        self,
+        namespace,
+        key,
+        *,
+        expected_revision,
+    ):
+        if (
+            self.fail_enabled
+            and not self.failed
+            and namespace == "receipts"
+        ):
+            self.receipt_delete_calls += 1
+            if (
+                self.receipt_delete_calls
+                > self.fail_after
+            ):
+                self.failed = True
+                raise RuntimeError(
+                    "synthetic receipt pruning crash"
+                )
+        return super().delete(
+            namespace,
+            key,
+            expected_revision=expected_revision,
+        )
+
+
 class ManualReviewTargetOperator(
     DurableCompactionOperator
 ):
@@ -1147,6 +1245,223 @@ def test_partial_commit_is_persisted_when_second_member_fails_before_floor():
         .hot_floor()
         .sequence
         == 0
+    )
+
+
+def test_archive_loss_on_second_member_escalates_partial_group_to_manual_review():
+    fixture = GroupFixture(
+        operator_class=ArchiveLossTargetOperator,
+    )
+    planned, *_ = (
+        fixture.through_prepared()
+    )
+    receipt_before = (
+        fixture.receipts.snapshot()
+    )
+    fixture.operator.fail_enabled = True
+
+    with pytest.raises(
+        DurableCompactionGroupManualReview,
+        match="bound archive",
+    ):
+        fixture.coordinator.execute(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+    stored = fixture.coordinator.current(
+        planned.group.group_id
+    )
+    assert stored is not None
+    assert (
+        stored.group.phase
+        is DurableCompactionGroupPhase.MANUAL_REVIEW
+    )
+    assert stored.group.requires_manual_review
+    assert stored.group.partial_commit
+
+    journal_member = next(
+        item
+        for item in stored.group.members
+        if item.chain_id == "journal"
+    )
+    receipt_member = next(
+        item
+        for item in stored.group.members
+        if item.chain_id == "receipts"
+    )
+    assert journal_member.complete
+    assert journal_member.floor_committed
+    assert receipt_member.manual_review
+    assert not receipt_member.floor_committed
+
+    assert (
+        fixture.journal.hot_floor().sequence
+        == 6
+    )
+    assert (
+        fixture.receipts.hot_floor().sequence
+        == 0
+    )
+    assert (
+        fixture.receipts.snapshot()
+        == receipt_before
+    )
+
+
+def test_archive_loss_partial_group_cannot_resume_automatically():
+    fixture = GroupFixture(
+        operator_class=ArchiveLossTargetOperator,
+    )
+    planned, *_ = (
+        fixture.through_prepared()
+    )
+    fixture.operator.fail_enabled = True
+
+    with pytest.raises(
+        DurableCompactionGroupManualReview,
+    ):
+        fixture.coordinator.execute(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+    with pytest.raises(
+        DurableCompactionGroupManualReview,
+    ):
+        fixture.coordinator.resume(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+
+def test_partial_receipt_delete_then_archive_loss_stops_further_group_deletion():
+    backend = FailReceiptDeleteOnceBackend()
+    fixture = GroupFixture(
+        backend=backend,
+    )
+    planned, *_ = (
+        fixture.through_prepared()
+    )
+
+    backend.fail_enabled = True
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic receipt pruning crash",
+    ):
+        fixture.coordinator.execute(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+    stored = fixture.coordinator.current(
+        planned.group.group_id
+    )
+    assert stored is not None
+    assert stored.group.partial_commit
+    journal_member = next(
+        item
+        for item in stored.group.members
+        if item.chain_id == "journal"
+    )
+    receipt_member = next(
+        item
+        for item in stored.group.members
+        if item.chain_id == "receipts"
+    )
+    assert journal_member.complete
+    assert receipt_member.floor_committed
+    assert not receipt_member.complete
+
+    receipt_workflow = fixture.operator.current(
+        receipt_member.workflow_id
+    )
+    assert receipt_workflow is not None
+    operation_id = (
+        receipt_workflow.workflow
+        .pruning_operation_id
+    )
+    manifest = fixture.executor.manifest(
+        operation_id
+    )
+    assert manifest is not None
+
+    before_resume = tuple(
+        fixture.backend.get(
+            fixture.receipts.namespace,
+            item.node_key,
+        )
+        is not None
+        for item in manifest.items
+    )
+    assert not all(before_resume)
+
+    backend.fail_enabled = False
+    remaining = tuple(
+        item
+        for item, present in zip(
+            manifest.items,
+            before_resume,
+        )
+        if present
+    )
+    assert remaining
+    target = remaining[-1]
+    archive_key = (
+        fixture.archives._node_key(
+            "receipts",
+            target.node_hash,
+        )
+    )
+    archive_record = fixture.backend.get(
+        fixture.archives.namespace,
+        archive_key,
+    )
+    assert archive_record is not None
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        archive_key,
+        expected_revision=archive_record.revision,
+    )
+
+    with pytest.raises(
+        DurableCompactionGroupManualReview,
+        match="bound archive",
+    ):
+        fixture.coordinator.resume(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+    after_resume = tuple(
+        fixture.backend.get(
+            fixture.receipts.namespace,
+            item.node_key,
+        )
+        is not None
+        for item in manifest.items
+    )
+    assert after_resume == before_resume
+
+    final_group = fixture.coordinator.current(
+        planned.group.group_id
+    )
+    assert final_group is not None
+    assert (
+        final_group.group.phase
+        is DurableCompactionGroupPhase.MANUAL_REVIEW
+    )
+    assert final_group.group.partial_commit
+
+    final_receipt_workflow = (
+        fixture.operator.current(
+            receipt_member.workflow_id
+        )
+    )
+    assert final_receipt_workflow is not None
+    assert (
+        final_receipt_workflow.workflow.phase
+        is DurableCompactionWorkflowPhase.MANUAL_REVIEW
     )
 
 
