@@ -185,7 +185,8 @@ def compute_preconditions(
     if expected_snapshot_fingerprint is not None:
         policy_matches = (
             policy_matches
-            and expected_snapshot_fingerprint == original.fingerprint()
+            and expected_snapshot_fingerprint
+            == snapshot_policy_fingerprint(original)
         )
     return Preconditions(
         protected_base=protected_ok,
