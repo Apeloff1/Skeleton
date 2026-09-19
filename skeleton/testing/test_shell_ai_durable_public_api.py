@@ -25,6 +25,14 @@ from skeleton.shells.ai.durable_archive_store import (
     DurableArchiveStoreReport,
     StoredDurableArchive,
 )
+from skeleton.shells.ai.durable_compaction import (
+    DurableCompactionError,
+    DurableCompactionPlanner,
+    DurableCompactionPolicy,
+    DurableCompactionReadiness,
+    DurableCompactionRootCoverage,
+    DurableCompactionState,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryFinding,
     DurableRecoveryStatus,
@@ -51,6 +59,12 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "DurableCompactionError": DurableCompactionError,
+    "DurableCompactionPlanner": DurableCompactionPlanner,
+    "DurableCompactionPolicy": DurableCompactionPolicy,
+    "DurableCompactionReadiness": DurableCompactionReadiness,
+    "DurableCompactionRootCoverage": DurableCompactionRootCoverage,
+    "DurableCompactionState": DurableCompactionState,
     "ArchiveBackedHistoricalChain": ArchiveBackedHistoricalChain,
     "DurableArchivedNode": DurableArchivedNode,
     "DurableArchivedNodeType": DurableArchivedNodeType,
@@ -951,5 +965,54 @@ def test_archive_store_error_is_runtime_error():
     assert issubclass(
         DurableArchiveStoreError,
         RuntimeError,
+    )
+
+def test_compaction_planner_constructor_exposes_archive_authority():
+    signature = inspect.signature(DurableCompactionPlanner)
+    assert "archives" in signature.parameters
+    assert "policy" in signature.parameters
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "require_ready"],
+)
+def test_compaction_planner_public_methods_are_stable(method):
+    assert callable(
+        getattr(
+            DurableCompactionPlanner,
+            method,
+            None,
+        )
+    )
+
+
+def test_compaction_state_wire_values_are_public_contract():
+    assert {
+        item.value
+        for item in DurableCompactionState
+    } == {
+        "ready",
+        "no_archive_candidate",
+        "archive_missing",
+        "archive_invalid",
+        "stale_retention_plan",
+        "live_tail_too_small",
+        "protected_root_gap",
+        "chain_invalid",
+    }
+
+
+def test_compaction_error_is_runtime_error_public_contract():
+    assert issubclass(
+        DurableCompactionError,
+        RuntimeError,
+    )
+
+
+def test_compaction_readiness_exposes_non_destructive_authority_property():
+    assert isinstance(
+        DurableCompactionReadiness.destructive_action_authorized,
+        property,
     )
 
