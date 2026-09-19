@@ -65,6 +65,7 @@ from .solver import SequentialImpulseSolver, SolverStats
 MAX_WORLD_BODIES = 100_000
 MAX_WORLD_JOINTS = 100_000
 MAX_STEP_COUNT = 10_000
+MAX_TOI_RESIDUAL_PROJECTION_PASSES = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -877,37 +878,64 @@ class PhysicsWorld:
         body_b = self._bodies[manifold.body_b]
         normal = manifold.normal
 
-        for point in manifold.points:
-            velocity_a = body_a.velocity_at_world_point(point.position)
-            velocity_b = body_b.velocity_at_world_point(point.position)
-            normal_speed = (velocity_b - velocity_a).dot(normal)
-            if normal_speed >= -EPSILON:
-                continue
+        # A single projection is exact for one isolated point in exact
+        # arithmetic, but applying the correction changes angular velocity at
+        # every other manifold point.  Curved support-map contacts can
+        # therefore re-introduce a tiny closing velocity at an earlier point,
+        # and architecture-level floating-point differences can make that
+        # residual large enough to trigger another zero-time TOI.  Iterate a
+        # fixed small number of Gauss-Seidel passes and stop as soon as a full
+        # pass needs no correction.
+        for _ in range(MAX_TOI_RESIDUAL_PROJECTION_PASSES):
+            corrected = False
+            for point in manifold.points:
+                velocity_a = body_a.velocity_at_world_point(point.position)
+                velocity_b = body_b.velocity_at_world_point(point.position)
+                normal_speed = (velocity_b - velocity_a).dot(normal)
+                if normal_speed >= -EPSILON:
+                    continue
 
-            arm_a = point.position - body_a.position
-            arm_b = point.position - body_b.position
-            effective_inverse_mass = body_a.inverse_mass + body_b.inverse_mass
+                arm_a = point.position - body_a.position
+                arm_b = point.position - body_b.position
+                effective_inverse_mass = (
+                    body_a.inverse_mass + body_b.inverse_mass
+                )
 
-            if body_a.dynamic_body:
-                angular_a = body_a.world_inverse_inertia().mul_vec(
-                    arm_a.cross(normal)
-                ).cross(arm_a)
-                effective_inverse_mass += normal.dot(angular_a)
-            if body_b.dynamic_body:
-                angular_b = body_b.world_inverse_inertia().mul_vec(
-                    arm_b.cross(normal)
-                ).cross(arm_b)
-                effective_inverse_mass += normal.dot(angular_b)
+                if body_a.dynamic_body:
+                    angular_a = body_a.world_inverse_inertia().mul_vec(
+                        arm_a.cross(normal)
+                    ).cross(arm_a)
+                    effective_inverse_mass += normal.dot(angular_a)
+                if body_b.dynamic_body:
+                    angular_b = body_b.world_inverse_inertia().mul_vec(
+                        arm_b.cross(normal)
+                    ).cross(arm_b)
+                    effective_inverse_mass += normal.dot(angular_b)
 
-            if effective_inverse_mass <= EPSILON:
-                continue
+                if effective_inverse_mass <= EPSILON:
+                    continue
 
-            impulse_magnitude = -normal_speed / effective_inverse_mass
-            if not math.isfinite(impulse_magnitude) or impulse_magnitude <= 0.0:
-                continue
-            impulse = normal * impulse_magnitude
-            body_a.apply_impulse(-impulse, point=point.position)
-            body_b.apply_impulse(impulse, point=point.position)
+                impulse_magnitude = (
+                    -normal_speed / effective_inverse_mass
+                )
+                if (
+                    not math.isfinite(impulse_magnitude)
+                    or impulse_magnitude <= 0.0
+                ):
+                    continue
+                impulse = normal * impulse_magnitude
+                body_a.apply_impulse(
+                    -impulse,
+                    point=point.position,
+                )
+                body_b.apply_impulse(
+                    impulse,
+                    point=point.position,
+                )
+                corrected = True
+
+            if not corrected:
+                break
 
     def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
         self._bias_toi_pair_into_contact(event)
