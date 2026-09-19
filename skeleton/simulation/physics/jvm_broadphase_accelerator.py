@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .math3d import AABB
+from .queries import Ray
 
 _MAGIC = 0x534B4250
 _VERSION = 1
@@ -28,19 +29,24 @@ _OP_PING = 1
 _OP_PAIRS = 2
 _OP_SHUTDOWN = 3
 _OP_QUERY_AABBS = 4
+_OP_RAY_AABBS = 5
+_OP_SPHERE_CAST_AABBS = 6
 _STATUS_OK = 0
 _MAX_BODIES = 100_000
 _MAX_PAIRS = 1_000_000
 _MAX_QUERIES = 4096
 _MAX_QUERY_HITS = 1_000_000
+_MAX_SPATIAL_TESTS = 50_000_000
 _HEADER_REQUEST = struct.Struct(">IhBq")
 _HEADER_RESPONSE = struct.Struct(">IhBBq")
 _INT = struct.Struct(">i")
 _PING = struct.Struct(">qi")
 _REQUEST_PREFIX = struct.Struct(">iid")
 _QUERY_PREFIX = struct.Struct(">iii")
+_SPHERE_QUERY_PREFIX = struct.Struct(">iiid")
 _BOX = struct.Struct(">?6d")
 _BOUNDS = struct.Struct(">6d")
+_RAY = struct.Struct(">7d")
 _PAIR = struct.Struct(">ii")
 
 
@@ -76,6 +82,7 @@ class JvmBroadPhaseConfig:
     source: Path
     response_timeout_seconds: float = 15.0
     minimum_bodies: int = 2048
+    minimum_spatial_tests: int = 16_384
     max_bodies: int = _MAX_BODIES
     max_pairs: int = _MAX_PAIRS
 
@@ -86,6 +93,8 @@ class JvmBroadPhaseConfig:
             raise ValueError("response_timeout_seconds must be positive")
         if not 1 <= self.minimum_bodies <= self.max_bodies:
             raise ValueError("minimum_bodies outside supported range")
+        if not 1 <= self.minimum_spatial_tests <= _MAX_SPATIAL_TESTS:
+            raise ValueError("minimum_spatial_tests outside supported range")
         if not 1 <= self.max_bodies <= _MAX_BODIES:
             raise ValueError("max_bodies outside supported range")
         if not 1 <= self.max_pairs <= _MAX_PAIRS:
@@ -103,11 +112,18 @@ class JvmBroadPhaseConfig:
         )
         timeout = float(os.environ.get("SKELETON_JVM_BROADPHASE_TIMEOUT", "15"))
         minimum = int(os.environ.get("SKELETON_JVM_BROADPHASE_MIN_BODIES", "2048"))
+        minimum_spatial = int(
+            os.environ.get(
+                "SKELETON_JVM_BROADPHASE_MIN_SPATIAL_TESTS",
+                "16384",
+            )
+        )
         return cls(
             java_binary=java_binary,
             source=source,
             response_timeout_seconds=timeout,
             minimum_bodies=minimum,
+            minimum_spatial_tests=minimum_spatial,
         )
 
 
@@ -138,6 +154,10 @@ class JvmBroadPhaseAccelerator:
     @property
     def minimum_bodies(self) -> int:
         return self.config.minimum_bodies
+
+    @property
+    def minimum_spatial_tests(self) -> int:
+        return self.config.minimum_spatial_tests
 
     def __enter__(self) -> "JvmBroadPhaseAccelerator":
         self.ping()
@@ -210,6 +230,8 @@ class JvmBroadPhaseAccelerator:
             raise ValueError("query count outside accelerator bound")
         if not 1 <= max_total_hits <= _MAX_QUERY_HITS:
             raise ValueError("max_total_hits outside accelerator bound")
+        if body_count * query_count > _MAX_SPATIAL_TESTS:
+            raise ValueError("spatial test bound exceeded")
 
         payload = bytearray(
             _QUERY_PREFIX.pack(body_count, query_count, max_total_hits)
@@ -223,27 +245,135 @@ class JvmBroadPhaseAccelerator:
         if not isinstance(response.payload, list):
             raise JvmBroadPhaseProtocolError("AABB query response type mismatch")
         batches = response.payload
-        if len(batches) != query_count:
-            raise JvmBroadPhaseProtocolError("AABB query count mismatch")
+        self._validate_index_batches(
+            batches,
+            batch_count=query_count,
+            body_count=body_count,
+            max_total=max_total_hits,
+            label="AABB query",
+        )
+        return batches
 
-        total = 0
-        for hits in batches:
-            if not isinstance(hits, list):
-                raise JvmBroadPhaseProtocolError("invalid AABB hit batch")
-            previous = -1
-            for index in hits:
-                if not isinstance(index, int) or not 0 <= index < body_count:
-                    raise JvmBroadPhaseProtocolError("AABB hit index outside body range")
-                if index <= previous:
-                    raise JvmBroadPhaseProtocolError(
-                        "AABB hit indices are not strictly ordered"
-                    )
-                previous = index
-                total += 1
-                if total > max_total_hits:
-                    raise JvmBroadPhaseProtocolError(
-                        "AABB query total-hit bound exceeded"
-                    )
+    def ray_candidates_many(
+        self,
+        body_bounds: Sequence[AABB],
+        rays: Sequence[Ray],
+        *,
+        max_total_candidates: int = _MAX_QUERY_HITS,
+    ) -> list[list[int]]:
+        """Return stable finite-body candidate indices for each ray."""
+        body_count = len(body_bounds)
+        ray_count = len(rays)
+        if body_count > self.config.max_bodies:
+            raise ValueError("body count exceeds accelerator bound")
+        if not 1 <= ray_count <= _MAX_QUERIES:
+            raise ValueError("ray count outside accelerator bound")
+        if not 1 <= max_total_candidates <= _MAX_QUERY_HITS:
+            raise ValueError("max_total_candidates outside accelerator bound")
+        if body_count * ray_count > _MAX_SPATIAL_TESTS:
+            raise ValueError("spatial test bound exceeded")
+
+        payload = bytearray(
+            _QUERY_PREFIX.pack(
+                body_count,
+                ray_count,
+                max_total_candidates,
+            )
+        )
+        for bounds in body_bounds:
+            payload.extend(self._encode_bounds(bounds))
+        for ray in rays:
+            if not isinstance(ray, Ray):
+                raise TypeError("ray batch must contain Ray values")
+            payload.extend(
+                _RAY.pack(
+                    ray.origin.x,
+                    ray.origin.y,
+                    ray.origin.z,
+                    ray.direction.x,
+                    ray.direction.y,
+                    ray.direction.z,
+                    ray.max_distance,
+                )
+            )
+
+        response = self._request(_OP_RAY_AABBS, bytes(payload))
+        if not isinstance(response.payload, list):
+            raise JvmBroadPhaseProtocolError("ray candidate response type mismatch")
+        batches = response.payload
+        self._validate_index_batches(
+            batches,
+            batch_count=ray_count,
+            body_count=body_count,
+            max_total=max_total_candidates,
+            label="ray candidate",
+        )
+        return batches
+
+    def sphere_cast_candidates_many(
+        self,
+        body_bounds: Sequence[AABB],
+        rays: Sequence[Ray],
+        radius: float,
+        *,
+        max_total_candidates: int = _MAX_QUERY_HITS,
+    ) -> list[list[int]]:
+        """Return stable finite-body coarse candidates for sphere casts."""
+        body_count = len(body_bounds)
+        ray_count = len(rays)
+        radius_value = float(radius)
+        if not math.isfinite(radius_value) or radius_value <= 0.0:
+            raise ValueError("sphere cast radius must be finite and positive")
+        if body_count > self.config.max_bodies:
+            raise ValueError("body count exceeds accelerator bound")
+        if not 1 <= ray_count <= _MAX_QUERIES:
+            raise ValueError("ray count outside accelerator bound")
+        if not 1 <= max_total_candidates <= _MAX_QUERY_HITS:
+            raise ValueError("max_total_candidates outside accelerator bound")
+        if body_count * ray_count > _MAX_SPATIAL_TESTS:
+            raise ValueError("spatial test bound exceeded")
+
+        payload = bytearray(
+            _SPHERE_QUERY_PREFIX.pack(
+                body_count,
+                ray_count,
+                max_total_candidates,
+                radius_value,
+            )
+        )
+        for bounds in body_bounds:
+            payload.extend(self._encode_bounds(bounds))
+        for ray in rays:
+            if not isinstance(ray, Ray):
+                raise TypeError("sphere cast batch must contain Ray values")
+            payload.extend(
+                _RAY.pack(
+                    ray.origin.x,
+                    ray.origin.y,
+                    ray.origin.z,
+                    ray.direction.x,
+                    ray.direction.y,
+                    ray.direction.z,
+                    ray.max_distance,
+                )
+            )
+
+        response = self._request(
+            _OP_SPHERE_CAST_AABBS,
+            bytes(payload),
+        )
+        if not isinstance(response.payload, list):
+            raise JvmBroadPhaseProtocolError(
+                "sphere-cast candidate response type mismatch"
+            )
+        batches = response.payload
+        self._validate_index_batches(
+            batches,
+            batch_count=ray_count,
+            body_count=body_count,
+            max_total=max_total_candidates,
+            label="sphere-cast candidate",
+        )
         return batches
 
     def close(self) -> None:
@@ -422,16 +552,20 @@ class JvmBroadPhaseAccelerator:
                 except ValueError as exc:
                     raise JvmBroadPhaseProtocolError(str(exc)) from exc
             return pairs
-        if op == _OP_QUERY_AABBS:
-            query_count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
-            if not 0 <= query_count <= _MAX_QUERIES:
-                raise JvmBroadPhaseProtocolError("invalid AABB query count")
+        if op in {
+            _OP_QUERY_AABBS,
+            _OP_RAY_AABBS,
+            _OP_SPHERE_CAST_AABBS,
+        }:
+            batch_count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
+            if not 0 <= batch_count <= _MAX_QUERIES:
+                raise JvmBroadPhaseProtocolError("invalid spatial batch count")
             batches: list[list[int]] = []
             total = 0
-            for _ in range(query_count):
+            for _ in range(batch_count):
                 count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
                 if not 0 <= count <= self.config.max_bodies:
-                    raise JvmBroadPhaseProtocolError("invalid AABB hit count")
+                    raise JvmBroadPhaseProtocolError("invalid spatial hit count")
                 hits: list[int] = []
                 for _ in range(count):
                     index = _INT.unpack(
@@ -441,7 +575,7 @@ class JvmBroadPhaseAccelerator:
                     total += 1
                     if total > _MAX_QUERY_HITS:
                         raise JvmBroadPhaseProtocolError(
-                            "AABB response exceeds hard hit bound"
+                            "spatial response exceeds hard hit bound"
                         )
                 batches.append(hits)
             return batches
@@ -472,6 +606,42 @@ class JvmBroadPhaseAccelerator:
             bounds.maximum.y,
             bounds.maximum.z,
         )
+
+    @staticmethod
+    def _validate_index_batches(
+        batches: object,
+        *,
+        batch_count: int,
+        body_count: int,
+        max_total: int,
+        label: str,
+    ) -> None:
+        if not isinstance(batches, list) or len(batches) != batch_count:
+            raise JvmBroadPhaseProtocolError(
+                f"{label} batch count mismatch"
+            )
+        total = 0
+        for hits in batches:
+            if not isinstance(hits, list):
+                raise JvmBroadPhaseProtocolError(
+                    f"invalid {label} batch"
+                )
+            previous = -1
+            for index in hits:
+                if not isinstance(index, int) or not 0 <= index < body_count:
+                    raise JvmBroadPhaseProtocolError(
+                        f"{label} index outside body range"
+                    )
+                if index <= previous:
+                    raise JvmBroadPhaseProtocolError(
+                        f"{label} indices are not strictly ordered"
+                    )
+                previous = index
+                total += 1
+                if total > max_total:
+                    raise JvmBroadPhaseProtocolError(
+                        f"{label} total-hit bound exceeded"
+                    )
 
     @staticmethod
     def _validate_pairs(
