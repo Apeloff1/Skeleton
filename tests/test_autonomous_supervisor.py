@@ -178,9 +178,8 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             execution,
             EXECUTION,
         )
-        self.assertEqual(
+        self.assertIsNone(
             approved_build_count,
-            0,
         )
 
     def test_envelope_payload_contains_only_expected_fields(
@@ -197,7 +196,7 @@ class SupervisorEnvelopeTests(unittest.TestCase):
                 "plan",
                 "execution",
                 "execution_fingerprint",
-                "approved_build_count",
+                "build_authorization",
             },
         )
 
@@ -370,39 +369,34 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         ):
             self.decode(encoded)
 
-    def test_envelope_rejects_invalid_approved_build_count(
+    def test_envelope_rejects_malformed_build_authorization(
         self,
     ) -> None:
         _snap, envelope = self.envelope()
-        for invalid in (
-            -1,
-            True,
-            41,
-            "1",
+        encoded = tamper_envelope(
+            envelope.to_base64(),
+            lambda value: value.__setitem__(
+                "build_authorization",
+                {"version": 1, "issue_number": 1},
+            ),
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
         ):
-            encoded = tamper_envelope(
-                envelope.to_base64(),
-                lambda value, item=invalid: value.__setitem__(
-                    "approved_build_count",
-                    item,
-                ),
-            )
-            with self.assertRaises(
-                secretary.SecretaryAdmissionError
-            ):
-                self.decode(encoded)
+            self.decode(encoded)
 
     def test_envelope_rejects_empty_plan(
         self,
     ) -> None:
         snap = self.snapshot()
         envelope = supervisor.DelegationEnvelope(
-            version=2,
+            version=3,
             repository=REPO,
             snapshot_fingerprint=snap.fingerprint,
             observed_at=snap.observed_at,
             plan="",
             execution=EXECUTION,
+            build_authorization=None,
         )
         with self.assertRaises(
             supervisor.SupervisorError
@@ -599,9 +593,12 @@ class BuildAuthorityTests(unittest.TestCase):
             "implement approved feature",
             EXECUTION,
         )
+        self.assertIsNotNone(
+            envelope.build_authorization,
+        )
         self.assertEqual(
-            envelope.approved_build_count,
-            1,
+            envelope.build_authorization.issue_number,
+            2,
         )
         decoded = secretary.decode_delegation(
             envelope.to_base64(),
@@ -609,9 +606,12 @@ class BuildAuthorityTests(unittest.TestCase):
             expected_execution=EXECUTION,
             now=snapshot.observed_at,
         )
-        self.assertEqual(
+        self.assertIsNotNone(
             decoded[3],
-            1,
+        )
+        self.assertEqual(
+            decoded[3].issue_number,
+            2,
         )
 
     def test_feature_builder_is_inert_without_approved_work(
@@ -623,7 +623,7 @@ class BuildAuthorityTests(unittest.TestCase):
                 "feature implement enhancement"
             ),
             ["feature-builder"],
-            approved_build_count=0,
+            build_authorization=None,
         )
         self.assertEqual(
             routed,
@@ -639,7 +639,24 @@ class BuildAuthorityTests(unittest.TestCase):
                 "feature implement enhancement"
             ),
             ["feature-builder"],
-            approved_build_count=1,
+            build_authorization=supervisor.selected_build_authorization(
+                supervisor.SupervisorSnapshot(
+                    repository=REPO,
+                    observed_at=1_700_000_000,
+                    issues=(
+                        {
+                            "number": 9,
+                            "title": "approved",
+                            "body": "implement this",
+                            "labels": ("automation-approved",),
+                            "updatedAt": "2026-09-19T00:00:00Z",
+                            "automation_authorized": True,
+                        },
+                    ),
+                    pull_requests=(),
+                    workflow_runs=(),
+                )
+            ),
         )
         self.assertEqual(
             routed,
@@ -655,7 +672,24 @@ class BuildAuthorityTests(unittest.TestCase):
                 "root-cause",
                 "feature-builder",
             ],
-            approved_build_count=3,
+            build_authorization=supervisor.selected_build_authorization(
+                supervisor.SupervisorSnapshot(
+                    repository=REPO,
+                    observed_at=1_700_000_000,
+                    issues=(
+                        {
+                            "number": 9,
+                            "title": "approved",
+                            "body": "implement this",
+                            "labels": ("automation-approved",),
+                            "updatedAt": "2026-09-19T00:00:00Z",
+                            "automation_authorized": True,
+                        },
+                    ),
+                    pull_requests=(),
+                    workflow_runs=(),
+                )
+            ),
         )
         self.assertEqual(
             routed,
