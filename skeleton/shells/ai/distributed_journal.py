@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import math
 from types import MappingProxyType
 import time
-from typing import Callable, Mapping
+from typing import Callable, Iterable, Mapping
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
 from skeleton.shells.ai.durable_hot_floor import (
@@ -1173,6 +1173,153 @@ class DistributedAIDecisionJournal:
                 "decision journal segment end root mismatch"
             )
         return events
+
+    def restore_segment(
+        self,
+        events: Iterable[AIDecisionEvent],
+        *,
+        max_items: int = 4096,
+    ) -> DistributedJournalHead:
+        """Restore an exact committed segment onto this chain.
+
+        The target may be empty, behind the segment, or already contain an
+        identical prefix. Same-sequence different-root state is treated as
+        divergence and is never overwritten.
+        """
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        values = tuple(events)
+        if len(values) > max_items:
+            raise DistributedJournalConflict(
+                "journal restore exceeds bounded segment size"
+            )
+        if not values:
+            return self.head()
+
+        previous_hash = values[0].previous_hash
+        previous_sequence = values[0].sequence - 1
+        if previous_sequence < 0:
+            raise DistributedJournalCorruption(
+                "journal restore begins before sequence one"
+            )
+        for offset, event in enumerate(values):
+            if not isinstance(event, AIDecisionEvent):
+                raise TypeError(
+                    "journal restore items must be AIDecisionEvent"
+                )
+            expected_sequence = previous_sequence + offset + 1
+            if event.sequence != expected_sequence:
+                raise DistributedJournalCorruption(
+                    "journal restore sequence is not contiguous"
+                )
+            expected_previous = (
+                previous_hash
+                if offset == 0
+                else values[offset - 1].event_hash
+            )
+            if event.previous_hash != expected_previous:
+                raise DistributedJournalCorruption(
+                    "journal restore linkage mismatch"
+                )
+            expected_hash = AIDecisionJournal._hash(
+                event.previous_hash,
+                event.sequence,
+                event.kind,
+                event.observed_at,
+                event.session_id,
+                event.intent_id,
+                event.proposal_id,
+                event.summary,
+                event.data,
+            )
+            if expected_hash != event.event_hash:
+                raise DistributedJournalCorruption(
+                    "journal restore event digest mismatch"
+                )
+            if event.sequence > self.max_events:
+                raise DistributedJournalConflict(
+                    "journal restore exceeds chain capacity"
+                )
+
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and values[0].sequence <= floor.sequence
+        ):
+            raise DistributedJournalConflict(
+                "journal restore overlaps compacted hot floor"
+            )
+
+        for event in values:
+            for _ in range(self.max_cas_retries):
+                revision, head = self._head_revision()
+                if head.sequence >= event.sequence:
+                    try:
+                        existing_root = self.root_for_sequence(
+                            event.sequence,
+                            repair_missing=True,
+                        )
+                    except (
+                        DistributedJournalConflict,
+                        DistributedJournalCorruption,
+                        IndexError,
+                    ) as exc:
+                        raise DistributedJournalConflict(
+                            "journal restore cannot verify existing target prefix"
+                        ) from exc
+                    if existing_root != event.event_hash:
+                        raise DistributedJournalConflict(
+                            "journal restore diverges from existing target prefix"
+                        )
+                    self._put_event(event)
+                    self._put_sequence_index(event)
+                    break
+
+                if head.sequence != event.sequence - 1:
+                    raise DistributedJournalConflict(
+                        "journal restore target has a sequence gap"
+                    )
+                if head.root_hash != event.previous_hash:
+                    raise DistributedJournalConflict(
+                        "journal restore target root diverges from segment"
+                    )
+
+                self._put_event(event)
+                next_head = DistributedJournalHead(
+                    event.sequence,
+                    event.event_hash,
+                )
+                try:
+                    self.backend.compare_and_swap(
+                        self.namespace,
+                        "head",
+                        expected_revision=revision,
+                        value=next_head,
+                    )
+                except DistributedStateConflict:
+                    continue
+                self._put_sequence_index(event)
+                break
+            else:
+                raise DistributedJournalConflict(
+                    "journal restore CAS retry budget exhausted"
+                )
+
+        last = values[-1]
+        current = self.head()
+        if current.sequence < last.sequence:
+            raise DistributedJournalCorruption(
+                "journal restore ended before requested segment"
+            )
+        if self.root_for_sequence(last.sequence) != last.event_hash:
+            raise DistributedJournalConflict(
+                "journal restore final prefix differs from segment"
+            )
+        return current
 
     def verify_segment(
         self,
