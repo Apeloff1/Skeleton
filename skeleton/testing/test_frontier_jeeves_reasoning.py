@@ -711,6 +711,7 @@ def test_frontier_uncertainty_uses_strongest_unresolved_signal() -> None:
             normalized_entropy=0.72,
             agreement=0.80,
         ),
+        lens_fusion=None,
     )
 
     value = AdaptiveJeevesRuntime._frontier_uncertainty(decision)
