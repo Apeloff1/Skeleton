@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -33,8 +34,7 @@ from skeleton.shells.plan_executor import (
 from skeleton.shells.receipts import ReceiptChain
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def completed_session(
