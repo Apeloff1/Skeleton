@@ -125,6 +125,47 @@ class ContentAddressedBackupStore:
             raise BackupError("backup blob verification failed")
         return data
 
+    def _publish_manifest(self, manifest: BackupManifest) -> None:
+        destination = self.manifest_root / f"{manifest.backup_id}.json"
+        payload = json.dumps(
+            manifest.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        fd, temporary = tempfile.mkstemp(
+            prefix=".manifest-",
+            suffix=".tmp",
+            dir=str(self.manifest_root),
+        )
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, destination)
+            # Best-effort directory fsync closes the rename durability window
+            # on filesystems that support syncing directory metadata.
+            try:
+                directory_fd = os.open(self.manifest_root, os.O_RDONLY)
+            except OSError:
+                directory_fd = None
+            if directory_fd is not None:
+                try:
+                    os.fsync(directory_fd)
+                except OSError:
+                    pass
+                finally:
+                    os.close(directory_fd)
+        except OSError as exc:
+            raise BackupError("failed publishing backup manifest") from exc
+        finally:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
     def create_manifest(
         self,
         workspace_root: Path | str,
@@ -220,11 +261,7 @@ class ContentAddressedBackupStore:
             root_mode=root_mode,
             root_mtime_ns=root_mtime_ns,
         )
-        manifest_path = self.manifest_root / f"{manifest.backup_id}.json"
-        manifest_path.write_text(
-            json.dumps(manifest.to_dict(), sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
+        self._publish_manifest(manifest)
         return manifest
 
     def verify_manifest(self, manifest: BackupManifest) -> bool:
