@@ -468,6 +468,102 @@ class DistributedReceiptChain:
             )
         return items
 
+    def snapshot_at(
+        self,
+        root_hash: str,
+    ) -> tuple[ChainedReceipt, ...]:
+        """Return and verify the committed receipt prefix ending at root_hash."""
+        root_hash = _sha256_hex(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return ()
+        root_item = self.get_node(root_hash)
+        expected_sequence = root_item.sequence
+        current_hash = root_hash
+        reverse: list[ChainedReceipt] = []
+        seen: set[str] = set()
+
+        while current_hash != GENESIS_HASH:
+            if current_hash in seen:
+                raise DistributedReceiptCorruption(
+                    "historical receipt chain contains a cycle"
+                )
+            seen.add(current_hash)
+            item = self.get_node(current_hash)
+            if item.sequence != expected_sequence:
+                raise DistributedReceiptCorruption(
+                    "historical receipt sequence is not contiguous"
+                )
+            reverse.append(item)
+            current_hash = item.previous_hash
+            expected_sequence -= 1
+            if expected_sequence < 0:
+                raise DistributedReceiptCorruption(
+                    "historical receipt sequence underflow"
+                )
+
+        if expected_sequence != 0:
+            raise DistributedReceiptCorruption(
+                "historical receipt chain terminated before genesis"
+            )
+        items = tuple(reversed(reverse))
+        if not items or items[-1].receipt_hash != root_hash:
+            raise DistributedReceiptCorruption(
+                "historical receipt root mismatch"
+            )
+        return items
+
+    def verify_root(
+        self,
+        root_hash: str,
+    ) -> bool:
+        try:
+            items = self.snapshot_at(root_hash)
+        except (
+            DistributedReceiptCorruption,
+            ValueError,
+        ):
+            return False
+        previous = GENESIS_HASH
+        for sequence, item in enumerate(items, start=1):
+            if (
+                item.sequence != sequence
+                or item.previous_hash != previous
+            ):
+                return False
+            expected = ReceiptChain._hash(
+                previous,
+                sequence,
+                item.receipt,
+            )
+            if expected != item.receipt_hash:
+                return False
+            previous = item.receipt_hash
+        return previous == root_hash
+
+    def root_is_ancestor(
+        self,
+        root_hash: str,
+    ) -> bool:
+        root_hash = _sha256_hex(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return True
+        if not self.verify_root(root_hash):
+            return False
+        try:
+            current = self.snapshot()
+        except DistributedReceiptCorruption:
+            return False
+        return any(
+            item.receipt_hash == root_hash
+            for item in current
+        )
+
     def verify(self) -> bool:
         try:
             items = self.snapshot()
