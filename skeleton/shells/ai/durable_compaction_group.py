@@ -1497,6 +1497,7 @@ class DurableCompactionGroupCoordinator:
                     )
             except (
                 DurableCompactionWorkflowManualReview,
+                DurableCompactionGroupManualReview,
             ) as exc:
                 synced = self._sync_members(
                     current,
