@@ -11,7 +11,6 @@ import argparse
 from dataclasses import asdict
 import json
 import os
-from pathlib import Path
 import sys
 from typing import Mapping, Sequence
 
