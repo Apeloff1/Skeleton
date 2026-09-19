@@ -385,6 +385,24 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         ):
             self.decode(encoded)
 
+    def test_envelope_rejects_non_hex_fingerprint_before_encoding(
+        self,
+    ) -> None:
+        snap = self.snapshot()
+        envelope = supervisor.DelegationEnvelope(
+            version=3,
+            repository=REPO,
+            snapshot_fingerprint="z" * 64,
+            observed_at=snap.observed_at,
+            plan="repair CI",
+            execution=EXECUTION,
+            build_authorization=None,
+        )
+        with self.assertRaises(
+            supervisor.SupervisorError
+        ):
+            envelope.to_base64()
+
     def test_envelope_rejects_empty_plan(
         self,
     ) -> None:
@@ -1409,8 +1427,9 @@ class WorkerProposalTests(unittest.TestCase):
         existing = {
             "number": 77,
             "headRefName": (
-                "bot/specialist-root-cause-old"
+                "bot/specialist-root-cause-aaaaaaaaaaaaaaaa"
             ),
+            "baseRefName": "main",
         }
         with (
             patch(
@@ -1435,6 +1454,41 @@ class WorkerProposalTests(unittest.TestCase):
             active,
             existing,
         )
+
+    def test_preflight_rejects_worker_pr_on_unexpected_base(
+        self,
+    ) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=FP,
+            execution=EXECUTION,
+        )
+        existing = {
+            "number": 77,
+            "headRefName": (
+                "bot/specialist-root-cause-aaaaaaaaaaaaaaaa"
+            ),
+            "baseRefName": "release",
+        }
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=existing,
+            ),
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots._preflight(custody)
 
     def test_preflight_rejects_orphan_remote_branch(
         self,
