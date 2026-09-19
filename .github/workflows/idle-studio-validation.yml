@@ -2,8 +2,8 @@ name: Idle Studio Validation
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - '.github/workflows/idle-studio.yml'
       - '.github/workflows/idle-studio-validation.yml'
