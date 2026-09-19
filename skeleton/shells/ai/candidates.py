@@ -77,6 +77,7 @@ class CandidateSelector:
         evaluations.sort(
             key=lambda item: (
                 not item.critique.accepted_for_execution,
+                item.critique.risk.score,
                 -item.utility,
                 item.proposal.fingerprint,
             )
