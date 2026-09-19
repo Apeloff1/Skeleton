@@ -37,6 +37,16 @@ class VersionedStateBackend(Protocol):
 
 
 @runtime_checkable
+class RecordListingBackend(VersionedStateBackend, Protocol):
+    """Optional backend capability used by bounded maintenance scanners."""
+
+    def records(
+        self,
+        namespace: str | None = None,
+    ) -> tuple[VersionedValue[object], ...]: ...
+
+
+@runtime_checkable
 class FencedLeaseBackend(Protocol):
     def acquire_lease(
         self,
