@@ -28,6 +28,7 @@ from skeleton.shells.ai.durable_compaction import (
 from skeleton.shells.ai.durable_retention import (
     DurableRetentionPlanner,
     DurableRetentionPolicy,
+    ProtectedHistoricalRoot,
 )
 from skeleton.shells.ai.signed_artifact import ArtifactSigner
 from skeleton.shells.distributed_receipts import DistributedReceiptChain
@@ -192,9 +193,6 @@ def test_ready_compaction_after_verified_archive():
 
 
 def test_ready_report_never_authorizes_deletion():
-    *_, retention, planner, _ = journal_ready_fixture()
-    journal = _[0] if False else None
-    # Recreate cleanly to keep the assertion explicit.
     fixture = journal_ready_fixture()
     journal = fixture[1]
     retention = fixture[6]
@@ -1003,37 +1001,33 @@ def test_compaction_inspect_type_validation():
 
 def test_protected_root_bound_is_enforced():
     fixture = journal_ready_fixture()
-    report = fixture[6]
-    roots = tuple(
-        DurableCompactionRootCoverage(
-            fp(f"root-{index}"),
-            index,
-            False,
-            False,
-            True,
-            True,
+    journal = fixture[1]
+    events = journal.snapshot()
+    protected = tuple(
+        ProtectedHistoricalRoot(
+            events[index].event_hash,
+            events[index].sequence,
         )
         for index in range(3)
     )
-    policy = DurableCompactionPolicy(
-        max_protected_roots=2,
+    retention = replace(
+        fixture[6],
+        protected_roots=protected,
     )
     planner = DurableCompactionPlanner(
         fixture[3],
-        policy,
+        DurableCompactionPolicy(
+            max_protected_roots=2,
+        ),
     )
-    # Use retention dataclass mutation to exercise the independent planner bound.
-    protected = tuple(
-        fixture[6].protected_roots
-    )
-    if len(protected) < 3:
-        protected = tuple(
-            replace(
-                fixture[6],
-            ).protected_roots
+    with pytest.raises(
+        ValueError,
+        match="protected root bound",
+    ):
+        planner.inspect(
+            retention,
+            journal,
         )
-    assert roots  # keep coverage fixture explicit
-    assert planner.policy.max_protected_roots == 2
 
 
 def test_compaction_state_wire_values():
