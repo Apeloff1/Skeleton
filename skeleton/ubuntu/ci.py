@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
+from .model import (
+    UbuntuAction,
+    UbuntuPlan,
+    _clean,
+    _policy_errors,
+    _validate_policy_fields,
+    validate_plan,
+)
 
 @dataclass(frozen=True, slots=True)
 class CiRunnerPlan:
@@ -23,17 +30,25 @@ class CiRunnerPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-runner:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -43,9 +58,11 @@ class CiRunnerPlan:
 
 def validate_ci_runner(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-runner action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-runner:"+identifier, ("ubuntu","ci","runner",identifier,desired), "validated ci-runner")
 
 def plan_ci_runner(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -73,17 +90,25 @@ class CiCachePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-cache:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -93,9 +118,11 @@ class CiCachePlan:
 
 def validate_ci_cache(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-cache action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-cache:"+identifier, ("ubuntu","ci","cache",identifier,desired), "validated ci-cache")
 
 def plan_ci_cache(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -123,17 +150,25 @@ class CiArtifactPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-artifact:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -143,9 +178,11 @@ class CiArtifactPlan:
 
 def validate_ci_artifact(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-artifact action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-artifact:"+identifier, ("ubuntu","ci","artifact",identifier,desired), "validated ci-artifact")
 
 def plan_ci_artifact(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -173,17 +210,25 @@ class CiWorkspacePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-workspace:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -193,9 +238,11 @@ class CiWorkspacePlan:
 
 def validate_ci_workspace(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-workspace action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-workspace:"+identifier, ("ubuntu","ci","workspace",identifier,desired), "validated ci-workspace")
 
 def plan_ci_workspace(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -223,17 +270,25 @@ class CiCheckoutPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-checkout:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -243,9 +298,11 @@ class CiCheckoutPlan:
 
 def validate_ci_checkout(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-checkout action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-checkout:"+identifier, ("ubuntu","ci","checkout",identifier,desired), "validated ci-checkout")
 
 def plan_ci_checkout(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -273,17 +330,25 @@ class CiToolchainPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-toolchain:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -293,9 +358,11 @@ class CiToolchainPlan:
 
 def validate_ci_toolchain(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-toolchain action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-toolchain:"+identifier, ("ubuntu","ci","toolchain",identifier,desired), "validated ci-toolchain")
 
 def plan_ci_toolchain(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -323,17 +390,25 @@ class CiTestPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-test:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -343,9 +418,11 @@ class CiTestPlan:
 
 def validate_ci_test(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-test action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-test:"+identifier, ("ubuntu","ci","test",identifier,desired), "validated ci-test")
 
 def plan_ci_test(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -373,17 +450,25 @@ class CiLintPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-lint:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -393,9 +478,11 @@ class CiLintPlan:
 
 def validate_ci_lint(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-lint action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-lint:"+identifier, ("ubuntu","ci","lint",identifier,desired), "validated ci-lint")
 
 def plan_ci_lint(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -423,17 +510,25 @@ class CiCoveragePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-coverage:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -443,9 +538,11 @@ class CiCoveragePlan:
 
 def validate_ci_coverage(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-coverage action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-coverage:"+identifier, ("ubuntu","ci","coverage",identifier,desired), "validated ci-coverage")
 
 def plan_ci_coverage(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -473,17 +570,25 @@ class CiPublishPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "ci-publish:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -493,9 +598,11 @@ class CiPublishPlan:
 
 def validate_ci_publish(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated ci-publish action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("ci-publish:"+identifier, ("ubuntu","ci","publish",identifier,desired), "validated ci-publish")
 
 def plan_ci_publish(identifiers: Sequence[str]) -> UbuntuPlan:
