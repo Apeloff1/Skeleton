@@ -182,6 +182,58 @@ def test_transaction_survives_command_longer_than_original_lease_ttl(tmp_path: P
     assert result.transaction.execution.result.stdout_text().strip() == "alive"
 
 
+def test_backup_store_rejects_symlinked_storage_root(tmp_path: Path):
+    real = tmp_path / "real-backup"
+    real.mkdir()
+    link = tmp_path / "backup-link"
+    link.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(BackupError, match="real directory"):
+        ContentAddressedBackupStore(link)
+
+
+def test_backup_store_rejects_symlinked_blob_shard(tmp_path: Path):
+    store = ContentAddressedBackupStore(tmp_path / "backup")
+    payload = b"payload"
+    digest = hashlib.sha256(payload).hexdigest()
+    external = tmp_path / "external-shard"
+    external.mkdir()
+    shard = store.blob_root / digest[:2]
+    shard.symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(BackupError, match="real directory"):
+        store.put_blob(digest, payload)
+
+
+def test_durable_journal_rejects_symlinked_parent_directory(tmp_path: Path):
+    real = tmp_path / "real-journal-dir"
+    real.mkdir()
+    linked = tmp_path / "journal-dir"
+    linked.symlink_to(real, target_is_directory=True)
+    journal = TransactionJournal(
+        storage_path=linked / "transactions.jsonl",
+    )
+
+    with pytest.raises(JournalPersistenceError, match="real directory"):
+        journal.append(
+            "txn-1",
+            WorkspaceTransactionState.CREATED.value,
+            {},
+        )
+
+    assert not (real / "transactions.jsonl").exists()
+
+
+def test_durable_journal_rejects_symlinked_journal_file(tmp_path: Path):
+    target = tmp_path / "target.jsonl"
+    target.write_text("", encoding="utf-8")
+    link = tmp_path / "journal.jsonl"
+    link.symlink_to(target)
+
+    with pytest.raises(JournalPersistenceError, match="regular file"):
+        TransactionJournal(storage_path=link)
+
+
 def test_durable_journal_round_trip_preserves_hash_chain(tmp_path: Path):
     path = tmp_path / "transaction.jsonl"
     journal = TransactionJournal(storage_path=path)
