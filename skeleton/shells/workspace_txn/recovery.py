@@ -56,6 +56,10 @@ class TransactionRecoveryInspector:
         return ""
 
     def candidates(self) -> tuple[RecoveryCandidate, ...]:
+        if not self.journal.verify():
+            raise RuntimeError(
+                "transaction journal integrity verification failed"
+            )
         by_transaction: dict[str, list[JournalEvent]] = {}
         for event in self.journal.events():
             by_transaction.setdefault(event.transaction_id, []).append(event)
