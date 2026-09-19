@@ -42,6 +42,8 @@ MAX_PLAN = 18_000
 MAX_ASSIGNMENTS = 3
 MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 MAX_ENCODED_ENVELOPE = 32_000
+MAX_WORKER_SECONDS = 12 * 60
+MAX_DISPATCH_SECONDS = MAX_ASSIGNMENTS * MAX_WORKER_SECONDS
 
 KEYWORDS = {
     "root-cause": (
@@ -533,7 +535,7 @@ def _dispatch_one(
                 ],
                 cwd=worktree,
                 env=env,
-                timeout=900,
+                timeout=MAX_WORKER_SECONDS,
                 check=False,
             )
             return {
