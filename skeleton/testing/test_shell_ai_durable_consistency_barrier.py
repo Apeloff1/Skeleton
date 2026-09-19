@@ -1219,3 +1219,31 @@ def test_publication_serializes():
         data["stored"]["signed"]["barrier"]["atomic_snapshot"]
         is False
     )
+
+def test_floor_normalizes_dependency_neutral_receipt_genesis():
+    receipts = DistributedReceiptChain(
+        InMemoryFencedStore(),
+        namespace="receipt-genesis",
+    )
+
+    floor = DurableConsistencyBarrierCoordinator._floor(receipts)
+
+    assert isinstance(floor, HotFloorPosition)
+    assert floor == HotFloorPosition.genesis()
+
+
+def test_floor_rejects_unsigned_dependency_neutral_non_genesis():
+    class UnsignedFloor:
+        sequence = 1
+        root_hash = fp("a")
+
+    class Chain:
+        def hot_floor(self):
+            return UnsignedFloor()
+
+    with pytest.raises(
+        DurableConsistencyBarrierCorruption,
+        match="invalid type",
+    ):
+        DurableConsistencyBarrierCoordinator._floor(Chain())
+
