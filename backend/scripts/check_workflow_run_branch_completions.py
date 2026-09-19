@@ -21,6 +21,10 @@ QUEUE_DEFAULT_BRANCH_GUARD = (
     "github.event.workflow_run.head_branch == "
     "github.event.repository.default_branch"
 )
+QUEUE_SAME_REPO_GUARD = (
+    "github.event.workflow_run.head_repository.full_name == "
+    "github.repository"
+)
 REPAIR_WORKFLOW = "repair-intake.yml"
 IDLE_WORKFLOW = "idle-studio.yml"
 MISSING_IDENTITY = "workflow_run completion is missing head SHA or branch"
@@ -91,6 +95,7 @@ def _queue_drain_default_branch_contract(
         return False
     return all(
         QUEUE_DEFAULT_BRANCH_GUARD in body
+        and QUEUE_SAME_REPO_GUARD in body
         for _, body in mutation_jobs
     )
 
@@ -104,7 +109,7 @@ def violations_for_text(path_name: str, text: str) -> list[str]:
     has_all_branch_globs = ALL_BRANCH_GLOBS in workflow_run_block
     automation_main_only_exclusion = False
     if _is_named(path_name, AUTOMATION_WORKFLOW):
-        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(text)
+        match = AUTOMATION_MAIN_ONLY_EXCLUSION_RE.search(workflow_run_block)
         if match is not None:
             ignored = [
                 line.removeprefix("      - ").strip().strip("'\\\"")
