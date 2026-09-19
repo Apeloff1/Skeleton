@@ -88,13 +88,15 @@ Python integration:
 - `SweepAndPruneBroadPhase` can offload finite-AABB candidate generation.
 - `PhysicsWorld(..., use_jvm_broadphase=True)` enables the same fast path for
   normal world stepping.
+- `PhysicsWorld.query_aabb_many()` can reuse one finite-body AABB batch for
+  many spatial overlap queries in a single bounded JVM request.
 
 Java receives only:
 
 - finite AABB minima/maxima;
-- one boolean saying whether each body is dynamic;
-- the requested pair bound;
-- the Python sweep epsilon.
+- one boolean saying whether each body is dynamic for pair generation;
+- the requested pair bound and Python sweep epsilon;
+- for spatial batches, bounded query AABBs and a total-hit cap.
 
 Java returns only stable integer index pairs.
 
@@ -126,7 +128,8 @@ dominate those fixed costs:
 - repeated rolling-window statistics over a large input batch;
 - cosine scoring over many dense vectors;
 - bulk retrieval where many queries reuse one candidate matrix;
-- finite-AABB sweep-and-prune over large physics worlds.
+- finite-AABB sweep-and-prune over large physics worlds;
+- many spatial AABB queries that reuse one decoded body-bound array.
 
 By contrast, Java is intentionally not used here for:
 
@@ -192,6 +195,7 @@ Physics world:
 from skeleton.simulation.physics import PhysicsWorld
 
 world = PhysicsWorld(use_jvm_broadphase=True)
+hits = world.query_aabb_many((first_bounds, second_bounds))
 ```
 
 Existing constructors without the new keyword continue to use only Python.
@@ -237,13 +241,16 @@ PYTHONPATH=. python scripts/benchmark_java_accelerators.py \
   --vectors 10000 \
   --dims 256 \
   --top-k 20 \
+  --batch-queries 16 \
+  --physics-bodies 10000 \
+  --physics-queries 64 \
   --repeats 7
 ```
 
 The benchmark:
 
 1. creates deterministic fixtures;
-2. starts and warms both JVM helpers;
+2. starts and warms all three JVM helpers;
 3. measures the Python baseline;
 4. measures the Java path;
 5. verifies output parity;
@@ -345,6 +352,8 @@ Physics broad-phase bounds include:
 
 - maximum finite body count;
 - maximum candidate pair count;
+- maximum batch spatial-query count;
+- maximum total spatial-query hits;
 - finite AABB coordinates;
 - valid AABB minimum/maximum ordering;
 - bounded sweep epsilon;
@@ -403,11 +412,11 @@ CI provisions Java 21 for these helpers.
 
 The runtime uses the Java source-file launcher, so no Maven or Gradle project is
 required. That is intentional: adding a dependency graph and another package
-manager would be a poor trade for two small optional kernels.
+manager would be a poor trade for a few small optional kernels.
 
 The dedicated CI lane runs:
 
-1. both Java source self-tests;
+1. all Java source self-tests;
 2. Python compilation for the affected packages;
 3. fake-accelerator parity/fallback tests;
 4. real Java protocol tests.
