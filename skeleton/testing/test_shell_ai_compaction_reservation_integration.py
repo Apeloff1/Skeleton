@@ -1914,4 +1914,3 @@ def test_epoch_head_missing_record_is_rejected():
         match="missing record",
     ):
         store.latest("epoch")
-
