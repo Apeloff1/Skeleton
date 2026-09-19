@@ -22,6 +22,7 @@ from typing import Any
 from .build_authority import (
     BuildAuthorization,
     BuildAuthorityError,
+    revalidate_live_build_authorization,
 )
 from .advanced_bots import (
     ADVANCED_BOTS,
@@ -122,7 +123,7 @@ def admit_worker(name: str) -> WorkerCustody:
 
 
 def admit_build_authorization(
-    worker: str,
+    custody: WorkerCustody,
 ) -> BuildAuthorization | None:
     """Revalidate the exact build task delegated by the Secretary."""
     encoded = os.environ.get(
@@ -134,6 +135,7 @@ def admit_build_authorization(
         "",
     ).strip()
 
+    worker = custody.worker
     if worker != "feature-builder":
         if encoded or expected_digest:
             raise WorkerAdmissionError(
@@ -173,6 +175,10 @@ def admit_build_authorization(
     if authorization.task_digest != expected_digest:
         raise WorkerAdmissionError(
             "feature build task digest mismatch"
+        )
+    if authorization.repository != custody.execution.repository:
+        raise WorkerAdmissionError(
+            "feature build repository custody mismatch"
         )
     return authorization
 
@@ -666,8 +672,12 @@ def main() -> int:
         execution = custody.execution
         spec = spec_for(args.bot)
         build_authorization = admit_build_authorization(
-            spec.name
+            custody
         )
+        if build_authorization is not None:
+            build_authorization = revalidate_live_build_authorization(
+                build_authorization
+            )
         branch, active_pr = _preflight(custody)
 
         if active_pr is not None:
@@ -848,8 +858,12 @@ def main() -> int:
                 "unable to establish staged proposal"
             )
 
-        # Model generation may take long enough for main to advance. Recheck
-        # immediately before creating the commit/publishing any remote ref.
+        # Model generation may take long enough for repository authority or main
+        # to change. Revalidate both immediately before creating the commit.
+        if build_authorization is not None:
+            build_authorization = revalidate_live_build_authorization(
+                build_authorization
+            )
         require_remote_base_unchanged(execution)
 
         _run_git(
@@ -874,7 +888,11 @@ def main() -> int:
             timeout=30,
         )
 
-        # Close the final stale-base window before the remote mutation.
+        # Close the final authority/base window before the remote mutation.
+        if build_authorization is not None:
+            build_authorization = revalidate_live_build_authorization(
+                build_authorization
+            )
         require_remote_base_unchanged(execution)
         _run_git(
             [
