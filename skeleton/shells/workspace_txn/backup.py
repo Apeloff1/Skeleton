@@ -191,19 +191,34 @@ class ContentAddressedBackupStore:
                     )
                 )
         records.sort(key=lambda record: record.path)
-        payload = {
-            "root_fingerprint": snapshot.root_fingerprint,
-            "records": [record.to_dict() for record in records],
-            "total_bytes": total,
-        }
-        digest = hashlib.sha256(canonical_json(payload)).hexdigest()
-        manifest = BackupManifest(
+        try:
+            root_metadata = root.stat()
+        except OSError as exc:
+            raise BackupError("failed reading workspace root metadata") from exc
+        root_mode = stat.S_IMODE(root_metadata.st_mode)
+        root_mtime_ns = int(root_metadata.st_mtime_ns)
+        unsigned_manifest = BackupManifest(
             uuid.uuid4().hex,
             snapshot.root_fingerprint,
             datetime.now(timezone.utc).isoformat(),
             tuple(records),
             total,
+            "",
+            root_mode=root_mode,
+            root_mtime_ns=root_mtime_ns,
+        )
+        digest = hashlib.sha256(
+            canonical_json(unsigned_manifest.integrity_payload())
+        ).hexdigest()
+        manifest = BackupManifest(
+            unsigned_manifest.backup_id,
+            unsigned_manifest.root_fingerprint,
+            unsigned_manifest.created_at,
+            unsigned_manifest.records,
+            unsigned_manifest.total_bytes,
             digest,
+            root_mode=root_mode,
+            root_mtime_ns=root_mtime_ns,
         )
         manifest_path = self.manifest_root / f"{manifest.backup_id}.json"
         manifest_path.write_text(
@@ -213,12 +228,9 @@ class ContentAddressedBackupStore:
         return manifest
 
     def verify_manifest(self, manifest: BackupManifest) -> bool:
-        payload = {
-            "root_fingerprint": manifest.root_fingerprint,
-            "records": [record.to_dict() for record in manifest.records],
-            "total_bytes": manifest.total_bytes,
-        }
-        expected = hashlib.sha256(canonical_json(payload)).hexdigest()
+        expected = hashlib.sha256(
+            canonical_json(manifest.integrity_payload())
+        ).hexdigest()
         if expected != manifest.digest:
             return False
         for record in manifest.records:
