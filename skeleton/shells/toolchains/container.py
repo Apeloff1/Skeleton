@@ -9,7 +9,7 @@ SPECS = (
     OperationSpec(
         logical_name="container.docker_version",
         executable_key="docker",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
@@ -329,7 +329,7 @@ SPECS = (
     OperationSpec(
         logical_name="container.podman_version",
         executable_key="podman",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
