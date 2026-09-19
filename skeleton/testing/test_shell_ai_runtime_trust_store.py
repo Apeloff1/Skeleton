@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -22,8 +23,7 @@ from skeleton.shells.ai.runtime_trust_store import (
 from skeleton.shells.ai.signed_artifact import ArtifactSigner
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def surface(**changes) -> RuntimeTrustSurface:
