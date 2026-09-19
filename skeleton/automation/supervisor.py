@@ -298,6 +298,47 @@ def observe(repository: str) -> SupervisorSnapshot:
     )
 
 
+
+def durable_worker_health(snapshot: SupervisorSnapshot) -> dict[str, object]:
+    """Derive bounded cross-run worker evidence from GitHub-native PR state.
+
+    This is intentionally descriptive rather than authoritative. Worker branch
+    namespaces are deterministic and durable on GitHub, unlike runner-local
+    files, so open bot PRs provide useful dedup/backpressure evidence across
+    ephemeral Actions runners.
+    """
+    prefix = "bot/specialist-"
+    active: list[dict[str, object]] = []
+    for pr in snapshot.pull_requests:
+        head = pr.get("headRefName")
+        number = pr.get("number")
+        if not isinstance(head, str) or not head.startswith(prefix):
+            continue
+        if isinstance(number, bool) or not isinstance(number, int):
+            continue
+        worker_and_base = head[len(prefix):]
+        worker, separator, base = worker_and_base.rpartition("-")
+        if not separator or not worker or len(base) != 16:
+            continue
+        if any(ch not in "0123456789abcdef" for ch in base):
+            continue
+        active.append({
+            "worker": worker[:48],
+            "pull_request": number,
+            "base_prefix": base,
+            "is_draft": bool(pr.get("isDraft", False)),
+            "merge_state": str(pr.get("mergeStateStatus", ""))[:32],
+        })
+    active.sort(key=lambda item: (str(item["worker"]), int(item["pull_request"])))
+    return {
+        "version": 1,
+        "non_authoritative": True,
+        "source": "github-open-pull-requests",
+        "active_count": len(active),
+        "active_workers": active[:MAX_ITEMS],
+    }
+
+
 def _context(snapshot: SupervisorSnapshot) -> str:
     value = {
         "authority": {
@@ -320,6 +361,7 @@ def _context(snapshot: SupervisorSnapshot) -> str:
         # priority but never grants build authority, selects an executable, or
         # bypasses Secretary admission.
         "automation_health": bounded_health_summary(load_state()),
+        "durable_automation_health": durable_worker_health(snapshot),
     }
     text = redact_secrets(_canonical(value).decode("utf-8"))
     encoded = text.encode("utf-8")
@@ -373,6 +415,7 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
             ),
             "queued_approved_work_count": len(queued_builds),
             "automation_health": bounded_health_summary(load_state()),
+            "durable_automation_health": durable_worker_health(snapshot),
         },
     }
     return _canonical(payload).decode("utf-8")
