@@ -20,7 +20,6 @@ __all__ = [
     "DistributedReceiptConflict",
     "DistributedReceiptCorruption",
     "DistributedReceiptHead",
-    "GENESIS_HASH",
     "ReceiptInclusion",
     "ReceiptIndexEntry",
 ]
