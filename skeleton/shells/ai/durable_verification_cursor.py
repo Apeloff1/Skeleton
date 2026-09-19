@@ -765,9 +765,16 @@ class DurableVerificationCursorStore:
                 raise DurableVerificationCursorError(
                     "verification cursor predecessor is stale"
                 )
-            if item.cursor.sequence <= current.sequence:
+            if item.cursor.sequence < current.sequence:
                 raise DurableVerificationCursorError(
-                    "verification cursor sequence must advance"
+                    "verification cursor sequence may not regress"
+                )
+            if (
+                item.cursor.sequence == current.sequence
+                and item.cursor.root_hash != current.root_hash
+            ):
+                raise DurableVerificationCursorError(
+                    "verification cursor may not fork at equal sequence"
                 )
             head = DurableVerificationCursorHead(
                 chain_id,
