@@ -786,6 +786,62 @@ class WorkerResultEvidenceTests(unittest.TestCase):
             runtime.parse_worker_result(payload, worker="root-cause")
 
 
+    def test_created_pr_requires_complete_custody_proof(self) -> None:
+        payload = json.dumps({
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
+
+    def test_created_pr_custody_must_match_execution(self) -> None:
+        custody = runtime.WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint="b" * 64,
+            execution=execution(),
+        )
+        payload = json.dumps({
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": runtime.deterministic_worker_branch(custody),
+            "changed_lines": 1,
+            "proposal_digest": "c" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+            "execution_fingerprint": custody.execution.fingerprint,
+        })
+        evidence = runtime.parse_worker_result(
+            payload,
+            worker="root-cause",
+        )
+        runtime.validate_worker_evidence_custody(evidence, custody)
+
+        altered = dict(evidence)
+        altered["base_sha"] = "d" * 40
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.validate_worker_evidence_custody(altered, custody)
+
+    def test_created_pr_branch_is_derived_from_custody(self) -> None:
+        custody = runtime.WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint="b" * 64,
+            execution=execution(),
+        )
+        evidence = {
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-deadbeefdeadbeef",
+            "changed_lines": 1,
+            "proposal_digest": "c" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+            "execution_fingerprint": custody.execution.fingerprint,
+        }
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.validate_worker_evidence_custody(evidence, custody)
+
+
 class EnvironmentSanitizationTests(unittest.TestCase):
     def test_worker_env_removes_process_injection_controls(
         self,
