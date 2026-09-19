@@ -120,6 +120,25 @@ class WorkspaceRollback:
     def _ensure_parent(path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _restore_metadata(
+        path: Path,
+        record,
+        *,
+        symlink: bool = False,
+    ) -> None:
+        if not symlink:
+            os.chmod(path, record.mode)
+        try:
+            os.utime(
+                path,
+                ns=(record.mtime_ns, record.mtime_ns),
+                follow_symlinks=not symlink,
+            )
+        except (NotImplementedError, OSError):
+            if not symlink:
+                raise
+
     def _restore_record(
         self,
         root: Path,
@@ -141,11 +160,7 @@ class WorkspaceRollback:
                     os.fsync(handle.fileno())
                 os.chmod(temporary, record.mode)
                 os.replace(temporary, absolute)
-                os.utime(
-                    absolute,
-                    ns=(record.mtime_ns, record.mtime_ns),
-                    follow_symlinks=False,
-                )
+                self._restore_metadata(absolute, record)
             finally:
                 try:
                     os.unlink(temporary)
@@ -158,10 +173,11 @@ class WorkspaceRollback:
             except OSError as exc:
                 raise RollbackError("failed to replace symlink target") from exc
             os.symlink(record.link_target, absolute)
+            self._restore_metadata(absolute, record, symlink=True)
             return
         if record.kind is WorkspaceEntryKind.DIRECTORY:
             absolute.mkdir(parents=True, exist_ok=True)
-            os.chmod(absolute, record.mode)
+            self._restore_metadata(absolute, record)
             return
         raise RollbackError("unsupported backup record type")
 
@@ -263,8 +279,11 @@ class WorkspaceRollback:
                     "content changed after transaction",
                 )
             try:
-                if current.kind is not WorkspaceEntryKind.SYMLINK:
-                    os.chmod(absolute, record.mode)
+                self._restore_metadata(
+                    absolute,
+                    record,
+                    symlink=current.kind is WorkspaceEntryKind.SYMLINK,
+                )
                 return RollbackActionResult(action, RollbackActionState.APPLIED)
             except OSError as exc:
                 return RollbackActionResult(action, RollbackActionState.FAILED, str(exc))
