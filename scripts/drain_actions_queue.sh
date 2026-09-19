@@ -84,6 +84,7 @@ retryable = frozenset({0, 429, 500, 502, 503, 504})
 control_plane_paths = frozenset(
     {
         ".github/workflows/actions-housekeeping-cli.yml",
+        ".github/workflows/branch-archive.yml",
         ".github/workflows/branch-clean.yml",
         ".github/workflows/branch-flow.yml",
         ".github/workflows/branch-repair-100.yml",

@@ -47,8 +47,16 @@ def test_verified_locator_binds_only_exact_named_claim():
     async def search(inquiry, questions):
         return [{
             "source": "paper-a", "locator": "doi:example", "kind": "primary_empirical",
-            "independence_group": "lab-a", "quality": 0.9, "supports_claims": [claim, "Different claim"],
+            "independence_group": "lab-a", "quality": 0.9,
+            "supports_claims": [claim, "Different claim"],
             "verified_locator": True, "reproducible": True, "peer_reviewed": True,
+            "excerpt": claim,
+            "claim_bindings": [{
+                "claim": claim,
+                "supports": True,
+                "binding_method": "direct_quote",
+                "evidence_span": claim,
+            }],
         }]
     researcher = EnsembleCuriosityResearcher(agreeing_model, source_search=search, models=("a", "b"))
     result = asyncio.run(researcher(INQUIRY, {}))
