@@ -1207,12 +1207,6 @@ class DurableSessionRecoveryVerifier:
 
                 revision_checks = (
                     (
-                        "session_commit.finalization_revision_regressed",
-                        stored_finalization.revision,
-                        commit.finalization_revision,
-                        "finalization revision is older than signed session commit",
-                    ),
-                    (
                         "session_commit.recovery_revision_regressed",
                         stored_recovery.revision,
                         commit.recovery_revision,
