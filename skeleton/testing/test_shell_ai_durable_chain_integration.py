@@ -3495,4 +3495,3 @@ def test_obligation_recovery_type_validation(tmp_path):
             durable_recovery_requirement_store=requirements,
             durable_recovery_requirement_scope="prod",
         )
-
