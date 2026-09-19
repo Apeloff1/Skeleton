@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import heapq
+import math
 import threading
 import time
 from typing import Callable
@@ -21,11 +22,32 @@ class ScheduledWork:
     principal:str="default"
 
     def __post_init__(self)->None:
-        if not self.schedule_id:
-            raise ValueError("schedule_id is required")
-        if self.ready_at<0:
-            raise ValueError("ready_at may not be negative")
-        if not self.principal or len(self.principal)>256:
+        if (
+            not isinstance(self.schedule_id,str)
+            or not self.schedule_id.strip()
+            or len(self.schedule_id)>256
+            or "\x00" in self.schedule_id
+        ):
+            raise ValueError("invalid schedule_id")
+        if not isinstance(self.command,ShellCommand):
+            raise TypeError("command must be ShellCommand")
+        if (
+            isinstance(self.ready_at,bool)
+            or not isinstance(self.ready_at,(int,float))
+            or not math.isfinite(float(self.ready_at))
+            or float(self.ready_at)<0.0
+        ):
+            raise ValueError("ready_at must be finite and non-negative")
+        if isinstance(self.priority,bool) or not isinstance(self.priority,int):
+            raise ValueError("priority must be an integer")
+        if isinstance(self.sequence,bool) or not isinstance(self.sequence,int) or self.sequence<=0:
+            raise ValueError("sequence must be a positive integer")
+        if (
+            not isinstance(self.principal,str)
+            or not self.principal.strip()
+            or len(self.principal)>256
+            or "\x00" in self.principal
+        ):
             raise ValueError("invalid schedule principal")
 
 
@@ -33,7 +55,8 @@ class WorkerSchedule:
     """Heap-backed schedule polled explicitly by the control plane."""
 
     def __init__(self,*,clock:Callable[[],float]=time.monotonic,max_items:int=10000)->None:
-        if max_items<=0: raise ValueError("max_items must be positive")
+        if isinstance(max_items,bool) or not isinstance(max_items,int) or max_items<=0:
+            raise ValueError("max_items must be a positive integer")
         self._clock=clock
         self.max_items=max_items
         self._heap:list[tuple[float,int,int,str]]=[]
@@ -50,7 +73,15 @@ class WorkerSchedule:
         priority:int=100,
         principal:str="default",
     )->ScheduledWork:
-        if delay_seconds<0: raise ValueError("delay_seconds may not be negative")
+        if (
+            isinstance(delay_seconds,bool)
+            or not isinstance(delay_seconds,(int,float))
+            or not math.isfinite(float(delay_seconds))
+            or float(delay_seconds)<0.0
+        ):
+            raise ValueError("delay_seconds must be finite and non-negative")
+        if isinstance(priority,bool) or not isinstance(priority,int):
+            raise ValueError("priority must be an integer")
         with self._lock:
             if schedule_id in self._items:
                 raise RuntimeError("schedule_id already exists")
@@ -69,7 +100,8 @@ class WorkerSchedule:
             return self._items.pop(schedule_id,None) is not None
 
     def pop_ready(self,*,limit:int=100)->tuple[ScheduledWork,...]:
-        if limit<=0: raise ValueError("limit must be positive")
+        if isinstance(limit,bool) or not isinstance(limit,int) or limit<=0:
+            raise ValueError("limit must be a positive integer")
         now=self._clock()
         result=[]
         with self._lock:
