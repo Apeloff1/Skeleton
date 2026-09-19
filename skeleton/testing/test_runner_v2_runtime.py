@@ -12,7 +12,6 @@ import pytest
 from skeleton.pr_automation.core import Decision, Mode
 from skeleton.pr_automation.runner_contracts import (
     AdmissionState,
-    CheckState,
     PriorityBand,
     RequestOutcome,
     RunBudget,
