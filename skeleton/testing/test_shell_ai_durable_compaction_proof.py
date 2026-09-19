@@ -2140,4 +2140,3 @@ def test_proof_store_workflow_index_validation():
             fp("proof"),
             fp("digest"),
         )
-
