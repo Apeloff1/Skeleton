@@ -299,7 +299,7 @@ def audit(root: Path = DEFAULT_ROOT) -> list[Finding]:
                 'OBSERVE = "observe"',
                 'MUTATE = "mutate"',
                 'frozenset({"Merge Readiness"})',
-                "event.conclusion == "cancelled"",
+                'event.conclusion == "cancelled"',
                 'event.conclusion != "success"',
                 "event.source_event not in selected.mutation_source_events",
                 "cross-repository completion is observation-only",
