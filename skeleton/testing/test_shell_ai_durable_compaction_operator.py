@@ -1,0 +1,2232 @@
+"""End-to-end durable compaction workflow operator tests."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+import hashlib
+
+import pytest
+
+from skeleton.shells.ai.distributed_journal import (
+    DistributedAIDecisionJournal,
+)
+from skeleton.shells.ai.distributed_state import (
+    DistributedStateConflict,
+    InMemoryFencedStore,
+)
+from skeleton.shells.ai.durable_archive import (
+    DurableArchiveManifestBuilder,
+)
+from skeleton.shells.ai.durable_archive_store import (
+    ArchiveBackedHistoricalChain,
+    DurableArchiveRepository,
+)
+from skeleton.shells.ai.durable_checkpoint import (
+    DurableChainCheckpointStore,
+)
+from skeleton.shells.ai.durable_compaction import (
+    DurableCompactionPlanner,
+    DurableCompactionPolicy,
+)
+from skeleton.shells.ai.durable_compaction_certificate import (
+    DurableCompactionCertificateStore,
+)
+from skeleton.shells.ai.durable_compaction_operator import (
+    DurableCompactionExecution,
+    DurableCompactionOperator,
+    DurableCompactionPrepared,
+    DurableCompactionWorkflow,
+    DurableCompactionWorkflowError,
+    DurableCompactionWorkflowManualReview,
+    DurableCompactionWorkflowPhase,
+    DurableCompactionWorkflowStale,
+    StoredDurableCompactionWorkflow,
+)
+from skeleton.shells.ai.durable_hot_floor import (
+    DurableHotFloorStore,
+)
+from skeleton.shells.ai.durable_pruning import (
+    DurablePruningExecutor,
+    DurablePruningPhase,
+)
+from skeleton.shells.ai.durable_pruning_authorization import (
+    DurablePruningAuthorizationStore,
+)
+from skeleton.shells.ai.durable_retention import (
+    DurableRetentionPlanner,
+    DurableRetentionPolicy,
+)
+from skeleton.shells.ai.signed_artifact import ArtifactSigner
+from skeleton.shells.distributed_receipts import (
+    DistributedReceiptChain,
+)
+from skeleton.shells.receipts import ExecutionReceipt
+
+
+def fp(value: str) -> str:
+    return hashlib.sha256(
+        value.encode()
+    ).hexdigest()
+
+
+def signer(
+    name: str,
+    char: bytes,
+    *,
+    clock=lambda: 100.0,
+) -> ArtifactSigner:
+    return ArtifactSigner(
+        name,
+        char * 32,
+        clock=clock,
+    )
+
+
+def append_events(
+    journal,
+    count,
+    *,
+    start=0,
+):
+    values = []
+    for index in range(
+        start,
+        start + count,
+    ):
+        values.append(
+            journal.append(
+                "operator.event",
+                session_id=f"session-{index}",
+                intent_id=f"intent-{index}",
+                proposal_id=f"proposal-{index}",
+                summary=f"event {index}",
+                data={"index": index},
+            )
+        )
+    return tuple(values)
+
+
+def receipt(index: int) -> ExecutionReceipt:
+    return ExecutionReceipt(
+        command="python",
+        correlation_id=f"corr-{index}",
+        fingerprint=fp(
+            f"receipt:{index}"
+        ),
+        started_at=(
+            "2026-09-19T00:00:00+00:00"
+        ),
+        finished_at=(
+            "2026-09-19T00:00:01+00:00"
+        ),
+        duration_ms=1.0,
+        returncode=0,
+        ok=True,
+        timed_out=False,
+        output_limited=False,
+        stdout_bytes=index + 1,
+        stderr_bytes=0,
+        attempt=1,
+        receipt_id=f"receipt-{index}",
+        metadata={"index": index},
+    )
+
+
+class FailDeleteOnceBackend(
+    InMemoryFencedStore
+):
+    def __init__(self):
+        super().__init__()
+        self.fail_enabled = False
+        self.fail_after = 1
+        self.calls = 0
+        self.failed = False
+
+    def delete(
+        self,
+        namespace,
+        key,
+        *,
+        expected_revision,
+    ):
+        if (
+            self.fail_enabled
+            and not self.failed
+        ):
+            self.calls += 1
+            if self.calls > self.fail_after:
+                self.failed = True
+                raise RuntimeError(
+                    "synthetic operator pruning crash"
+                )
+        return super().delete(
+            namespace,
+            key,
+            expected_revision=expected_revision,
+        )
+
+
+class OperatorFixture:
+    def __init__(
+        self,
+        *,
+        kind="journal",
+        backend=None,
+        now=400.0,
+        max_items=100,
+    ):
+        self.kind = kind
+        self.now = [float(now)]
+        self.nonce = [0]
+        self.backend = (
+            backend
+            or InMemoryFencedStore()
+        )
+        self.floor_store = (
+            DurableHotFloorStore(
+                self.backend,
+                signer(
+                    "hot-floor",
+                    b"f",
+                    clock=lambda: self.now[0],
+                ),
+                namespace=(
+                    f"{kind}-hot-floors"
+                ),
+                clock=lambda: self.now[0],
+            )
+        )
+
+        if kind == "journal":
+            self.chain = (
+                DistributedAIDecisionJournal(
+                    self.backend,
+                    namespace="journal",
+                    max_events=20,
+                    clock=lambda: 10.0,
+                    hot_floor_store=(
+                        self.floor_store
+                    ),
+                    hot_floor_chain_id=(
+                        "journal"
+                    ),
+                )
+            )
+            self.chain_id = "journal"
+            self.first = append_events(
+                self.chain,
+                6,
+            )
+        elif kind == "receipts":
+            self.chain = (
+                DistributedReceiptChain(
+                    self.backend,
+                    namespace="receipts",
+                    max_receipts=20,
+                    hot_floor_store=(
+                        self.floor_store
+                    ),
+                    hot_floor_chain_id=(
+                        "receipts"
+                    ),
+                )
+            )
+            self.chain_id = "receipts"
+            self.first = tuple(
+                self.chain.append(
+                    receipt(index)
+                )
+                for index in range(6)
+            )
+        else:
+            raise ValueError(
+                "unknown fixture kind"
+            )
+
+        self.checkpoints = (
+            DurableChainCheckpointStore(
+                self.backend,
+                signer(
+                    "checkpoint",
+                    b"c",
+                ),
+                namespace=(
+                    f"{kind}-checkpoints"
+                ),
+                clock=lambda: 100.0,
+            )
+        )
+        self.archive_signer = signer(
+            "archive",
+            b"a",
+            clock=lambda: 200.0,
+        )
+        self.archive_builder = (
+            DurableArchiveManifestBuilder(
+                self.checkpoints,
+                self.archive_signer,
+                clock=lambda: 200.0,
+            )
+        )
+        self.archives = (
+            DurableArchiveRepository(
+                self.backend,
+                self.checkpoints,
+                self.archive_signer,
+                namespace=(
+                    f"{kind}-archives"
+                ),
+                clock=lambda: 300.0,
+            )
+        )
+        checkpoint = (
+            self.checkpoints.publish(
+                self.chain_id,
+                self.chain,
+            )
+        )
+        archive = (
+            self.archive_builder.build(
+                checkpoint,
+                self.chain,
+            )
+        )
+        self.archives.put(
+            archive,
+            checkpoint,
+            self.chain,
+        )
+        self.archive = archive
+
+        if kind == "journal":
+            self.later = append_events(
+                self.chain,
+                2,
+                start=6,
+            )
+        else:
+            self.later = tuple(
+                self.chain.append(
+                    receipt(index)
+                )
+                for index in range(
+                    6,
+                    8,
+                )
+            )
+
+        self.retention_planner = (
+            DurableRetentionPlanner(
+                self.checkpoints,
+                DurableRetentionPolicy(
+                    minimum_live_tail=2,
+                    minimum_archive_batch=2,
+                    target_utilization=0.25,
+                    warning_utilization=0.75,
+                    critical_utilization=0.95,
+                    max_protected_roots=32,
+                ),
+            )
+        )
+        self.retention = (
+            self.retention_planner.plan(
+                self.chain_id,
+                self.chain,
+            )
+        )
+        self.compaction = (
+            DurableCompactionPlanner(
+                self.archives,
+                DurableCompactionPolicy(
+                    minimum_live_tail=2,
+                    maximum_candidate_nodes=20,
+                    max_protected_roots=32,
+                ),
+            )
+        )
+        assert (
+            self.compaction
+            .require_ready(
+                self.retention,
+                self.chain,
+            )
+            .ready
+        )
+
+        self.certificate_store = (
+            DurableCompactionCertificateStore(
+                self.backend,
+                signer(
+                    "certificate",
+                    b"s",
+                    clock=(
+                        lambda:
+                        self.now[0]
+                    ),
+                ),
+                self.compaction,
+                namespace=(
+                    f"{kind}-certificates"
+                ),
+                ttl_seconds=60.0,
+                max_ttl_seconds=3600.0,
+                clock=lambda: self.now[0],
+            )
+        )
+
+        def nonce():
+            self.nonce[0] += 1
+            return (
+                f"nonce-{kind}-"
+                f"{self.nonce[0]}"
+            )
+
+        self.authorization_store = (
+            DurablePruningAuthorizationStore(
+                self.backend,
+                signer(
+                    "pruning",
+                    b"p",
+                    clock=(
+                        lambda:
+                        self.now[0]
+                    ),
+                ),
+                self.certificate_store,
+                namespace=(
+                    f"{kind}-authorizations"
+                ),
+                ttl_seconds=30.0,
+                max_ttl_seconds=600.0,
+                max_delete_items=max_items,
+                clock=lambda: self.now[0],
+                nonce_factory=nonce,
+            )
+        )
+        self.executor = (
+            DurablePruningExecutor(
+                self.backend,
+                self.authorization_store,
+                self.floor_store,
+                namespace=(
+                    f"{kind}-pruning"
+                ),
+                max_items=max_items,
+                clock=lambda: self.now[0],
+            )
+        )
+        self.operator = (
+            DurableCompactionOperator(
+                self.backend,
+                self.compaction,
+                self.certificate_store,
+                self.authorization_store,
+                self.executor,
+                namespace=(
+                    f"{kind}-operator"
+                ),
+                clock=lambda: self.now[0],
+            )
+        )
+
+    def append_one(self):
+        if self.kind == "journal":
+            return append_events(
+                self.chain,
+                1,
+                start=self.chain.length(),
+            )[0]
+        return self.chain.append(
+            receipt(
+                self.chain.length()
+            )
+        )
+
+    def plan(self):
+        return self.operator.plan(
+            self.retention,
+            self.chain,
+            operator_id="operator",
+        )
+
+    def certify(self, workflow_id):
+        return self.operator.certify(
+            workflow_id,
+            self.retention,
+            self.chain,
+        )
+
+    def authorize(
+        self,
+        workflow_id,
+    ):
+        return self.operator.authorize(
+            workflow_id,
+            self.retention,
+            self.chain,
+        )
+
+    def prepare(
+        self,
+        workflow_id,
+    ):
+        return self.operator.prepare(
+            workflow_id,
+            self.retention,
+            self.chain,
+        )
+
+    def execute(
+        self,
+        workflow_id,
+    ):
+        return self.operator.execute(
+            workflow_id,
+            self.retention,
+            self.chain,
+        )
+
+    def through_prepared(self):
+        plan = self.plan()
+        self.certify(
+            plan.workflow_id
+        )
+        self.authorize(
+            plan.workflow_id
+        )
+        prepared = self.prepare(
+            plan.workflow_id
+        )
+        return plan, prepared
+
+    def through_complete(self):
+        plan, prepared = (
+            self.through_prepared()
+        )
+        result = self.execute(
+            plan.workflow_id
+        )
+        return (
+            plan,
+            prepared,
+            result,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_plan_is_non_destructive(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    before = fixture.chain.snapshot()
+    plan = fixture.plan()
+    workflow = plan.stored.workflow
+
+    assert (
+        workflow.phase
+        is DurableCompactionWorkflowPhase.PLANNED
+    )
+    assert (
+        not workflow
+        .destructive_authority_issued
+    )
+    assert (
+        not workflow
+        .delete_manifest_frozen
+    )
+    assert (
+        not plan
+        .destructive_action_authorized
+    )
+    assert fixture.chain.snapshot() == before
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_plan_binds_head_cutoff_archive_and_floor(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    workflow = plan.stored.workflow
+    readiness = plan.readiness
+
+    assert (
+        workflow.chain_id
+        == fixture.chain_id
+    )
+    assert workflow.operator_id == "operator"
+    assert (
+        workflow.retention_plan_digest
+        == fixture.retention.digest
+    )
+    assert (
+        workflow.readiness_digest
+        == readiness.digest
+    )
+    assert (
+        workflow.compaction_policy_digest
+        == readiness.policy_digest
+    )
+    assert (
+        workflow.current_sequence
+        == fixture.chain.head().sequence
+    )
+    assert (
+        workflow.current_root
+        == fixture.chain.head().root_hash
+    )
+    assert (
+        workflow.cutoff_sequence
+        == fixture.retention
+        .archive_through_sequence
+    )
+    assert (
+        workflow.cutoff_root
+        == fixture.retention
+        .archive_through_root
+    )
+    assert (
+        workflow.previous_floor_sequence
+        == 0
+    )
+    assert (
+        workflow.previous_floor_root
+        == "0" * 64
+    )
+    assert workflow.archive_id
+    assert (
+        len(
+            workflow
+            .archive_manifest_digest
+        )
+        == 64
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_plan_retry_is_revision_idempotent(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    first = fixture.plan()
+    second = fixture.plan()
+    assert (
+        second.workflow_id
+        == first.workflow_id
+    )
+    assert (
+        second.stored.revision
+        == first.stored.revision
+    )
+    assert (
+        second.stored.workflow
+        == first.stored.workflow
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_different_operator_gets_different_workflow_id(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    first = fixture.plan()
+    second = fixture.operator.plan(
+        fixture.retention,
+        fixture.chain,
+        operator_id="other-operator",
+    )
+    assert (
+        first.workflow_id
+        != second.workflow_id
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_certify_advances_only_non_destructive_phase(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    certificate = fixture.certify(
+        plan.workflow_id
+    )
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    workflow = stored.workflow
+
+    assert (
+        workflow.phase
+        is DurableCompactionWorkflowPhase.CERTIFIED
+    )
+    assert (
+        workflow.certificate_id
+        == certificate.certificate_id
+    )
+    assert (
+        workflow.certificate_digest
+        == certificate.certificate.digest
+    )
+    assert (
+        not workflow
+        .destructive_authority_issued
+    )
+    assert (
+        not certificate
+        .destructive_action_authorized
+    )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_certify_retry_reuses_certificate(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    first = fixture.certify(
+        plan.workflow_id
+    )
+    revision = (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .revision
+    )
+    second = fixture.certify(
+        plan.workflow_id
+    )
+    assert second == first
+    assert (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .revision
+        == revision
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_authorize_requires_certified_workflow(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="certified",
+    ):
+        fixture.authorize(
+            plan.workflow_id
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_authorize_crosses_explicit_destructive_boundary(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    authorization = fixture.authorize(
+        plan.workflow_id
+    )
+    workflow = (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .workflow
+    )
+
+    assert (
+        workflow.phase
+        is DurableCompactionWorkflowPhase.AUTHORIZED
+    )
+    assert (
+        workflow.authorization_id
+        == authorization.authorization_id
+    )
+    assert (
+        workflow.authorization_digest
+        == authorization.authorization.digest
+    )
+    assert (
+        workflow
+        .destructive_authority_issued
+    )
+    assert (
+        authorization
+        .destructive_action_authorized
+    )
+    assert (
+        workflow.delete_count
+        == workflow.cutoff_sequence
+        - workflow.previous_floor_sequence
+    )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_authorize_retry_is_idempotent(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    first = fixture.authorize(
+        plan.workflow_id
+    )
+    revision = (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .revision
+    )
+    second = fixture.authorize(
+        plan.workflow_id
+    )
+    assert second == first
+    assert (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .revision
+        == revision
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepare_requires_authorization(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="authorized",
+    ):
+        fixture.prepare(
+            plan.workflow_id
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepare_freezes_manifest_without_deleting(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    before = fixture.chain.snapshot()
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    fixture.authorize(
+        plan.workflow_id
+    )
+    prepared = fixture.prepare(
+        plan.workflow_id
+    )
+    workflow = (
+        prepared.stored.workflow
+    )
+
+    assert isinstance(
+        prepared,
+        DurableCompactionPrepared,
+    )
+    assert (
+        workflow.phase
+        is DurableCompactionWorkflowPhase.PREPARED
+    )
+    assert (
+        workflow.delete_manifest_frozen
+    )
+    assert (
+        workflow.pruning_operation_id
+        == prepared.operation.operation_id
+    )
+    assert (
+        workflow.pruning_manifest_digest
+        == prepared.manifest.digest
+    )
+    assert (
+        prepared.operation.phase
+        is DurablePruningPhase.PREPARED
+    )
+    assert (
+        prepared.manifest.delete_count
+        == workflow.delete_count
+    )
+    assert fixture.chain.snapshot() == before
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepare_retry_reuses_exact_manifest(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, first = (
+        fixture.through_prepared()
+    )
+    revision = (
+        first.stored.revision
+    )
+    second = fixture.prepare(
+        plan.workflow_id
+    )
+    assert (
+        second.manifest.digest
+        == first.manifest.digest
+    )
+    assert (
+        second.operation.operation_id
+        == first.operation.operation_id
+    )
+    assert (
+        second.stored.revision
+        == revision
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_execute_requires_prepared_manifest(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    fixture.authorize(
+        plan.workflow_id
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="prepared",
+    ):
+        fixture.execute(
+            plan.workflow_id
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_execute_completes_pruning_and_workflow(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _ = fixture.through_prepared()
+    executed = fixture.execute(
+        plan.workflow_id
+    )
+    workflow = (
+        executed.stored.workflow
+    )
+
+    assert isinstance(
+        executed,
+        DurableCompactionExecution,
+    )
+    assert executed.ok
+    assert executed.result.ok
+    assert workflow.complete
+    assert (
+        workflow.phase
+        is DurableCompactionWorkflowPhase.COMPLETE
+    )
+    assert (
+        workflow.pruning_phase
+        == DurablePruningPhase.COMPLETE.value
+    )
+    assert (
+        workflow.deleted_items
+        == workflow.delete_count
+    )
+    assert (
+        workflow.floor_id
+        == executed.result.floor.floor_id
+    )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == workflow.cutoff_sequence
+    )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .root_hash
+        == workflow.cutoff_root
+    )
+    assert (
+        fixture.chain.snapshot()
+        == fixture.later
+    )
+    assert fixture.chain.verify()
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_completed_history_remains_available_via_archive(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _, result = (
+        fixture.through_complete()
+    )
+    workflow = (
+        result.stored.workflow
+    )
+    archive_backed = (
+        ArchiveBackedHistoricalChain(
+            fixture.chain_id,
+            fixture.chain,
+            fixture.archives,
+        )
+    )
+    historical = (
+        archive_backed.snapshot_at(
+            workflow.cutoff_root
+        )
+    )
+    assert len(historical) == (
+        workflow.cutoff_sequence
+    )
+    assert (
+        historical[-1].sequence
+        == workflow.cutoff_sequence
+    )
+    assert archive_backed.verify()
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_resume_completed_workflow_is_idempotent(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _, first = (
+        fixture.through_complete()
+    )
+    revision = first.stored.revision
+    second = fixture.operator.resume(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert second.ok
+    assert (
+        second.stored.revision
+        == revision
+    )
+    assert (
+        second.result.operation.operation_id
+        == first.result.operation.operation_id
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_fresh_operator_reads_persisted_workflow(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, prepared = (
+        fixture.through_prepared()
+    )
+    fresh = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fixture.executor,
+        namespace=f"{kind}-operator",
+        clock=lambda: fixture.now[0],
+    )
+    restored = fresh.current(
+        plan.workflow_id
+    )
+    assert restored == prepared.stored
+    report = fresh.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.current
+    assert report.safe_to_execute
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_growth_after_plan_stales_certification(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.append_one()
+
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.certify(
+            plan.workflow_id
+        )
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert (
+        stored.workflow.phase
+        is DurableCompactionWorkflowPhase.PLANNED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_growth_after_certificate_stales_authorization(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    fixture.append_one()
+
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.authorize(
+            plan.workflow_id
+        )
+    assert (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .workflow.phase
+        is DurableCompactionWorkflowPhase.CERTIFIED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_growth_after_prepare_blocks_execution(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, _ = fixture.through_prepared()
+    fixture.append_one()
+
+    with pytest.raises(Exception):
+        fixture.execute(
+            plan.workflow_id
+        )
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert (
+        stored.workflow.phase
+        in {
+            DurableCompactionWorkflowPhase.EXECUTING,
+            DurableCompactionWorkflowPhase.MANUAL_REVIEW,
+        }
+    )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_changed_retention_plan_is_rejected(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    protected = (
+        fixture.first[1].event_hash
+        if kind == "journal"
+        else fixture.first[1].receipt_hash
+    )
+    changed = (
+        fixture.retention_planner.plan(
+            fixture.chain_id,
+            fixture.chain,
+            protected_roots=(
+                protected,
+            ),
+        )
+    )
+    assert (
+        changed.digest
+        != fixture.retention.digest
+    )
+
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+        match="retention",
+    ):
+        fixture.operator.certify(
+            plan.workflow_id,
+            changed,
+            fixture.chain,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_archive_tamper_stales_workflow_before_certificate(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    root = (
+        fixture.retention
+        .archive_through_root
+    )
+    key = fixture.archives._node_key(
+        fixture.chain_id,
+        root,
+    )
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    raw = dict(record.value)
+    payload = dict(
+        raw["payload"]
+    )
+    if kind == "journal":
+        payload["summary"] = "tampered"
+    else:
+        payload["stdout_bytes"] = 999
+    raw["payload"] = payload
+    fixture.backend.compare_and_swap(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+
+    with pytest.raises(Exception):
+        fixture.certify(
+            plan.workflow_id
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_expired_certificate_can_be_renewed_before_authorization(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    first = fixture.certify(
+        plan.workflow_id
+    )
+    fixture.now[0] = (
+        first.certificate.expires_at
+        + 1.0
+    )
+    second = fixture.certify(
+        plan.workflow_id
+    )
+    assert (
+        second.certificate_id
+        != first.certificate_id
+    )
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert (
+        stored.workflow.certificate_id
+        == second.certificate_id
+    )
+    authorization = fixture.authorize(
+        plan.workflow_id
+    )
+    assert (
+        authorization.authorization
+        .certificate_id
+        == second.certificate_id
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_expired_authorization_can_be_renewed_before_prepare(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.certify(
+        plan.workflow_id
+    )
+    first = fixture.authorize(
+        plan.workflow_id
+    )
+    fixture.now[0] = (
+        first.authorization.expires_at
+        + 1.0
+    )
+    second = fixture.authorize(
+        plan.workflow_id
+    )
+    assert (
+        second.authorization_id
+        != first.authorization_id
+    )
+    assert (
+        fixture.operator
+        .current(
+            plan.workflow_id
+        )
+        .workflow.authorization_id
+        == second.authorization_id
+    )
+    prepared = fixture.prepare(
+        plan.workflow_id
+    )
+    assert (
+        prepared.authorization
+        .authorization_id
+        == second.authorization_id
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_expired_authorization_blocks_pre_floor_execute(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan, prepared = (
+        fixture.through_prepared()
+    )
+    fixture.now[0] = (
+        prepared.authorization
+        .authorization.expires_at
+        + 1.0
+    )
+
+    with pytest.raises(Exception):
+        fixture.execute(
+            plan.workflow_id
+        )
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_crash_during_deletion_is_resumable_after_floor_commit(kind):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan, _ = fixture.through_prepared()
+    backend.fail_enabled = True
+
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic operator pruning crash",
+    ):
+        fixture.execute(
+            plan.workflow_id
+        )
+
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert (
+        stored.workflow.phase
+        is DurableCompactionWorkflowPhase.EXECUTING
+    )
+    assert stored.workflow.error_count == 1
+    assert stored.workflow.resumable
+    assert (
+        fixture.chain
+        .hot_floor()
+        .sequence
+        == stored.workflow.cutoff_sequence
+    )
+
+    # Expiry after floor commit does not revoke authority to finish the exact
+    # already-fenced deletion manifest.
+    fixture.now[0] += 1000.0
+    backend.fail_enabled = False
+    result = fixture.operator.resume(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.ok
+    assert result.stored.workflow.complete
+    assert (
+        fixture.chain.snapshot()
+        == fixture.later
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_fresh_operator_resumes_crashed_deletion(kind):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan, _ = fixture.through_prepared()
+    backend.fail_enabled = True
+    with pytest.raises(RuntimeError):
+        fixture.execute(
+            plan.workflow_id
+        )
+    backend.fail_enabled = False
+
+    fresh_executor = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        fixture.floor_store,
+        namespace=f"{kind}-pruning",
+        max_items=100,
+        clock=lambda: fixture.now[0],
+    )
+    fresh = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fresh_executor,
+        namespace=f"{kind}-operator",
+        clock=lambda: fixture.now[0],
+    )
+    result = fresh.resume(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.ok
+    assert result.stored.workflow.complete
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_inspect_reports_phase_capabilities(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.current
+    assert not report.safe_to_execute
+    assert not report.safe_to_resume
+    assert report.reasons == ()
+
+    fixture.certify(
+        plan.workflow_id
+    )
+    fixture.authorize(
+        plan.workflow_id
+    )
+    fixture.prepare(
+        plan.workflow_id
+    )
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.current
+    assert report.safe_to_execute
+    assert not report.safe_to_resume
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_inspect_detects_stale_head(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.append_one()
+    report = fixture.operator.inspect(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not report.current
+    assert not report.live_head_matches
+    assert any(
+        "live head differs" in reason
+        for reason in report.reasons
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_require_current_rejects_stale_workflow(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    fixture.append_one()
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.operator.require_current(
+            plan.workflow_id,
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_complete_workflow_serializes_full_authority_chain(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    _, _, result = (
+        fixture.through_complete()
+    )
+    data = result.to_dict()
+    workflow = data["stored"][
+        "workflow"
+    ]
+    assert data["ok"] is True
+    assert workflow["phase"] == "complete"
+    assert (
+        workflow[
+            "destructive_authority_issued"
+        ]
+        is True
+    )
+    assert (
+        workflow[
+            "delete_manifest_frozen"
+        ]
+        is True
+    )
+    assert workflow["complete"] is True
+    assert (
+        workflow["deleted_items"]
+        == workflow["delete_count"]
+    )
+    assert (
+        len(workflow["binding_digest"])
+        == 64
+    )
+    assert len(workflow["digest"]) == 64
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_workflow_binding_digest_is_stable_across_phases(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    initial = (
+        plan.stored.workflow
+        .binding_digest
+    )
+    fixture.certify(
+        plan.workflow_id
+    )
+    assert (
+        fixture.operator
+        .current(plan.workflow_id)
+        .workflow.binding_digest
+        == initial
+    )
+    fixture.authorize(
+        plan.workflow_id
+    )
+    fixture.prepare(
+        plan.workflow_id
+    )
+    result = fixture.execute(
+        plan.workflow_id
+    )
+    assert (
+        result.stored.workflow
+        .binding_digest
+        == initial
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_workflow_revision_advances_monotonically(kind):
+    fixture = OperatorFixture(
+        kind=kind
+    )
+    plan = fixture.plan()
+    revisions = [
+        plan.stored.revision
+    ]
+    fixture.certify(
+        plan.workflow_id
+    )
+    revisions.append(
+        fixture.operator
+        .current(plan.workflow_id)
+        .revision
+    )
+    fixture.authorize(
+        plan.workflow_id
+    )
+    revisions.append(
+        fixture.operator
+        .current(plan.workflow_id)
+        .revision
+    )
+    fixture.prepare(
+        plan.workflow_id
+    )
+    revisions.append(
+        fixture.operator
+        .current(plan.workflow_id)
+        .revision
+    )
+    fixture.execute(
+        plan.workflow_id
+    )
+    revisions.append(
+        fixture.operator
+        .current(plan.workflow_id)
+        .revision
+    )
+    assert revisions == sorted(
+        revisions
+    )
+    assert len(set(revisions)) == 5
+
+
+def test_missing_workflow_is_rejected():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="missing",
+    ):
+        fixture.operator.certify(
+            fp("missing"),
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+def test_current_missing_workflow_returns_none():
+    fixture = OperatorFixture()
+    assert (
+        fixture.operator.current(
+            fp("missing")
+        )
+        is None
+    )
+
+
+def test_operator_namespace_validation():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        ValueError,
+        match="namespace",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            fixture.certificate_store,
+            fixture.authorization_store,
+            fixture.executor,
+            namespace="",
+        )
+
+
+@pytest.mark.parametrize(
+    "retries",
+    [0, 129, True],
+)
+def test_operator_retry_bound_validation(retries):
+    fixture = OperatorFixture()
+    with pytest.raises(
+        ValueError,
+        match="max_cas_retries",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            fixture.certificate_store,
+            fixture.authorization_store,
+            fixture.executor,
+            max_cas_retries=retries,
+        )
+
+
+def test_operator_clock_validation():
+    fixture = OperatorFixture()
+    operator = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fixture.executor,
+        namespace="bad-clock-operator",
+        clock=lambda: float("nan"),
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="clock",
+    ):
+        operator.plan(
+            fixture.retention,
+            fixture.chain,
+            operator_id="operator",
+        )
+
+
+def test_operator_rejects_mismatched_certificate_store():
+    fixture = OperatorFixture()
+    other_planner = DurableCompactionPlanner(
+        fixture.archives,
+        DurableCompactionPolicy(
+            minimum_live_tail=2,
+            maximum_candidate_nodes=20,
+        ),
+    )
+    other_store = (
+        DurableCompactionCertificateStore(
+            fixture.backend,
+            signer(
+                "other-certificate",
+                b"z",
+            ),
+            other_planner,
+            namespace="other-certificates",
+        )
+    )
+    with pytest.raises(
+        ValueError,
+        match="different compaction planner",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            other_store,
+            fixture.authorization_store,
+            fixture.executor,
+        )
+
+
+def test_operator_rejects_mismatched_authorization_store():
+    fixture = OperatorFixture()
+    other_authorizations = (
+        DurablePruningAuthorizationStore(
+            fixture.backend,
+            signer(
+                "other-auth",
+                b"z",
+            ),
+            fixture.certificate_store,
+            namespace="other-auths",
+        )
+    )
+    other_certificates = (
+        DurableCompactionCertificateStore(
+            fixture.backend,
+            signer(
+                "other-cert",
+                b"y",
+            ),
+            fixture.compaction,
+            namespace="other-certs",
+        )
+    )
+    with pytest.raises(
+        ValueError,
+        match="different certificate store",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            other_certificates,
+            other_authorizations,
+            fixture.executor,
+        )
+
+
+def test_operator_rejects_mismatched_pruning_executor():
+    fixture = OperatorFixture()
+    other_authorizations = (
+        DurablePruningAuthorizationStore(
+            fixture.backend,
+            signer(
+                "other-auth",
+                b"z",
+            ),
+            fixture.certificate_store,
+            namespace="other-auths",
+        )
+    )
+    other_executor = DurablePruningExecutor(
+        fixture.backend,
+        other_authorizations,
+        fixture.floor_store,
+        namespace="other-pruning",
+    )
+    with pytest.raises(
+        ValueError,
+        match="different authorization store",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            fixture.certificate_store,
+            fixture.authorization_store,
+            other_executor,
+        )
+
+
+def test_wrong_backend_workflow_value_type_is_rejected():
+    fixture = OperatorFixture()
+    workflow_id = fp("bad-workflow")
+    fixture.backend.put_if_absent(
+        fixture.operator.namespace,
+        fixture.operator._key(
+            workflow_id
+        ),
+        {"bad": True},
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="value type",
+    ):
+        fixture.operator.current(
+            workflow_id
+        )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema_version", 2),
+        ("workflow_id", "bad"),
+        ("chain_id", ""),
+        ("operator_id", ""),
+        ("retention_plan_digest", "bad"),
+        ("readiness_digest", "bad"),
+        ("compaction_policy_digest", "bad"),
+        ("current_sequence", -1),
+        ("cutoff_sequence", 0),
+        ("previous_floor_sequence", -1),
+        ("archive_id", ""),
+        ("created_at", -1.0),
+        ("updated_at", -1.0),
+    ],
+)
+def test_workflow_validation(field, value):
+    values = dict(
+        schema_version=1,
+        workflow_id=fp("workflow"),
+        chain_id="journal",
+        operator_id="operator",
+        phase=(
+            DurableCompactionWorkflowPhase
+            .PLANNED
+        ),
+        retention_plan_digest=fp(
+            "retention"
+        ),
+        readiness_digest=fp(
+            "readiness"
+        ),
+        compaction_policy_digest=fp(
+            "policy"
+        ),
+        current_sequence=8,
+        current_root=fp("head"),
+        cutoff_sequence=6,
+        cutoff_root=fp("cutoff"),
+        previous_floor_sequence=0,
+        previous_floor_root="0" * 64,
+        archive_id="archive",
+        archive_manifest_digest=fp(
+            "archive"
+        ),
+        created_at=1.0,
+        updated_at=1.0,
+    )
+    values[field] = value
+    with pytest.raises(
+        (ValueError, TypeError),
+    ):
+        DurableCompactionWorkflow(
+            **values
+        )
+
+
+def test_certified_workflow_requires_certificate():
+    with pytest.raises(
+        ValueError,
+        match="certificate",
+    ):
+        DurableCompactionWorkflow(
+            1,
+            fp("workflow"),
+            "journal",
+            "operator",
+            DurableCompactionWorkflowPhase.CERTIFIED,
+            fp("retention"),
+            fp("readiness"),
+            fp("policy"),
+            8,
+            fp("head"),
+            6,
+            fp("cutoff"),
+            0,
+            "0" * 64,
+            "archive",
+            fp("archive"),
+            created_at=1.0,
+            updated_at=1.0,
+        )
+
+
+def test_authorized_workflow_requires_authorization():
+    with pytest.raises(
+        ValueError,
+        match="authority",
+    ):
+        DurableCompactionWorkflow(
+            1,
+            fp("workflow"),
+            "journal",
+            "operator",
+            DurableCompactionWorkflowPhase.AUTHORIZED,
+            fp("retention"),
+            fp("readiness"),
+            fp("policy"),
+            8,
+            fp("head"),
+            6,
+            fp("cutoff"),
+            0,
+            "0" * 64,
+            "archive",
+            fp("archive"),
+            certificate_id=fp("cert"),
+            certificate_digest=fp(
+                "cert-digest"
+            ),
+            created_at=1.0,
+            updated_at=1.0,
+        )
+
+
+def test_complete_workflow_requires_complete_pruning_result():
+    with pytest.raises(
+        ValueError,
+        match="completed pruning",
+    ):
+        DurableCompactionWorkflow(
+            1,
+            fp("workflow"),
+            "journal",
+            "operator",
+            DurableCompactionWorkflowPhase.COMPLETE,
+            fp("retention"),
+            fp("readiness"),
+            fp("policy"),
+            8,
+            fp("head"),
+            6,
+            fp("cutoff"),
+            0,
+            "0" * 64,
+            "archive",
+            fp("archive"),
+            certificate_id=fp("cert"),
+            certificate_digest=fp(
+                "cert-digest"
+            ),
+            authorization_id=fp("auth"),
+            authorization_digest=fp(
+                "auth-digest"
+            ),
+            pruning_operation_id=fp(
+                "operation"
+            ),
+            pruning_manifest_digest=fp(
+                "manifest"
+            ),
+            pruning_phase=(
+                DurablePruningPhase
+                .PREPARED.value
+            ),
+            delete_count=6,
+            deleted_items=6,
+            floor_id=fp("floor"),
+            created_at=1.0,
+            updated_at=1.0,
+        )
+
+
+def test_stored_workflow_revision_validation():
+    workflow = DurableCompactionWorkflow(
+        1,
+        fp("workflow"),
+        "journal",
+        "operator",
+        DurableCompactionWorkflowPhase.PLANNED,
+        fp("retention"),
+        fp("readiness"),
+        fp("policy"),
+        8,
+        fp("head"),
+        6,
+        fp("cutoff"),
+        0,
+        "0" * 64,
+        "archive",
+        fp("archive"),
+        created_at=1.0,
+        updated_at=1.0,
+    )
+    with pytest.raises(ValueError):
+        StoredDurableCompactionWorkflow(
+            0,
+            workflow,
+        )
+
+
+def test_workflow_error_fields_are_paired():
+    base = dict(
+        schema_version=1,
+        workflow_id=fp("workflow"),
+        chain_id="journal",
+        operator_id="operator",
+        phase=(
+            DurableCompactionWorkflowPhase
+            .PLANNED
+        ),
+        retention_plan_digest=fp(
+            "retention"
+        ),
+        readiness_digest=fp(
+            "readiness"
+        ),
+        compaction_policy_digest=fp(
+            "policy"
+        ),
+        current_sequence=8,
+        current_root=fp("head"),
+        cutoff_sequence=6,
+        cutoff_root=fp("cutoff"),
+        previous_floor_sequence=0,
+        previous_floor_root="0" * 64,
+        archive_id="archive",
+        archive_manifest_digest=fp(
+            "archive"
+        ),
+        created_at=1.0,
+        updated_at=1.0,
+    )
+    with pytest.raises(
+        ValueError,
+        match="requires last_error",
+    ):
+        DurableCompactionWorkflow(
+            **base,
+            error_count=1,
+            last_error_at=1.0,
+        )
+    with pytest.raises(
+        ValueError,
+        match="require error_count",
+    ):
+        DurableCompactionWorkflow(
+            **base,
+            last_error="error",
+            last_error_at=1.0,
+        )
+
+
+class ConflictOnceBackend(
+    InMemoryFencedStore
+):
+    def __init__(self):
+        super().__init__()
+        self.workflow_conflicted = False
+
+    def compare_and_swap(
+        self,
+        namespace,
+        key,
+        *,
+        expected_revision,
+        value,
+    ):
+        if (
+            "operator" in namespace
+            and not self.workflow_conflicted
+            and key.startswith("workflow:")
+        ):
+            self.workflow_conflicted = True
+            raise DistributedStateConflict(
+                "synthetic workflow race"
+            )
+        return super().compare_and_swap(
+            namespace,
+            key,
+            expected_revision=expected_revision,
+            value=value,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_workflow_transition_retries_cas_conflict(kind):
+    backend = ConflictOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+    )
+    plan = fixture.plan()
+    certificate = fixture.certify(
+        plan.workflow_id
+    )
+    assert certificate.certificate_id
+    assert backend.workflow_conflicted
+    assert (
+        fixture.operator
+        .current(plan.workflow_id)
+        .workflow.phase
+        is DurableCompactionWorkflowPhase.CERTIFIED
+    )
