@@ -83,7 +83,7 @@ def _registry(
     *,
     failing: str | None = None,
 ) -> tuple[JvmAcceleratorRegistry, dict[str, _FakeAccelerator], dict[str, int]]:
-    names = ("observability", "vector", "physics")
+    names = ("observability", "vector", "physics", "retrieval")
     instances = {
         name: _FakeAccelerator(name, fail_ping=name == failing)
         for name in names
@@ -122,7 +122,7 @@ def test_preflight_and_status_do_not_initialize_helpers(tmp_path: Path) -> None:
     preflight = registry.preflight()
     status = registry.status()
 
-    assert set(preflight) == {"observability", "vector", "physics"}
+    assert set(preflight) == {"observability", "vector", "physics", "retrieval"}
     assert all(item.ready for item in preflight.values())
     assert all(not item.initialized for item in status.values())
     assert all(item.healthy for item in status.values())
@@ -130,6 +130,7 @@ def test_preflight_and_status_do_not_initialize_helpers(tmp_path: Path) -> None:
         "observability": 0,
         "vector": 0,
         "physics": 0,
+        "retrieval": 0,
     }
 
 
@@ -244,6 +245,7 @@ def test_health_probe_redacts_exception_text(tmp_path: Path) -> None:
     assert result.detail == "RuntimeError"
     assert "hunter2" not in result.detail
 
+
 def test_warm_all_starts_each_helper_and_surfaces_runtime_counters(tmp_path: Path) -> None:
     registry, instances, _factory_calls = _registry(tmp_path)
 
@@ -269,6 +271,7 @@ def test_nonstrict_warm_reports_failure_without_hiding_other_helpers(tmp_path: P
 
     assert statuses["observability"].healthy is True
     assert statuses["physics"].healthy is True
+    assert statuses["retrieval"].healthy is True
     assert statuses["vector"].healthy is False
     assert statuses["vector"].failed_requests >= 1
     assert statuses["vector"].last_error == "RuntimeError"
@@ -388,6 +391,7 @@ def test_health_probe_reports_missing_source_without_starting_factory(tmp_path: 
     assert result.ok is False
     assert "unavailable" in result.detail
     assert factory_calls["vector"] == 0
+
 
 def test_unknown_names_fail_closed(tmp_path: Path) -> None:
     registry, _instances, _factory_calls = _registry(tmp_path)
