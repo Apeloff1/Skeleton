@@ -24,11 +24,36 @@ class RecoveryCandidate:
     needs_manual_review: bool
     safe_to_forget: bool
     reason: str
+    backup_id: str = ""
+    backup_digest: str = ""
+    before_snapshot_digest: str = ""
+    root_fingerprint: str = ""
+    command_fingerprint: str = ""
+
+    @property
+    def evidence_complete(self) -> bool:
+        return all(
+            (
+                self.backup_id,
+                self.backup_digest,
+                self.before_snapshot_digest,
+                self.root_fingerprint,
+                self.command_fingerprint,
+            )
+        )
 
 
 class TransactionRecoveryInspector:
     def __init__(self, journal: TransactionJournal) -> None:
         self.journal = journal
+
+    @staticmethod
+    def _latest_text(events: list[JournalEvent], key: str) -> str:
+        for event in reversed(events):
+            value = event.payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+        return ""
 
     def candidates(self) -> tuple[RecoveryCandidate, ...]:
         by_transaction: dict[str, list[JournalEvent]] = {}
@@ -59,6 +84,17 @@ class TransactionRecoveryInspector:
                         "execution may have mutated workspace; compare snapshot and backup evidence"
                         if mutated_possible
                         else "transaction did not reach execution"
+                    ),
+                    backup_id=self._latest_text(events, "backup_id"),
+                    backup_digest=self._latest_text(events, "backup_digest"),
+                    before_snapshot_digest=self._latest_text(
+                        events,
+                        "before_snapshot_digest",
+                    ),
+                    root_fingerprint=self._latest_text(events, "root_fingerprint"),
+                    command_fingerprint=self._latest_text(
+                        events,
+                        "command_fingerprint",
                     ),
                 )
             )
