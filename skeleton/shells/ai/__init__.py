@@ -1,5 +1,14 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_receipt_inclusion import (
+    DurableReceiptInclusion,
+    DurableReceiptInclusionAuthority,
+    DurableReceiptInclusionError,
+    DurableReceiptInclusionPolicy,
+    DurableReceiptInclusionState,
+    DurableReceiptInclusionVerification,
+)
+
 from skeleton.shells.ai.durable_destruction_health import (
     DurableDestructionChainHealth,
     DurableDestructionFleetHealth,
