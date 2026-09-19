@@ -21,6 +21,14 @@ from skeleton.shells.ai.durable_merkle import (
     DurableMerkleVerification,
     SignedDurableMerkleCheckpoint,
 )
+from skeleton.shells.ai.durable_merkle_health import (
+    DurableMerkleHealthError,
+    DurableMerkleHealthFinding,
+    DurableMerkleHealthGuard,
+    DurableMerkleHealthPolicy,
+    DurableMerkleHealthReport,
+    DurableMerkleHealthSeverity,
+)
 from skeleton.shells.ai.durable_merkle_operator import (
     DurableMerkleOperatorError,
     DurableMerkleOperatorResult,
@@ -74,6 +82,12 @@ MERKLE_EXPORTS = {
     "DurableMerkleOperatorResult": DurableMerkleOperatorResult,
     "DurableMerkleOperatorStatus": DurableMerkleOperatorStatus,
     "DurableSessionMerkleOperator": DurableSessionMerkleOperator,
+    "DurableMerkleHealthError": DurableMerkleHealthError,
+    "DurableMerkleHealthFinding": DurableMerkleHealthFinding,
+    "DurableMerkleHealthGuard": DurableMerkleHealthGuard,
+    "DurableMerkleHealthPolicy": DurableMerkleHealthPolicy,
+    "DurableMerkleHealthReport": DurableMerkleHealthReport,
+    "DurableMerkleHealthSeverity": DurableMerkleHealthSeverity,
 }
 
 
@@ -391,3 +405,59 @@ def test_side_round_trip(value):
 )
 def test_operator_status_round_trip(value):
     assert DurableMerkleOperatorStatus(value).value == value
+
+def test_merkle_health_severity_values_are_wire_stable():
+    assert {
+        item.value
+        for item in DurableMerkleHealthSeverity
+    } == {
+        "warning",
+        "error",
+    }
+
+
+def test_merkle_health_guard_constructor_contract():
+    signature = inspect.signature(
+        DurableMerkleHealthGuard
+    )
+    assert {
+        "operator",
+        "policy",
+    }.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "require"],
+)
+def test_merkle_health_guard_method_surface(method):
+    assert callable(
+        getattr(
+            DurableMerkleHealthGuard,
+            method,
+            None,
+        )
+    )
+
+
+def test_merkle_health_policy_digest_property():
+    assert isinstance(
+        DurableMerkleHealthPolicy.digest,
+        property,
+    )
+
+
+def test_merkle_health_report_digest_property():
+    assert isinstance(
+        DurableMerkleHealthReport.digest,
+        property,
+    )
+
+
+def test_package_merkle_health_guard_is_canonical_class():
+    from skeleton.shells.ai import (
+        DurableMerkleHealthGuard as RootImport,
+    )
+
+    assert RootImport is DurableMerkleHealthGuard
+
