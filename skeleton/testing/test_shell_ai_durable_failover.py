@@ -75,7 +75,9 @@ class Environment:
         self.now = [float(now)]
         self.source_backend = InMemoryFencedStore()
         self.target_backend = InMemoryFencedStore()
-        self.registry_backend = InMemoryFencedStore()
+        self.registry_backend = InMemoryFencedStore(
+            clock=lambda: self.now[0],
+        )
         self.source_journal = DistributedAIDecisionJournal(
             self.source_backend,
             namespace="journal",
@@ -1261,3 +1263,559 @@ def test_two_tickets_can_be_claimed_independently():
         consumer_id="operator-2",
     )
     assert one.record.ticket_id != two.record.ticket_id
+
+# ---------------------------------------------------------------------------
+# Cross-operation durable maintenance authority integration
+# ---------------------------------------------------------------------------
+
+
+def test_failover_maintenance_resources_bind_logical_chain_ids():
+    env = Environment(
+        maintenance=True,
+    )
+    resources = (
+        env.coordinator
+        .maintenance_resources()
+    )
+    assert tuple(
+        item.resource_id
+        for item in resources
+    ) == (
+        "journal",
+        "receipts",
+    )
+    report = env.manager.require_promotion_ready()
+    assert all(
+        item.resource_kind
+        == "replicated-evidence-chain"
+        for item in resources
+    )
+    assert all(
+        item.state_digest
+        == report.digest
+        for item in resources
+    )
+
+
+def test_maintenance_enabled_failover_issue_requires_epoch():
+    env = Environment(
+        maintenance=True,
+    )
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="maintenance epoch",
+    ):
+        env.coordinator.issue()
+
+
+def test_valid_failover_epoch_allows_issue_claim_and_complete():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    claimed = env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    assert (
+        claimed.record.phase
+        is DurableFailoverPhase.CLAIMED
+    )
+    applied = env.coordinator.complete(
+        signed,
+        consumer_id="worker",
+        maintenance_epoch=epoch,
+    )
+    assert (
+        applied.record.phase
+        is DurableFailoverPhase.APPLIED
+    )
+    assert env.maintenance.require_active(
+        epoch,
+        operation=(
+            DurableMaintenanceOperation.FAILOVER
+        ),
+        required_resources=(
+            "journal",
+            "receipts",
+        ),
+    ).active
+
+
+def test_failover_complete_requires_epoch_even_after_claim():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="maintenance epoch",
+    ):
+        env.coordinator.complete(
+            signed,
+            consumer_id="worker",
+        )
+
+
+def test_released_failover_epoch_blocks_completion():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    env.maintenance.release(epoch)
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="maintenance authority is stale",
+    ):
+        env.coordinator.complete(
+            signed,
+            consumer_id="worker",
+            maintenance_epoch=epoch,
+        )
+
+
+def test_old_epoch_is_rejected_after_failover_renewal():
+    env = Environment(
+        maintenance=True,
+    )
+    old = env.acquire_maintenance()
+    renewed = env.maintenance.renew(
+        old
+    )
+    with pytest.raises(
+        DurableFailoverTicketError,
+    ):
+        env.coordinator.issue(
+            maintenance_epoch=old,
+        )
+    signed = env.coordinator.issue(
+        maintenance_epoch=renewed,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    applied = env.coordinator.complete(
+        signed,
+        consumer_id="worker",
+        maintenance_epoch=renewed,
+    )
+    assert (
+        applied.record.phase
+        is DurableFailoverPhase.APPLIED
+    )
+
+
+def test_replication_state_drift_invalidates_failover_epoch():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    env.advance_both_identically()
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="state changed",
+    ):
+        env.coordinator.issue(
+            maintenance_epoch=epoch,
+        )
+
+
+def test_wrong_operation_epoch_cannot_issue_failover_ticket():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance(
+        operation=(
+            DurableMaintenanceOperation.COMPACTION
+        )
+    )
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="operation differs",
+    ):
+        env.coordinator.issue(
+            maintenance_epoch=epoch,
+        )
+
+
+def test_epoch_missing_receipt_resource_cannot_authorize_failover():
+    env = Environment(
+        maintenance=True,
+    )
+    report = env.manager.require_promotion_ready()
+    journal = (
+        DurableMaintenanceResource
+        .replicated_chain(
+            "journal",
+            source_sequence=(
+                report.journal.source_sequence
+            ),
+            source_root=(
+                report.journal.source_root
+            ),
+            target_sequence=(
+                report.journal.target_sequence
+            ),
+            target_root=(
+                report.journal.target_root
+            ),
+            replication_state_digest=(
+                report.digest
+            ),
+        )
+    )
+    epoch = env.maintenance.acquire(
+        DurableMaintenanceOperation.FAILOVER,
+        owner_id="worker",
+        resources=(journal,),
+    )
+    with pytest.raises(
+        DurableFailoverTicketError,
+        match="lacks required resources",
+    ):
+        env.coordinator.issue(
+            maintenance_epoch=epoch,
+        )
+
+
+def test_applied_failover_idempotency_does_not_require_live_epoch():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    first = env.coordinator.complete(
+        signed,
+        consumer_id="worker",
+        maintenance_epoch=epoch,
+    )
+    env.maintenance.release(epoch)
+    second = env.coordinator.complete(
+        signed,
+        consumer_id="worker",
+    )
+    assert second == first
+    assert (
+        second.record.phase
+        is DurableFailoverPhase.APPLIED
+    )
+
+
+def test_compaction_lock_on_journal_blocks_failover_epoch_acquisition():
+    env = Environment(
+        maintenance=True,
+    )
+    report = env.manager.require_promotion_ready()
+    journal = (
+        DurableMaintenanceResource
+        .replicated_chain(
+            "journal",
+            source_sequence=(
+                report.journal.source_sequence
+            ),
+            source_root=(
+                report.journal.source_root
+            ),
+            target_sequence=(
+                report.journal.target_sequence
+            ),
+            target_root=(
+                report.journal.target_root
+            ),
+            replication_state_digest=(
+                report.digest
+            ),
+        )
+    )
+    compaction = env.maintenance.acquire(
+        DurableMaintenanceOperation.COMPACTION,
+        owner_id="compactor",
+        resources=(journal,),
+    )
+    assert env.maintenance.require_active(
+        compaction
+    ).active
+    with pytest.raises(
+        DurableMaintenanceConflict,
+        match="active authority",
+    ):
+        env.acquire_maintenance()
+
+
+def test_failover_epoch_blocks_compaction_lock_on_same_journal():
+    env = Environment(
+        maintenance=True,
+    )
+    failover = env.acquire_maintenance()
+    report = env.manager.require_promotion_ready()
+    journal = (
+        DurableMaintenanceResource
+        .replicated_chain(
+            "journal",
+            source_sequence=(
+                report.journal.source_sequence
+            ),
+            source_root=(
+                report.journal.source_root
+            ),
+            target_sequence=(
+                report.journal.target_sequence
+            ),
+            target_root=(
+                report.journal.target_root
+            ),
+            replication_state_digest=(
+                report.digest
+            ),
+        )
+    )
+    assert env.maintenance.require_active(
+        failover
+    ).active
+    with pytest.raises(
+        DurableMaintenanceConflict,
+        match="active authority",
+    ):
+        env.maintenance.acquire(
+            DurableMaintenanceOperation.COMPACTION,
+            owner_id="compactor",
+            resources=(journal,),
+        )
+
+
+def test_failover_epoch_blocks_pruning_lock_on_receipts():
+    env = Environment(
+        maintenance=True,
+    )
+    failover = env.acquire_maintenance()
+    report = env.manager.require_promotion_ready()
+    receipts = (
+        DurableMaintenanceResource
+        .replicated_chain(
+            "receipts",
+            source_sequence=(
+                report.receipts.source_sequence
+            ),
+            source_root=(
+                report.receipts.source_root
+            ),
+            target_sequence=(
+                report.receipts.target_sequence
+            ),
+            target_root=(
+                report.receipts.target_root
+            ),
+            replication_state_digest=(
+                report.digest
+            ),
+        )
+    )
+    assert env.maintenance.require_active(
+        failover
+    ).active
+    with pytest.raises(
+        DurableMaintenanceConflict,
+    ):
+        env.maintenance.acquire(
+            DurableMaintenanceOperation.PRUNING,
+            owner_id="pruner",
+            resources=(receipts,),
+        )
+
+
+def test_disjoint_maintenance_resource_can_coexist_with_failover():
+    env = Environment(
+        maintenance=True,
+    )
+    failover = env.acquire_maintenance()
+    unrelated = env.maintenance.acquire(
+        DurableMaintenanceOperation.INDEX_REPAIR,
+        owner_id="repair",
+        resources=(
+            DurableMaintenanceResource(
+                "unrelated-index",
+                "index",
+                1,
+                fp("d"),
+                fp("e"),
+            ),
+        ),
+    )
+    assert env.maintenance.require_active(
+        failover
+    ).active
+    assert env.maintenance.require_active(
+        unrelated
+    ).active
+
+
+def test_failover_coordinator_rejects_wrong_maintenance_type():
+    env = Environment()
+    with pytest.raises(
+        TypeError,
+        match="maintenance",
+    ):
+        DurableFailoverCoordinator(
+            env.manager,
+            env.authority,
+            env.registry,
+            source_id="primary",
+            target_id="replica",
+            maintenance=object(),
+        )
+
+
+def test_maintenance_resources_require_promotion_ready_replica():
+    env = Environment(
+        synced=False,
+        maintenance=True,
+    )
+    with pytest.raises(Exception):
+        env.coordinator.maintenance_resources()
+
+
+def test_failover_epoch_resources_change_after_replication_growth():
+    env = Environment(
+        maintenance=True,
+    )
+    before = (
+        env.coordinator
+        .maintenance_resources()
+    )
+    env.advance_both_identically()
+    after = (
+        env.coordinator
+        .maintenance_resources()
+    )
+    assert tuple(
+        item.digest
+        for item in before
+    ) != tuple(
+        item.digest
+        for item in after
+    )
+
+
+def test_failover_issue_with_epoch_preserves_ticket_root_binding():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    report = env.manager.require_promotion_ready()
+    assert (
+        signed.ticket.journal_root
+        == report.journal.source_root
+    )
+    assert (
+        signed.ticket.receipt_root
+        == report.receipts.source_root
+    )
+    resources = {
+        item.resource_id: item
+        for item in epoch.epoch.resources
+    }
+    assert set(resources) == {
+        "journal",
+        "receipts",
+    }
+
+
+def test_claim_does_not_consume_or_release_maintenance_epoch():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    assert env.maintenance.require_active(
+        epoch,
+        operation=(
+            DurableMaintenanceOperation.FAILOVER
+        ),
+    ).active
+
+
+def test_cancel_does_not_require_or_mutate_maintenance_authority():
+    env = Environment(
+        maintenance=True,
+    )
+    epoch = env.acquire_maintenance()
+    signed = env.coordinator.issue(
+        maintenance_epoch=epoch,
+    )
+    env.coordinator.claim(
+        signed,
+        consumer_id="worker",
+    )
+    env.maintenance.release(epoch)
+    cancelled = env.coordinator.cancel(
+        signed,
+        consumer_id="worker",
+    )
+    assert (
+        cancelled.record.phase
+        is DurableFailoverPhase.CANCELLED
+    )
+
+
+def test_complete_rejects_epoch_from_separate_maintenance_store():
+    env = Environment(
+        maintenance=True,
+    )
+    other = DurableMaintenanceStore(
+        env.registry_backend,
+        ArtifactSigner(
+            "other-maintenance",
+            b"z" * 32,
+            clock=lambda: env.now[0],
+        ),
+        namespace="other-maintenance",
+        clock=lambda: env.now[0],
+    )
+    epoch = other.acquire(
+        DurableMaintenanceOperation.FAILOVER,
+        owner_id="other",
+        resources=(
+            env.coordinator
+            .maintenance_resources()
+        ),
+    )
+    # The primary maintenance store cannot authenticate/persist the foreign
+    # epoch, so even matching resource claims do not cross authority domains.
+    with pytest.raises(Exception):
+        env.coordinator.issue(
+            maintenance_epoch=epoch,
+        )
+
