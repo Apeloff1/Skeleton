@@ -455,6 +455,34 @@ class PhysicsWorld:
         ]
         return sort_hits(hits)
 
+    def raycast_many(
+        self,
+        rays: tuple[Ray, ...],
+        *,
+        ignore: tuple[str, ...] = (),
+        max_total_candidates: int = MAX_BROAD_PHASE_QUERY_HITS,
+    ) -> tuple[tuple[RayHit, ...], ...]:
+        """Batch raycasts with optional JVM coarse-AABB candidate filtering."""
+        batch = tuple(rays)
+        if not batch:
+            return ()
+        candidate_batches = self._broad_phase.ray_candidate_ids(
+            self.bodies(),
+            batch,
+            max_total_candidates=max_total_candidates,
+        )
+        ignored = set(ignore)
+        output: list[tuple[RayHit, ...]] = []
+        for ray, candidate_ids in zip(batch, candidate_batches):
+            hits = [
+                hit
+                for body_id in candidate_ids
+                if body_id not in ignored
+                if (hit := raycast_body(ray, self._bodies[body_id])) is not None
+            ]
+            output.append(sort_hits(hits))
+        return tuple(output)
+
     def raycast_closest(
         self,
         ray: Ray,
