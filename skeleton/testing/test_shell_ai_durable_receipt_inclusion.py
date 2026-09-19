@@ -17,6 +17,7 @@ from skeleton.shells.ai.durable_proof_window import (
 from skeleton.shells.ai.durable_receipt_inclusion import (
     DurableReceiptInclusion,
     DurableReceiptInclusionAuthority,
+    DurableReceiptInclusionBatchResult,
     DurableReceiptInclusionError,
     DurableReceiptInclusionPolicy,
     DurableReceiptInclusionState,
@@ -921,3 +922,545 @@ def test_inclusion_validation(field, value):
             item,
             **{field: value},
         )
+
+def test_build_many_verifies_multiple_receipts_in_order():
+    env, _, _, after = anchored_fixture(
+        after=4,
+        max_window_items=16,
+    )
+    receipt_ids = tuple(
+        item.receipt.receipt_id
+        for item in after
+    )
+    result = env.authority.build_many(
+        "receipts",
+        env.chain,
+        receipt_ids,
+    )
+    assert isinstance(
+        result,
+        DurableReceiptInclusionBatchResult,
+    )
+    assert result.valid
+    assert result.verified_count == 4
+    assert result.invalid_count == 0
+    assert tuple(
+        item.receipt_id
+        for item in result.items
+    ) == receipt_ids
+    assert all(
+        verification.valid
+        for verification in result.verifications
+    )
+    assert result.current_sequence == env.chain.length()
+    assert result.current_root == env.chain.root_hash()
+
+
+def test_build_many_uses_one_full_ancestry_snapshot():
+    env, _, _, after = anchored_fixture(
+        after=4,
+        max_window_items=16,
+    )
+    calls = {"snapshot": 0}
+    original = env.chain.snapshot
+
+    def counted_snapshot():
+        calls["snapshot"] += 1
+        return original()
+
+    env.chain.snapshot = counted_snapshot
+    result = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    assert result.valid
+    assert calls["snapshot"] == 1
+
+
+def test_verify_many_uses_one_full_ancestry_snapshot():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    calls = {"snapshot": 0}
+    original = env.chain.snapshot
+
+    def counted_snapshot():
+        calls["snapshot"] += 1
+        return original()
+
+    env.chain.snapshot = counted_snapshot
+    verified = env.authority.verify_many(
+        built.items,
+        env.chain,
+    )
+    assert verified.valid
+    assert calls["snapshot"] == 1
+
+
+def test_batch_proofs_are_cached_per_target():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    batch = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    for item in batch.items:
+        assert env.proof_store.find_target(
+            "receipts",
+            item.receipt_hash,
+        ) == item.proof
+
+
+def test_verify_many_survives_later_chain_growth():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    env.append(5)
+    verified = env.authority.require_many(
+        built.items,
+        env.chain,
+    )
+    assert verified.valid
+    assert (
+        verified.current_sequence
+        == env.chain.length()
+    )
+
+
+def test_verify_many_reports_single_tampered_item():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    items = list(built.items)
+    items[1] = replace(
+        items[1],
+        receipt_fingerprint=fp("f"),
+    )
+    verified = env.authority.verify_many(
+        tuple(items),
+        env.chain,
+    )
+    assert not verified.valid
+    assert verified.verified_count == 2
+    assert verified.invalid_count == 1
+    assert verified.verifications[0].valid
+    assert not verified.verifications[1].valid
+    assert verified.verifications[2].valid
+
+
+def test_require_many_raises_on_tampered_item():
+    env, _, _, after = anchored_fixture(
+        after=2,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    items = (
+        built.items[0],
+        replace(
+            built.items[1],
+            receipt_fingerprint=fp("f"),
+        ),
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+    ):
+        env.authority.require_many(
+            items,
+            env.chain,
+        )
+
+
+def test_build_many_rejects_duplicate_receipt_ids():
+    env, _, _, after = anchored_fixture()
+    receipt_id = after[-1].receipt.receipt_id
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="duplicates",
+    ):
+        env.authority.build_many(
+            "receipts",
+            env.chain,
+            (receipt_id, receipt_id),
+        )
+
+
+def test_verify_many_rejects_duplicate_items():
+    env, _, _, after = anchored_fixture()
+    item = env.authority.build(
+        "receipts",
+        env.chain,
+        after[-1].receipt.receipt_id,
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="duplicates",
+    ):
+        env.authority.verify_many(
+            (item, item),
+            env.chain,
+        )
+
+
+def test_build_many_enforces_batch_bound():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    bounded = DurableReceiptInclusionAuthority(
+        env.proofs,
+        proof_store=env.proof_store,
+        max_batch_items=2,
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="batch exceeds",
+    ):
+        bounded.build_many(
+            "receipts",
+            env.chain,
+            tuple(
+                item.receipt.receipt_id
+                for item in after
+            ),
+        )
+
+
+def test_verify_many_enforces_batch_bound():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    bounded = DurableReceiptInclusionAuthority(
+        env.proofs,
+        proof_store=env.proof_store,
+        max_batch_items=2,
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="batch exceeds",
+    ):
+        bounded.verify_many(
+            built.items,
+            env.chain,
+        )
+
+
+@pytest.mark.parametrize(
+    "maximum",
+    [0, -1, True, 1.2],
+)
+def test_batch_bound_constructor_validation(maximum):
+    env = Fixture()
+    with pytest.raises(
+        ValueError,
+        match="max_batch_items",
+    ):
+        DurableReceiptInclusionAuthority(
+            env.proofs,
+            max_batch_items=maximum,
+        )
+
+
+def test_verify_many_rejects_wrong_item_type():
+    env = Fixture()
+    with pytest.raises(
+        TypeError,
+        match="all batch items",
+    ):
+        env.authority.verify_many(
+            (object(),),
+            env.chain,
+        )
+
+
+def test_verify_many_rejects_mixed_chain_ids():
+    env, _, _, after = anchored_fixture(
+        after=2,
+    )
+    built = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    mixed = (
+        built.items[0],
+        replace(
+            built.items[1],
+            chain_id="other",
+            proof=replace(
+                built.items[1].proof,
+                proof=replace(
+                    built.items[1].proof.proof,
+                    chain_id="other",
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="mixes chain identities",
+    ):
+        env.authority.verify_many(
+            mixed,
+            env.chain,
+        )
+
+
+def test_build_many_missing_one_index_fails_closed():
+    env, _, _, after = anchored_fixture(
+        after=3,
+    )
+    missing = after[1]
+    key = env.chain._index_key(
+        missing.receipt.receipt_id
+    )
+    record = env.backend.get(
+        env.chain.namespace,
+        key,
+    )
+    env.backend.delete(
+        env.chain.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="index is missing",
+    ):
+        env.authority.build_many(
+            "receipts",
+            env.chain,
+            tuple(
+                item.receipt.receipt_id
+                for item in after
+            ),
+        )
+
+
+def test_batch_rejects_orphan_indexed_fork():
+    env = Fixture()
+    env.append(3)
+    checkpoint = env.checkpoint()
+    committed = env.append(1)[0]
+    fork_receipt = receipt(
+        "batch-fork",
+        fingerprint=fp("f"),
+    )
+    fork_hash = ReceiptChain._hash(
+        checkpoint.checkpoint.root_hash,
+        4,
+        fork_receipt,
+    )
+    fork = ChainedReceipt(
+        4,
+        checkpoint.checkpoint.root_hash,
+        fork_hash,
+        fork_receipt,
+    )
+    env.backend.put_if_absent(
+        env.chain.namespace,
+        env.chain._node_key(fork_hash),
+        fork,
+    )
+    env.backend.put_if_absent(
+        env.chain.namespace,
+        env.chain._index_key(
+            fork_receipt.receipt_id
+        ),
+        ReceiptIndexEntry(
+            fork_receipt.receipt_id,
+            fork_hash,
+            fork_receipt.fingerprint,
+            4,
+        ),
+    )
+    assert (
+        committed.receipt_hash
+        == env.chain.root_hash()
+    )
+    with pytest.raises(
+        DurableReceiptInclusionError,
+        match="not in committed chain snapshot",
+    ):
+        env.authority.build_many(
+            "receipts",
+            env.chain,
+            (fork_receipt.receipt_id,),
+        )
+
+
+def test_empty_build_many_is_valid():
+    env = Fixture()
+    result = env.authority.build_many(
+        "custom-chain",
+        env.chain,
+        (),
+    )
+    assert result.valid
+    assert result.items == ()
+    assert result.verifications == ()
+    assert result.verified_count == 0
+    assert result.invalid_count == 0
+    assert result.chain_id == "custom-chain"
+
+
+def test_empty_verify_many_is_valid():
+    env = Fixture()
+    result = env.authority.verify_many(
+        (),
+        env.chain,
+    )
+    assert result.valid
+    assert result.items == ()
+    assert result.chain_id == "receipts"
+
+
+def test_batch_result_digest_is_stable():
+    env, _, _, after = anchored_fixture(
+        after=2,
+    )
+    result = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    clone = replace(result)
+    assert clone.digest == result.digest
+    assert len(result.digest) == 64
+
+
+def test_batch_result_to_dict():
+    env, _, _, after = anchored_fixture(
+        after=2,
+    )
+    result = env.authority.build_many(
+        "receipts",
+        env.chain,
+        tuple(
+            item.receipt.receipt_id
+            for item in after
+        ),
+    )
+    data = result.to_dict()
+    assert data["valid"] is True
+    assert data["verified_count"] == 2
+    assert data["invalid_count"] == 0
+    assert len(data["items"]) == 2
+    assert len(data["verifications"]) == 2
+    assert data["digest"] == result.digest
+
+
+def test_batch_result_rejects_length_mismatch():
+    env, _, _, after = anchored_fixture()
+    item, verification = env.authority.build_and_require(
+        "receipts",
+        env.chain,
+        after[-1].receipt.receipt_id,
+    )
+    with pytest.raises(
+        ValueError,
+        match="length mismatch",
+    ):
+        DurableReceiptInclusionBatchResult(
+            "receipts",
+            env.chain.length(),
+            env.chain.root_hash(),
+            (item,),
+            (),
+        )
+
+
+def test_batch_result_rejects_identity_mismatch():
+    env, _, _, after = anchored_fixture()
+    item, verification = env.authority.build_and_require(
+        "receipts",
+        env.chain,
+        after[-1].receipt.receipt_id,
+    )
+    bad_verification = replace(
+        verification,
+        receipt_id="receipt-other",
+    )
+    with pytest.raises(
+        ValueError,
+        match="identity differs",
+    ):
+        DurableReceiptInclusionBatchResult(
+            "receipts",
+            env.chain.length(),
+            env.chain.root_hash(),
+            (item,),
+            (bad_verification,),
+        )
+
+
+def test_batch_result_rejects_duplicate_items():
+    env, _, _, after = anchored_fixture()
+    item, verification = env.authority.build_and_require(
+        "receipts",
+        env.chain,
+        after[-1].receipt.receipt_id,
+    )
+    with pytest.raises(
+        ValueError,
+        match="duplicate",
+    ):
+        DurableReceiptInclusionBatchResult(
+            "receipts",
+            env.chain.length(),
+            env.chain.root_hash(),
+            (item, item),
+            (verification, verification),
+        )
+
