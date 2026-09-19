@@ -22,7 +22,11 @@ from skeleton.shells.session import ShellSession
 from skeleton.shells.workspace_txn.backup import ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.diff import WorkspaceDiffer
 from skeleton.shells.workspace_txn.journal import TransactionJournal
-from skeleton.shells.workspace_txn.lease import WorkspaceLease, WorkspaceLeaseRegistry
+from skeleton.shells.workspace_txn.lease import (
+    WorkspaceLease,
+    WorkspaceLeaseHeartbeat,
+    WorkspaceLeaseRegistry,
+)
 from skeleton.shells.workspace_txn.metrics import TransactionMetrics
 from skeleton.shells.workspace_txn.policy import WorkspaceMutationPolicy, default_safe_policy
 from skeleton.shells.workspace_txn.rollback import WorkspaceRollback
@@ -40,10 +44,19 @@ class TransactionConfig:
     auto_rollback_on_policy_rejection: bool = True
     require_clean_rollback: bool = True
     lease_ttl_seconds: float = 120.0
+    lease_renew_interval_seconds: float | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.lease_ttl_seconds, bool) or self.lease_ttl_seconds <= 0:
             raise ValueError("lease_ttl_seconds must be positive")
+        if self.lease_renew_interval_seconds is not None:
+            interval = self.lease_renew_interval_seconds
+            if isinstance(interval, bool) or interval <= 0:
+                raise ValueError("lease_renew_interval_seconds must be positive")
+            if interval >= self.lease_ttl_seconds:
+                raise ValueError(
+                    "lease renewal interval must be below lease ttl"
+                )
 
 
 class WorkspaceTransactionManager:
@@ -156,12 +169,15 @@ class WorkspaceTransactionManager:
         policy: WorkspaceMutationPolicy | None = None,
     ) -> TransactionResult:
         root_path = Path(root).expanduser().resolve(strict=True)
+        self.backup_store.require_external_to_workspace(root_path)
         transaction_id = uuid.uuid4().hex
         correlation = correlation_id or uuid.uuid4().hex
         started_at = datetime.now(timezone.utc).isoformat()
         effective_policy = self.policy if policy is None else policy
         workspace_id = hashlib.sha256(str(root_path).encode("utf-8")).hexdigest()
         lease: WorkspaceLease | None = None
+        heartbeat: WorkspaceLeaseHeartbeat | None = None
+        terminal_journaled = False
 
         self._journal(
             transaction_id,
@@ -180,6 +196,12 @@ class WorkspaceTransactionManager:
                 lease_id=lease.lease_id,
                 generation=lease.generation,
             )
+            heartbeat = WorkspaceLeaseHeartbeat(
+                self.leases,
+                lease,
+                ttl_seconds=self.config.lease_ttl_seconds,
+                interval_seconds=self.config.lease_renew_interval_seconds,
+            ).start()
 
             self._journal(transaction_id, WorkspaceTransactionState.SNAPSHOTTING)
             before = self.scanner.scan(root_path)
@@ -189,7 +211,7 @@ class WorkspaceTransactionManager:
             if not self.backup_store.verify_manifest(backup):
                 raise RuntimeError("pre-mutation backup failed verification")
 
-            self.leases.require(lease)
+            heartbeat.require_healthy()
             self._journal(transaction_id, WorkspaceTransactionState.EXECUTING)
             execution = self.executor.execute(
                 command,
@@ -198,7 +220,7 @@ class WorkspaceTransactionManager:
                 correlation_id=correlation,
             )
 
-            self.leases.require(lease)
+            heartbeat.require_healthy()
             self._journal(transaction_id, WorkspaceTransactionState.REVIEWING)
             after = self.scanner.scan(root_path)
             changes = self.differ.diff(before, after)
@@ -216,6 +238,7 @@ class WorkspaceTransactionManager:
             )
             rollback = None
             state = WorkspaceTransactionState.ACCEPTED
+            heartbeat.require_healthy()
 
             if should_rollback:
                 self._journal(transaction_id, WorkspaceTransactionState.REJECTED)
@@ -226,6 +249,7 @@ class WorkspaceTransactionManager:
                     changes,
                     backup,
                 )
+                heartbeat.require_healthy()
                 state = (
                     WorkspaceTransactionState.ROLLED_BACK
                     if rollback.ok
@@ -236,11 +260,14 @@ class WorkspaceTransactionManager:
                     state,
                     rollback_ok=rollback.ok,
                 )
+                terminal_journaled = True
             elif not execution.ok or not decision.allowed:
                 state = WorkspaceTransactionState.REJECTED
                 self._journal(transaction_id, state)
+                terminal_journaled = True
             else:
                 self._journal(transaction_id, state)
+                terminal_journaled = True
 
             receipt = self._build_receipt(
                 transaction_id=transaction_id,
@@ -278,9 +305,12 @@ class WorkspaceTransactionManager:
                 )
             return result
         except Exception:
-            self._journal(transaction_id, WorkspaceTransactionState.ABORTED)
+            if not terminal_journaled:
+                self._journal(transaction_id, WorkspaceTransactionState.ABORTED)
             raise
         finally:
+            if heartbeat is not None:
+                heartbeat.stop()
             if lease is not None:
                 try:
                     self.leases.release(lease)
