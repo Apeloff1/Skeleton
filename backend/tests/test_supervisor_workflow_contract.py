@@ -100,6 +100,7 @@ def test_secretary_has_only_content_and_pull_request_write_authority() -> None:
     secretary = _job_block(source, "secretary")
     permissions = secretary.split("    permissions:\n", 1)[1].split("    runs-on:", 1)[0]
     assert "contents: write" in permissions
+    assert "issues: read" in permissions
     assert "pull-requests: write" in permissions
     for forbidden in (
         "actions: write",
