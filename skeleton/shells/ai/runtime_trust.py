@@ -31,13 +31,12 @@ from skeleton.shells.ai.startup_release import (
 def _sha256(name: str, value: str, *, optional: bool = False) -> str:
     if optional and not value:
         return ""
-    if len(value) != 64:
+    if not isinstance(value, str) or len(value) != 64:
         raise ValueError(f"{name} must be SHA-256 hex")
-    # Digest values are opaque 64-character authority tokens; production
-
-    # hashes are hexadecimal, while deterministic test/adapter sentinels may
-
-    # use the full string alphabet.
+    try:
+        int(value, 16)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be SHA-256 hex") from exc
     return value.lower()
 
 
