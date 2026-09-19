@@ -27,7 +27,6 @@ from skeleton.pr_automation.runner_contracts import (
     ReviewEvidence,
     RunBudget,
     RunIdentity,
-    RunnerLimits,
     RunnerPolicy,
     RunTrigger,
     Target,
