@@ -1,59 +1,208 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
 
+class ProvenanceKind(str,Enum):
+    PRIMARY="primary"
+    SECONDARY="secondary"
+    TERTIARY="tertiary"
+    BLOCKING="blocking"
+    ADVISORY="advisory"
 
-class ProvenanceKind(str, Enum):
-    PRIMARY = "primary"
-    SECONDARY = "secondary"
-    TERTIARY = "tertiary"
-    BLOCKING = "blocking"
-    ADVISORY = "advisory"
-
-
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True,slots=True)
 class ProvenanceRule:
-    name: str
-    kind: ProvenanceKind
-    threshold: float
-    rationale: str
+    name:str
+    kind:ProvenanceKind
+    threshold:float
+    rationale:str
+    def applies(self,value:float)->bool:
+        if not isinstance(value,(int,float)) or isinstance(value,bool) or not isfinite(float(value)): raise ValueError("value must be finite")
+        return float(value)>=self.threshold
 
-    def applies(self, value: float) -> bool:
-        if (
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not isfinite(float(value))
-        ):
-            raise ValueError("value must be finite")
-        return float(value) >= self.threshold
-
-
-_KIND_CYCLE = (
-    ProvenanceKind.PRIMARY,
-    ProvenanceKind.SECONDARY,
-    ProvenanceKind.TERTIARY,
-    ProvenanceKind.BLOCKING,
-    ProvenanceKind.ADVISORY,
+RULES=(
+    ProvenanceRule("provenance_001",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded provenance rule 1"),
+    ProvenanceRule("provenance_002",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded provenance rule 2"),
+    ProvenanceRule("provenance_003",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded provenance rule 3"),
+    ProvenanceRule("provenance_004",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded provenance rule 4"),
+    ProvenanceRule("provenance_005",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded provenance rule 5"),
+    ProvenanceRule("provenance_006",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded provenance rule 6"),
+    ProvenanceRule("provenance_007",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded provenance rule 7"),
+    ProvenanceRule("provenance_008",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded provenance rule 8"),
+    ProvenanceRule("provenance_009",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded provenance rule 9"),
+    ProvenanceRule("provenance_010",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded provenance rule 10"),
+    ProvenanceRule("provenance_011",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded provenance rule 11"),
+    ProvenanceRule("provenance_012",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded provenance rule 12"),
+    ProvenanceRule("provenance_013",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded provenance rule 13"),
+    ProvenanceRule("provenance_014",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded provenance rule 14"),
+    ProvenanceRule("provenance_015",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded provenance rule 15"),
+    ProvenanceRule("provenance_016",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded provenance rule 16"),
+    ProvenanceRule("provenance_017",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded provenance rule 17"),
+    ProvenanceRule("provenance_018",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded provenance rule 18"),
+    ProvenanceRule("provenance_019",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded provenance rule 19"),
+    ProvenanceRule("provenance_020",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded provenance rule 20"),
+    ProvenanceRule("provenance_021",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded provenance rule 21"),
+    ProvenanceRule("provenance_022",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded provenance rule 22"),
+    ProvenanceRule("provenance_023",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded provenance rule 23"),
+    ProvenanceRule("provenance_024",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded provenance rule 24"),
+    ProvenanceRule("provenance_025",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded provenance rule 25"),
+    ProvenanceRule("provenance_026",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded provenance rule 26"),
+    ProvenanceRule("provenance_027",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded provenance rule 27"),
+    ProvenanceRule("provenance_028",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded provenance rule 28"),
+    ProvenanceRule("provenance_029",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded provenance rule 29"),
+    ProvenanceRule("provenance_030",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded provenance rule 30"),
+    ProvenanceRule("provenance_031",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded provenance rule 31"),
+    ProvenanceRule("provenance_032",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded provenance rule 32"),
+    ProvenanceRule("provenance_033",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded provenance rule 33"),
+    ProvenanceRule("provenance_034",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded provenance rule 34"),
+    ProvenanceRule("provenance_035",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded provenance rule 35"),
+    ProvenanceRule("provenance_036",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded provenance rule 36"),
+    ProvenanceRule("provenance_037",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded provenance rule 37"),
+    ProvenanceRule("provenance_038",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded provenance rule 38"),
+    ProvenanceRule("provenance_039",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded provenance rule 39"),
+    ProvenanceRule("provenance_040",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded provenance rule 40"),
+    ProvenanceRule("provenance_041",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded provenance rule 41"),
+    ProvenanceRule("provenance_042",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded provenance rule 42"),
+    ProvenanceRule("provenance_043",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded provenance rule 43"),
+    ProvenanceRule("provenance_044",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded provenance rule 44"),
+    ProvenanceRule("provenance_045",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded provenance rule 45"),
+    ProvenanceRule("provenance_046",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded provenance rule 46"),
+    ProvenanceRule("provenance_047",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded provenance rule 47"),
+    ProvenanceRule("provenance_048",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded provenance rule 48"),
+    ProvenanceRule("provenance_049",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded provenance rule 49"),
+    ProvenanceRule("provenance_050",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded provenance rule 50"),
+    ProvenanceRule("provenance_051",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded provenance rule 51"),
+    ProvenanceRule("provenance_052",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded provenance rule 52"),
+    ProvenanceRule("provenance_053",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded provenance rule 53"),
+    ProvenanceRule("provenance_054",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded provenance rule 54"),
+    ProvenanceRule("provenance_055",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded provenance rule 55"),
+    ProvenanceRule("provenance_056",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded provenance rule 56"),
+    ProvenanceRule("provenance_057",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded provenance rule 57"),
+    ProvenanceRule("provenance_058",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded provenance rule 58"),
+    ProvenanceRule("provenance_059",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded provenance rule 59"),
+    ProvenanceRule("provenance_060",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded provenance rule 60"),
+    ProvenanceRule("provenance_061",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded provenance rule 61"),
+    ProvenanceRule("provenance_062",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded provenance rule 62"),
+    ProvenanceRule("provenance_063",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded provenance rule 63"),
+    ProvenanceRule("provenance_064",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded provenance rule 64"),
+    ProvenanceRule("provenance_065",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded provenance rule 65"),
+    ProvenanceRule("provenance_066",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded provenance rule 66"),
+    ProvenanceRule("provenance_067",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded provenance rule 67"),
+    ProvenanceRule("provenance_068",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded provenance rule 68"),
+    ProvenanceRule("provenance_069",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded provenance rule 69"),
+    ProvenanceRule("provenance_070",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded provenance rule 70"),
+    ProvenanceRule("provenance_071",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded provenance rule 71"),
+    ProvenanceRule("provenance_072",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded provenance rule 72"),
+    ProvenanceRule("provenance_073",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded provenance rule 73"),
+    ProvenanceRule("provenance_074",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded provenance rule 74"),
+    ProvenanceRule("provenance_075",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded provenance rule 75"),
+    ProvenanceRule("provenance_076",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded provenance rule 76"),
+    ProvenanceRule("provenance_077",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded provenance rule 77"),
+    ProvenanceRule("provenance_078",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded provenance rule 78"),
+    ProvenanceRule("provenance_079",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded provenance rule 79"),
+    ProvenanceRule("provenance_080",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded provenance rule 80"),
+    ProvenanceRule("provenance_081",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.81,"bounded provenance rule 81"),
+    ProvenanceRule("provenance_082",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.82,"bounded provenance rule 82"),
+    ProvenanceRule("provenance_083",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.83,"bounded provenance rule 83"),
+    ProvenanceRule("provenance_084",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.84,"bounded provenance rule 84"),
+    ProvenanceRule("provenance_085",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.85,"bounded provenance rule 85"),
+    ProvenanceRule("provenance_086",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.86,"bounded provenance rule 86"),
+    ProvenanceRule("provenance_087",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.87,"bounded provenance rule 87"),
+    ProvenanceRule("provenance_088",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.88,"bounded provenance rule 88"),
+    ProvenanceRule("provenance_089",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.89,"bounded provenance rule 89"),
+    ProvenanceRule("provenance_090",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.9,"bounded provenance rule 90"),
+    ProvenanceRule("provenance_091",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.91,"bounded provenance rule 91"),
+    ProvenanceRule("provenance_092",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.92,"bounded provenance rule 92"),
+    ProvenanceRule("provenance_093",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.93,"bounded provenance rule 93"),
+    ProvenanceRule("provenance_094",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.94,"bounded provenance rule 94"),
+    ProvenanceRule("provenance_095",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.95,"bounded provenance rule 95"),
+    ProvenanceRule("provenance_096",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.96,"bounded provenance rule 96"),
+    ProvenanceRule("provenance_097",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.97,"bounded provenance rule 97"),
+    ProvenanceRule("provenance_098",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.98,"bounded provenance rule 98"),
+    ProvenanceRule("provenance_099",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.99,"bounded provenance rule 99"),
+    ProvenanceRule("provenance_100",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0,"bounded provenance rule 100"),
+    ProvenanceRule("provenance_101",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded provenance rule 101"),
+    ProvenanceRule("provenance_102",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded provenance rule 102"),
+    ProvenanceRule("provenance_103",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded provenance rule 103"),
+    ProvenanceRule("provenance_104",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded provenance rule 104"),
+    ProvenanceRule("provenance_105",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded provenance rule 105"),
+    ProvenanceRule("provenance_106",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded provenance rule 106"),
+    ProvenanceRule("provenance_107",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded provenance rule 107"),
+    ProvenanceRule("provenance_108",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded provenance rule 108"),
+    ProvenanceRule("provenance_109",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded provenance rule 109"),
+    ProvenanceRule("provenance_110",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded provenance rule 110"),
+    ProvenanceRule("provenance_111",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded provenance rule 111"),
+    ProvenanceRule("provenance_112",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded provenance rule 112"),
+    ProvenanceRule("provenance_113",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded provenance rule 113"),
+    ProvenanceRule("provenance_114",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded provenance rule 114"),
+    ProvenanceRule("provenance_115",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded provenance rule 115"),
+    ProvenanceRule("provenance_116",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded provenance rule 116"),
+    ProvenanceRule("provenance_117",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded provenance rule 117"),
+    ProvenanceRule("provenance_118",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded provenance rule 118"),
+    ProvenanceRule("provenance_119",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded provenance rule 119"),
+    ProvenanceRule("provenance_120",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded provenance rule 120"),
+    ProvenanceRule("provenance_121",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded provenance rule 121"),
+    ProvenanceRule("provenance_122",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded provenance rule 122"),
+    ProvenanceRule("provenance_123",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded provenance rule 123"),
+    ProvenanceRule("provenance_124",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded provenance rule 124"),
+    ProvenanceRule("provenance_125",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded provenance rule 125"),
+    ProvenanceRule("provenance_126",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded provenance rule 126"),
+    ProvenanceRule("provenance_127",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded provenance rule 127"),
+    ProvenanceRule("provenance_128",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded provenance rule 128"),
+    ProvenanceRule("provenance_129",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded provenance rule 129"),
+    ProvenanceRule("provenance_130",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded provenance rule 130"),
+    ProvenanceRule("provenance_131",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded provenance rule 131"),
+    ProvenanceRule("provenance_132",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded provenance rule 132"),
+    ProvenanceRule("provenance_133",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded provenance rule 133"),
+    ProvenanceRule("provenance_134",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded provenance rule 134"),
+    ProvenanceRule("provenance_135",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded provenance rule 135"),
+    ProvenanceRule("provenance_136",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded provenance rule 136"),
+    ProvenanceRule("provenance_137",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded provenance rule 137"),
+    ProvenanceRule("provenance_138",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded provenance rule 138"),
+    ProvenanceRule("provenance_139",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded provenance rule 139"),
+    ProvenanceRule("provenance_140",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded provenance rule 140"),
+    ProvenanceRule("provenance_141",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded provenance rule 141"),
+    ProvenanceRule("provenance_142",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded provenance rule 142"),
+    ProvenanceRule("provenance_143",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded provenance rule 143"),
+    ProvenanceRule("provenance_144",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded provenance rule 144"),
+    ProvenanceRule("provenance_145",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded provenance rule 145"),
+    ProvenanceRule("provenance_146",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded provenance rule 146"),
+    ProvenanceRule("provenance_147",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded provenance rule 147"),
+    ProvenanceRule("provenance_148",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded provenance rule 148"),
+    ProvenanceRule("provenance_149",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded provenance rule 149"),
+    ProvenanceRule("provenance_150",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded provenance rule 150"),
+    ProvenanceRule("provenance_151",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded provenance rule 151"),
+    ProvenanceRule("provenance_152",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded provenance rule 152"),
+    ProvenanceRule("provenance_153",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded provenance rule 153"),
+    ProvenanceRule("provenance_154",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded provenance rule 154"),
+    ProvenanceRule("provenance_155",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded provenance rule 155"),
+    ProvenanceRule("provenance_156",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded provenance rule 156"),
+    ProvenanceRule("provenance_157",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded provenance rule 157"),
+    ProvenanceRule("provenance_158",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded provenance rule 158"),
+    ProvenanceRule("provenance_159",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded provenance rule 159"),
+    ProvenanceRule("provenance_160",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded provenance rule 160"),
+    ProvenanceRule("provenance_161",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded provenance rule 161"),
+    ProvenanceRule("provenance_162",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded provenance rule 162"),
+    ProvenanceRule("provenance_163",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded provenance rule 163"),
+    ProvenanceRule("provenance_164",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded provenance rule 164"),
+    ProvenanceRule("provenance_165",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded provenance rule 165"),
+    ProvenanceRule("provenance_166",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded provenance rule 166"),
+    ProvenanceRule("provenance_167",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded provenance rule 167"),
+    ProvenanceRule("provenance_168",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded provenance rule 168"),
+    ProvenanceRule("provenance_169",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded provenance rule 169"),
+    ProvenanceRule("provenance_170",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded provenance rule 170"),
+    ProvenanceRule("provenance_171",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded provenance rule 171"),
+    ProvenanceRule("provenance_172",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded provenance rule 172"),
+    ProvenanceRule("provenance_173",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded provenance rule 173"),
+    ProvenanceRule("provenance_174",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded provenance rule 174"),
+    ProvenanceRule("provenance_175",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded provenance rule 175"),
+    ProvenanceRule("provenance_176",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded provenance rule 176"),
+    ProvenanceRule("provenance_177",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded provenance rule 177"),
+    ProvenanceRule("provenance_178",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded provenance rule 178"),
+    ProvenanceRule("provenance_179",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded provenance rule 179"),
+    ProvenanceRule("provenance_180",ProvenanceKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded provenance rule 180"),
 )
 
-_RULE_COUNT = 180
+def active(value:float): return tuple(r.name for r in RULES if r.applies(value))
 
-RULES = tuple(
-    ProvenanceRule(
-        name=f"provenance_{index:03d}",
-        kind=_KIND_CYCLE[index % len(_KIND_CYCLE)],
-        threshold=(index % 100) / 100,
-        rationale=f"bounded provenance rule {index}",
-    )
-    for index in range(1, _RULE_COUNT + 1)
-)
-
-
-def active(value: float):
-    return tuple(rule.name for rule in RULES if rule.applies(value))
-
-
-def by_kind(kind: ProvenanceKind):
-    return tuple(rule for rule in RULES if rule.kind is kind)
+def by_kind(kind:ProvenanceKind): return tuple(r for r in RULES if r.kind is kind)
