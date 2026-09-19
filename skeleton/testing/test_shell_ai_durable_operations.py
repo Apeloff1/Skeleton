@@ -2034,4 +2034,3 @@ def test_default_index_policy_service_start_allows_repairable_gap(tmp_path):
         status.durable_operations["warnings"]
         >= 1
     )
-
