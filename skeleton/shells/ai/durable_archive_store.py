@@ -306,6 +306,68 @@ class DurableArchiveSequenceIndex:
 
 
 @dataclass(frozen=True)
+class DurableArchiveSequenceIndexHealth:
+    head_sequence: int
+    inspected: int
+    indexed: int
+    missing: int
+    corrupt: int
+    first_missing_sequence: int | None = None
+    first_corrupt_sequence: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "head_sequence",
+            "inspected",
+            "indexed",
+            "missing",
+            "corrupt",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        for name in (
+            "first_missing_sequence",
+            "first_corrupt_sequence",
+        ):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+            ):
+                raise ValueError(
+                    f"{name} must be positive when present"
+                )
+
+    @property
+    def healthy(self) -> bool:
+        return self.missing == 0 and self.corrupt == 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "head_sequence": self.head_sequence,
+            "inspected": self.inspected,
+            "indexed": self.indexed,
+            "missing": self.missing,
+            "corrupt": self.corrupt,
+            "first_missing_sequence": (
+                self.first_missing_sequence
+            ),
+            "first_corrupt_sequence": (
+                self.first_corrupt_sequence
+            ),
+            "healthy": self.healthy,
+        }
+
+
+@dataclass(frozen=True)
 class DurableArchiveRootResolution:
     chain_id: str
     root_hash: str
@@ -1631,6 +1693,175 @@ class DurableArchiveRepository:
         if index.chain_id != chain_id or index.root_hash != root_hash:
             raise DurableArchiveStoreError("archive root index identity mismatch")
         return index
+
+    def inspect_sequence_indexes(
+        self,
+        chain_id: str,
+        *,
+        end_sequence: int | None = None,
+        max_items: int = 100_000,
+    ) -> DurableArchiveSequenceIndexHealth:
+        _identity("chain_id", chain_id, maximum=128)
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        head = self.latest(chain_id)
+        if head is None:
+            if end_sequence not in (None, 0):
+                raise IndexError(
+                    "archive sequence inspection exceeds empty archive"
+                )
+            return DurableArchiveSequenceIndexHealth(
+                0,
+                0,
+                0,
+                0,
+                0,
+            )
+        target = (
+            head.sequence
+            if end_sequence is None
+            else end_sequence
+        )
+        if (
+            isinstance(target, bool)
+            or not isinstance(target, int)
+            or target < 0
+            or target > head.sequence
+        ):
+            raise ValueError(
+                "archive index inspection end_sequence outside archived range"
+            )
+        if target > max_items:
+            raise DurableArchiveStoreError(
+                "archive index inspection exceeds bounded window"
+            )
+        stored = self.get(head.archive_id)
+        if (
+            stored is None
+            or not self.verify_archive(stored)
+        ):
+            raise DurableArchiveStoreError(
+                "archive index inspection lacks verified head archive"
+            )
+        if target > len(stored.node_hashes):
+            raise DurableArchiveStoreError(
+                "archive index inspection exceeds head archive payload"
+            )
+
+        indexed = 0
+        missing = 0
+        corrupt = 0
+        first_missing = None
+        first_corrupt = None
+        for sequence in range(1, target + 1):
+            expected_root = stored.node_hashes[
+                sequence - 1
+            ]
+            try:
+                entry = self.sequence_index(
+                    chain_id,
+                    sequence,
+                )
+            except DurableArchiveStoreError:
+                corrupt += 1
+                if first_corrupt is None:
+                    first_corrupt = sequence
+                continue
+            if entry is None:
+                missing += 1
+                if first_missing is None:
+                    first_missing = sequence
+                continue
+            if entry.root_hash != expected_root:
+                corrupt += 1
+                if first_corrupt is None:
+                    first_corrupt = sequence
+                continue
+            root_index = self.root_index(
+                chain_id,
+                expected_root,
+            )
+            if (
+                root_index is None
+                or root_index.sequence != sequence
+            ):
+                corrupt += 1
+                if first_corrupt is None:
+                    first_corrupt = sequence
+                continue
+            indexed += 1
+        return DurableArchiveSequenceIndexHealth(
+            head.sequence,
+            target,
+            indexed,
+            missing,
+            corrupt,
+            first_missing,
+            first_corrupt,
+        )
+
+    def repair_sequence_indexes(
+        self,
+        chain_id: str,
+        *,
+        end_sequence: int | None = None,
+        max_items: int = 100_000,
+    ) -> DurableArchiveSequenceIndexHealth:
+        _identity("chain_id", chain_id, maximum=128)
+        head = self.latest(chain_id)
+        if head is None:
+            return self.inspect_sequence_indexes(
+                chain_id,
+                end_sequence=end_sequence,
+                max_items=max_items,
+            )
+        target = (
+            head.sequence
+            if end_sequence is None
+            else end_sequence
+        )
+        if (
+            isinstance(target, bool)
+            or not isinstance(target, int)
+            or target < 0
+            or target > head.sequence
+        ):
+            raise ValueError(
+                "archive index repair end_sequence outside archived range"
+            )
+        if target > max_items:
+            raise DurableArchiveStoreError(
+                "archive index repair exceeds bounded window"
+            )
+        stored = self.get(head.archive_id)
+        if (
+            stored is None
+            or not self.verify_archive(stored)
+        ):
+            raise DurableArchiveStoreError(
+                "archive index repair lacks verified head archive"
+            )
+        for sequence in range(1, target + 1):
+            self._put_sequence_index(
+                DurableArchiveSequenceIndex(
+                    chain_id,
+                    sequence,
+                    stored.node_hashes[
+                        sequence - 1
+                    ],
+                )
+            )
+        return self.inspect_sequence_indexes(
+            chain_id,
+            end_sequence=target,
+            max_items=max_items,
+        )
 
     def sequence_index(
         self,
@@ -3158,6 +3389,185 @@ class ArchiveBackedHistoricalChain:
                 "historical indexed range terminal root mismatch"
             )
         return items
+
+    @staticmethod
+    def _merge_index_health(
+        head_sequence: int,
+        *reports,
+    ) -> DurableArchiveSequenceIndexHealth:
+        inspected = sum(
+            int(item.inspected)
+            for item in reports
+        )
+        indexed = sum(
+            int(item.indexed)
+            for item in reports
+        )
+        missing = sum(
+            int(item.missing)
+            for item in reports
+        )
+        corrupt = sum(
+            int(item.corrupt)
+            for item in reports
+        )
+        first_missing_candidates = tuple(
+            int(item.first_missing_sequence)
+            for item in reports
+            if item.first_missing_sequence is not None
+        )
+        first_corrupt_candidates = tuple(
+            int(item.first_corrupt_sequence)
+            for item in reports
+            if item.first_corrupt_sequence is not None
+        )
+        return DurableArchiveSequenceIndexHealth(
+            head_sequence,
+            inspected,
+            indexed,
+            missing,
+            corrupt,
+            (
+                min(first_missing_candidates)
+                if first_missing_candidates
+                else None
+            ),
+            (
+                min(first_corrupt_candidates)
+                if first_corrupt_candidates
+                else None
+            ),
+        )
+
+    def inspect_sequence_indexes(
+        self,
+        *,
+        max_items: int = 100_000,
+    ) -> DurableArchiveSequenceIndexHealth:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        head = self.head()
+        total = int(head.sequence)
+        if total > max_items:
+            raise DurableArchiveStoreError(
+                "archive-backed index inspection exceeds bounded window"
+            )
+        floor = self._active_floor()
+        if floor is None:
+            live_inspect = getattr(
+                self.live_chain,
+                "inspect_sequence_indexes",
+                None,
+            )
+            if callable(live_inspect):
+                return live_inspect(
+                    max_items=max_items,
+                )
+            archive_head = self.archives.latest(
+                self.chain_id
+            )
+            if (
+                archive_head is not None
+                and archive_head.sequence == total
+            ):
+                return self.archives.inspect_sequence_indexes(
+                    self.chain_id,
+                    end_sequence=total,
+                    max_items=max_items,
+                )
+            raise DurableArchiveStoreError(
+                "historical chain has no sequence-index inspection surface"
+            )
+
+        floor_sequence = int(floor.sequence)
+        archive_health = (
+            self.archives.inspect_sequence_indexes(
+                self.chain_id,
+                end_sequence=floor_sequence,
+                max_items=max_items,
+            )
+        )
+        live_health = (
+            self.live_chain.inspect_sequence_indexes(
+                max_items=max(
+                    1,
+                    max_items - floor_sequence,
+                ),
+            )
+        )
+        return self._merge_index_health(
+            total,
+            archive_health,
+            live_health,
+        )
+
+    def repair_sequence_indexes(
+        self,
+        *,
+        max_items: int = 100_000,
+    ) -> DurableArchiveSequenceIndexHealth:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        head = self.head()
+        total = int(head.sequence)
+        if total > max_items:
+            raise DurableArchiveStoreError(
+                "archive-backed index repair exceeds bounded window"
+            )
+        floor = self._active_floor()
+        if floor is None:
+            live_repair = getattr(
+                self.live_chain,
+                "repair_sequence_indexes",
+                None,
+            )
+            if callable(live_repair):
+                return live_repair(
+                    max_items=max_items,
+                )
+            archive_head = self.archives.latest(
+                self.chain_id
+            )
+            if (
+                archive_head is not None
+                and archive_head.sequence == total
+            ):
+                return self.archives.repair_sequence_indexes(
+                    self.chain_id,
+                    end_sequence=total,
+                    max_items=max_items,
+                )
+            raise DurableArchiveStoreError(
+                "historical chain has no sequence-index repair surface"
+            )
+
+        floor_sequence = int(floor.sequence)
+        self.archives.repair_sequence_indexes(
+            self.chain_id,
+            end_sequence=floor_sequence,
+            max_items=max_items,
+        )
+        self.live_chain.repair_sequence_indexes(
+            max_items=max(
+                1,
+                max_items - floor_sequence,
+            ),
+        )
+        return self.inspect_sequence_indexes(
+            max_items=max_items,
+        )
 
     def sequence_for_root(
         self,
