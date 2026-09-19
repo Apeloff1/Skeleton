@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
+from .model import (
+    UbuntuAction,
+    UbuntuPlan,
+    _clean,
+    _policy_errors,
+    _validate_policy_fields,
+    validate_plan,
+)
 
 @dataclass(frozen=True, slots=True)
 class ServiceSystemdPlan:
@@ -23,17 +30,25 @@ class ServiceSystemdPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-systemd:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -43,9 +58,11 @@ class ServiceSystemdPlan:
 
 def validate_service_systemd(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-systemd action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-systemd:"+identifier, ("ubuntu","service","systemd",identifier,desired), "validated service-systemd")
 
 def plan_service_systemd(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -73,17 +90,25 @@ class ServiceSocketPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-socket:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -93,9 +118,11 @@ class ServiceSocketPlan:
 
 def validate_service_socket(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-socket action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-socket:"+identifier, ("ubuntu","service","socket",identifier,desired), "validated service-socket")
 
 def plan_service_socket(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -123,17 +150,25 @@ class ServiceTimerPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-timer:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -143,9 +178,11 @@ class ServiceTimerPlan:
 
 def validate_service_timer(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-timer action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-timer:"+identifier, ("ubuntu","service","timer",identifier,desired), "validated service-timer")
 
 def plan_service_timer(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -173,17 +210,25 @@ class ServiceTargetPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-target:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -193,9 +238,11 @@ class ServiceTargetPlan:
 
 def validate_service_target(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-target action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-target:"+identifier, ("ubuntu","service","target",identifier,desired), "validated service-target")
 
 def plan_service_target(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -223,17 +270,25 @@ class ServiceUnitPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-unit:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -243,9 +298,11 @@ class ServiceUnitPlan:
 
 def validate_service_unit(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-unit action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-unit:"+identifier, ("ubuntu","service","unit",identifier,desired), "validated service-unit")
 
 def plan_service_unit(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -273,17 +330,25 @@ class ServiceJournalPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-journal:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -293,9 +358,11 @@ class ServiceJournalPlan:
 
 def validate_service_journal(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-journal action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-journal:"+identifier, ("ubuntu","service","journal",identifier,desired), "validated service-journal")
 
 def plan_service_journal(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -323,17 +390,25 @@ class ServiceRestartPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-restart:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -343,9 +418,11 @@ class ServiceRestartPlan:
 
 def validate_service_restart(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-restart action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-restart:"+identifier, ("ubuntu","service","restart",identifier,desired), "validated service-restart")
 
 def plan_service_restart(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -373,17 +450,25 @@ class ServiceEnablePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-enable:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -393,9 +478,11 @@ class ServiceEnablePlan:
 
 def validate_service_enable(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-enable action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-enable:"+identifier, ("ubuntu","service","enable",identifier,desired), "validated service-enable")
 
 def plan_service_enable(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -423,17 +510,25 @@ class ServiceMaskPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-mask:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -443,9 +538,11 @@ class ServiceMaskPlan:
 
 def validate_service_mask(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-mask action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-mask:"+identifier, ("ubuntu","service","mask",identifier,desired), "validated service-mask")
 
 def plan_service_mask(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -473,17 +570,25 @@ class ServiceHealthPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "service-health:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -493,9 +598,11 @@ class ServiceHealthPlan:
 
 def validate_service_health(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated service-health action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("service-health:"+identifier, ("ubuntu","service","health",identifier,desired), "validated service-health")
 
 def plan_service_health(identifiers: Sequence[str]) -> UbuntuPlan:
