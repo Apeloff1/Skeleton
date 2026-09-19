@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
+from .model import (
+    UbuntuAction,
+    UbuntuPlan,
+    _clean,
+    _policy_errors,
+    _validate_policy_fields,
+    validate_plan,
+)
 
 @dataclass(frozen=True, slots=True)
 class RuntimePythonPlan:
@@ -23,17 +30,25 @@ class RuntimePythonPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-python:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -43,9 +58,11 @@ class RuntimePythonPlan:
 
 def validate_runtime_python(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-python action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-python:"+identifier, ("ubuntu","runtime","python",identifier,desired), "validated runtime-python")
 
 def plan_runtime_python(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -73,17 +90,25 @@ class RuntimeDockerPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-docker:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -93,9 +118,11 @@ class RuntimeDockerPlan:
 
 def validate_runtime_docker(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-docker action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-docker:"+identifier, ("ubuntu","runtime","docker",identifier,desired), "validated runtime-docker")
 
 def plan_runtime_docker(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -123,17 +150,25 @@ class RuntimeContainerdPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-containerd:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -143,9 +178,11 @@ class RuntimeContainerdPlan:
 
 def validate_runtime_containerd(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-containerd action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-containerd:"+identifier, ("ubuntu","runtime","containerd",identifier,desired), "validated runtime-containerd")
 
 def plan_runtime_containerd(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -173,17 +210,25 @@ class RuntimePodmanPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-podman:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -193,9 +238,11 @@ class RuntimePodmanPlan:
 
 def validate_runtime_podman(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-podman action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-podman:"+identifier, ("ubuntu","runtime","podman",identifier,desired), "validated runtime-podman")
 
 def plan_runtime_podman(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -223,17 +270,25 @@ class RuntimeBuildxPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-buildx:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -243,9 +298,11 @@ class RuntimeBuildxPlan:
 
 def validate_runtime_buildx(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-buildx action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-buildx:"+identifier, ("ubuntu","runtime","buildx",identifier,desired), "validated runtime-buildx")
 
 def plan_runtime_buildx(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -273,17 +330,25 @@ class RuntimeQemuPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-qemu:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -293,9 +358,11 @@ class RuntimeQemuPlan:
 
 def validate_runtime_qemu(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-qemu action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-qemu:"+identifier, ("ubuntu","runtime","qemu",identifier,desired), "validated runtime-qemu")
 
 def plan_runtime_qemu(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -323,17 +390,25 @@ class RuntimeGccPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-gcc:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -343,9 +418,11 @@ class RuntimeGccPlan:
 
 def validate_runtime_gcc(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-gcc action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-gcc:"+identifier, ("ubuntu","runtime","gcc",identifier,desired), "validated runtime-gcc")
 
 def plan_runtime_gcc(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -373,17 +450,25 @@ class RuntimeNodePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-node:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -393,9 +478,11 @@ class RuntimeNodePlan:
 
 def validate_runtime_node(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-node action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-node:"+identifier, ("ubuntu","runtime","node",identifier,desired), "validated runtime-node")
 
 def plan_runtime_node(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -423,17 +510,25 @@ class RuntimeUvPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-uv:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -443,9 +538,11 @@ class RuntimeUvPlan:
 
 def validate_runtime_uv(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-uv action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-uv:"+identifier, ("ubuntu","runtime","uv",identifier,desired), "validated runtime-uv")
 
 def plan_runtime_uv(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -473,17 +570,25 @@ class RuntimePipPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "runtime-pip:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -493,9 +598,11 @@ class RuntimePipPlan:
 
 def validate_runtime_pip(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated runtime-pip action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("runtime-pip:"+identifier, ("ubuntu","runtime","pip",identifier,desired), "validated runtime-pip")
 
 def plan_runtime_pip(identifiers: Sequence[str]) -> UbuntuPlan:
