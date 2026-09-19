@@ -14,7 +14,6 @@ from skeleton.pr_automation.runner_contracts import (
     WorkState,
 )
 from skeleton.pr_automation.runner_engine import (
-    RunnerEngine,
     report_has_merge,
     report_result,
     run_engine,
@@ -22,7 +21,6 @@ from skeleton.pr_automation.runner_engine import (
 )
 from skeleton.testing.runner_v2_test_support import (
     NOW,
-    SHA_A,
     SHA_B,
     SHA_C,
     ScriptedTransport,
