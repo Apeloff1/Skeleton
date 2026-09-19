@@ -28,6 +28,7 @@ from skeleton.shells.ai.distributed_journal import (
 )
 from skeleton.shells.ai.durable_destruction import (
     DurableDestructionConflict,
+    DurableDestructionCorruption,
     DurableDestructionItem,
     DurableDestructionItemState,
     DurableDestructionKind,
@@ -1114,9 +1115,12 @@ class DurableOrphanGCOperator:
                 fencing_token=fencing_token,
                 completed_at=result.completed_at,
             )
-        except DurableDestructionConflict as exc:
+        except (
+            DurableDestructionConflict,
+            DurableDestructionCorruption,
+        ) as exc:
             raise DurableOrphanGCManualReview(
-                "destruction evidence conflicted with committed orphan GC record"
+                "destruction evidence failed committed orphan GC verification"
             ) from exc
 
     def _result_with_destruction(
