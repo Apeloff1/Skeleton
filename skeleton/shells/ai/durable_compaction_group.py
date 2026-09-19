@@ -32,6 +32,13 @@ from typing import Callable, Mapping, Sequence
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
 from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStale,
+    DurableMaintenanceStore,
+    SignedDurableMaintenanceEpoch,
+)
 from skeleton.shells.ai.durable_compaction_reservation import (
     DurableCompactionReservationConflict,
     DurableCompactionReservationStore,
@@ -735,6 +742,7 @@ class DurableCompactionGroupCoordinator:
         backend: VersionedStateBackend,
         *,
         reservations: DurableCompactionReservationStore | None = None,
+        maintenance: DurableMaintenanceStore | None = None,
         namespace: str = (
             "shell-ai-durable-compaction-groups"
         ),
@@ -758,6 +766,16 @@ class DurableCompactionGroupCoordinator:
         ):
             raise TypeError(
                 "reservations must be DurableCompactionReservationStore"
+            )
+        if (
+            maintenance is not None
+            and not isinstance(
+                maintenance,
+                DurableMaintenanceStore,
+            )
+        ):
+            raise TypeError(
+                "maintenance must be DurableMaintenanceStore"
             )
         if (
             not namespace
@@ -786,10 +804,138 @@ class DurableCompactionGroupCoordinator:
             raise TypeError("clock must be callable")
         self.backend = backend
         self.reservations = reservations
+        self.maintenance = maintenance
         self.namespace = namespace
         self.max_members = max_members
         self.max_cas_retries = max_cas_retries
         self._clock = clock
+
+    def _require_maintenance_wiring(
+        self,
+        request_map: Mapping[
+            str,
+            DurableCompactionGroupRequest,
+        ],
+    ) -> None:
+        member_stores = {
+            id(request.operator.maintenance): (
+                request.operator.maintenance
+            )
+            for request in request_map.values()
+            if request.operator.maintenance
+            is not None
+        }
+        if self.maintenance is None:
+            if member_stores:
+                raise DurableCompactionGroupError(
+                    "maintenance-enabled group members require coordinator maintenance store"
+                )
+            return
+        if not member_stores:
+            raise DurableCompactionGroupError(
+                "maintenance-enabled group requires maintenance-enabled member operators"
+            )
+        if (
+            len(member_stores) != 1
+            or next(iter(member_stores.values()))
+            is not self.maintenance
+        ):
+            raise DurableCompactionGroupError(
+                "group members and coordinator must share maintenance store"
+            )
+        for request in request_map.values():
+            if (
+                request.operator.maintenance
+                is not self.maintenance
+            ):
+                raise DurableCompactionGroupError(
+                    "every group member must share coordinator maintenance store"
+                )
+
+    @staticmethod
+    def _maintenance_resources(
+        request_map: Mapping[
+            str,
+            DurableCompactionGroupRequest,
+        ],
+    ) -> tuple[
+        DurableMaintenanceResource,
+        ...,
+    ]:
+        return tuple(
+            DurableMaintenanceResource.from_chain(
+                chain_id,
+                request_map[chain_id].chain,
+                resource_kind="evidence-chain",
+            )
+            for chain_id in sorted(request_map)
+        )
+
+    def maintenance_resources(
+        self,
+        requests: Sequence[
+            DurableCompactionGroupRequest
+        ],
+    ) -> tuple[
+        DurableMaintenanceResource,
+        ...,
+    ]:
+        request_map = self._request_map(
+            requests
+        )
+        self._require_maintenance_wiring(
+            request_map
+        )
+        return self._maintenance_resources(
+            request_map
+        )
+
+    def _require_maintenance(
+        self,
+        request_map: Mapping[
+            str,
+            DurableCompactionGroupRequest,
+        ],
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ),
+    ):
+        self._require_maintenance_wiring(
+            request_map
+        )
+        if self.maintenance is None:
+            return None
+        if maintenance_epoch is None:
+            raise DurableCompactionGroupError(
+                "durable maintenance epoch is required for group compaction"
+            )
+        if not isinstance(
+            maintenance_epoch,
+            SignedDurableMaintenanceEpoch,
+        ):
+            raise TypeError(
+                "maintenance_epoch must be SignedDurableMaintenanceEpoch"
+            )
+        resources = self._maintenance_resources(
+            request_map
+        )
+        try:
+            return self.maintenance.require_active(
+                maintenance_epoch,
+                operation=(
+                    DurableMaintenanceOperation.COMPACTION
+                ),
+                required_resources=tuple(
+                    item.resource_id
+                    for item in resources
+                ),
+                live_resources=resources,
+            )
+        except DurableMaintenanceStale as exc:
+            raise DurableCompactionGroupStale(
+                "durable group maintenance authority is stale: "
+                + str(exc)
+            ) from exc
 
     def _require_reservation_wiring(
         self,
@@ -1279,6 +1425,9 @@ class DurableCompactionGroupCoordinator:
         self._require_reservation_wiring(
             request_map
         )
+        self._require_maintenance_wiring(
+            request_map
+        )
         if not 2 <= len(request_map) <= self.max_members:
             raise ValueError(
                 "group member count outside supported range"
@@ -1534,6 +1683,9 @@ class DurableCompactionGroupCoordinator:
         ],
         *,
         start_index: int,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> StoredDurableCompactionGroup:
         current = group
         synced = self._sync_members(
@@ -1557,6 +1709,10 @@ class DurableCompactionGroupCoordinator:
             start_index,
             len(current.members),
         ):
+            self._require_maintenance(
+                request_map,
+                maintenance_epoch,
+            )
             member = current.members[
                 index
             ]
@@ -1579,6 +1735,7 @@ class DurableCompactionGroupCoordinator:
                         request.retention,
                         request.chain,
                         reservation_holder_id=current.group_id,
+                        maintenance_epoch=maintenance_epoch,
                     )
                 elif workflow.workflow.phase in {
                     DurableCompactionWorkflowPhase.EXECUTING,
@@ -1588,6 +1745,7 @@ class DurableCompactionGroupCoordinator:
                         request.retention,
                         request.chain,
                         reservation_holder_id=current.group_id,
+                        maintenance_epoch=maintenance_epoch,
                     )
                 else:
                     result = request.operator.execute(
@@ -1595,6 +1753,7 @@ class DurableCompactionGroupCoordinator:
                         request.retention,
                         request.chain,
                         reservation_holder_id=current.group_id,
+                        maintenance_epoch=maintenance_epoch,
                     )
                 if not isinstance(
                     result,
@@ -1719,6 +1878,10 @@ class DurableCompactionGroupCoordinator:
         requests: Sequence[
             DurableCompactionGroupRequest
         ],
+        *,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> StoredDurableCompactionGroup:
         stored = self._require_group(
             group_id
@@ -1735,6 +1898,7 @@ class DurableCompactionGroupCoordinator:
                 return self.resume(
                     group_id,
                     requests,
+                    maintenance_epoch=maintenance_epoch,
                 )
             if group.complete:
                 return stored
@@ -1745,6 +1909,10 @@ class DurableCompactionGroupCoordinator:
             group,
             requests,
         )
+        self._require_maintenance(
+            request_map,
+            maintenance_epoch,
+        )
         self._ensure_reservations(
             group,
             request_map,
@@ -1754,6 +1922,7 @@ class DurableCompactionGroupCoordinator:
             group,
             request_map,
             start_index=0,
+            maintenance_epoch=maintenance_epoch,
         )
 
     def resume(
@@ -1762,6 +1931,10 @@ class DurableCompactionGroupCoordinator:
         requests: Sequence[
             DurableCompactionGroupRequest
         ],
+        *,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> StoredDurableCompactionGroup:
         stored = self._require_group(
             group_id
@@ -1782,6 +1955,10 @@ class DurableCompactionGroupCoordinator:
         request_map = self._require_requests(
             group,
             requests,
+        )
+        self._require_maintenance(
+            request_map,
+            maintenance_epoch,
         )
         self._ensure_reservations(
             group,
@@ -1855,6 +2032,7 @@ class DurableCompactionGroupCoordinator:
             updated,
             request_map,
             start_index=start_index,
+            maintenance_epoch=maintenance_epoch,
         )
 
     def inspect(
