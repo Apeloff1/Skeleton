@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import json
 import os
 import sys
 import time
@@ -23,6 +24,7 @@ from skeleton.shells.toolchains.types import (
     CommandRisk,
     LogicalCommandContract,
 )
+import skeleton.shells.workspace_txn.backup as backup_module
 from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.lease import (
     WorkspaceLeaseHeartbeat,
@@ -255,6 +257,40 @@ def test_rollback_restores_workspace_root_mtime_after_top_level_create(tmp_path:
     assert result.transaction.backup is not None
     assert result.transaction.backup.root_mtime_ns == before_mtime
     assert root.stat().st_mtime_ns == before_mtime
+
+
+def test_backup_manifest_publication_is_atomic_and_parseable(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    snapshot = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, snapshot)
+
+    manifest_path = manager.backup_store.manifest_root / f"{manifest.backup_id}.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["digest"] == manifest.digest
+    assert payload["root_mtime_ns"] == manifest.root_mtime_ns
+    assert list(manager.backup_store.manifest_root.glob(".manifest-*.tmp")) == []
+
+
+def test_backup_manifest_publish_failure_leaves_no_partial_final_file(
+    tmp_path: Path,
+    monkeypatch,
+):
+    root, manager, _ = _manager(tmp_path)
+    snapshot = manager.scanner.scan(root)
+    real_replace = backup_module.os.replace
+
+    def fail_manifest_replace(source, destination):
+        if Path(destination).parent == manager.backup_store.manifest_root:
+            raise OSError("simulated manifest publish failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(backup_module.os, "replace", fail_manifest_replace)
+
+    with pytest.raises(BackupError, match="publishing backup manifest"):
+        manager.backup_store.create_manifest(root, snapshot)
+
+    assert list(manager.backup_store.manifest_root.glob("*.json")) == []
+    assert list(manager.backup_store.manifest_root.glob(".manifest-*.tmp")) == []
 
 
 def test_backup_manifest_root_metadata_is_integrity_bound(tmp_path: Path):
