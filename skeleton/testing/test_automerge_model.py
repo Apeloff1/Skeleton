@@ -10,7 +10,6 @@ import pytest
 from skeleton.pr_automation.automerge_model import (
     AutoMergePolicy,
     CandidateClass,
-    CandidateSnapshot,
     DecisionKind,
     DiffSummary,
     GateRequirement,
