@@ -4,7 +4,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
+from skeleton.artifact_plane.plane import ArtifactPlane
 from skeleton.artifact_plane.seven_by import SevenByAuditor
 
 
@@ -49,6 +51,18 @@ class GB8bSevenByTests(unittest.TestCase):
         card = SevenByAuditor(self.root).audit()
         restored = json.loads(json.dumps(card))
         self.assertEqual(restored["stored_prose"], 0)
+
+    def test_composite_plane_fails_closed_when_seven_by_fails(self) -> None:
+        plane = ArtifactPlane.__new__(ArtifactPlane)
+        plane.track_e = Mock(audit=Mock(return_value={"hit": 1}))
+        plane.seven_by = Mock(audit=Mock(return_value={"hit": 0}))
+        plane.godot = Mock(locate=Mock(return_value={"hit": 1}))
+
+        card = plane.snapshot()
+
+        self.assertEqual(card["hit"], 0)
+        self.assertEqual(card["law"], "GB-8/GB-8b")
+        self.assertEqual(card["seven_by"]["hit"], 0)
 
 
 if __name__ == "__main__":
