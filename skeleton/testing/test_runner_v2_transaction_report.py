@@ -37,7 +37,6 @@ from skeleton.pr_automation.runner_report import (
     checkpoint_compatible,
     checkpoint_from_report,
     compact_report,
-    deferred_results,
     failed_results,
     load_checkpoint,
     markdown_summary,
