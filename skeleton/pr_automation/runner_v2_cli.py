@@ -35,6 +35,7 @@ from .runner_targeting import (
     parse_pr_hints,
 )
 from .runner_transport import BudgetedGitHubTransport
+from .safety import load_operator_safety
 
 
 def env_bool(
@@ -449,6 +450,19 @@ def run_v2(
         parser.error("--limit must be between 1 and 1000")
 
     try:
+        safety = load_operator_safety(source_env)
+        if safety.blocked:
+            print(
+                json.dumps(
+                    {
+                        "kind": "pr-automation-operator-hold",
+                        **safety.public_payload(),
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0
+
         json_hints = parse_pr_hints(str(args.pr_hints_json or ""))
         hints = merge_hint_sets(json_hints, args.pr_hints)
         policy = runner_policy_from_env(source_env)
