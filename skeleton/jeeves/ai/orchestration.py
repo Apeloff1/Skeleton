@@ -123,8 +123,11 @@ def _validate_graph(records: Sequence[OrchestrRecord]) -> None:
             if record.authority not in _ALLOWED_DELEGATION[parent.authority]:
                 raise ValueError("authority escalation")
         for dep in record.dependencies:
-            if dep not in by_name:
+            dependency = by_name.get(dep)
+            if dependency is None:
                 raise ValueError("missing dependency")
+            if dependency.authority not in _ALLOWED_DELEGATION[record.authority]:
+                raise ValueError("dependency authority escalation")
 
     visiting: set[str] = set()
     visited: set[str] = set()
