@@ -27,6 +27,7 @@ public final class BroadPhaseMain {
     static final byte OP_PAIRS = 2;
     static final byte OP_SHUTDOWN = 3;
     static final byte OP_QUERY_AABBS = 4;
+    static final byte OP_RAY_AABBS = 5;
 
     static final byte STATUS_OK = 0;
     static final byte STATUS_BAD_REQUEST = 1;
@@ -79,6 +80,7 @@ public final class BroadPhaseMain {
                     case OP_PING -> handlePing(out, header);
                     case OP_PAIRS -> handlePairs(in, out, header);
                     case OP_QUERY_AABBS -> handleQueryAabbs(in, out, header);
+                    case OP_RAY_AABBS -> handleRayAabbs(in, out, header);
                     default -> throw new ProtocolException("unsupported operation: " + header.op());
                 }
             } catch (ProtocolException | IllegalArgumentException bad) {
@@ -269,6 +271,110 @@ public final class BroadPhaseMain {
         );
     }
 
+    static void handleRayAabbs(
+        DataInputStream in,
+        DataOutputStream out,
+        RequestHeader header
+    ) throws IOException {
+        int bodyCount = readBoundedInt(in, "body count", 0, MAX_BODIES);
+        int rayCount = readBoundedInt(in, "ray count", 1, MAX_QUERIES);
+        int maxTotalHits = readBoundedInt(
+            in,
+            "max total candidates",
+            1,
+            MAX_QUERY_HITS
+        );
+
+        var bodies = new Box[bodyCount];
+        for (int i = 0; i < bodyCount; i++) {
+            bodies[i] = readBounds(in, i);
+        }
+        var rays = new RayQuery[rayCount];
+        for (int i = 0; i < rayCount; i++) {
+            rays[i] = readRay(in, i);
+        }
+
+        QueryHits result = rayAabbCandidates(
+            bodies,
+            rays,
+            maxTotalHits
+        );
+        writeHeader(out, header.op(), STATUS_OK, header.requestId());
+        out.writeInt(result.counts().length);
+        int offset = 0;
+        for (int count : result.counts()) {
+            out.writeInt(count);
+            for (int index = 0; index < count; index++) {
+                out.writeInt(result.indices()[offset++]);
+            }
+        }
+    }
+
+    static RayQuery readRay(
+        DataInputStream in,
+        int index
+    ) throws IOException {
+        RayQuery ray = new RayQuery(
+            index,
+            readFinite(in, "ray origin x"),
+            readFinite(in, "ray origin y"),
+            readFinite(in, "ray origin z"),
+            readFinite(in, "ray direction x"),
+            readFinite(in, "ray direction y"),
+            readFinite(in, "ray direction z"),
+            readFinite(in, "ray max distance")
+        );
+        ray.validate();
+        return ray;
+    }
+
+    static QueryHits rayAabbCandidates(
+        Box[] bodies,
+        RayQuery[] rays,
+        int maxTotalHits
+    ) {
+        if (bodies.length > MAX_BODIES) {
+            throw new IllegalArgumentException("body count");
+        }
+        if (rays.length < 1 || rays.length > MAX_QUERIES) {
+            throw new IllegalArgumentException("ray count");
+        }
+        if (maxTotalHits < 1 || maxTotalHits > MAX_QUERY_HITS) {
+            throw new IllegalArgumentException("maxTotalHits");
+        }
+        for (Box body : bodies) {
+            if (body == null) throw new IllegalArgumentException("null body box");
+            body.validate();
+        }
+        for (RayQuery ray : rays) {
+            if (ray == null) throw new IllegalArgumentException("null ray");
+            ray.validate();
+        }
+
+        int[] counts = new int[rays.length];
+        int[] indices = new int[maxTotalHits];
+        int total = 0;
+        for (int rayIndex = 0; rayIndex < rays.length; rayIndex++) {
+            RayQuery ray = rays[rayIndex];
+            int count = 0;
+            for (int bodyIndex = 0; bodyIndex < bodies.length; bodyIndex++) {
+                if (!ray.intersects(bodies[bodyIndex])) continue;
+                if (total >= maxTotalHits) {
+                    throw new QueryHitBoundException(
+                        "ray candidate total-hit bound exceeded"
+                    );
+                }
+                indices[total++] = bodyIndex;
+                count++;
+            }
+            counts[rayIndex] = count;
+        }
+        return new QueryHits(
+            counts,
+            java.util.Arrays.copyOf(indices, total)
+        );
+    }
+
     static List<Pair> computePairs(Box[] boxes, int maxPairs, double epsilon) {
         if (boxes.length > MAX_BODIES) throw new IllegalArgumentException("body count");
         if (maxPairs < 1 || maxPairs > MAX_PAIRS) throw new IllegalArgumentException("maxPairs");
@@ -375,6 +481,77 @@ public final class BroadPhaseMain {
             if (counts == null || indices == null) {
                 throw new IllegalArgumentException("query hit arrays must not be null");
             }
+        }
+    }
+
+    record RayQuery(
+        int index,
+        double originX,
+        double originY,
+        double originZ,
+        double directionX,
+        double directionY,
+        double directionZ,
+        double maxDistance
+    ) {
+        void validate() {
+            if (index < 0) throw new IllegalArgumentException("negative ray index");
+            if (
+                !Double.isFinite(originX)
+                || !Double.isFinite(originY)
+                || !Double.isFinite(originZ)
+                || !Double.isFinite(directionX)
+                || !Double.isFinite(directionY)
+                || !Double.isFinite(directionZ)
+                || !Double.isFinite(maxDistance)
+            ) {
+                throw new IllegalArgumentException("non-finite ray component");
+            }
+            double normSq = (
+                directionX * directionX
+                + directionY * directionY
+                + directionZ * directionZ
+            );
+            if (!(normSq > 0.0)) {
+                throw new IllegalArgumentException("ray direction must be non-zero");
+            }
+            if (maxDistance < 0.0) {
+                throw new IllegalArgumentException("ray max distance must be non-negative");
+            }
+        }
+
+        boolean intersects(Box box) {
+            double tMin = 0.0;
+            double tMax = maxDistance;
+            double[] origins = {originX, originY, originZ};
+            double[] directions = {directionX, directionY, directionZ};
+            double[] minimums = {box.minX(), box.minY(), box.minZ()};
+            double[] maximums = {box.maxX(), box.maxY(), box.maxZ()};
+
+            for (int axis = 0; axis < 3; axis++) {
+                double origin = origins[axis];
+                double direction = directions[axis];
+                double minimum = minimums[axis];
+                double maximum = maximums[axis];
+
+                if (direction == 0.0) {
+                    if (origin < minimum || origin > maximum) return false;
+                    continue;
+                }
+
+                double inverse = 1.0 / direction;
+                double near = (minimum - origin) * inverse;
+                double far = (maximum - origin) * inverse;
+                if (near > far) {
+                    double swap = near;
+                    near = far;
+                    far = swap;
+                }
+                tMin = Math.max(tMin, near);
+                tMax = Math.min(tMax, far);
+                if (tMin > tMax + 1.0e-12) return false;
+            }
+            return tMax >= -1.0e-12 && tMin <= maxDistance + 1.0e-12;
         }
     }
 
@@ -510,6 +687,30 @@ public final class BroadPhaseMain {
                 new int[] {0, 1, 2, 4, 3}
             ),
             "AABB query stable body indices"
+        );
+
+        QueryHits rayHits = rayAabbCandidates(
+            boxes,
+            new RayQuery[] {
+                new RayQuery(0, -1, 1, 1, 1, 0, 0, 20),
+                new RayQuery(1, 9.5, 10.5, 10.5, 1, 0, 0, 5),
+                new RayQuery(2, 0, 100, 0, 1, 0, 0, 5),
+            },
+            100
+        );
+        check(
+            java.util.Arrays.equals(
+                rayHits.counts(),
+                new int[] {4, 1, 0}
+            ),
+            "ray AABB candidate counts"
+        );
+        check(
+            java.util.Arrays.equals(
+                rayHits.indices(),
+                new int[] {0, 1, 2, 4, 3}
+            ),
+            "ray AABB candidate indices"
         );
 
         boolean queryBoundRaised = false;
