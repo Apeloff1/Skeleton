@@ -410,6 +410,10 @@ class DurableRecoveryRequirementStore:
             raise DurableRecoveryRequirementConflict(
                 "recovery requirement head scope mismatch"
             )
+        if item.manifest.generation != record.revision:
+            raise DurableRecoveryRequirementConflict(
+                "recovery requirement head generation/revision mismatch"
+            )
         return record.revision, item
 
     def history_item(
