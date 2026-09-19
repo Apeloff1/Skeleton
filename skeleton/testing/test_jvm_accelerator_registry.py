@@ -271,8 +271,20 @@ def test_nonstrict_warm_reports_failure_without_hiding_other_helpers(tmp_path: P
     assert statuses["physics"].healthy is True
     assert statuses["vector"].healthy is False
     assert statuses["vector"].failed_requests >= 1
-    assert "unavailable" in (statuses["vector"].last_error or "")
+    assert statuses["vector"].last_error == "RuntimeError"
 
+
+def test_nonstrict_warm_redacts_exception_payload(tmp_path: Path) -> None:
+    registry, instances, _factory_calls = _registry(tmp_path)
+
+    def leaking_ping() -> int:
+        raise RuntimeError("token=super-secret-value")
+
+    instances["vector"].ping = leaking_ping  # type: ignore[method-assign]
+    statuses = registry.warm("vector", strict=False)
+
+    assert statuses["vector"].last_error == "RuntimeError"
+    assert "super-secret-value" not in (statuses["vector"].last_error or "")
 
 def test_strict_warm_raises_aggregated_registry_error(tmp_path: Path) -> None:
     registry, _instances, _factory_calls = _registry(
