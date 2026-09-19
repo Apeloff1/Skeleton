@@ -60,6 +60,7 @@ from skeleton.pr_automation.runner_v2_cli import (
     env_bool,
     env_int,
     limits_from_env,
+    run_v2,
     runner_policy_from_env,
 )
 from skeleton.testing.runner_v2_test_support import (
@@ -637,6 +638,34 @@ def test_limits_from_env():
     assert value.max_targets == 5
     assert value.max_mutations == 2
     assert value.queue_pressure_threshold == 20
+
+
+def test_runner_v2_operator_pause_short_circuits_without_token(capsys):
+    code = run_v2(
+        ["--repo", "Apeloff1/Skeleton"],
+        env={
+            "SKELETON_AUTOMATION_PAUSED": "true",
+            "SKELETON_AUTOMATION_QUARANTINED": "false",
+            "SKELETON_AUTOMATION_HOLD_REASON": "incident response",
+        },
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "pr-automation-operator-hold"
+    assert payload["status"] == "paused"
+    assert payload["blocked"] is True
+
+
+def test_runner_v2_malformed_operator_control_fails_closed(capsys):
+    code = run_v2(
+        ["--repo", "Apeloff1/Skeleton"],
+        env={
+            "SKELETON_AUTOMATION_PAUSED": "maybe",
+            "SKELETON_AUTOMATION_QUARANTINED": "false",
+        },
+    )
+    assert code == 2
+    assert "must be one of" in capsys.readouterr().err
 
 
 def test_runner_policy_apply_requires_checks():
