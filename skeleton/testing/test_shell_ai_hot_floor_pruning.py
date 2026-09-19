@@ -2888,4 +2888,3 @@ def test_pruning_executor_rejects_wrong_destruction_ledger_type():
             fixture.floor_store,
             destruction_ledger=object(),
         )
-
