@@ -1786,3 +1786,341 @@ def test_floor_history_is_namespaced():
     )
     assert first.get(item.floor.floor_id) == item
     assert second.get(item.floor.floor_id) is None
+
+
+def test_hot_floor_history_empty_chain_is_verified():
+    _, store = _history_store()
+    report = store.require_history("journal")
+    assert report.ok
+    assert report.floor_count == 0
+    assert report.complete_to_genesis
+    assert report.current_sequence == 0
+    assert report.current_root == "0" * 64
+
+
+def test_hot_floor_history_single_floor_reaches_genesis():
+    _, store = _history_store()
+    floor = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("history-root-3"),
+        suffix="history-one",
+        fencing_token=1,
+    )
+    report = store.require_history("journal")
+    assert report.ok
+    assert report.floor_count == 1
+    assert report.floors == (floor,)
+    assert report.oldest_sequence == 3
+    assert report.newest_sequence == 3
+
+
+def test_hot_floor_history_multi_floor_order_is_oldest_to_newest():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("history-root-3"),
+        suffix="history-one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("history-root-5"),
+        suffix="history-two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=first.floor.root_hash,
+    )
+    third = _advance_history_floor(
+        store,
+        sequence=9,
+        root=fp("history-root-9"),
+        suffix="history-three",
+        fencing_token=3,
+        previous_sequence=5,
+        previous_root=second.floor.root_hash,
+    )
+    report = store.require_history("journal")
+    assert report.floors == (
+        first,
+        second,
+        third,
+    )
+    assert report.oldest_sequence == 3
+    assert report.newest_sequence == 9
+    assert report.current_floor_id == third.floor.floor_id
+
+
+def test_hot_floor_history_fresh_reader_reconstructs_all_floors():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=2,
+        root=fp("fresh-history-2"),
+        suffix="fresh-one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("fresh-history-6"),
+        suffix="fresh-two",
+        fencing_token=2,
+        previous_sequence=2,
+        previous_root=first.floor.root_hash,
+    )
+    fresh = DurableHotFloorStore(
+        backend,
+        store.signer,
+        namespace="history-floors",
+        clock=lambda: 20.0,
+    )
+    report = fresh.require_history("journal")
+    assert report.floors == (first, second)
+    assert report.ok
+
+
+def test_hot_floor_history_missing_middle_floor_is_incomplete():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=2,
+        root=fp("missing-middle-2"),
+        suffix="missing-one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("missing-middle-6"),
+        suffix="missing-two",
+        fencing_token=2,
+        previous_sequence=2,
+        previous_root=first.floor.root_hash,
+    )
+    history_key = store._history_key(
+        first.floor.floor_id
+    )
+    index_key = store._sequence_key(
+        "journal",
+        first.floor.sequence,
+    )
+    history_record = backend.get(
+        store.namespace,
+        history_key,
+    )
+    index_record = backend.get(
+        store.namespace,
+        index_key,
+    )
+    backend.delete(
+        store.namespace,
+        history_key,
+        expected_revision=history_record.revision,
+    )
+    backend.delete(
+        store.namespace,
+        index_key,
+        expected_revision=index_record.revision,
+    )
+    report = store.inspect_history("journal")
+    assert not report.ok
+    assert not report.complete_to_genesis
+    assert any(
+        "missing" in issue
+        for issue in report.issues
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="missing",
+    ):
+        store.require_history("journal")
+
+
+def test_hot_floor_history_bound_is_fail_closed():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=2,
+        root=fp("bound-2"),
+        suffix="bound-one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=4,
+        root=fp("bound-4"),
+        suffix="bound-two",
+        fencing_token=2,
+        previous_sequence=2,
+        previous_root=first.floor.root_hash,
+    )
+    report = store.inspect_history(
+        "journal",
+        max_floors=1,
+    )
+    assert not report.ok
+    assert any(
+        "bound" in issue
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize("maximum", [0, -1, True])
+def test_hot_floor_history_bound_validation(maximum):
+    _, store = _history_store()
+    with pytest.raises(
+        ValueError,
+        match="max_floors",
+    ):
+        store.inspect_history(
+            "journal",
+            max_floors=maximum,
+        )
+
+
+def test_hot_floor_history_report_digest_is_stable():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("digest-root-3"),
+        suffix="digest-one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=7,
+        root=fp("digest-root-7"),
+        suffix="digest-two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=first.floor.root_hash,
+    )
+    one = store.require_history("journal")
+    two = store.require_history("journal")
+    assert one == two
+    assert one.digest == two.digest
+    assert one.to_dict()["digest"] == one.digest
+
+
+def test_hot_floor_advance_rejects_non_increasing_fencing_token():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("fence-root-3"),
+        suffix="fence-one",
+        fencing_token=5,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="fencing token must increase",
+    ):
+        _advance_history_floor(
+            store,
+            sequence=6,
+            root=fp("fence-root-6"),
+            suffix="fence-two",
+            fencing_token=5,
+            previous_sequence=3,
+            previous_root=first.floor.root_hash,
+        )
+
+
+def test_hot_floor_advance_accepts_strictly_increasing_fencing_token():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("fence-ok-3"),
+        suffix="fence-ok-one",
+        fencing_token=5,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("fence-ok-6"),
+        suffix="fence-ok-two",
+        fencing_token=6,
+        previous_sequence=3,
+        previous_root=first.floor.root_hash,
+    )
+    assert second.floor.fencing_token == 6
+    assert store.require_history("journal").ok
+
+
+def test_hot_floor_history_detects_sequence_index_corruption():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("index-corrupt-3"),
+        suffix="index-corrupt-one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("index-corrupt-6"),
+        suffix="index-corrupt-two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=first.floor.root_hash,
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    payload["floor_id"] = fp("wrong-history-floor")
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    report = store.inspect_history("journal")
+    assert not report.ok
+    assert any(
+        "lookup raised" in issue
+        for issue in report.issues
+    )
+
+
+def test_hot_floor_history_detects_signed_history_tamper():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("signed-corrupt-3"),
+        suffix="signed-corrupt-one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("signed-corrupt-6"),
+        suffix="signed-corrupt-two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=first.floor.root_hash,
+    )
+    key = store._history_key(first.floor.floor_id)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    floor_payload = dict(payload["floor"])
+    floor_payload["operation_id"] = fp("tampered-operation")
+    payload["floor"] = floor_payload
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    report = store.inspect_history("journal")
+    assert not report.ok
+    assert any(
+        "lookup raised" in issue
+        for issue in report.issues
+    )
