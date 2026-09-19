@@ -563,6 +563,25 @@ def test_mutation_intent_is_deterministic():
     assert first.expected_base_sha == SHA_A
 
 
+def test_mutation_intent_ignores_capture_telemetry():
+    first_snapshot = snapshot()
+    second_snapshot = replace(
+        first_snapshot,
+        captured_at=(NOW + timedelta(minutes=10)).isoformat(),
+        source_request_count=999,
+    )
+    first = MutationIntent.from_work_item(
+        work_item(first_snapshot),
+        runner_policy(),
+    )
+    second = MutationIntent.from_work_item(
+        work_item(second_snapshot),
+        runner_policy(),
+    )
+    assert first.key == second.key
+    assert first.snapshot_fingerprint == second.snapshot_fingerprint
+
+
 def test_mutation_intent_changes_with_method():
     item = work_item()
     squash = MutationIntent.from_work_item(item, runner_policy())
