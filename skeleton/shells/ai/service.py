@@ -1196,6 +1196,23 @@ class AIShellService:
             raise RuntimeError(
                 "AI durable evidence readiness reconciliation incomplete"
             )
+        if self.state.phase is AIServicePhase.DEGRADED:
+            history = self.state.history()
+            last_reason = (
+                ""
+                if not history
+                else history[-1].reason
+            )
+            if last_reason.startswith(
+                "AI durable evidence readiness"
+            ):
+                self.state.transition(
+                    AIServicePhase.READY,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation restored service"
+                    ),
+                )
         return report
 
     def _durable_verification_health_for_chain(
