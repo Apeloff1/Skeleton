@@ -465,6 +465,11 @@ class RunnerEngine:
             assert_report_invariants(report)
             return report
 
+        # Target discovery is the first repository-read phase for admitted
+        # runs. Resolve once, preserve its completeness bit in the report, and
+        # schedule only identities admitted by the bounded resolver.
+        targets = self.resolver.resolve(self.identity)
+
         initial_observation = _queue_observation(
             self.transport,
             self.identity.repository,
