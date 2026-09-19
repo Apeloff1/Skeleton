@@ -1904,7 +1904,7 @@ class DurableCompactionOperator:
             workflow,
             retention,
             chain,
-            require_current=False,
+            require_current=True,
         )
         manifest = self.pruning.manifest(
             workflow.pruning_operation_id
@@ -1986,11 +1986,18 @@ class DurableCompactionOperator:
             raise DurableCompactionWorkflowError(
                 "workflow is not in a resumable pruning phase"
             )
+        floor_sequence, floor_root = self._floor(
+            chain
+        )
+        floor_committed = (
+            floor_sequence == workflow.cutoff_sequence
+            and floor_root == workflow.cutoff_root
+        )
         authorization = self._bound_authorization(
             workflow,
             retention,
             chain,
-            require_current=False,
+            require_current=not floor_committed,
         )
         try:
             result = self.pruning.resume(
