@@ -159,6 +159,7 @@ class FailTargetOnceOperator(
         workflow_id,
         retention,
         chain,
+        **kwargs,
     ):
         stored = self.current(
             workflow_id
@@ -178,6 +179,7 @@ class FailTargetOnceOperator(
             workflow_id,
             retention,
             chain,
+            **kwargs,
         )
 
 
@@ -204,6 +206,7 @@ class ManualReviewTargetOperator(
         workflow_id,
         retention,
         chain,
+        **kwargs,
     ):
         stored = self.current(
             workflow_id
@@ -223,6 +226,7 @@ class ManualReviewTargetOperator(
             workflow_id,
             retention,
             chain,
+            **kwargs,
         )
 
 
