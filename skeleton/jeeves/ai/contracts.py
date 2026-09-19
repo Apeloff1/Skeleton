@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 from ._canonical import bounded_text, canonical_digest, detached_json, frozen_mapping
 
 MAX_TEXT = 8192
+MAX_CONTRACTS = 4096
 MAX_EVIDENCE = 256
 MAX_PAYLOAD_BYTES = 64 * 1024
 
@@ -78,8 +79,8 @@ class ContractLedger:
     records: tuple[ContractRecord, ...] = ()
 
     def __post_init__(self) -> None:
-        if not isinstance(self.records, tuple):
-            raise ValueError("records must be a tuple")
+        if not isinstance(self.records, tuple) or len(self.records) > MAX_CONTRACTS:
+            raise ValueError("invalid contract records")
         names: set[str] = set()
         digests: set[str] = set()
         for record in self.records:
