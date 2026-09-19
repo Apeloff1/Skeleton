@@ -135,6 +135,7 @@ def test_executor_exception_becomes_terminal_failed_item() -> None:
     assert snap.counters.failed == 1
     assert snap.counters.executor_errors == 1
     assert snap.state is WorkerState.IDLE
+    assert snap.inflight_item_id is None
 
 
 def test_executor_error_can_stop_worker() -> None:
@@ -178,6 +179,27 @@ def test_consecutive_failure_guard_trips() -> None:
     assert snap.counters.consecutive_failures == 2
     assert snap.stop_requested is True
     assert snap.state is WorkerState.FAILED
+
+
+def test_executor_exception_at_failure_threshold_clears_inflight() -> None:
+    queue = ShellWorkQueue()
+    queue.enqueue(_command(), item_id="threshold-error")
+    worker = QueueWorker(
+        "worker-a",
+        queue,
+        FakeExecutor([RuntimeError("boom")]),
+        policy=WorkerPolicy(max_consecutive_failures=1),
+    )
+
+    result = worker.run_once()
+
+    assert result is not None
+    assert result.disposition is WorkDisposition.EXECUTOR_ERROR
+    snap = worker.snapshot()
+    assert snap.state is WorkerState.FAILED
+    assert snap.stop_requested is True
+    assert snap.inflight_item_id is None
+    assert snap.counters.executor_errors == 1
 
 
 def test_success_resets_consecutive_failure_counter() -> None:
@@ -232,6 +254,35 @@ def test_invalid_retry_factory_fails_claim_and_raises() -> None:
     assert snap.state is WorkerState.FAILED
     assert snap.stop_requested is True
     assert snap.counters.executor_errors == 1
+    assert snap.inflight_item_id is None
+
+
+def test_retry_factory_exception_fails_claim_and_clears_inflight() -> None:
+    queue = ShellWorkQueue()
+    item = queue.enqueue(_command(), item_id="retry-factory-error")
+    executor = FakeExecutor()
+
+    def broken_factory(_item):
+        raise ValueError("retry policy unavailable")
+
+    worker = QueueWorker(
+        "worker-a",
+        queue,
+        executor,
+        retry_factory=broken_factory,
+    )
+
+    with pytest.raises(ValueError, match="retry policy unavailable"):
+        worker.run_once()
+
+    assert queue.get(item.item_id).state is QueueState.FAILED
+    snap = worker.snapshot()
+    assert snap.state is WorkerState.FAILED
+    assert snap.stop_requested is True
+    assert snap.inflight_item_id is None
+    assert snap.counters.failed == 1
+    assert snap.counters.executor_errors == 1
+    assert executor.calls == []
 
 
 class StaleFailureQueue(ShellWorkQueue):
@@ -252,6 +303,7 @@ def test_stale_failure_transition_preserves_failed_worker_state() -> None:
     assert snap.stop_requested is True
     assert snap.counters.transition_errors == 1
     assert snap.counters.executor_errors == 0
+    assert snap.inflight_item_id is None
 
 
 def test_session_is_forwarded_without_worker_mutation() -> None:
