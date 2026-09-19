@@ -178,6 +178,140 @@ class DurableMaintenancePolicy:
             ),
         }
 
+    @classmethod
+    def from_chain(
+        cls,
+        chain_id: str,
+        chain: object,
+        *,
+        resource_kind: str = "evidence-chain",
+    ) -> "DurableMaintenanceResource":
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=256,
+        )
+        _identity(
+            "resource_kind",
+            resource_kind,
+            maximum=128,
+        )
+        head_method = getattr(
+            chain,
+            "head",
+            None,
+        )
+        if not callable(head_method):
+            raise TypeError(
+                "chain must expose head()"
+            )
+        head = head_method()
+        try:
+            sequence = int(
+                getattr(head, "sequence")
+            )
+            root_hash = str(
+                getattr(head, "root_hash")
+            )
+        except Exception as exc:
+            raise TypeError(
+                "chain head must expose sequence and root_hash"
+            ) from exc
+        state_raw = json.dumps(
+            {
+                "chain_id": chain_id,
+                "resource_kind": resource_kind,
+                "sequence": sequence,
+                "root_hash": root_hash,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        state_digest = hashlib.sha256(
+            state_raw
+        ).hexdigest()
+        return cls(
+            chain_id,
+            resource_kind,
+            sequence,
+            root_hash,
+            state_digest,
+        )
+
+    @classmethod
+    def replica(
+        cls,
+        replica_id: str,
+        *,
+        journal_sequence: int,
+        journal_root: str,
+        receipt_sequence: int,
+        receipt_root: str,
+        replication_state_digest: str = "",
+    ) -> "DurableMaintenanceResource":
+        replica_id = _identity(
+            "replica_id",
+            replica_id,
+            maximum=256,
+        )
+        for name, value in (
+            ("journal_sequence", journal_sequence),
+            ("receipt_sequence", receipt_sequence),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        journal_root = _digest(
+            "journal_root",
+            journal_root,
+        )
+        receipt_root = _digest(
+            "receipt_root",
+            receipt_root,
+        )
+        replication_state_digest = _digest(
+            "replication_state_digest",
+            replication_state_digest,
+            optional=True,
+        )
+        binding = {
+            "replica_id": replica_id,
+            "journal_sequence": journal_sequence,
+            "journal_root": journal_root,
+            "receipt_sequence": receipt_sequence,
+            "receipt_root": receipt_root,
+            "replication_state_digest": (
+                replication_state_digest
+            ),
+        }
+        raw = json.dumps(
+            binding,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        combined_root = hashlib.sha256(
+            raw
+        ).hexdigest()
+        state_digest = (
+            replication_state_digest
+            or combined_root
+        )
+        return cls(
+            replica_id,
+            "evidence-replica",
+            max(
+                journal_sequence,
+                receipt_sequence,
+            ),
+            combined_root,
+            state_digest,
+        )
+
     @property
     def digest(self) -> str:
         raw = json.dumps(
