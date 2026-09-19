@@ -23,7 +23,8 @@ from skeleton.shells.ai.session import AISessionPhase, AIShellSession
 from skeleton.shells.ai.types import AIAction, AIIntent, AIPlanProposal
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def session_with_transitions(
