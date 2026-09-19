@@ -703,6 +703,89 @@ class RemoteObservationTests(unittest.TestCase):
                 )
 
 
+
+class WorkerResultEvidenceTests(unittest.TestCase):
+    def test_accepts_created_pr_evidence(self) -> None:
+        payload = json.dumps({
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            "pull_request": 42,
+            "changed_lines": 17,
+            "proposal_digest": "a" * 64,
+        })
+        result = runtime.parse_worker_result(
+            payload + "\n",
+            worker="root-cause",
+        )
+        self.assertEqual(result["status"], "pull-request-created")
+        self.assertEqual(result["pull_request"], 42)
+        self.assertEqual(result["changed_lines"], 17)
+
+    def test_uses_only_final_non_empty_status_line(self) -> None:
+        payload = (
+            "diagnostic text that must not cross the boundary\n"
+            + json.dumps({
+                "status": "no-change",
+                "bot": "security-auditor",
+            })
+            + "\n"
+        )
+        result = runtime.parse_worker_result(
+            payload,
+            worker="security-auditor",
+        )
+        self.assertEqual(
+            result,
+            {"status": "no-change", "bot": "security-auditor"},
+        )
+
+    def test_rejects_worker_identity_confusion(self) -> None:
+        payload = json.dumps({
+            "status": "no-change",
+            "bot": "security-auditor",
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
+
+    def test_rejects_unknown_status(self) -> None:
+        payload = json.dumps({
+            "status": "executed-arbitrary-command",
+            "bot": "root-cause",
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
+
+    def test_rejects_oversized_stdout(self) -> None:
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(
+                "x" * (runtime.MAX_WORKER_RESULT_BYTES + 1),
+                worker="root-cause",
+            )
+
+    def test_drops_unadmitted_worker_fields(self) -> None:
+        payload = json.dumps({
+            "status": "existing-pr",
+            "bot": "root-cause",
+            "pull_request": 7,
+            "provider_raw_output": "must-not-propagate",
+            "token": "must-not-propagate",
+        })
+        result = runtime.parse_worker_result(payload, worker="root-cause")
+        self.assertNotIn("provider_raw_output", result)
+        self.assertNotIn("token", result)
+        self.assertEqual(result["pull_request"], 7)
+
+    def test_rejects_negative_numeric_evidence(self) -> None:
+        payload = json.dumps({
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "changed_lines": -1,
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
+
+
 class EnvironmentSanitizationTests(unittest.TestCase):
     def test_worker_env_removes_process_injection_controls(
         self,
