@@ -605,6 +605,176 @@ class DistributedReceiptChain:
             )
         return item
 
+    def get_by_sequence(
+        self,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ) -> ChainedReceipt:
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence <= 0
+        ):
+            raise ValueError("sequence must be positive integer")
+        head = self.head()
+        if sequence > head.sequence:
+            raise IndexError(
+                "receipt sequence is beyond committed head"
+            )
+        entry = self._sequence_index(sequence)
+        if entry is None:
+            if not repair_missing:
+                raise DistributedReceiptConflict(
+                    "receipt sequence index is missing"
+                )
+            entry = self._repair_sequence_index(sequence)
+        item = self.get_node(entry.receipt_hash)
+        if item.sequence != sequence:
+            raise DistributedReceiptCorruption(
+                "receipt sequence index resolves wrong node sequence"
+            )
+        return item
+
+    def root_for_sequence(
+        self,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ) -> str:
+        if sequence == 0:
+            return GENESIS_HASH
+        return self.get_by_sequence(
+            sequence,
+            repair_missing=repair_missing,
+        ).receipt_hash
+
+    def snapshot_range(
+        self,
+        start_sequence: int,
+        end_sequence: int,
+        *,
+        max_items: int = 4096,
+        repair_missing: bool = True,
+    ) -> tuple[ChainedReceipt, ...]:
+        if (
+            isinstance(start_sequence, bool)
+            or not isinstance(start_sequence, int)
+            or start_sequence <= 0
+        ):
+            raise ValueError(
+                "start_sequence must be positive integer"
+            )
+        if (
+            isinstance(end_sequence, bool)
+            or not isinstance(end_sequence, int)
+            or end_sequence < start_sequence
+        ):
+            raise ValueError(
+                "end_sequence must be >= start_sequence"
+            )
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        count = end_sequence - start_sequence + 1
+        if count > max_items:
+            raise DistributedReceiptConflict(
+                "receipt range exceeds bounded verification window"
+            )
+        head = self.head()
+        if end_sequence > head.sequence:
+            raise IndexError(
+                "receipt range extends beyond committed head"
+            )
+        start_root = self.root_for_sequence(
+            start_sequence - 1,
+            repair_missing=repair_missing,
+        )
+        end_root = self.root_for_sequence(
+            end_sequence,
+            repair_missing=repair_missing,
+        )
+        return self.snapshot_segment(
+            start_root,
+            end_root,
+            max_items=max_items,
+        )
+
+    def inspect_sequence_indexes(
+        self,
+        *,
+        max_items: int = 100_000,
+    ) -> DistributedReceiptIndexHealth:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        items = self.snapshot()
+        if len(items) > max_items:
+            raise DistributedReceiptConflict(
+                "receipt index inspection exceeds bounded window"
+            )
+        indexed = 0
+        missing = 0
+        corrupt = 0
+        first_missing = None
+        first_corrupt = None
+        for item in items:
+            try:
+                entry = self._sequence_index(item.sequence)
+            except DistributedReceiptCorruption:
+                corrupt += 1
+                if first_corrupt is None:
+                    first_corrupt = item.sequence
+                continue
+            if entry is None:
+                missing += 1
+                if first_missing is None:
+                    first_missing = item.sequence
+                continue
+            if entry.receipt_hash != item.receipt_hash:
+                corrupt += 1
+                if first_corrupt is None:
+                    first_corrupt = item.sequence
+                continue
+            indexed += 1
+        return DistributedReceiptIndexHealth(
+            self.head().sequence,
+            len(items),
+            indexed,
+            missing,
+            corrupt,
+            first_missing,
+            first_corrupt,
+        )
+
+    def repair_sequence_indexes(
+        self,
+        *,
+        max_items: int = 100_000,
+    ) -> DistributedReceiptIndexHealth:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        items = self.snapshot()
+        if len(items) > max_items:
+            raise DistributedReceiptConflict(
+                "receipt index repair exceeds bounded window"
+            )
+        for item in items:
+            self._put_sequence_index(item)
+        return self.inspect_sequence_indexes(
+            max_items=max_items,
+        )
+
     def snapshot(
         self,
     ) -> tuple[ChainedReceipt, ...]:
