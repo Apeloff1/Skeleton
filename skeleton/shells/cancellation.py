@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 import threading
 import time
 from typing import Callable
@@ -61,7 +62,8 @@ class CancellationToken:
         *,
         detail:str="",
     )->bool:
-        if len(detail)>512:raise ValueError("cancellation detail too long")
+        if not isinstance(detail,str) or len(detail)>512 or "\x00" in detail:
+            raise ValueError("invalid cancellation detail")
         reason=CancellationReason(reason)
         with self._lock:
             if self._state.cancelled:return False
@@ -80,7 +82,14 @@ class CancellationToken:
         if state.cancelled:raise CancellationError(state)
 
     def wait(self,timeout:float|None=None)->bool:
-        if timeout is not None and timeout<0:raise ValueError("timeout may not be negative")
+        if timeout is not None:
+            if (
+                isinstance(timeout,bool)
+                or not isinstance(timeout,(int,float))
+                or not math.isfinite(float(timeout))
+                or float(timeout)<0.0
+            ):
+                raise ValueError("timeout must be finite and non-negative")
         return self._event.wait(timeout)
 
 
@@ -88,14 +97,21 @@ class CancellationRegistry:
     """Bounded named cancellation-token registry."""
 
     def __init__(self,*,max_tokens:int=10000,clock:Callable[[],float]=time.monotonic)->None:
-        if max_tokens<=0:raise ValueError("max_tokens must be positive")
+        if isinstance(max_tokens,bool) or not isinstance(max_tokens,int) or max_tokens<=0:
+            raise ValueError("max_tokens must be a positive integer")
         self.max_tokens=max_tokens
         self._clock=clock
         self._tokens:dict[str,CancellationToken]={}
         self._lock=threading.RLock()
 
     def create(self,key:str)->CancellationToken:
-        if not key or len(key)>256:raise ValueError("invalid cancellation key")
+        if (
+            not isinstance(key,str)
+            or not key.strip()
+            or len(key)>256
+            or "\x00" in key
+        ):
+            raise ValueError("invalid cancellation key")
         with self._lock:
             if key in self._tokens:raise RuntimeError("cancellation key already exists")
             if len(self._tokens)>=self.max_tokens:raise RuntimeError("cancellation registry capacity exhausted")
