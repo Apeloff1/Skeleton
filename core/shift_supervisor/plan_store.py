@@ -6,6 +6,13 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from .models import PlanItem, PlanRevision, WorkerState
+from .ownership import (
+    clone_plan_item,
+    clone_plan_revision,
+    clone_state_value,
+    clone_worker_state,
+    require_exact_schema_version,
+)
 from .policy import may_admit_worker
 
 
@@ -27,19 +34,19 @@ class InMemoryPlanStore:
 
     def snapshot_items(self) -> list[PlanItem]:
         with self._lock:
-            return [replace(item) for item in self._items.values()]
+            return [clone_plan_item(item) for item in self._items.values()]
 
     def snapshot_workers(self) -> list[WorkerState]:
         with self._lock:
-            return [replace(worker) for worker in self._workers.values()]
+            return [clone_worker_state(worker) for worker in self._workers.values()]
 
     def snapshot_revisions(self) -> list[PlanRevision]:
         with self._lock:
-            return [replace(revision) for revision in self._revisions]
+            return [clone_plan_revision(revision) for revision in self._revisions]
 
     def upsert_worker(self, worker: WorkerState) -> None:
         with self._lock:
-            self._workers[worker.worker_id] = replace(worker)
+            self._workers[worker.worker_id] = clone_worker_state(worker)
 
     def add_items(self, items: Iterable[PlanItem]) -> list[str]:
         added: list[str] = []
@@ -53,7 +60,7 @@ class InMemoryPlanStore:
                 fp = self._fingerprint(item.title, item.description, item.target_team)
                 if item.id in self._items or fp in existing_fingerprints:
                     continue
-                self._items[item.id] = replace(item)
+                self._items[item.id] = clone_plan_item(item)
                 existing_fingerprints.add(fp)
                 added.append(item.id)
         return added
@@ -63,7 +70,7 @@ class InMemoryPlanStore:
             if item.id not in self._items:
                 raise KeyError(item.id)
             item.updated_at = datetime.now(timezone.utc)
-            self._items[item.id] = replace(item)
+            self._items[item.id] = clone_plan_item(item)
 
     def claim_next_for_worker(
         self,
@@ -121,7 +128,7 @@ class InMemoryPlanStore:
             worker.status = "working"
             worker.last_heartbeat_at = now
             self._workers[worker_id] = replace(worker)
-            return replace(item)
+            return clone_plan_item(item)
 
     def finish_claim(
         self,
@@ -160,7 +167,7 @@ class InMemoryPlanStore:
 
     def append_revision(self, revision: PlanRevision) -> None:
         with self._lock:
-            self._revisions.append(replace(revision))
+            self._revisions.append(clone_plan_revision(revision))
             if len(self._revisions) > 256:
                 self._revisions = self._revisions[-256:]
 
@@ -214,8 +221,16 @@ class InMemoryPlanStore:
         fails closed so a future incompatible state shape is never misread.
         """
         version = state.get("version", self.STATE_VERSION)
-        if version != self.STATE_VERSION:
-            raise ValueError(f"unsupported shift-supervisor state version: {version!r}")
+        try:
+            require_exact_schema_version(
+                version,
+                self.STATE_VERSION,
+                field="shift-supervisor state version",
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"unsupported shift-supervisor state version: {version!r}"
+            ) from exc
 
         raw_items = state.get("plan_items", state.get("items", []))
         raw_workers = state.get("workers", [])
@@ -228,16 +243,29 @@ class InMemoryPlanStore:
             for row in raw_items[:256]:
                 item = self._parse_item(row)
                 if item is not None:
+                    if item.id in items:
+                        raise ValueError(f"duplicate plan item id in durable state: {item.id!r}")
                     items[item.id] = item
         if isinstance(raw_workers, list):
             for row in raw_workers[:512]:
                 worker = self._parse_worker(row)
                 if worker is not None:
+                    if worker.worker_id in workers:
+                        raise ValueError(
+                            f"duplicate worker id in durable state: {worker.worker_id!r}"
+                        )
                     workers[worker.worker_id] = worker
+        revision_ids: set[str] = set()
         if isinstance(raw_revisions, list):
             for row in raw_revisions[-256:]:
                 revision = self._parse_revision(row)
                 if revision is not None:
+                    if revision.revision_id in revision_ids:
+                        raise ValueError(
+                            "duplicate plan revision id in durable state: "
+                            f"{revision.revision_id!r}"
+                        )
+                    revision_ids.add(revision.revision_id)
                     revisions.append(revision)
 
         with self._lock:
@@ -295,7 +323,7 @@ class InMemoryPlanStore:
             "validation": list(item.validation),
             "created_at": cls._encode_dt(item.created_at),
             "updated_at": cls._encode_dt(item.updated_at),
-            "metadata": dict(item.metadata),
+            "metadata": clone_state_value(item.metadata),
         }
 
     @classmethod
@@ -311,7 +339,7 @@ class InMemoryPlanStore:
             "normal_shift_minutes": worker.normal_shift_minutes,
             "overtime_minutes": worker.overtime_minutes,
             "overtime_task_ids": list(worker.overtime_task_ids),
-            "metadata": dict(worker.metadata),
+            "metadata": clone_state_value(worker.metadata),
         }
 
     @classmethod
@@ -359,7 +387,11 @@ class InMemoryPlanStore:
             validation=cls._string_list(value.get("validation")),
             created_at=cls._decode_dt(value.get("created_at")) or datetime.now(timezone.utc),
             updated_at=cls._decode_dt(value.get("updated_at")) or datetime.now(timezone.utc),
-            metadata=dict(value.get("metadata", {})) if isinstance(value.get("metadata"), Mapping) else {},
+            metadata=(
+                clone_state_value(dict(value.get("metadata", {})))
+                if isinstance(value.get("metadata"), Mapping)
+                else {}
+            ),
         )
 
     @classmethod
@@ -384,7 +416,11 @@ class InMemoryPlanStore:
             normal_shift_minutes=cls._nonnegative_int(value.get("normal_shift_minutes")),
             overtime_minutes=cls._nonnegative_int(value.get("overtime_minutes")),
             overtime_task_ids=cls._string_list(value.get("overtime_task_ids")),
-            metadata=dict(value.get("metadata", {})) if isinstance(value.get("metadata"), Mapping) else {},
+            metadata=(
+                clone_state_value(dict(value.get("metadata", {})))
+                if isinstance(value.get("metadata"), Mapping)
+                else {}
+            ),
         )
 
     @classmethod
