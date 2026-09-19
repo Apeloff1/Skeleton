@@ -156,6 +156,7 @@ class DurableSessionCommitPolicy:
     require_session_journal_manifest: bool = True
     require_audit_witness: bool = True
     require_signed_execution_evidence: bool = True
+    require_root_protection: bool = False
 
     def __post_init__(self) -> None:
         for name in (
@@ -164,6 +165,7 @@ class DurableSessionCommitPolicy:
             "require_session_journal_manifest",
             "require_audit_witness",
             "require_signed_execution_evidence",
+            "require_root_protection",
         ):
             if not isinstance(
                 getattr(self, name),
@@ -195,6 +197,9 @@ class DurableSessionCommitPolicy:
             ),
             "require_signed_execution_evidence": (
                 self.require_signed_execution_evidence
+            ),
+            "require_root_protection": (
+                self.require_root_protection
             ),
         }
 
@@ -229,6 +234,7 @@ class DurableSessionCommit:
     recovery_revision: int | None
     session_evidence_revision: int
     session_journal_revision: int | None
+    root_protection_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -297,6 +303,7 @@ class DurableSessionCommit:
             "execution_evidence_chain_node_hash",
             "runtime_trust_digest",
             "release_evidence_digest",
+            "root_protection_digest",
         ):
             object.__setattr__(
                 self,
@@ -454,6 +461,9 @@ class DurableSessionCommit:
             ),
             "release_evidence_digest": (
                 self.release_evidence_digest
+            ),
+            "root_protection_digest": (
+                self.root_protection_digest
             ),
             "policy_digest": self.policy_digest,
             "recovery_revision": self.recovery_revision,
@@ -707,6 +717,7 @@ class DurableSessionCommitBuilder:
         audit_witness_sequence: int | None = None,
         execution_evidence_digest: str = "",
         execution_evidence_chain_node_hash: str = "",
+        root_protection_digest: str = "",
     ) -> DurableSessionCommit:
         if not isinstance(
             finalization,
@@ -795,6 +806,13 @@ class DurableSessionCommitBuilder:
             raise DurableSessionCommitConflict(
                 "session commit requires signed execution evidence"
             )
+        if (
+            self.policy.require_root_protection
+            and not root_protection_digest
+        ):
+            raise DurableSessionCommitConflict(
+                "session commit requires durable root protection"
+            )
         if not session_journal_digest:
             raise DurableSessionCommitConflict(
                 "session commit requires session journal digest"
@@ -849,6 +867,7 @@ class DurableSessionCommitBuilder:
             recovery_revision,
             session_evidence_revision,
             session_journal_revision,
+            root_protection_digest,
         )
 
 
