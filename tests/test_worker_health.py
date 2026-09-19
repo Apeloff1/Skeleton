@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from skeleton.automation.worker_health import (
+    MAX_ACTIVE_WORKERS,
+    MAX_OBSERVED_PULL_REQUESTS,
     classify_worker_pr,
     classify_worker_prs,
     summarize_checks,
@@ -126,6 +128,15 @@ class WorkerPrClassificationTests(unittest.TestCase):
                 pr(headRefName="bot/specialist--root-0123456789abcdef")
             )
         )
+        self.assertIsNone(
+            classify_worker_pr(
+                pr(headRefName="bot/specialist-røøt-0123456789abcdef")
+            )
+        )
+
+    def test_non_mapping_pr_is_ignored(self) -> None:
+        self.assertIsNone(classify_worker_pr(None))
+        self.assertIsNone(classify_worker_pr("not-a-pr"))
 
     def test_invalid_pr_number_is_rejected(self) -> None:
         self.assertIsNone(classify_worker_pr(pr(number=True)))
@@ -179,10 +190,24 @@ class WorkerPrSetTests(unittest.TestCase):
         self.assertEqual(result["active_workers"][0]["worker"], "alpha")
 
     def test_invalid_limits_fail_closed(self) -> None:
-        for value in (0, -1, True, 1.5, "1"):
+        for value in (0, -1, True, 1.5, "1", MAX_ACTIVE_WORKERS + 1):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     classify_worker_prs([], limit=value)
+
+    def test_input_iteration_is_hard_bounded(self) -> None:
+        consumed = 0
+
+        def endless():
+            nonlocal consumed
+            while True:
+                consumed += 1
+                yield pr(number=consumed)
+
+        result = classify_worker_prs(endless(), limit=1)
+
+        self.assertEqual(consumed, MAX_OBSERVED_PULL_REQUESTS)
+        self.assertEqual(result["active_count"], 1)
 
 
 if __name__ == "__main__":
