@@ -28,6 +28,7 @@ public final class BroadPhaseMain {
     static final byte OP_SHUTDOWN = 3;
     static final byte OP_QUERY_AABBS = 4;
     static final byte OP_RAY_AABBS = 5;
+    static final byte OP_SPHERE_CAST_AABBS = 6;
 
     static final byte STATUS_OK = 0;
     static final byte STATUS_BAD_REQUEST = 1;
@@ -82,6 +83,7 @@ public final class BroadPhaseMain {
                     case OP_PAIRS -> handlePairs(in, out, header);
                     case OP_QUERY_AABBS -> handleQueryAabbs(in, out, header);
                     case OP_RAY_AABBS -> handleRayAabbs(in, out, header);
+                    case OP_SPHERE_CAST_AABBS -> handleSphereCastAabbs(in, out, header);
                     default -> throw new ProtocolException("unsupported operation: " + header.op());
                 }
             } catch (ProtocolException | IllegalArgumentException bad) {
@@ -528,12 +530,27 @@ public final class BroadPhaseMain {
         }
 
         boolean intersects(Box box) {
+            return intersects(box, 0.0);
+        }
+
+        boolean intersects(Box box, double expansion) {
+            if (!Double.isFinite(expansion) || expansion < 0.0) {
+                throw new IllegalArgumentException("invalid AABB expansion");
+            }
             double tMin = 0.0;
             double tMax = maxDistance;
             double[] origins = {originX, originY, originZ};
             double[] directions = {directionX, directionY, directionZ};
-            double[] minimums = {box.minX(), box.minY(), box.minZ()};
-            double[] maximums = {box.maxX(), box.maxY(), box.maxZ()};
+            double[] minimums = {
+                box.minX() - expansion,
+                box.minY() - expansion,
+                box.minZ() - expansion,
+            };
+            double[] maximums = {
+                box.maxX() + expansion,
+                box.maxY() + expansion,
+                box.maxZ() + expansion,
+            };
 
             for (int axis = 0; axis < 3; axis++) {
                 double origin = origins[axis];
@@ -718,6 +735,30 @@ public final class BroadPhaseMain {
                 new int[] {0, 1, 2, 4, 3}
             ),
             "ray AABB candidate indices"
+        );
+
+        QueryHits sphereCastHits = sphereCastAabbCandidates(
+            boxes,
+            new RayQuery[] {
+                new RayQuery(0, -1, 3.25, 1, 1, 0, 0, 20),
+                new RayQuery(1, 8.5, 10.5, 10.5, 1, 0, 0, 5),
+            },
+            1.5,
+            100
+        );
+        check(
+            java.util.Arrays.equals(
+                sphereCastHits.counts(),
+                new int[] {4, 1}
+            ),
+            "sphere-cast AABB candidate counts"
+        );
+        check(
+            java.util.Arrays.equals(
+                sphereCastHits.indices(),
+                new int[] {0, 1, 2, 4, 3}
+            ),
+            "sphere-cast AABB candidate indices"
         );
 
         boolean queryBoundRaised = false;
