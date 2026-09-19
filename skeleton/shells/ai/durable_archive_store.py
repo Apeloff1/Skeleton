@@ -1124,6 +1124,83 @@ class DurableArchiveRepository:
             raise DurableArchiveStoreError("archived node identity mismatch")
         return self._decode_node(archived)
 
+    def _stored_nodes(
+        self,
+        stored: StoredDurableArchive,
+        *,
+        through_sequence: int | None = None,
+    ) -> tuple[object, ...]:
+        manifest = stored.manifest.manifest
+        limit = (
+            len(stored.node_hashes)
+            if through_sequence is None
+            else through_sequence
+        )
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or limit < 0
+            or limit > len(stored.node_hashes)
+        ):
+            raise DurableArchiveStoreError(
+                "archive node reconstruction sequence outside stored range"
+            )
+        nodes = tuple(
+            self.get_node(
+                manifest.chain_id,
+                node_hash,
+            )
+            for node_hash in stored.node_hashes[:limit]
+        )
+        previous = GENESIS_HASH
+        for expected_sequence, node in enumerate(
+            nodes,
+            start=1,
+        ):
+            node_hash = str(
+                getattr(
+                    node,
+                    "event_hash",
+                    getattr(
+                        node,
+                        "receipt_hash",
+                        getattr(
+                            node,
+                            "node_hash",
+                            "",
+                        ),
+                    ),
+                )
+            )
+            if int(node.sequence) != expected_sequence:
+                raise DurableArchiveStoreError(
+                    "archived snapshot sequence is not contiguous"
+                )
+            if str(node.previous_hash) != previous:
+                raise DurableArchiveStoreError(
+                    "archived snapshot previous hash is not contiguous"
+                )
+            previous = node_hash
+        if limit == 0:
+            terminal = GENESIS_HASH
+        else:
+            terminal = str(
+                getattr(
+                    nodes[-1],
+                    "event_hash",
+                    getattr(
+                        nodes[-1],
+                        "receipt_hash",
+                        getattr(
+                            nodes[-1],
+                            "node_hash",
+                            "",
+                        ),
+                    ),
+                )
+            )
+        return nodes
+
     def snapshot_at(
         self,
         chain_id: str,
@@ -1141,36 +1218,40 @@ class DurableArchiveRepository:
                 "archive root index references missing archive"
             )
         if stored.manifest.manifest.digest != index.archive_manifest_digest:
-            raise DurableArchiveStoreError("root index manifest digest mismatch")
+            raise DurableArchiveStoreError(
+                "root index manifest digest mismatch"
+            )
         if index.sequence > len(stored.node_hashes):
-            raise DurableArchiveStoreError("root index sequence exceeds archive")
-        hashes = stored.node_hashes[: index.sequence]
-        nodes = tuple(
-            self.get_node(chain_id, node_hash)
-            for node_hash in hashes
+            raise DurableArchiveStoreError(
+                "root index sequence exceeds archive"
+            )
+        nodes = self._stored_nodes(
+            stored,
+            through_sequence=index.sequence,
         )
-        previous = GENESIS_HASH
-        for expected_sequence, node in enumerate(nodes, start=1):
-            node_hash = str(
+        terminal = (
+            GENESIS_HASH
+            if not nodes
+            else str(
                 getattr(
-                    node,
+                    nodes[-1],
                     "event_hash",
                     getattr(
-                        node,
+                        nodes[-1],
                         "receipt_hash",
-                        getattr(node, "node_hash", ""),
+                        getattr(
+                            nodes[-1],
+                            "node_hash",
+                            "",
+                        ),
                     ),
                 )
             )
-            if int(node.sequence) != expected_sequence:
-                raise DurableArchiveStoreError("archived snapshot sequence is not contiguous")
-            if str(node.previous_hash) != previous:
-                raise DurableArchiveStoreError(
-                    "archived snapshot previous hash is not contiguous"
-                )
-            previous = node_hash
-        if previous != root_hash:
-            raise DurableArchiveStoreError("archived snapshot does not terminate at root")
+        )
+        if terminal != root_hash:
+            raise DurableArchiveStoreError(
+                "archived snapshot does not terminate at root"
+            )
         return nodes
 
     def verify_root(
@@ -1225,10 +1306,31 @@ class DurableArchiveRepository:
         try:
             self._verify_manifest_signature(stored.manifest)
             self._verify_checkpoint_authority(stored.checkpoint)
-            nodes = self.snapshot_at(
-                manifest.chain_id,
-                manifest.checkpoint_root,
+            nodes = self._stored_nodes(
+                stored,
+                through_sequence=manifest.checkpoint_sequence,
             )
+            terminal = (
+                GENESIS_HASH
+                if not nodes
+                else str(
+                    getattr(
+                        nodes[-1],
+                        "event_hash",
+                        getattr(
+                            nodes[-1],
+                            "receipt_hash",
+                            getattr(
+                                nodes[-1],
+                                "node_hash",
+                                "",
+                            ),
+                        ),
+                    )
+                )
+            )
+            if terminal != manifest.checkpoint_root:
+                return False
             encoded = tuple(
                 self._encode_node(manifest.chain_id, node)
                 for node in nodes
@@ -1267,7 +1369,15 @@ class DurableArchiveRepository:
         self,
         archive_id: str,
     ) -> int:
-        stored = self.require(archive_id)
+        stored = self.get(archive_id)
+        if stored is None:
+            raise DurableArchiveStoreError(
+                "required archive is missing"
+            )
+        if not self.verify_archive(stored):
+            raise DurableArchiveStoreError(
+                "archive failed verification before index repair"
+            )
         manifest = stored.manifest.manifest
         repaired = 0
         genesis = DurableArchiveRootIndex(
