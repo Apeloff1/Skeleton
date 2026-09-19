@@ -182,6 +182,68 @@ def test_concurrent_get_constructs_one_accelerator_instance(tmp_path: Path) -> N
     assert all(instance is created[0] for instance in instances)
 
 
+def test_close_serializes_against_concurrent_get(tmp_path: Path) -> None:
+    source = tmp_path / "vector.java"
+    source.write_text("// test source\n", encoding="utf-8")
+    close_started = threading.Event()
+    close_release = threading.Event()
+    created: list[_FakeAccelerator] = []
+
+    class BlockingCloseAccelerator(_FakeAccelerator):
+        def close(self) -> None:
+            close_started.set()
+            assert close_release.wait(timeout=2.0)
+            super().close()
+
+    def factory() -> _FakeAccelerator:
+        if not created:
+            instance: _FakeAccelerator = BlockingCloseAccelerator("vector-first")
+        else:
+            instance = _FakeAccelerator("vector-next")
+        created.append(instance)
+        return instance
+
+    registry = JvmAcceleratorRegistry(
+        factories={"vector": factory},
+        config_providers={
+            "vector": lambda: SimpleNamespace(
+                java_binary=sys.executable,
+                source=source,
+            )
+        },
+    )
+    first = registry.get("vector")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        closing = pool.submit(registry.close, "vector")
+        assert close_started.wait(timeout=1.0)
+        getting = pool.submit(registry.get, "vector")
+        time.sleep(0.05)
+        assert getting.done() is False
+        close_release.set()
+        closing.result(timeout=2.0)
+        second = getting.result(timeout=2.0)
+
+    assert first.closed is True
+    assert second is not first
+    assert len(created) == 2
+
+
+def test_health_probe_redacts_exception_text(tmp_path: Path) -> None:
+    registry = JvmAcceleratorRegistry(
+        config_providers={
+            "vector": lambda: (_ for _ in ()).throw(
+                RuntimeError("password=hunter2")
+            )
+        }
+    )
+
+    result = registry.health_probe("vector")()
+
+    assert result.ok is False
+    assert result.detail == "RuntimeError"
+    assert "hunter2" not in result.detail
+
 def test_warm_all_starts_each_helper_and_surfaces_runtime_counters(tmp_path: Path) -> None:
     registry, instances, _factory_calls = _registry(tmp_path)
 
