@@ -53,11 +53,37 @@ class _FakeBroadPhaseAccelerator:
         return pairs
 
 
+    def query_overlaps_many(
+        self,
+        body_bounds: list[AABB],
+        queries: tuple[AABB, ...],
+        *,
+        max_total_hits: int = 1_000_000,
+    ) -> list[list[int]]:
+        self.calls += 1
+        total = 0
+        batches: list[list[int]] = []
+        for query in queries:
+            hits: list[int] = []
+            for index, bounds in enumerate(body_bounds):
+                if not bounds.overlaps(query):
+                    continue
+                total += 1
+                if total > max_total_hits:
+                    raise RuntimeError("AABB query total-hit bound exceeded")
+                hits.append(index)
+            batches.append(hits)
+        return batches
+
+
 class _FailingBroadPhaseAccelerator:
     minimum_bodies = 1
 
     def compute_pairs(self, *args: object, **kwargs: object) -> list[BroadPhaseIndexPair]:
         raise RuntimeError("simulated JVM broad-phase failure")
+
+    def query_overlaps_many(self, *args: object, **kwargs: object) -> list[list[int]]:
+        raise RuntimeError("simulated JVM AABB query failure")
 
 
 class _MalformedBroadPhaseAccelerator:
@@ -225,6 +251,53 @@ def test_world_step_with_fake_jvm_matches_python_receipts_and_digest() -> None:
     assert stats["successes"] >= 1
 
 
+def test_batch_aabb_queries_match_repeated_python_world_queries() -> None:
+    fake = _FakeBroadPhaseAccelerator()
+    world = _world(accelerated=True, accelerator=fake)
+    queries = (
+        _aabb((-2.0, 1.0, -1.0), (0.2, 4.0, 1.0)),
+        _aabb((0.2, 1.0, -1.0), (2.0, 4.0, 1.0)),
+        _aabb((100.0, 100.0, 100.0), (101.0, 101.0, 101.0)),
+    )
+
+    expected = tuple(world.query_aabb(query) for query in queries)
+    actual = world.query_aabb_many(queries)
+
+    assert actual == expected
+    assert all("ground" not in hits for hits in actual)
+    stats = world.broad_phase_acceleration_stats()
+    assert stats["spatial_attempts"] == 1
+    assert stats["spatial_successes"] == 1
+
+
+def test_batch_aabb_query_failure_falls_back_to_python() -> None:
+    world = _world(
+        accelerated=True,
+        accelerator=_FailingBroadPhaseAccelerator(),
+    )
+    queries = (
+        _aabb((-10.0, -10.0, -10.0), (10.0, 10.0, 10.0)),
+        _aabb((100.0, 100.0, 100.0), (101.0, 101.0, 101.0)),
+    )
+
+    expected = tuple(world.query_aabb(query) for query in queries)
+    actual = world.query_aabb_many(queries)
+
+    assert actual == expected
+    assert world.broad_phase_acceleration_stats()["fallbacks"] == 1
+
+
+def test_batch_aabb_queries_enforce_total_hit_bound_on_fallback() -> None:
+    world = _world(
+        accelerated=True,
+        accelerator=_FailingBroadPhaseAccelerator(),
+    )
+    query = _aabb((-10.0, -10.0, -10.0), (10.0, 10.0, 10.0))
+
+    with pytest.raises(PhysicsValidationError, match="total-hit bound"):
+        world.query_aabb_many((query, query), max_total_hits=2)
+
+
 def _java_major(java: str) -> int | None:
     completed = subprocess.run(
         [java, "-version"],
@@ -316,6 +389,46 @@ def test_real_java_physics_world_matches_python_world() -> None:
 
     assert actual == expected
     assert accelerated.state_digest == baseline.state_digest
+
+
+def test_real_java_batch_aabb_query_roundtrip_is_stable() -> None:
+    bodies = [
+        _aabb((0, 0, 0), (2, 2, 2)),
+        _aabb((1, 1, 1), (3, 3, 3)),
+        _aabb((10, 10, 10), (11, 11, 11)),
+        _aabb((2, 2, 2), (2, 2, 2)),
+    ]
+    queries = (
+        _aabb((-1, -1, -1), (2.1, 2.1, 2.1)),
+        _aabb((9.5, 9.5, 9.5), (11.5, 11.5, 11.5)),
+    )
+
+    with JvmBroadPhaseAccelerator(_real_config()) as accelerator:
+        batches = accelerator.query_overlaps_many(
+            bodies,
+            queries,
+            max_total_hits=100,
+        )
+
+    assert batches == [[0, 1, 3], [2]]
+
+
+def test_real_java_world_batch_aabb_queries_match_python() -> None:
+    baseline = _world(accelerated=False)
+    accelerator = JvmBroadPhaseAccelerator(_real_config())
+    accelerated = _world(accelerated=True, accelerator=accelerator)
+    queries = (
+        _aabb((-2.0, 1.0, -1.0), (0.2, 4.0, 1.0)),
+        _aabb((0.2, 1.0, -1.0), (2.0, 4.0, 1.0)),
+    )
+
+    try:
+        expected = tuple(baseline.query_aabb(query) for query in queries)
+        actual = accelerated.query_aabb_many(queries)
+    finally:
+        accelerator.close()
+
+    assert actual == expected
 
 
 def test_real_java_bridge_rejects_invalid_epsilon_before_ipc() -> None:
