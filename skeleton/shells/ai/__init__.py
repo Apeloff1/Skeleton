@@ -206,6 +206,43 @@ from skeleton.shells.ai.durable_compaction_certificate import DurableCompactionC
 
 from skeleton.shells.ai.durable_health import DurableRecoveryHealthError, DurableRecoveryHealthFinding, DurableRecoveryHealthGuard, DurableRecoveryHealthPolicy, DurableRecoveryHealthReport, DurableRecoveryHealthSeverity
 
+from skeleton.shells.ai.durable_merkle import (
+    MERKLE_ALGORITHM,
+    MERKLE_CHECKPOINT_ARTIFACT,
+    DurableMerkleAuthority,
+    DurableMerkleChainKind,
+    DurableMerkleCheckpoint,
+    DurableMerkleError,
+    DurableMerkleLeaf,
+    DurableMerkleProof,
+    DurableMerkleProofStep,
+    DurableMerkleSide,
+    DurableMerkleVerification,
+    SignedDurableMerkleCheckpoint,
+)
+from skeleton.shells.ai.durable_merkle_session import (
+    DurableSessionMerkleAuthority,
+    DurableSessionMerkleError,
+    DurableSessionMerkleProofBundle,
+    DurableSessionMerkleVerification,
+)
+from skeleton.shells.ai.durable_merkle_store import (
+    DurableMerkleBundleCommit,
+    DurableMerkleBundleConflict,
+    DurableMerkleBundleCorruption,
+    DurableMerkleBundleIndex,
+    DurableMerkleBundleStoreError,
+    DurableSessionMerkleBundleStore,
+    StoredDurableMerkleBundle,
+    StoredDurableMerkleBundleIndex,
+)
+from skeleton.shells.ai.durable_merkle_operator import (
+    DurableMerkleOperatorError,
+    DurableMerkleOperatorResult,
+    DurableMerkleOperatorStatus,
+    DurableSessionMerkleOperator,
+)
+
 from skeleton.shells.ai.durable_recovery import DurableRecoveryFinding, DurableRecoveryStatus, DurableRecoveryVerificationError, DurableSessionRecoveryReport, DurableSessionRecoveryVerifier, RecoveryFindingSeverity
 
 from skeleton.shells.ai.session_integrity import JournalInclusionResult, ReceiptInclusionResult, SessionEvidenceIntegrityError, SessionEvidenceIntegrityReport, SessionEvidenceIntegrityVerifier
