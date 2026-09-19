@@ -32,6 +32,7 @@ from .build_authority import (
     select_build_authorization,
 )
 from .free_model import FreeModelClient, ModelError, redact_secrets
+from .bot_manager import bounded_health_summary, load_state
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
@@ -315,6 +316,10 @@ def _context(snapshot: SupervisorSnapshot) -> str:
         ),
         "pull_requests": snapshot.pull_requests,
         "workflow_runs": snapshot.workflow_runs,
+        # Local bot health is advisory telemetry only. It may influence planning
+        # priority but never grants build authority, selects an executable, or
+        # bypasses Secretary admission.
+        "automation_health": bounded_health_summary(load_state()),
     }
     text = redact_secrets(_canonical(value).decode("utf-8"))
     encoded = text.encode("utf-8")
@@ -367,6 +372,7 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
                 else None
             ),
             "queued_approved_work_count": len(queued_builds),
+            "automation_health": bounded_health_summary(load_state()),
         },
     }
     return _canonical(payload).decode("utf-8")
