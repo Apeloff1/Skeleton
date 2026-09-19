@@ -746,6 +746,18 @@ class WorkerProposalTests(unittest.TestCase):
                 "deploy/release.py"
             )
         )
+        for protected in (
+            "skeleton/security/defense_plane.py",
+            "skeleton/pr_automation/runner.py",
+            "skeleton/build/tooling.py",
+            "tests/run_unit.py",
+            "tests/test_autonomous_supervisor.py",
+            "tests/test_supervisor_runtime.py",
+        ):
+            self.assertFalse(
+                specialist_bots.safe_path(protected),
+                protected,
+            )
         self.assertTrue(
             specialist_bots.safe_path(
                 "skeleton/runtime.py"
