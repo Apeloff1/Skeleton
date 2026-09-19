@@ -89,11 +89,21 @@ class ResilientAIPlanner:
     ) -> ResilientPlanningResult:
         attempts = []
         last_error: BaseException | None = None
+        quarantined = {
+            planner.model.model_id
+            for planner in self.planners
+            if self.health.snapshot(planner.model.model_id).state
+            is ProviderHealth.QUARANTINED
+        }
+        for planner in self.planners:
+            model_id = planner.model.model_id
+            if model_id in quarantined:
+                attempts.append(
+                    PlannerAttempt(model_id, "quarantined", 0.0)
+                )
         for planner in self.ordered():
             model_id = planner.model.model_id
-            health = self.health.snapshot(model_id)
-            if health.state is ProviderHealth.QUARANTINED:
-                attempts.append(PlannerAttempt(model_id, "quarantined", 0.0))
+            if model_id in quarantined:
                 continue
             try:
                 self.circuits.allow(model_id)
