@@ -145,6 +145,7 @@ class AIExecutionEvidenceFinalizer:
         quorum_approval_digest: str = "",
         runtime_trust_digest: str = "",
         authority_health_policy_digest: str = "",
+        execution_attempt_authority_digest: str = "",
         execution_attempt: AIExecutionAttempt | None = None,
     ) -> FinalizedAIExecutionEvidence:
         if session.phase.value not in {"complete", "failed"}:
@@ -189,7 +190,31 @@ class AIExecutionEvidenceFinalizer:
                 "execution provenance authority health policy differs from finalizer"
             )
         execution_attempt_id = ""
-        execution_attempt_authority_digest = ""
+        explicit_attempt_authority_digest = (
+            execution_attempt_authority_digest
+        )
+        if explicit_attempt_authority_digest:
+            if not execution_seal_id:
+                raise RuntimeError(
+                    "execution attempt authority requires execution seal"
+                )
+            if len(explicit_attempt_authority_digest) != 64:
+                raise ValueError(
+                    "execution_attempt_authority_digest must be SHA-256 hex"
+                )
+            try:
+                int(explicit_attempt_authority_digest, 16)
+            except ValueError as exc:
+                raise ValueError(
+                    "execution_attempt_authority_digest must be SHA-256 hex"
+                ) from exc
+            explicit_attempt_authority_digest = (
+                explicit_attempt_authority_digest.lower()
+            )
+            execution_attempt_id = execution_seal_id
+        execution_attempt_authority_digest = (
+            explicit_attempt_authority_digest
+        )
         execution_attempt_state = ""
         if execution_attempt is not None:
             if not isinstance(execution_attempt, AIExecutionAttempt):
@@ -257,6 +282,14 @@ class AIExecutionEvidenceFinalizer:
                     raise RuntimeError(
                         "execution attempt terminal evidence differs from provenance"
                     )
+            if (
+                explicit_attempt_authority_digest
+                and explicit_attempt_authority_digest
+                != execution_attempt.authority_digest
+            ):
+                raise RuntimeError(
+                    "execution attempt authority differs from finalizer authority"
+                )
             execution_attempt_id = execution_attempt.attempt_id
             execution_attempt_authority_digest = (
                 execution_attempt.authority_digest
