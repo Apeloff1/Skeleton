@@ -21,6 +21,10 @@ from typing import Callable, Sequence, TypeVar
 
 from skeleton.memory.jvm_vector_accelerator import JvmVectorAccelerator
 from skeleton.observability.jvm_accelerator import JvmObservabilityAccelerator
+from skeleton.simulation.physics.jvm_broadphase_accelerator import (
+    JvmBroadPhaseAccelerator,
+)
+from skeleton.simulation.physics.math3d import AABB, Vec3
 
 T = TypeVar("T")
 
@@ -140,6 +144,99 @@ def _check_vector_batch_parity(
         _check_vector_parity(python_hits, java_hits)
 
 
+def _physics_fixture(
+    count: int,
+) -> list[tuple[AABB, bool]]:
+    bodies: list[tuple[AABB, bool]] = []
+    for index in range(count):
+        minimum_x = index * 0.25
+        bounds = AABB(
+            Vec3(minimum_x, 0.0, 0.0),
+            Vec3(minimum_x + 1.0, 1.0, 1.0),
+        )
+        bodies.append((bounds, index % 3 != 0))
+    return bodies
+
+
+def _python_broadphase(
+    bodies: Sequence[tuple[AABB, bool]],
+    max_pairs: int,
+) -> list[tuple[int, int]]:
+    ordered = sorted(
+        range(len(bodies)),
+        key=lambda index: (
+            bodies[index][0].minimum.x,
+            index,
+        ),
+    )
+    active: list[tuple[float, int]] = []
+    pairs: list[tuple[int, int]] = []
+    epsilon = 1.0e-9
+    for index in ordered:
+        bounds, dynamic = bodies[index]
+        active = [
+            row
+            for row in active
+            if row[0] + epsilon >= bounds.minimum.x
+        ]
+        for _, other_index in active:
+            other_bounds, other_dynamic = bodies[other_index]
+            if not dynamic and not other_dynamic:
+                continue
+            if bounds.overlaps(other_bounds):
+                if len(pairs) >= max_pairs:
+                    raise RuntimeError("physics pair fixture exceeds pair bound")
+                pairs.append(
+                    (
+                        min(index, other_index),
+                        max(index, other_index),
+                    )
+                )
+        active.append((bounds.maximum.x, index))
+        active.sort()
+    pairs.sort()
+    return pairs
+
+
+def _physics_queries(
+    body_count: int,
+    query_count: int,
+) -> list[AABB]:
+    span = max(1.0, body_count * 0.25)
+    stride = span / query_count
+    return [
+        AABB(
+            Vec3(index * stride, -0.5, -0.5),
+            Vec3(index * stride + 8.0, 1.5, 1.5),
+        )
+        for index in range(query_count)
+    ]
+
+
+def _python_aabb_queries(
+    body_bounds: Sequence[AABB],
+    queries: Sequence[AABB],
+) -> list[list[int]]:
+    return [
+        [
+            index
+            for index, bounds in enumerate(body_bounds)
+            if bounds.overlaps(query)
+        ]
+        for query in queries
+    ]
+
+
+def _check_index_batches(
+    expected: Sequence[Sequence[int]],
+    actual: Sequence[Sequence[int]],
+    label: str,
+) -> None:
+    normalized = [list(batch) for batch in actual]
+    if normalized != [list(batch) for batch in expected]:
+        raise RuntimeError(f"{label} parity mismatch")
+
+
 def _speedup(python: Timing, java: Timing) -> float:
     if java.median_ms <= 0:
         return float("inf")
@@ -204,6 +301,10 @@ def run(args: argparse.Namespace) -> int:
         raise SystemExit("--batch-queries must be in [1, 512]")
     if (args.vectors + args.batch_queries) * args.dims > 4_000_000:
         raise SystemExit("batch vector fixture exceeds the accelerator 4,000,000-element bound")
+    if not 1 <= args.physics_bodies <= 100_000:
+        raise SystemExit("--physics-bodies must be in [1, 100000]")
+    if not 1 <= args.physics_queries <= 4096:
+        raise SystemExit("--physics-queries must be in [1, 4096]")
     if args.repeats < 1:
         raise SystemExit("--repeats must be positive")
 
@@ -218,6 +319,12 @@ def run(args: argparse.Namespace) -> int:
         )
         for item in batch_queries
     ]
+    physics_bodies = _physics_fixture(args.physics_bodies)
+    physics_bounds = [bounds for bounds, _ in physics_bodies]
+    physics_queries = _physics_queries(
+        args.physics_bodies,
+        args.physics_queries,
+    )
 
     print("Skeleton Java accelerator benchmark")
     print(f"histogram values : {len(hist):,}")
@@ -225,10 +332,16 @@ def run(args: argparse.Namespace) -> int:
     print(f"vector dimensions: {args.dims:,}")
     print(f"top_k            : {args.top_k:,}")
     print(f"batch queries    : {args.batch_queries:,}")
+    print(f"physics bodies   : {args.physics_bodies:,}")
+    print(f"physics queries  : {args.physics_queries:,}")
     print(f"repeats          : {args.repeats}")
     print()
 
-    with JvmObservabilityAccelerator() as observability, JvmVectorAccelerator() as vector:
+    with (
+        JvmObservabilityAccelerator() as observability,
+        JvmVectorAccelerator() as vector,
+        JvmBroadPhaseAccelerator() as physics,
+    ):
         # Warm source launchers, JIT paths, protocol buffers, and class loading.
         observability.summarize(hist[: min(len(hist), 4096)])
         vector.top_k(
@@ -236,6 +349,11 @@ def run(args: argparse.Namespace) -> int:
             query_norm,
             candidates[: min(len(candidates), max(args.top_k, 32))],
             min(args.top_k, min(len(candidates), max(args.top_k, 32))),
+        )
+        physics.compute_pairs(
+            physics_bodies[: min(len(physics_bodies), 256)],
+            max_pairs=1_000_000,
+            epsilon=1.0e-9,
         )
 
         py_hist, py_hist_result = _measure(
@@ -278,6 +396,52 @@ def run(args: argparse.Namespace) -> int:
         )
         _check_vector_batch_parity(py_batch_result, java_batch_result)
 
+        py_physics, py_physics_result = _measure(
+            "Python broad phase",
+            args.repeats,
+            lambda: _python_broadphase(
+                physics_bodies,
+                1_000_000,
+            ),
+        )
+        java_physics, java_physics_result = _measure(
+            "Java broad phase",
+            args.repeats,
+            lambda: physics.compute_pairs(
+                physics_bodies,
+                max_pairs=1_000_000,
+                epsilon=1.0e-9,
+            ),
+        )
+        if py_physics_result != [
+            (pair.left, pair.right)
+            for pair in java_physics_result
+        ]:
+            raise RuntimeError("physics broad-phase parity mismatch")
+
+        py_spatial, py_spatial_result = _measure(
+            "Python AABB query batch",
+            args.repeats,
+            lambda: _python_aabb_queries(
+                physics_bounds,
+                physics_queries,
+            ),
+        )
+        java_spatial, java_spatial_result = _measure(
+            "Java AABB query batch",
+            args.repeats,
+            lambda: physics.query_overlaps_many(
+                physics_bounds,
+                physics_queries,
+                max_total_hits=1_000_000,
+            ),
+        )
+        _check_index_batches(
+            py_spatial_result,
+            java_spatial_result,
+            "physics AABB query",
+        )
+
     _print_timing(py_hist)
     _print_timing(java_hist)
     print(f"{'Histogram speedup':28s} {_speedup(py_hist, java_hist):9.3f}x")
@@ -289,6 +453,14 @@ def run(args: argparse.Namespace) -> int:
     _print_timing(py_batch)
     _print_timing(java_batch)
     print(f"{'Vector batch speedup':28s} {_speedup(py_batch, java_batch):9.3f}x")
+    print()
+    _print_timing(py_physics)
+    _print_timing(java_physics)
+    print(f"{'Broad-phase speedup':28s} {_speedup(py_physics, java_physics):9.3f}x")
+    print()
+    _print_timing(py_spatial)
+    _print_timing(java_spatial)
+    print(f"{'AABB batch speedup':28s} {_speedup(py_spatial, java_spatial):9.3f}x")
     print()
     print(
         "Interpretation: enable a JVM fast path only above the measured crossover "
@@ -305,6 +477,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--dims", type=int, default=256)
     p.add_argument("--top-k", type=int, default=10)
     p.add_argument("--batch-queries", type=int, default=8)
+    p.add_argument("--physics-bodies", type=int, default=5000)
+    p.add_argument("--physics-queries", type=int, default=32)
     p.add_argument("--repeats", type=int, default=5)
     return p
 
