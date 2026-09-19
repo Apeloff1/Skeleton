@@ -276,3 +276,70 @@ def test_domain_modules_are_bounded_and_static() -> None:
     assert all(path.exists() for path in domain_paths)
     assert all(len(path.read_text(encoding="utf-8").splitlines()) < 650 for path in domain_paths)
     assert sum(len(path.read_text(encoding="utf-8").splitlines()) for path in domain_paths) < 4500
+
+
+
+def test_action_rejects_type_coercion_and_unbounded_argv_items() -> None:
+    with pytest.raises(TypeError, match="tuple"):
+        UbuntuAction("x", ["ubuntu", "noop"], "test")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="int"):
+        UbuntuAction("x", ("ubuntu", "noop"), "test", timeout_seconds=True)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="bounded"):
+        UbuntuAction("x", ("ubuntu", "bad\\x00arg"), "test")
+    with pytest.raises(ValueError, match="bounded"):
+        UbuntuAction(" x ", ("ubuntu", "noop"), "test")
+
+
+def test_plan_metadata_is_copied_validated_and_immutable() -> None:
+    source = {"domain": "test"}
+    plan = UbuntuPlan(metadata=source)
+    source["domain"] = "mutated"
+    assert plan.metadata["domain"] == "test"
+    with pytest.raises(TypeError):
+        plan.metadata["domain"] = "mutated"  # type: ignore[index]
+    with pytest.raises(TypeError, match="mapping"):
+        UbuntuPlan(metadata=[("domain", "test")])  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="bounded"):
+        UbuntuPlan(metadata={" domain ": "test"})
+
+
+def test_plan_rejects_non_action_payloads_and_string_extensions() -> None:
+    with pytest.raises(TypeError, match="UbuntuAction"):
+        UbuntuPlan(("not-an-action",))  # type: ignore[arg-type]
+    plan = UbuntuPlan()
+    with pytest.raises(TypeError, match="sequence"):
+        plan.extend("not-actions")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="UbuntuAction"):
+        plan.append("not-an-action")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("spec", RESOURCE_SPECS, ids=lambda spec: spec.resource_id)
+def test_resource_defaults_accept_empty_optional_version(spec) -> None:
+    plan_type = getattr(ops, spec.class_name)
+    policy = plan_type("resource")
+    assert policy.version == ""
+    assert policy.validate() == ()
+
+
+@pytest.mark.parametrize("spec", RESOURCE_SPECS[:8], ids=lambda spec: spec.resource_id)
+def test_resource_boolean_and_tag_types_fail_closed(spec) -> None:
+    plan_type = getattr(ops, spec.class_name)
+    with pytest.raises(TypeError, match="enabled"):
+        plan_type("resource", enabled=1)
+    with pytest.raises(TypeError, match="restart"):
+        plan_type("resource", restart=0)
+    with pytest.raises(TypeError, match="tags"):
+        plan_type("resource", tags=["safe"])  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="duplicate tags"):
+        plan_type("resource", tags=("safe", "safe"))
+
+
+@pytest.mark.parametrize("spec", RESOURCE_SPECS[:8], ids=lambda spec: spec.resource_id)
+def test_resource_text_identity_is_canonical_and_non_coercive(spec) -> None:
+    plan_type = getattr(ops, spec.class_name)
+    with pytest.raises(ValueError, match="bounded"):
+        plan_type(" resource ")
+    with pytest.raises(TypeError, match="str"):
+        plan_type(123)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="optional"):
+        plan_type("resource", version=1)  # type: ignore[arg-type]
