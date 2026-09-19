@@ -22,6 +22,7 @@ from .character_motor import (
 )
 from .collision import (
     ContactManifold,
+    MAX_BROAD_PHASE_QUERY_HITS,
     SweepAndPruneBroadPhase,
     detect_collision,
     generate_manifolds,
@@ -425,6 +426,19 @@ class PhysicsWorld:
             if body_bounds is not None and body_bounds.overlaps(bounds):
                 matches.append(body.body_id)
         return tuple(matches)
+
+    def query_aabb_many(
+        self,
+        bounds: tuple[AABB, ...],
+        *,
+        max_total_hits: int = MAX_BROAD_PHASE_QUERY_HITS,
+    ) -> tuple[tuple[str, ...], ...]:
+        """Batch finite-body AABB queries with optional JVM acceleration."""
+        return self._broad_phase.query_aabbs(
+            self.bodies(),
+            tuple(bounds),
+            max_total_hits=max_total_hits,
+        )
 
     def raycast(
         self,
