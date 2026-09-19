@@ -392,6 +392,47 @@ class HotFloorPosition:
         }
 
 
+@dataclass(frozen=True)
+class DurableHotFloorHistoryIndex:
+    chain_id: str
+    sequence: int
+    root_hash: str
+    floor_id: str
+
+    def __post_init__(self) -> None:
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence <= 0
+        ):
+            raise ValueError(
+                "hot floor history sequence must be positive"
+            )
+        object.__setattr__(
+            self,
+            "root_hash",
+            _digest("root_hash", self.root_hash),
+        )
+        object.__setattr__(
+            self,
+            "floor_id",
+            _digest("floor_id", self.floor_id),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "sequence": self.sequence,
+            "root_hash": self.root_hash,
+            "floor_id": self.floor_id,
+        }
+
+
 class DurableHotFloorError(RuntimeError):
     pass
 
@@ -439,6 +480,42 @@ class DurableHotFloorStore:
         self.namespace = namespace
         self.max_cas_retries = max_cas_retries
         self._clock = clock
+
+    @staticmethod
+    def _history_key(floor_id: str) -> str:
+        return (
+            "history:"
+            + _digest(
+                "floor_id",
+                floor_id,
+            )
+        )
+
+    @staticmethod
+    def _sequence_key(
+        chain_id: str,
+        sequence: int,
+    ) -> str:
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=128,
+        )
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence <= 0
+        ):
+            raise ValueError(
+                "sequence must be positive integer"
+            )
+        return (
+            "history-sequence:"
+            + hashlib.sha256(
+                chain_id.encode()
+            ).hexdigest()
+            + f":{sequence:020d}"
+        )
 
     @staticmethod
     def _key(chain_id: str) -> str:
@@ -539,6 +616,214 @@ class DurableHotFloorStore:
             raise DurableHotFloorError(
                 "hot floor signature metadata mismatch"
             )
+
+    def _persist_committed(
+        self,
+        item: SignedDurableHotFloor,
+    ) -> None:
+        """Persist immutable history for a floor already known to be current."""
+        if not isinstance(
+            item,
+            SignedDurableHotFloor,
+        ):
+            raise TypeError(
+                "item must be SignedDurableHotFloor"
+            )
+        self._verify(item)
+        payload = item.to_dict()
+        history_key = self._history_key(
+            item.floor.floor_id
+        )
+        history = self.backend.get(
+            self.namespace,
+            history_key,
+        )
+        if history is None:
+            try:
+                self.backend.put_if_absent(
+                    self.namespace,
+                    history_key,
+                    payload,
+                )
+            except DistributedStateConflict:
+                history = self.backend.get(
+                    self.namespace,
+                    history_key,
+                )
+        if history is None:
+            history = self.backend.get(
+                self.namespace,
+                history_key,
+            )
+        if (
+            history is None
+            or not isinstance(history.value, dict)
+        ):
+            raise DurableHotFloorError(
+                "hot floor history record is missing or invalid"
+            )
+        historical = self._signed(
+            dict(history.value)
+        )
+        self._verify(historical)
+        if historical != item:
+            raise DurableHotFloorError(
+                "hot floor history id binds different signed floor"
+            )
+
+        index = DurableHotFloorHistoryIndex(
+            item.floor.chain_id,
+            item.floor.sequence,
+            item.floor.root_hash,
+            item.floor.floor_id,
+        )
+        index_key = self._sequence_key(
+            item.floor.chain_id,
+            item.floor.sequence,
+        )
+        existing = self.backend.get(
+            self.namespace,
+            index_key,
+        )
+        if existing is None:
+            try:
+                self.backend.put_if_absent(
+                    self.namespace,
+                    index_key,
+                    index.to_dict(),
+                )
+            except DistributedStateConflict:
+                existing = self.backend.get(
+                    self.namespace,
+                    index_key,
+                )
+        if existing is None:
+            existing = self.backend.get(
+                self.namespace,
+                index_key,
+            )
+        if (
+            existing is None
+            or not isinstance(existing.value, dict)
+        ):
+            raise DurableHotFloorError(
+                "hot floor history sequence index is missing or invalid"
+            )
+        raw = dict(existing.value)
+        indexed = DurableHotFloorHistoryIndex(
+            str(raw["chain_id"]),
+            int(raw["sequence"]),
+            str(raw["root_hash"]),
+            str(raw["floor_id"]),
+        )
+        if indexed != index:
+            raise DurableHotFloorError(
+                "hot floor history sequence already binds different floor"
+            )
+
+    def get(
+        self,
+        floor_id: str,
+    ) -> SignedDurableHotFloor | None:
+        floor_id = _digest(
+            "floor_id",
+            floor_id,
+        )
+        record = self.backend.get(
+            self.namespace,
+            self._history_key(floor_id),
+        )
+        if record is not None:
+            if not isinstance(record.value, dict):
+                raise DurableHotFloorError(
+                    "hot floor history record must be mapping"
+                )
+            item = self._signed(
+                dict(record.value)
+            )
+            if item.floor.floor_id != floor_id:
+                raise DurableHotFloorError(
+                    "hot floor history identity mismatch"
+                )
+            self._verify(item)
+            return item
+
+        # Repair the post-CAS/pre-history crash window from the authoritative
+        # current record.  This never promotes an orphan candidate because
+        # only the current key establishes committed authority.
+        # Floor ids are globally content-addressed; scan is deliberately
+        # avoided.  A caller that knows the chain can use floor_at(), which
+        # can repair from the current record.  Direct get returns absent here.
+        return None
+
+    def floor_at(
+        self,
+        chain_id: str,
+        sequence: int,
+    ) -> SignedDurableHotFloor | None:
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=128,
+        )
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence <= 0
+        ):
+            raise ValueError(
+                "sequence must be positive integer"
+            )
+        index_key = self._sequence_key(
+            chain_id,
+            sequence,
+        )
+        record = self.backend.get(
+            self.namespace,
+            index_key,
+        )
+        if record is not None:
+            if not isinstance(record.value, dict):
+                raise DurableHotFloorError(
+                    "hot floor history sequence index must be mapping"
+                )
+            raw = dict(record.value)
+            index = DurableHotFloorHistoryIndex(
+                str(raw["chain_id"]),
+                int(raw["sequence"]),
+                str(raw["root_hash"]),
+                str(raw["floor_id"]),
+            )
+            if (
+                index.chain_id != chain_id
+                or index.sequence != sequence
+            ):
+                raise DurableHotFloorError(
+                    "hot floor history sequence index identity mismatch"
+                )
+            item = self.get(index.floor_id)
+            if item is None:
+                raise DurableHotFloorError(
+                    "hot floor sequence index references missing history"
+                )
+            if (
+                item.floor.chain_id != chain_id
+                or item.floor.sequence != sequence
+                or item.floor.root_hash != index.root_hash
+            ):
+                raise DurableHotFloorError(
+                    "hot floor history index/content mismatch"
+                )
+            return item
+
+        current = self.current(chain_id)
+        if (
+            current is not None
+            and current.floor.sequence == sequence
+        ):
+            self._persist_committed(current)
+            return current
+        return None
 
     def current(
         self,
@@ -690,6 +975,7 @@ class DurableHotFloorStore:
             )
             if current is not None:
                 self._verify(current)
+                self._persist_committed(current)
                 if current.floor.chain_id != chain_id:
                     raise DurableHotFloorError(
                         "hot floor current chain mismatch"
@@ -740,6 +1026,7 @@ class DurableHotFloorStore:
                     and current.floor.operation_id
                     == operation_id
                 ):
+                    self._persist_committed(current)
                     return current
                 raise DurableHotFloorError(
                     "same hot floor sequence carries different authority"
@@ -808,6 +1095,7 @@ class DurableHotFloorStore:
                     raise DurableHotFloorError(
                         "hot floor backend returned invalid revision"
                     )
+                self._persist_committed(item)
                 return item
             except DistributedStateConflict:
                 continue
