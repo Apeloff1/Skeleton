@@ -13,6 +13,8 @@ from dataclasses import dataclass
 import hashlib
 from typing import Iterable, Protocol
 
+from skeleton.shells.state_conflicts import DistributedStateConflict
+
 
 class VersionedStateBackend(Protocol):
     def get(self, namespace: str, key: str): ...
@@ -54,13 +56,6 @@ class HotFloorPosition:
     @classmethod
     def genesis(cls) -> "HotFloorPosition":
         return cls(0, "0" * 64)
-
-
-def _distributed_state_conflict_type():
-    """Resolve the AI store conflict lazily to avoid package import cycles."""
-    from skeleton.shells.ai.distributed_state import DistributedStateConflict
-
-    return DistributedStateConflict
 from skeleton.shells.sequence_index import SequenceIndexBackfillBatch
 from skeleton.shells.receipts import (
     ChainedReceipt,
@@ -428,7 +423,7 @@ class DistributedReceiptChain:
                     entry,
                 )
                 return entry
-            except _distributed_state_conflict_type():
+            except DistributedStateConflict:
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -523,7 +518,7 @@ class DistributedReceiptChain:
                     item,
                 )
                 return
-            except _distributed_state_conflict_type():
+            except DistributedStateConflict:
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -567,7 +562,7 @@ class DistributedReceiptChain:
                     entry,
                 )
                 return
-            except _distributed_state_conflict_type():
+            except DistributedStateConflict:
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -646,7 +641,7 @@ class DistributedReceiptChain:
                     expected_revision=revision,
                     value=next_head,
                 )
-            except _distributed_state_conflict_type():
+            except DistributedStateConflict:
                 current_revision, current = (
                     self._head_revision()
                 )
@@ -1470,7 +1465,7 @@ class DistributedReceiptChain:
                         expected_revision=revision,
                         value=next_head,
                     )
-                except _distributed_state_conflict_type():
+                except DistributedStateConflict:
                     continue
                 self._put_sequence_index(item)
                 self._put_index(item)
