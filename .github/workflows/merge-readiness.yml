@@ -199,6 +199,7 @@ jobs:
           skeleton/testing/test_pr_automation_workflow.py
           skeleton/testing/test_pr_automation_branch_completions.py
           tests/test_autonomous_supervisor.py
+          tests/test_build_authority.py
           tests/test_supervisor_runtime.py
           backend/tests/test_supervisor_workflow_contract.py
 
