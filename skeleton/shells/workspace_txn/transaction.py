@@ -190,6 +190,7 @@ class WorkspaceTransactionManager:
             raise ValueError("transaction root must be a directory")
         command = self._bind_command_to_workspace(root_path, command)
         self.backup_store.require_external_to_workspace(root_path)
+        self.journal.require_external_to_workspace(root_path)
         transaction_id = uuid.uuid4().hex
         correlation = correlation_id or uuid.uuid4().hex
         started_at = datetime.now(timezone.utc).isoformat()
