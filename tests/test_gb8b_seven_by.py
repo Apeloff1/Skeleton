@@ -52,17 +52,32 @@ class GB8bSevenByTests(unittest.TestCase):
         restored = json.loads(json.dumps(card))
         self.assertEqual(restored["stored_prose"], 0)
 
-    def test_composite_plane_fails_closed_when_seven_by_fails(self) -> None:
+    def _composite_card(self, *, track_hit: int, seven_hit: int) -> dict[str, object]:
         plane = ArtifactPlane.__new__(ArtifactPlane)
-        plane.track_e = Mock(audit=Mock(return_value={"hit": 1}))
-        plane.seven_by = Mock(audit=Mock(return_value={"hit": 0}))
-        plane.godot = Mock(locate=Mock(return_value={"hit": 1}))
+        plane.track_e = Mock(audit=Mock(return_value={"hit": track_hit}))
+        plane.seven_by = Mock(audit=Mock(return_value={"hit": seven_hit}))
+        # Godot is discovery metadata today, not an accepted archive-policy gate.
+        plane.godot = Mock(locate=Mock(return_value={"hit": 0}))
+        return plane.snapshot()
 
-        card = plane.snapshot()
-
-        self.assertEqual(card["hit"], 0)
+    def test_composite_plane_accepts_only_when_archive_policies_accept(self) -> None:
+        card = self._composite_card(track_hit=1, seven_hit=1)
+        self.assertEqual(card["hit"], 1)
         self.assertEqual(card["law"], "GB-8/GB-8b")
+
+    def test_composite_plane_fails_closed_when_seven_by_fails(self) -> None:
+        card = self._composite_card(track_hit=1, seven_hit=0)
+        self.assertEqual(card["hit"], 0)
         self.assertEqual(card["seven_by"]["hit"], 0)
+
+    def test_composite_plane_fails_closed_when_track_e_fails(self) -> None:
+        card = self._composite_card(track_hit=0, seven_hit=1)
+        self.assertEqual(card["hit"], 0)
+        self.assertEqual(card["track_e"]["hit"], 0)
+
+    def test_composite_plane_fails_closed_when_both_archive_policies_fail(self) -> None:
+        card = self._composite_card(track_hit=0, seven_hit=0)
+        self.assertEqual(card["hit"], 0)
 
 
 if __name__ == "__main__":
