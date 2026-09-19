@@ -157,7 +157,7 @@ def _request_id(request: Request) -> str:
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex[:16]
+    return uuid.uuid4().hex
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
