@@ -18,6 +18,8 @@ from skeleton.shells.ai.durable_archive import (
     SignedDurableArchiveManifest,
 )
 from skeleton.shells.ai.durable_archive_store import (
+    DurableArchiveIndexHealth,
+    DurableArchiveIndexState,
     DurableArchiveRepository,
     DurableArchiveStoreReport,
 )
@@ -127,6 +129,7 @@ class DurableLifecycleReport:
     archive_store: DurableArchiveStoreReport | None
     compaction: DurableCompactionReadiness | None
     reasons: tuple[str, ...]
+    archive_index_health: DurableArchiveIndexHealth | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -240,6 +243,11 @@ class DurableLifecycleReport:
                 else self.compaction.to_dict()
             ),
             "reasons": list(self.reasons),
+            "archive_index_health": (
+                None
+                if self.archive_index_health is None
+                else self.archive_index_health.to_dict()
+            ),
         }
         if include_digest:
             data["digest"] = self.digest
@@ -337,19 +345,18 @@ class DurableEvidenceLifecycleCoordinator:
     ) -> SignedDurableChainCheckpoint | None:
         if not plan.checkpoint_digest:
             return None
-        matches = tuple(
-            item
-            for item in self.checkpoints.for_chain(
-                plan.chain_id
+        try:
+            checkpoint = self.checkpoints.find_by_digest(
+                plan.checkpoint_digest
             )
-            if item.checkpoint.digest
-            == plan.checkpoint_digest
-        )
-        if len(matches) != 1:
+        except Exception as exc:
             raise DurableLifecycleError(
-                "retention checkpoint is not uniquely present in registry"
+                "retention checkpoint canonical lookup failed"
+            ) from exc
+        if checkpoint is None:
+            raise DurableLifecycleError(
+                "retention checkpoint is not present in registry"
             )
-        checkpoint = matches[0]
         if (
             checkpoint.checkpoint.sequence
             != plan.checkpoint_sequence
@@ -510,6 +517,56 @@ class DurableEvidenceLifecycleCoordinator:
                 tuple(reasons),
             )
 
+        try:
+            archive_index_health = (
+                self.archives.inspect_indexes(
+                    index.archive_id
+                )
+            )
+        except Exception as exc:
+            reasons.append(
+                "archive lookup metadata inspection failed: "
+                f"{type(exc).__name__}"
+            )
+            return DurableLifecycleReport(
+                chain_id,
+                DurableLifecycleState.BLOCKED,
+                DurableLifecycleAction.NONE,
+                self.policy.digest,
+                plan,
+                checkpoint,
+                stored.manifest,
+                None,
+                None,
+                tuple(reasons),
+            )
+
+        if (
+            archive_index_health.state
+            is not DurableArchiveIndexState.HEALTHY
+        ):
+            reasons.append(
+                (
+                    "archive lookup metadata is invalid"
+                    if archive_index_health.state
+                    is DurableArchiveIndexState.INVALID
+                    else "archive lookup metadata requires repair before compaction"
+                )
+            )
+            return DurableLifecycleReport(
+                chain_id,
+                DurableLifecycleState.BLOCKED,
+                DurableLifecycleAction.NONE,
+                self.policy.digest,
+                plan,
+                checkpoint,
+                stored.manifest,
+                None,
+                None,
+                tuple(reasons),
+                archive_index_health,
+            )
+
         readiness = self.compaction.inspect(
             plan,
             chain,
@@ -529,6 +586,7 @@ class DurableEvidenceLifecycleCoordinator:
                 None,
                 readiness,
                 tuple(reasons),
+                archive_index_health,
             )
 
         reasons.extend(readiness.reasons)
@@ -547,6 +605,7 @@ class DurableEvidenceLifecycleCoordinator:
             None,
             readiness,
             tuple(reasons),
+            archive_index_health,
         )
 
     def prepare(
