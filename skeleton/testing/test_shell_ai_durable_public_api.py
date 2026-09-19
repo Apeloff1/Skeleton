@@ -70,6 +70,24 @@ from skeleton.shells.ai.durable_compaction_certificate import (
     DurableCompactionCertificateVerification,
     SignedDurableCompactionCertificate,
 )
+from skeleton.shells.ai.durable_destruction import (
+    DESTRUCTION_ARTIFACT_TYPE,
+    DurableDestructionConflict,
+    DurableDestructionCorruption,
+    DurableDestructionError,
+    DurableDestructionHead,
+    DurableDestructionIndexFinding,
+    DurableDestructionIndexHealth,
+    DurableDestructionIndexState,
+    DurableDestructionItem,
+    DurableDestructionItemState,
+    DurableDestructionKind,
+    DurableDestructionLedger,
+    DurableDestructionOperationIndex,
+    DurableDestructionRecord,
+    DurableDestructionVerification,
+    SignedDurableDestructionRecord,
+)
 from skeleton.shells.ai.durable_lifecycle import (
     DurableEvidenceLifecycleCoordinator,
     DurableLifecycleAction,
@@ -169,6 +187,22 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "DESTRUCTION_ARTIFACT_TYPE": DESTRUCTION_ARTIFACT_TYPE,
+    "DurableDestructionConflict": DurableDestructionConflict,
+    "DurableDestructionCorruption": DurableDestructionCorruption,
+    "DurableDestructionError": DurableDestructionError,
+    "DurableDestructionHead": DurableDestructionHead,
+    "DurableDestructionIndexFinding": DurableDestructionIndexFinding,
+    "DurableDestructionIndexHealth": DurableDestructionIndexHealth,
+    "DurableDestructionIndexState": DurableDestructionIndexState,
+    "DurableDestructionItem": DurableDestructionItem,
+    "DurableDestructionItemState": DurableDestructionItemState,
+    "DurableDestructionKind": DurableDestructionKind,
+    "DurableDestructionLedger": DurableDestructionLedger,
+    "DurableDestructionOperationIndex": DurableDestructionOperationIndex,
+    "DurableDestructionRecord": DurableDestructionRecord,
+    "DurableDestructionVerification": DurableDestructionVerification,
+    "SignedDurableDestructionRecord": SignedDurableDestructionRecord,
     "PROOF_ARTIFACT_TYPE": PROOF_ARTIFACT_TYPE,
     "DurableHistoricalProofAuthority": DurableHistoricalProofAuthority,
     "DurableHistoricalProofError": DurableHistoricalProofError,
@@ -2300,3 +2334,70 @@ def test_finalizer_constructor_exposes_session_journal_store():
             AIExecutionEvidenceFinalizer
         ).parameters
     )
+
+def test_durable_destruction_constructor_exposes_backend_and_signer():
+    signature = inspect.signature(DurableDestructionLedger)
+    assert "backend" in signature.parameters
+    assert "signer" in signature.parameters
+    assert "namespace" in signature.parameters
+    assert "max_records" in signature.parameters
+    assert "max_items_per_record" in signature.parameters
+    assert "max_cas_retries" in signature.parameters
+    assert "clock" in signature.parameters
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "head",
+        "get",
+        "snapshot",
+        "find_operation",
+        "append",
+        "verify",
+        "require_verified",
+        "inspect_operation_indexes",
+        "repair_operation_indexes",
+    ],
+)
+def test_durable_destruction_public_methods_are_stable(method):
+    assert callable(
+        getattr(
+            DurableDestructionLedger,
+            method,
+            None,
+        )
+    )
+
+
+def test_durable_destruction_kind_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableDestructionKind
+    } == {
+        "pruning",
+        "orphan_gc",
+    }
+
+
+def test_durable_destruction_item_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableDestructionItemState
+    } == {
+        "deleted",
+        "already_absent",
+    }
+
+
+def test_durable_destruction_index_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableDestructionIndexState
+    } == {
+        "healthy",
+        "missing",
+        "corrupt",
+        "uncommitted",
+    }
+
