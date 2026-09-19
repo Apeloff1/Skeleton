@@ -4,7 +4,12 @@ from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBa
 from skeleton.shells.workspace_txn.batch import BatchItem, BatchPolicy, BatchResult, WorkspaceTransactionBatch
 from skeleton.shells.workspace_txn.diff import DiffConfig, WorkspaceDiffer
 from skeleton.shells.workspace_txn.journal import JournalEvent, TransactionJournal
-from skeleton.shells.workspace_txn.lease import WorkspaceLease, WorkspaceLeaseError, WorkspaceLeaseRegistry
+from skeleton.shells.workspace_txn.lease import (
+    WorkspaceLease,
+    WorkspaceLeaseError,
+    WorkspaceLeaseHeartbeat,
+    WorkspaceLeaseRegistry,
+)
 from skeleton.shells.workspace_txn.metrics import TransactionMetricSnapshot, TransactionMetrics
 from skeleton.shells.workspace_txn.pathing import (
     PathMatcher,
@@ -87,6 +92,7 @@ __all__ = [
     "TransactionJournal",
     "WorkspaceLease",
     "WorkspaceLeaseError",
+    "WorkspaceLeaseHeartbeat",
     "WorkspaceLeaseRegistry",
     "TransactionMetricSnapshot",
     "TransactionMetrics",
