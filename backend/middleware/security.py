@@ -228,10 +228,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not math.isfinite(configured_ttl) or configured_ttl <= 0:
             raise ValueError("rate-limit bucket_ttl must be finite and positive")
 
-        RateLimitMiddleware._rps = float(configured_rps)
-        RateLimitMiddleware._burst = int(configured_burst)
-        RateLimitMiddleware._max_buckets = int(configured_max)
-        RateLimitMiddleware._bucket_ttl = float(configured_ttl)
+        limiter_type = type(self)
+        limiter_type._rps = float(configured_rps)
+        limiter_type._burst = int(configured_burst)
+        limiter_type._max_buckets = int(configured_max)
+        limiter_type._bucket_ttl = float(configured_ttl)
         self.prefix = prefix.rstrip("/") or "/"
         self._trusted_proxy_networks = _trusted_proxy_networks()
         self._whitelist = (

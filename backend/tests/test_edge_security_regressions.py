@@ -15,7 +15,23 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from middleware import security  # noqa: E402
-from middleware.security import AuditMiddleware, RateLimitMiddleware  # noqa: E402
+from middleware.security import (  # noqa: E402
+    AuditMiddleware,
+    RateLimitMiddleware as _ProductionRateLimitMiddleware,
+)
+
+
+class RateLimitMiddleware(_ProductionRateLimitMiddleware):
+    """Test-local limiter with isolated class-level enforcement state."""
+
+    _buckets = {}
+    _lock = None
+    _rps = 2.0
+    _burst = 120
+    _max_buckets = 4096
+    _bucket_ttl = 300.0
+    _saturation_rejections = 0
+    _expired_pruned = 0
 
 
 class _App:

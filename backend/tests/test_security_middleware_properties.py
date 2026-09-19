@@ -12,6 +12,19 @@ import api_middleware
 import middleware.security as legacy_security
 
 
+class _IsolatedRateLimitMiddleware(legacy_security.RateLimitMiddleware):
+    """Private rate-limit state for destructive property tests."""
+
+    _buckets = {}
+    _lock = None
+    _rps = 2.0
+    _burst = 120
+    _max_buckets = 4096
+    _bucket_ttl = 300.0
+    _saturation_rejections = 0
+    _expired_pruned = 0
+
+
 def _request(
     *,
     path: str = "/api/run",
@@ -153,7 +166,7 @@ def test_high_cardinality_generated_identities_keep_legacy_limiter_bounded(
             return Response(status_code=204)
 
         monkeypatch.setenv("CODEDOCK_TRUSTED_PROXY_CIDRS", "")
-        limiter_type = legacy_security.RateLimitMiddleware
+        limiter_type = _IsolatedRateLimitMiddleware
         limiter_type._buckets.clear()
         limiter_type._lock = None
         limiter_type._saturation_rejections = 0
