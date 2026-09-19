@@ -134,6 +134,9 @@ def test_validated_worker_snapshot_retires_matching_canonical_plan_item():
                 "metadata": {
                     "last_task_id": "night-task-1",
                     "worked_on": ["night-task-1", "idle-task-1", "unknown-task"],
+                    "roles": ["researcher", "lead", "reviewer", "verifier"],
+                    "validation_status": "passed",
+                    "validation_source": "credential-free-studio-validation",
                 },
             }
         ]
@@ -152,6 +155,134 @@ def test_validated_worker_snapshot_retires_matching_canonical_plan_item():
     assert items["night-task-1"]["metadata"]["completion_source"] == "validated-studio-worker-snapshot"
     assert items["idle-task-1"]["status"] == "queued"
     assert items["idle-task-1"]["owner"] is None
+
+
+
+def test_unvalidated_worker_snapshot_cannot_retire_canonical_work():
+    store = InMemoryPlanStore()
+    store.add_items(
+        [
+            PlanItem(
+                id="night-task-1",
+                title="Night canonical task",
+                description="must remain queued without validation custody",
+                priority=90,
+                target_team="night",
+            )
+        ]
+    )
+    context = {
+        "worker_snapshots": [
+            {
+                "worker_id": "night-0042",
+                "team": "night",
+                "status": "offline",
+                "clocked_out_at": "2026-09-16T10:07:00+00:00",
+                "last_heartbeat_at": "2026-09-16T10:07:00+00:00",
+                "metadata": {
+                    "worked_on": ["night-task-1"],
+                    "roles": ["researcher", "lead", "reviewer", "verifier"],
+                },
+            }
+        ]
+    }
+    scheduler = SupervisorScheduler(
+        manager=_Manager(store),
+        secretary=_Secretary(),
+        project_context_supplier=lambda: context,
+    )
+
+    result = scheduler.run_once(run_secretary=False, run_manager=True)
+
+    item = next(row for row in result["plan_items"] if row["id"] == "night-task-1")
+    assert item["status"] == "queued"
+    assert item["owner"] is None
+
+
+def test_snapshot_current_task_id_cannot_self_assign_worker():
+    store = InMemoryPlanStore()
+    context = {
+        "worker_snapshots": [
+            {
+                "worker_id": "night-0042",
+                "team": "night",
+                "status": "working",
+                "last_heartbeat_at": "2026-09-16T10:07:00+00:00",
+                "current_task_id": "attacker-selected-task",
+                "metadata": {},
+            }
+        ]
+    }
+    scheduler = SupervisorScheduler(
+        manager=_Manager(store),
+        secretary=_Secretary(),
+        project_context_supplier=lambda: context,
+    )
+
+    result = scheduler.run_once(run_secretary=False, run_manager=True)
+
+    worker = result["workers"][0]
+    assert worker["current_task_id"] is None
+    assert worker["status"] == "idle"
+    assert worker["metadata"]["ignored_reported_task_id"] == "attacker-selected-task"
+    assert worker["metadata"]["reported_working_without_assignment"] is True
+
+
+def test_older_worker_snapshot_cannot_rewind_canonical_worker_state():
+    store = InMemoryPlanStore()
+    newer = {
+        "worker_id": "night-0042",
+        "team": "night",
+        "status": "offline",
+        "last_heartbeat_at": "2026-09-16T12:00:00+00:00",
+        "clocked_out_at": "2026-09-16T12:00:00+00:00",
+        "metadata": {"marker": "new"},
+    }
+    older = {
+        "worker_id": "night-0042",
+        "team": "night",
+        "status": "offline",
+        "last_heartbeat_at": "2026-09-16T11:00:00+00:00",
+        "clocked_out_at": "2026-09-16T11:00:00+00:00",
+        "metadata": {"marker": "old"},
+    }
+    scheduler = SupervisorScheduler(
+        manager=_Manager(store),
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots([newer])
+    scheduler._ingest_worker_snapshots([older])
+
+    worker = store.snapshot_workers()[0]
+    assert worker.last_heartbeat_at.isoformat() == "2026-09-16T12:00:00+00:00"
+    assert worker.metadata["marker"] == "new"
+
+
+def test_context_bound_research_uses_same_snapshot_object_as_manager():
+    secretary = _Secretary()
+    manager = _Manager()
+    context = {"generation": "one", "worker_snapshots": []}
+    seen = []
+
+    def research_from_context(snapshot):
+        seen.append(snapshot)
+        return [{"generation": snapshot["generation"]}]
+
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=secretary,
+        project_context_supplier=lambda: context,
+        research_from_context=research_from_context,
+    )
+
+    scheduler.run_once()
+
+    assert seen == [context]
+    assert seen[0] is context
+    assert secretary.calls == [context]
+    assert manager.calls == [(context, [{"generation": "one"}])]
 
 
 def test_run_once_can_execute_secretary_without_manager():
