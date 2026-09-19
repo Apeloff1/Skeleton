@@ -50,6 +50,15 @@ def detached_json(value: Any, *, depth: int = 0) -> Any:
     raise ValueError(f"unsupported JSON type: {type(value).__name__}")
 
 
+def _deep_freeze(value: Any) -> Any:
+    """Recursively freeze an already-detached JSON tree."""
+    if isinstance(value, dict):
+        return MappingProxyType({key: _deep_freeze(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_deep_freeze(item) for item in value)
+    return value
+
+
 def canonical_bytes(value: Any, *, max_bytes: int) -> bytes:
     encoded = json.dumps(
         detached_json(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -68,4 +77,4 @@ def frozen_mapping(value: Mapping[str, Any], *, max_bytes: int) -> Mapping[str, 
         raise ValueError("payload must be a mapping")
     detached = detached_json(value)
     canonical_bytes(detached, max_bytes=max_bytes)
-    return MappingProxyType(detached)
+    return _deep_freeze(detached)
