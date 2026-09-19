@@ -1151,6 +1151,64 @@ class WorkerAdmissionTests(unittest.TestCase):
                 )
 
 
+class WorkerPublicationBoundaryTests(unittest.TestCase):
+    def test_publication_env_rebuilds_fixed_git_identity(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_TOKEN": "token",
+                "GH_TOKEN": "shadow",
+                "GIT_AUTHOR_NAME": "attacker",
+                "GIT_AUTHOR_EMAIL": "attacker@example.invalid",
+                "GIT_COMMITTER_NAME": "attacker",
+                "GIT_COMMITTER_EMAIL": "attacker@example.invalid",
+                "MODEL_API_KEY": "model-secret",
+            },
+            clear=True,
+        ):
+            env = specialist_bots._publication_env()
+
+        self.assertEqual(env["GITHUB_TOKEN"], "token")
+        self.assertEqual(env["GH_TOKEN"], "token")
+        self.assertEqual(
+            env["GIT_AUTHOR_NAME"],
+            "skeleton-specialist-bot",
+        )
+        self.assertEqual(
+            env["GIT_COMMITTER_NAME"],
+            "skeleton-specialist-bot",
+        )
+        self.assertEqual(
+            env["GIT_AUTHOR_EMAIL"],
+            "skeleton-specialist-bot@users.noreply.github.com",
+        )
+        self.assertEqual(
+            env["GIT_COMMITTER_EMAIL"],
+            "skeleton-specialist-bot@users.noreply.github.com",
+        )
+        self.assertNotIn("MODEL_API_KEY", env)
+
+    def test_hook_suppression_is_scoped_to_one_git_invocation(self) -> None:
+        hooks = Path("/tmp/empty-hooks")
+        self.assertEqual(
+            specialist_bots._hookless_git_args(
+                hooks,
+                "push",
+                "--set-upstream",
+                "origin",
+                "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            ),
+            [
+                "-c",
+                "core.hooksPath=/tmp/empty-hooks",
+                "push",
+                "--set-upstream",
+                "origin",
+                "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            ],
+        )
+
+
 class WorkerProposalTests(unittest.TestCase):
     def test_safe_path_rejects_control_planes(
         self,
