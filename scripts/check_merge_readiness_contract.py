@@ -153,6 +153,13 @@ def main() -> int:
         failures,
     )
     require(
+        '"pytest>=8,<9"' in shell_stability
+        and '"pydantic>=2.5,<3"' in shell_stability
+        and '"pydantic-settings>=2.1,<3"' in shell_stability,
+        "shell stability runtime must include pydantic settings dependencies",
+        failures,
+    )
+    require(
         'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in shell_stability,
         "shell stability tests must disable ambient pytest plugins",
         failures,
