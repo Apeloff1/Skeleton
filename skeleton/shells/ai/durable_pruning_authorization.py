@@ -138,7 +138,6 @@ class DurablePruningAuthorization:
         for name in (
             "current_sequence",
             "cutoff_sequence",
-            "previous_floor_sequence",
             "delete_count",
             "max_delete_items",
         ):
@@ -151,6 +150,14 @@ class DurablePruningAuthorization:
                 raise ValueError(
                     f"{name} must be positive integer"
                 )
+        if (
+            isinstance(self.previous_floor_sequence, bool)
+            or not isinstance(self.previous_floor_sequence, int)
+            or self.previous_floor_sequence < 0
+        ):
+            raise ValueError(
+                "previous_floor_sequence must be non-negative integer"
+            )
         if self.cutoff_sequence > self.current_sequence:
             raise ValueError(
                 "pruning cutoff exceeds authorized head"
