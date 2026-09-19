@@ -3,7 +3,7 @@
 from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.batch import BatchItem, BatchPolicy, BatchResult, WorkspaceTransactionBatch
 from skeleton.shells.workspace_txn.diff import DiffConfig, WorkspaceDiffer
-from skeleton.shells.workspace_txn.journal import JournalEvent, TransactionJournal
+from skeleton.shells.workspace_txn.journal import JournalEvent, JournalPersistenceError, TransactionJournal
 from skeleton.shells.workspace_txn.lease import (
     WorkspaceLease,
     WorkspaceLeaseError,
@@ -31,7 +31,7 @@ from skeleton.shells.workspace_txn.policy import (
     source_edit_policy,
 )
 from skeleton.shells.workspace_txn.profiles import PROFILE_FACTORIES, build_profile
-from skeleton.shells.workspace_txn.recovery import RecoveryCandidate, TransactionRecoveryInspector
+from skeleton.shells.workspace_txn.recovery import RecoveryCandidate, RecoveryEvidence, TransactionRecoveryInspector
 from skeleton.shells.workspace_txn.report import TransactionSummary, format_text, summarize
 from skeleton.shells.workspace_txn.rollback import RollbackError, WorkspaceRollback, build_rollback_actions
 from skeleton.shells.workspace_txn.rules import (
@@ -51,7 +51,13 @@ from skeleton.shells.workspace_txn.rules import (
     SymlinkMutationRule,
     evaluate_rules,
 )
-from skeleton.shells.workspace_txn.scanner import ScannerConfig, WorkspaceScanError, WorkspaceScanner
+from skeleton.shells.workspace_txn.scanner import (
+    ScannerConfig,
+    WorkspaceScanError,
+    WorkspaceScanner,
+    snapshot_digest,
+    snapshot_entry_state,
+)
 from skeleton.shells.workspace_txn.state_machine import TransactionStateMachine, TransitionDecision
 from skeleton.shells.workspace_txn.transaction import TransactionConfig, WorkspaceTransactionManager
 from skeleton.shells.workspace_txn.types import (
@@ -89,6 +95,7 @@ __all__ = [
     "DiffConfig",
     "WorkspaceDiffer",
     "JournalEvent",
+    "JournalPersistenceError",
     "TransactionJournal",
     "WorkspaceLease",
     "WorkspaceLeaseError",
@@ -114,6 +121,7 @@ __all__ = [
     "PROFILE_FACTORIES",
     "build_profile",
     "RecoveryCandidate",
+    "RecoveryEvidence",
     "TransactionRecoveryInspector",
     "TransactionSummary",
     "format_text",
@@ -139,6 +147,8 @@ __all__ = [
     "ScannerConfig",
     "WorkspaceScanError",
     "WorkspaceScanner",
+    "snapshot_digest",
+    "snapshot_entry_state",
     "TransactionStateMachine",
     "TransitionDecision",
     "TransactionConfig",
