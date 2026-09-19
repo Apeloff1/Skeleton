@@ -60,6 +60,51 @@ class _FakeVectorAccelerator:
         return batches
 
 
+    def range_search(
+        self,
+        query: list[float],
+        query_norm: float,
+        candidates: list[tuple[list[float], float]],
+        similarity_threshold: float,
+        *,
+        max_hits: int,
+    ) -> list[VectorHit]:
+        self.calls += 1
+        scored: list[VectorHit] = []
+        for index, (vector, norm) in enumerate(candidates):
+            dot = sum(q * value for q, value in zip(query, vector))
+            similarity = dot / (query_norm * norm)
+            if similarity >= similarity_threshold:
+                scored.append(VectorHit(index=index, similarity=similarity))
+        scored.sort(key=lambda hit: (-hit.similarity, hit.index))
+        if len(scored) > max_hits:
+            raise RuntimeError("range result bound exceeded")
+        return scored
+
+    def range_search_many(
+        self,
+        queries: list[tuple[list[float], float]],
+        candidates: list[tuple[list[float], float]],
+        similarity_threshold: float,
+        *,
+        max_total_hits: int,
+    ) -> list[list[VectorHit]]:
+        self.batch_calls += 1
+        batches: list[list[VectorHit]] = []
+        total = 0
+        for query, query_norm in queries:
+            scored: list[VectorHit] = []
+            for index, (vector, norm) in enumerate(candidates):
+                dot = sum(q * value for q, value in zip(query, vector))
+                similarity = dot / (query_norm * norm)
+                if similarity >= similarity_threshold:
+                    scored.append(VectorHit(index=index, similarity=similarity))
+            scored.sort(key=lambda hit: (-hit.similarity, hit.index))
+            total += len(scored)
+            if total > max_total_hits:
+                raise RuntimeError("batch range result bound exceeded")
+            batches.append(scored)
+        return batches
 class _FailingVectorAccelerator:
     minimum_candidates = 1
 
@@ -68,6 +113,12 @@ class _FailingVectorAccelerator:
 
     def top_k_many(self, *args: object, **kwargs: object) -> list[list[VectorHit]]:
         raise RuntimeError("simulated vector JVM batch failure")
+
+    def range_search(self, *args: object, **kwargs: object) -> list[VectorHit]:
+        raise RuntimeError("simulated vector JVM range failure")
+
+    def range_search_many(self, *args: object, **kwargs: object) -> list[list[VectorHit]]:
+        raise RuntimeError("simulated vector JVM batch range failure")
 
 
 _VECTORS = {
@@ -247,6 +298,104 @@ def test_vector_store_batch_failure_falls_back_for_every_query() -> None:
     assert accelerated.acceleration_stats()["fallbacks"] == 1
 
 
+def test_vector_store_threshold_query_matches_python_and_preserves_ties() -> None:
+    baseline = _build_store(accelerated=False)
+    fake = _FakeVectorAccelerator()
+    accelerated = _build_store(accelerated=True, accelerator=fake)
+
+    expected = baseline.query_threshold("query", minimum_score=0.75)
+    actual = accelerated.query_threshold("query", minimum_score=0.75)
+
+    assert [row.chunk.chunk_id for row in actual] == [
+        row.chunk.chunk_id for row in expected
+    ]
+    assert [row.score for row in actual] == pytest.approx(
+        [row.score for row in expected]
+    )
+    assert [row.chunk.chunk_id for row in actual] == [
+        "alpha",
+        "alpha-tie",
+        "diagonal",
+    ]
+    assert accelerated.acceleration_stats()["range_successes"] == 1
+
+
+def test_vector_store_threshold_filters_metadata_before_java() -> None:
+    fake = _FakeVectorAccelerator()
+    store = _build_store(accelerated=True, accelerator=fake)
+
+    results = store.query_threshold(
+        "query",
+        minimum_score=0.0,
+        metadata_filter={"group": "keep"},
+    )
+
+    assert all(row.chunk.metadata["group"] == "keep" for row in results)
+    assert "opposite" not in [row.chunk.chunk_id for row in results]
+
+
+def test_vector_store_threshold_failure_falls_back() -> None:
+    baseline = _build_store(accelerated=False)
+    accelerated = _build_store(
+        accelerated=True,
+        accelerator=_FailingVectorAccelerator(),
+    )
+
+    expected = baseline.query_threshold("query", minimum_score=0.5)
+    actual = accelerated.query_threshold("query", minimum_score=0.5)
+
+    assert [row.chunk.chunk_id for row in actual] == [
+        row.chunk.chunk_id for row in expected
+    ]
+    assert accelerated.acceleration_stats()["fallbacks"] == 1
+
+
+def test_vector_store_threshold_result_cap_survives_jvm_fallback() -> None:
+    store = _build_store(
+        accelerated=True,
+        accelerator=_FailingVectorAccelerator(),
+    )
+
+    with pytest.raises(ValueError, match="threshold result bound"):
+        store.query_threshold(
+            "query",
+            minimum_score=0.0,
+            max_results=2,
+        )
+
+
+def test_vector_store_threshold_many_matches_repeated_queries() -> None:
+    baseline = _build_store(accelerated=False)
+    fake = _FakeVectorAccelerator()
+    accelerated = _build_store(accelerated=True, accelerator=fake)
+    texts = ["query", "orthogonal", "diagonal"]
+
+    expected = [
+        baseline.query_threshold(text, minimum_score=0.6)
+        for text in texts
+    ]
+    actual = accelerated.query_threshold_many(
+        texts,
+        minimum_score=0.6,
+    )
+
+    assert [
+        [row.chunk.chunk_id for row in batch]
+        for batch in actual
+    ] == [
+        [row.chunk.chunk_id for row in batch]
+        for batch in expected
+    ]
+    assert accelerated.acceleration_stats()["range_successes"] == 1
+    assert accelerated.stats()["queries"] == len(texts)
+
+
+def test_vector_store_threshold_validates_public_score_contract() -> None:
+    store = _build_store(accelerated=False)
+    for invalid in (-0.01, 1.01, math.inf, math.nan, True):
+        with pytest.raises(ValueError, match="minimum_score"):
+            store.query_threshold("query", invalid)
+
 def _java_major(java: str) -> int | None:
     completed = subprocess.run(
         [java, "-version"],
@@ -366,6 +515,75 @@ def test_real_java_vector_store_batch_matches_python_store() -> None:
             [row.score for row in expected_batch]
         )
 
+
+def test_real_java_vector_range_search_roundtrip_is_stable() -> None:
+    query = [1.0, 0.0]
+    candidates = [
+        ([1.0, 0.0], 1.0),
+        ([1.0, 0.0], 1.0),
+        ([0.5, 0.5], math.sqrt(0.5)),
+        ([0.0, 1.0], 1.0),
+        ([-1.0, 0.0], 1.0),
+    ]
+
+    with JvmVectorAccelerator(_real_config()) as accelerator:
+        hits = accelerator.range_search(
+            query,
+            1.0,
+            candidates,
+            0.70,
+            max_hits=5,
+        )
+
+    assert [hit.index for hit in hits] == [0, 1, 2]
+    assert [hit.similarity for hit in hits] == pytest.approx(
+        [1.0, 1.0, math.sqrt(0.5)]
+    )
+
+
+def test_real_java_batch_range_search_reuses_candidate_matrix() -> None:
+    queries = [
+        ([1.0, 0.0], 1.0),
+        ([0.0, 1.0], 1.0),
+    ]
+    candidates = [
+        ([1.0, 0.0], 1.0),
+        ([0.0, 1.0], 1.0),
+        ([0.5, 0.5], math.sqrt(0.5)),
+        ([-1.0, 0.0], 1.0),
+    ]
+
+    with JvmVectorAccelerator(_real_config()) as accelerator:
+        batches = accelerator.range_search_many(
+            queries,
+            candidates,
+            0.70,
+            max_total_hits=10,
+        )
+
+    assert [[hit.index for hit in batch] for batch in batches] == [
+        [0, 2],
+        [1, 2],
+    ]
+
+
+def test_real_java_vector_store_threshold_matches_python_store() -> None:
+    baseline = _build_store(accelerated=False)
+    accelerator = JvmVectorAccelerator(_real_config())
+    accelerated = _build_store(accelerated=True, accelerator=accelerator)
+
+    try:
+        expected = baseline.query_threshold("query", minimum_score=0.75)
+        actual = accelerated.query_threshold("query", minimum_score=0.75)
+    finally:
+        accelerator.close()
+
+    assert [row.chunk.chunk_id for row in actual] == [
+        row.chunk.chunk_id for row in expected
+    ]
+    assert [row.score for row in actual] == pytest.approx(
+        [row.score for row in expected]
+    )
 
 def test_real_java_vector_bridge_rejects_dimension_mismatch_before_ipc() -> None:
     with JvmVectorAccelerator(_real_config()) as accelerator:
