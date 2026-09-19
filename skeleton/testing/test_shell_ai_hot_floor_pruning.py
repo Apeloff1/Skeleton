@@ -16,6 +16,7 @@ from skeleton.shells.ai.durable_archive import DurableArchiveManifestBuilder
 from skeleton.shells.ai.durable_archive_store import (
     ArchiveBackedHistoricalChain,
     DurableArchiveRepository,
+    DurableArchiveStoreError,
 )
 from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
 from skeleton.shells.ai.durable_compaction import (
@@ -1074,6 +1075,428 @@ def test_resume_after_crash_during_deletion(kind):
     assert result.operation.phase is DurablePruningPhase.COMPLETE
     assert fixture.chain.verify()
     assert fixture.chain.snapshot() == fixture.later
+
+
+def _archive_record_key(fixture):
+    return fixture.archives._archive_key(
+        fixture.authorization.authorization.archive_id
+    )
+
+
+def _delete_archive_record(fixture):
+    key = _archive_record_key(fixture)
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    assert record is not None
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+
+def _delete_archived_node(
+    fixture,
+    item,
+):
+    key = fixture.archives._node_key(
+        fixture.chain_id,
+        item.node_hash,
+    )
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    assert record is not None
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+
+def _hot_node_presence(
+    fixture,
+    manifest,
+):
+    return tuple(
+        fixture.backend.get(
+            fixture.chain.namespace,
+            item.node_key,
+        )
+        is not None
+        for item in manifest.items
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_archive_record_loss_before_execute_blocks_floor_and_marks_manual_review(
+    kind,
+):
+    fixture = Fixture(kind=kind)
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    before = _hot_node_presence(
+        fixture,
+        manifest,
+    )
+    _delete_archive_record(fixture)
+
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="bound archive is not recoverable",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    current = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert current is not None
+    assert (
+        current.phase
+        is DurablePruningPhase.MANUAL_REVIEW
+    )
+    assert fixture.chain.hot_floor().sequence == 0
+    assert _hot_node_presence(
+        fixture,
+        manifest,
+    ) == before
+    assert all(before)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_archive_node_loss_before_execute_blocks_destructive_boundary(
+    kind,
+):
+    fixture = Fixture(kind=kind)
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    target = manifest.items[-1]
+    _delete_archived_node(
+        fixture,
+        target,
+    )
+    before = _hot_node_presence(
+        fixture,
+        manifest,
+    )
+
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="bound archive is not recoverable",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    current = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert current is not None
+    assert current.requires_manual_review
+    assert fixture.chain.hot_floor().sequence == 0
+    assert _hot_node_presence(
+        fixture,
+        manifest,
+    ) == before
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_archive_record_digest_tamper_blocks_pruning_before_floor_commit(
+    kind,
+):
+    fixture = Fixture(kind=kind)
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    key = _archive_record_key(fixture)
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    assert record is not None
+    assert isinstance(record.value, dict)
+    tampered = dict(record.value)
+    tampered["record_digest"] = "f" * 64
+    fixture.backend.compare_and_swap(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+        value=tampered,
+    )
+
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="bound archive is not recoverable",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    current = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert current is not None
+    assert current.requires_manual_review
+    assert fixture.chain.hot_floor().sequence == 0
+    assert all(
+        _hot_node_presence(
+            fixture,
+            manifest,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_per_item_archive_guard_blocks_delete_after_floor_commit(
+    kind,
+    monkeypatch,
+):
+    fixture = Fixture(kind=kind)
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    before = _hot_node_presence(
+        fixture,
+        manifest,
+    )
+
+    original_guard = (
+        fixture.executor
+        ._require_archive_recoverability
+    )
+    original_get_node = (
+        fixture.archives.get_node
+    )
+    armed = {"value": False}
+
+    def guard_then_arm(bound_manifest):
+        stored = original_guard(
+            bound_manifest
+        )
+        armed["value"] = True
+        return stored
+
+    def fail_after_guard(
+        chain_id,
+        node_hash,
+    ):
+        if armed["value"]:
+            raise DurableArchiveStoreError(
+                "synthetic archive read loss"
+            )
+        return original_get_node(
+            chain_id,
+            node_hash,
+        )
+
+    monkeypatch.setattr(
+        fixture.executor,
+        "_require_archive_recoverability",
+        guard_then_arm,
+    )
+    monkeypatch.setattr(
+        fixture.archives,
+        "get_node",
+        fail_after_guard,
+    )
+
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="archived pruning item is unreadable",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    current = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert current is not None
+    assert current.requires_manual_review
+    assert (
+        fixture.chain.hot_floor().sequence
+        == fixture.cutoff_sequence
+    )
+    assert _hot_node_presence(
+        fixture,
+        manifest,
+    ) == before
+    assert all(before)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_resume_after_partial_delete_stops_when_archive_is_lost(
+    kind,
+):
+    backend = FailDeleteOnceBackend()
+    fixture = Fixture(
+        kind=kind,
+        backend=backend,
+    )
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+
+    backend.fail_enabled = True
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic pruning crash",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    partial = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert partial is not None
+    assert (
+        partial.phase
+        is DurablePruningPhase.DELETING
+    )
+    assert (
+        fixture.chain.hot_floor().sequence
+        == fixture.cutoff_sequence
+    )
+    before_resume = _hot_node_presence(
+        fixture,
+        manifest,
+    )
+    assert not all(before_resume)
+
+    backend.fail_enabled = False
+    remaining = tuple(
+        item
+        for item, present in zip(
+            manifest.items,
+            before_resume,
+        )
+        if present
+    )
+    assert remaining
+    _delete_archived_node(
+        fixture,
+        remaining[-1],
+    )
+
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="bound archive is not recoverable",
+    ):
+        fixture.executor.resume(
+            operation.operation_id,
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    after_resume = _hot_node_presence(
+        fixture,
+        manifest,
+    )
+    assert after_resume == before_resume
+    current = fixture.executor.operation(
+        operation.operation_id
+    )
+    assert current is not None
+    assert current.requires_manual_review
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_executor_archive_guard_is_bound_to_authorization_planner_repository(
+    kind,
+):
+    fixture = Fixture(kind=kind)
+    assert (
+        fixture.executor.archives
+        is fixture.archives
+    )
+    fresh = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        fixture.floor_store,
+        namespace=f"{kind}-fresh-archive-guard",
+    )
+    assert fresh.archives is fixture.archives
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_successful_pruning_still_reverifies_archive_after_delete(
+    kind,
+    monkeypatch,
+):
+    fixture = Fixture(kind=kind)
+    calls = {"count": 0}
+    original = (
+        fixture.executor
+        ._require_archive_recoverability
+    )
+
+    def counted(manifest):
+        calls["count"] += 1
+        return original(manifest)
+
+    monkeypatch.setattr(
+        fixture.executor,
+        "_require_archive_recoverability",
+        counted,
+    )
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.ok
+    assert calls["count"] >= 2
+    assert fixture.chain.verify()
 
 
 @pytest.mark.parametrize(
