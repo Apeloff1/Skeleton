@@ -412,7 +412,17 @@ def test_larger_archive_reuses_earlier_root_indexes():
         "journal",
         first_events[0].event_hash,
     )
-    assert retained_index == first_index
+    assert retained_index.archive_id == first_index.archive_id
+    assert retained_index.sequence == first_index.sequence
+    assert retained_index.root_hash == first_index.root_hash
+    assert len(retained_index.replicas) == 2
+    assert tuple(
+        replica.archive_id
+        for replica in retained_index.replicas
+    ) == (
+        first_archive.manifest.archive_id,
+        later_archive.manifest.archive_id,
+    )
     assert repository.snapshot_at(
         "journal",
         first_events[0].event_hash,
@@ -1785,3 +1795,319 @@ def test_archive_repository_does_not_delete_live_nodes():
             ),
         ) is not None
     assert journal.snapshot() == events
+
+def two_replica_journal_fixture():
+    (
+        backend,
+        journal,
+        checkpoints,
+        builder,
+        repository,
+    ) = journal_fixture()
+    first_events = append_events(
+        journal,
+        2,
+    )
+    _, first_archive, _ = archive_current(
+        "journal",
+        journal,
+        checkpoints,
+        builder,
+        repository,
+    )
+    append_events(
+        journal,
+        3,
+        start=2,
+    )
+    _, second_archive, _ = archive_current(
+        "journal",
+        journal,
+        checkpoints,
+        builder,
+        repository,
+    )
+    root = first_events[0].event_hash
+    index = repository.root_index(
+        "journal",
+        root,
+    )
+    assert index is not None
+    assert len(index.replicas) == 2
+    return (
+        backend,
+        journal,
+        repository,
+        first_events,
+        first_archive,
+        second_archive,
+        root,
+    )
+
+
+def delete_archive_record(
+    backend,
+    repository,
+    archive_id,
+):
+    key = repository._archive_key(
+        archive_id
+    )
+    record = backend.get(
+        repository.namespace,
+        key,
+    )
+    assert record is not None
+    backend.delete(
+        repository.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+
+def test_historical_root_falls_back_when_primary_archive_is_missing():
+    (
+        backend,
+        _,
+        repository,
+        first_events,
+        first_archive,
+        second_archive,
+        root,
+    ) = two_replica_journal_fixture()
+    delete_archive_record(
+        backend,
+        repository,
+        first_archive.manifest.archive_id,
+    )
+    resolution = repository.resolve_root(
+        "journal",
+        root,
+    )
+    assert (
+        resolution.archive_id
+        == second_archive.manifest.archive_id
+    )
+    assert resolution.replica_index == 1
+    assert repository.snapshot_at(
+        "journal",
+        root,
+    ) == first_events[:1]
+    assert repository.verify_root(
+        "journal",
+        root,
+    )
+
+
+def test_historical_root_falls_back_when_primary_archive_record_is_tampered():
+    (
+        backend,
+        _,
+        repository,
+        first_events,
+        first_archive,
+        second_archive,
+        root,
+    ) = two_replica_journal_fixture()
+    key = repository._archive_key(
+        first_archive.manifest.archive_id
+    )
+    record = backend.get(
+        repository.namespace,
+        key,
+    )
+    raw = dict(record.value)
+    raw["stored_at"] = (
+        float(raw["stored_at"])
+        + 1.0
+    )
+    backend.compare_and_swap(
+        repository.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+    resolution = repository.resolve_root(
+        "journal",
+        root,
+    )
+    assert (
+        resolution.archive_id
+        == second_archive.manifest.archive_id
+    )
+    assert repository.snapshot_at(
+        "journal",
+        root,
+    ) == first_events[:1]
+
+
+def test_historical_root_falls_back_when_primary_archive_node_is_tampered():
+    (
+        backend,
+        _,
+        repository,
+        first_events,
+        first_archive,
+        second_archive,
+        root,
+    ) = two_replica_journal_fixture()
+    node_key = repository._node_key(
+        "journal",
+        root,
+    )
+    # Nodes are content-addressed and shared by replicas, so corrupting the
+    # shared node correctly invalidates every replica. This test instead
+    # corrupts a primary-only later node so primary archive verification fails
+    # while the one-node historical prefix remains reconstructable from replica
+    # metadata in the second archive.
+    primary = repository.require(
+        first_archive.manifest.archive_id
+    )
+    primary_only_hash = (
+        primary.node_hashes[-1]
+    )
+    if primary_only_hash == root:
+        pytest.skip(
+            "fixture has no primary-only node"
+        )
+    key = repository._node_key(
+        "journal",
+        primary_only_hash,
+    )
+    record = backend.get(
+        repository.namespace,
+        key,
+    )
+    raw = dict(record.value)
+    payload = dict(raw["payload"])
+    payload["summary"] = "tampered-primary-only"
+    raw["payload"] = payload
+    backend.compare_and_swap(
+        repository.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+    resolution = repository.resolve_root(
+        "journal",
+        root,
+    )
+    assert (
+        resolution.archive_id
+        == second_archive.manifest.archive_id
+    )
+    assert repository.snapshot_at(
+        "journal",
+        root,
+    ) == first_events[:1]
+
+
+def test_historical_root_fails_closed_when_all_archive_records_are_missing():
+    (
+        backend,
+        _,
+        repository,
+        _,
+        first_archive,
+        second_archive,
+        root,
+    ) = two_replica_journal_fixture()
+    delete_archive_record(
+        backend,
+        repository,
+        first_archive.manifest.archive_id,
+    )
+    delete_archive_record(
+        backend,
+        repository,
+        second_archive.manifest.archive_id,
+    )
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="all archive replicas",
+    ):
+        repository.snapshot_at(
+            "journal",
+            root,
+        )
+    assert not repository.verify_root(
+        "journal",
+        root,
+    )
+
+
+def test_root_replica_list_is_stable_across_fresh_reader():
+    (
+        backend,
+        _,
+        repository,
+        _,
+        _,
+        _,
+        root,
+    ) = two_replica_journal_fixture()
+    fresh = DurableArchiveRepository(
+        backend,
+        repository.checkpoints,
+        archive_signer(),
+        namespace=repository.namespace,
+    )
+    index = fresh.root_index(
+        "journal",
+        root,
+    )
+    assert len(index.replicas) == 2
+    assert index.replicas[0].archive_id == index.archive_id
+
+
+def test_resolve_root_reports_primary_replica_when_healthy():
+    (
+        _,
+        _,
+        repository,
+        _,
+        first_archive,
+        _,
+        root,
+    ) = two_replica_journal_fixture()
+    resolution = repository.resolve_root(
+        "journal",
+        root,
+    )
+    assert resolution.replica_index == 0
+    assert (
+        resolution.archive_id
+        == first_archive.manifest.archive_id
+    )
+    assert resolution.sequence == 1
+
+
+def test_root_replica_manifest_conflict_is_rejected():
+    (
+        _,
+        _,
+        repository,
+        _,
+        first_archive,
+        _,
+        root,
+    ) = two_replica_journal_fixture()
+    index = repository.root_index(
+        "journal",
+        root,
+    )
+    conflicting = DurableArchiveRootIndex(
+        index.chain_id,
+        index.root_hash,
+        index.sequence,
+        first_archive.manifest.archive_id,
+        fp("different-manifest"),
+    )
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="different manifest",
+    ):
+        repository._put_root_index(
+            conflicting
+        )
+
