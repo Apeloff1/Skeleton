@@ -456,6 +456,8 @@ class BackupManifest:
     digest: str
     root_mode: int | None = None
     root_mtime_ns: int | None = None
+    snapshot_digest: str = ""
+    complete_snapshot: bool = False
 
     def __post_init__(self) -> None:
         if (self.root_mode is None) != (self.root_mtime_ns is None):
@@ -473,6 +475,12 @@ class BackupManifest:
                 or self.root_mtime_ns < 0
             ):
                 raise ValueError("root_mtime_ns must be a non-negative integer")
+        if self.snapshot_digest and len(self.snapshot_digest) != 64:
+            raise ValueError("snapshot_digest must be SHA-256 hex")
+        if not isinstance(self.complete_snapshot, bool):
+            raise ValueError("complete_snapshot must be boolean")
+        if self.complete_snapshot and not self.snapshot_digest:
+            raise ValueError("complete backup requires snapshot_digest")
 
     @property
     def by_path(self) -> Mapping[str, BackupRecord]:
@@ -489,6 +497,11 @@ class BackupManifest:
                 "mode": self.root_mode,
                 "mtime_ns": self.root_mtime_ns,
             }
+        if self.snapshot_digest:
+            payload["snapshot"] = {
+                "digest": self.snapshot_digest,
+                "complete": self.complete_snapshot,
+            }
         return payload
 
     def to_dict(self) -> dict[str, Any]:
@@ -503,6 +516,9 @@ class BackupManifest:
         if self.root_mode is not None and self.root_mtime_ns is not None:
             value["root_mode"] = self.root_mode
             value["root_mtime_ns"] = self.root_mtime_ns
+        if self.snapshot_digest:
+            value["snapshot_digest"] = self.snapshot_digest
+            value["complete_snapshot"] = self.complete_snapshot
         return value
 
 
