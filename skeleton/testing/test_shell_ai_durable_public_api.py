@@ -113,6 +113,36 @@ from skeleton.shells.ai.durable_replication import (
     DurableReplicationPolicy,
     DurableReplicationRun,
 )
+from skeleton.shells.ai.durable_proof_window import (
+    PROOF_ARTIFACT_TYPE,
+    DurableHistoricalProofAuthority,
+    DurableHistoricalProofError,
+    DurableHistoricalProofIndex,
+    DurableHistoricalProofStore,
+    DurableHistoricalProofVerification,
+    DurableHistoricalProofWindow,
+    ProofWindowChain,
+    SignedDurableHistoricalProofWindow,
+)
+from skeleton.shells.ai.durable_proof_window_operator import (
+    DurableProofWindowFleetReport,
+    DurableProofWindowFinding,
+    DurableProofWindowOperator,
+    DurableProofWindowOperatorError,
+    DurableProofWindowPolicy,
+    DurableProofWindowReport,
+    DurableProofWindowState,
+    DurableProofWindowTarget,
+)
+from skeleton.shells.ai.durable_session_journal import (
+    DurableSessionJournalCommit,
+    DurableSessionJournalConflict,
+    DurableSessionJournalCorruption,
+    DurableSessionJournalHead,
+    DurableSessionJournalManifest,
+    DurableSessionJournalStore,
+    StoredDurableSessionJournal,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryFinding,
     DurableRecoveryStatus,
@@ -139,6 +169,30 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "PROOF_ARTIFACT_TYPE": PROOF_ARTIFACT_TYPE,
+    "DurableHistoricalProofAuthority": DurableHistoricalProofAuthority,
+    "DurableHistoricalProofError": DurableHistoricalProofError,
+    "DurableHistoricalProofIndex": DurableHistoricalProofIndex,
+    "DurableHistoricalProofStore": DurableHistoricalProofStore,
+    "DurableHistoricalProofVerification": DurableHistoricalProofVerification,
+    "DurableHistoricalProofWindow": DurableHistoricalProofWindow,
+    "ProofWindowChain": ProofWindowChain,
+    "SignedDurableHistoricalProofWindow": SignedDurableHistoricalProofWindow,
+    "DurableProofWindowFleetReport": DurableProofWindowFleetReport,
+    "DurableProofWindowFinding": DurableProofWindowFinding,
+    "DurableProofWindowOperator": DurableProofWindowOperator,
+    "DurableProofWindowOperatorError": DurableProofWindowOperatorError,
+    "DurableProofWindowPolicy": DurableProofWindowPolicy,
+    "DurableProofWindowReport": DurableProofWindowReport,
+    "DurableProofWindowState": DurableProofWindowState,
+    "DurableProofWindowTarget": DurableProofWindowTarget,
+    "DurableSessionJournalCommit": DurableSessionJournalCommit,
+    "DurableSessionJournalConflict": DurableSessionJournalConflict,
+    "DurableSessionJournalCorruption": DurableSessionJournalCorruption,
+    "DurableSessionJournalHead": DurableSessionJournalHead,
+    "DurableSessionJournalManifest": DurableSessionJournalManifest,
+    "DurableSessionJournalStore": DurableSessionJournalStore,
+    "StoredDurableSessionJournal": StoredDurableSessionJournal,
     "ArchiveIndexRepairAction": ArchiveIndexRepairAction,
     "ArchiveIndexRepairBatchReport": ArchiveIndexRepairBatchReport,
     "ArchiveIndexRepairError": ArchiveIndexRepairError,
@@ -1881,3 +1935,369 @@ def test_failover_coordinator_constructor_exposes_optional_fleet():
 def test_restore_segment_is_present_on_both_canonical_chain_types():
     assert hasattr(DistributedAIDecisionJournal, "restore_segment")
     assert hasattr(DistributedReceiptChain, "restore_segment")
+
+def test_durable_historical_proof_public_exports():
+    for name, expected in {
+        "DurableHistoricalProofAuthority": DurableHistoricalProofAuthority,
+        "DurableHistoricalProofError": DurableHistoricalProofError,
+        "DurableHistoricalProofIndex": DurableHistoricalProofIndex,
+        "DurableHistoricalProofStore": DurableHistoricalProofStore,
+        "DurableHistoricalProofVerification": DurableHistoricalProofVerification,
+        "DurableHistoricalProofWindow": DurableHistoricalProofWindow,
+        "SignedDurableHistoricalProofWindow": SignedDurableHistoricalProofWindow,
+        "DurableProofWindowOperator": DurableProofWindowOperator,
+        "DurableProofWindowPolicy": DurableProofWindowPolicy,
+        "DurableProofWindowState": DurableProofWindowState,
+        "DurableProofWindowTarget": DurableProofWindowTarget,
+    }.items():
+        assert getattr(ai, name) is expected
+
+
+def test_durable_session_journal_public_exports():
+    for name, expected in {
+        "DurableSessionJournalCommit": DurableSessionJournalCommit,
+        "DurableSessionJournalConflict": DurableSessionJournalConflict,
+        "DurableSessionJournalCorruption": DurableSessionJournalCorruption,
+        "DurableSessionJournalHead": DurableSessionJournalHead,
+        "DurableSessionJournalManifest": DurableSessionJournalManifest,
+        "DurableSessionJournalStore": DurableSessionJournalStore,
+        "StoredDurableSessionJournal": StoredDurableSessionJournal,
+    }.items():
+        assert getattr(ai, name) is expected
+
+
+def test_proof_artifact_type_is_stable_public_wire_value():
+    assert PROOF_ARTIFACT_TYPE == "shell-ai-durable-proof-window"
+    assert ai.PROOF_ARTIFACT_TYPE == PROOF_ARTIFACT_TYPE
+
+
+def test_proof_window_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableProofWindowState
+    } == {
+        "current",
+        "missing",
+        "invalid",
+        "out_of_window",
+        "unanchored",
+        "error",
+    }
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "build_for_sequence",
+        "build_for_root",
+        "verify",
+        "require",
+    ],
+)
+def test_historical_proof_authority_public_methods(method):
+    assert callable(
+        getattr(
+            DurableHistoricalProofAuthority,
+            method,
+            None,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "put",
+        "get",
+        "find_target",
+        "put_once_for_target",
+    ],
+)
+def test_historical_proof_store_public_methods(method):
+    assert callable(
+        getattr(
+            DurableHistoricalProofStore,
+            method,
+            None,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "inspect_target",
+        "ensure_target",
+        "verify_root",
+        "require_root",
+        "inspect",
+        "ensure",
+        "require",
+    ],
+)
+def test_proof_window_operator_public_methods(method):
+    assert callable(
+        getattr(
+            DurableProofWindowOperator,
+            method,
+            None,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "get",
+        "head",
+        "put",
+        "require",
+        "current_session",
+        "verify_manifest",
+    ],
+)
+def test_session_journal_store_public_methods(method):
+    assert callable(
+        getattr(
+            DurableSessionJournalStore,
+            method,
+            None,
+        )
+    )
+
+
+def test_historical_proof_window_public_shape():
+    signature = inspect.signature(
+        DurableHistoricalProofWindow
+    )
+    assert tuple(signature.parameters) == (
+        "schema_version",
+        "chain_id",
+        "checkpoint_digest",
+        "checkpoint_sequence",
+        "checkpoint_root",
+        "target_sequence",
+        "target_root",
+        "item_count",
+        "segment_digest",
+        "first_item_hash",
+        "last_item_hash",
+        "generated_at",
+    )
+
+
+def test_signed_historical_proof_window_public_shape():
+    signature = inspect.signature(
+        SignedDurableHistoricalProofWindow
+    )
+    assert tuple(signature.parameters) == (
+        "proof",
+        "signature",
+    )
+
+
+def test_historical_proof_verification_public_shape():
+    signature = inspect.signature(
+        DurableHistoricalProofVerification
+    )
+    assert tuple(signature.parameters) == (
+        "valid",
+        "chain_id",
+        "target_sequence",
+        "target_root",
+        "checkpoint_sequence",
+        "checkpoint_root",
+        "checked_items",
+        "current_sequence",
+        "current_root",
+        "reasons",
+    )
+
+
+def test_historical_proof_index_public_shape():
+    signature = inspect.signature(
+        DurableHistoricalProofIndex
+    )
+    assert tuple(signature.parameters) == (
+        "chain_id",
+        "target_sequence",
+        "target_root",
+        "proof_digest",
+    )
+
+
+def test_proof_window_policy_public_shape():
+    signature = inspect.signature(
+        DurableProofWindowPolicy
+    )
+    assert tuple(signature.parameters) == (
+        "max_targets",
+        "require_all",
+        "allow_build_missing",
+        "refresh_invalid",
+        "require_cached",
+    )
+
+
+def test_proof_window_target_public_shape():
+    signature = inspect.signature(
+        DurableProofWindowTarget
+    )
+    assert tuple(signature.parameters) == (
+        "chain_id",
+        "target_root",
+    )
+
+
+def test_proof_window_report_public_shape():
+    signature = inspect.signature(
+        DurableProofWindowReport
+    )
+    assert tuple(signature.parameters) == (
+        "target",
+        "state",
+        "cached",
+        "built",
+        "proof_digest",
+        "checkpoint_sequence",
+        "target_sequence",
+        "checked_items",
+        "verification",
+        "findings",
+    )
+
+
+def test_proof_window_fleet_report_public_shape():
+    signature = inspect.signature(
+        DurableProofWindowFleetReport
+    )
+    assert tuple(signature.parameters) == (
+        "policy_digest",
+        "reports",
+        "mutations",
+    )
+
+
+def test_session_journal_manifest_public_shape():
+    signature = inspect.signature(
+        DurableSessionJournalManifest
+    )
+    assert tuple(signature.parameters) == (
+        "schema_version",
+        "finalization_id",
+        "session_id",
+        "journal_root",
+        "journal_evidence",
+        "stored_at",
+    )
+
+
+def test_session_journal_head_public_shape():
+    signature = inspect.signature(
+        DurableSessionJournalHead
+    )
+    assert tuple(signature.parameters) == (
+        "session_id",
+        "finalization_id",
+        "journal_root",
+        "journal_digest",
+        "event_count",
+        "last_sequence",
+    )
+
+
+def test_stored_session_journal_public_shape():
+    signature = inspect.signature(
+        StoredDurableSessionJournal
+    )
+    assert tuple(signature.parameters) == (
+        "revision",
+        "manifest",
+    )
+
+
+def test_session_journal_commit_public_shape():
+    signature = inspect.signature(
+        DurableSessionJournalCommit
+    )
+    assert tuple(signature.parameters) == (
+        "stored",
+        "head_revision",
+        "head",
+        "head_advanced",
+    )
+
+
+def test_proof_and_manifest_errors_are_runtime_errors():
+    for error in (
+        DurableHistoricalProofError,
+        DurableProofWindowOperatorError,
+        DurableSessionJournalConflict,
+        DurableSessionJournalCorruption,
+    ):
+        assert issubclass(
+            error,
+            RuntimeError,
+        )
+
+
+def test_durable_recovery_constructor_exposes_acceleration_surfaces():
+    signature = inspect.signature(
+        DurableSessionRecoveryVerifier
+    )
+    assert {
+        "session_journals",
+        "proof_windows",
+        "journal_proof_chain_id",
+        "receipt_proof_chain_id",
+    }.issubset(signature.parameters)
+
+
+def test_session_integrity_constructor_exposes_root_verifiers():
+    signature = inspect.signature(
+        SessionEvidenceIntegrityVerifier
+    )
+    assert {
+        "journal_root_verifier",
+        "receipt_root_verifier",
+    }.issubset(signature.parameters)
+
+
+def test_recovery_checkpoint_exposes_manifest_commitment():
+    from skeleton.shells.ai.recovery_checkpoint import (
+        AIRecoveryCheckpoint,
+    )
+
+    assert (
+        "session_journal_manifest_digest"
+        in inspect.signature(
+            AIRecoveryCheckpoint
+        ).parameters
+    )
+
+
+def test_execution_evidence_exposes_manifest_commitment():
+    from skeleton.shells.ai.execution_evidence import (
+        AIExecutionEvidence,
+    )
+
+    assert (
+        "session_journal_manifest_digest"
+        in inspect.signature(
+            AIExecutionEvidence
+        ).parameters
+    )
+
+
+def test_finalizer_constructor_exposes_session_journal_store():
+    from skeleton.shells.ai.evidence_finalizer import (
+        AIExecutionEvidenceFinalizer,
+    )
+
+    assert (
+        "session_journals"
+        in inspect.signature(
+            AIExecutionEvidenceFinalizer
+        ).parameters
+    )
+
