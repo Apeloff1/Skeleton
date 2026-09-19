@@ -2300,4 +2300,3 @@ def test_finalizer_constructor_exposes_session_journal_store():
             AIExecutionEvidenceFinalizer
         ).parameters
     )
-
