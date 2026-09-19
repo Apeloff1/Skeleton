@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 from email.message import Message
-import json
 from urllib.error import HTTPError, URLError
 
 import pytest
