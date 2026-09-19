@@ -9,10 +9,64 @@ from pathlib import Path
 from unittest.mock import patch
 
 from skeleton.automation import secretary, specialist_bots, supervisor
+from skeleton.automation.supervisor_runtime import (
+    ExecutionIdentity,
+    WorkerCustody,
+)
 
 
 FP = "a" * 64
+BASE = "b" * 40
+OTHER_BASE = "c" * 40
 REPO = "Apeloff1/Skeleton"
+EXECUTION = ExecutionIdentity(
+    repository=REPO,
+    base_sha=BASE,
+    default_branch="main",
+    run_id="12345",
+    run_attempt="1",
+)
+
+
+def execution_env(
+    *,
+    worker: str = "root-cause",
+    snapshot: str = FP,
+) -> dict[str, str]:
+    return {
+        "GITHUB_REPOSITORY": REPO,
+        "GITHUB_SHA": BASE,
+        "GITHUB_RUN_ID": "12345",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "SUPERVISOR_BASE_SHA": BASE,
+        "SUPERVISOR_DEFAULT_BRANCH": "main",
+        "SUPERVISOR_RUN_ID": "12345",
+        "SUPERVISOR_RUN_ATTEMPT": "1",
+        "SUPERVISOR_EXECUTION_FINGERPRINT": EXECUTION.fingerprint,
+        "SUPERVISOR_SNAPSHOT_FINGERPRINT": snapshot,
+        "SECRETARY_DELEGATION": "1",
+        "SECRETARY_WORKER": worker,
+    }
+
+
+def tamper_envelope(
+    encoded: str,
+    mutate,
+) -> str:
+    value = json.loads(
+        base64.b64decode(
+            encoded,
+            validate=True,
+        ).decode("utf-8")
+    )
+    mutate(value)
+    return base64.b64encode(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).decode("ascii")
 
 
 class SupervisorEnvelopeTests(unittest.TestCase):
@@ -20,183 +74,1017 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         return supervisor.SupervisorSnapshot(
             repository=REPO,
             observed_at=1_700_000_000,
-            issues=({"number": 1, "title": "CI failure"},),
-            pull_requests=({"number": 2, "title": "repair", "mergeStateStatus": "BLOCKED"},),
-            workflow_runs=({"databaseId": 3, "conclusion": "failure", "name": "quality"},),
+            issues=(
+                {
+                    "number": 1,
+                    "title": "CI failure",
+                },
+            ),
+            pull_requests=(
+                {
+                    "number": 2,
+                    "title": "repair",
+                    "mergeStateStatus": "BLOCKED",
+                },
+            ),
+            workflow_runs=(
+                {
+                    "databaseId": 3,
+                    "conclusion": "failure",
+                    "name": "quality",
+                },
+            ),
         )
 
-    def test_snapshot_fingerprint_is_stable_across_observation_time(self) -> None:
+    def envelope(self, plan: str = "repair failing CI"):
+        snap = self.snapshot()
+        return (
+            snap,
+            supervisor.make_envelope(
+                snap,
+                plan,
+                EXECUTION,
+            ),
+        )
+
+    def decode(
+        self,
+        encoded: str,
+        *,
+        repository: str = REPO,
+        execution: ExecutionIdentity = EXECUTION,
+        now: int = 1_700_000_000,
+    ):
+        return secretary.decode_delegation(
+            encoded,
+            repository=repository,
+            expected_execution=execution,
+            now=now,
+        )
+
+    def test_snapshot_fingerprint_is_stable_across_observation_time(
+        self,
+    ) -> None:
         first = self.snapshot()
-        second = supervisor.SupervisorSnapshot(first.repository, first.observed_at + 30, first.issues, first.pull_requests, first.workflow_runs)
-        self.assertEqual(first.fingerprint, second.fingerprint)
+        second = supervisor.SupervisorSnapshot(
+            first.repository,
+            first.observed_at + 30,
+            first.issues,
+            first.pull_requests,
+            first.workflow_runs,
+        )
+        self.assertEqual(
+            first.fingerprint,
+            second.fingerprint,
+        )
 
-    def test_snapshot_fingerprint_changes_with_repository_state(self) -> None:
+    def test_snapshot_fingerprint_changes_with_repository_state(
+        self,
+    ) -> None:
         first = self.snapshot()
-        second = supervisor.SupervisorSnapshot(first.repository, first.observed_at, (), first.pull_requests, first.workflow_runs)
-        self.assertNotEqual(first.fingerprint, second.fingerprint)
+        second = supervisor.SupervisorSnapshot(
+            first.repository,
+            first.observed_at,
+            (),
+            first.pull_requests,
+            first.workflow_runs,
+        )
+        self.assertNotEqual(
+            first.fingerprint,
+            second.fingerprint,
+        )
 
-    def test_envelope_round_trip(self) -> None:
+    def test_version_two_envelope_round_trip_binds_execution(
+        self,
+    ) -> None:
+        snap, envelope = self.envelope()
+        plan, fingerprint, execution = self.decode(
+            envelope.to_base64()
+        )
+        self.assertEqual(
+            plan,
+            "repair failing CI",
+        )
+        self.assertEqual(
+            fingerprint,
+            snap.fingerprint,
+        )
+        self.assertEqual(
+            execution,
+            EXECUTION,
+        )
+
+    def test_envelope_payload_contains_only_expected_fields(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        self.assertEqual(
+            set(envelope.payload()),
+            {
+                "version",
+                "repository",
+                "snapshot_fingerprint",
+                "observed_at",
+                "plan",
+                "execution",
+                "execution_fingerprint",
+            },
+        )
+
+    def test_envelope_rejects_cross_repository_replay(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                repository="other/repository",
+            )
+
+    def test_envelope_rejects_cross_execution_replay(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        other = ExecutionIdentity(
+            repository=REPO,
+            base_sha=OTHER_BASE,
+            default_branch="main",
+            run_id="12345",
+            run_attempt="1",
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                execution=other,
+            )
+
+    def test_envelope_rejects_run_id_replay(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        other = ExecutionIdentity(
+            repository=REPO,
+            base_sha=BASE,
+            default_branch="main",
+            run_id="99999",
+            run_attempt="1",
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                execution=other,
+            )
+
+    def test_envelope_rejects_attempt_replay(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        other = ExecutionIdentity(
+            repository=REPO,
+            base_sha=BASE,
+            default_branch="main",
+            run_id="12345",
+            run_attempt="2",
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                execution=other,
+            )
+
+    def test_envelope_rejects_stale_plan(
+        self,
+    ) -> None:
+        snap, envelope = self.envelope()
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                now=(
+                    snap.observed_at
+                    + secretary.MAX_ENVELOPE_AGE_SECONDS
+                    + 1
+                ),
+            )
+
+    def test_envelope_rejects_far_future_observation(
+        self,
+    ) -> None:
+        snap, envelope = self.envelope()
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(
+                envelope.to_base64(),
+                now=snap.observed_at - 301,
+            )
+
+    def test_envelope_rejects_malformed_base64(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode("%%%")
+
+    def test_envelope_rejects_unsupported_version(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        encoded = tamper_envelope(
+            envelope.to_base64(),
+            lambda value: value.__setitem__(
+                "version",
+                99,
+            ),
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(encoded)
+
+    def test_envelope_rejects_unknown_field(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        encoded = tamper_envelope(
+            envelope.to_base64(),
+            lambda value: value.__setitem__(
+                "executable",
+                "python -c unsafe",
+            ),
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(encoded)
+
+    def test_envelope_rejects_execution_fingerprint_tamper(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        encoded = tamper_envelope(
+            envelope.to_base64(),
+            lambda value: value.__setitem__(
+                "execution_fingerprint",
+                "d" * 64,
+            ),
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(encoded)
+
+    def test_envelope_rejects_snapshot_fingerprint_tamper(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        encoded = tamper_envelope(
+            envelope.to_base64(),
+            lambda value: value.__setitem__(
+                "snapshot_fingerprint",
+                "nope",
+            ),
+        )
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            self.decode(encoded)
+
+    def test_envelope_rejects_empty_plan(
+        self,
+    ) -> None:
         snap = self.snapshot()
-        env = supervisor.make_envelope(snap, "repair failing CI")
-        plan, fingerprint = secretary.decode_delegation(env.to_base64(), repository=REPO, now=snap.observed_at)
-        self.assertEqual(plan, "repair failing CI")
-        self.assertEqual(fingerprint, snap.fingerprint)
+        envelope = supervisor.DelegationEnvelope(
+            version=2,
+            repository=REPO,
+            snapshot_fingerprint=snap.fingerprint,
+            observed_at=snap.observed_at,
+            plan="",
+            execution=EXECUTION,
+        )
+        with self.assertRaises(
+            supervisor.SupervisorError
+        ):
+            envelope.to_base64()
 
-    def test_envelope_rejects_cross_repository_replay(self) -> None:
+    def test_emit_github_output_is_bounded_single_line_data(
+        self,
+    ) -> None:
+        snap, envelope = self.envelope("repair CI")
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "output"
+            supervisor.emit_github_output(
+                envelope,
+                str(target),
+            )
+            lines = target.read_text(
+                encoding="utf-8"
+            ).splitlines()
+
+        self.assertEqual(
+            len(lines),
+            4,
+        )
+        self.assertTrue(
+            lines[0].startswith("delegation_b64=")
+        )
+        self.assertEqual(
+            lines[1],
+            (
+                "snapshot_fingerprint="
+                f"{snap.fingerprint}"
+            ),
+        )
+        self.assertEqual(
+            lines[2],
+            (
+                "execution_fingerprint="
+                f"{EXECUTION.fingerprint}"
+            ),
+        )
+        self.assertEqual(
+            lines[3],
+            f"base_sha={BASE}",
+        )
+
+    def test_emit_github_output_rejects_relative_path(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope("repair CI")
+        with self.assertRaises(
+            supervisor.SupervisorError
+        ):
+            supervisor.emit_github_output(
+                envelope,
+                "relative-output",
+            )
+
+    def test_deterministic_plan_carries_snapshot_identity(
+        self,
+    ) -> None:
         snap = self.snapshot()
-        encoded = supervisor.make_envelope(snap, "repair failing CI").to_base64()
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation(encoded, repository="other/repository", now=snap.observed_at)
+        plan = json.loads(
+            supervisor.deterministic_plan(snap)
+        )
+        self.assertEqual(
+            plan["snapshot_fingerprint"],
+            snap.fingerprint,
+        )
+        self.assertEqual(
+            plan["priority_observations"][
+                "open_issue_count"
+            ],
+            1,
+        )
+        self.assertIn(
+            "Do not mutate when the observed default-branch "
+            "base becomes stale.",
+            plan["constraints"],
+        )
 
-    def test_envelope_rejects_stale_plan(self) -> None:
+    def test_model_plan_falls_back_without_complete_provider(
+        self,
+    ) -> None:
         snap = self.snapshot()
-        encoded = supervisor.make_envelope(snap, "repair failing CI").to_base64()
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation(encoded, repository=REPO, now=snap.observed_at + secretary.MAX_ENVELOPE_AGE_SECONDS + 1)
-
-    def test_envelope_rejects_far_future_observation(self) -> None:
-        snap = self.snapshot()
-        encoded = supervisor.make_envelope(snap, "repair failing CI").to_base64()
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation(encoded, repository=REPO, now=snap.observed_at - 301)
-
-    def test_envelope_rejects_malformed_base64(self) -> None:
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation("%%%", repository=REPO, now=1_700_000_000)
-
-    def test_envelope_rejects_unsupported_version(self) -> None:
-        payload = base64.b64encode(json.dumps({"version": 99}).encode()).decode()
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation(payload, repository=REPO, now=1_700_000_000)
-
-    def test_envelope_rejects_invalid_fingerprint(self) -> None:
-        payload = {"version": 1, "repository": REPO, "snapshot_fingerprint": "nope", "observed_at": 1_700_000_000, "plan": "CI failure"}
-        encoded = base64.b64encode(json.dumps(payload).encode()).decode()
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.decode_delegation(encoded, repository=REPO, now=1_700_000_000)
-
-    def test_emit_github_output_is_single_line_bounded_data(self) -> None:
-        snap = self.snapshot()
-        env = supervisor.make_envelope(snap, "repair CI")
-        with tempfile.TemporaryDirectory() as td:
-            target = Path(td) / "output"
-            supervisor.emit_github_output(env, str(target))
-            lines = target.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(len(lines), 2)
-        self.assertTrue(lines[0].startswith("delegation_b64="))
-        self.assertEqual(lines[1], f"snapshot_fingerprint={snap.fingerprint}")
-
-    def test_emit_github_output_rejects_relative_path(self) -> None:
-        with self.assertRaises(supervisor.SupervisorError):
-            supervisor.emit_github_output(supervisor.make_envelope(self.snapshot(), "repair CI"), "relative-output")
-
-    def test_deterministic_plan_carries_snapshot_identity(self) -> None:
-        snap = self.snapshot()
-        plan = json.loads(supervisor.deterministic_plan(snap))
-        self.assertEqual(plan["snapshot_fingerprint"], snap.fingerprint)
-        self.assertEqual(plan["priority_observations"]["open_issue_count"], 1)
-
-    def test_model_plan_falls_back_without_provider(self) -> None:
-        snap = self.snapshot()
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(supervisor.model_plan(snap), supervisor.deterministic_plan(snap))
+        with patch.dict(
+            os.environ,
+            {},
+            clear=True,
+        ):
+            self.assertEqual(
+                supervisor.model_plan(snap),
+                supervisor.deterministic_plan(snap),
+            )
 
 
 class SecretaryRoutingTests(unittest.TestCase):
-    def test_route_only_returns_due_registered_workers(self) -> None:
-        due = ["root-cause", "security-auditor"]
-        self.assertEqual(set(secretary.route("CI build failure and security finding", due)), set(due))
+    def test_route_only_returns_due_registered_workers(
+        self,
+    ) -> None:
+        due = [
+            "root-cause",
+            "security-auditor",
+        ]
+        self.assertEqual(
+            set(
+                secretary.route(
+                    "CI build failure and security finding",
+                    due,
+                )
+            ),
+            set(due),
+        )
 
-    def test_route_never_exceeds_assignment_budget(self) -> None:
-        due = [spec.name for spec in secretary.ADVANCED_BOTS]
-        routed = secretary.route("CI workflow failure dependency CVE regression architecture security performance release docs integration contract PR review coverage API schema", due)
-        self.assertLessEqual(len(routed), secretary.MAX_ASSIGNMENTS)
+    def test_route_ignores_unregistered_due_names(
+        self,
+    ) -> None:
+        self.assertEqual(
+            secretary.route(
+                "CI build failure",
+                [
+                    "root-cause",
+                    "arbitrary-module",
+                ],
+            ),
+            ["root-cause"],
+        )
 
-    def test_dispatch_rejects_duplicate_workers(self) -> None:
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.dispatch("plan", ["root-cause", "root-cause"], FP)
+    def test_route_never_exceeds_assignment_budget(
+        self,
+    ) -> None:
+        due = [
+            spec.name
+            for spec in secretary.ADVANCED_BOTS
+        ]
+        routed = secretary.route(
+            (
+                "CI workflow failure dependency CVE regression "
+                "architecture security performance release docs "
+                "integration contract PR review coverage API schema"
+            ),
+            due,
+        )
+        self.assertLessEqual(
+            len(routed),
+            secretary.MAX_ASSIGNMENTS,
+        )
 
-    def test_dispatch_rejects_unregistered_worker(self) -> None:
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.dispatch("plan", ["arbitrary-module"], FP)
+    def test_dispatch_rejects_duplicate_workers(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            secretary.dispatch(
+                "plan",
+                [
+                    "root-cause",
+                    "root-cause",
+                ],
+                FP,
+                EXECUTION,
+            )
 
-    def test_dispatch_rejects_assignment_budget_overflow(self) -> None:
-        with self.assertRaises(secretary.SecretaryAdmissionError):
-            secretary.dispatch("plan", [spec.name for spec in secretary.ADVANCED_BOTS[:4]], FP)
+    def test_dispatch_rejects_unregistered_worker(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            secretary.dispatch(
+                "plan",
+                ["arbitrary-module"],
+                FP,
+                EXECUTION,
+            )
 
-    def test_dispatch_stamps_secretary_custody(self) -> None:
-        captured = {}
-        def fake_run(argv, *, env, timeout):
-            captured.update(env)
-            class Result:
-                returncode = 0
-            return Result()
-        with patch("skeleton.automation.secretary.subprocess.run", side_effect=fake_run):
-            result = secretary.dispatch("CI failure", ["root-cause"], FP)
-        self.assertEqual(result[0]["returncode"], 0)
-        self.assertEqual(captured["SECRETARY_DELEGATION"], "1")
-        self.assertEqual(captured["SECRETARY_WORKER"], "root-cause")
-        self.assertEqual(captured["SUPERVISOR_SNAPSHOT_FINGERPRINT"], FP)
+    def test_dispatch_rejects_assignment_budget_overflow(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            secretary.dispatch(
+                "plan",
+                [
+                    spec.name
+                    for spec
+                    in secretary.ADVANCED_BOTS[:4]
+                ],
+                FP,
+                EXECUTION,
+            )
+
+    def test_dispatch_rejects_invalid_snapshot_fingerprint(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            secretary.SecretaryAdmissionError
+        ):
+            secretary.dispatch(
+                "plan",
+                ["root-cause"],
+                "bad",
+                EXECUTION,
+            )
+
+    def test_dispatch_uses_isolated_worker_boundary(
+        self,
+    ) -> None:
+        with patch(
+            "skeleton.automation.secretary._dispatch_one",
+            return_value={
+                "bot": "root-cause",
+                "returncode": 0,
+                "isolated": True,
+            },
+        ) as worker:
+            result = secretary.dispatch(
+                "CI failure",
+                ["root-cause"],
+                FP,
+                EXECUTION,
+            )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "bot": "root-cause",
+                    "returncode": 0,
+                    "isolated": True,
+                }
+            ],
+        )
+        worker.assert_called_once_with(
+            "CI failure",
+            "root-cause",
+            supervisor_fingerprint=FP,
+            execution=EXECUTION,
+        )
 
 
 class WorkerAdmissionTests(unittest.TestCase):
-    def test_direct_worker_invocation_is_rejected(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(specialist_bots.WorkerAdmissionError):
-                specialist_bots.admit_worker("root-cause")
+    def test_direct_worker_invocation_is_rejected(
+        self,
+    ) -> None:
+        with patch.dict(
+            os.environ,
+            {},
+            clear=True,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.admit_worker(
+                    "root-cause"
+                )
 
-    def test_worker_identity_mismatch_is_rejected(self) -> None:
-        with patch.dict(os.environ, {"SECRETARY_DELEGATION": "1", "SECRETARY_WORKER": "security-auditor"}, clear=True):
-            with self.assertRaises(specialist_bots.WorkerAdmissionError):
-                specialist_bots.admit_worker("root-cause")
+    def test_worker_identity_mismatch_is_rejected(
+        self,
+    ) -> None:
+        env = execution_env(
+            worker="security-auditor"
+        )
+        with patch.dict(
+            os.environ,
+            env,
+            clear=True,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.admit_worker(
+                    "root-cause"
+                )
 
-    def test_valid_secretary_delegation_is_admitted(self) -> None:
-        env = {"SECRETARY_DELEGATION": "1", "SECRETARY_WORKER": "root-cause", "SUPERVISOR_SNAPSHOT_FINGERPRINT": FP}
-        with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(specialist_bots.admit_worker("root-cause"), FP)
+    def test_worker_execution_fingerprint_mismatch_is_rejected(
+        self,
+    ) -> None:
+        env = execution_env()
+        env[
+            "SUPERVISOR_EXECUTION_FINGERPRINT"
+        ] = "d" * 64
+        with patch.dict(
+            os.environ,
+            env,
+            clear=True,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.admit_worker(
+                    "root-cause"
+                )
 
-    def test_invalid_supervisor_fingerprint_is_rejected(self) -> None:
-        env = {"SECRETARY_DELEGATION": "1", "SECRETARY_WORKER": "root-cause", "SUPERVISOR_SNAPSHOT_FINGERPRINT": "bad"}
-        with patch.dict(os.environ, env, clear=True):
-            with self.assertRaises(specialist_bots.WorkerAdmissionError):
-                specialist_bots.admit_worker("root-cause")
+    def test_valid_secretary_delegation_returns_full_custody(
+        self,
+    ) -> None:
+        with patch.dict(
+            os.environ,
+            execution_env(),
+            clear=True,
+        ):
+            custody = specialist_bots.admit_worker(
+                "root-cause"
+            )
 
-    def test_safe_path_rejects_control_planes(self) -> None:
-        self.assertFalse(specialist_bots.safe_path(".github/workflows/evil.yml"))
-        self.assertFalse(specialist_bots.safe_path("skeleton/automation/supervisor.py"))
-        self.assertFalse(specialist_bots.safe_path("skeleton/automation/secretary.py"))
-        self.assertFalse(specialist_bots.safe_path("../outside.py"))
-        self.assertFalse(specialist_bots.safe_path("deploy/release.py"))
-        self.assertTrue(specialist_bots.safe_path("skeleton/runtime.py"))
-        self.assertTrue(specialist_bots.safe_path("tests/test_runtime.py"))
+        self.assertIsInstance(
+            custody,
+            WorkerCustody,
+        )
+        self.assertEqual(
+            custody.worker,
+            "root-cause",
+        )
+        self.assertEqual(
+            custody.snapshot_fingerprint,
+            FP,
+        )
+        self.assertEqual(
+            custody.execution,
+            EXECUTION,
+        )
 
-    def test_extract_plan_rejects_duplicate_paths(self) -> None:
-        raw = json.dumps({"files": [{"path": "tests/test_x.py", "content": "x = 1\n"}, {"path": "tests/test_x.py", "content": "x = 2\n"}]})
+    def test_invalid_supervisor_fingerprint_is_rejected(
+        self,
+    ) -> None:
+        with patch.dict(
+            os.environ,
+            execution_env(snapshot="bad"),
+            clear=True,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.admit_worker(
+                    "root-cause"
+                )
+
+
+class WorkerProposalTests(unittest.TestCase):
+    def test_safe_path_rejects_control_planes(
+        self,
+    ) -> None:
+        self.assertFalse(
+            specialist_bots.safe_path(
+                ".github/workflows/evil.yml"
+            )
+        )
+        self.assertFalse(
+            specialist_bots.safe_path(
+                "skeleton/automation/supervisor.py"
+            )
+        )
+        self.assertFalse(
+            specialist_bots.safe_path(
+                "skeleton/automation/secretary.py"
+            )
+        )
+        self.assertFalse(
+            specialist_bots.safe_path(
+                "../outside.py"
+            )
+        )
+        self.assertFalse(
+            specialist_bots.safe_path(
+                "skeleton//runtime.py"
+            )
+        )
+        self.assertFalse(
+            specialist_bots.safe_path(
+                "deploy/release.py"
+            )
+        )
+        self.assertTrue(
+            specialist_bots.safe_path(
+                "skeleton/runtime.py"
+            )
+        )
+        self.assertTrue(
+            specialist_bots.safe_path(
+                "tests/test_runtime.py"
+            )
+        )
+
+    def test_extract_plan_accepts_bounded_json(
+        self,
+    ) -> None:
+        proposal = specialist_bots.extract_plan(
+            json.dumps(
+                {
+                    "summary": "repair",
+                    "files": [
+                        {
+                            "path": "tests/test_x.py",
+                            "content": "x = 1\n",
+                        }
+                    ],
+                    "tests": [
+                        "run focused unit coverage"
+                    ],
+                }
+            ),
+            3,
+        )
+        self.assertEqual(
+            proposal["summary"],
+            "repair",
+        )
+        self.assertEqual(
+            proposal["files"][0]["path"],
+            "tests/test_x.py",
+        )
+
+    def test_extract_plan_accepts_single_json_fence(
+        self,
+    ) -> None:
+        raw = (
+            "```json\n"
+            '{"summary":"repair","files":[],"tests":[]}'
+            "\n```"
+        )
+        result = specialist_bots.extract_plan(
+            raw,
+            3,
+        )
+        self.assertEqual(
+            result["files"],
+            [],
+        )
+
+    def test_extract_plan_rejects_trailing_non_json(
+        self,
+    ) -> None:
+        raw = (
+            '{"summary":"repair","files":[],"tests":[]}'
+            " run this shell command"
+        )
         with self.assertRaises(ValueError):
-            specialist_bots.extract_plan(raw, 3)
+            specialist_bots.extract_plan(
+                raw,
+                3,
+            )
 
-    def test_extract_plan_rejects_total_byte_overflow(self) -> None:
-        old = specialist_bots.MAX_TOTAL_PROPOSED_BYTES
-        with patch.object(specialist_bots, "MAX_TOTAL_PROPOSED_BYTES", 10):
-            raw = json.dumps({"files": [{"path": "tests/test_x.py", "content": "x" * 11}]})
+    def test_extract_plan_rejects_unknown_fields(
+        self,
+    ) -> None:
+        raw = json.dumps(
+            {
+                "summary": "repair",
+                "files": [],
+                "tests": [],
+                "command": "rm -rf /",
+            }
+        )
+        with self.assertRaises(ValueError):
+            specialist_bots.extract_plan(
+                raw,
+                3,
+            )
+
+    def test_extract_plan_rejects_duplicate_paths(
+        self,
+    ) -> None:
+        raw = json.dumps(
+            {
+                "summary": "repair",
+                "files": [
+                    {
+                        "path": "tests/test_x.py",
+                        "content": "x = 1\n",
+                    },
+                    {
+                        "path": "tests/test_x.py",
+                        "content": "x = 2\n",
+                    },
+                ],
+                "tests": [],
+            }
+        )
+        with self.assertRaises(ValueError):
+            specialist_bots.extract_plan(
+                raw,
+                3,
+            )
+
+    def test_extract_plan_rejects_total_byte_overflow(
+        self,
+    ) -> None:
+        with patch.object(
+            specialist_bots,
+            "MAX_TOTAL_PROPOSED_BYTES",
+            10,
+        ):
+            raw = json.dumps(
+                {
+                    "summary": "",
+                    "files": [
+                        {
+                            "path": "tests/test_x.py",
+                            "content": "x" * 11,
+                        }
+                    ],
+                    "tests": [],
+                }
+            )
             with self.assertRaises(ValueError):
-                specialist_bots.extract_plan(raw, 3)
-        self.assertGreater(old, 10)
+                specialist_bots.extract_plan(
+                    raw,
+                    3,
+                )
 
-    def test_generated_python_must_parse(self) -> None:
+    def test_extract_plan_rejects_oversized_test_metadata(
+        self,
+    ) -> None:
+        with patch.object(
+            specialist_bots,
+            "MAX_TEST_DESCRIPTION_BYTES",
+            5,
+        ):
+            raw = json.dumps(
+                {
+                    "summary": "",
+                    "files": [],
+                    "tests": [
+                        "too-long-description"
+                    ],
+                }
+            )
+            with self.assertRaises(ValueError):
+                specialist_bots.extract_plan(
+                    raw,
+                    3,
+                )
+
+    def test_generated_python_must_parse(
+        self,
+    ) -> None:
         with self.assertRaises(RuntimeError):
-            specialist_bots.validate_generated_files([{"path": "tests/test_bad.py", "content": "def broken(:\n"}])
+            specialist_bots.validate_generated_files(
+                [
+                    {
+                        "path": "tests/test_bad.py",
+                        "content": "def broken(:\n",
+                    }
+                ]
+            )
 
-    def test_mutation_budget_counts_insertions_and_deletions(self) -> None:
-        files = [{"path": "tests/test_x.py", "content": "new\nvalue\n"}]
-        with patch("skeleton.automation.specialist_bots.subprocess.check_output", return_value="old\n"):
-            self.assertEqual(specialist_bots.validate_mutation_budget(files), 3)
+    def test_generated_json_must_parse(
+        self,
+    ) -> None:
+        with self.assertRaises(RuntimeError):
+            specialist_bots.validate_generated_files(
+                [
+                    {
+                        "path": "docs/result.json",
+                        "content": "{broken",
+                    }
+                ]
+            )
 
-    def test_mutation_budget_fails_closed(self) -> None:
-        files = [{"path": "tests/test_x.py", "content": "a\nb\nc\n"}]
-        with patch.object(specialist_bots, "MAX_CHANGED_LINES", 2), patch("skeleton.automation.specialist_bots.subprocess.check_output", return_value=""):
+    def test_mutation_budget_counts_insertions_and_deletions(
+        self,
+    ) -> None:
+        files = [
+            {
+                "path": "tests/test_x.py",
+                "content": "new\nvalue\n",
+            }
+        ]
+        with patch(
+            "skeleton.automation.specialist_bots._head_text",
+            return_value="old\n",
+        ):
+            self.assertEqual(
+                specialist_bots.validate_mutation_budget(
+                    files
+                ),
+                3,
+            )
+
+    def test_mutation_budget_fails_closed(
+        self,
+    ) -> None:
+        files = [
+            {
+                "path": "tests/test_x.py",
+                "content": "a\nb\nc\n",
+            }
+        ]
+        with (
+            patch.object(
+                specialist_bots,
+                "MAX_CHANGED_LINES",
+                2,
+            ),
+            patch(
+                "skeleton.automation.specialist_bots._head_text",
+                return_value="",
+            ),
+        ):
             with self.assertRaises(RuntimeError):
-                specialist_bots.validate_mutation_budget(files)
+                specialist_bots.validate_mutation_budget(
+                    files
+                )
+
+    def test_noop_files_are_removed(
+        self,
+    ) -> None:
+        files = [
+            {
+                "path": "tests/test_x.py",
+                "content": "same\n",
+            },
+            {
+                "path": "tests/test_y.py",
+                "content": "new\n",
+            },
+        ]
+
+        def old(path: str):
+            if path.endswith("test_x.py"):
+                return "same\n"
+            return "old\n"
+
+        with patch(
+            "skeleton.automation.specialist_bots._head_text",
+            side_effect=old,
+        ):
+            result = specialist_bots.filter_noop_files(
+                files
+            )
+
+        self.assertEqual(
+            [item["path"] for item in result],
+            ["tests/test_y.py"],
+        )
+
+    def test_preflight_converges_on_existing_worker_pr(
+        self,
+    ) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=FP,
+            execution=EXECUTION,
+        )
+        existing = {
+            "number": 77,
+            "headRefName": (
+                "bot/specialist-root-cause-old"
+            ),
+        }
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=existing,
+            ),
+        ):
+            _branch, active = specialist_bots._preflight(
+                custody
+            )
+
+        self.assertEqual(
+            active,
+            existing,
+        )
+
+    def test_preflight_rejects_orphan_remote_branch(
+        self,
+    ) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=FP,
+            execution=EXECUTION,
+        )
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=None,
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_head",
+                return_value=None,
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.remote_branch_exists",
+                return_value=True,
+            ),
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots._preflight(
+                    custody
+                )
 
 
 if __name__ == "__main__":
