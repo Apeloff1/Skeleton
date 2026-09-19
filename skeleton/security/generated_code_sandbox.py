@@ -302,13 +302,17 @@ class GeneratedCodeSandbox:
         text = _bounded_payload(payload)
         payload_kind = PayloadKind(kind) if not isinstance(kind, PayloadKind) else kind
         operations: list[Operation] = []
-        operations.extend(_injection_operations(text))
-        if payload_kind is PayloadKind.PYTHON:
-            operations.extend(_inspect_python(text))
-        elif payload_kind is PayloadKind.TOOL_JSON:
+        if payload_kind is PayloadKind.TOOL_JSON:
+            # Parse structured policy/grant keys before broad text heuristics so
+            # denial evidence points at the exact nested mutation attempt.
             operations.extend(_inspect_tool_json(text))
+            operations.extend(_injection_operations(text))
         else:
-            operations.extend(_inspect_prompt(text))
+            operations.extend(_injection_operations(text))
+            if payload_kind is PayloadKind.PYTHON:
+                operations.extend(_inspect_python(text))
+            else:
+                operations.extend(_inspect_prompt(text))
         if len(operations) > MAX_OPERATIONS:
             raise SandboxPolicyError(
                 "generated payload exceeds operation bound",

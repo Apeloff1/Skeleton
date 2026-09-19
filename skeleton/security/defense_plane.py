@@ -215,9 +215,9 @@ def _repository(value: object) -> str:
 
 
 def _commit_sha(value: object) -> str:
-    text = _required_text(value, field_name="commit_sha", limit=40).casefold()
+    text = _required_text(value, field_name="commit_sha", limit=40)
     if _SHA_RE.fullmatch(text) is None:
-        raise DefenseIntegrityError("commit_sha must be a full 40-character hex OID")
+        raise DefenseIntegrityError("commit_sha must be a full lowercase 40-character hex OID")
     return text
 
 
