@@ -153,11 +153,13 @@ class WorkspaceTransactionManager:
         retry: RetryPolicy | None = None,
         session: ShellSession | None = None,
         metadata: Mapping[str, str] | None = None,
+        policy: WorkspaceMutationPolicy | None = None,
     ) -> TransactionResult:
         root_path = Path(root).expanduser().resolve(strict=True)
         transaction_id = uuid.uuid4().hex
         correlation = correlation_id or uuid.uuid4().hex
         started_at = datetime.now(timezone.utc).isoformat()
+        effective_policy = self.policy if policy is None else policy
         workspace_id = hashlib.sha256(str(root_path).encode("utf-8")).hexdigest()
         lease: WorkspaceLease | None = None
 
@@ -200,7 +202,7 @@ class WorkspaceTransactionManager:
             self._journal(transaction_id, WorkspaceTransactionState.REVIEWING)
             after = self.scanner.scan(root_path)
             changes = self.differ.diff(before, after)
-            decision = self.policy.evaluate(changes)
+            decision = effective_policy.evaluate(changes)
 
             should_rollback = (
                 (
