@@ -286,7 +286,13 @@ class QueueWorker:
             raise
 
     def run_once(self) -> WorkResult | None:
-        """Claim at most one item and execute it."""
+        """Claim at most one item and execute it.
+
+        Every successful claim has one cleanup owner: this method.  Once an
+        item becomes inflight, the inflight marker is cleared on every exit,
+        including retry-factory failures, executor failures, stale queue
+        transitions, and raised policy errors.
+        """
 
         if self._stop.is_set():
             if self.snapshot().state is not WorkerState.FAILED:
@@ -300,73 +306,87 @@ class QueueWorker:
 
         self._record_claim()
         self._set_state(WorkerState.RUNNING, inflight=item.item_id)
-        retry = self.retry_factory(item)
-        if not isinstance(retry, RetryPolicy):
-            self._transition_failed(item)
-            self._record_failure(WorkDisposition.EXECUTOR_ERROR)
-            self._stop.set()
-            self._set_state(WorkerState.FAILED)
-            raise TypeError("retry_factory must return RetryPolicy")
 
         try:
-            outcome = self.executor.execute(
-                item.command,
-                retry=retry,
-                session=self.session,
-                correlation_id=self._correlation_id(item),
-                circuit_key=item.command.command,
-            )
-        except Exception as exc:
-            # First prove ownership can make the claimed item terminal.  If that
-            # transition is stale, _transition_failed records the stronger
-            # transition failure and raises without this handler overwriting it.
-            terminal = self._transition_failed(item)
-            self._record_failure(WorkDisposition.EXECUTOR_ERROR)
-            if self.policy.stop_on_executor_error:
+            try:
+                retry = self.retry_factory(item)
+            except Exception:
+                # A retry factory is control-plane code.  Once it has accepted
+                # a claimed item, failure to produce policy must not strand
+                # that claim in CLAIMED state.
+                self._transition_failed(item)
+                self._record_failure(WorkDisposition.EXECUTOR_ERROR)
                 self._stop.set()
-                self._set_state(WorkerState.FAILED)
-            elif self.snapshot().state is not WorkerState.FAILED:
-                self._set_state(WorkerState.IDLE)
+                self._set_state(WorkerState.FAILED, inflight=item.item_id)
+                raise
+
+            if not isinstance(retry, RetryPolicy):
+                self._transition_failed(item)
+                self._record_failure(WorkDisposition.EXECUTOR_ERROR)
+                self._stop.set()
+                self._set_state(WorkerState.FAILED, inflight=item.item_id)
+                raise TypeError("retry_factory must return RetryPolicy")
+
+            try:
+                outcome = self.executor.execute(
+                    item.command,
+                    retry=retry,
+                    session=self.session,
+                    correlation_id=self._correlation_id(item),
+                    circuit_key=item.command.command,
+                )
+            except Exception as exc:
+                # First prove ownership can make the claimed item terminal. If
+                # that transition is stale, _transition_failed records the
+                # stronger transition failure and raises. The outer finally
+                # still clears the inflight marker.
+                terminal = self._transition_failed(item)
+                self._record_failure(WorkDisposition.EXECUTOR_ERROR)
+                if self.policy.stop_on_executor_error:
+                    self._stop.set()
+                    self._set_state(WorkerState.FAILED, inflight=item.item_id)
+                elif self.snapshot().state is not WorkerState.FAILED:
+                    self._set_state(WorkerState.IDLE, inflight=item.item_id)
+                return WorkResult(
+                    item_id=item.item_id,
+                    claim_id=item.claim_id or "",
+                    disposition=WorkDisposition.EXECUTOR_ERROR,
+                    queue_state=terminal.state,
+                    outcome=None,
+                    error_type=type(exc).__name__,
+                )
+
+            try:
+                if bool(getattr(outcome, "ok", False)):
+                    terminal = self.queue.complete(item)
+                    self._record_success()
+                    disposition = WorkDisposition.COMPLETED
+                else:
+                    terminal = self.queue.fail(item)
+                    self._record_failure(WorkDisposition.FAILED)
+                    disposition = WorkDisposition.FAILED
+            except RuntimeError:
+                self._record_failure(WorkDisposition.TRANSITION_ERROR)
+                self._stop.set()
+                self._set_state(WorkerState.FAILED, inflight=item.item_id)
+                raise
+
+            snapshot = self.snapshot()
+            if self._stop.is_set() and snapshot.state is not WorkerState.FAILED:
+                self._set_state(WorkerState.STOPPING, inflight=item.item_id)
+            elif not self._stop.is_set():
+                self._set_state(WorkerState.IDLE, inflight=item.item_id)
+
             return WorkResult(
                 item_id=item.item_id,
                 claim_id=item.claim_id or "",
-                disposition=WorkDisposition.EXECUTOR_ERROR,
+                disposition=disposition,
                 queue_state=terminal.state,
-                outcome=None,
-                error_type=type(exc).__name__,
+                outcome=outcome,
             )
-
-        try:
-            if bool(getattr(outcome, "ok", False)):
-                terminal = self.queue.complete(item)
-                self._record_success()
-                disposition = WorkDisposition.COMPLETED
-            else:
-                terminal = self.queue.fail(item)
-                self._record_failure(WorkDisposition.FAILED)
-                disposition = WorkDisposition.FAILED
-        except RuntimeError:
-            self._record_failure(WorkDisposition.TRANSITION_ERROR)
-            self._stop.set()
-            self._set_state(WorkerState.FAILED)
-            raise
         finally:
             with self._lock:
                 self._inflight_item_id = None
-
-        snapshot = self.snapshot()
-        if self._stop.is_set() and snapshot.state is not WorkerState.FAILED:
-            self._set_state(WorkerState.STOPPING)
-        elif not self._stop.is_set():
-            self._set_state(WorkerState.IDLE)
-
-        return WorkResult(
-            item_id=item.item_id,
-            claim_id=item.claim_id or "",
-            disposition=disposition,
-            queue_state=terminal.state,
-            outcome=outcome,
-        )
 
     def drain(self, *, max_items: int | None = None) -> DrainReport:
         """Process a bounded number of available items and return evidence."""
