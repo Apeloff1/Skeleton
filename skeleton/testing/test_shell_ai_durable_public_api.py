@@ -21,6 +21,8 @@ from skeleton.shells.ai.durable_archive_store import (
     DurableArchiveHead,
     DurableArchiveRepository,
     DurableArchiveRootIndex,
+    DurableArchiveRootReplica,
+    DurableArchiveRootResolution,
     DurableArchiveStoreError,
     DurableArchiveStoreReport,
     StoredDurableArchive,
@@ -32,6 +34,14 @@ from skeleton.shells.ai.durable_compaction import (
     DurableCompactionReadiness,
     DurableCompactionRootCoverage,
     DurableCompactionState,
+)
+from skeleton.shells.ai.durable_compaction_certificate import (
+    DurableCompactionCertificate,
+    DurableCompactionCertificateError,
+    DurableCompactionCertificateHead,
+    DurableCompactionCertificateStore,
+    DurableCompactionCertificateVerification,
+    SignedDurableCompactionCertificate,
 )
 from skeleton.shells.ai.durable_lifecycle import (
     DurableEvidenceLifecycleCoordinator,
@@ -73,6 +83,12 @@ AI_EXPORTS = {
     "DurableLifecyclePolicy": DurableLifecyclePolicy,
     "DurableLifecycleReport": DurableLifecycleReport,
     "DurableLifecycleState": DurableLifecycleState,
+    "DurableCompactionCertificate": DurableCompactionCertificate,
+    "DurableCompactionCertificateError": DurableCompactionCertificateError,
+    "DurableCompactionCertificateHead": DurableCompactionCertificateHead,
+    "DurableCompactionCertificateStore": DurableCompactionCertificateStore,
+    "DurableCompactionCertificateVerification": DurableCompactionCertificateVerification,
+    "SignedDurableCompactionCertificate": SignedDurableCompactionCertificate,
     "DurableCompactionError": DurableCompactionError,
     "DurableCompactionPlanner": DurableCompactionPlanner,
     "DurableCompactionPolicy": DurableCompactionPolicy,
@@ -85,6 +101,8 @@ AI_EXPORTS = {
     "DurableArchiveHead": DurableArchiveHead,
     "DurableArchiveRepository": DurableArchiveRepository,
     "DurableArchiveRootIndex": DurableArchiveRootIndex,
+    "DurableArchiveRootReplica": DurableArchiveRootReplica,
+    "DurableArchiveRootResolution": DurableArchiveRootResolution,
     "DurableArchiveStoreError": DurableArchiveStoreError,
     "DurableArchiveStoreReport": DurableArchiveStoreReport,
     "StoredDurableArchive": StoredDurableArchive,
@@ -1097,3 +1115,85 @@ def test_durable_lifecycle_error_is_runtime_error_public_contract():
         DurableLifecycleError,
         RuntimeError,
     )
+
+def test_compaction_certificate_store_constructor_contract():
+    signature = inspect.signature(
+        DurableCompactionCertificateStore
+    )
+    assert {
+        "backend",
+        "signer",
+        "planner",
+        "namespace",
+        "ttl_seconds",
+        "max_ttl_seconds",
+        "max_cas_retries",
+        "clock",
+    }.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "get",
+        "latest",
+        "issue",
+        "inspect",
+        "require_current",
+    ],
+)
+def test_compaction_certificate_store_public_methods(method):
+    assert callable(
+        getattr(
+            DurableCompactionCertificateStore,
+            method,
+            None,
+        )
+    )
+
+
+def test_signed_compaction_certificate_is_non_destructive_public_contract():
+    assert isinstance(
+        SignedDurableCompactionCertificate.destructive_action_authorized,
+        property,
+    )
+    assert isinstance(
+        DurableCompactionCertificate.destructive_action_authorized,
+        property,
+    )
+    assert isinstance(
+        DurableCompactionCertificateVerification.destructive_action_authorized,
+        property,
+    )
+
+
+def test_compaction_certificate_error_is_runtime_error_public_contract():
+    assert issubclass(
+        DurableCompactionCertificateError,
+        RuntimeError,
+    )
+
+
+def test_archive_root_replica_public_shape():
+    signature = inspect.signature(
+        DurableArchiveRootReplica
+    )
+    assert tuple(signature.parameters) == (
+        "archive_id",
+        "archive_manifest_digest",
+    )
+
+
+def test_archive_root_resolution_public_shape():
+    signature = inspect.signature(
+        DurableArchiveRootResolution
+    )
+    assert {
+        "chain_id",
+        "root_hash",
+        "sequence",
+        "archive_id",
+        "archive_manifest_digest",
+        "replica_index",
+    } == set(signature.parameters)
+
