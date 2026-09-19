@@ -78,6 +78,41 @@ from skeleton.shells.ai.durable_lifecycle import (
     DurableLifecycleReport,
     DurableLifecycleState,
 )
+from skeleton.shells.ai.durable_failover import (
+    DurableFailoverAuthority,
+    DurableFailoverConflict,
+    DurableFailoverCoordinator,
+    DurableFailoverPhase,
+    DurableFailoverRecord,
+    DurableFailoverRegistry,
+    DurableFailoverTicket,
+    DurableFailoverTicketError,
+    SignedDurableFailoverTicket,
+    StoredDurableFailover,
+)
+from skeleton.shells.ai.durable_replica_fleet import (
+    DurableReplicaFleet,
+    DurableReplicaFleetError,
+    DurableReplicaFleetFinding,
+    DurableReplicaFleetMember,
+    DurableReplicaFleetMemberReport,
+    DurableReplicaFleetMemberRun,
+    DurableReplicaFleetPolicy,
+    DurableReplicaFleetReport,
+    DurableReplicaFleetRun,
+)
+from skeleton.shells.ai.durable_replication import (
+    DurableChainReplicationReport,
+    DurableChainReplicator,
+    DurableEvidenceReplicaManager,
+    DurableEvidenceReplicationReport,
+    DurableEvidenceReplicationRun,
+    DurableReplicaState,
+    DurableReplicationBatch,
+    DurableReplicationError,
+    DurableReplicationPolicy,
+    DurableReplicationRun,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryFinding,
     DurableRecoveryStatus,
@@ -169,6 +204,35 @@ AI_EXPORTS = {
     "DurableSessionRecoveryReport": DurableSessionRecoveryReport,
     "DurableSessionRecoveryVerifier": DurableSessionRecoveryVerifier,
     "RecoveryFindingSeverity": RecoveryFindingSeverity,
+    "DurableChainReplicationReport": DurableChainReplicationReport,
+    "DurableChainReplicator": DurableChainReplicator,
+    "DurableEvidenceReplicaManager": DurableEvidenceReplicaManager,
+    "DurableEvidenceReplicationReport": DurableEvidenceReplicationReport,
+    "DurableEvidenceReplicationRun": DurableEvidenceReplicationRun,
+    "DurableReplicaState": DurableReplicaState,
+    "DurableReplicationBatch": DurableReplicationBatch,
+    "DurableReplicationError": DurableReplicationError,
+    "DurableReplicationPolicy": DurableReplicationPolicy,
+    "DurableReplicationRun": DurableReplicationRun,
+    "DurableFailoverAuthority": DurableFailoverAuthority,
+    "DurableFailoverConflict": DurableFailoverConflict,
+    "DurableFailoverCoordinator": DurableFailoverCoordinator,
+    "DurableFailoverPhase": DurableFailoverPhase,
+    "DurableFailoverRecord": DurableFailoverRecord,
+    "DurableFailoverRegistry": DurableFailoverRegistry,
+    "DurableFailoverTicket": DurableFailoverTicket,
+    "DurableFailoverTicketError": DurableFailoverTicketError,
+    "SignedDurableFailoverTicket": SignedDurableFailoverTicket,
+    "StoredDurableFailover": StoredDurableFailover,
+    "DurableReplicaFleet": DurableReplicaFleet,
+    "DurableReplicaFleetError": DurableReplicaFleetError,
+    "DurableReplicaFleetFinding": DurableReplicaFleetFinding,
+    "DurableReplicaFleetMember": DurableReplicaFleetMember,
+    "DurableReplicaFleetMemberReport": DurableReplicaFleetMemberReport,
+    "DurableReplicaFleetMemberRun": DurableReplicaFleetMemberRun,
+    "DurableReplicaFleetPolicy": DurableReplicaFleetPolicy,
+    "DurableReplicaFleetReport": DurableReplicaFleetReport,
+    "DurableReplicaFleetRun": DurableReplicaFleetRun,
 }
 
 
@@ -1661,3 +1725,159 @@ def test_archive_repository_exposes_index_health():
             None,
         )
     )
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "sync_once", "sync", "require_in_sync"],
+)
+def test_durable_chain_replicator_public_methods_are_stable(method):
+    assert callable(getattr(DurableChainReplicator, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "sync", "require_promotion_ready"],
+)
+def test_durable_replica_manager_public_methods_are_stable(method):
+    assert callable(getattr(DurableEvidenceReplicaManager, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["issue", "verify_static", "verify"],
+)
+def test_durable_failover_authority_public_methods_are_stable(method):
+    assert callable(getattr(DurableFailoverAuthority, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["current", "claim", "applied", "cancel"],
+)
+def test_durable_failover_registry_public_methods_are_stable(method):
+    assert callable(getattr(DurableFailoverRegistry, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["issue", "claim", "complete", "cancel"],
+)
+def test_durable_failover_coordinator_public_methods_are_stable(method):
+    assert callable(getattr(DurableFailoverCoordinator, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "sync_all", "require_quorum", "eligible_targets"],
+)
+def test_durable_replica_fleet_public_methods_are_stable(method):
+    assert callable(getattr(DurableReplicaFleet, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "append",
+        "snapshot",
+        "snapshot_at",
+        "snapshot_range",
+        "snapshot_segment",
+        "verify_segment",
+        "restore_segment",
+        "verify",
+        "verify_root",
+        "root_for_sequence",
+        "sequence_for_root",
+        "get_by_sequence",
+        "root_is_ancestor",
+        "root_hash",
+        "length",
+    ],
+)
+def test_distributed_journal_replication_methods_are_public(method):
+    assert callable(getattr(DistributedAIDecisionJournal, method, None))
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "append",
+        "snapshot",
+        "snapshot_at",
+        "snapshot_range",
+        "snapshot_segment",
+        "verify_segment",
+        "restore_segment",
+        "verify",
+        "verify_root",
+        "root_for_sequence",
+        "sequence_for_root",
+        "get_by_sequence",
+        "root_is_ancestor",
+        "root_hash",
+        "length",
+    ],
+)
+def test_distributed_receipt_replication_methods_are_public(method):
+    assert callable(getattr(DistributedReceiptChain, method, None))
+
+
+def test_durable_replica_state_wire_values_are_stable():
+    assert {item.value for item in DurableReplicaState} == {
+        "in_sync",
+        "lagging",
+        "target_ahead",
+        "diverged",
+        "source_invalid",
+        "target_invalid",
+        "history_unavailable",
+        "unsupported",
+    }
+
+
+def test_durable_failover_phase_wire_values_are_stable():
+    assert {item.value for item in DurableFailoverPhase} == {
+        "claimed",
+        "applied",
+        "cancelled",
+    }
+
+
+def test_replication_policy_constructor_contract():
+    signature = inspect.signature(DurableReplicationPolicy)
+    assert "max_batch_items" in signature.parameters
+    assert "max_batches_per_run" in signature.parameters
+    assert "require_source_integrity" in signature.parameters
+    assert "require_target_integrity" in signature.parameters
+    assert "promotion_max_lag_items" in signature.parameters
+
+
+def test_replica_fleet_policy_constructor_contract():
+    signature = inspect.signature(DurableReplicaFleetPolicy)
+    assert "min_ready_replicas" in signature.parameters
+    assert "min_ready_failure_domains" in signature.parameters
+    assert "max_member_lag_items" in signature.parameters
+    assert "require_all_required_members" in signature.parameters
+    assert "continue_on_sync_error" in signature.parameters
+
+
+def test_failover_ticket_constructor_exposes_fleet_commitments():
+    signature = inspect.signature(DurableFailoverTicket)
+    assert "fleet_state_digest" in signature.parameters
+    assert "fleet_policy_digest" in signature.parameters
+
+
+def test_failover_coordinator_constructor_exposes_optional_fleet():
+    signature = inspect.signature(DurableFailoverCoordinator)
+    assert "manager" in signature.parameters
+    assert "authority" in signature.parameters
+    assert "registry" in signature.parameters
+    assert "source_id" in signature.parameters
+    assert "target_id" in signature.parameters
+    assert "fleet" in signature.parameters
+
+
+def test_restore_segment_is_present_on_both_canonical_chain_types():
+    assert hasattr(DistributedAIDecisionJournal, "restore_segment")
+    assert hasattr(DistributedReceiptChain, "restore_segment")
