@@ -31,6 +31,17 @@ from skeleton.shells.ai.durable_health import (
     DurableRecoveryHealthGuard,
     DurableRecoveryHealthPolicy,
 )
+from skeleton.shells.ai.durable_proof_window import (
+    DurableHistoricalProofAuthority,
+    DurableHistoricalProofStore,
+)
+from skeleton.shells.ai.durable_proof_window_operator import (
+    DurableProofWindowOperator,
+    DurableProofWindowPolicy,
+)
+from skeleton.shells.ai.durable_session_journal import (
+    DurableSessionJournalStore,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryStatus,
     DurableRecoveryVerificationError,
@@ -322,6 +333,11 @@ class DurableEnvironment:
             namespace="finalizations",
             clock=lambda: 10.0,
         )
+        self.session_journals = DurableSessionJournalStore(
+            self.backend,
+            namespace="session-journals",
+            clock=lambda: 10.0,
+        )
         self.finalizer = AIExecutionEvidenceFinalizer(
             journal=self.journal,
             receipt_chain=self.receipts,
@@ -333,6 +349,7 @@ class DurableEnvironment:
             ),
             finalizations=self.finalizations,
             recovery_checkpoints=self.recovery,
+            session_journals=self.session_journals,
         )
 
     def execute(
