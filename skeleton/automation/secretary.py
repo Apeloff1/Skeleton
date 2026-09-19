@@ -38,6 +38,7 @@ from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
     canonical_json,
+    parse_worker_result,
     require_exact_head,
     require_remote_base_unchanged,
     sanitized_worker_env,
@@ -581,11 +582,20 @@ def _dispatch_one(
                 env=env,
                 timeout=MAX_WORKER_SECONDS,
                 check=False,
+                capture_output=True,
+                text=True,
             )
+            evidence = None
+            if process.returncode == 0:
+                evidence = parse_worker_result(
+                    process.stdout,
+                    worker=name,
+                )
             return {
                 "bot": name,
                 "returncode": process.returncode,
                 "isolated": True,
+                "evidence": evidence,
             }
         except (
             OSError,
