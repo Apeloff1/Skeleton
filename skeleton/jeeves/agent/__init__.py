@@ -169,6 +169,10 @@ from .execution_audit import (
     ReplayIssueKind,
     ReplayReport,
 )
+from .frontier_adjudication import (
+    CandidateAdjudication,
+    HostCandidateAdjudicator,
+)
 from .frontier_control_plane import FrontierCognitiveControlPlane
 from .frontier_consensus import (
     ConsensusCluster,
@@ -483,6 +487,31 @@ from .semantic_lens_topology import (
     SemanticTopologySnapshot,
 )
 
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
+)
+
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
+    SemanticLearningScope,
+    SemanticScopePoolSnapshot,
+)
+
+from .semantic_topology_learning import (
+    LearnedTopologyRule,
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
+    TopologyBridgeDomainReport,
+    TopologyBridgePolicy,
+    TopologyBridgePrediction,
+    TopologyBridgeReport,
+    TopologyBridgeStatus,
+    TopologyBridgeTrial,
+)
+
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
     FrontierLensRouter,
@@ -503,6 +532,7 @@ from .semantic_maximal import (
 )
 from .semantic_plane import (
     FindingRejection,
+    LearnedCompanionActivation,
     SemanticFindingAudit,
     SemanticLensPlane,
     SemanticPlaneCoverage,

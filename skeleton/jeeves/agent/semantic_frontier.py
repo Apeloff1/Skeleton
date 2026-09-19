@@ -65,6 +65,7 @@ class LensInteractionRule:
     predictive_effect: str
     symmetric: bool = True
     tangent_axis_hint: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "left_key", str(self.left_key).strip().casefold())
@@ -77,7 +78,16 @@ class LensInteractionRule:
         object.__setattr__(self, "question", bounded_text("interaction question", self.question, maximum=4096))
         object.__setattr__(self, "predictive_effect", bounded_text("predictive effect", self.predictive_effect, maximum=4096))
         if self.tangent_axis_hint is not None:
-            object.__setattr__(self, "tangent_axis_hint", str(self.tangent_axis_hint).strip().casefold())
+            object.__setattr__(
+                self,
+                "tangent_axis_hint",
+                str(self.tangent_axis_hint).strip().casefold(),
+            )
+        object.__setattr__(
+            self,
+            "metadata",
+            json_safe(dict(self.metadata)),
+        )
 
     @property
     def key(self) -> tuple[str, str]:
@@ -113,18 +123,20 @@ class LensInteraction:
 
     @property
     def fingerprint(self) -> str:
-        return stable_fingerprint(
-            {
-                "rule": self.rule.key,
-                "kind": self.rule.kind.value,
-                "left": self.left_finding_id,
-                "right": self.right_finding_id,
-                "observations": self.observation_ids,
-                "evidence": self.evidence_ids,
-                "hypothesis": self.hypothesis,
-                "counter": self.counter_hypothesis,
-            }
-        )
+        payload: dict[str, Any] = {
+            "rule": self.rule.key,
+            "kind": self.rule.kind.value,
+            "left": self.left_finding_id,
+            "right": self.right_finding_id,
+            "observations": self.observation_ids,
+            "evidence": self.evidence_ids,
+            "hypothesis": self.hypothesis,
+            "counter": self.counter_hypothesis,
+        }
+        rule_provenance = self.metadata.get("rule_provenance")
+        if rule_provenance:
+            payload["rule_provenance"] = rule_provenance
+        return stable_fingerprint(payload)
 
 
 @dataclass(frozen=True, slots=True)
@@ -417,12 +429,6 @@ def frontier_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
               ("Can the player infer which action caused which consequence?",),
               "More legible feedback predicts faster policy adaptation and fewer mistaken causal attributions.",
               "Assuming immediate feedback is always desirable or truthful.", minimum=2, sequential=True),
-        _lens("diegetic_interface", LensFamily.GAME, SemanticRole.PERSPECTIVE, 2000,
-              "Distinguish information available inside the game world from interface-only information available to the player.",
-              ("hud", "interface", "diegetic", "character", "player knows", "map"),
-              ("Who has access to this information: avatar, player, both, or neither?",),
-              "Behavior can diverge when player information exceeds character information.",
-              "Assuming UI information is available to in-world agents."),
         _lens("sequence_break", LensFamily.GAME, SemanticRole.ADVERSARIAL_READING, 1990,
               "Detect player routes that bypass the intended progression graph while remaining mechanically valid.",
               ("skip", "sequence break", "speedrun", "bypass", "route", "exploit"),
@@ -708,16 +714,52 @@ class LensCompositionEngine:
         right = str(right_key).casefold()
         return self._directed.get((left, right)) or self._symmetric.get(tuple(sorted((left, right))))
 
-    def compose(self, findings: Sequence[SemanticFinding]) -> SemanticComposition:
+    def compose(
+        self,
+        findings: Sequence[SemanticFinding],
+        *,
+        supplemental_rules: Iterable[LensInteractionRule] = (),
+    ) -> SemanticComposition:
         findings = tuple(findings)
         if any(not isinstance(item, SemanticFinding) for item in findings):
             raise TypeError("compose requires SemanticFinding values")
+
+        supplemental_symmetric: dict[tuple[str, str], LensInteractionRule] = {}
+        supplemental_directed: dict[tuple[str, str], LensInteractionRule] = {}
+        for rule in tuple(supplemental_rules):
+            if not isinstance(rule, LensInteractionRule):
+                raise TypeError(
+                    "supplemental_rules must contain LensInteractionRule values"
+                )
+            if self.rule_for(rule.left_key, rule.right_key) is not None:
+                raise AgentContractError(
+                    f"supplemental rule collides with static interaction: {rule.key}"
+                )
+            destination = (
+                supplemental_symmetric
+                if rule.symmetric
+                else supplemental_directed
+            )
+            if rule.key in destination:
+                raise AgentContractError(
+                    f"duplicate supplemental interaction rule: {rule.key}"
+                )
+            destination[rule.key] = rule
+
         interactions: list[LensInteraction] = []
         conflicts: list[str] = []
         tangent_seeds: list[TangentSeed] = []
         for i, left in enumerate(findings):
             for right in findings[i + 1 :]:
-                rule = self.rule_for(left.lens_key, right.lens_key)
+                directed_key = (left.lens_key, right.lens_key)
+                symmetric_key = tuple(
+                    sorted((left.lens_key, right.lens_key))
+                )
+                rule = (
+                    supplemental_directed.get(directed_key)
+                    or supplemental_symmetric.get(symmetric_key)
+                    or self.rule_for(left.lens_key, right.lens_key)
+                )
                 if rule is None:
                     continue
                 observations = tuple(sorted(set(left.observation_ids) | set(right.observation_ids)))
@@ -776,6 +818,11 @@ class LensCompositionEngine:
                         "may_promote_to_evidence": False,
                         "left_status": left.status.value,
                         "right_status": right.status.value,
+                        **(
+                            {"rule_provenance": dict(rule.metadata)}
+                            if rule.metadata
+                            else {}
+                        ),
                     },
                 )
                 interactions.append(interaction)

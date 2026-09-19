@@ -5,9 +5,13 @@ import pytest
 from skeleton.jeeves.agent.action_model import SkillSpec
 from skeleton.jeeves.agent.cortex import CortexError, JeevesCortex
 from skeleton.jeeves.agent.evidence import EvidenceLedger
-from skeleton.jeeves.agent.execution_audit import AuditEventKind
+from skeleton.jeeves.agent.execution_audit import (
+    AuditEventKind,
+    ExecutionAuditError,
+)
 from skeleton.jeeves.agent.frontier_runtime import FrontierJeevesAgentRuntime
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
+from skeleton.jeeves.agent.semantic_frontier import LensInteractionKind
 from skeleton.jeeves.agent.runtime import RunInputs
 from skeleton.jeeves.agent.tools import ToolSpec
 from skeleton.jeeves.agent.types import (
@@ -294,6 +298,65 @@ def test_cortex_current_risk_uses_host_tool_risk_not_model_understatement() -> N
     )
 
     assert runtime._cortex_current_risk(state) is RiskTier.EXTERNAL
+
+
+def test_checkpoint_binds_semantic_topology_learning_root() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-topology-root")
+    state = runtime._new_state("run-topology-root", inputs)
+    checkpoint = runtime.checkpointer.latest(state.run_id)
+    assert checkpoint is not None
+
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    expected = scoped_plane.topology_learning.fingerprint
+    assert (
+        checkpoint.metadata["semantic_topology_learning_fingerprint"]
+        == expected
+    )
+
+    ledger = runtime.runtime_guard.audit_store.get(state.run_id)
+    assert ledger is not None
+    binding = next(
+        entry
+        for entry in reversed(ledger.entries())
+        if entry.kind is AuditEventKind.CHECKPOINT_BOUND
+        and entry.payload.get("checkpoint_sequence") == checkpoint.sequence
+    )
+    assert (
+        binding.payload["semantic_topology_learning_fingerprint"]
+        == expected
+    )
+
+
+def test_resume_rejects_semantic_topology_learning_drift() -> None:
+    clock = TickClock()
+    runtime = _runtime(clock)
+    inputs = _inputs("run-topology-drift")
+    state = runtime._new_state("run-topology-drift", inputs)
+    checkpoint = runtime.checkpointer.latest(state.run_id)
+    assert checkpoint is not None
+
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    candidate = scoped_plane.topology.bridge_candidates(
+        limit=1,
+        minimum_score=0.0,
+    )[0]
+    runtime.declare_scoped_semantic_topology_candidate_prediction(
+        inputs,
+        candidate.candidate_id,
+        kind=LensInteractionKind.REINFORCES,
+        predicted_probability=0.7,
+        domain="film",
+        independent_run="drift-run",
+        predicted_at=clock(),
+    )
+
+    with pytest.raises(
+        ExecutionAuditError,
+        match="topology learning fingerprint changed",
+    ):
+        runtime._state_from_checkpoint(inputs, checkpoint)
 
 
 def test_resume_rebinds_existing_cortex_run_to_restored_evidence_ledger() -> None:

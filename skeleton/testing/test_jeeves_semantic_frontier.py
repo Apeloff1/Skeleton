@@ -5,8 +5,15 @@ from skeleton.jeeves.agent.semantic_frontier import (
     FrontierSemanticRegistry,
     LensCompositionEngine,
     LensInteractionKind,
+    frontier_semantic_lenses,
 )
-from skeleton.jeeves.agent.semantic_lenses import LensFamily, ReadingStatus, SemanticFinding, SemanticObservation
+from skeleton.jeeves.agent.semantic_lenses import (
+    LensFamily,
+    ReadingStatus,
+    SemanticFinding,
+    SemanticObservation,
+    default_semantic_lenses,
+)
 from skeleton.jeeves.agent.semantic_prediction import PredictionStatus, SemanticPredictionLedger, SemanticPredictiveModel
 from skeleton.jeeves.agent.semantic_tangent_bridge import SemanticTangentBridge
 
@@ -36,6 +43,15 @@ def _finding(
         evidence_ids=("ev-1",),
         counterreading=counterreading,
     )
+
+
+def test_frontier_extension_catalog_is_disjoint_from_base_catalog() -> None:
+    base = {spec.key for spec in default_semantic_lenses()}
+    frontier = {spec.key for spec in frontier_semantic_lenses()}
+
+    assert base.isdisjoint(frontier)
+    assert "diegetic_interface" in base
+    assert "diegetic_interface" not in frontier
 
 
 def test_frontier_registry_contains_rare_film_literary_and_game_lenses() -> None:
