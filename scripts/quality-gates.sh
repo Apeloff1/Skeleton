@@ -142,6 +142,11 @@ python backend/scripts/check_secret_hygiene.py
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
 
+printf '\n== Live-service backend test boundary ==\n'
+python backend/scripts/check_live_service_test_boundaries.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  backend/tests/test_live_service_test_boundaries.py
+
 printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
