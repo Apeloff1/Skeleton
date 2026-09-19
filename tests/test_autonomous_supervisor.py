@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from skeleton.automation import secretary, specialist_bots, supervisor
+from skeleton.automation.build_authority import BuildAuthorization
 from skeleton.automation.supervisor_runtime import (
     ExecutionIdentity,
     WorkerCustody,
@@ -1090,6 +1091,50 @@ class WorkerAdmissionTests(unittest.TestCase):
             EXECUTION,
         )
 
+    def test_feature_builder_rejects_duplicate_authorization_keys(
+        self,
+    ) -> None:
+        authorization = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 17,
+                "title": "Approved build",
+                "body": "Implement the bounded task.",
+                "labels": ["automation-approved"],
+                "updatedAt": "2026-09-19T00:00:00Z",
+                "automation_authorized": True,
+            },
+        )
+        rendered = json.dumps(
+            authorization.as_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        rendered = rendered.replace(
+            '"version":1',
+            '"version":1,"version":1',
+            1,
+        )
+        env = execution_env(worker="feature-builder")
+        env["SUPERVISOR_BUILD_AUTHORIZATION_B64"] = (
+            base64.b64encode(rendered.encode("utf-8")).decode("ascii")
+        )
+        env["SUPERVISOR_BUILD_TASK_DIGEST"] = authorization.task_digest
+        custody = WorkerCustody(
+            worker="feature-builder",
+            snapshot_fingerprint=FP,
+            execution=EXECUTION,
+        )
+        with patch.dict(
+            os.environ,
+            env,
+            clear=True,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.admit_build_authorization(custody)
+
     def test_invalid_supervisor_fingerprint_is_rejected(
         self,
     ) -> None:
@@ -1215,6 +1260,19 @@ class WorkerProposalTests(unittest.TestCase):
         raw = (
             '{"summary":"repair","files":[],"tests":[]}'
             " run this shell command"
+        )
+        with self.assertRaises(ValueError):
+            specialist_bots.extract_plan(
+                raw,
+                3,
+            )
+
+    def test_extract_plan_rejects_duplicate_json_keys(
+        self,
+    ) -> None:
+        raw = (
+            '{"summary":"first","summary":"second",'
+            '"files":[],"tests":[]}'
         )
         with self.assertRaises(ValueError):
             specialist_bots.extract_plan(
