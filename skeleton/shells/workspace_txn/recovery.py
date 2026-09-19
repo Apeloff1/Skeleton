@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.journal import JournalEvent, TransactionJournal
 from skeleton.shells.workspace_txn.state_machine import TransactionStateMachine
-from skeleton.shells.workspace_txn.types import WorkspaceTransactionState
+from skeleton.shells.workspace_txn.types import BackupManifest, WorkspaceSnapshot, WorkspaceTransactionState
 
 _STATE_MACHINE = TransactionStateMachine()
 _TERMINAL = frozenset(
@@ -40,6 +41,22 @@ class RecoveryCandidate:
                 self.root_fingerprint,
                 self.command_fingerprint,
             )
+        )
+
+
+@dataclass(frozen=True)
+class RecoveryEvidence:
+    candidate: RecoveryCandidate
+    manifest: BackupManifest
+    before: WorkspaceSnapshot
+
+    @property
+    def verified(self) -> bool:
+        return (
+            self.candidate.evidence_complete
+            and self.manifest.digest == self.candidate.backup_digest
+            and self.before.digest == self.candidate.before_snapshot_digest
+            and self.before.root_fingerprint == self.candidate.root_fingerprint
         )
 
 
@@ -103,6 +120,29 @@ class TransactionRecoveryInspector:
                 )
             )
         return tuple(result)
+
+    def resolve_evidence(
+        self,
+        candidate: RecoveryCandidate,
+        backup_store: ContentAddressedBackupStore,
+    ) -> RecoveryEvidence:
+        if not candidate.evidence_complete:
+            raise BackupError(
+                "recovery candidate lacks complete backup/snapshot evidence"
+            )
+        manifest = backup_store.load_manifest(
+            candidate.backup_id,
+            expected_digest=candidate.backup_digest,
+            expected_root_fingerprint=candidate.root_fingerprint,
+        )
+        before = backup_store.reconstruct_snapshot(
+            manifest,
+            expected_digest=candidate.before_snapshot_digest,
+        )
+        evidence = RecoveryEvidence(candidate, manifest, before)
+        if not evidence.verified:
+            raise BackupError("resolved recovery evidence failed verification")
+        return evidence
 
     def require_clean(self) -> None:
         risky = [candidate for candidate in self.candidates() if candidate.needs_manual_review]
