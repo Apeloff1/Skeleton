@@ -752,6 +752,27 @@ def test_transport_rate_floor():
         transport.ensure_rate_floor()
 
 
+def test_transport_paged_named_list_rejects_page_bound_over_limit():
+    transport = _transport(RouteOpener(), max_pages=1)
+    with pytest.raises(ValueError, match="max_pages"):
+        transport.paged_named_list(
+            "/checks",
+            "check_runs",
+            max_pages=2,
+        )
+
+
+@pytest.mark.parametrize("per_page", [0, 101])
+def test_transport_paged_named_list_rejects_invalid_page_size(per_page):
+    transport = _transport(RouteOpener())
+    with pytest.raises(ValueError, match="per_page"):
+        transport.paged_named_list(
+            "/checks",
+            "check_runs",
+            per_page=per_page,
+        )
+
+
 def test_transport_paged_list_complete():
     opener = RouteOpener()
     opener.add(
