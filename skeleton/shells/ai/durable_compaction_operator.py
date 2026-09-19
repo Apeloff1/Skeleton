@@ -767,7 +767,10 @@ class DurableCompactionWorkflowInspection:
     @property
     def safe_to_resume(self) -> bool:
         return (
-            self.stored.workflow.resumable
+            # PREPARED has not started destructive execution yet; callers
+            # should use execute(), not the crash-recovery resume path.
+            self.stored.workflow.phase
+            is DurableCompactionWorkflowPhase.EXECUTING
             and self.pruning_state_consistent
             and self.archive_recoverable
             and self.hot_floor_consistent
