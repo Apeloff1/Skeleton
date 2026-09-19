@@ -36,6 +36,13 @@ from skeleton.shells.ai.durable_compaction_lineage import (
     DurableCompactionLineageAuditor,
     DurableCompactionLineageError,
 )
+from skeleton.shells.ai.durable_compaction_lineage_health import (
+    CompactionLineageFleetError,
+    CompactionLineageFleetGuard,
+    CompactionLineageHealthFinding,
+    CompactionLineageHealthPolicy,
+    CompactionLineageHealthSeverity,
+)
 from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionExecution,
     DurableCompactionOperator,
@@ -2843,3 +2850,626 @@ def test_compaction_lineage_workflow_id_validation():
         lineage_auditor(
             fixture
         ).inspect("bad")
+
+
+def lineage_guard(
+    fixture,
+    policy=None,
+):
+    return CompactionLineageFleetGuard(
+        lineage_auditor(fixture),
+        policy,
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_all_verified_is_allowed(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = lineage_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,)
+    )
+    assert report.allowed
+    assert report.verified == 1
+    assert report.incomplete == 0
+    assert report.manual_review == 0
+    assert report.errors == 0
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_default_policy_denies_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    report = lineage_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,)
+    )
+    assert not report.allowed
+    assert report.incomplete == 1
+    assert report.errors >= 1
+    assert any(
+        item.code
+        == "compaction_lineage.incomplete_bound"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_can_tolerate_bounded_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=1,
+        ),
+    )
+    report = guard.require(
+        (plan.workflow_id,)
+    )
+    assert report.allowed
+    assert report.incomplete == 1
+    assert report.errors == 0
+    assert report.warnings >= 1
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_manual_review_is_never_tolerated(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            stored.workflow,
+            certificate_digest=fp(
+                "fleet-conflict"
+            ),
+        ),
+    )
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=10,
+        ),
+    )
+    report = guard.inspect(
+        (plan.workflow_id,)
+    )
+    assert not report.allowed
+    assert report.manual_review == 1
+    assert report.errors >= 1
+    assert any(
+        item.code
+        == "compaction_lineage.manual_review_present"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_minimum_verified_is_enforced(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=1,
+            minimum_verified=1,
+        ),
+    )
+    report = guard.inspect(
+        (plan.workflow_id,)
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "compaction_lineage.minimum_verified"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_minimum_verified_accepts_completed(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            minimum_verified=1,
+        ),
+    )
+    report = guard.require(
+        (plan.workflow_id,)
+    )
+    assert report.allowed
+    assert report.verified == 1
+
+
+def test_lineage_fleet_require_nonempty():
+    fixture = OperatorFixture()
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            require_nonempty=True,
+        ),
+    )
+    report = guard.inspect(())
+    assert not report.allowed
+    assert any(
+        item.code
+        == "compaction_lineage.empty_required_set"
+        for item in report.findings
+    )
+
+
+def test_lineage_fleet_empty_allowed_by_default():
+    fixture = OperatorFixture()
+    report = lineage_guard(
+        fixture
+    ).require(())
+    assert report.allowed
+    assert report.workflow_ids == ()
+    assert report.reports == ()
+
+
+def test_lineage_fleet_sorts_workflow_ids():
+    fixture = OperatorFixture()
+    first = fixture.plan()
+    second_id = fp(
+        "synthetic-missing-second"
+    )
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=2,
+        ),
+    )
+    report = guard.inspect(
+        (second_id, first.workflow_id)
+    )
+    assert report.workflow_ids == tuple(
+        sorted(
+            (
+                second_id,
+                first.workflow_id,
+            )
+        )
+    )
+
+
+def test_lineage_fleet_rejects_duplicate_ids():
+    fixture = OperatorFixture()
+    plan = fixture.plan()
+    with pytest.raises(
+        ValueError,
+        match="duplicate",
+    ):
+        lineage_guard(
+            fixture
+        ).inspect(
+            (
+                plan.workflow_id,
+                plan.workflow_id,
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "workflow_id",
+    ["", "bad", "x" * 63, "x" * 65],
+)
+def test_lineage_fleet_rejects_invalid_ids(workflow_id):
+    fixture = OperatorFixture()
+    with pytest.raises(
+        ValueError,
+        match="64-character",
+    ):
+        lineage_guard(
+            fixture
+        ).inspect(
+            (workflow_id,)
+        )
+
+
+def test_lineage_fleet_max_workflow_bound():
+    fixture = OperatorFixture()
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_workflows=1,
+            max_incomplete=1,
+        ),
+    )
+    with pytest.raises(
+        CompactionLineageFleetError,
+        match="bound",
+    ):
+        guard.inspect(
+            (
+                fp("workflow-one"),
+                fp("workflow-two"),
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_workflows": 0},
+        {"max_workflows": True},
+        {"max_incomplete": -1},
+        {"minimum_verified": -1},
+        {"max_findings": 0},
+        {"max_findings": True},
+        {"require_nonempty": "yes"},
+    ],
+)
+def test_lineage_health_policy_validation(kwargs):
+    with pytest.raises(ValueError):
+        CompactionLineageHealthPolicy(
+            **kwargs
+        )
+
+
+def test_lineage_health_policy_rejects_incomplete_above_workflow_bound():
+    with pytest.raises(
+        ValueError,
+        match="max_incomplete",
+    ):
+        CompactionLineageHealthPolicy(
+            max_workflows=2,
+            max_incomplete=3,
+        )
+
+
+def test_lineage_health_policy_rejects_minimum_verified_above_workflow_bound():
+    with pytest.raises(
+        ValueError,
+        match="minimum_verified",
+    ):
+        CompactionLineageHealthPolicy(
+            max_workflows=2,
+            minimum_verified=3,
+        )
+
+
+def test_lineage_health_policy_digest_is_stable():
+    one = CompactionLineageHealthPolicy(
+        max_workflows=10,
+        max_incomplete=2,
+        minimum_verified=3,
+        require_nonempty=True,
+        max_findings=99,
+    )
+    two = CompactionLineageHealthPolicy(
+        max_workflows=10,
+        max_incomplete=2,
+        minimum_verified=3,
+        require_nonempty=True,
+        max_findings=99,
+    )
+    assert one.digest == two.digest
+    assert len(one.digest) == 64
+
+
+def test_lineage_health_policy_digest_changes_with_policy():
+    one = CompactionLineageHealthPolicy()
+    two = CompactionLineageHealthPolicy(
+        max_incomplete=1,
+    )
+    assert one.digest != two.digest
+
+
+class RaisingLineageAuditor(
+    DurableCompactionLineageAuditor
+):
+    def inspect(self, workflow_id):
+        raise RuntimeError(
+            "synthetic lineage probe failure"
+        )
+
+
+def test_lineage_fleet_probe_exception_fails_closed():
+    fixture = OperatorFixture()
+    guard = CompactionLineageFleetGuard(
+        RaisingLineageAuditor(
+            fixture.operator
+        )
+    )
+    workflow_id = fp(
+        "probe-error-workflow"
+    )
+    report = guard.inspect(
+        (workflow_id,)
+    )
+    assert not report.allowed
+    assert report.manual_review == 1
+    assert report.reports[0].requires_manual_review
+    assert any(
+        detail.code
+        == "lineage.probe_error"
+        for detail
+        in report.reports[0].findings
+    )
+
+
+def test_lineage_fleet_require_raises_on_probe_error():
+    fixture = OperatorFixture()
+    guard = CompactionLineageFleetGuard(
+        RaisingLineageAuditor(
+            fixture.operator
+        )
+    )
+    with pytest.raises(
+        CompactionLineageFleetError,
+    ):
+        guard.require(
+            (fp("probe-error"),)
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_require_raises_on_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            stored.workflow,
+            certificate_digest=fp(
+                "manual-review-conflict"
+            ),
+        ),
+    )
+    with pytest.raises(
+        CompactionLineageFleetError,
+    ):
+        lineage_guard(
+            fixture
+        ).require(
+            (plan.workflow_id,)
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_report_digest_is_stable(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    guard = lineage_guard(fixture)
+    first = guard.require(
+        (plan.workflow_id,)
+    )
+    second = guard.require(
+        (plan.workflow_id,)
+    )
+    assert first == second
+    assert first.digest == second.digest
+    assert first.to_dict()["digest"] == first.digest
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_report_serializes_counts(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = lineage_guard(
+        fixture
+    ).require(
+        (plan.workflow_id,)
+    )
+    data = report.to_dict()
+    assert data["allowed"] is True
+    assert data["verified"] == 1
+    assert data["incomplete"] == 0
+    assert data["manual_review"] == 0
+    assert data["errors"] == 0
+    assert data["workflow_ids"] == [
+        plan.workflow_id
+    ]
+
+
+def test_lineage_health_finding_validation():
+    finding = CompactionLineageHealthFinding(
+        CompactionLineageHealthSeverity.WARNING,
+        "code",
+        "message",
+        fp("workflow"),
+    )
+    assert finding.to_dict() == {
+        "severity": "warning",
+        "code": "code",
+        "message": "message",
+        "workflow_id": fp("workflow"),
+    }
+    with pytest.raises(ValueError):
+        CompactionLineageHealthFinding(
+            CompactionLineageHealthSeverity.ERROR,
+            "",
+            "message",
+        )
+    with pytest.raises(ValueError):
+        CompactionLineageHealthFinding(
+            CompactionLineageHealthSeverity.ERROR,
+            "code",
+            "",
+        )
+
+
+def test_lineage_guard_requires_auditor():
+    with pytest.raises(
+        TypeError,
+        match="auditor",
+    ):
+        CompactionLineageFleetGuard(
+            object()
+        )
+
+
+def test_lineage_guard_requires_policy_type():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        TypeError,
+        match="policy",
+    ):
+        CompactionLineageFleetGuard(
+            lineage_auditor(
+                fixture
+            ),
+            object(),
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_detail_conflicts_become_health_errors(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            stored.workflow,
+            certificate_digest=fp(
+                "detail-conflict"
+            ),
+        ),
+    )
+    report = lineage_guard(
+        fixture
+    ).inspect(
+        (plan.workflow_id,)
+    )
+    assert any(
+        item.code.startswith(
+            "compaction_lineage.detail."
+        )
+        for item in report.findings
+    )
+
+
+def test_lineage_fleet_max_findings_bound_fails_closed():
+    fixture = OperatorFixture()
+    guard = CompactionLineageFleetGuard(
+        RaisingLineageAuditor(
+            fixture.operator
+        ),
+        CompactionLineageHealthPolicy(
+            max_workflows=10,
+            max_incomplete=10,
+            max_findings=1,
+        ),
+    )
+    # A manual-review report creates both a fleet-level and per-workflow error,
+    # exceeding the deliberately tiny finding budget.
+    with pytest.raises(
+        CompactionLineageFleetError,
+        match="finding bound",
+    ):
+        guard.inspect(
+            (fp("many-findings"),)
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_mixed_verified_and_incomplete_with_tolerance(kind):
+    fixture = OperatorFixture(kind=kind)
+    completed, _, _ = (
+        fixture.through_complete()
+    )
+    missing = fp(
+        "missing-incomplete-workflow"
+    )
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=1,
+            minimum_verified=1,
+        ),
+    )
+    report = guard.require(
+        (
+            completed.workflow_id,
+            missing,
+        )
+    )
+    assert report.allowed
+    assert report.verified == 1
+    assert report.incomplete == 1
+    assert report.manual_review == 0
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_lineage_fleet_mixed_manual_review_denies_even_with_incomplete_tolerance(kind):
+    fixture = OperatorFixture(kind=kind)
+    completed, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        completed.workflow_id
+    )
+    key = fixture.operator._key(
+        completed.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            workflow.workflow,
+            floor_id=fp("fleet-wrong-floor"),
+        ),
+    )
+    guard = lineage_guard(
+        fixture,
+        CompactionLineageHealthPolicy(
+            max_incomplete=10,
+        ),
+    )
+    report = guard.inspect(
+        (
+            completed.workflow_id,
+            fp("missing-workflow"),
+        )
+    )
+    assert not report.allowed
+    assert report.manual_review == 1
