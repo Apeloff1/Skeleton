@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ POINTER_NAMES = (
     ".godot-engine.pointer",
 )
 CANDIDATE_RELATIVE = (
+    "backend/godot",
     "tools/godot/Godot",
     "tools/godot/godot",
     "third_party/godot/Godot",
@@ -27,16 +29,17 @@ class GodotLocator:
         self.root = Path(root) if root is not None else Path.cwd()
 
     def locate(self) -> dict[str, Any]:
-        env = os.environ.get("SKELETON_GODOT_BIN")
+        env = os.environ.get("SKELETON_GODOT_BIN") or os.environ.get("GODOT_BINARY")
         if env:
             path = Path(env)
             if path.is_file():
+                hint = "env:SKELETON_GODOT_BIN" if os.environ.get("SKELETON_GODOT_BIN") else "env:GODOT_BINARY"
                 return plane_card(
                     kind="godot-binary",
                     hit=1,
                     law="GB-9",
                     citation="docs/ARTIFACT_PLANE.md",
-                    extra={"found": 1, "hint": "env:SKELETON_GODOT_BIN", "path": str(path)},
+                    extra={"found": 1, "hint": hint, "path": str(path)},
                 )
         for relative in CANDIDATE_RELATIVE:
             path = self.root / relative
@@ -67,6 +70,13 @@ class GodotLocator:
                 except OSError:
                     return name
                 return text[0] if text else name
+        artifact = self.root / "backend" / "godot.artifact.json"
+        if artifact.is_file():
+            try:
+                data = json.loads(artifact.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return "backend/godot.artifact.json"
+            return str(data.get("source") or data.get("hint") or "backend/godot.artifact.json")
         return None
 
 
