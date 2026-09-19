@@ -19,6 +19,13 @@ import time
 from typing import Callable
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStale,
+    DurableMaintenanceStore,
+    SignedDurableMaintenanceEpoch,
+)
 from skeleton.shells.ai.durable_replica_fleet import (
     DurableReplicaFleet,
     DurableReplicaFleetError,
@@ -1087,6 +1094,7 @@ class DurableFailoverCoordinator:
         source_id: str,
         target_id: str,
         fleet: DurableReplicaFleet | None = None,
+        maintenance: DurableMaintenanceStore | None = None,
     ) -> None:
         if not isinstance(
             manager,
@@ -1138,7 +1146,131 @@ class DurableFailoverCoordinator:
             raise ValueError(
                 "failover fleet source_id mismatch"
             )
+        if (
+            maintenance is not None
+            and not isinstance(
+                maintenance,
+                DurableMaintenanceStore,
+            )
+        ):
+            raise TypeError(
+                "maintenance must be DurableMaintenanceStore"
+            )
         self.fleet = fleet
+        self.maintenance = maintenance
+
+    def _maintenance_resources(
+        self,
+        report: DurableEvidenceReplicationReport,
+    ) -> tuple[
+        DurableMaintenanceResource,
+        DurableMaintenanceResource,
+    ]:
+        journal_id = self.manager.journal.chain_id
+        receipt_id = self.manager.receipts.chain_id
+        if journal_id == receipt_id:
+            raise DurableFailoverTicketError(
+                "failover journal and receipt chain ids must differ"
+            )
+        journal = (
+            DurableMaintenanceResource
+            .replicated_chain(
+                journal_id,
+                source_sequence=(
+                    report.journal.source_sequence
+                ),
+                source_root=(
+                    report.journal.source_root
+                ),
+                target_sequence=(
+                    report.journal.target_sequence
+                ),
+                target_root=(
+                    report.journal.target_root
+                ),
+                replication_state_digest=(
+                    report.digest
+                ),
+            )
+        )
+        receipts = (
+            DurableMaintenanceResource
+            .replicated_chain(
+                receipt_id,
+                source_sequence=(
+                    report.receipts.source_sequence
+                ),
+                source_root=(
+                    report.receipts.source_root
+                ),
+                target_sequence=(
+                    report.receipts.target_sequence
+                ),
+                target_root=(
+                    report.receipts.target_root
+                ),
+                replication_state_digest=(
+                    report.digest
+                ),
+            )
+        )
+        return tuple(
+            sorted(
+                (journal, receipts),
+                key=lambda item: item.resource_id,
+            )
+        )
+
+    def maintenance_resources(
+        self,
+    ) -> tuple[
+        DurableMaintenanceResource,
+        DurableMaintenanceResource,
+    ]:
+        return self._maintenance_resources(
+            self.manager.require_promotion_ready()
+        )
+
+    def _require_maintenance(
+        self,
+        report: DurableEvidenceReplicationReport,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ),
+    ):
+        if self.maintenance is None:
+            return None
+        if maintenance_epoch is None:
+            raise DurableFailoverTicketError(
+                "durable maintenance epoch is required for failover"
+            )
+        if not isinstance(
+            maintenance_epoch,
+            SignedDurableMaintenanceEpoch,
+        ):
+            raise TypeError(
+                "maintenance_epoch must be SignedDurableMaintenanceEpoch"
+            )
+        resources = self._maintenance_resources(
+            report
+        )
+        try:
+            return self.maintenance.require_active(
+                maintenance_epoch,
+                operation=(
+                    DurableMaintenanceOperation.FAILOVER
+                ),
+                required_resources=tuple(
+                    item.resource_id
+                    for item in resources
+                ),
+                live_resources=resources,
+            )
+        except DurableMaintenanceStale as exc:
+            raise DurableFailoverTicketError(
+                "durable maintenance authority is stale: "
+                + str(exc)
+            ) from exc
 
     def _fleet_report(self):
         if self.fleet is None:
@@ -1193,8 +1325,17 @@ class DurableFailoverCoordinator:
         self,
         *,
         ttl_seconds: float = 60.0,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> SignedDurableFailoverTicket:
         fleet_report = self._fleet_report()
+        if self.maintenance is not None:
+            report = self.manager.require_promotion_ready()
+            self._require_maintenance(
+                report,
+                maintenance_epoch,
+            )
         return self.authority.issue(
             self.manager,
             source_id=self.source_id,
@@ -1235,6 +1376,9 @@ class DurableFailoverCoordinator:
         signed: SignedDurableFailoverTicket,
         *,
         consumer_id: str,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> StoredDurableFailover:
         current = self.registry.current(
             signed.ticket.ticket_id
@@ -1274,6 +1418,10 @@ class DurableFailoverCoordinator:
         )
         self._require_ticket_fleet(ticket)
         report = self.manager.require_promotion_ready()
+        self._require_maintenance(
+            report,
+            maintenance_epoch,
+        )
         return self.registry.applied(
             ticket,
             consumer_id=consumer_id,
