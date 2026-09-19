@@ -26,6 +26,7 @@ public final class BroadPhaseMain {
     static final byte OP_PING = 1;
     static final byte OP_PAIRS = 2;
     static final byte OP_SHUTDOWN = 3;
+    static final byte OP_QUERY_AABBS = 4;
 
     static final byte STATUS_OK = 0;
     static final byte STATUS_BAD_REQUEST = 1;
@@ -33,6 +34,8 @@ public final class BroadPhaseMain {
 
     static final int MAX_BODIES = 100_000;
     static final int MAX_PAIRS = 1_000_000;
+    static final int MAX_QUERIES = 4096;
+    static final int MAX_QUERY_HITS = 1_000_000;
     static final int MAX_ERROR_BYTES = 8192;
 
     private BroadPhaseMain() {}
@@ -75,6 +78,7 @@ public final class BroadPhaseMain {
                 switch (header.op()) {
                     case OP_PING -> handlePing(out, header);
                     case OP_PAIRS -> handlePairs(in, out, header);
+                    case OP_QUERY_AABBS -> handleQueryAabbs(in, out, header);
                     default -> throw new ProtocolException("unsupported operation: " + header.op());
                 }
             } catch (ProtocolException | IllegalArgumentException bad) {
@@ -159,6 +163,110 @@ public final class BroadPhaseMain {
             out.writeInt(pair.left());
             out.writeInt(pair.right());
         }
+    }
+
+    static void handleQueryAabbs(
+        DataInputStream in,
+        DataOutputStream out,
+        RequestHeader header
+    ) throws IOException {
+        int bodyCount = readBoundedInt(in, "body count", 0, MAX_BODIES);
+        int queryCount = readBoundedInt(in, "query count", 1, MAX_QUERIES);
+        int maxTotalHits = readBoundedInt(
+            in,
+            "max total hits",
+            1,
+            MAX_QUERY_HITS
+        );
+
+        var bodies = new Box[bodyCount];
+        for (int i = 0; i < bodyCount; i++) {
+            bodies[i] = readBounds(in, i);
+        }
+        var queries = new Box[queryCount];
+        for (int i = 0; i < queryCount; i++) {
+            queries[i] = readBounds(in, i);
+        }
+
+        QueryHits result = queryAabbs(bodies, queries, maxTotalHits);
+        writeHeader(out, header.op(), STATUS_OK, header.requestId());
+        out.writeInt(result.counts().length);
+        int offset = 0;
+        for (int count : result.counts()) {
+            out.writeInt(count);
+            for (int index = 0; index < count; index++) {
+                out.writeInt(result.indices()[offset++]);
+            }
+        }
+    }
+
+    static Box readBounds(DataInputStream in, int index) throws IOException {
+        double minX = readFinite(in, "min x");
+        double minY = readFinite(in, "min y");
+        double minZ = readFinite(in, "min z");
+        double maxX = readFinite(in, "max x");
+        double maxY = readFinite(in, "max y");
+        double maxZ = readFinite(in, "max z");
+        Box box = new Box(
+            index,
+            false,
+            minX,
+            minY,
+            minZ,
+            maxX,
+            maxY,
+            maxZ
+        );
+        box.validate();
+        return box;
+    }
+
+    static QueryHits queryAabbs(
+        Box[] bodies,
+        Box[] queries,
+        int maxTotalHits
+    ) {
+        if (bodies.length > MAX_BODIES) {
+            throw new IllegalArgumentException("body count");
+        }
+        if (queries.length < 1 || queries.length > MAX_QUERIES) {
+            throw new IllegalArgumentException("query count");
+        }
+        if (maxTotalHits < 1 || maxTotalHits > MAX_QUERY_HITS) {
+            throw new IllegalArgumentException("maxTotalHits");
+        }
+        for (Box body : bodies) {
+            if (body == null) throw new IllegalArgumentException("null body box");
+            body.validate();
+        }
+        for (Box query : queries) {
+            if (query == null) throw new IllegalArgumentException("null query box");
+            query.validate();
+        }
+
+        int[] counts = new int[queries.length];
+        int[] indices = new int[maxTotalHits];
+        int total = 0;
+        for (int queryIndex = 0; queryIndex < queries.length; queryIndex++) {
+            Box query = queries[queryIndex];
+            int count = 0;
+            for (int bodyIndex = 0; bodyIndex < bodies.length; bodyIndex++) {
+                if (!query.overlaps(bodies[bodyIndex])) continue;
+                if (total >= maxTotalHits) {
+                    throw new QueryHitBoundException(
+                        "AABB query total-hit bound exceeded"
+                    );
+                }
+                indices[total++] = bodyIndex;
+                count++;
+            }
+            counts[queryIndex] = count;
+        }
+
+        return new QueryHits(
+            counts,
+            java.util.Arrays.copyOf(indices, total)
+        );
     }
 
     static List<Pair> computePairs(Box[] boxes, int maxPairs, double epsilon) {
@@ -262,6 +370,14 @@ public final class BroadPhaseMain {
 
     record RequestHeader(byte op, long requestId) {}
 
+    record QueryHits(int[] counts, int[] indices) {
+        QueryHits {
+            if (counts == null || indices == null) {
+                throw new IllegalArgumentException("query hit arrays must not be null");
+            }
+        }
+    }
+
     record Pair(int left, int right) {
         Pair {
             if (left < 0 || right <= left) {
@@ -315,6 +431,10 @@ public final class BroadPhaseMain {
 
     static final class PairBoundException extends IllegalArgumentException {
         PairBoundException(String message) { super(message); }
+    }
+
+    static final class QueryHitBoundException extends IllegalArgumentException {
+        QueryHitBoundException(String message) { super(message); }
     }
 
     static Box box(
@@ -371,6 +491,40 @@ public final class BroadPhaseMain {
             box(1, false, 1.0 + 5.0e-10, 0, 0, 2, 1, 1),
         };
         check(computePairs(nearGap, 10, 1.0e-9).isEmpty(), "full-AABB rejection");
+
+        QueryHits queryHits = queryAabbs(
+            boxes,
+            new Box[] {
+                box(0, false, -0.5, -0.5, -0.5, 2.1, 2.1, 2.1),
+                box(1, false, 9.5, 9.5, 9.5, 11.5, 11.5, 11.5),
+            },
+            100
+        );
+        check(
+            java.util.Arrays.equals(queryHits.counts(), new int[] {4, 1}),
+            "AABB query counts"
+        );
+        check(
+            java.util.Arrays.equals(
+                queryHits.indices(),
+                new int[] {0, 1, 2, 4, 3}
+            ),
+            "AABB query stable body indices"
+        );
+
+        boolean queryBoundRaised = false;
+        try {
+            queryAabbs(
+                boxes,
+                new Box[] {
+                    box(0, false, -100, -100, -100, 100, 100, 100),
+                },
+                2
+            );
+        } catch (QueryHitBoundException expected) {
+            queryBoundRaised = true;
+        }
+        check(queryBoundRaised, "AABB query hit bound");
 
         boolean boundRaised = false;
         try {
