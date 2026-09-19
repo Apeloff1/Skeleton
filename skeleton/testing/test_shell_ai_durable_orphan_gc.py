@@ -1559,3 +1559,616 @@ def test_plan_rejects_manual_review_with_corrupt_node():
             "chain-id",
             chain,
         )
+
+def test_orphan_gc_emits_signed_destruction_record():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    guard = guard_for(
+        operator,
+        store,
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard,
+    )
+    assert result.destruction_record_id
+    assert result.destruction_record_digest
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert destruction is not None
+    assert destruction.record_id == result.destruction_record_id
+    assert destruction.record.digest == result.destruction_record_digest
+    assert destruction.record.authority_id == guard.signed.epoch_id
+    assert destruction.record.authority_digest == guard.signed.epoch.digest
+    assert destruction.record.manifest_digest == plan.digest
+    assert destruction.record.post_verified
+    assert operator.destruction_ledger.require_verified(
+        "chain-id"
+    ).ok
+
+
+def test_orphan_gc_destruction_record_binds_plan_chain_state():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    record = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    ).record
+    assert record.before_sequence == plan.head_sequence
+    assert record.before_root == plan.head_root
+    assert record.before_floor_sequence == plan.floor_sequence
+    assert record.before_floor_root == plan.floor_root
+    assert record.after_sequence == chain.head().sequence
+    assert record.after_root == chain.head().root_hash
+    assert record.after_floor_sequence == plan.floor_sequence
+    assert record.after_floor_root == plan.floor_root
+    assert record.deleted_count == result.deleted
+    assert record.already_absent_count == result.already_absent
+
+
+def test_orphan_gc_destruction_item_binds_target():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    record = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    ).record
+    assert len(record.items) == len(plan.targets)
+    target = plan.targets[0]
+    item = record.items[0]
+    assert item.backend_namespace == target.backend_namespace
+    assert item.backend_key == target.backend_key
+    assert item.node_hash == target.node_hash
+    assert item.expected_revision == target.expected_revision
+    assert item.sequence == target.sequence
+    assert not item.archived
+    assert item.state.value == "deleted"
+    assert result.deleted == 1
+
+
+def test_receipt_orphan_gc_emits_destruction_record():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment(kind="receipt")
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert destruction is not None
+    assert destruction.record.items[0].item_kind == plan.node_kind.value
+    assert destruction.record.items[0].node_hash == plan.targets[0].node_hash
+    assert result.destruction_record_id == destruction.record_id
+
+
+def test_already_absent_orphan_is_recorded_as_already_absent():
+    (
+        _,
+        backend,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    target = plan.targets[0]
+    backend.delete(
+        target.backend_namespace,
+        target.backend_key,
+        expected_revision=target.expected_revision,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert result.already_absent == 1
+    assert destruction.record.already_absent_count == 1
+    assert destruction.record.deleted_count == 0
+    assert destruction.record.items[0].state.value == "already_absent"
+
+
+def test_empty_orphan_gc_plan_does_not_emit_destruction_record():
+    clock = Clock()
+    backend = InMemoryFencedStore(
+        clock=clock,
+    )
+    chain = DistributedAIDecisionJournal(
+        backend,
+        namespace="empty-chain",
+        clock=clock,
+    )
+    chain.append(
+        "committed",
+        session_id="session",
+        intent_id="intent",
+    )
+    destruction_ledger = DurableDestructionLedger(
+        backend,
+        ArtifactSigner(
+            "empty-destruction",
+            b"d" * 32,
+            clock=clock,
+        ),
+        namespace="empty-destruction",
+        clock=clock,
+    )
+    operator = DurableOrphanGCOperator(
+        DurableOrphanScanner(clock=clock),
+        destruction_ledger=destruction_ledger,
+        clock=clock,
+    )
+    maintenance_store = DurableMaintenanceStore(
+        backend,
+        ArtifactSigner(
+            "empty-maintenance",
+            b"m" * 32,
+            clock=clock,
+        ),
+        namespace="empty-maintenance",
+        clock=clock,
+        nonce_factory=lambda: "nonce",
+    )
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    assert plan.empty
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            maintenance_store,
+            chain,
+        ),
+    )
+    assert result.ok
+    assert result.destruction_record_id == ""
+    assert result.destruction_record_digest == ""
+    assert destruction_ledger.snapshot(
+        "chain-id"
+    ) == ()
+
+
+def test_orphan_gc_result_serializes_destruction_evidence():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    data = result.to_dict()
+    assert data["destruction_record_id"] == result.destruction_record_id
+    assert (
+        data["destruction_record_digest"]
+        == result.destruction_record_digest
+    )
+    assert len(data["destruction_record_id"]) == 64
+
+
+def test_verify_result_requires_destruction_record_when_ledger_enabled():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    stripped = replace(
+        result,
+        destruction_record_id="",
+        destruction_record_digest="",
+    )
+    assert not operator.verify_result(
+        plan,
+        stripped,
+        chain,
+    )
+
+
+def test_verify_result_rejects_destruction_record_id_substitution():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    altered = replace(
+        result,
+        destruction_record_id=fp("x"),
+        destruction_record_digest=fp("x"),
+    )
+    assert not operator.verify_result(
+        plan,
+        altered,
+        chain,
+    )
+
+
+def test_fresh_destruction_reader_verifies_orphan_gc_record():
+    (
+        _,
+        backend,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    fresh = DurableDestructionLedger(
+        backend,
+        ArtifactSigner(
+            "orphan-gc-destruction",
+            b"d" * 32,
+            clock=lambda: 100.0,
+        ),
+        namespace="destruction",
+        clock=lambda: 100.0,
+    )
+    found = fresh.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert found.record_id == result.destruction_record_id
+    assert fresh.require_verified(
+        "chain-id"
+    ).ok
+
+
+def test_orphan_gc_destruction_index_repairs_after_loss():
+    (
+        _,
+        backend,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    key = operator.destruction_ledger._operation_index_key(
+        destruction.operation_key
+    )
+    record = backend.get(
+        operator.destruction_ledger.namespace,
+        key,
+    )
+    backend.delete(
+        operator.destruction_ledger.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    repaired = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert repaired.record_id == result.destruction_record_id
+
+
+def test_verify_result_fails_on_destruction_signature_tamper():
+    (
+        _,
+        backend,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    key = operator.destruction_ledger._record_key(
+        result.destruction_record_id
+    )
+    stored = backend.get(
+        operator.destruction_ledger.namespace,
+        key,
+    )
+    raw = dict(stored.value)
+    signature = dict(raw["signature"])
+    signature["signature"] = "f" * 64
+    raw["signature"] = signature
+    backend.compare_and_swap(
+        operator.destruction_ledger.namespace,
+        key,
+        expected_revision=stored.revision,
+        value=raw,
+    )
+    assert not operator.verify_result(
+        plan,
+        result,
+        chain,
+    )
+
+
+def test_orphan_gc_operator_rejects_wrong_destruction_ledger_type():
+    with pytest.raises(
+        TypeError,
+        match="destruction_ledger",
+    ):
+        DurableOrphanGCOperator(
+            DurableOrphanScanner(),
+            destruction_ledger=object(),
+        )
+
+
+def test_multiple_orphan_deletions_share_one_destruction_record():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    orphan_event(
+        chain,
+        name="second-ledger",
+        observed_at=130.0,
+    )
+    orphan_event(
+        chain,
+        name="third-ledger",
+        observed_at=131.0,
+    )
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard_for(
+            operator,
+            store,
+            chain,
+        ),
+    )
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    assert len(plan.targets) == 3
+    assert len(destruction.record.items) == 3
+    assert destruction.record.deleted_count == 3
+    assert result.deleted == 3
+    assert len(
+        operator.destruction_ledger.snapshot(
+            "chain-id"
+        )
+    ) == 1
+
+
+def test_orphan_gc_destruction_record_binds_maintenance_fence():
+    (
+        _,
+        _,
+        chain,
+        _,
+        _,
+        _,
+        operator,
+        store,
+    ) = environment()
+    plan = operator.plan(
+        "chain-id",
+        chain,
+    )
+    guard = guard_for(
+        operator,
+        store,
+        chain,
+    )
+    result = operator.execute(
+        plan,
+        chain,
+        maintenance=guard,
+    )
+    destruction = operator.destruction_ledger.find_operation(
+        "chain-id",
+        "orphan_gc",
+        plan.plan_id,
+    )
+    claim = next(
+        item
+        for item in guard.signed.epoch.claims
+        if item.resource_id == "chain-id"
+    )
+    assert destruction.record.fencing_token == claim.fencing_token
+    assert destruction.record.authority_id == result.maintenance_epoch_id
+
