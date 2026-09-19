@@ -21,6 +21,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
+printf '\n== Shell execution plane regressions ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_shell_*.py
+
 printf '\n== Backend Ruff ==\n'
 (
   cd backend
