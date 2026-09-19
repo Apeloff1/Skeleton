@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 import threading
 import time
 from typing import Callable
@@ -29,10 +30,24 @@ class SupervisorPolicy:
     restart_window_seconds: float = 3600.0
 
     def __post_init__(self) -> None:
-        if self.max_faults <= 0 or self.max_restarts <= 0:
-            raise ValueError("fault/restart limits must be positive")
-        if self.fault_window_seconds <= 0 or self.quarantine_seconds <= 0 or self.restart_window_seconds <= 0:
-            raise ValueError("supervisor time windows must be positive")
+        for name, value in (
+            ("max_faults", self.max_faults),
+            ("max_restarts", self.max_restarts),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        for name, value in (
+            ("fault_window_seconds", self.fault_window_seconds),
+            ("quarantine_seconds", self.quarantine_seconds),
+            ("restart_window_seconds", self.restart_window_seconds),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) <= 0.0
+            ):
+                raise ValueError(f"{name} must be finite and positive")
 
 
 @dataclass(frozen=True)
@@ -42,12 +57,22 @@ class WorkerFault:
     detail: str = ""
 
     def __post_init__(self) -> None:
-        if self.observed_at < 0:
-            raise ValueError("fault timestamp may not be negative")
-        if not self.kind or len(self.kind) > 128:
+        if (
+            isinstance(self.observed_at, bool)
+            or not isinstance(self.observed_at, (int, float))
+            or not math.isfinite(float(self.observed_at))
+            or float(self.observed_at) < 0.0
+        ):
+            raise ValueError("fault timestamp must be finite and non-negative")
+        if (
+            not isinstance(self.kind, str)
+            or not self.kind.strip()
+            or len(self.kind) > 128
+            or "\x00" in self.kind
+        ):
             raise ValueError("invalid fault kind")
-        if len(self.detail) > 512:
-            raise ValueError("fault detail too long")
+        if not isinstance(self.detail, str) or len(self.detail) > 512 or "\x00" in self.detail:
+            raise ValueError("invalid fault detail")
 
 
 @dataclass(frozen=True)
@@ -137,6 +162,12 @@ class WorkerSupervisor:
         now = self._clock()
         with self._lock:
             current = self.require(identity)
+            if current.state in {
+                SupervisionState.QUARANTINED,
+                SupervisionState.STOPPING,
+                SupervisionState.STOPPED,
+            }:
+                raise RuntimeError("worker cannot record faults in current state")
             threshold = now - self.policy.fault_window_seconds
             faults = tuple(fault for fault in current.faults if fault.observed_at >= threshold)
             faults = faults + (WorkerFault(now, kind, detail),)
@@ -154,6 +185,12 @@ class WorkerSupervisor:
         now = self._clock()
         with self._lock:
             current = self.require(identity)
+            if current.state in {
+                SupervisionState.QUARANTINED,
+                SupervisionState.STOPPING,
+                SupervisionState.STOPPED,
+            }:
+                raise RuntimeError("worker cannot restart from current state")
             threshold = now - self.policy.restart_window_seconds
             restarts = tuple(value for value in current.restarts if value >= threshold)
             if len(restarts) >= self.policy.max_restarts:
@@ -198,12 +235,13 @@ class WorkerSupervisor:
             )
 
     def require(self, identity: WorkerIdentity) -> SupervisedWorker:
-        current = self._states.get(identity.worker_id)
-        if current is None:
-            raise KeyError(identity.worker_id)
-        if current.identity.generation != identity.generation:
-            raise RuntimeError("supervisor generation is stale")
-        return current
+        with self._lock:
+            current = self._states.get(identity.worker_id)
+            if current is None:
+                raise KeyError(identity.worker_id)
+            if current.identity.generation != identity.generation:
+                raise RuntimeError("supervisor generation is stale")
+            return current
 
     def get(self, worker_id: str) -> SupervisedWorker | None:
         with self._lock:
