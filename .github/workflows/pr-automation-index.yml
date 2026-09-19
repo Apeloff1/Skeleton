@@ -124,6 +124,14 @@ jobs:
           WORKFLOW_RUN_PR_HINTS: ${{ github.event_name == 'workflow_run' && toJSON(github.event.workflow_run.pull_requests.*.number) || '[]' }}
           WORKFLOW_RUN_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
           WORKFLOW_RUN_HEAD_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          WORKFLOW_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.run_attempt || '' }}
+          WORKFLOW_RUN_WORKFLOW_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.workflow_id || '' }}
+          WORKFLOW_RUN_NAME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || '' }}
+          WORKFLOW_RUN_STATUS: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.status || '' }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || '' }}
+          WORKFLOW_RUN_EVENT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.event || '' }}
+          WORKFLOW_RUN_HEAD_REPOSITORY: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_repository.full_name || '' }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           INPUT_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}
         run: |
