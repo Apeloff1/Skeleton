@@ -1,5 +1,9 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_verification_health import DurableChainVerificationHealth, DurableVerificationFinding, DurableVerificationFleetError, DurableVerificationFleetGuard, DurableVerificationFleetPolicy, DurableVerificationFleetReport, DurableVerificationSeverity
+
+from skeleton.shells.ai.durable_verification_cursor import DurableIncrementalVerifier, DurableVerificationCursor, DurableVerificationCursorError, DurableVerificationCursorHead, DurableVerificationCursorStore, DurableVerificationMode, DurableVerificationPolicy, DurableVerificationReport, DurableVerificationResult, DurableVerificationStatus, IncrementallyVerifiableChain, SignedDurableVerificationCursor, StoredDurableVerificationCursor
+
 from skeleton.shells.ai.execution_obligation_recovery import *
 
 from skeleton.shells.ai.execution_obligation import *
