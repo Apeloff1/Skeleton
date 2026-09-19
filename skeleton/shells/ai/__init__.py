@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_compaction_operator import DurableCompactionExecution, DurableCompactionOperator, DurableCompactionPrepared, DurableCompactionWorkflow, DurableCompactionWorkflowError, DurableCompactionWorkflowInspection, DurableCompactionWorkflowManualReview, DurableCompactionWorkflowPhase, DurableCompactionWorkflowPlan, DurableCompactionWorkflowStale, StoredDurableCompactionWorkflow
+
 from skeleton.shells.ai.durable_failover_operator import (
     DurableFailoverOperator,
     DurableFailoverOperatorError,
