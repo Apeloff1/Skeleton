@@ -66,6 +66,16 @@ KEYWORDS = {
         "failing test",
         "test failure",
     ),
+    "feature-builder": (
+        "approved_work_items",
+        "automation_authorized",
+        "automation-approved",
+        "supervisor-approved",
+        "build-approved",
+        "feature",
+        "implement",
+        "enhancement",
+    ),
     "architecture-reviewer": (
         "architecture",
         "subsystem",
@@ -249,6 +259,7 @@ def decode_delegation(
         "plan",
         "execution",
         "execution_fingerprint",
+        "approved_build_count",
     }
     if not isinstance(value, dict) or set(value) != expected_fields:
         raise SecretaryAdmissionError(
@@ -332,7 +343,16 @@ def decode_delegation(
             "supervisor execution fingerprint mismatch"
         )
 
-    return plan, fingerprint, envelope_execution
+    approved_build_count = value.get("approved_build_count")
+    if (
+        isinstance(approved_build_count, bool)
+        or not isinstance(approved_build_count, int)
+        or approved_build_count < 0
+        or approved_build_count > 40
+    ):
+        raise SecretaryAdmissionError("invalid approved build count")
+
+    return plan, fingerprint, envelope_execution, approved_build_count
 
 
 def _supervisor_provenance(
@@ -361,8 +381,12 @@ def _supervisor_provenance(
     return fingerprint
 
 
-def route(plan: str, due: list[str]) -> list[str]:
-    """Score due registered specialists without allowing model-selected code."""
+def route(
+    plan: str,
+    due: list[str],
+    approved_build_count: int = 0,
+) -> list[str]:
+    """Score due specialists while keeping build authority deterministic."""
     text = plan.lower()
     due_set = set(due)
     registered = {spec.name for spec in ADVANCED_BOTS}
@@ -371,6 +395,8 @@ def route(plan: str, due: list[str]) -> list[str]:
     scored: list[tuple[int, bool, str]] = []
     for spec in ADVANCED_BOTS:
         if spec.name not in due_set:
+            continue
+        if spec.name == "feature-builder" and approved_build_count <= 0:
             continue
         score = sum(
             1
@@ -491,6 +517,7 @@ def _dispatch_one(
                     ),
                     "PYTHONPATH": str(worktree),
                     "GITHUB_WORKSPACE": str(worktree),
+                    "PYTHONDONTWRITEBYTECODE": "1",
                 }
             )
 
@@ -595,6 +622,7 @@ def main() -> int:
             plan,
             supervisor_fingerprint,
             envelope_execution,
+            approved_build_count,
         ) = decode_delegation(
             args.delegation_b64,
             repository=execution.repository,
@@ -611,6 +639,7 @@ def main() -> int:
         supervisor_fingerprint = _supervisor_provenance(
             execution
         )
+        approved_build_count = 0
 
     if not plan:
         raise SecretaryAdmissionError(
@@ -623,7 +652,11 @@ def main() -> int:
 
     state = load_state()
     due = select_specialists_due(state)
-    assignments = route(plan, due)
+    assignments = route(
+        plan,
+        due,
+        approved_build_count=approved_build_count,
+    )
 
     print(
         json.dumps(
@@ -640,6 +673,7 @@ def main() -> int:
                 ],
                 "specialists_due": due,
                 "assignments": assignments,
+                "approved_build_count": approved_build_count,
                 "worker_isolation": "detached-worktree",
             },
             indent=2,
