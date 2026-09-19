@@ -17,7 +17,6 @@ from skeleton.pr_automation.runner_contracts import (
     EvidenceCompleteness,
     FileEvidence,
     MutationIntent,
-    MutationKind,
     MutationReceipt,
     MutationState,
     Preconditions,
