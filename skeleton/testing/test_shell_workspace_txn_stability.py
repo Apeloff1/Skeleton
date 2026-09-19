@@ -34,13 +34,15 @@ from skeleton.shells.workspace_txn.lease import (
 )
 from skeleton.shells.workspace_txn.journal import TransactionJournal
 from skeleton.shells.workspace_txn.recovery import TransactionRecoveryInspector
-from skeleton.shells.workspace_txn.scanner import WorkspaceScanner
+from skeleton.shells.workspace_txn.scanner import WorkspaceScanner, snapshot_digest
 from skeleton.shells.workspace_txn.transaction import (
     TransactionConfig,
     WorkspaceTransactionManager,
 )
 from skeleton.shells.workspace_txn.types import (
     RollbackReport,
+    SnapshotEntry,
+    WorkspaceEntryKind,
     WorkspaceTransactionState,
 )
 
@@ -259,6 +261,69 @@ def test_rollback_restores_workspace_root_mtime_after_top_level_create(tmp_path:
     assert result.transaction.backup is not None
     assert result.transaction.backup.root_mtime_ns == before_mtime
     assert root.stat().st_mtime_ns == before_mtime
+
+
+def test_snapshot_digest_ignores_volatile_device_and_inode_identity():
+    first = SnapshotEntry(
+        "same.txt",
+        WorkspaceEntryKind.FILE,
+        4,
+        0o644,
+        1_700_000_000_000_000_000,
+        digest="a" * 64,
+        device=1,
+        inode=10,
+    )
+    second = replace(first, device=99, inode=9999)
+
+    assert snapshot_digest((first,), "b" * 64) == snapshot_digest(
+        (second,),
+        "b" * 64,
+    )
+
+
+def test_persisted_manifest_round_trip_reconstructs_source_snapshot(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    (root / "a.txt").write_text("alpha", encoding="utf-8")
+    nested = root / "nested"
+    nested.mkdir()
+    (nested / "b.txt").write_text("beta", encoding="utf-8")
+    before = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, before)
+
+    reopened = ContentAddressedBackupStore(manager.backup_store.storage_root)
+    loaded = reopened.load_manifest(
+        manifest.backup_id,
+        expected_digest=manifest.digest,
+        expected_root_fingerprint=before.root_fingerprint,
+    )
+    reconstructed = reopened.reconstruct_snapshot(
+        loaded,
+        expected_digest=before.digest,
+    )
+
+    assert loaded.complete_snapshot
+    assert loaded.snapshot_digest == before.digest
+    assert reconstructed.digest == before.digest
+    assert tuple(entry.path for entry in reconstructed.entries) == tuple(
+        entry.path for entry in before.entries
+    )
+
+
+def test_partial_backup_refuses_full_snapshot_reconstruction(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    (root / "a.txt").write_text("alpha", encoding="utf-8")
+    (root / "b.txt").write_text("beta", encoding="utf-8")
+    before = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(
+        root,
+        before,
+        paths=("a.txt",),
+    )
+
+    assert not manifest.complete_snapshot
+    with pytest.raises(BackupError, match="partial backup"):
+        manager.backup_store.reconstruct_snapshot(manifest)
 
 
 def test_backup_manifest_publication_is_atomic_and_parseable(tmp_path: Path):
@@ -605,6 +670,46 @@ def test_recovery_refuses_corrupted_journal_chain():
 
     with pytest.raises(RuntimeError, match="integrity verification failed"):
         TransactionRecoveryInspector(journal).candidates()
+
+
+def test_recovery_candidate_resolves_persisted_manifest_and_snapshot(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    (root / "state.txt").write_text("stable", encoding="utf-8")
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            ("-c", "print('evidence')"),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+    transaction_id = result.transaction.receipt.transaction_id
+    events = manager.journal.events(transaction_id=transaction_id)
+    executing = next(
+        event
+        for event in events
+        if event.kind == WorkspaceTransactionState.EXECUTING.value
+    )
+
+    interrupted = TransactionJournal()
+    interrupted.append(
+        transaction_id,
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    interrupted.append(
+        transaction_id,
+        WorkspaceTransactionState.EXECUTING.value,
+        dict(executing.payload),
+    )
+    inspector = TransactionRecoveryInspector(interrupted)
+    candidate = inspector.candidates()[0]
+    evidence = inspector.resolve_evidence(candidate, manager.backup_store)
+
+    assert evidence.verified
+    assert evidence.manifest.backup_id == candidate.backup_id
+    assert evidence.before.digest == candidate.before_snapshot_digest
+    assert evidence.before.root_fingerprint == candidate.root_fingerprint
 
 
 def test_recovery_candidate_reports_bound_execution_evidence():
