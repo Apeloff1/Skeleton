@@ -7,6 +7,7 @@ by the planning-only Supervisor without widening Secretary or Worker authority.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import islice
 import re
 from typing import Any, Iterable, Mapping
 
@@ -178,9 +179,7 @@ def classify_worker_prs(
             f"limit must be an integer in 1..{MAX_ACTIVE_WORKERS}"
         )
     admitted: list[DurableWorkerHealth] = []
-    for index, pr in enumerate(pull_requests):
-        if index >= MAX_OBSERVED_PULL_REQUESTS:
-            break
+    for pr in islice(pull_requests, MAX_OBSERVED_PULL_REQUESTS):
         health = classify_worker_pr(pr)
         if health is not None:
             admitted.append(health)
