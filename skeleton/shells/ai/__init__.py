@@ -1,5 +1,15 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_destruction_health import (
+    DurableDestructionChainHealth,
+    DurableDestructionFleetHealth,
+    DurableDestructionHealthError,
+    DurableDestructionHealthFinding,
+    DurableDestructionHealthGuard,
+    DurableDestructionHealthPolicy,
+    DurableDestructionHealthSeverity,
+)
+
 from skeleton.shells.ai.durable_destruction import (
     DESTRUCTION_ARTIFACT_TYPE,
     DurableDestructionConflict,
