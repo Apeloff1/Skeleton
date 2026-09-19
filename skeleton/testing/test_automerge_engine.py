@@ -31,7 +31,6 @@ from skeleton.testing.automerge_test_support import (
     SHA_A,
     SHA_B,
     SHA_C,
-    as_stack_child,
     policy,
     snapshot,
     successful_runs,
