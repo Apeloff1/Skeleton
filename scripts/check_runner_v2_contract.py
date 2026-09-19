@@ -82,6 +82,7 @@ REQUIRED_V2_MARKERS = {
         "runner_policy_from_env",
         "run_engine",
         "PR_AUTOMATION_MODE",
+        "load_operator_safety",
     ),
 }
 
