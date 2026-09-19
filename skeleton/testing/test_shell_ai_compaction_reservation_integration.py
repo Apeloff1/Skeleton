@@ -20,6 +20,7 @@ from skeleton.shells.ai.durable_compaction_certificate import (
 )
 from skeleton.shells.ai.durable_compaction_group import (
     DurableCompactionGroupCoordinator,
+    DurableCompactionGroupError,
     DurableCompactionGroupPhase,
     DurableCompactionGroupRequest,
     DurableCompactionGroupStale,
