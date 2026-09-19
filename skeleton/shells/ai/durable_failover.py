@@ -444,6 +444,8 @@ class DurableFailoverAuthority:
         ttl_seconds: float = 60.0,
         fleet_state_digest: str = "",
         fleet_policy_digest: str = "",
+        consensus_state_digest: str = "",
+        consensus_policy_digest: str = "",
     ) -> SignedDurableFailoverTicket:
         if not isinstance(
             manager,
