@@ -480,6 +480,29 @@ def test_world_ccd_resolves_fast_capsule_against_static_cylinder() -> None:
     assert moving.linear_velocity.x < 9.0
 
 
+
+def test_general_convex_ccd_ignores_near_zero_separating_repeat() -> None:
+    """A just-resolved convex pair must not consume the CCD substep budget."""
+    moving = _dynamic(
+        "capsule",
+        CapsuleShape(0.4, 0.7),
+        Vec3(-0.9000001, 0.0, 0.0),
+        Quat.from_axis_angle(Vec3.axis(2), 0.1),
+    )
+    target = _static(
+        "cylinder",
+        CylinderShape(0.5, 0.8),
+        Vec3.zero(),
+        Quat.from_axis_angle(Vec3.axis(0), -0.1),
+    )
+    moving.linear_velocity = Vec3(-1.0, 0.0, 0.0)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+
+    event = detector.earliest_event((moving, target), 0.5)
+
+    assert event is None
+
+
 def test_general_convex_toi_tie_break_is_canonical() -> None:
     moving = _dynamic(
         "m",
