@@ -1026,6 +1026,9 @@ def durable_verifier(env):
             namespace="receipts",
         ),
         execution_evidence=env.execution_evidence,
+        session_journals=env.session_journals,
+        session_commits=env.session_commits,
+        require_session_commit=True,
     )
 
 
