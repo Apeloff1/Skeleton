@@ -28,7 +28,16 @@ ADVANCED_BOTS = (
     AdvancedBot("api-contract", "API/schema contract drift", "high", 6),
 )
 
-BLOCKED_PREFIXES = (".github/", ".git/", ".env", "secrets/", "deploy/")
+# Specialist workers are intentionally unable to rewrite their own authority,
+# workflow permissions, deployment surface, or repository secret boundary.
+BLOCKED_PREFIXES = (
+    ".github/",
+    ".git/",
+    ".env",
+    "secrets/",
+    "deploy/",
+    "skeleton/automation/",
+)
 SAFE_PREFIXES = ("skeleton/", "tests/", "docs/")
 
 
