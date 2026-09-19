@@ -201,6 +201,8 @@ jobs:
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_supervisor_runtime.py
+          tests/test_worker_health.py
+          skeleton/testing/test_bot_manager.py
           backend/tests/test_supervisor_workflow_contract.py
 
   readiness:
