@@ -8,6 +8,7 @@ from typing import Any
 from .epistemic_gate import EpistemicExecutionGate
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, WorkerState, utcnow
+from .ownership import strict_nonnegative_int
 from .plan_api import SquadPlanQueueAPI
 from .plan_graph import require_acyclic_new_items
 from .plan_store import InMemoryPlanStore
@@ -44,14 +45,24 @@ class SMBShiftManager:
         self.model = model
         self.council = council
         self.gate = gate
-        self.normal_shift_minutes = normal_shift_minutes
-        self.overtime_soft_limit_minutes = overtime_soft_limit_minutes
+        self.normal_shift_minutes = strict_nonnegative_int(
+            normal_shift_minutes,
+            field="normal_shift_minutes",
+            maximum=24 * 60,
+        )
+        if self.normal_shift_minutes == 0:
+            raise ValueError("normal_shift_minutes must be positive")
+        self.overtime_soft_limit_minutes = strict_nonnegative_int(
+            overtime_soft_limit_minutes,
+            field="overtime_soft_limit_minutes",
+            maximum=24 * 60,
+        )
 
     def clock_in(self, worker_id: str, team: str, *, at: datetime | None = None) -> WorkerState:
         if team not in {"night", "idle"}:
             raise ValueError("team must be night or idle")
-        now = at or datetime.now(timezone.utc)
         worker = self._get_worker(worker_id) or WorkerState(worker_id=worker_id, team=team)  # type: ignore[arg-type]
+        now = self._event_time(worker, at, operation="clock-in")
         if worker.current_task_id is not None:
             raise PermissionError("cannot clock in or reset a worker with an active task")
         worker.team = team  # type: ignore[assignment]
@@ -70,7 +81,7 @@ class SMBShiftManager:
         worker = self._require_worker(worker_id)
         if worker.current_task_id is not None:
             raise PermissionError("cannot clock out a worker with an active task; release the assignment first")
-        now = at or datetime.now(timezone.utc)
+        now = self._event_time(worker, at, operation="clock-out")
         self._refresh_worker_time(worker, now)
         worker.status = "offline"
         worker.clocked_out_at = now
@@ -97,7 +108,7 @@ class SMBShiftManager:
                 raise PermissionError("heartbeat cannot replace or clear an active task assignment")
             if status == "idle":
                 raise PermissionError("heartbeat cannot mark a worker idle while a task is active")
-        now = at or datetime.now(timezone.utc)
+        now = self._event_time(worker, at, operation="heartbeat")
         self._refresh_worker_time(worker, now)
         worker.status = status  # type: ignore[assignment]
         worker.current_task_id = task_id
@@ -186,6 +197,47 @@ class SMBShiftManager:
         )
         self.store.append_revision(revision)
         return revision
+
+    @staticmethod
+    def _normalize_time(value: datetime | None) -> datetime:
+        result = value or datetime.now(timezone.utc)
+        if result.tzinfo is None:
+            result = result.replace(tzinfo=timezone.utc)
+        return result.astimezone(timezone.utc)
+
+    @classmethod
+    def _event_time(
+        cls,
+        worker: WorkerState,
+        value: datetime | None,
+        *,
+        operation: str,
+    ) -> datetime:
+        """Return monotonic UTC worker-event time or fail closed.
+
+        Worker messages can be delayed or retried.  Once the control plane has
+        accepted a later heartbeat/clock event, an older event must never rewind
+        status, shift accounting, or task evidence.
+        """
+        moment = cls._normalize_time(value)
+        floor_candidates = (
+            worker.clocked_in_at,
+            worker.last_heartbeat_at,
+            worker.clocked_out_at,
+        )
+        floor = max(
+            (
+                cls._normalize_time(candidate)
+                for candidate in floor_candidates
+                if candidate is not None
+            ),
+            default=None,
+        )
+        if floor is not None and moment < floor:
+            raise ValueError(
+                f"{operation} timestamp precedes canonical worker state"
+            )
+        return moment
 
     def _refresh_worker_time(self, worker: WorkerState, now: datetime) -> None:
         if worker.clocked_in_at is None:
