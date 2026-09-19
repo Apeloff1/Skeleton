@@ -1149,6 +1149,14 @@ class AIShellService:
     def reconcile_durable_readiness(
         self,
     ) -> DurableEvidenceReadinessReport:
+        if self.state.phase in {
+            AIServicePhase.FAILED,
+            AIServicePhase.STOPPING,
+            AIServicePhase.STOPPED,
+        }:
+            raise RuntimeError(
+                "AI service phase does not permit durable readiness reconciliation"
+            )
         guard = self.durable_readiness_guard
         if guard is None:
             raise RuntimeError(
