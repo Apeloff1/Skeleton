@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import threading
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from skeleton.shells.provenance import canonical_json
@@ -22,6 +23,13 @@ class JournalEvent:
     kind: str
     created_at: str
     payload: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "payload",
+            MappingProxyType(dict(self.payload)),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
