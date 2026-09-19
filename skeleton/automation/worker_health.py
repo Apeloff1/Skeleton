@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import islice
-import re
 from typing import Any, Iterable, Mapping
+
+from .supervisor_runtime import SupervisorRuntimeError, validate_worker_name
 
 BOT_BRANCH_PREFIX = "bot/specialist-"
 BASE_PREFIX_LENGTH = 16
@@ -17,7 +18,6 @@ MAX_WORKER_NAME = 48
 MAX_CHECKS = 64
 MAX_ACTIVE_WORKERS = 40
 MAX_OBSERVED_PULL_REQUESTS = 256
-_WORKER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
 
 _PENDING = frozenset({"QUEUED", "IN_PROGRESS", "PENDING", "WAITING", "REQUESTED"})
 _FAILURE = frozenset({"FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"})
@@ -65,7 +65,9 @@ def _branch_identity(value: object) -> tuple[str, str] | None:
         return None
     if any(ch not in "0123456789abcdef" for ch in base_prefix):
         return None
-    if _WORKER_RE.fullmatch(worker) is None or "--" in worker:
+    try:
+        worker = validate_worker_name(worker)
+    except SupervisorRuntimeError:
         return None
     return worker, base_prefix
 
