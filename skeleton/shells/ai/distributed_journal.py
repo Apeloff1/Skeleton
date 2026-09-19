@@ -19,6 +19,10 @@ import time
 from typing import Callable, Mapping
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
+from skeleton.shells.ai.durable_hot_floor import (
+    DurableHotFloorStore,
+    HotFloorPosition,
+)
 from skeleton.shells.ai.journal import AIDecisionEvent, AIDecisionJournal
 from skeleton.shells.ai.store_protocol import VersionedStateBackend
 
@@ -164,6 +168,8 @@ class DistributedAIDecisionJournal:
         max_events: int = 100_000,
         max_cas_retries: int = 32,
         clock: Callable[[], float] = time.time,
+        hot_floor_store: DurableHotFloorStore | None = None,
+        hot_floor_chain_id: str = "",
     ) -> None:
         if not namespace or len(namespace) > 128:
             raise ValueError("invalid decision journal namespace")
@@ -186,6 +192,47 @@ class DistributedAIDecisionJournal:
         self.max_events = max_events
         self.max_cas_retries = max_cas_retries
         self._clock = clock
+        if (hot_floor_store is None) != (not hot_floor_chain_id):
+            raise ValueError(
+                "hot_floor_store and hot_floor_chain_id must be configured together"
+            )
+        if hot_floor_store is not None and not isinstance(
+            hot_floor_store,
+            DurableHotFloorStore,
+        ):
+            raise TypeError(
+                "hot_floor_store must be DurableHotFloorStore"
+            )
+        if hot_floor_chain_id and len(hot_floor_chain_id) > 128:
+            raise ValueError("hot_floor_chain_id too long")
+        self.hot_floor_store = hot_floor_store
+        self.hot_floor_chain_id = hot_floor_chain_id
+
+    def hot_floor(self) -> HotFloorPosition:
+        if self.hot_floor_store is None:
+            return HotFloorPosition.genesis()
+        return self.hot_floor_store.position(
+            self.hot_floor_chain_id
+        )
+
+    def _hot_floor_active(
+        self,
+        floor: HotFloorPosition | None = None,
+    ) -> bool:
+        floor = floor or self.hot_floor()
+        if floor.sequence == 0:
+            return False
+        return self.backend.get(
+            self.namespace,
+            self._event_key(floor.root_hash),
+        ) is None
+
+    def hot_length(self) -> int:
+        head = self.head()
+        floor = self.hot_floor()
+        if self._hot_floor_active(floor):
+            return max(0, head.sequence - floor.sequence)
+        return head.sequence
 
     @staticmethod
     def _event_key(event_hash: str) -> str:
@@ -273,6 +320,14 @@ class DistributedAIDecisionJournal:
         if sequence > head.sequence:
             raise IndexError(
                 "journal sequence is beyond committed head"
+            )
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence <= floor.sequence
+        ):
+            raise DistributedJournalConflict(
+                "journal sequence was compacted from hot storage"
             )
         current_hash = head.root_hash
         current_sequence = head.sequence
@@ -389,7 +444,16 @@ class DistributedAIDecisionJournal:
 
         for _ in range(self.max_cas_retries):
             revision, head = self._head_revision()
-            if head.sequence >= self.max_events:
+            floor = self.hot_floor()
+            live_events = max(
+                0,
+                head.sequence - (
+                    floor.sequence
+                    if self._hot_floor_active(floor)
+                    else 0
+                ),
+            )
+            if live_events >= self.max_events:
                 raise RuntimeError(
                     "AI decision journal capacity exhausted"
                 )
@@ -503,6 +567,14 @@ class DistributedAIDecisionJournal:
             raise IndexError(
                 "journal sequence is beyond committed head"
             )
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence <= floor.sequence
+        ):
+            raise DistributedJournalConflict(
+                "journal sequence was compacted from hot storage"
+            )
         entry = self._sequence_index(sequence)
         if entry is None:
             if not repair_missing:
@@ -525,6 +597,19 @@ class DistributedAIDecisionJournal:
     ) -> str:
         if sequence == 0:
             return GENESIS_HASH
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and sequence == floor.sequence
+        ):
+            return floor.root_hash
+        if (
+            self._hot_floor_active(floor)
+            and sequence < floor.sequence
+        ):
+            raise DistributedJournalConflict(
+                "journal root sequence was compacted from hot storage"
+            )
         return self.get_by_sequence(
             sequence,
             repair_missing=repair_missing,
@@ -660,11 +745,18 @@ class DistributedAIDecisionJournal:
         head = self.head()
         if head.sequence == 0:
             return ()
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
         current_hash = head.root_hash
         expected_sequence = head.sequence
         reverse: list[AIDecisionEvent] = []
         seen: set[str] = set()
         while current_hash != GENESIS_HASH:
+            if (
+                floor_active
+                and current_hash == floor.root_hash
+            ):
+                break
             if current_hash in seen:
                 raise DistributedJournalCorruption(
                     "decision journal contains a cycle"
@@ -682,14 +774,21 @@ class DistributedAIDecisionJournal:
                 raise DistributedJournalCorruption(
                     "decision journal sequence underflow"
                 )
-        if expected_sequence != 0:
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        if expected_sequence != expected_base:
             raise DistributedJournalCorruption(
-                "decision journal terminated before genesis"
+                "decision journal terminated before trusted hot floor"
             )
         events = tuple(reversed(reverse))
-        if len(events) != head.sequence:
+        if len(events) != (
+            head.sequence - expected_base
+        ):
             raise DistributedJournalCorruption(
-                "decision journal snapshot length differs from head"
+                "decision journal snapshot length differs from live suffix"
             )
         return events
 
@@ -704,12 +803,37 @@ class DistributedAIDecisionJournal:
         )
         if root_hash == GENESIS_HASH:
             return ()
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        if floor_active and root_hash == floor.root_hash:
+            return ()
+        if floor_active:
+            try:
+                target_sequence = self.sequence_for_root(
+                    root_hash
+                )
+            except (
+                DistributedJournalConflict,
+                DistributedJournalCorruption,
+            ) as exc:
+                raise DistributedJournalCorruption(
+                    "historical journal root is below compacted hot floor"
+                ) from exc
+            if target_sequence < floor.sequence:
+                raise DistributedJournalCorruption(
+                    "historical journal root is below compacted hot floor"
+                )
         root_event = self.get_event(root_hash)
         expected_sequence = root_event.sequence
         current_hash = root_hash
         reverse: list[AIDecisionEvent] = []
         seen: set[str] = set()
         while current_hash != GENESIS_HASH:
+            if (
+                floor_active
+                and current_hash == floor.root_hash
+            ):
+                break
             if current_hash in seen:
                 raise DistributedJournalCorruption(
                     "historical decision journal contains a cycle"
@@ -727,9 +851,14 @@ class DistributedAIDecisionJournal:
                 raise DistributedJournalCorruption(
                     "historical decision journal sequence underflow"
                 )
-        if expected_sequence != 0:
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        if expected_sequence != expected_base:
             raise DistributedJournalCorruption(
-                "historical decision journal terminated before genesis"
+                "historical decision journal did not reach trusted hot floor"
             )
         events = tuple(reversed(reverse))
         if not events or events[-1].event_hash != root_hash:
@@ -749,8 +878,24 @@ class DistributedAIDecisionJournal:
             ValueError,
         ):
             return False
-        previous = GENESIS_HASH
-        for sequence, event in enumerate(events, start=1):
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        if floor_active and root_hash == floor.root_hash:
+            return True
+        previous = (
+            floor.root_hash
+            if floor_active
+            else GENESIS_HASH
+        )
+        start_sequence = (
+            floor.sequence + 1
+            if floor_active
+            else 1
+        )
+        for sequence, event in enumerate(
+            events,
+            start=start_sequence,
+        ):
             if (
                 event.sequence != sequence
                 or event.previous_hash != previous
@@ -782,6 +927,12 @@ class DistributedAIDecisionJournal:
         )
         if root_hash == GENESIS_HASH:
             return True
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and root_hash == floor.root_hash
+        ):
+            return True
         if not self.verify_root(root_hash):
             return False
         try:
@@ -803,6 +954,12 @@ class DistributedAIDecisionJournal:
         )
         if root_hash == GENESIS_HASH:
             return 0
+        floor = self.hot_floor()
+        if (
+            self._hot_floor_active(floor)
+            and root_hash == floor.root_hash
+        ):
+            return floor.sequence
         return self.get_event(root_hash).sequence
 
     def snapshot_segment(
@@ -945,8 +1102,22 @@ class DistributedAIDecisionJournal:
             ValueError,
         ):
             return False
-        previous = GENESIS_HASH
-        for sequence, event in enumerate(events, start=1):
+        floor = self.hot_floor()
+        floor_active = self._hot_floor_active(floor)
+        previous = (
+            floor.root_hash
+            if floor_active
+            else GENESIS_HASH
+        )
+        start_sequence = (
+            floor.sequence + 1
+            if floor_active
+            else 1
+        )
+        for sequence, event in enumerate(
+            events,
+            start=start_sequence,
+        ):
             if (
                 event.sequence != sequence
                 or event.previous_hash != previous
@@ -966,11 +1137,24 @@ class DistributedAIDecisionJournal:
             if expected != event.event_hash:
                 return False
             previous = event.event_hash
-        return (
-            head.sequence == len(events)
-            and head.root_hash == (
-                previous if events else GENESIS_HASH
+        expected_base = (
+            floor.sequence
+            if floor_active
+            else 0
+        )
+        expected_root = (
+            previous
+            if events
+            else (
+                floor.root_hash
+                if floor_active
+                else GENESIS_HASH
             )
+        )
+        return (
+            head.sequence
+            == expected_base + len(events)
+            and head.root_hash == expected_root
         )
 
     def root_hash(self) -> str:
