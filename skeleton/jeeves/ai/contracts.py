@@ -1,17 +1,12 @@
-"""Typed, deterministic assurance contracts for the Jeeves control plane.
-
-This module is deliberately small.  Contract identity is derived from canonical JSON,
-not Python repr(), and records copy caller-owned data before fingerprinting so later
-mutation cannot silently change the meaning of an admitted contract.
-"""
+"""Typed, deterministic assurance contracts for the Jeeves control plane."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from hashlib import sha256
-import json
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
+
+from ._canonical import bounded_text, canonical_digest, detached_json, frozen_mapping
 
 MAX_TEXT = 8192
 MAX_EVIDENCE = 256
@@ -28,55 +23,13 @@ class ContractState(str, Enum):
 
 
 class Authority(str, Enum):
-    """Repository orchestration authority; ordering is intentionally not numeric."""
-
     SUPERVISOR = "supervisor"
     SECRETARY = "secretary"
     WORKER = "worker"
 
 
-def _text(value: str, *, field_name: str = "text") -> str:
-    if not isinstance(value, str) or not value or len(value) > MAX_TEXT or "\x00" in value:
-        raise ValueError(f"invalid {field_name}")
-    return value
-
-
-def _json_value(value: Any, *, depth: int = 0) -> Any:
-    """Return a JSON-safe detached value with bounded recursive structure."""
-    if depth > 12:
-        raise ValueError("payload nesting too deep")
-    if value is None or isinstance(value, (str, bool, int)):
-        if isinstance(value, str) and len(value) > MAX_TEXT:
-            raise ValueError("payload text too long")
-        return value
-    if isinstance(value, float):
-        if value != value or value in (float("inf"), float("-inf")):
-            raise ValueError("non-finite payload number")
-        return value
-    if isinstance(value, Mapping):
-        out: dict[str, Any] = {}
-        for key, item in value.items():
-            _text(key, field_name="payload key")
-            if key in out:
-                raise ValueError("duplicate payload key")
-            out[key] = _json_value(item, depth=depth + 1)
-        return out
-    if isinstance(value, (list, tuple)):
-        return [_json_value(item, depth=depth + 1) for item in value]
-    raise ValueError(f"unsupported payload type: {type(value).__name__}")
-
-
-def _canonical(value: Any) -> bytes:
-    encoded = json.dumps(
-        _json_value(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
-    if len(encoded) > MAX_PAYLOAD_BYTES:
-        raise ValueError("payload too large")
-    return encoded
-
-
 def _digest(value: Any) -> str:
-    return sha256(_canonical(value)).hexdigest()
+    return canonical_digest(value, max_bytes=MAX_PAYLOAD_BYTES)
 
 
 @dataclass(frozen=True)
@@ -89,17 +42,15 @@ class ContractRecord:
     parent_digest: str | None = None
 
     def __post_init__(self) -> None:
-        _text(self.name, field_name="contract name")
+        bounded_text(self.name, "contract name")
         if not isinstance(self.state, ContractState):
             raise ValueError("invalid contract state")
         if not isinstance(self.authority, Authority):
             raise ValueError("invalid authority")
         if not isinstance(self.evidence, tuple) or len(self.evidence) > MAX_EVIDENCE:
             raise ValueError("invalid evidence")
-        evidence = tuple(_text(item, field_name="evidence") for item in self.evidence)
-        detached = _json_value(self.payload)
-        _canonical(detached)
-        object.__setattr__(self, "payload", MappingProxyType(detached))
+        evidence = tuple(bounded_text(item, "evidence") for item in self.evidence)
+        object.__setattr__(self, "payload", frozen_mapping(self.payload, max_bytes=MAX_PAYLOAD_BYTES))
         object.__setattr__(self, "evidence", evidence)
         if self.parent_digest is not None:
             if not isinstance(self.parent_digest, str) or len(self.parent_digest) != 64:
@@ -111,17 +62,15 @@ class ContractRecord:
 
     @property
     def digest(self) -> str:
-        return _digest(
-            {
-                "authority": self.authority.value,
-                "evidence": list(self.evidence),
-                "name": self.name,
-                "parent_digest": self.parent_digest,
-                "payload": dict(self.payload),
-                "state": self.state.value,
-                "v": 1,
-            }
-        )
+        return _digest({
+            "authority": self.authority.value,
+            "evidence": list(self.evidence),
+            "name": self.name,
+            "parent_digest": self.parent_digest,
+            "payload": dict(self.payload),
+            "state": self.state.value,
+            "v": 1,
+        })
 
 
 @dataclass(frozen=True)
