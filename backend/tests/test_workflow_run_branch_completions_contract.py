@@ -102,6 +102,48 @@ def test_rejects_queue_drain_with_additional_unguarded_actions_writer() -> None:
     assert "every completing head" in messages
 
 
+def test_rejects_queue_drain_writer_without_same_repo_guard() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    guard = (
+        "github.event.workflow_run.head_repository.full_name == "
+        "github.repository"
+    )
+    assert source.count(guard) >= 2
+    source = source.replace(guard, "true", 1)
+    messages = "\n".join(
+        violations_for_text(QUEUE_DRAIN.name, source)
+    )
+    assert "every completing head" in messages
+
+
+def test_rejects_additional_writer_with_branch_guard_but_no_repo_guard() -> None:
+    source = QUEUE_DRAIN.read_text(encoding="utf-8")
+    marker = "\n  wake-housekeeping:\n"
+    assert marker in source
+    injected = """
+  unsafe-cross-repo-writer:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo unsafe
+
+"""
+    source = source.replace(
+        marker,
+        "\n" + injected + "  wake-housekeeping:\n",
+        1,
+    )
+    messages = "\n".join(
+        violations_for_text(QUEUE_DRAIN.name, source)
+    )
+    assert "every completing head" in messages
+
+
 def test_queue_drain_read_only_job_does_not_need_default_branch_guard() -> None:
     source = QUEUE_DRAIN.read_text(encoding="utf-8")
     marker = "\n  wake-housekeeping:\n"
