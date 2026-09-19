@@ -62,8 +62,8 @@ class ShellServiceState:
         clock: Callable[[], float] = time.monotonic,
         max_history: int = 1000,
     ) -> None:
-        if max_history <= 0:
-            raise ValueError("max_history must be positive")
+        if isinstance(max_history, bool) or not isinstance(max_history, int) or max_history <= 0:
+            raise ValueError("max_history must be a positive integer")
         self._clock = clock
         self.max_history = max_history
         self._phase = ShellServicePhase.NEW
@@ -77,8 +77,8 @@ class ShellServiceState:
 
     def transition(self, target: ShellServicePhase, *, reason: str = "") -> ServiceTransition:
         target = ShellServicePhase(target)
-        if len(reason) > 512:
-            raise ValueError("service transition reason too long")
+        if not isinstance(reason, str) or len(reason) > 512 or "\x00" in reason:
+            raise ValueError("invalid service transition reason")
         with self._lock:
             if target not in _ALLOWED[self._phase]:
                 raise RuntimeError(f"invalid shell service transition {self._phase.value}->{target.value}")
