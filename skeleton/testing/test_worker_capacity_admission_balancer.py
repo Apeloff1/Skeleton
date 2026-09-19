@@ -165,3 +165,17 @@ def test_batch_plan_exposes_rejection():
 def test_batch_item_requires_identity_fields(item_id,principal):
     with pytest.raises(ValueError):
         WorkerBatchItem(item_id,principal)
+
+@pytest.mark.parametrize("value",[True,1.5,"2",-1])
+def test_capacity_catalog_rejects_coerced_or_negative_active_weight(value):
+    worker=reg("a")
+    catalog=WorkerCapacityCatalog()
+    with pytest.raises(ValueError,match="active worker weight"):
+        catalog.fleet([worker],{"a":live("a")},{"a":value})
+
+
+def test_capacity_catalog_accepts_zero_active_weight():
+    worker=reg("a")
+    view=WorkerCapacityCatalog().fleet([worker],{"a":live("a")},{"a":0}).workers[0]
+    assert view.active_weight==0
+
