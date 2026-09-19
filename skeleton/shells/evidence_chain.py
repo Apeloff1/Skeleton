@@ -103,10 +103,18 @@ class ContentAddressedEvidenceChain:
     ) -> None:
         if not namespace or len(namespace) > 128:
             raise ValueError("invalid evidence namespace")
-        if max_events <= 0:
-            raise ValueError("max_events must be positive")
-        if max_cas_retries <= 0:
-            raise ValueError("max_cas_retries must be positive")
+        if (
+            isinstance(max_events, bool)
+            or not isinstance(max_events, int)
+            or max_events <= 0
+        ):
+            raise ValueError("max_events must be a positive integer")
+        if (
+            isinstance(max_cas_retries, bool)
+            or not isinstance(max_cas_retries, int)
+            or max_cas_retries <= 0
+        ):
+            raise ValueError("max_cas_retries must be a positive integer")
         self.backend = backend
         self.namespace = namespace
         self.max_events = max_events
