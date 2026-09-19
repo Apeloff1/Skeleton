@@ -13,6 +13,11 @@ from skeleton.memory.jvm_vector_accelerator import (
     JvmVectorConfig,
     JvmVectorUnavailable,
 )
+from skeleton.retrieval.jvm_fusion_accelerator import (
+    JvmFusionAccelerator,
+    JvmFusionConfig,
+    JvmFusionUnavailable,
+)
 from skeleton.observability.jvm_accelerator import (
     JvmAcceleratorConfig,
     JvmAcceleratorUnavailable,
@@ -60,6 +65,18 @@ def _missing_source_factories(tmp_path: Path):
                 )
             ),
             JvmBroadPhaseUnavailable,
+        ),
+        (
+            "retrieval",
+            JvmFusionAccelerator(
+                JvmFusionConfig(
+                    java_binary=sys.executable,
+                    source=missing,
+                    response_timeout_seconds=1.0,
+                    minimum_contributions=1,
+                )
+            ),
+            JvmFusionUnavailable,
         ),
     )
 
@@ -193,11 +210,26 @@ def _real_accelerators() -> tuple[tuple[str, Callable[[], object]], ...]:
                 minimum_spatial_tests=1,
             )
         )
+    def retrieval() -> JvmFusionAccelerator:
+        return JvmFusionAccelerator(
+            JvmFusionConfig(
+                java_binary=_java(),
+                source=(
+                    root
+                    / "java-accelerators"
+                    / "retrieval"
+                    / "FusionMain.java"
+                ),
+                response_timeout_seconds=20,
+                minimum_contributions=1,
+            )
+        )
 
     return (
         ("observability", observability),
         ("vector", vector),
         ("physics", physics),
+        ("retrieval", retrieval),
     )
 
 
