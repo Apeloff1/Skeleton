@@ -66,7 +66,7 @@ from skeleton.shells.executor import ShellExecutor
 from skeleton.shells.registry import ExecutableSpec
 from skeleton.shells.runner import ShellPolicy, ShellRunner
 from skeleton.shells.shell_service import ShellService
-from skeleton.shells.receipts import ExecutionReceipt
+from skeleton.shells.receipts import ExecutionReceipt, ReceiptChain
 
 
 def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
