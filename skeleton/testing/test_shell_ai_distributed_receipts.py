@@ -1039,4 +1039,3 @@ def test_durable_receipt_compatibility_import_is_same_class():
     )
 
     assert CompatibilityChain is DistributedReceiptChain
-
