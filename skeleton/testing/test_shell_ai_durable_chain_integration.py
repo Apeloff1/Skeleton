@@ -40,6 +40,9 @@ from skeleton.shells.ai.durable_proof_window_operator import (
     DurableProofWindowPolicy,
     DurableProofWindowTarget,
 )
+from skeleton.shells.ai.durable_session_commit import (
+    DurableSessionCommitStore,
+)
 from skeleton.shells.ai.durable_session_journal import (
     DurableSessionJournalStore,
 )
@@ -339,6 +342,15 @@ class DurableEnvironment:
             namespace="session-journals",
             clock=lambda: 10.0,
         )
+        self.session_commits = DurableSessionCommitStore(
+            self.backend,
+            ArtifactSigner(
+                "session-commit",
+                b"c" * 32,
+                clock=lambda: 10.0,
+            ),
+            namespace="session-commits",
+        )
         self.finalizer = AIExecutionEvidenceFinalizer(
             journal=self.journal,
             receipt_chain=self.receipts,
@@ -351,6 +363,7 @@ class DurableEnvironment:
             finalizations=self.finalizations,
             recovery_checkpoints=self.recovery,
             session_journals=self.session_journals,
+            session_commits=self.session_commits,
         )
 
     def execute(
