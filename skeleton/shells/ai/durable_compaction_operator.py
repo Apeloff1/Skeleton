@@ -45,6 +45,10 @@ from skeleton.shells.ai.durable_pruning import (
     DurablePruningPhase,
     DurablePruningResult,
 )
+from skeleton.shells.ai.durable_compaction_reservation import (
+    DurableCompactionReservationConflict,
+    DurableCompactionReservationStore,
+)
 from skeleton.shells.ai.durable_pruning_authorization import (
     DurablePruningAuthorizationError,
     DurablePruningAuthorizationStore,
@@ -808,6 +812,7 @@ class DurableCompactionOperator:
         authorizations: DurablePruningAuthorizationStore,
         pruning: DurablePruningExecutor,
         *,
+        reservations: DurableCompactionReservationStore | None = None,
         namespace: str = (
             "shell-ai-durable-compaction-workflows"
         ),
@@ -862,6 +867,16 @@ class DurableCompactionOperator:
                 "pruning executor is wired to a different authorization store"
             )
         if (
+            reservations is not None
+            and not isinstance(
+                reservations,
+                DurableCompactionReservationStore,
+            )
+        ):
+            raise TypeError(
+                "reservations must be DurableCompactionReservationStore"
+            )
+        if (
             not namespace
             or len(namespace) > 128
         ):
@@ -883,6 +898,7 @@ class DurableCompactionOperator:
         self.certificates = certificates
         self.authorizations = authorizations
         self.pruning = pruning
+        self.reservations = reservations
         self.namespace = namespace
         self.max_cas_retries = max_cas_retries
         self._clock = clock
@@ -909,6 +925,37 @@ class DurableCompactionOperator:
                 "workflow clock returned invalid time"
             )
         return float(value)
+
+    def _require_reservation(
+        self,
+        workflow: DurableCompactionWorkflow,
+        *,
+        reservation_holder_id: str = "",
+    ) -> None:
+        if self.reservations is None:
+            return
+        if workflow.complete:
+            return
+        if reservation_holder_id:
+            try:
+                self.reservations.require_holder(
+                    workflow.chain_id,
+                    holder_id=reservation_holder_id,
+                    operator_id=workflow.operator_id,
+                )
+            except DurableCompactionReservationConflict as exc:
+                raise DurableCompactionWorkflowStale(
+                    "compaction reservation is missing, expired, or owned by another holder"
+                ) from exc
+            return
+        try:
+            self.reservations.assert_available(
+                workflow.chain_id,
+            )
+        except DurableCompactionReservationConflict as exc:
+            raise DurableCompactionWorkflowStale(
+                "chain is reserved by another compaction workflow"
+            ) from exc
 
     @staticmethod
     def _floor(
@@ -1428,11 +1475,16 @@ class DurableCompactionOperator:
         chain: CheckpointableEvidenceChain,
         *,
         ttl_seconds: float | None = None,
+        reservation_holder_id: str = "",
     ) -> SignedDurableCompactionCertificate:
         stored = self._require(
             workflow_id
         )
         workflow = stored.workflow
+        self._require_reservation(
+            workflow,
+            reservation_holder_id=reservation_holder_id,
+        )
         self._revalidate(
             workflow,
             retention,
@@ -1497,11 +1549,16 @@ class DurableCompactionOperator:
         *,
         ttl_seconds: float | None = None,
         max_delete_items: int | None = None,
+        reservation_holder_id: str = "",
     ) -> SignedDurablePruningAuthorization:
         stored = self._require(
             workflow_id
         )
         workflow = stored.workflow
+        self._require_reservation(
+            workflow,
+            reservation_holder_id=reservation_holder_id,
+        )
         if (
             _PHASE_ORDER[workflow.phase]
             < _PHASE_ORDER[
@@ -1687,11 +1744,17 @@ class DurableCompactionOperator:
         workflow_id: str,
         retention: DurableRetentionPlan,
         chain: CheckpointableEvidenceChain,
+        *,
+        reservation_holder_id: str = "",
     ) -> DurableCompactionPrepared:
         stored = self._require(
             workflow_id
         )
         workflow = stored.workflow
+        self._require_reservation(
+            workflow,
+            reservation_holder_id=reservation_holder_id,
+        )
         if (
             _PHASE_ORDER[workflow.phase]
             < _PHASE_ORDER[
@@ -1879,11 +1942,17 @@ class DurableCompactionOperator:
         workflow_id: str,
         retention: DurableRetentionPlan,
         chain: CheckpointableEvidenceChain,
+        *,
+        reservation_holder_id: str = "",
     ) -> DurableCompactionExecution:
         stored = self._require(
             workflow_id
         )
         workflow = stored.workflow
+        self._require_reservation(
+            workflow,
+            reservation_holder_id=reservation_holder_id,
+        )
         if (
             workflow.phase
             is not DurableCompactionWorkflowPhase.PREPARED
@@ -1896,6 +1965,7 @@ class DurableCompactionOperator:
                     workflow_id,
                     retention,
                     chain,
+                    reservation_holder_id=reservation_holder_id,
                 )
             raise DurableCompactionWorkflowError(
                 "workflow must be prepared before destructive execution"
@@ -1960,11 +2030,17 @@ class DurableCompactionOperator:
         workflow_id: str,
         retention: DurableRetentionPlan,
         chain: CheckpointableEvidenceChain,
+        *,
+        reservation_holder_id: str = "",
     ) -> DurableCompactionExecution:
         stored = self._require(
             workflow_id
         )
         workflow = stored.workflow
+        self._require_reservation(
+            workflow,
+            reservation_holder_id=reservation_holder_id,
+        )
         if workflow.complete:
             authorization = self._bound_authorization(
                 workflow,
@@ -2032,6 +2108,8 @@ class DurableCompactionOperator:
         workflow_id: str,
         retention: DurableRetentionPlan,
         chain: CheckpointableEvidenceChain,
+        *,
+        reservation_holder_id: str = "",
     ) -> DurableCompactionWorkflowInspection:
         stored = self.current(
             workflow_id
@@ -2042,6 +2120,14 @@ class DurableCompactionOperator:
             )
         workflow = stored.workflow
         reasons: list[str] = []
+        if self.reservations is not None and not workflow.complete:
+            try:
+                self._require_reservation(
+                    workflow,
+                    reservation_holder_id=reservation_holder_id,
+                )
+            except DurableCompactionWorkflowStale as exc:
+                reasons.append(str(exc))
 
         head = chain.head()
         live_head_matches = (
@@ -2244,11 +2330,14 @@ class DurableCompactionOperator:
         workflow_id: str,
         retention: DurableRetentionPlan,
         chain: CheckpointableEvidenceChain,
+        *,
+        reservation_holder_id: str = "",
     ) -> DurableCompactionWorkflowInspection:
         report = self.inspect(
             workflow_id,
             retention,
             chain,
+            reservation_holder_id=reservation_holder_id,
         )
         if not report.current:
             detail = (
