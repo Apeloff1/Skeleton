@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 from datetime import timedelta
 import json
 from pathlib import Path
