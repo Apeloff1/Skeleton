@@ -2,6 +2,7 @@ name: Mixture of Depths
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "skeleton/cortex/mixture_depth.py"
@@ -29,6 +30,7 @@ permissions:
 
 jobs:
   adaptive-depth:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Adaptive inference invariants
     runs-on: ubuntu-latest
     timeout-minutes: 10

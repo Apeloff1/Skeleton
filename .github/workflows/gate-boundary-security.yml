@@ -2,6 +2,7 @@ name: Gate Boundary Security
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "skeleton/api/middleware.py"
@@ -25,6 +26,7 @@ concurrency:
 
 jobs:
   boundary-regression:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

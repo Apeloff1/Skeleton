@@ -2,6 +2,7 @@ name: Jeeves Game Engine Era Lab
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "skeleton/jeeves/game_engine_lab.py"
       - "skeleton/jeeves/core.py"
@@ -98,6 +99,7 @@ concurrency:
 
 jobs:
   era-lab:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

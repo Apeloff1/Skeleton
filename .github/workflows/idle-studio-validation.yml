@@ -3,7 +3,7 @@ name: Idle Studio Validation
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - '.github/workflows/idle-studio.yml'
       - '.github/workflows/idle-studio-validation.yml'
@@ -40,6 +40,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Idle Studio contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 10

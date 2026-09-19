@@ -2,6 +2,7 @@ name: Jeeves Session Resilience
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "skeleton/jeeves/core.py"
@@ -25,6 +26,7 @@ permissions:
 
 jobs:
   resilience:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Session rollback and resource bounds
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -16,6 +16,7 @@ on:
       - "backend/tests/test_control_plane_transparency.py"
       - ".github/workflows/epistemic-transparency.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/transparency_log.py"
       - "backend/core/epistemic_transparency.py"
@@ -38,6 +39,7 @@ concurrency:
 
 jobs:
   transparency:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
