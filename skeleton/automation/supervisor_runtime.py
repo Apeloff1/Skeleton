@@ -584,7 +584,7 @@ def validate_staged_paths(
                 "cannot parse staged git mode"
             )
         new_mode = fields[1]
-        if new_mode != "100644":
+        if new_mode not in {"100644", "100755"}:
             raise SupervisorRuntimeError(
                 f"staged path has forbidden git mode: {path or '<unknown>'}"
             )
