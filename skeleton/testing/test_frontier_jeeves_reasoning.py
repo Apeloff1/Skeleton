@@ -37,7 +37,7 @@ from skeleton.jeeves.agent.rational_metareasoning import (
     MetaBudget,
     MetaState,
 )
-from skeleton.jeeves.agent.semantic_lenses import LensFamily
+from skeleton.jeeves.agent.semantic_lenses import LensFamily, SemanticRole
 from skeleton.jeeves.agent.types import (
     EvidenceKind,
     EvidenceRef,
@@ -711,7 +711,6 @@ def test_frontier_uncertainty_uses_strongest_unresolved_signal() -> None:
             normalized_entropy=0.72,
             agreement=0.80,
         ),
-        lens_fusion=None,
     )
 
     value = AdaptiveJeevesRuntime._frontier_uncertainty(decision)
@@ -879,6 +878,7 @@ def test_eval_gated_policy_tuning_promotes_useful_extra_compute_safely() -> None
         recommendation,
         gate,
         trial_gate=trial_gate,
+        feedback_report=feedback.report(),
     )
 
     assert blocked_without_trials.approved_for_trial is False
@@ -887,6 +887,8 @@ def test_eval_gated_policy_tuning_promotes_useful_extra_compute_safely() -> None
     )
     assert trial_gate.passed is True
     assert proposal.approved_for_trial is True
+    assert proposal.feedback_report_fingerprint == feedback.report().fingerprint
+    assert proposal.trial_gate_fingerprint == trial_gate.fingerprint
     assert proposal.proposed_policy.maximum_normalized_entropy < baseline.maximum_normalized_entropy
     assert proposal.proposed_policy.verification_required_at is baseline.verification_required_at
     assert (
@@ -928,7 +930,12 @@ def test_policy_tuning_is_blocked_without_matched_eval_gate() -> None:
     )
     baseline = FrontierReasoningPolicy()
 
-    proposal = FrontierPolicyTuner().propose(baseline, recommendation, gate)
+    proposal = FrontierPolicyTuner().propose(
+        baseline,
+        recommendation,
+        gate,
+        feedback_report=feedback.report(),
+    )
 
     assert gate.passed is False
     assert proposal.approved_for_trial is False
@@ -1027,23 +1034,49 @@ def test_policy_tuner_rejects_unbound_fabricated_recommendation() -> None:
         maximum_loss_rate=0.0,
         allow_pass_losses=0,
     )
+    authoritative_feedback = FrontierReasoningFeedback()
+    coordinator = FrontierReasoningCoordinator()
+    for index in range(6):
+        authoritative_feedback.observe(
+            coordinator.decide(_strong_search(trace=f"authoritative-direct:{index}")),
+            verified_success=False,
+            escalation_rounds=0,
+            model_calls=2,
+            estimated_tokens=1000,
+        )
+        authoritative_feedback.observe(
+            coordinator.decide(_strong_search(trace=f"authoritative-escalated:{index}")),
+            verified_success=True,
+            escalation_rounds=1,
+            model_calls=5,
+            estimated_tokens=3000,
+        )
+    report = authoritative_feedback.report()
     fabricated = FrontierFeedbackRecommendation(
         minimum_quality_delta=0.04,
         minimum_choice_probability_delta=0.03,
-        maximum_entropy_delta=-0.04,
+        maximum_entropy_delta=0.0,
         reasons=("fabricated recommendation",),
         fingerprint=stable_fingerprint("fabricated-recommendation"),
-        sample_count=0,
+        feedback_report_fingerprint=stable_fingerprint("different-report"),
+        sample_count=report.count,
+        direct_count=report.direct_count,
+        escalated_count=report.escalated_count,
     )
     baseline = FrontierReasoningPolicy()
 
-    proposal = FrontierPolicyTuner().propose(baseline, fabricated, gate)
+    proposal = FrontierPolicyTuner().propose(
+        baseline,
+        fabricated,
+        gate,
+        feedback_report=report,
+    )
 
     assert gate.passed is True
     assert proposal.approved_for_trial is False
     assert proposal.proposed_policy == baseline
     assert proposal.changed_fields == {}
-    assert any("insufficient bound feedback" in reason for reason in proposal.reasons)
+    assert any("authoritative feedback report" in reason for reason in proposal.reasons)
 
 
 def test_host_candidate_adjudicator_rewards_authoritative_diverse_evidence() -> None:
@@ -1152,3 +1185,10 @@ def test_host_candidate_adjudicator_penalizes_contradictions_and_bad_custody() -
     assert bad.known_evidence_count == 1
     assert any("unknown_evidence=" in reason for reason in bad.reasons)
     assert any("fingerprint_mismatch=" in reason for reason in bad.reasons)
+
+
+
+def test_frontier_semantic_catalog_roles_are_import_safe() -> None:
+    assert SemanticRole.SYSTEM.value == "system"
+    assert SemanticRole.SOCIAL.value == "social"
+    assert SemanticRole.TEMPORAL.value == "temporal"
