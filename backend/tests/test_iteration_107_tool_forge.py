@@ -4,6 +4,8 @@ import json
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 TOOLS_BASE = f"{BASE_URL}/api/galaxy-studio/tools"
 UF_BASE = f"{BASE_URL}/api/galaxy-studio/forge"

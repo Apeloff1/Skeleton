@@ -5,6 +5,9 @@ from pathlib import Path
 from core.exec_guard import configure_cors_environment, normalize_cors_origins
 
 
+import pytest
+
+pytestmark = pytest.mark.live_service
 _DEPLOYMENT_KEYS = (
     "EMERGENT_DEPLOY",
     "ENVIRONMENT",

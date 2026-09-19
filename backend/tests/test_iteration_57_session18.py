@@ -20,6 +20,8 @@ import time
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_BACKEND_URL") or "http://localhost:8001").rstrip("/")
 SEED_PID = "d02790d6d8174ff59bf7005221cd7609"  # remix · arcade · most artifacts present
 

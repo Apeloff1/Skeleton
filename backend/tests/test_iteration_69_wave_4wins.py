@@ -12,6 +12,8 @@ import zipfile
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"
 
 

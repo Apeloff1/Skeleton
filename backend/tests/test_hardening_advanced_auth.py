@@ -7,6 +7,9 @@ from starlette.requests import Request
 from middleware import hardening
 
 
+import pytest
+
+pytestmark = pytest.mark.live_service
 def _request(
     path: str = "/api/advanced/settings",
     token: str | None = None,
