@@ -9,7 +9,6 @@ busy branch to monopolize a run.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import quote, urlencode
