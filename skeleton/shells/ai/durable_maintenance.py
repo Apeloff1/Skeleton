@@ -108,6 +108,7 @@ class DurableMaintenanceState(str, Enum):
     RELEASED = "released"
     EXPIRED = "expired"
     SUPERSEDED = "superseded"
+    INVALIDATED = "invalidated"
 
 
 @dataclass(frozen=True)
@@ -1585,6 +1586,63 @@ class DurableMaintenanceStore:
             )
         return status
 
+    def _invalidate_record(
+        self,
+        epoch_id: str,
+    ) -> DurableMaintenanceRecord | None:
+        record = self._record(
+            epoch_id
+        )
+        if record is None:
+            return None
+        if (
+            record.value.state
+            is not DurableMaintenanceState.ACTIVE
+        ):
+            return record.value
+        now = self._now()
+        updated = replace(
+            record.value,
+            state=DurableMaintenanceState.INVALIDATED,
+            updated_at=now,
+        )
+        try:
+            stored = self.backend.compare_and_swap(
+                self.namespace,
+                self._record_key(
+                    epoch_id
+                ),
+                expected_revision=record.revision,
+                value=updated,
+            )
+            return stored.value
+        except DistributedStateConflict:
+            current = self._record(
+                epoch_id
+            )
+            return (
+                None
+                if current is None
+                else current.value
+            )
+
+    @staticmethod
+    def _release_claims_best_effort(
+        backend: DistributedAIBackend,
+        claims: Iterable[
+            DurableMaintenanceClaim
+        ],
+    ) -> None:
+        for claim in reversed(
+            tuple(claims)
+        ):
+            try:
+                backend.release_lease(
+                    claim.lease()
+                )
+            except Exception:
+                pass
+
     def renew(
         self,
         signed: SignedDurableMaintenanceEpoch,
@@ -1613,17 +1671,47 @@ class DurableMaintenanceStore:
         renewed_claims: list[
             DurableMaintenanceClaim
         ] = []
-        for claim in epoch.claims:
-            renewed = self.backend.renew_lease(
-                claim.lease(),
-                ttl_seconds=ttl,
-            )
-            renewed_claims.append(
-                DurableMaintenanceClaim.from_lease(
-                    claim.resource_id,
-                    renewed,
+        renewed_ids: set[str] = set()
+        try:
+            for claim in epoch.claims:
+                renewed = self.backend.renew_lease(
+                    claim.lease(),
+                    ttl_seconds=ttl,
                 )
+                renewed_claims.append(
+                    DurableMaintenanceClaim.from_lease(
+                        claim.resource_id,
+                        renewed,
+                    )
+                )
+                renewed_ids.add(
+                    claim.resource_id
+                )
+        except Exception as exc:
+            # Renewal is a saga, not an atomic backend primitive.  Once even
+            # one claim has been renewed the old epoch is intentionally made
+            # unusable.  Release both renewed and still-old claims so a
+            # partial renewal cannot strand split authority across resources.
+            self._release_claims_best_effort(
+                self.backend,
+                renewed_claims,
             )
+            self._release_claims_best_effort(
+                self.backend,
+                (
+                    claim
+                    for claim in epoch.claims
+                    if claim.resource_id
+                    not in renewed_ids
+                ),
+            )
+            self._invalidate_record(
+                epoch.epoch_id
+            )
+            raise DurableMaintenanceStale(
+                "maintenance lease renewal failed and epoch was invalidated"
+            ) from exc
+
         claims = tuple(
             renewed_claims
         )
@@ -1674,29 +1762,39 @@ class DurableMaintenanceStore:
         next_signed = self._sign(
             next_epoch
         )
-        self._put_epoch(
-            next_signed
-        )
-        self._put_record(
-            DurableMaintenanceRecord(
-                next_epoch.epoch_id,
-                next_epoch.digest,
-                next_epoch.operation,
-                next_epoch.owner_id,
-                next_epoch.generation,
-                DurableMaintenanceState.ACTIVE,
-                now,
-                now,
-            )
-        )
-        old_record = self._record(
-            epoch.epoch_id
-        )
-        if old_record is None:
-            raise DurableMaintenanceConflict(
-                "maintenance parent record disappeared during renewal"
-            )
+        next_persisted = False
         try:
+            self._put_epoch(
+                next_signed
+            )
+            self._put_record(
+                DurableMaintenanceRecord(
+                    next_epoch.epoch_id,
+                    next_epoch.digest,
+                    next_epoch.operation,
+                    next_epoch.owner_id,
+                    next_epoch.generation,
+                    DurableMaintenanceState.ACTIVE,
+                    now,
+                    now,
+                )
+            )
+            next_persisted = True
+
+            old_record = self._record(
+                epoch.epoch_id
+            )
+            if old_record is None:
+                raise DurableMaintenanceConflict(
+                    "maintenance parent record disappeared during renewal"
+                )
+            if (
+                old_record.value.state
+                is not DurableMaintenanceState.ACTIVE
+            ):
+                raise DurableMaintenanceConflict(
+                    "maintenance parent is no longer active"
+                )
             self.backend.compare_and_swap(
                 self.namespace,
                 self._record_key(
@@ -1714,9 +1812,20 @@ class DurableMaintenanceStore:
                     ),
                 ),
             )
-        except DistributedStateConflict as exc:
+        except Exception as exc:
+            self._release_claims_best_effort(
+                self.backend,
+                claims,
+            )
+            self._invalidate_record(
+                epoch.epoch_id
+            )
+            if next_persisted:
+                self._invalidate_record(
+                    next_epoch.epoch_id
+                )
             raise DurableMaintenanceConflict(
-                "maintenance parent renewal state conflicted"
+                "maintenance renewal commit failed and authority was invalidated"
             ) from exc
         return next_signed
 
