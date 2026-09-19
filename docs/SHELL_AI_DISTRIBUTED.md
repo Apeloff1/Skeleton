@@ -705,12 +705,12 @@ use filesystem snapshot
 
 ## Multi-instance shell receipts
 
-The current in-memory receipt ledger is process-local unless backed by durable
-storage elsewhere.
+The repository now includes `DistributedReceiptChain`, a CAS-backed durable
+receipt chain with immutable content-addressed nodes, a receipt-ID index,
+historical-prefix verification, and restart repair for the crash window between
+head commit and secondary index publication.
 
-A production distributed shell service should use durable execution evidence.
-
-At minimum preserve:
+The receipt chain preserves:
 
 receipt ID
 
@@ -719,6 +719,24 @@ command fingerprint
 principal
 
 correlation ID
+
+attempt number
+
+return code
+
+receipt fingerprint
+
+historical chain root
+
+A fresh reader can verify receipts at historical roots even after the global
+receipt head advances.
+
+The durable archive repository can persist receipt payloads and later serve
+historical prefixes through `ArchiveBackedHistoricalChain`.
+
+For lifecycle, archive redundancy, recovery fallback, and non-destructive
+compaction-readiness semantics, see
+`docs/SHELL_AI_DURABLE_EVIDENCE_LIFECYCLE.md`.
 
 return code
 
