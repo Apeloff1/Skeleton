@@ -3,7 +3,7 @@
 The high-confidence scanner lives in ``backend/scripts/check_sast_security.py``.
 Historically its Python file enumeration covered only ``backend/`` which left the
 production ``skeleton/`` package and top-level repository tooling outside that
-security boundary.  Reuse the same violation engine here so the policy remains
+security boundary. Reuse the same violation engine here so the policy remains
 single-sourced while coverage spans the rest of the Python runtime/tooling
 surface.
 """
@@ -35,6 +35,18 @@ SKIP_DIRS = {
 }
 
 
+def _relative_scan_parts(path: Path, root: Path) -> tuple[str, ...]:
+    """Return stable scan-relative parts without assuming roots live in REPO_ROOT.
+
+    Tests intentionally replace ``SCAN_ROOTS`` with temporary directories.  The
+    security scanner must preserve that dependency-injection seam rather than
+    crashing while formatting repository-relative paths.  Prefix the relative
+    path with the configured root's logical name so the existing ``skeleton/build``
+    exception remains precise and no arbitrary parent directories affect policy.
+    """
+    return (root.name, *path.relative_to(root).parts)
+
+
 def python_files() -> Iterable[Path]:
     """Yield required core/tooling Python files, failing closed on missing roots."""
     for root in SCAN_ROOTS:
@@ -43,8 +55,7 @@ def python_files() -> Iterable[Path]:
         if root.is_symlink():
             raise OSError("required scan root must not be a symlink")
         for path in root.rglob("*.py"):
-            relative = path.relative_to(REPO_ROOT)
-            parts = relative.parts
+            parts = _relative_scan_parts(path, root)
             filtered_parts = (
                 (parts[0], *parts[2:])
                 if len(parts) >= 2 and parts[:2] == ("skeleton", "build")
@@ -81,7 +92,7 @@ def main() -> int:
 
     try:
         files = list(python_files())
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         detail = str(exc)
         safe_details = {
             "required scan root missing",
