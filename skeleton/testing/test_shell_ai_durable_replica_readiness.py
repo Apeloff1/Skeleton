@@ -1018,8 +1018,10 @@ def test_reconcile_can_disable_history_recording():
 
 def test_reconcile_preserves_local_mutation_names():
     env = Environment()
-    # Force local verification stale by extending both source chains.
+    # Force local verification stale by extending both source chains, then
+    # independently resync replicas so the assertion isolates local repair.
     env.append()
+    env.sync_all()
     result = env.guard.reconcile(
         env.entries
     )
