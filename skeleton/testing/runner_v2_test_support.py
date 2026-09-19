@@ -650,6 +650,20 @@ class ScriptedTransport:
             raise value
         return int(value)
 
+    def summary(self, *, include_records: bool = True):
+        from skeleton.pr_automation.runner_contracts import TransportSummary
+
+        return TransportSummary(
+            requests=self.request_count,
+            graphql_requests=0,
+            retries=0,
+            bytes_received=0,
+            rate_limited=0,
+            failures=0,
+            minimum_remaining_seen=self.minimum_rate_remaining,
+            records=(),
+        )
+
 
 def configure_collector_transport(
     transport: ScriptedTransport,
