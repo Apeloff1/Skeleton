@@ -484,8 +484,17 @@ class RecoveryAuthority:
         self.active_key_id = _key_id(self.active_key_id)
         if self.active_key_id not in ids:
             raise IncidentIntegrityError("active recovery key is unavailable")
-        if self.max_ttl_seconds <= 0 or self.max_future_skew_seconds <= 0:
-            raise IncidentIntegrityError("recovery timing bounds must be positive")
+        for name in ("max_ttl_seconds", "max_future_skew_seconds"):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) <= 0
+            ):
+                raise IncidentIntegrityError(
+                    f"{name} must be finite and positive"
+                )
 
     @property
     def _key_map(self) -> dict[str, bytes]:
