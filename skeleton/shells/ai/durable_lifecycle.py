@@ -35,6 +35,9 @@ from skeleton.shells.ai.durable_retention import (
     DurableRetentionPlanner,
     DurableRetentionState,
 )
+from skeleton.shells.ai.durable_verification_health import (
+    DurableChainVerificationHealth,
+)
 
 
 class DurableLifecycleState(str, Enum):
@@ -310,6 +313,7 @@ class DurableEvidenceLifecycleCoordinator:
         *,
         protected_roots: tuple[str, ...],
         capacity: int | None,
+        verified_head: DurableChainVerificationHealth | None = None,
     ) -> DurableRetentionPlan:
         if (
             not isinstance(protected_roots, tuple)
@@ -324,6 +328,7 @@ class DurableEvidenceLifecycleCoordinator:
             chain,
             protected_roots=protected_roots,
             capacity=capacity,
+            verified_head=verified_head,
         )
 
     def _checkpoint_for_retention(
@@ -363,6 +368,7 @@ class DurableEvidenceLifecycleCoordinator:
         *,
         protected_roots: tuple[str, ...] = (),
         capacity: int | None = None,
+        verified_head: DurableChainVerificationHealth | None = None,
     ) -> DurableLifecycleReport:
         plan = self._retention(
             chain_id,
@@ -371,6 +377,7 @@ class DurableEvidenceLifecycleCoordinator:
                 protected_roots
             ),
             capacity=capacity,
+            verified_head=verified_head,
         )
         checkpoint = self._checkpoint_for_retention(
             plan
@@ -549,12 +556,14 @@ class DurableEvidenceLifecycleCoordinator:
         *,
         protected_roots: tuple[str, ...] = (),
         capacity: int | None = None,
+        verified_head: DurableChainVerificationHealth | None = None,
     ) -> DurableLifecycleReport:
         report = self.inspect(
             chain_id,
             chain,
             protected_roots=protected_roots,
             capacity=capacity,
+            verified_head=verified_head,
         )
 
         if (
@@ -577,6 +586,7 @@ class DurableEvidenceLifecycleCoordinator:
                     protected_roots
                 ),
                 capacity=capacity,
+                verified_head=verified_head,
             )
             return DurableLifecycleReport(
                 chain_id,
@@ -654,12 +664,14 @@ class DurableEvidenceLifecycleCoordinator:
         *,
         protected_roots: tuple[str, ...] = (),
         capacity: int | None = None,
+        verified_head: DurableChainVerificationHealth | None = None,
     ) -> DurableLifecycleReport:
         report = self.inspect(
             chain_id,
             chain,
             protected_roots=protected_roots,
             capacity=capacity,
+            verified_head=verified_head,
         )
         if not report.ok:
             detail = (
