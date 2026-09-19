@@ -17,6 +17,9 @@ from skeleton.shells.ai.durable_archive_store import (
     ArchiveBackedHistoricalChain,
     DurableArchiveRepository,
 )
+from skeleton.shells.ai.durable_session_journal import (
+    DurableSessionJournalStore,
+)
 from skeleton.shells.ai.execution_evidence import (
     AIExecutionEvidenceStore,
     SignedAIExecutionEvidence,
@@ -258,6 +261,7 @@ class DurableSessionRecoveryVerifier:
         journal,
         receipt_chain,
         execution_evidence: AIExecutionEvidenceStore | None = None,
+        session_journals: DurableSessionJournalStore | None = None,
         journal_archive: DurableArchiveRepository | None = None,
         journal_chain_id: str = "",
         receipt_archive: DurableArchiveRepository | None = None,
@@ -307,6 +311,17 @@ class DurableSessionRecoveryVerifier:
             )
         )
         self.execution_evidence = execution_evidence
+        if (
+            session_journals is not None
+            and not isinstance(
+                session_journals,
+                DurableSessionJournalStore,
+            )
+        ):
+            raise TypeError(
+                "session_journals must be DurableSessionJournalStore"
+            )
+        self.session_journals = session_journals
         self.journal_archive = journal_archive
         self.journal_chain_id = journal_chain_id
         self.receipt_archive = receipt_archive
@@ -344,9 +359,49 @@ class DurableSessionRecoveryVerifier:
 
     def _session_journal(
         self,
+        finalization_id: str,
         session_id: str,
         journal_root: str,
+        *,
+        expected_digest: str = "",
+        expected_manifest_digest: str = "",
     ) -> SessionJournalEvidence:
+        if self.session_journals is not None:
+            stored = self.session_journals.get(
+                finalization_id
+            )
+            if stored is not None:
+                manifest = stored.manifest
+                if manifest.session_id != session_id:
+                    raise DurableRecoveryVerificationError(
+                        "durable session-journal manifest session differs"
+                    )
+                if manifest.journal_root != journal_root:
+                    raise DurableRecoveryVerificationError(
+                        "durable session-journal manifest root differs"
+                    )
+                if (
+                    expected_digest
+                    and manifest.journal_digest
+                    != expected_digest
+                ):
+                    raise DurableRecoveryVerificationError(
+                        "durable session-journal manifest evidence digest differs"
+                    )
+                if (
+                    expected_manifest_digest
+                    and manifest.digest
+                    != expected_manifest_digest
+                ):
+                    raise DurableRecoveryVerificationError(
+                        "durable session-journal manifest digest differs"
+                    )
+                return manifest.journal_evidence
+            if expected_manifest_digest:
+                raise DurableRecoveryVerificationError(
+                    "required durable session-journal manifest is missing"
+                )
+
         snapshot_at = getattr(
             self.journal,
             "snapshot_at",
@@ -375,10 +430,19 @@ class DurableSessionRecoveryVerifier:
             for event in events
             if event.session_id == session_id
         )
-        return SessionJournalEvidence(
+        evidence = SessionJournalEvidence(
             session_id,
             projected,
         )
+        if (
+            expected_digest
+            and evidence.digest
+            != expected_digest
+        ):
+            raise DurableRecoveryVerificationError(
+                "reconstructed session journal differs from expected digest"
+            )
+        return evidence
 
     def _signed_evidence(
         self,
@@ -644,8 +708,15 @@ class DurableSessionRecoveryVerifier:
         try:
             session_journal = (
                 self._session_journal(
+                    finalization_id,
                     session_id,
                     journal_root,
+                    expected_digest=(
+                        recovery.session_journal_digest
+                    ),
+                    expected_manifest_digest=(
+                        recovery.session_journal_manifest_digest
+                    ),
                 )
             )
             session_journal_digest = (
@@ -801,6 +872,12 @@ class DurableSessionRecoveryVerifier:
                     ),
                     evidence.session_journal_digest,
                     "signed execution journal commitment differs from reconstruction",
+                ),
+                (
+                    "signed_evidence.session_journal_manifest",
+                    recovery.session_journal_manifest_digest,
+                    evidence.session_journal_manifest_digest,
+                    "signed execution session-journal manifest differs from recovery checkpoint",
                 ),
                 (
                     "signed_evidence.session_integrity",
