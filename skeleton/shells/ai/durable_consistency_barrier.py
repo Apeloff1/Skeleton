@@ -1189,14 +1189,34 @@ class DurableConsistencyBarrierCoordinator:
         if not callable(method):
             return HotFloorPosition.genesis()
         floor = method()
-        if not isinstance(
+        if isinstance(
             floor,
             HotFloorPosition,
         ):
+            return floor
+
+        # Core receipt chains deliberately expose a tiny dependency-neutral
+        # genesis position instead of importing the AI durability layer.  That
+        # adapter is safe only at genesis: it carries no archive authority and
+        # therefore cannot smuggle an unsigned non-genesis floor into a signed
+        # consistency barrier.  Normalize that one shape while keeping every
+        # active floor type-strict and fail-closed.
+        try:
+            sequence = floor.sequence
+            root_hash = floor.root_hash
+        except Exception as exc:
             raise DurableConsistencyBarrierCorruption(
                 "chain hot_floor returned invalid type"
-            )
-        return floor
+            ) from exc
+        if (
+            type(sequence) is int
+            and sequence == 0
+            and root_hash == GENESIS_HASH
+        ):
+            return HotFloorPosition.genesis()
+        raise DurableConsistencyBarrierCorruption(
+            "chain hot_floor returned invalid type"
+        )
 
     def _observe(
         self,
