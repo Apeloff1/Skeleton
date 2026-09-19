@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import math
 from types import MappingProxyType
-from typing import Iterable, Mapping
+from typing import Mapping
 
 from skeleton.shells.arguments import ArgumentPolicy
 from skeleton.shells.capabilities import ShellCapability
@@ -114,11 +115,30 @@ class LogicalCommandContract:
     def __post_init__(self) -> None:
         if not self.name or not self.executable_key:
             raise ValueError("contract name and executable_key are required")
-        if self.max_timeout is not None and self.max_timeout <= 0:
-            raise ValueError("max_timeout must be positive")
-        capabilities = frozenset(self.required_capabilities) | {ShellCapability.EXECUTE}
+        if self.max_timeout is not None:
+            if (
+                isinstance(self.max_timeout, bool)
+                or not isinstance(self.max_timeout, (int, float))
+                or not math.isfinite(float(self.max_timeout))
+                or float(self.max_timeout) <= 0.0
+            ):
+                raise ValueError("max_timeout must be finite and positive")
+            object.__setattr__(self, "max_timeout", float(self.max_timeout))
+        capabilities = frozenset(
+            ShellCapability(capability)
+            for capability in self.required_capabilities
+        ) | {ShellCapability.EXECUTE}
+        effects = frozenset(
+            CommandEffect(effect)
+            for effect in self.effects
+        )
+        object.__setattr__(
+            self,
+            "risk",
+            CommandRisk(self.risk),
+        )
         object.__setattr__(self, "required_capabilities", capabilities)
-        object.__setattr__(self, "effects", frozenset(self.effects))
+        object.__setattr__(self, "effects", effects)
         object.__setattr__(self, "tags", frozenset(self.tags))
 
     def bind(self, executable_path: str) -> CommandDefinition:
