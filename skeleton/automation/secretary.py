@@ -225,7 +225,7 @@ def decode_delegation(
     repository: str,
     expected_execution: ExecutionIdentity,
     now: int | None = None,
-) -> tuple[str, str, ExecutionIdentity]:
+) -> tuple[str, str, ExecutionIdentity, int]:
     """Decode and bind a version-2 cross-job Supervisor custody envelope."""
     if not encoded or len(encoded) > MAX_ENCODED_ENVELOPE:
         raise SecretaryAdmissionError(
