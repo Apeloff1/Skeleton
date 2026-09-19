@@ -47,6 +47,14 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_provider_runtime_boundary.py \
   tests/test_orchestration.py \
   tests/test_generated_code_sandbox.py \
+  skeleton/testing/test_scanner_integrity.py \
+  skeleton/testing/test_defense_plane.py \
+  skeleton/testing/test_defense_control_plane_contract.py \
+  skeleton/testing/test_incident_containment.py \
+  skeleton/testing/test_automation_control_plane.py \
+  skeleton/testing/test_pr_automation_event_firewall.py \
+  skeleton/testing/test_pr_automation_operator_safety.py \
+  skeleton/testing/test_outbound_url_resolution_security.py \
   tests/test_orchestration_error_redaction.py \
   tests/test_frontier_runtime_memory_retrieval.py \
   tests/test_retrieval_pipeline_internals.py \
@@ -97,6 +105,9 @@ python scripts/check_repository_archive_extraction_safety.py
 
 printf '\n== Security scanner surface preflight ==\n'
 python backend/scripts/check_security_scan_surface.py
+
+printf '\n== Defense control-plane contract ==\n'
+python scripts/check_defense_control_plane_contract.py
 
 printf '\n== Backend/frontend high-confidence SAST ==\n'
 python backend/scripts/check_sast_security.py
