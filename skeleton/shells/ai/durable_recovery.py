@@ -17,6 +17,9 @@ from skeleton.shells.ai.durable_archive_store import (
     ArchiveBackedHistoricalChain,
     DurableArchiveRepository,
 )
+from skeleton.shells.ai.durable_proof_window_operator import (
+    DurableProofWindowOperator,
+)
 from skeleton.shells.ai.durable_session_journal import (
     DurableSessionJournalStore,
 )
@@ -266,6 +269,9 @@ class DurableSessionRecoveryVerifier:
         journal_chain_id: str = "",
         receipt_archive: DurableArchiveRepository | None = None,
         receipt_chain_id: str = "",
+        proof_windows: DurableProofWindowOperator | None = None,
+        journal_proof_chain_id: str = "",
+        receipt_proof_chain_id: str = "",
     ) -> None:
         if (journal_archive is None) != (not journal_chain_id):
             raise ValueError(
@@ -289,6 +295,39 @@ class DurableSessionRecoveryVerifier:
             raise TypeError(
                 "receipt_archive must be DurableArchiveRepository"
             )
+        if (
+            proof_windows is not None
+            and not isinstance(
+                proof_windows,
+                DurableProofWindowOperator,
+            )
+        ):
+            raise TypeError(
+                "proof_windows must be DurableProofWindowOperator"
+            )
+        if proof_windows is None and (
+            journal_proof_chain_id
+            or receipt_proof_chain_id
+        ):
+            raise ValueError(
+                "proof chain ids require proof_windows operator"
+            )
+        if proof_windows is not None and (
+            not journal_proof_chain_id
+            or not receipt_proof_chain_id
+        ):
+            raise ValueError(
+                "journal and receipt proof chain ids are required"
+            )
+        for name, value in (
+            ("journal_proof_chain_id", journal_proof_chain_id),
+            ("receipt_proof_chain_id", receipt_proof_chain_id),
+        ):
+            if value and len(value) > 128:
+                raise ValueError(
+                    f"{name} too long"
+                )
+
         self.finalizations = finalizations
         self.recovery_checkpoints = recovery_checkpoints
         self.session_evidence = session_evidence
@@ -326,9 +365,28 @@ class DurableSessionRecoveryVerifier:
         self.journal_chain_id = journal_chain_id
         self.receipt_archive = receipt_archive
         self.receipt_chain_id = receipt_chain_id
+        self.proof_windows = proof_windows
+        self.journal_proof_chain_id = journal_proof_chain_id
+        self.receipt_proof_chain_id = receipt_proof_chain_id
         self.integrity_verifier = SessionEvidenceIntegrityVerifier(
             self.journal,
             self.receipt_chain,
+            journal_root_verifier=(
+                None
+                if proof_windows is None
+                else lambda root: proof_windows.verify_root(
+                    journal_proof_chain_id,
+                    root,
+                )
+            ),
+            receipt_root_verifier=(
+                None
+                if proof_windows is None
+                else lambda root: proof_windows.verify_root(
+                    receipt_proof_chain_id,
+                    root,
+                )
+            ),
         )
 
     @staticmethod
