@@ -300,7 +300,7 @@ def test_transaction_plane_requires_same_executor(tmp_path: Path):
         scanner=WorkspaceScanner(),
         backup_store=ContentAddressedBackupStore(backup),
     )
-    with pytest.raises(TransactionalToolchainError, match="same compiled"):
+    with pytest.raises(TransactionalToolchainError, match="compiled toolchain executor"):
         TransactionalToolchainExecutionPlane(
             ToolchainExecutionPlane(first),
             manager,
