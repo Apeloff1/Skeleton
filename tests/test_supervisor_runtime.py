@@ -795,6 +795,22 @@ class WorkerResultEvidenceTests(unittest.TestCase):
             {"status": "no-change", "bot": "security-auditor"},
         )
 
+    def test_rejects_duplicate_worker_result_keys(self) -> None:
+        payload = (
+            '{"status":"no-change","status":"existing-pr",'
+            '"bot":"root-cause","branch":'
+            '"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
+            '"pull_request":7,'
+            '"supervisor_snapshot_fingerprint":"'
+            + ("b" * 64)
+            + '"}'
+        )
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(
+                payload,
+                worker="root-cause",
+            )
+
     def test_rejects_worker_identity_confusion(self) -> None:
         payload = json.dumps({
             "status": "no-change",
