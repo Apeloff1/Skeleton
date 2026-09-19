@@ -164,7 +164,7 @@ class WorkspaceScanner:
                 kind,
                 0,
                 stat.S_IMODE(metadata.st_mode),
-                0,
+                int(metadata.st_mtime_ns),
                 device=int(metadata.st_dev),
                 inode=int(metadata.st_ino),
             )
