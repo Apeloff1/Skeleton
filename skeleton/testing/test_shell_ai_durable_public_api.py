@@ -14,6 +14,17 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedJournalCorruption,
     DistributedJournalHead,
 )
+from skeleton.shells.ai.durable_archive_store import (
+    ArchiveBackedHistoricalChain,
+    DurableArchivedNode,
+    DurableArchivedNodeType,
+    DurableArchiveHead,
+    DurableArchiveRepository,
+    DurableArchiveRootIndex,
+    DurableArchiveStoreError,
+    DurableArchiveStoreReport,
+    StoredDurableArchive,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryFinding,
     DurableRecoveryStatus,
@@ -40,6 +51,15 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "ArchiveBackedHistoricalChain": ArchiveBackedHistoricalChain,
+    "DurableArchivedNode": DurableArchivedNode,
+    "DurableArchivedNodeType": DurableArchivedNodeType,
+    "DurableArchiveHead": DurableArchiveHead,
+    "DurableArchiveRepository": DurableArchiveRepository,
+    "DurableArchiveRootIndex": DurableArchiveRootIndex,
+    "DurableArchiveStoreError": DurableArchiveStoreError,
+    "DurableArchiveStoreReport": DurableArchiveStoreReport,
+    "StoredDurableArchive": StoredDurableArchive,
     "DistributedAIDecisionJournal": DistributedAIDecisionJournal,
     "DistributedJournalConflict": DistributedJournalConflict,
     "DistributedJournalCorruption": DistributedJournalCorruption,
@@ -852,3 +872,84 @@ def test_ai_export_points_to_canonical_recovery_verifier():
     )
 
     assert RootImport is CanonicalImport
+
+def test_archive_repository_constructor_exposes_durable_authority():
+    signature = inspect.signature(DurableArchiveRepository)
+    required = {
+        "backend",
+        "checkpoints",
+        "archive_signer",
+        "namespace",
+        "max_nodes_per_archive",
+        "max_cas_retries",
+        "clock",
+    }
+    assert required.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "put",
+        "get",
+        "require",
+        "root_index",
+        "latest",
+        "get_node",
+        "snapshot_at",
+        "verify_root",
+        "root_is_archived",
+        "verify_archive",
+        "repair_indexes",
+    ],
+)
+def test_archive_repository_public_methods_are_stable(method):
+    assert callable(
+        getattr(
+            DurableArchiveRepository,
+            method,
+            None,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "head",
+        "verify",
+        "snapshot",
+        "root_hash",
+        "length",
+        "snapshot_at",
+        "verify_root",
+        "root_is_ancestor",
+    ],
+)
+def test_archive_backed_historical_chain_surface_is_stable(method):
+    assert callable(
+        getattr(
+            ArchiveBackedHistoricalChain,
+            method,
+            None,
+        )
+    )
+
+
+def test_archive_node_type_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableArchivedNodeType
+    } == {
+        "ai_decision_event",
+        "execution_receipt",
+        "evidence_node",
+    }
+
+
+def test_archive_store_error_is_runtime_error():
+    assert issubclass(
+        DurableArchiveStoreError,
+        RuntimeError,
+    )
+
