@@ -29,7 +29,7 @@ LIVE_EXAMPLES = (
     ("satellites/gameforge-middleware/README.md", "first-party"),
     ("skeleton/testing/data/frontier_npc_source_fixture.json", "fixture"),
     ("frontend/assets/images/icon.png", "binary"),
-    ("backend/godot", "binary"),
+    ("backend/godot.artifact.json", "canonical"),
     ("memory/mongo_backup/test_database/academy_subjects.bson", "generated"),
     ("backend/data/vault/compressed/_manifest.json", "generated"),
     ("satellites/branch-snapshots/README.md", "archive"),
