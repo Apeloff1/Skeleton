@@ -208,7 +208,7 @@ def test_permit_is_bound_to_repository() -> None:
     )
     token = authority().issue(permit_claims)
 
-    with pytest.raises(AutomationControlError, match="actor binding"):
+    with pytest.raises(AutomationControlError, match="repository binding"):
         authority().verify(token, actor=other_repo, now=clock())
 
 
