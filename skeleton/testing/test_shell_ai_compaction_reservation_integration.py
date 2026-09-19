@@ -32,6 +32,14 @@ from skeleton.shells.ai.durable_compaction_reservation import (
     DurableCompactionReservationConflict,
     DurableCompactionReservationStore,
 )
+from skeleton.shells.ai.durable_evidence_epoch import (
+    DurableEvidenceEpochConflict,
+    DurableEvidenceEpochError,
+    DurableEvidenceEpochHead,
+    DurableEvidenceEpochMember,
+    DurableEvidenceEpochMemberState,
+    DurableEvidenceEpochStore,
+)
 from skeleton.shells.ai.durable_hot_floor import DurableHotFloorStore
 from skeleton.shells.ai.durable_pruning import DurablePruningExecutor
 from skeleton.shells.ai.durable_pruning_authorization import (
@@ -1078,3 +1086,832 @@ def test_group_reservation_status_serializes_owner_and_generation():
     assert status["operator_id"] == "operator"
     assert status["generation"] == 1
     assert len(status["reservation_id"]) == 64
+
+def epoch_store(fixture):
+    return DurableEvidenceEpochStore(
+        fixture.backend,
+        signer("epoch", b"e", lambda: fixture.now[0]),
+        fixture.coordinator,
+        namespace="evidence-epochs",
+    )
+
+
+def complete_group(fixture):
+    planned, _, _, _ = fixture.through_prepared()
+    completed = fixture.coordinator.execute(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    return planned, completed
+
+
+def test_epoch_publish_requires_completed_group():
+    fixture = Fixture()
+    planned = fixture.plan_group()
+    store = epoch_store(fixture)
+    with pytest.raises(
+        DurableEvidenceEpochConflict,
+        match="completed",
+    ):
+        store.publish(
+            planned.group.group_id,
+            fixture.requests(),
+        )
+
+
+def test_epoch_publish_binds_complete_group_and_members():
+    fixture = Fixture()
+    planned, completed = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    epoch = item.epoch
+
+    assert epoch.epoch_id == "epoch-1"
+    assert epoch.group_id == completed.group.group_id
+    assert epoch.group_digest == completed.group.digest
+    assert epoch.group_binding_digest == completed.group.binding_digest
+    assert epoch.operator_id == "operator"
+    assert epoch.completed_at == completed.group.updated_at
+    assert [member.chain_id for member in epoch.members] == [
+        "journal",
+        "receipts",
+    ]
+    assert len(epoch.record_id) == 64
+    assert len(epoch.digest) == 64
+
+
+def test_epoch_member_binds_archive_floor_and_pruning_authority():
+    fixture = Fixture()
+    planned, completed = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    for member in item.epoch.members:
+        group_member = next(
+            value
+            for value in completed.group.members
+            if value.chain_id == member.chain_id
+        )
+        workflow = fixture.operator.current(
+            member.workflow_id
+        ).workflow
+        floor = fixture.floor_store.get(member.floor_id).floor
+        assert member.workflow_binding_digest == group_member.workflow_binding_digest
+        assert member.workflow_digest == workflow.digest
+        assert member.archive_id == workflow.archive_id
+        assert member.archive_manifest_digest == workflow.archive_manifest_digest
+        assert member.certificate_id == workflow.certificate_id
+        assert member.authorization_id == workflow.authorization_id
+        assert member.pruning_operation_id == workflow.pruning_operation_id
+        assert member.pruning_manifest_digest == workflow.pruning_manifest_digest
+        assert member.floor_id == floor.floor_id
+        assert member.floor_digest == floor.digest
+        assert member.floor_fencing_token == floor.fencing_token
+        assert member.deleted_items == member.delete_count == 6
+
+
+def test_epoch_signature_declares_non_destructive_completion_authority():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    assert item.signature.artifact_type == "durable-evidence-epoch"
+    assert item.signature.artifact_digest == item.epoch.digest
+    assert (
+        item.signature.metadata["authority"]
+        == "durable-evidence-epoch-completion"
+    )
+    assert item.signature.metadata["record_id"] == item.record_id
+    assert item.signature.metadata["group_id"] == item.epoch.group_id
+    assert not item.destructive_action_authorized
+    assert item.to_dict()["destructive_action_authorized"] is False
+
+
+def test_epoch_publish_is_idempotent():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    first = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    second = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    assert second == first
+    latest = store.latest("epoch-1")
+    assert latest == first
+
+
+def test_epoch_latest_head_is_generation_one_initially():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    head_record = fixture.backend.get(
+        store.namespace,
+        store._head_key("epoch-1"),
+    )
+    assert isinstance(head_record.value, DurableEvidenceEpochHead)
+    assert head_record.value.generation == 1
+    assert head_record.value.record_id == item.record_id
+    assert head_record.value.completed_at == item.epoch.completed_at
+
+
+def test_epoch_current_verification_succeeds_after_publication():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    report = store.inspect(
+        item.record_id,
+        fixture.requests(),
+    )
+    assert report.historically_valid
+    assert report.current
+    assert report.latest_for_epoch
+    assert report.signature_valid
+    assert report.group_valid
+    assert report.reasons == ()
+    assert all(member.current for member in report.members)
+    assert all(
+        member.state is DurableEvidenceEpochMemberState.VALID
+        for member in report.members
+    )
+
+
+def test_epoch_require_current_succeeds_for_latest_completion():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    published = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    report = store.require_current(
+        "epoch-1",
+        fixture.requests(),
+    )
+    assert report.current
+    assert report.item == published
+
+
+def test_epoch_require_historical_succeeds_for_complete_artifact():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    report = store.require_historically_valid(
+        item.record_id,
+        fixture.requests(),
+    )
+    assert report.historically_valid
+
+
+def test_fresh_epoch_store_verifies_existing_record():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    first_store = epoch_store(fixture)
+    item = first_store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    fresh = DurableEvidenceEpochStore(
+        fixture.backend,
+        ArtifactSigner(
+            "epoch",
+            b"e" * 32,
+            clock=lambda: fixture.now[0],
+        ),
+        fixture.coordinator,
+        namespace="evidence-epochs",
+    )
+    assert fresh.get(item.record_id) == item
+    assert fresh.latest("epoch-1") == item
+    assert fresh.require_current(
+        "epoch-1",
+        fixture.requests(),
+    ).current
+
+
+def test_epoch_remains_historically_valid_after_new_appends():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    append_events(
+        fixture.journal,
+        2,
+        start=8,
+    )
+    fixture.receipts.append(receipt(8))
+    fixture.receipts.append(receipt(9))
+
+    report = store.inspect(
+        item.record_id,
+        fixture.requests(),
+    )
+    assert report.historically_valid
+    assert report.current
+    assert all(member.current_floor_exact for member in report.members)
+    assert all(member.live_head_valid for member in report.members)
+
+
+def test_epoch_historical_head_can_be_proved_from_hot_ancestor():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    old_journal_root = next(
+        member.current_root
+        for member in item.epoch.members
+        if member.chain_id == "journal"
+    )
+    append_events(fixture.journal, 1, start=8)
+    assert fixture.journal.root_is_ancestor(old_journal_root)
+    report = store.inspect(item.record_id, fixture.requests())
+    journal = next(member for member in report.members if member.chain_id == "journal")
+    assert journal.live_head_valid
+
+
+def test_epoch_request_set_must_match_members():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    with pytest.raises(
+        DurableEvidenceEpochConflict,
+        match="request set",
+    ):
+        store.inspect(
+            item.record_id,
+            fixture.requests()[:1],
+        )
+
+
+def test_epoch_publish_request_set_must_match_group():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    with pytest.raises(
+        DurableEvidenceEpochConflict,
+        match="request set",
+    ):
+        store.publish(
+            planned.group.group_id,
+            fixture.requests()[:1],
+        )
+
+
+def test_epoch_missing_record_is_rejected():
+    fixture = Fixture()
+    store = epoch_store(fixture)
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="missing",
+    ):
+        store.inspect(
+            fp("missing"),
+            fixture.requests(),
+        )
+
+
+def test_epoch_latest_missing_returns_none():
+    fixture = Fixture()
+    assert epoch_store(fixture).latest("missing") is None
+
+
+def test_epoch_require_current_missing_is_rejected():
+    fixture = Fixture()
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="missing",
+    ):
+        epoch_store(fixture).require_current(
+            "missing",
+            fixture.requests(),
+        )
+
+
+def test_epoch_signature_tamper_is_rejected_on_get():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    key = store._record_key(item.record_id)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            item,
+            signature=replace(
+                item.signature,
+                signature="f" * 64,
+            ),
+        ),
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="signature verification",
+    ):
+        store.get(item.record_id)
+
+
+def test_epoch_signature_metadata_tamper_is_rejected():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    key = store._record_key(item.record_id)
+    record = fixture.backend.get(store.namespace, key)
+    metadata = dict(item.signature.metadata)
+    metadata["group_id"] = fp("wrong")
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            item,
+            signature=replace(
+                item.signature,
+                metadata=metadata,
+            ),
+        ),
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="metadata",
+    ):
+        store.get(item.record_id)
+
+
+def test_epoch_wrong_signer_cannot_verify_record():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    wrong = DurableEvidenceEpochStore(
+        fixture.backend,
+        ArtifactSigner("wrong", b"w" * 32),
+        fixture.coordinator,
+        namespace="evidence-epochs",
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="signature",
+    ):
+        wrong.get(item.record_id)
+
+
+def test_epoch_group_removal_breaks_historical_verification():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    group_key = fixture.coordinator._key(planned.group.group_id)
+    record = fixture.backend.get(
+        fixture.coordinator.namespace,
+        group_key,
+    )
+    fixture.backend.delete(
+        fixture.coordinator.namespace,
+        group_key,
+        expected_revision=record.revision,
+    )
+    report = store.inspect(
+        item.record_id,
+        fixture.requests(),
+    )
+    assert not report.historically_valid
+    assert not report.group_valid
+    assert any("group is missing" in reason for reason in report.reasons)
+
+
+def test_epoch_group_tamper_breaks_group_digest_verification():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    group_key = fixture.coordinator._key(planned.group.group_id)
+    record = fixture.backend.get(
+        fixture.coordinator.namespace,
+        group_key,
+    )
+    tampered = replace(
+        record.value,
+        updated_at=record.value.updated_at + 1.0,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.coordinator.namespace,
+        group_key,
+        expected_revision=record.revision,
+        value=tampered,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    assert not report.historically_valid
+    assert not report.group_valid
+
+
+def test_epoch_workflow_tamper_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.operator._key(member.workflow_id)
+    record = fixture.backend.get(fixture.operator.namespace, key)
+    tampered = replace(
+        record.value,
+        error_count=1,
+        last_error="tampered",
+        last_error_at=record.value.updated_at + 1.0,
+        updated_at=record.value.updated_at + 1.0,
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=tampered,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.historically_valid
+    assert not target.workflow_valid
+    assert any("workflow differs" in reason for reason in target.reasons)
+
+
+def test_epoch_archive_record_tamper_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.archives._archive_key(member.archive_id)
+    record = fixture.backend.get(fixture.archives.namespace, key)
+    fixture.backend.compare_and_swap(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+        value={"bad": True},
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.archive_valid
+    assert not target.historically_valid
+
+
+def test_epoch_certificate_removal_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.certificates._certificate_key(member.certificate_id)
+    record = fixture.backend.get(fixture.certificates.namespace, key)
+    fixture.backend.delete(
+        fixture.certificates.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.certificate_valid
+    assert not target.historically_valid
+
+
+def test_epoch_authorization_removal_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.authorizations._authorization_key(member.authorization_id)
+    record = fixture.backend.get(fixture.authorizations.namespace, key)
+    fixture.backend.delete(
+        fixture.authorizations.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.authorization_valid
+    assert not target.historically_valid
+
+
+def test_epoch_pruning_manifest_removal_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.executor._manifest_key(member.pruning_operation_id)
+    record = fixture.backend.get(fixture.executor.namespace, key)
+    fixture.backend.delete(
+        fixture.executor.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.pruning_valid
+    assert not target.historically_valid
+
+
+def test_epoch_floor_history_tamper_invalidates_member():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    key = fixture.floor_store._history_key(member.floor_id)
+    record = fixture.backend.get(fixture.floor_store.namespace, key)
+    raw = dict(record.value)
+    raw["floor"] = dict(raw["floor"])
+    raw["floor"]["fencing_token"] = raw["floor"]["fencing_token"] + 1
+    fixture.backend.compare_and_swap(
+        fixture.floor_store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    target = next(value for value in report.members if value.chain_id == member.chain_id)
+    assert not target.floor_valid
+    assert not target.historically_valid
+
+
+def test_epoch_member_record_serialization_is_stable():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    member = item.epoch.members[0]
+    data = member.to_dict()
+    assert data["digest"] == member.digest
+    assert len(data["workflow_digest"]) == 64
+    assert len(data["floor_digest"]) == 64
+    assert data["deleted_items"] == data["delete_count"]
+
+
+def test_epoch_artifact_serialization_contains_completion_proof():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    data = item.to_dict()
+    assert data["epoch"]["record_id"] == item.record_id
+    assert data["epoch"]["digest"] == item.epoch.digest
+    assert len(data["epoch"]["members"]) == 2
+    assert data["destructive_action_authorized"] is False
+
+
+def test_epoch_verification_serialization_exposes_member_states():
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    store = epoch_store(fixture)
+    item = store.publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    report = store.inspect(item.record_id, fixture.requests())
+    data = report.to_dict()
+    assert data["historically_valid"] is True
+    assert data["current"] is True
+    assert [value["chain_id"] for value in data["members"]] == [
+        "journal",
+        "receipts",
+    ]
+    assert all(value["state"] == "valid" for value in data["members"])
+
+
+def test_epoch_record_id_is_content_deterministic():
+    fixture = Fixture()
+    planned, completed = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    expected = item.epoch.derive_record_id(
+        epoch_id=item.epoch.epoch_id,
+        group_id=item.epoch.group_id,
+        group_digest=completed.group.digest,
+        group_binding_digest=completed.group.binding_digest,
+        operator_id="operator",
+        completed_at=completed.group.updated_at,
+        members=item.epoch.members,
+    )
+    assert expected == item.record_id
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("record_id", "bad"),
+        ("epoch_id", ""),
+        ("group_id", "bad"),
+        ("group_digest", "bad"),
+        ("group_binding_digest", "bad"),
+        ("operator_id", ""),
+        ("completed_at", -1.0),
+    ],
+)
+def test_epoch_dataclass_validation(field, value):
+    fixture = Fixture()
+    planned, completed = complete_group(fixture)
+    item = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    )
+    values = dict(
+        schema_version=1,
+        record_id=item.epoch.record_id,
+        epoch_id=item.epoch.epoch_id,
+        group_id=item.epoch.group_id,
+        group_digest=item.epoch.group_digest,
+        group_binding_digest=item.epoch.group_binding_digest,
+        operator_id=item.epoch.operator_id,
+        completed_at=item.epoch.completed_at,
+        members=item.epoch.members,
+    )
+    values[field] = value
+    with pytest.raises((ValueError, TypeError)):
+        type(item.epoch)(**values)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("workflow_id", "bad"),
+        ("workflow_digest", "bad"),
+        ("workflow_binding_digest", "bad"),
+        ("retention_plan_digest", "bad"),
+        ("current_sequence", 0),
+        ("cutoff_sequence", 0),
+        ("archive_id", ""),
+        ("certificate_id", "bad"),
+        ("authorization_id", "bad"),
+        ("pruning_operation_id", "bad"),
+        ("floor_id", "bad"),
+        ("floor_fencing_token", 0),
+        ("delete_count", 0),
+    ],
+)
+def test_epoch_member_validation(field, value):
+    fixture = Fixture()
+    planned, _ = complete_group(fixture)
+    member = epoch_store(fixture).publish(
+        planned.group.group_id,
+        fixture.requests(),
+    ).epoch.members[0]
+    values = {
+        name: getattr(member, name)
+        for name in member.__dataclass_fields__
+    }
+    values[field] = value
+    with pytest.raises((ValueError, TypeError)):
+        DurableEvidenceEpochMember(**values)
+
+
+def test_epoch_head_validation():
+    with pytest.raises(ValueError):
+        DurableEvidenceEpochHead("", fp("record"), 1, 1.0)
+    with pytest.raises(ValueError):
+        DurableEvidenceEpochHead("epoch", "bad", 1, 1.0)
+    with pytest.raises(ValueError):
+        DurableEvidenceEpochHead("epoch", fp("record"), 0, 1.0)
+    with pytest.raises(ValueError):
+        DurableEvidenceEpochHead("epoch", fp("record"), 1, -1.0)
+
+
+def test_epoch_store_constructor_validation():
+    fixture = Fixture()
+    with pytest.raises(ValueError, match="namespace"):
+        DurableEvidenceEpochStore(
+            fixture.backend,
+            signer("epoch", b"e"),
+            fixture.coordinator,
+            namespace="",
+        )
+    with pytest.raises(ValueError, match="max_cas_retries"):
+        DurableEvidenceEpochStore(
+            fixture.backend,
+            signer("epoch", b"e"),
+            fixture.coordinator,
+            max_cas_retries=0,
+        )
+
+
+def test_epoch_wrong_record_backend_type_is_rejected():
+    fixture = Fixture()
+    store = epoch_store(fixture)
+    record_id = fp("bad-record")
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._record_key(record_id),
+        {"bad": True},
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="value type",
+    ):
+        store.get(record_id)
+
+
+def test_epoch_wrong_head_backend_type_is_rejected():
+    fixture = Fixture()
+    store = epoch_store(fixture)
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._head_key("epoch"),
+        {"bad": True},
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="head",
+    ):
+        store.latest("epoch")
+
+
+def test_epoch_head_missing_record_is_rejected():
+    fixture = Fixture()
+    store = epoch_store(fixture)
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._head_key("epoch"),
+        DurableEvidenceEpochHead(
+            "epoch",
+            fp("missing"),
+            1,
+            1.0,
+        ),
+    )
+    with pytest.raises(
+        DurableEvidenceEpochError,
+        match="missing record",
+    ):
+        store.latest("epoch")
+
