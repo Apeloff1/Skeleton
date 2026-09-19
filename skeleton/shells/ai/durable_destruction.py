@@ -307,13 +307,16 @@ class DurableDestructionRecord:
             raise ValueError(
                 "non-first destruction record may not follow genesis"
             )
-        if self.after_sequence != self.before_sequence:
+        if self.after_sequence < self.before_sequence:
             raise ValueError(
-                "destruction may not change committed chain sequence"
+                "destruction may not move committed chain head backward"
             )
-        if self.after_root != self.before_root:
+        if (
+            self.after_sequence == self.before_sequence
+            and self.after_root != self.before_root
+        ):
             raise ValueError(
-                "destruction may not change committed chain root"
+                "same committed head sequence may not bind different root"
             )
         if (
             self.after_floor_sequence
