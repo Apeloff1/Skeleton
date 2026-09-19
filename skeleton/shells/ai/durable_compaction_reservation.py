@@ -195,6 +195,11 @@ class DurableCompactionReservation:
         ).encode()
         return hashlib.sha256(raw).hexdigest()
 
+    @property
+    def destructive_action_authorized(self) -> bool:
+        """Reservations serialize coordination authority, never delete authority."""
+        return False
+
     def to_dict(
         self,
     ) -> dict[str, object]:
