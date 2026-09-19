@@ -20,7 +20,7 @@ from skeleton.shells.ai.durable_operations import DurableChainOperationalState, 
 
 from skeleton.shells.ai.durable_retention import DurableRetentionError, DurableRetentionPlan, DurableRetentionPlanner, DurableRetentionPolicy, DurableRetentionState, ProtectedHistoricalRoot
 
-from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain, DurableChainCheckpoint, DurableChainCheckpointStore, DurableCheckpointError, DurableCheckpointVerification, SignedDurableChainCheckpoint
+from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain, DurableChainCheckpoint, DurableChainCheckpointStore, DurableCheckpointError, DurableCheckpointIndexHealth, DurableCheckpointIndexState, DurableCheckpointLookupIndex, DurableCheckpointVerification, SignedDurableChainCheckpoint
 
 from skeleton.shells.ai.durable_compaction import DurableCompactionError, DurableCompactionPlanner, DurableCompactionPolicy, DurableCompactionReadiness, DurableCompactionRootCoverage, DurableCompactionState
 
