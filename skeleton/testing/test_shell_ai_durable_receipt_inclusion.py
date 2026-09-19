@@ -1463,4 +1463,3 @@ def test_batch_result_rejects_duplicate_items():
             (item, item),
             (verification, verification),
         )
-
