@@ -20,7 +20,8 @@ from skeleton.shells.ai.execution_attempt import (
 )
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def store():
