@@ -487,6 +487,171 @@ class DurableArchiveStoreError(RuntimeError):
     pass
 
 
+class DurableArchiveIndexState(str, Enum):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True)
+class DurableArchiveIndexHealth:
+    archive_id: str
+    chain_id: str
+    state: DurableArchiveIndexState
+    archive_valid: bool
+    expected_root_indexes: int
+    root_indexes_present: int
+    replica_bindings_present: int
+    missing_root_indexes: tuple[str, ...]
+    missing_replica_roots: tuple[str, ...]
+    corrupt_root_indexes: tuple[str, ...]
+    head_repair_required: bool
+    head_valid: bool
+
+    def __post_init__(self) -> None:
+        _identity(
+            "archive_id",
+            self.archive_id,
+            maximum=160,
+        )
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        object.__setattr__(
+            self,
+            "state",
+            DurableArchiveIndexState(
+                self.state
+            ),
+        )
+        for name in (
+            "archive_valid",
+            "head_repair_required",
+            "head_valid",
+        ):
+            if not isinstance(
+                getattr(self, name),
+                bool,
+            ):
+                raise ValueError(
+                    f"{name} must be bool"
+                )
+        for name in (
+            "expected_root_indexes",
+            "root_indexes_present",
+            "replica_bindings_present",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        if (
+            self.root_indexes_present
+            > self.expected_root_indexes
+        ):
+            raise ValueError(
+                "root_indexes_present exceeds expected count"
+            )
+        if (
+            self.replica_bindings_present
+            > self.expected_root_indexes
+        ):
+            raise ValueError(
+                "replica_bindings_present exceeds expected count"
+            )
+        for name in (
+            "missing_root_indexes",
+            "missing_replica_roots",
+            "corrupt_root_indexes",
+        ):
+            values = tuple(
+                getattr(self, name)
+            )
+            for value in values:
+                _digest(name, value)
+            if len(values) != len(set(values)):
+                raise ValueError(
+                    f"duplicate {name}"
+                )
+            object.__setattr__(
+                self,
+                name,
+                values,
+            )
+
+    @property
+    def missing(self) -> int:
+        return (
+            len(self.missing_root_indexes)
+            + len(self.missing_replica_roots)
+            + int(self.head_repair_required)
+        )
+
+    @property
+    def corrupt(self) -> int:
+        return len(
+            self.corrupt_root_indexes
+        ) + int(not self.head_valid)
+
+    @property
+    def healthy(self) -> bool:
+        return (
+            self.state
+            is DurableArchiveIndexState.HEALTHY
+        )
+
+    @property
+    def repairable(self) -> bool:
+        return (
+            self.archive_valid
+            and self.state
+            is DurableArchiveIndexState.DEGRADED
+            and self.corrupt == 0
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "archive_id": self.archive_id,
+            "chain_id": self.chain_id,
+            "state": self.state.value,
+            "archive_valid": self.archive_valid,
+            "expected_root_indexes": self.expected_root_indexes,
+            "root_indexes_present": self.root_indexes_present,
+            "replica_bindings_present": self.replica_bindings_present,
+            "missing_root_indexes": list(
+                self.missing_root_indexes
+            ),
+            "missing_replica_roots": list(
+                self.missing_replica_roots
+            ),
+            "corrupt_root_indexes": list(
+                self.corrupt_root_indexes
+            ),
+            "head_repair_required": self.head_repair_required,
+            "head_valid": self.head_valid,
+            "missing": self.missing,
+            "corrupt": self.corrupt,
+            "healthy": self.healthy,
+            "repairable": self.repairable,
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+
 class DurableArchiveRepository:
     """CAS-backed repository containing signed archive metadata and node payloads."""
 
@@ -1936,6 +2101,217 @@ class DurableArchiveRepository:
             KeyError,
         ):
             return False
+
+    def inspect_indexes(
+        self,
+        archive_id: str,
+    ) -> DurableArchiveIndexHealth:
+        _identity(
+            "archive_id",
+            archive_id,
+            maximum=160,
+        )
+        stored = self.get(
+            archive_id
+        )
+        if stored is None:
+            raise DurableArchiveStoreError(
+                "required archive is missing"
+            )
+        manifest = stored.manifest.manifest
+        if not self.verify_archive(
+            stored
+        ):
+            return DurableArchiveIndexHealth(
+                archive_id,
+                manifest.chain_id,
+                DurableArchiveIndexState.INVALID,
+                False,
+                manifest.node_count + 1,
+                0,
+                0,
+                (),
+                (),
+                (),
+                False,
+                True,
+            )
+
+        expected = (
+            (GENESIS_HASH, 0),
+            *tuple(
+                (
+                    node_hash,
+                    sequence,
+                )
+                for sequence, node_hash
+                in enumerate(
+                    stored.node_hashes,
+                    start=1,
+                )
+            ),
+        )
+        missing_root: list[str] = []
+        missing_replica: list[str] = []
+        corrupt_root: list[str] = []
+        root_present = 0
+        replica_present = 0
+
+        for (
+            root_hash,
+            sequence,
+        ) in expected:
+            key = self._root_key(
+                manifest.chain_id,
+                root_hash,
+            )
+            record = self.backend.get(
+                self.namespace,
+                key,
+            )
+            if record is None:
+                missing_root.append(
+                    root_hash
+                )
+                continue
+            root_present += 1
+            if not isinstance(
+                record.value,
+                dict,
+            ):
+                corrupt_root.append(
+                    root_hash
+                )
+                continue
+            try:
+                index = self._root_index(
+                    dict(record.value)
+                )
+            except Exception:
+                corrupt_root.append(
+                    root_hash
+                )
+                continue
+            if (
+                index.chain_id
+                != manifest.chain_id
+                or index.root_hash
+                != root_hash
+                or index.sequence
+                != sequence
+            ):
+                corrupt_root.append(
+                    root_hash
+                )
+                continue
+            matching = tuple(
+                replica
+                for replica in index.replicas
+                if (
+                    replica.archive_id
+                    == archive_id
+                )
+            )
+            if not matching:
+                missing_replica.append(
+                    root_hash
+                )
+                continue
+            if (
+                len(matching) != 1
+                or matching[0]
+                .archive_manifest_digest
+                != manifest.digest
+            ):
+                corrupt_root.append(
+                    root_hash
+                )
+                continue
+            replica_present += 1
+
+        head_repair_required = False
+        head_valid = True
+        head_record = self.backend.get(
+            self.namespace,
+            self._head_key(
+                manifest.chain_id
+            ),
+        )
+        if head_record is None:
+            head_repair_required = True
+        elif not isinstance(
+            head_record.value,
+            dict,
+        ):
+            head_valid = False
+        else:
+            try:
+                head = self._head(
+                    dict(
+                        head_record.value
+                    )
+                )
+            except Exception:
+                head_valid = False
+            else:
+                if (
+                    head.chain_id
+                    != manifest.chain_id
+                ):
+                    head_valid = False
+                elif (
+                    head.sequence
+                    < manifest.checkpoint_sequence
+                ):
+                    head_repair_required = True
+                elif (
+                    head.sequence
+                    == manifest.checkpoint_sequence
+                    and (
+                        head.root_hash
+                        != manifest.checkpoint_root
+                        or head.archive_id
+                        != archive_id
+                        or head.archive_manifest_digest
+                        != manifest.digest
+                    )
+                ):
+                    head_valid = False
+
+        if (
+            corrupt_root
+            or not head_valid
+        ):
+            state = (
+                DurableArchiveIndexState.INVALID
+            )
+        elif (
+            missing_root
+            or missing_replica
+            or head_repair_required
+        ):
+            state = (
+                DurableArchiveIndexState.DEGRADED
+            )
+        else:
+            state = (
+                DurableArchiveIndexState.HEALTHY
+            )
+
+        return DurableArchiveIndexHealth(
+            archive_id,
+            manifest.chain_id,
+            state,
+            True,
+            len(expected),
+            root_present,
+            replica_present,
+            tuple(missing_root),
+            tuple(missing_replica),
+            tuple(corrupt_root),
+            head_repair_required,
+            head_valid,
+        )
 
     def repair_indexes(
         self,
