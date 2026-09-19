@@ -23,6 +23,17 @@ from skeleton.memory.core import (
     TrinityResult,
 )
 from skeleton.memory.vector import HashEmbedder, VectorEntry, VectorStore
+from skeleton.memory.jvm_vector_accelerator import (
+    JvmVectorAccelerator,
+    JvmVectorConfig,
+    JvmVectorError,
+    JvmVectorProtocolError,
+    JvmVectorTimeout,
+    JvmVectorUnavailable,
+    VectorHit,
+    close_default_vector_accelerator,
+    get_default_vector_accelerator,
+)
 from skeleton.memory.consolidation import ConsolidationCycle, wire_from_genesis
 
 __all__ = [
@@ -30,6 +41,15 @@ __all__ = [
     "VectorStore",
     "HashEmbedder",
     "VectorEntry",
+    "JvmVectorAccelerator",
+    "JvmVectorConfig",
+    "JvmVectorError",
+    "JvmVectorUnavailable",
+    "JvmVectorProtocolError",
+    "JvmVectorTimeout",
+    "VectorHit",
+    "get_default_vector_accelerator",
+    "close_default_vector_accelerator",
     "CAGStore",
     "MAGStore",
     "MemoryTrinity",
