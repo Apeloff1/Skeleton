@@ -377,6 +377,24 @@ class DurableOrphanGCPlan:
                 self.created_at,
             ),
         )
+        expected_plan_id = self.derive_id(
+            chain_id=self.chain_id,
+            node_kind=self.node_kind,
+            policy_digest=self.policy_digest,
+            scanner_policy_digest=self.scanner_policy_digest,
+            scan_digest=self.scan_digest,
+            head_sequence=self.head_sequence,
+            head_root=self.head_root,
+            floor_sequence=self.floor_sequence,
+            floor_root=self.floor_root,
+            floor_active=self.floor_active,
+            targets=self.targets,
+            created_at=self.created_at,
+        )
+        if self.plan_id != expected_plan_id:
+            raise ValueError(
+                "orphan GC plan_id differs from deterministic binding"
+            )
 
     @staticmethod
     def derive_id(
