@@ -23,7 +23,6 @@ from .runner_contracts import (
     RunnerPolicy,
     Target,
     TargetSet,
-    unique_text,
     valid_repository,
     valid_sha,
 )
