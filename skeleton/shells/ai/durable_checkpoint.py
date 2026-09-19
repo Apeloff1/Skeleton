@@ -230,6 +230,51 @@ class DurableCheckpointError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class DurableCheckpointLookupIndex:
+    chain_id: str
+    sequence: int
+    root_hash: str
+    checkpoint_digest: str
+    chain_node_hash: str
+
+    def __post_init__(self) -> None:
+        if not self.chain_id or len(self.chain_id) > 128:
+            raise ValueError(
+                "invalid durable checkpoint lookup chain_id"
+            )
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence < 0
+        ):
+            raise ValueError(
+                "durable checkpoint lookup sequence must be non-negative"
+            )
+        for name in (
+            "root_hash",
+            "checkpoint_digest",
+            "chain_node_hash",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _digest(
+                    name,
+                    getattr(self, name),
+                ),
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "sequence": self.sequence,
+            "root_hash": self.root_hash,
+            "checkpoint_digest": self.checkpoint_digest,
+            "chain_node_hash": self.chain_node_hash,
+        }
+
+
 class DurableChainCheckpointStore:
     """Append-only signed checkpoint history for one or more evidence chains."""
 
@@ -262,11 +307,349 @@ class DurableChainCheckpointStore:
             raise TypeError("clock must be callable")
         self.signer = signer
         self._clock = clock
+        self._backend = backend
+        self._namespace = namespace
         self._chain = ContentAddressedEvidenceChain(
             backend,
             namespace=namespace,
             max_events=max_checkpoints,
         )
+
+    @staticmethod
+    def _root_lookup_key(
+        chain_id: str,
+        root_hash: str,
+    ) -> str:
+        if not chain_id or len(chain_id) > 128:
+            raise ValueError("invalid chain_id")
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        raw = json.dumps(
+            {
+                "chain_id": chain_id,
+                "root_hash": root_hash,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return (
+            "checkpoint-root:"
+            + hashlib.sha256(raw).hexdigest()
+        )
+
+    @staticmethod
+    def _digest_lookup_key(
+        checkpoint_digest: str,
+    ) -> str:
+        checkpoint_digest = _digest(
+            "checkpoint_digest",
+            checkpoint_digest,
+        )
+        return (
+            "checkpoint-digest:"
+            + checkpoint_digest
+        )
+
+    @staticmethod
+    def _lookup(
+        raw: dict[str, object],
+    ) -> DurableCheckpointLookupIndex:
+        return DurableCheckpointLookupIndex(
+            str(raw["chain_id"]),
+            int(raw["sequence"]),
+            str(raw["root_hash"]),
+            str(raw["checkpoint_digest"]),
+            str(raw["chain_node_hash"]),
+        )
+
+    @staticmethod
+    def _lookup_for(
+        item: SignedDurableChainCheckpoint,
+    ) -> DurableCheckpointLookupIndex:
+        return DurableCheckpointLookupIndex(
+            item.checkpoint.chain_id,
+            item.checkpoint.sequence,
+            item.checkpoint.root_hash,
+            item.checkpoint.digest,
+            item.chain_node_hash,
+        )
+
+    def _put_lookup(
+        self,
+        key: str,
+        lookup: DurableCheckpointLookupIndex,
+    ) -> bool:
+        value = lookup.to_dict()
+        existing = self._backend.get(
+            self._namespace,
+            key,
+        )
+        if existing is None:
+            try:
+                self._backend.put_if_absent(
+                    self._namespace,
+                    key,
+                    value,
+                )
+                return True
+            except Exception:
+                existing = self._backend.get(
+                    self._namespace,
+                    key,
+                )
+                if existing is None:
+                    raise
+        if not isinstance(existing.value, dict):
+            raise DurableCheckpointError(
+                "durable checkpoint lookup index must be mapping"
+            )
+        current = self._lookup(
+            dict(existing.value)
+        )
+        if current != lookup:
+            raise DurableCheckpointError(
+                "durable checkpoint lookup key binds different checkpoint"
+            )
+        return False
+
+    def _index_item(
+        self,
+        item: SignedDurableChainCheckpoint,
+    ) -> int:
+        lookup = self._lookup_for(item)
+        written = 0
+        if self._put_lookup(
+            self._digest_lookup_key(
+                lookup.checkpoint_digest
+            ),
+            lookup,
+        ):
+            written += 1
+        if self._put_lookup(
+            self._root_lookup_key(
+                lookup.chain_id,
+                lookup.root_hash,
+            ),
+            lookup,
+        ):
+            written += 1
+        return written
+
+    def _lookup_record(
+        self,
+        key: str,
+    ) -> DurableCheckpointLookupIndex | None:
+        record = self._backend.get(
+            self._namespace,
+            key,
+        )
+        if record is None:
+            return None
+        if not isinstance(record.value, dict):
+            raise DurableCheckpointError(
+                "durable checkpoint lookup index must be mapping"
+            )
+        return self._lookup(
+            dict(record.value)
+        )
+
+    def _item_from_lookup(
+        self,
+        lookup: DurableCheckpointLookupIndex,
+    ) -> SignedDurableChainCheckpoint:
+        try:
+            node = self._chain.get_node(
+                lookup.chain_node_hash
+            )
+        except Exception as exc:
+            raise DurableCheckpointError(
+                "indexed checkpoint registry node is unavailable"
+            ) from exc
+        if (
+            node.kind
+            != "durable.chain.checkpoint"
+        ):
+            raise DurableCheckpointError(
+                "indexed checkpoint registry node has wrong kind"
+            )
+        raw_checkpoint = node.payload.get(
+            "checkpoint"
+        )
+        raw_signature = node.payload.get(
+            "signature"
+        )
+        if (
+            not isinstance(raw_checkpoint, dict)
+            or not isinstance(raw_signature, dict)
+        ):
+            raise DurableCheckpointError(
+                "indexed checkpoint registry payload is invalid"
+            )
+        item = SignedDurableChainCheckpoint(
+            self._checkpoint(
+                dict(raw_checkpoint)
+            ),
+            self._signature(
+                dict(raw_signature)
+            ),
+            node.node_hash,
+        )
+        expected = self._lookup_for(
+            item
+        )
+        if expected != lookup:
+            raise DurableCheckpointError(
+                "indexed checkpoint identity differs from registry node"
+            )
+        try:
+            self.signer.verify(
+                item.signature
+            )
+        except ArtifactSignatureError as exc:
+            raise DurableCheckpointError(
+                "indexed checkpoint signature is invalid"
+            ) from exc
+        if (
+            item.signature.artifact_type
+            != "durable-chain-checkpoint"
+            or item.signature.artifact_digest
+            != item.checkpoint.digest
+        ):
+            raise DurableCheckpointError(
+                "indexed checkpoint signature binding is invalid"
+            )
+        if not self._chain.root_is_ancestor(
+            item.chain_node_hash
+        ):
+            raise DurableCheckpointError(
+                "indexed checkpoint node is not committed in registry"
+            )
+        return item
+
+    def find_by_digest(
+        self,
+        checkpoint_digest: str,
+    ) -> SignedDurableChainCheckpoint | None:
+        checkpoint_digest = _digest(
+            "checkpoint_digest",
+            checkpoint_digest,
+        )
+        lookup = self._lookup_record(
+            self._digest_lookup_key(
+                checkpoint_digest
+            )
+        )
+        if lookup is not None:
+            return self._item_from_lookup(
+                lookup
+            )
+
+        matches = tuple(
+            item
+            for item in self.snapshot()
+            if item.checkpoint.digest
+            == checkpoint_digest
+        )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise DurableCheckpointError(
+                "checkpoint digest is not unique in canonical registry"
+            )
+        self._index_item(
+            matches[0]
+        )
+        return matches[0]
+
+    def find_by_root(
+        self,
+        chain_id: str,
+        root_hash: str,
+    ) -> SignedDurableChainCheckpoint | None:
+        key = self._root_lookup_key(
+            chain_id,
+            root_hash,
+        )
+        lookup = self._lookup_record(
+            key
+        )
+        if lookup is not None:
+            if lookup.chain_id != chain_id:
+                raise DurableCheckpointError(
+                    "checkpoint root index chain mismatch"
+                )
+            return self._item_from_lookup(
+                lookup
+            )
+
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        matches = tuple(
+            item
+            for item in self.snapshot()
+            if (
+                item.checkpoint.chain_id
+                == chain_id
+                and item.checkpoint.root_hash
+                == root_hash
+            )
+        )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise DurableCheckpointError(
+                "checkpoint root is not unique in canonical registry"
+            )
+        self._index_item(
+            matches[0]
+        )
+        return matches[0]
+
+    def repair_lookup_indexes(
+        self,
+    ) -> int:
+        if not self.verify():
+            raise DurableCheckpointError(
+                "cannot repair indexes from invalid checkpoint registry"
+            )
+        repaired = 0
+        for item in self.snapshot():
+            repaired += self._index_item(
+                item
+            )
+        return repaired
+
+    def verify_lookup_indexes(
+        self,
+    ) -> bool:
+        if not self.verify():
+            return False
+        try:
+            for item in self.snapshot():
+                digest_item = self.find_by_digest(
+                    item.checkpoint.digest
+                )
+                root_item = self.find_by_root(
+                    item.checkpoint.chain_id,
+                    item.checkpoint.root_hash,
+                )
+                if (
+                    digest_item != item
+                    or root_item != item
+                ):
+                    return False
+        except (
+            DurableCheckpointError,
+            ValueError,
+            TypeError,
+            KeyError,
+        ):
+            return False
+        return True
 
     @staticmethod
     def _checkpoint(
@@ -390,6 +773,9 @@ class DurableChainCheckpointStore:
                 prior.sequence == sequence
                 and prior.root_hash == root_hash
             ):
+                self._index_item(
+                    previous
+                )
                 return previous
             if sequence <= prior.sequence:
                 raise DurableCheckpointError(
@@ -429,11 +815,15 @@ class DurableChainCheckpointStore:
                 "signature": signature.to_dict(),
             },
         )
-        return SignedDurableChainCheckpoint(
+        item = SignedDurableChainCheckpoint(
             checkpoint,
             signature,
             node.node_hash,
         )
+        self._index_item(
+            item
+        )
+        return item
 
     def verify(self) -> bool:
         if not self._chain.verify():
