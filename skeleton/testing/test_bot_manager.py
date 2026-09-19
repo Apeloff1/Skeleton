@@ -7,6 +7,7 @@ from skeleton.automation.bot_manager import (
     DEFAULT_BOTS,
     BotHealth,
     record_result,
+    record_worker_outcome,
     select_due,
 )
 
@@ -45,3 +46,91 @@ def test_state_write_uses_unique_temp_and_cleans_it(tmp_path, monkeypatch):
     assert legacy.read_text(encoding="utf-8") == "sentinel"
     assert target.exists()
     assert list(tmp_path.glob(f".{target.name}.*.tmp")) == []
+
+
+def test_semantic_no_change_is_successful_worker_outcome():
+    state = {}
+    record_worker_outcome(
+        state,
+        {
+            "bot": "security-auditor",
+            "returncode": 0,
+            "evidence": {
+                "bot": "security-auditor",
+                "status": "no-change",
+            },
+        },
+        now=200,
+    )
+    item = state["security-auditor"]
+    assert item["failures"] == 0
+    assert item["circuit_open"] is False
+    assert item["last_run"] == 200.0
+
+
+def test_existing_pr_dedup_is_successful_worker_outcome():
+    state = {}
+    record_worker_outcome(
+        state,
+        {
+            "bot": "root-cause",
+            "returncode": 0,
+            "evidence": {
+                "bot": "root-cause",
+                "status": "existing-pr",
+                "pull_request": 42,
+            },
+        },
+        now=300,
+    )
+    assert state["root-cause"]["failures"] == 0
+
+
+def test_zero_exit_without_evidence_counts_as_failure():
+    state = {}
+    for moment in (1, 2, 3):
+        record_worker_outcome(
+            state,
+            {
+                "bot": "root-cause",
+                "returncode": 0,
+                "evidence": None,
+            },
+            now=moment,
+        )
+    assert state["root-cause"]["failures"] == 3
+    assert state["root-cause"]["circuit_open"] is True
+
+
+def test_nonzero_exit_with_success_shaped_evidence_still_fails():
+    state = {}
+    record_worker_outcome(
+        state,
+        {
+            "bot": "root-cause",
+            "returncode": 1,
+            "evidence": {
+                "bot": "root-cause",
+                "status": "no-change",
+            },
+        },
+        now=400,
+    )
+    assert state["root-cause"]["failures"] == 1
+
+
+def test_worker_outcome_rejects_unregistered_identity():
+    import pytest
+
+    with pytest.raises(ValueError):
+        record_worker_outcome(
+            {},
+            {
+                "bot": "arbitrary-worker",
+                "returncode": 0,
+                "evidence": {
+                    "bot": "arbitrary-worker",
+                    "status": "no-change",
+                },
+            },
+        )
