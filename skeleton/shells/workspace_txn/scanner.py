@@ -102,10 +102,24 @@ def _hash_file(path: Path, before: os.stat_result, limits: ScanLimits) -> tuple[
     return digest.hexdigest(), read_bytes
 
 
+def snapshot_entry_state(entry: SnapshotEntry) -> dict[str, object]:
+    """Return restorable workspace state, excluding volatile filesystem identity."""
+
+    return {
+        "path": entry.path,
+        "kind": entry.kind.value,
+        "size": entry.size,
+        "mode": entry.mode,
+        "mtime_ns": entry.mtime_ns,
+        "digest": entry.digest,
+        "link_target": entry.link_target,
+    }
+
+
 def snapshot_digest(entries: Iterable[SnapshotEntry], root_digest: str) -> str:
     payload = {
         "root": root_digest,
-        "entries": [entry.to_dict() for entry in entries],
+        "entries": [snapshot_entry_state(entry) for entry in entries],
     }
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
