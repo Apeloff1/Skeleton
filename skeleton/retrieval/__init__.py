@@ -12,6 +12,18 @@ Exports:
 """
 
 from skeleton.retrieval.fusion import FusionStrategy, Fuser, ScoredResult
+from skeleton.retrieval.jvm_fusion_accelerator import (
+    FusionAcceleratorStatus,
+    FusionHit,
+    JvmFusionAccelerator,
+    JvmFusionConfig,
+    JvmFusionError,
+    JvmFusionProtocolError,
+    JvmFusionTimeout,
+    JvmFusionUnavailable,
+    close_default_fusion_accelerator,
+    get_default_fusion_accelerator,
+)
 from skeleton.retrieval.ranking import Ranker
 from skeleton.retrieval.reranker import FeatureReranker
 from skeleton.retrieval.provenance import ProvenanceEntry, ProvenanceLedger
@@ -23,6 +35,16 @@ __all__ = [
     "Fuser",
     "FusionStrategy",
     "ScoredResult",
+    "FusionAcceleratorStatus",
+    "FusionHit",
+    "JvmFusionAccelerator",
+    "JvmFusionConfig",
+    "JvmFusionError",
+    "JvmFusionUnavailable",
+    "JvmFusionProtocolError",
+    "JvmFusionTimeout",
+    "get_default_fusion_accelerator",
+    "close_default_fusion_accelerator",
     "Ranker",
     "FeatureReranker",
     "ProvenanceLedger",
