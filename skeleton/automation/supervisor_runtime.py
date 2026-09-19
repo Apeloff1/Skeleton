@@ -698,6 +698,70 @@ def safe_write_text(target: Path, content: str) -> None:
     os.chmod(target, 0o644)
 
 
+
+WORKER_RESULT_STATUSES = frozenset({
+    "existing-pr",
+    "no-change",
+    "pull-request-created",
+})
+MAX_WORKER_RESULT_BYTES = 16_384
+
+
+def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
+    """Admit one bounded machine-readable worker result.
+
+    Worker stdout is an untrusted process boundary. Only the final non-empty
+    line may become evidence, and only a closed set of status/identity fields is
+    retained. Raw model/provider output is never propagated to the Secretary.
+    """
+    if not isinstance(output, str):
+        raise SupervisorRuntimeError("worker result output must be text")
+    encoded = output.encode("utf-8")
+    if len(encoded) > MAX_WORKER_RESULT_BYTES:
+        raise SupervisorRuntimeError("worker result exceeds evidence budget")
+    lines = [line for line in output.splitlines() if line.strip()]
+    if not lines:
+        raise SupervisorRuntimeError("worker emitted no result evidence")
+    try:
+        value = json.loads(lines[-1])
+    except json.JSONDecodeError as exc:
+        raise SupervisorRuntimeError("worker result is not JSON") from exc
+    if not isinstance(value, dict):
+        raise SupervisorRuntimeError("worker result must be an object")
+    if value.get("bot") != worker:
+        raise SupervisorRuntimeError("worker result identity mismatch")
+    status = value.get("status")
+    if status not in WORKER_RESULT_STATUSES:
+        raise SupervisorRuntimeError("worker result status is not admitted")
+
+    admitted: dict[str, Any] = {"status": status, "bot": worker}
+    for key in (
+        "branch",
+        "parse_worker_result",
+    "proposal_digest",
+        "base_sha",
+        "supervisor_snapshot_fingerprint",
+        "execution_fingerprint",
+        "build_task_digest",
+    ):
+        item = value.get(key)
+        if item is not None:
+            if not isinstance(item, str) or len(item) > 220:
+                raise SupervisorRuntimeError(
+                    f"invalid worker result field: {key}"
+                )
+            admitted[key] = item
+    for key in ("pull_request", "changed_lines", "build_issue_number"):
+        item = value.get(key)
+        if item is not None:
+            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+                raise SupervisorRuntimeError(
+                    f"invalid worker result field: {key}"
+                )
+            admitted[key] = item
+    return admitted
+
+
 def sanitized_worker_env(
     source: Mapping[str, str],
 ) -> dict[str, str]:
