@@ -444,14 +444,15 @@ class DurableFailoverAuthority:
             signature,
         )
 
-    def verify(
+    def verify_static(
         self,
         signed: SignedDurableFailoverTicket,
-        manager: DurableEvidenceReplicaManager,
         *,
         source_id: str = "",
         target_id: str = "",
+        enforce_time: bool = True,
     ) -> DurableFailoverTicket:
+        """Verify signature, identity, metadata, and optionally ticket time."""
         if not isinstance(
             signed,
             SignedDurableFailoverTicket,
@@ -459,13 +460,8 @@ class DurableFailoverAuthority:
             raise TypeError(
                 "signed must be SignedDurableFailoverTicket"
             )
-        if not isinstance(
-            manager,
-            DurableEvidenceReplicaManager,
-        ):
-            raise TypeError(
-                "manager must be DurableEvidenceReplicaManager"
-            )
+        if not isinstance(enforce_time, bool):
+            raise ValueError("enforce_time must be bool")
         try:
             self.signer.verify(
                 signed.signature
@@ -499,39 +495,63 @@ class DurableFailoverAuthority:
                 "failover ticket signed metadata mismatch"
             )
 
-        now = float(self._clock())
-        if not math.isfinite(now) or now < 0.0:
-            raise DurableFailoverTicketError(
-                "failover clock returned invalid time"
-            )
-        if (
-            ticket.issued_at
-            > now + self.max_clock_skew_seconds
+        if enforce_time:
+            now = float(self._clock())
+            if not math.isfinite(now) or now < 0.0:
+                raise DurableFailoverTicketError(
+                    "failover clock returned invalid time"
+                )
+            if (
+                ticket.issued_at
+                > now + self.max_clock_skew_seconds
+            ):
+                raise DurableFailoverTicketError(
+                    "failover ticket issue time is too far in the future"
+                )
+            if now > ticket.expires_at:
+                raise DurableFailoverTicketError(
+                    "failover ticket expired"
+                )
+            if (
+                ticket.expires_at - ticket.issued_at
+                > self.max_ttl_seconds
+            ):
+                raise DurableFailoverTicketError(
+                    "failover ticket TTL exceeds authority maximum"
+                )
+            if (
+                abs(
+                    signed.signature.issued_at
+                    - ticket.issued_at
+                )
+                > self.max_clock_skew_seconds
+            ):
+                raise DurableFailoverTicketError(
+                    "failover signature/ticket issue times differ"
+                )
+        return ticket
+
+    def verify(
+        self,
+        signed: SignedDurableFailoverTicket,
+        manager: DurableEvidenceReplicaManager,
+        *,
+        source_id: str = "",
+        target_id: str = "",
+    ) -> DurableFailoverTicket:
+        if not isinstance(
+            manager,
+            DurableEvidenceReplicaManager,
         ):
-            raise DurableFailoverTicketError(
-                "failover ticket issue time is too far in the future"
+            raise TypeError(
+                "manager must be DurableEvidenceReplicaManager"
             )
-        if now > ticket.expires_at:
-            raise DurableFailoverTicketError(
-                "failover ticket expired"
-            )
-        if (
-            ticket.expires_at - ticket.issued_at
-            > self.max_ttl_seconds
-        ):
-            raise DurableFailoverTicketError(
-                "failover ticket TTL exceeds authority maximum"
-            )
-        if (
-            abs(
-                signed.signature.issued_at
-                - ticket.issued_at
-            )
-            > self.max_clock_skew_seconds
-        ):
-            raise DurableFailoverTicketError(
-                "failover signature/ticket issue times differ"
-            )
+        ticket = self.verify_static(
+            signed,
+            source_id=source_id,
+            target_id=target_id,
+            enforce_time=True,
+        )
 
         try:
             report = manager.require_promotion_ready()
@@ -1089,12 +1109,25 @@ class DurableFailoverCoordinator:
             and current.record.phase
             is DurableFailoverPhase.APPLIED
         ):
+            ticket = self.authority.verify_static(
+                signed,
+                source_id=self.source_id,
+                target_id=self.target_id,
+                enforce_time=False,
+            )
             if (
                 current.record.consumer_id
                 != consumer_id
             ):
                 raise DurableFailoverConflict(
                     "applied failover owner mismatch"
+                )
+            if (
+                current.record.ticket_digest
+                != ticket.digest
+            ):
+                raise DurableFailoverConflict(
+                    "applied failover ticket digest mismatch"
                 )
             return current
 
@@ -1117,16 +1150,13 @@ class DurableFailoverCoordinator:
         *,
         consumer_id: str,
     ) -> StoredDurableFailover:
-        if (
-            signed.ticket.source_id
-            != self.source_id
-            or signed.ticket.target_id
-            != self.target_id
-        ):
-            raise DurableFailoverConflict(
-                "failover ticket identity mismatch"
-            )
+        ticket = self.authority.verify_static(
+            signed,
+            source_id=self.source_id,
+            target_id=self.target_id,
+            enforce_time=False,
+        )
         return self.registry.cancel(
-            signed.ticket,
+            ticket,
             consumer_id=consumer_id,
         )
