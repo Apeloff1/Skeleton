@@ -31,6 +31,11 @@ from skeleton.shells.ai.durable_compaction import (
 from skeleton.shells.ai.durable_compaction_certificate import (
     DurableCompactionCertificateStore,
 )
+from skeleton.shells.ai.durable_compaction_lineage import (
+    CompactionLineageStatus,
+    DurableCompactionLineageAuditor,
+    DurableCompactionLineageError,
+)
 from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionExecution,
     DurableCompactionOperator,
@@ -2230,3 +2235,611 @@ def test_workflow_transition_retries_cas_conflict(kind):
         .workflow.phase
         is DurableCompactionWorkflowPhase.CERTIFIED
     )
+
+
+def lineage_auditor(fixture):
+    return DurableCompactionLineageAuditor(
+        fixture.operator
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_complete_workflow_verifies(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = lineage_auditor(
+        fixture
+    ).require_verified(
+        plan.workflow_id
+    )
+    assert report.ok
+    assert report.status is CompactionLineageStatus.VERIFIED
+    assert report.findings == ()
+    assert report.certificate.verified
+    assert report.authorization.verified
+    assert report.archive.verified
+    assert report.pruning_manifest.verified
+    assert report.pruning_operation.verified
+    assert report.hot_floor.verified
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_planned_workflow_is_clean_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    report = lineage_auditor(
+        fixture
+    ).inspect(
+        plan.workflow_id
+    )
+    assert report.status is CompactionLineageStatus.INCOMPLETE
+    assert report.safe_to_resume
+    assert report.archive.verified
+    assert not report.certificate.expected
+    assert not report.authorization.expected
+    assert not report.pruning_manifest.expected
+    assert not report.hot_floor.expected
+    assert report.findings == ()
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_certified_workflow_is_clean_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.INCOMPLETE
+    assert report.certificate.verified
+    assert not report.authorization.expected
+    assert report.archive.verified
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_authorized_workflow_is_clean_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    fixture.authorize(plan.workflow_id)
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.INCOMPLETE
+    assert report.certificate.verified
+    assert report.authorization.verified
+    assert not report.pruning_manifest.expected
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_prepared_workflow_is_clean_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _ = fixture.through_prepared()
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.INCOMPLETE
+    assert report.pruning_manifest.verified
+    assert report.pruning_operation.verified
+    assert not report.hot_floor.expected
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_survives_authority_expiry_after_completion(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    fixture.now[0] += 10_000.0
+    report = lineage_auditor(
+        fixture
+    ).require_verified(plan.workflow_id)
+    assert report.ok
+    assert report.certificate.verified
+    assert report.authorization.verified
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_survives_later_hot_floor(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    completed = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    first_floor = fixture.floor_store.floor_at(
+        fixture.chain_id,
+        completed.cutoff_sequence,
+    )
+    assert first_floor is not None
+
+    fixture.now[0] += 1.0
+    later = fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=completed.cutoff_sequence + 1,
+        root_hash=fp("later-floor-root"),
+        archive_id="later-archive",
+        archive_manifest_digest=fp(
+            "later-archive-manifest"
+        ),
+        compaction_certificate_id=fp(
+            "later-certificate"
+        ),
+        pruning_authorization_id=fp(
+            "later-authorization"
+        ),
+        operation_id=fp(
+            "later-operation"
+        ),
+        fencing_token=(
+            first_floor.floor.fencing_token + 1
+        ),
+        expected_previous_sequence=(
+            completed.cutoff_sequence
+        ),
+        expected_previous_root=(
+            completed.cutoff_root
+        ),
+    )
+    assert (
+        fixture.floor_store.current(
+            fixture.chain_id
+        )
+        == later
+    )
+    report = lineage_auditor(
+        fixture
+    ).require_verified(
+        plan.workflow_id
+    )
+    assert report.ok
+    assert report.hot_floor.artifact_id == completed.floor_id
+
+
+def test_compaction_lineage_missing_workflow_is_incomplete():
+    fixture = OperatorFixture()
+    report = lineage_auditor(
+        fixture
+    ).inspect(
+        fp("missing-workflow")
+    )
+    assert report.status is CompactionLineageStatus.INCOMPLETE
+    assert report.findings[0].code == "workflow.missing"
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_certificate_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    key = fixture.certificate_store._certificate_key(
+        workflow.certificate_id
+    )
+    record = fixture.backend.get(
+        fixture.certificate_store.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.certificate_store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "certificate.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_authorization_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    fixture.authorize(plan.workflow_id)
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    key = fixture.authorization_store._authorization_key(
+        workflow.authorization_id
+    )
+    record = fixture.backend.get(
+        fixture.authorization_store.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.authorization_store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "authorization.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_archive_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    key = fixture.archives._archive_key(
+        workflow.archive_id
+    )
+    record = fixture.backend.get(
+        fixture.archives.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.archives.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "archive.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_manifest_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, prepared = fixture.through_prepared()
+    operation_id = (
+        prepared.operation.operation_id
+    )
+    key = fixture.executor._manifest_key(
+        operation_id
+    )
+    record = fixture.backend.get(
+        fixture.executor.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.executor.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "manifest.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_operation_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, prepared = fixture.through_prepared()
+    operation_id = (
+        prepared.operation.operation_id
+    )
+    key = fixture.executor._operation_key(
+        operation_id
+    )
+    record = fixture.backend.get(
+        fixture.executor.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.executor.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "operation.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_missing_historical_floor_requires_manual_review(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    floor = fixture.floor_store.floor_at(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    fixture.now[0] += 1.0
+    fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=workflow.cutoff_sequence + 1,
+        root_hash=fp("later-root"),
+        archive_id="later-archive",
+        archive_manifest_digest=fp("later-archive"),
+        compaction_certificate_id=fp("later-certificate"),
+        pruning_authorization_id=fp("later-authorization"),
+        operation_id=fp("later-operation"),
+        fencing_token=floor.floor.fencing_token + 1,
+        expected_previous_sequence=workflow.cutoff_sequence,
+        expected_previous_root=workflow.cutoff_root,
+    )
+    history_key = fixture.floor_store._history_key(
+        workflow.floor_id
+    )
+    index_key = fixture.floor_store._sequence_key(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    history_record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        history_key,
+    )
+    index_record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        index_key,
+    )
+    fixture.backend.delete(
+        fixture.floor_store.namespace,
+        history_key,
+        expected_revision=history_record.revision,
+    )
+    fixture.backend.delete(
+        fixture.floor_store.namespace,
+        index_key,
+        expected_revision=index_record.revision,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "floor.missing"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_workflow_certificate_digest_substitution_is_detected(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    substituted = replace(
+        stored.workflow,
+        certificate_digest=fp(
+            "substituted-certificate"
+        ),
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "certificate.digest"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_workflow_authorization_digest_substitution_is_detected(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    fixture.certify(plan.workflow_id)
+    fixture.authorize(plan.workflow_id)
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    substituted = replace(
+        stored.workflow,
+        authorization_digest=fp(
+            "substituted-authorization"
+        ),
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "authorization.digest"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_workflow_floor_id_substitution_is_detected(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    key = fixture.operator._key(
+        plan.workflow_id
+    )
+    record = fixture.backend.get(
+        fixture.operator.namespace,
+        key,
+    )
+    substituted = replace(
+        stored.workflow,
+        floor_id=fp("substituted-floor"),
+    )
+    fixture.backend.compare_and_swap(
+        fixture.operator.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "floor.id"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_operation_phase_substitution_is_detected(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    key = fixture.executor._operation_key(
+        workflow.pruning_operation_id
+    )
+    record = fixture.backend.get(
+        fixture.executor.namespace,
+        key,
+    )
+    payload = dict(record.value)
+    payload["phase"] = DurablePruningPhase.EXECUTING.value
+    fixture.backend.compare_and_swap(
+        fixture.executor.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "operation.phase"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_floor_sequence_index_substitution_is_detected(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    workflow = fixture.operator.current(
+        plan.workflow_id
+    ).workflow
+    key = fixture.floor_store._sequence_key(
+        fixture.chain_id,
+        workflow.cutoff_sequence,
+    )
+    record = fixture.backend.get(
+        fixture.floor_store.namespace,
+        key,
+    )
+    payload = dict(record.value)
+    payload["root_hash"] = fp("wrong-root")
+    fixture.backend.compare_and_swap(
+        fixture.floor_store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    report = lineage_auditor(
+        fixture
+    ).inspect(plan.workflow_id)
+    assert report.status is CompactionLineageStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "floor.lookup_corruption"
+        for item in report.findings
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_report_digest_is_stable(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    auditor = lineage_auditor(fixture)
+    first = auditor.require_verified(
+        plan.workflow_id
+    )
+    second = auditor.require_verified(
+        plan.workflow_id
+    )
+    assert first == second
+    assert first.digest == second.digest
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_report_serializes_full_authority(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    report = lineage_auditor(
+        fixture
+    ).require_verified(plan.workflow_id)
+    data = report.to_dict()
+    assert data["status"] == "verified"
+    assert data["ok"] is True
+    assert data["certificate"]["verified"] is True
+    assert data["authorization"]["verified"] is True
+    assert data["archive"]["verified"] is True
+    assert data["pruning_manifest"]["verified"] is True
+    assert data["pruning_operation"]["verified"] is True
+    assert data["hot_floor"]["verified"] is True
+    assert data["digest"] == report.digest
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_compaction_lineage_require_verified_rejects_incomplete(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan = fixture.plan()
+    with pytest.raises(
+        DurableCompactionLineageError,
+    ):
+        lineage_auditor(
+            fixture
+        ).require_verified(
+            plan.workflow_id
+        )
+
+
+def test_compaction_lineage_workflow_id_validation():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        ValueError,
+        match="64-character",
+    ):
+        lineage_auditor(
+            fixture
+        ).inspect("bad")
