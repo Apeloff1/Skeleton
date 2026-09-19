@@ -181,7 +181,7 @@ def test_terraform_version_rejects_unknown_option():
 def test_terraform_version_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.version")
     contract = _contract("infrastructure", "terraform.version")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -243,7 +243,7 @@ def test_tofu_version_rejects_unknown_option():
 def test_tofu_version_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.version")
     contract = _contract("infrastructure", "tofu.version")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -305,7 +305,7 @@ def test_terraform_validate_rejects_unknown_option():
 def test_terraform_validate_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.validate")
     contract = _contract("infrastructure", "terraform.validate")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -367,7 +367,7 @@ def test_tofu_validate_rejects_unknown_option():
 def test_tofu_validate_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.validate")
     contract = _contract("infrastructure", "tofu.validate")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -429,7 +429,7 @@ def test_terraform_fmt_check_rejects_unknown_option():
 def test_terraform_fmt_check_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.fmt_check")
     contract = _contract("infrastructure", "terraform.fmt_check")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -491,7 +491,7 @@ def test_tofu_fmt_check_rejects_unknown_option():
 def test_tofu_fmt_check_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.fmt_check")
     contract = _contract("infrastructure", "tofu.fmt_check")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -553,7 +553,7 @@ def test_terraform_providers_rejects_unknown_option():
 def test_terraform_providers_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.providers")
     contract = _contract("infrastructure", "terraform.providers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -615,7 +615,7 @@ def test_tofu_providers_rejects_unknown_option():
 def test_tofu_providers_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.providers")
     contract = _contract("infrastructure", "tofu.providers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -677,7 +677,7 @@ def test_terraform_providers_lock_rejects_unknown_option():
 def test_terraform_providers_lock_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.providers_lock")
     contract = _contract("infrastructure", "terraform.providers_lock")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -739,7 +739,7 @@ def test_tofu_providers_lock_rejects_unknown_option():
 def test_tofu_providers_lock_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.providers_lock")
     contract = _contract("infrastructure", "tofu.providers_lock")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -801,7 +801,7 @@ def test_terraform_providers_schema_rejects_unknown_option():
 def test_terraform_providers_schema_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.providers_schema")
     contract = _contract("infrastructure", "terraform.providers_schema")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -863,7 +863,7 @@ def test_tofu_providers_schema_rejects_unknown_option():
 def test_tofu_providers_schema_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.providers_schema")
     contract = _contract("infrastructure", "tofu.providers_schema")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -925,7 +925,7 @@ def test_terraform_workspace_list_rejects_unknown_option():
 def test_terraform_workspace_list_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.workspace_list")
     contract = _contract("infrastructure", "terraform.workspace_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -987,7 +987,7 @@ def test_tofu_workspace_list_rejects_unknown_option():
 def test_tofu_workspace_list_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.workspace_list")
     contract = _contract("infrastructure", "tofu.workspace_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1049,7 +1049,7 @@ def test_terraform_workspace_show_rejects_unknown_option():
 def test_terraform_workspace_show_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.workspace_show")
     contract = _contract("infrastructure", "terraform.workspace_show")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1111,7 +1111,7 @@ def test_tofu_workspace_show_rejects_unknown_option():
 def test_tofu_workspace_show_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.workspace_show")
     contract = _contract("infrastructure", "tofu.workspace_show")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1173,7 +1173,7 @@ def test_terraform_state_list_rejects_unknown_option():
 def test_terraform_state_list_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.state_list")
     contract = _contract("infrastructure", "terraform.state_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1235,7 +1235,7 @@ def test_tofu_state_list_rejects_unknown_option():
 def test_tofu_state_list_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.state_list")
     contract = _contract("infrastructure", "tofu.state_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1297,7 +1297,7 @@ def test_terraform_graph_rejects_unknown_option():
 def test_terraform_graph_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.graph")
     contract = _contract("infrastructure", "terraform.graph")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1359,7 +1359,7 @@ def test_tofu_graph_rejects_unknown_option():
 def test_tofu_graph_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.graph")
     contract = _contract("infrastructure", "tofu.graph")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1421,7 +1421,7 @@ def test_terraform_plan_rejects_unknown_option():
 def test_terraform_plan_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.plan")
     contract = _contract("infrastructure", "terraform.plan")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1483,7 +1483,7 @@ def test_tofu_plan_rejects_unknown_option():
 def test_tofu_plan_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.plan")
     contract = _contract("infrastructure", "tofu.plan")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1545,7 +1545,7 @@ def test_terraform_init_backend_false_rejects_unknown_option():
 def test_terraform_init_backend_false_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.init_backend_false")
     contract = _contract("infrastructure", "terraform.init_backend_false")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1607,7 +1607,7 @@ def test_tofu_init_backend_false_rejects_unknown_option():
 def test_tofu_init_backend_false_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.init_backend_false")
     contract = _contract("infrastructure", "tofu.init_backend_false")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1669,7 +1669,7 @@ def test_terraform_test_rejects_unknown_option():
 def test_terraform_test_rejects_nul_argument():
     spec = _spec("infrastructure", "terraform.test")
     contract = _contract("infrastructure", "terraform.test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1731,7 +1731,7 @@ def test_tofu_test_rejects_unknown_option():
 def test_tofu_test_rejects_nul_argument():
     spec = _spec("infrastructure", "tofu.test")
     contract = _contract("infrastructure", "tofu.test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1793,7 +1793,7 @@ def test_kubectl_version_client_rejects_unknown_option():
 def test_kubectl_version_client_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.version_client")
     contract = _contract("infrastructure", "kubectl.version_client")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1855,7 +1855,7 @@ def test_kubectl_api_resources_rejects_unknown_option():
 def test_kubectl_api_resources_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.api_resources")
     contract = _contract("infrastructure", "kubectl.api_resources")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1917,7 +1917,7 @@ def test_kubectl_api_versions_rejects_unknown_option():
 def test_kubectl_api_versions_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.api_versions")
     contract = _contract("infrastructure", "kubectl.api_versions")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -1979,7 +1979,7 @@ def test_kubectl_cluster_info_rejects_unknown_option():
 def test_kubectl_cluster_info_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.cluster_info")
     contract = _contract("infrastructure", "kubectl.cluster_info")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2041,7 +2041,7 @@ def test_kubectl_current_context_rejects_unknown_option():
 def test_kubectl_current_context_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.current_context")
     contract = _contract("infrastructure", "kubectl.current_context")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2103,7 +2103,7 @@ def test_kubectl_get_contexts_rejects_unknown_option():
 def test_kubectl_get_contexts_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_contexts")
     contract = _contract("infrastructure", "kubectl.get_contexts")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2165,7 +2165,7 @@ def test_kubectl_auth_can_i_rejects_unknown_option():
 def test_kubectl_auth_can_i_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.auth_can_i")
     contract = _contract("infrastructure", "kubectl.auth_can_i")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2227,7 +2227,7 @@ def test_kubectl_explain_rejects_unknown_option():
 def test_kubectl_explain_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.explain")
     contract = _contract("infrastructure", "kubectl.explain")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2289,7 +2289,7 @@ def test_kubectl_top_pods_rejects_unknown_option():
 def test_kubectl_top_pods_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.top_pods")
     contract = _contract("infrastructure", "kubectl.top_pods")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2351,7 +2351,7 @@ def test_kubectl_top_nodes_rejects_unknown_option():
 def test_kubectl_top_nodes_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.top_nodes")
     contract = _contract("infrastructure", "kubectl.top_nodes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2413,7 +2413,7 @@ def test_kubectl_get_pods_rejects_unknown_option():
 def test_kubectl_get_pods_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_pods")
     contract = _contract("infrastructure", "kubectl.get_pods")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2475,7 +2475,7 @@ def test_kubectl_describe_pods_rejects_unknown_option():
 def test_kubectl_describe_pods_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_pods")
     contract = _contract("infrastructure", "kubectl.describe_pods")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2537,7 +2537,7 @@ def test_kubectl_get_deployments_rejects_unknown_option():
 def test_kubectl_get_deployments_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_deployments")
     contract = _contract("infrastructure", "kubectl.get_deployments")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2599,7 +2599,7 @@ def test_kubectl_describe_deployments_rejects_unknown_option():
 def test_kubectl_describe_deployments_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_deployments")
     contract = _contract("infrastructure", "kubectl.describe_deployments")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2661,7 +2661,7 @@ def test_kubectl_get_statefulsets_rejects_unknown_option():
 def test_kubectl_get_statefulsets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_statefulsets")
     contract = _contract("infrastructure", "kubectl.get_statefulsets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2723,7 +2723,7 @@ def test_kubectl_describe_statefulsets_rejects_unknown_option():
 def test_kubectl_describe_statefulsets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_statefulsets")
     contract = _contract("infrastructure", "kubectl.describe_statefulsets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2785,7 +2785,7 @@ def test_kubectl_get_daemonsets_rejects_unknown_option():
 def test_kubectl_get_daemonsets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_daemonsets")
     contract = _contract("infrastructure", "kubectl.get_daemonsets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2847,7 +2847,7 @@ def test_kubectl_describe_daemonsets_rejects_unknown_option():
 def test_kubectl_describe_daemonsets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_daemonsets")
     contract = _contract("infrastructure", "kubectl.describe_daemonsets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2909,7 +2909,7 @@ def test_kubectl_get_replicasets_rejects_unknown_option():
 def test_kubectl_get_replicasets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_replicasets")
     contract = _contract("infrastructure", "kubectl.get_replicasets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -2971,7 +2971,7 @@ def test_kubectl_describe_replicasets_rejects_unknown_option():
 def test_kubectl_describe_replicasets_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_replicasets")
     contract = _contract("infrastructure", "kubectl.describe_replicasets")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3033,7 +3033,7 @@ def test_kubectl_get_services_rejects_unknown_option():
 def test_kubectl_get_services_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_services")
     contract = _contract("infrastructure", "kubectl.get_services")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3095,7 +3095,7 @@ def test_kubectl_describe_services_rejects_unknown_option():
 def test_kubectl_describe_services_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_services")
     contract = _contract("infrastructure", "kubectl.describe_services")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3157,7 +3157,7 @@ def test_kubectl_get_ingresses_rejects_unknown_option():
 def test_kubectl_get_ingresses_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_ingresses")
     contract = _contract("infrastructure", "kubectl.get_ingresses")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3219,7 +3219,7 @@ def test_kubectl_describe_ingresses_rejects_unknown_option():
 def test_kubectl_describe_ingresses_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_ingresses")
     contract = _contract("infrastructure", "kubectl.describe_ingresses")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3281,7 +3281,7 @@ def test_kubectl_get_jobs_rejects_unknown_option():
 def test_kubectl_get_jobs_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_jobs")
     contract = _contract("infrastructure", "kubectl.get_jobs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3343,7 +3343,7 @@ def test_kubectl_describe_jobs_rejects_unknown_option():
 def test_kubectl_describe_jobs_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_jobs")
     contract = _contract("infrastructure", "kubectl.describe_jobs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3405,7 +3405,7 @@ def test_kubectl_get_cronjobs_rejects_unknown_option():
 def test_kubectl_get_cronjobs_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_cronjobs")
     contract = _contract("infrastructure", "kubectl.get_cronjobs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3467,7 +3467,7 @@ def test_kubectl_describe_cronjobs_rejects_unknown_option():
 def test_kubectl_describe_cronjobs_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_cronjobs")
     contract = _contract("infrastructure", "kubectl.describe_cronjobs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3529,7 +3529,7 @@ def test_kubectl_get_configmaps_rejects_unknown_option():
 def test_kubectl_get_configmaps_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_configmaps")
     contract = _contract("infrastructure", "kubectl.get_configmaps")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3591,7 +3591,7 @@ def test_kubectl_describe_configmaps_rejects_unknown_option():
 def test_kubectl_describe_configmaps_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_configmaps")
     contract = _contract("infrastructure", "kubectl.describe_configmaps")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3653,7 +3653,7 @@ def test_kubectl_get_persistentvolumeclaims_rejects_unknown_option():
 def test_kubectl_get_persistentvolumeclaims_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_persistentvolumeclaims")
     contract = _contract("infrastructure", "kubectl.get_persistentvolumeclaims")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3715,7 +3715,7 @@ def test_kubectl_describe_persistentvolumeclaims_rejects_unknown_option():
 def test_kubectl_describe_persistentvolumeclaims_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_persistentvolumeclaims")
     contract = _contract("infrastructure", "kubectl.describe_persistentvolumeclaims")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3777,7 +3777,7 @@ def test_kubectl_get_persistentvolumes_rejects_unknown_option():
 def test_kubectl_get_persistentvolumes_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_persistentvolumes")
     contract = _contract("infrastructure", "kubectl.get_persistentvolumes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3839,7 +3839,7 @@ def test_kubectl_describe_persistentvolumes_rejects_unknown_option():
 def test_kubectl_describe_persistentvolumes_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_persistentvolumes")
     contract = _contract("infrastructure", "kubectl.describe_persistentvolumes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3901,7 +3901,7 @@ def test_kubectl_get_nodes_rejects_unknown_option():
 def test_kubectl_get_nodes_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_nodes")
     contract = _contract("infrastructure", "kubectl.get_nodes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -3963,7 +3963,7 @@ def test_kubectl_describe_nodes_rejects_unknown_option():
 def test_kubectl_describe_nodes_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_nodes")
     contract = _contract("infrastructure", "kubectl.describe_nodes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4025,7 +4025,7 @@ def test_kubectl_get_namespaces_rejects_unknown_option():
 def test_kubectl_get_namespaces_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_namespaces")
     contract = _contract("infrastructure", "kubectl.get_namespaces")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4087,7 +4087,7 @@ def test_kubectl_describe_namespaces_rejects_unknown_option():
 def test_kubectl_describe_namespaces_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_namespaces")
     contract = _contract("infrastructure", "kubectl.describe_namespaces")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4149,7 +4149,7 @@ def test_kubectl_get_events_rejects_unknown_option():
 def test_kubectl_get_events_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_events")
     contract = _contract("infrastructure", "kubectl.get_events")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4211,7 +4211,7 @@ def test_kubectl_describe_events_rejects_unknown_option():
 def test_kubectl_describe_events_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_events")
     contract = _contract("infrastructure", "kubectl.describe_events")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4273,7 +4273,7 @@ def test_kubectl_get_serviceaccounts_rejects_unknown_option():
 def test_kubectl_get_serviceaccounts_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_serviceaccounts")
     contract = _contract("infrastructure", "kubectl.get_serviceaccounts")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4335,7 +4335,7 @@ def test_kubectl_describe_serviceaccounts_rejects_unknown_option():
 def test_kubectl_describe_serviceaccounts_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_serviceaccounts")
     contract = _contract("infrastructure", "kubectl.describe_serviceaccounts")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4397,7 +4397,7 @@ def test_kubectl_get_networkpolicies_rejects_unknown_option():
 def test_kubectl_get_networkpolicies_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_networkpolicies")
     contract = _contract("infrastructure", "kubectl.get_networkpolicies")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4459,7 +4459,7 @@ def test_kubectl_describe_networkpolicies_rejects_unknown_option():
 def test_kubectl_describe_networkpolicies_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_networkpolicies")
     contract = _contract("infrastructure", "kubectl.describe_networkpolicies")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4521,7 +4521,7 @@ def test_kubectl_get_horizontalpodautoscalers_rejects_unknown_option():
 def test_kubectl_get_horizontalpodautoscalers_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.get_horizontalpodautoscalers")
     contract = _contract("infrastructure", "kubectl.get_horizontalpodautoscalers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4583,7 +4583,7 @@ def test_kubectl_describe_horizontalpodautoscalers_rejects_unknown_option():
 def test_kubectl_describe_horizontalpodautoscalers_rejects_nul_argument():
     spec = _spec("infrastructure", "kubectl.describe_horizontalpodautoscalers")
     contract = _contract("infrastructure", "kubectl.describe_horizontalpodautoscalers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4645,7 +4645,7 @@ def test_helm_version_rejects_unknown_option():
 def test_helm_version_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.version")
     contract = _contract("infrastructure", "helm.version")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4707,7 +4707,7 @@ def test_helm_env_rejects_unknown_option():
 def test_helm_env_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.env")
     contract = _contract("infrastructure", "helm.env")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4769,7 +4769,7 @@ def test_helm_lint_rejects_unknown_option():
 def test_helm_lint_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.lint")
     contract = _contract("infrastructure", "helm.lint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4831,7 +4831,7 @@ def test_helm_template_rejects_unknown_option():
 def test_helm_template_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.template")
     contract = _contract("infrastructure", "helm.template")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4893,7 +4893,7 @@ def test_helm_show_chart_rejects_unknown_option():
 def test_helm_show_chart_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.show_chart")
     contract = _contract("infrastructure", "helm.show_chart")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -4955,7 +4955,7 @@ def test_helm_show_values_rejects_unknown_option():
 def test_helm_show_values_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.show_values")
     contract = _contract("infrastructure", "helm.show_values")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5017,7 +5017,7 @@ def test_helm_show_readme_rejects_unknown_option():
 def test_helm_show_readme_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.show_readme")
     contract = _contract("infrastructure", "helm.show_readme")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5079,7 +5079,7 @@ def test_helm_dependency_list_rejects_unknown_option():
 def test_helm_dependency_list_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.dependency_list")
     contract = _contract("infrastructure", "helm.dependency_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5141,7 +5141,7 @@ def test_helm_repo_list_rejects_unknown_option():
 def test_helm_repo_list_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.repo_list")
     contract = _contract("infrastructure", "helm.repo_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5203,7 +5203,7 @@ def test_helm_search_repo_rejects_unknown_option():
 def test_helm_search_repo_rejects_nul_argument():
     spec = _spec("infrastructure", "helm.search_repo")
     contract = _contract("infrastructure", "helm.search_repo")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5265,7 +5265,7 @@ def test_jq_filter_rejects_unknown_option():
 def test_jq_filter_rejects_nul_argument():
     spec = _spec("data", "jq.filter")
     contract = _contract("data", "jq.filter")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5327,7 +5327,7 @@ def test_jq_slurp_rejects_unknown_option():
 def test_jq_slurp_rejects_nul_argument():
     spec = _spec("data", "jq.slurp")
     contract = _contract("data", "jq.slurp")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5389,7 +5389,7 @@ def test_jq_raw_input_rejects_unknown_option():
 def test_jq_raw_input_rejects_nul_argument():
     spec = _spec("data", "jq.raw_input")
     contract = _contract("data", "jq.raw_input")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5451,7 +5451,7 @@ def test_jq_null_input_rejects_unknown_option():
 def test_jq_null_input_rejects_nul_argument():
     spec = _spec("data", "jq.null_input")
     contract = _contract("data", "jq.null_input")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5513,7 +5513,7 @@ def test_jq_seq_rejects_unknown_option():
 def test_jq_seq_rejects_nul_argument():
     spec = _spec("data", "jq.seq")
     contract = _contract("data", "jq.seq")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5575,7 +5575,7 @@ def test_yq_eval_rejects_unknown_option():
 def test_yq_eval_rejects_nul_argument():
     spec = _spec("data", "yq.eval")
     contract = _contract("data", "yq.eval")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5637,7 +5637,7 @@ def test_yq_eval_all_rejects_unknown_option():
 def test_yq_eval_all_rejects_nul_argument():
     spec = _spec("data", "yq.eval_all")
     contract = _contract("data", "yq.eval_all")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5699,7 +5699,7 @@ def test_yq_properties_rejects_unknown_option():
 def test_yq_properties_rejects_nul_argument():
     spec = _spec("data", "yq.properties")
     contract = _contract("data", "yq.properties")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5761,7 +5761,7 @@ def test_yq_json_rejects_unknown_option():
 def test_yq_json_rejects_nul_argument():
     spec = _spec("data", "yq.json")
     contract = _contract("data", "yq.json")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5823,7 +5823,7 @@ def test_rg_search_rejects_unknown_option():
 def test_rg_search_rejects_nul_argument():
     spec = _spec("data", "rg.search")
     contract = _contract("data", "rg.search")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5885,7 +5885,7 @@ def test_rg_files_rejects_unknown_option():
 def test_rg_files_rejects_nul_argument():
     spec = _spec("data", "rg.files")
     contract = _contract("data", "rg.files")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -5947,7 +5947,7 @@ def test_rg_files_with_matches_rejects_unknown_option():
 def test_rg_files_with_matches_rejects_nul_argument():
     spec = _spec("data", "rg.files_with_matches")
     contract = _contract("data", "rg.files_with_matches")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6009,7 +6009,7 @@ def test_rg_count_rejects_unknown_option():
 def test_rg_count_rejects_nul_argument():
     spec = _spec("data", "rg.count")
     contract = _contract("data", "rg.count")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6071,7 +6071,7 @@ def test_rg_json_rejects_unknown_option():
 def test_rg_json_rejects_nul_argument():
     spec = _spec("data", "rg.json")
     contract = _contract("data", "rg.json")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6133,7 +6133,7 @@ def test_fd_search_rejects_unknown_option():
 def test_fd_search_rejects_nul_argument():
     spec = _spec("data", "fd.search")
     contract = _contract("data", "fd.search")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6195,7 +6195,7 @@ def test_fd_files_rejects_unknown_option():
 def test_fd_files_rejects_nul_argument():
     spec = _spec("data", "fd.files")
     contract = _contract("data", "fd.files")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6257,7 +6257,7 @@ def test_fd_directories_rejects_unknown_option():
 def test_fd_directories_rejects_nul_argument():
     spec = _spec("data", "fd.directories")
     contract = _contract("data", "fd.directories")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6319,7 +6319,7 @@ def test_fd_symlinks_rejects_unknown_option():
 def test_fd_symlinks_rejects_nul_argument():
     spec = _spec("data", "fd.symlinks")
     contract = _contract("data", "fd.symlinks")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6381,7 +6381,7 @@ def test_tree_list_rejects_unknown_option():
 def test_tree_list_rejects_nul_argument():
     spec = _spec("data", "tree.list")
     contract = _contract("data", "tree.list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6443,7 +6443,7 @@ def test_tree_json_rejects_unknown_option():
 def test_tree_json_rejects_nul_argument():
     spec = _spec("data", "tree.json")
     contract = _contract("data", "tree.json")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6505,7 +6505,7 @@ def test_tree_xml_rejects_unknown_option():
 def test_tree_xml_rejects_nul_argument():
     spec = _spec("data", "tree.xml")
     contract = _contract("data", "tree.xml")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6567,7 +6567,7 @@ def test_xmllint_format_rejects_unknown_option():
 def test_xmllint_format_rejects_nul_argument():
     spec = _spec("data", "xmllint.format")
     contract = _contract("data", "xmllint.format")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6629,7 +6629,7 @@ def test_xmllint_xpath_rejects_unknown_option():
 def test_xmllint_xpath_rejects_nul_argument():
     spec = _spec("data", "xmllint.xpath")
     contract = _contract("data", "xmllint.xpath")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6691,7 +6691,7 @@ def test_xmllint_validate_rejects_unknown_option():
 def test_xmllint_validate_rejects_nul_argument():
     spec = _spec("data", "xmllint.validate")
     contract = _contract("data", "xmllint.validate")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6753,7 +6753,7 @@ def test_cloc_count_rejects_unknown_option():
 def test_cloc_count_rejects_nul_argument():
     spec = _spec("data", "cloc.count")
     contract = _contract("data", "cloc.count")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6815,7 +6815,7 @@ def test_scc_count_rejects_unknown_option():
 def test_scc_count_rejects_nul_argument():
     spec = _spec("data", "scc.count")
     contract = _contract("data", "scc.count")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6877,7 +6877,7 @@ def test_artifact_file_rejects_unknown_option():
 def test_artifact_file_rejects_nul_argument():
     spec = _spec("artifact", "artifact.file")
     contract = _contract("artifact", "artifact.file")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -6939,7 +6939,7 @@ def test_artifact_strings_rejects_unknown_option():
 def test_artifact_strings_rejects_nul_argument():
     spec = _spec("artifact", "artifact.strings")
     contract = _contract("artifact", "artifact.strings")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7001,7 +7001,7 @@ def test_artifact_readelf_headers_rejects_unknown_option():
 def test_artifact_readelf_headers_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_headers")
     contract = _contract("artifact", "artifact.readelf_headers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7063,7 +7063,7 @@ def test_artifact_readelf_sections_rejects_unknown_option():
 def test_artifact_readelf_sections_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_sections")
     contract = _contract("artifact", "artifact.readelf_sections")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7125,7 +7125,7 @@ def test_artifact_readelf_symbols_rejects_unknown_option():
 def test_artifact_readelf_symbols_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_symbols")
     contract = _contract("artifact", "artifact.readelf_symbols")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7187,7 +7187,7 @@ def test_artifact_readelf_relocs_rejects_unknown_option():
 def test_artifact_readelf_relocs_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_relocs")
     contract = _contract("artifact", "artifact.readelf_relocs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7249,7 +7249,7 @@ def test_artifact_readelf_dynamic_rejects_unknown_option():
 def test_artifact_readelf_dynamic_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_dynamic")
     contract = _contract("artifact", "artifact.readelf_dynamic")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7311,7 +7311,7 @@ def test_artifact_readelf_notes_rejects_unknown_option():
 def test_artifact_readelf_notes_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_notes")
     contract = _contract("artifact", "artifact.readelf_notes")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7373,7 +7373,7 @@ def test_artifact_readelf_version_info_rejects_unknown_option():
 def test_artifact_readelf_version_info_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_version_info")
     contract = _contract("artifact", "artifact.readelf_version_info")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7435,7 +7435,7 @@ def test_artifact_readelf_debug_rejects_unknown_option():
 def test_artifact_readelf_debug_rejects_nul_argument():
     spec = _spec("artifact", "artifact.readelf_debug")
     contract = _contract("artifact", "artifact.readelf_debug")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7497,7 +7497,7 @@ def test_artifact_objdump_headers_rejects_unknown_option():
 def test_artifact_objdump_headers_rejects_nul_argument():
     spec = _spec("artifact", "artifact.objdump_headers")
     contract = _contract("artifact", "artifact.objdump_headers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7559,7 +7559,7 @@ def test_artifact_objdump_sections_rejects_unknown_option():
 def test_artifact_objdump_sections_rejects_nul_argument():
     spec = _spec("artifact", "artifact.objdump_sections")
     contract = _contract("artifact", "artifact.objdump_sections")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7621,7 +7621,7 @@ def test_artifact_objdump_symbols_rejects_unknown_option():
 def test_artifact_objdump_symbols_rejects_nul_argument():
     spec = _spec("artifact", "artifact.objdump_symbols")
     contract = _contract("artifact", "artifact.objdump_symbols")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7683,7 +7683,7 @@ def test_artifact_objdump_disassemble_rejects_unknown_option():
 def test_artifact_objdump_disassemble_rejects_nul_argument():
     spec = _spec("artifact", "artifact.objdump_disassemble")
     contract = _contract("artifact", "artifact.objdump_disassemble")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7745,7 +7745,7 @@ def test_artifact_objdump_contents_rejects_unknown_option():
 def test_artifact_objdump_contents_rejects_nul_argument():
     spec = _spec("artifact", "artifact.objdump_contents")
     contract = _contract("artifact", "artifact.objdump_contents")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7807,7 +7807,7 @@ def test_artifact_nm_rejects_unknown_option():
 def test_artifact_nm_rejects_nul_argument():
     spec = _spec("artifact", "artifact.nm")
     contract = _contract("artifact", "artifact.nm")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7869,7 +7869,7 @@ def test_artifact_size_rejects_unknown_option():
 def test_artifact_size_rejects_nul_argument():
     spec = _spec("artifact", "artifact.size")
     contract = _contract("artifact", "artifact.size")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7931,7 +7931,7 @@ def test_artifact_ar_list_rejects_unknown_option():
 def test_artifact_ar_list_rejects_nul_argument():
     spec = _spec("artifact", "artifact.ar_list")
     contract = _contract("artifact", "artifact.ar_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -7993,7 +7993,7 @@ def test_artifact_ar_verbose_list_rejects_unknown_option():
 def test_artifact_ar_verbose_list_rejects_nul_argument():
     spec = _spec("artifact", "artifact.ar_verbose_list")
     contract = _contract("artifact", "artifact.ar_verbose_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8055,7 +8055,7 @@ def test_artifact_otool_libraries_rejects_unknown_option():
 def test_artifact_otool_libraries_rejects_nul_argument():
     spec = _spec("artifact", "artifact.otool_libraries")
     contract = _contract("artifact", "artifact.otool_libraries")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8117,7 +8117,7 @@ def test_artifact_otool_headers_rejects_unknown_option():
 def test_artifact_otool_headers_rejects_nul_argument():
     spec = _spec("artifact", "artifact.otool_headers")
     contract = _contract("artifact", "artifact.otool_headers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8179,7 +8179,7 @@ def test_artifact_otool_symbols_rejects_unknown_option():
 def test_artifact_otool_symbols_rejects_nul_argument():
     spec = _spec("artifact", "artifact.otool_symbols")
     contract = _contract("artifact", "artifact.otool_symbols")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8241,7 +8241,7 @@ def test_artifact_codesign_display_rejects_unknown_option():
 def test_artifact_codesign_display_rejects_nul_argument():
     spec = _spec("artifact", "artifact.codesign_display")
     contract = _contract("artifact", "artifact.codesign_display")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8303,7 +8303,7 @@ def test_artifact_wasm2wat_rejects_unknown_option():
 def test_artifact_wasm2wat_rejects_nul_argument():
     spec = _spec("artifact", "artifact.wasm2wat")
     contract = _contract("artifact", "artifact.wasm2wat")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8365,7 +8365,7 @@ def test_artifact_wasm_objdump_headers_rejects_unknown_option():
 def test_artifact_wasm_objdump_headers_rejects_nul_argument():
     spec = _spec("artifact", "artifact.wasm_objdump_headers")
     contract = _contract("artifact", "artifact.wasm_objdump_headers")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8427,7 +8427,7 @@ def test_artifact_wasm_objdump_details_rejects_unknown_option():
 def test_artifact_wasm_objdump_details_rejects_nul_argument():
     spec = _spec("artifact", "artifact.wasm_objdump_details")
     contract = _contract("artifact", "artifact.wasm_objdump_details")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8489,7 +8489,7 @@ def test_artifact_wasm_objdump_disassemble_rejects_unknown_option():
 def test_artifact_wasm_objdump_disassemble_rejects_nul_argument():
     spec = _spec("artifact", "artifact.wasm_objdump_disassemble")
     contract = _contract("artifact", "artifact.wasm_objdump_disassemble")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8551,7 +8551,7 @@ def test_archive_tar_list_rejects_unknown_option():
 def test_archive_tar_list_rejects_nul_argument():
     spec = _spec("archive", "archive.tar_list")
     contract = _contract("archive", "archive.tar_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8613,7 +8613,7 @@ def test_archive_tar_compare_rejects_unknown_option():
 def test_archive_tar_compare_rejects_nul_argument():
     spec = _spec("archive", "archive.tar_compare")
     contract = _contract("archive", "archive.tar_compare")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8675,7 +8675,7 @@ def test_archive_tar_create_rejects_unknown_option():
 def test_archive_tar_create_rejects_nul_argument():
     spec = _spec("archive", "archive.tar_create")
     contract = _contract("archive", "archive.tar_create")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8737,7 +8737,7 @@ def test_archive_unzip_list_rejects_unknown_option():
 def test_archive_unzip_list_rejects_nul_argument():
     spec = _spec("archive", "archive.unzip_list")
     contract = _contract("archive", "archive.unzip_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8799,7 +8799,7 @@ def test_archive_unzip_test_rejects_unknown_option():
 def test_archive_unzip_test_rejects_nul_argument():
     spec = _spec("archive", "archive.unzip_test")
     contract = _contract("archive", "archive.unzip_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8861,7 +8861,7 @@ def test_archive_zipinfo_rejects_unknown_option():
 def test_archive_zipinfo_rejects_nul_argument():
     spec = _spec("archive", "archive.zipinfo")
     contract = _contract("archive", "archive.zipinfo")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8923,7 +8923,7 @@ def test_archive_gzip_test_rejects_unknown_option():
 def test_archive_gzip_test_rejects_nul_argument():
     spec = _spec("archive", "archive.gzip_test")
     contract = _contract("archive", "archive.gzip_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -8985,7 +8985,7 @@ def test_archive_gzip_list_rejects_unknown_option():
 def test_archive_gzip_list_rejects_nul_argument():
     spec = _spec("archive", "archive.gzip_list")
     contract = _contract("archive", "archive.gzip_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9047,7 +9047,7 @@ def test_archive_bzip2_test_rejects_unknown_option():
 def test_archive_bzip2_test_rejects_nul_argument():
     spec = _spec("archive", "archive.bzip2_test")
     contract = _contract("archive", "archive.bzip2_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9109,7 +9109,7 @@ def test_archive_xz_test_rejects_unknown_option():
 def test_archive_xz_test_rejects_nul_argument():
     spec = _spec("archive", "archive.xz_test")
     contract = _contract("archive", "archive.xz_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9171,7 +9171,7 @@ def test_archive_xz_list_rejects_unknown_option():
 def test_archive_xz_list_rejects_nul_argument():
     spec = _spec("archive", "archive.xz_list")
     contract = _contract("archive", "archive.xz_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9233,7 +9233,7 @@ def test_archive_zstd_test_rejects_unknown_option():
 def test_archive_zstd_test_rejects_nul_argument():
     spec = _spec("archive", "archive.zstd_test")
     contract = _contract("archive", "archive.zstd_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9295,7 +9295,7 @@ def test_archive_zstd_list_rejects_unknown_option():
 def test_archive_zstd_list_rejects_nul_argument():
     spec = _spec("archive", "archive.zstd_list")
     contract = _contract("archive", "archive.zstd_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9357,7 +9357,7 @@ def test_archive_7z_list_rejects_unknown_option():
 def test_archive_7z_list_rejects_nul_argument():
     spec = _spec("archive", "archive.7z_list")
     contract = _contract("archive", "archive.7z_list")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9419,7 +9419,7 @@ def test_archive_7z_test_rejects_unknown_option():
 def test_archive_7z_test_rejects_nul_argument():
     spec = _spec("archive", "archive.7z_test")
     contract = _contract("archive", "archive.7z_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9481,7 +9481,7 @@ def test_archive_zip_test_rejects_unknown_option():
 def test_archive_zip_test_rejects_nul_argument():
     spec = _spec("archive", "archive.zip_test")
     contract = _contract("archive", "archive.zip_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9543,7 +9543,7 @@ def test_archive_zip_create_rejects_unknown_option():
 def test_archive_zip_create_rejects_nul_argument():
     spec = _spec("archive", "archive.zip_create")
     contract = _contract("archive", "archive.zip_create")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9605,7 +9605,7 @@ def test_quality_shellcheck_rejects_unknown_option():
 def test_quality_shellcheck_rejects_nul_argument():
     spec = _spec("quality", "quality.shellcheck")
     contract = _contract("quality", "quality.shellcheck")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9667,7 +9667,7 @@ def test_quality_hadolint_rejects_unknown_option():
 def test_quality_hadolint_rejects_nul_argument():
     spec = _spec("quality", "quality.hadolint")
     contract = _contract("quality", "quality.hadolint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9729,7 +9729,7 @@ def test_quality_actionlint_rejects_unknown_option():
 def test_quality_actionlint_rejects_nul_argument():
     spec = _spec("quality", "quality.actionlint")
     contract = _contract("quality", "quality.actionlint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9791,7 +9791,7 @@ def test_quality_yamllint_rejects_unknown_option():
 def test_quality_yamllint_rejects_nul_argument():
     spec = _spec("quality", "quality.yamllint")
     contract = _contract("quality", "quality.yamllint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9853,7 +9853,7 @@ def test_quality_semgrep_scan_rejects_unknown_option():
 def test_quality_semgrep_scan_rejects_nul_argument():
     spec = _spec("quality", "quality.semgrep_scan")
     contract = _contract("quality", "quality.semgrep_scan")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9915,7 +9915,7 @@ def test_quality_checkov_directory_rejects_unknown_option():
 def test_quality_checkov_directory_rejects_nul_argument():
     spec = _spec("quality", "quality.checkov_directory")
     contract = _contract("quality", "quality.checkov_directory")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -9977,7 +9977,7 @@ def test_quality_checkov_file_rejects_unknown_option():
 def test_quality_checkov_file_rejects_nul_argument():
     spec = _spec("quality", "quality.checkov_file")
     contract = _contract("quality", "quality.checkov_file")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10039,7 +10039,7 @@ def test_quality_conftest_test_rejects_unknown_option():
 def test_quality_conftest_test_rejects_nul_argument():
     spec = _spec("quality", "quality.conftest_test")
     contract = _contract("quality", "quality.conftest_test")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10101,7 +10101,7 @@ def test_quality_conftest_verify_rejects_unknown_option():
 def test_quality_conftest_verify_rejects_nul_argument():
     spec = _spec("quality", "quality.conftest_verify")
     contract = _contract("quality", "quality.conftest_verify")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10163,7 +10163,7 @@ def test_quality_opa_eval_rejects_unknown_option():
 def test_quality_opa_eval_rejects_nul_argument():
     spec = _spec("quality", "quality.opa_eval")
     contract = _contract("quality", "quality.opa_eval")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10225,7 +10225,7 @@ def test_quality_opa_check_rejects_unknown_option():
 def test_quality_opa_check_rejects_nul_argument():
     spec = _spec("quality", "quality.opa_check")
     contract = _contract("quality", "quality.opa_check")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10287,7 +10287,7 @@ def test_quality_opa_fmt_diff_rejects_unknown_option():
 def test_quality_opa_fmt_diff_rejects_nul_argument():
     spec = _spec("quality", "quality.opa_fmt_diff")
     contract = _contract("quality", "quality.opa_fmt_diff")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10349,7 +10349,7 @@ def test_quality_kubeconform_rejects_unknown_option():
 def test_quality_kubeconform_rejects_nul_argument():
     spec = _spec("quality", "quality.kubeconform")
     contract = _contract("quality", "quality.kubeconform")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10411,7 +10411,7 @@ def test_quality_kube_score_rejects_unknown_option():
 def test_quality_kube_score_rejects_nul_argument():
     spec = _spec("quality", "quality.kube_score")
     contract = _contract("quality", "quality.kube_score")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10473,7 +10473,7 @@ def test_quality_gitleaks_detect_rejects_unknown_option():
 def test_quality_gitleaks_detect_rejects_nul_argument():
     spec = _spec("quality", "quality.gitleaks_detect")
     contract = _contract("quality", "quality.gitleaks_detect")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10535,7 +10535,7 @@ def test_quality_gitleaks_git_rejects_unknown_option():
 def test_quality_gitleaks_git_rejects_nul_argument():
     spec = _spec("quality", "quality.gitleaks_git")
     contract = _contract("quality", "quality.gitleaks_git")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10597,7 +10597,7 @@ def test_quality_trivy_fs_rejects_unknown_option():
 def test_quality_trivy_fs_rejects_nul_argument():
     spec = _spec("quality", "quality.trivy_fs")
     contract = _contract("quality", "quality.trivy_fs")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10659,7 +10659,7 @@ def test_quality_trivy_config_rejects_unknown_option():
 def test_quality_trivy_config_rejects_nul_argument():
     spec = _spec("quality", "quality.trivy_config")
     contract = _contract("quality", "quality.trivy_config")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10721,7 +10721,7 @@ def test_quality_syft_scan_rejects_unknown_option():
 def test_quality_syft_scan_rejects_nul_argument():
     spec = _spec("quality", "quality.syft_scan")
     contract = _contract("quality", "quality.syft_scan")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10783,7 +10783,7 @@ def test_quality_osv_scan_source_rejects_unknown_option():
 def test_quality_osv_scan_source_rejects_nul_argument():
     spec = _spec("quality", "quality.osv_scan_source")
     contract = _contract("quality", "quality.osv_scan_source")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10845,7 +10845,7 @@ def test_quality_markdownlint_rejects_unknown_option():
 def test_quality_markdownlint_rejects_nul_argument():
     spec = _spec("quality", "quality.markdownlint")
     contract = _contract("quality", "quality.markdownlint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10907,7 +10907,7 @@ def test_quality_sqlfluff_lint_rejects_unknown_option():
 def test_quality_sqlfluff_lint_rejects_nul_argument():
     spec = _spec("quality", "quality.sqlfluff_lint")
     contract = _contract("quality", "quality.sqlfluff_lint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -10969,7 +10969,7 @@ def test_quality_sqlfluff_parse_rejects_unknown_option():
 def test_quality_sqlfluff_parse_rejects_nul_argument():
     spec = _spec("quality", "quality.sqlfluff_parse")
     contract = _contract("quality", "quality.sqlfluff_parse")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
@@ -11031,7 +11031,7 @@ def test_quality_spectral_lint_rejects_unknown_option():
 def test_quality_spectral_lint_rejects_nul_argument():
     spec = _spec("quality", "quality.spectral_lint")
     contract = _contract("quality", "quality.spectral_lint")
-    args = _minimal_args(spec) + ("bad\\x00argument",)
+    args = _minimal_args(spec) + ("bad" + chr(0) + "argument",)
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(contract.name, args)
 
