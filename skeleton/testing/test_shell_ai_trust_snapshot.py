@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -25,8 +26,7 @@ from skeleton.shells.ai.trust_snapshot import (
 )
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def runtime_report(*, release=fp("r")):
