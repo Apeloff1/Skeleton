@@ -1569,6 +1569,7 @@ class DistributedReceiptChain:
         receipt_id: str,
         *,
         verify_chain: bool = True,
+        repair_missing: bool = True,
     ) -> ReceiptInclusion | None:
         key = self._index_key(receipt_id)
         record = self.backend.get(
@@ -1576,6 +1577,8 @@ class DistributedReceiptChain:
             key,
         )
         if record is None:
+            if not repair_missing:
+                return None
             # A worker can crash after the head CAS and before the secondary
             # receipt-id index is written. Recover that narrow window by
             # scanning only the committed chain, then rebuild the immutable
