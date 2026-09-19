@@ -1,5 +1,9 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_compaction_reservation import DurableCompactionReservation, DurableCompactionReservationConflict, DurableCompactionReservationError, DurableCompactionReservationHead, DurableCompactionReservationStatus, DurableCompactionReservationStore, SignedDurableCompactionReservation
+
+from skeleton.shells.ai.durable_compaction_group import DurableCompactionGroup, DurableCompactionGroupCoordinator, DurableCompactionGroupError, DurableCompactionGroupInspection, DurableCompactionGroupManualReview, DurableCompactionGroupMember, DurableCompactionGroupPhase, DurableCompactionGroupRequest, DurableCompactionGroupStale, StoredDurableCompactionGroup
+
 from skeleton.shells.ai.durable_compaction_lineage_health import (
     CompactionLineageFleetError,
     CompactionLineageFleetGuard,
