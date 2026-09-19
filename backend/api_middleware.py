@@ -157,7 +157,9 @@ def _request_id(request: Request) -> str:
     candidates = request.headers.getlist("x-request-id")
     if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
         return candidates[0]
-    return uuid.uuid4().hex
+    # Keep generated IDs compact for logs/traces while retaining 64 bits
+    # of UUID4 entropy. Historical middleware consumers depend on 16 chars.
+    return uuid.uuid4().hex[:16]
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
