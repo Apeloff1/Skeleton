@@ -38,6 +38,7 @@ from skeleton.shells.ai.durable_proof_window import (
 from skeleton.shells.ai.durable_proof_window_operator import (
     DurableProofWindowOperator,
     DurableProofWindowPolicy,
+    DurableProofWindowTarget,
 )
 from skeleton.shells.ai.durable_session_journal import (
     DurableSessionJournalStore,
@@ -3512,3 +3513,930 @@ def test_obligation_recovery_type_validation(tmp_path):
             durable_recovery_requirement_store=requirements,
             durable_recovery_requirement_scope="prod",
         )
+
+class NoFullScanJournal:
+    """Expose exact lookup APIs while making any whole-chain scan fatal."""
+
+    def __init__(self, delegate):
+        self.delegate = delegate
+        self.snapshot_calls = 0
+        self.snapshot_at_calls = 0
+        self.verify_calls = 0
+
+    def snapshot(self):
+        self.snapshot_calls += 1
+        raise AssertionError(
+            "full journal snapshot is forbidden in bounded recovery"
+        )
+
+    def snapshot_at(self, root_hash):
+        self.snapshot_at_calls += 1
+        raise AssertionError(
+            "historical journal snapshot is forbidden in bounded recovery"
+        )
+
+    def verify(self):
+        self.verify_calls += 1
+        raise AssertionError(
+            "whole journal verification is forbidden in bounded recovery"
+        )
+
+    def root_hash(self):
+        return self.delegate.root_hash()
+
+    def get_by_sequence(
+        self,
+        sequence,
+        *,
+        repair_missing=True,
+    ):
+        return self.delegate.get_by_sequence(
+            sequence,
+            repair_missing=repair_missing,
+        )
+
+    def sequence_for_root(self, root_hash):
+        return self.delegate.sequence_for_root(
+            root_hash
+        )
+
+
+class NoFullScanReceipts:
+    """Expose exact receipt indexes while rejecting whole-chain traversal."""
+
+    def __init__(self, delegate):
+        self.delegate = delegate
+        self.snapshot_calls = 0
+        self.snapshot_at_calls = 0
+        self.verify_calls = 0
+
+    def snapshot(self):
+        self.snapshot_calls += 1
+        raise AssertionError(
+            "full receipt snapshot is forbidden in bounded recovery"
+        )
+
+    def snapshot_at(self, root_hash):
+        self.snapshot_at_calls += 1
+        raise AssertionError(
+            "historical receipt snapshot is forbidden in bounded recovery"
+        )
+
+    def verify(self):
+        self.verify_calls += 1
+        raise AssertionError(
+            "whole receipt verification is forbidden in bounded recovery"
+        )
+
+    def root_hash(self):
+        return self.delegate.root_hash()
+
+    def get_by_sequence(
+        self,
+        sequence,
+        *,
+        repair_missing=True,
+    ):
+        return self.delegate.get_by_sequence(
+            sequence,
+            repair_missing=repair_missing,
+        )
+
+    def sequence_for_root(self, root_hash):
+        return self.delegate.sequence_for_root(
+            root_hash
+        )
+
+    def find_by_receipt_id(
+        self,
+        receipt_id,
+        *,
+        verify_chain=True,
+    ):
+        return self.delegate.find_by_receipt_id(
+            receipt_id,
+            verify_chain=verify_chain,
+        )
+
+
+def bounded_recovery_proof_runtime(env):
+    checkpoints = DurableChainCheckpointStore(
+        env.backend,
+        ArtifactSigner(
+            "bounded-checkpoints",
+            b"c" * 32,
+            clock=lambda: 100.0,
+        ),
+        namespace="bounded-checkpoints",
+        max_checkpoints=1000,
+        clock=lambda: 100.0,
+    )
+    proof_authority = DurableHistoricalProofAuthority(
+        checkpoints,
+        ArtifactSigner(
+            "bounded-proofs",
+            b"p" * 32,
+            clock=lambda: 200.0,
+        ),
+        max_window_items=256,
+        clock=lambda: 200.0,
+    )
+    proof_store = DurableHistoricalProofStore(
+        env.backend,
+        namespace="bounded-proofs",
+    )
+    proof_operator = DurableProofWindowOperator(
+        proof_authority,
+        proof_store,
+        {
+            "journal": env.journal,
+            "receipts": env.receipts,
+        },
+        policy=DurableProofWindowPolicy(
+            max_targets=32,
+        ),
+    )
+    return (
+        checkpoints,
+        proof_authority,
+        proof_store,
+        proof_operator,
+    )
+
+
+def seed_and_checkpoint_durable_chains(env, checkpoints):
+    env.journal.append(
+        "seed.event",
+        session_id="seed-session",
+        intent_id="seed-intent",
+        proposal_id="seed-proposal",
+    )
+    env.receipts.append(
+        ExecutionReceipt.now_failure(
+            command="python",
+            correlation_id="seed-correlation",
+            fingerprint=fp("seed-receipt"),
+        )
+    )
+    journal_checkpoint = checkpoints.publish(
+        "journal",
+        env.journal,
+    )
+    receipt_checkpoint = checkpoints.publish(
+        "receipts",
+        env.receipts,
+    )
+    return (
+        journal_checkpoint,
+        receipt_checkpoint,
+    )
+
+
+def build_finalization_proofs(
+    env,
+    proof_operator,
+    result,
+):
+    targets = (
+        DurableProofWindowTarget(
+            "journal",
+            result.finalized.checkpoint.journal_root,
+        ),
+        DurableProofWindowTarget(
+            "receipts",
+            result.finalized.checkpoint.receipt_root,
+        ),
+    )
+    report = proof_operator.ensure(
+        targets
+    )
+    assert report.ok
+    return report
+
+
+def bounded_recovery_verifier(
+    env,
+    proof_operator,
+    *,
+    journal=None,
+    receipts=None,
+    session_journals=None,
+):
+    return DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=(
+            journal
+            if journal is not None
+            else env.journal
+        ),
+        receipt_chain=(
+            receipts
+            if receipts is not None
+            else env.receipts
+        ),
+        execution_evidence=env.execution_evidence,
+        session_journals=(
+            env.session_journals
+            if session_journals is None
+            else session_journals
+        ),
+        proof_windows=proof_operator,
+        journal_proof_chain_id="journal",
+        receipt_proof_chain_id="receipts",
+    )
+
+
+def test_finalization_persists_session_journal_manifest_commitment(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    finalized = result.finalized
+    assert finalized.session_journal_commit is not None
+    manifest = (
+        finalized.session_journal_commit
+        .stored.manifest
+    )
+    assert manifest.session_id == session.session_id
+    assert (
+        manifest.journal_root
+        == finalized.checkpoint.journal_root
+    )
+    assert (
+        manifest.journal_digest
+        == finalized.session_journal.digest
+    )
+    assert (
+        finalized.recovery_checkpoint
+        .session_journal_manifest_digest
+        == manifest.digest
+    )
+    assert (
+        finalized.execution_evidence.evidence
+        .session_journal_manifest_digest
+        == manifest.digest
+    )
+
+
+def test_fresh_manifest_store_reads_finalization_projection(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    fresh = DurableSessionJournalStore(
+        env.backend,
+        namespace="session-journals",
+    )
+    stored = fresh.require(
+        result.finalized.finalization.finalization_id,
+        journal_digest=result.finalized.session_journal.digest,
+        journal_root=result.finalized.checkpoint.journal_root,
+    )
+    assert stored.manifest.session_id == session.session_id
+    assert (
+        stored.manifest.digest
+        == result.finalized.recovery_checkpoint
+        .session_journal_manifest_digest
+    )
+
+
+def test_bounded_recovery_succeeds_without_any_full_chain_scan(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute(
+        session_id="bounded",
+        intent_id="bounded-intent",
+    )
+    proof_report = build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    assert all(
+        item.checked_items > 0
+        for item in proof_report.reports
+    )
+
+    journal = NoFullScanJournal(
+        env.journal
+    )
+    receipts = NoFullScanReceipts(
+        env.receipts
+    )
+    verifier = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=journal,
+        receipts=receipts,
+    )
+    report = verifier.require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.ok
+    assert report.integrity is not None
+    assert report.integrity.ok
+    assert journal.snapshot_calls == 0
+    assert journal.snapshot_at_calls == 0
+    assert journal.verify_calls == 0
+    assert receipts.snapshot_calls == 0
+    assert receipts.snapshot_at_calls == 0
+    assert receipts.verify_calls == 0
+
+
+def test_bounded_recovery_survives_later_unrelated_chain_growth_without_scan(
+    tmp_path,
+):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, first = env.execute(
+        session_id="first-bounded",
+        intent_id="first-bounded-intent",
+    )
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        first,
+    )
+    env.execute(
+        session_id="later-bounded",
+        intent_id="later-bounded-intent",
+    )
+    for index in range(10):
+        env.journal.append(
+            f"later.extra.{index}",
+            session_id="later-extra",
+            intent_id="later-extra-intent",
+        )
+
+    journal = NoFullScanJournal(
+        env.journal
+    )
+    receipts = NoFullScanReceipts(
+        env.receipts
+    )
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=journal,
+        receipts=receipts,
+    ).require_verified(
+        first.finalized.finalization.finalization_id
+    )
+    assert report.ok
+    assert (
+        report.journal_root
+        == first.finalized.checkpoint.journal_root
+    )
+    assert (
+        report.receipt_root
+        == first.finalized.checkpoint.receipt_root
+    )
+    assert journal.snapshot_calls == 0
+    assert receipts.snapshot_calls == 0
+
+
+def test_missing_cached_journal_proof_blocks_no_scan_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        proof_store,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    journal_root = (
+        result.finalized.checkpoint.journal_root
+    )
+    proof = proof_store.find_target(
+        "journal",
+        journal_root,
+    )
+    target_key = proof_store._target_key(
+        "journal",
+        journal_root,
+    )
+    target_record = env.backend.get(
+        "bounded-proofs",
+        target_key,
+    )
+    env.backend.delete(
+        "bounded-proofs",
+        target_key,
+        expected_revision=target_record.revision,
+    )
+    assert proof is not None
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.requires_manual_review
+    assert any(
+        item.code.startswith(
+            "session_integrity"
+        )
+        for item in report.findings
+    )
+
+
+def test_missing_cached_receipt_proof_blocks_no_scan_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        proof_store,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    receipt_root = (
+        result.finalized.checkpoint.receipt_root
+    )
+    target_key = proof_store._target_key(
+        "receipts",
+        receipt_root,
+    )
+    target_record = env.backend.get(
+        "bounded-proofs",
+        target_key,
+    )
+    env.backend.delete(
+        "bounded-proofs",
+        target_key,
+        expected_revision=target_record.revision,
+    )
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.requires_manual_review
+    assert any(
+        item.code.startswith(
+            "session_integrity"
+        )
+        for item in report.findings
+    )
+
+
+def test_tampered_session_manifest_blocks_no_scan_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    session, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    finalization_id = (
+        result.finalized.finalization
+        .finalization_id
+    )
+    key = (
+        env.session_journals
+        ._manifest_key(
+            finalization_id
+        )
+    )
+    record = env.backend.get(
+        "session-journals",
+        key,
+    )
+    bad_evidence = replace(
+        record.value.journal_evidence,
+        events=(
+            replace(
+                record.value.journal_evidence.events[0],
+                kind="tampered.kind",
+            ),
+            *record.value.journal_evidence.events[1:],
+        ),
+    )
+    env.backend.compare_and_swap(
+        "session-journals",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            journal_evidence=bad_evidence,
+        ),
+    )
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        finalization_id
+    )
+    assert report.requires_manual_review
+    assert any(
+        item.code
+        == "session_journal.corruption"
+        for item in report.findings
+    )
+    assert session.session_id == (
+        result.finalized.session_journal
+        .session_id
+    )
+
+
+def test_deleted_required_session_manifest_blocks_no_scan_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    finalization_id = (
+        result.finalized.finalization
+        .finalization_id
+    )
+    key = (
+        env.session_journals
+        ._manifest_key(
+            finalization_id
+        )
+    )
+    record = env.backend.get(
+        "session-journals",
+        key,
+    )
+    env.backend.delete(
+        "session-journals",
+        key,
+        expected_revision=record.revision,
+    )
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        finalization_id
+    )
+    assert report.requires_manual_review
+    assert any(
+        item.code
+        == "session_journal.corruption"
+        for item in report.findings
+    )
+
+
+def test_tampered_journal_sequence_index_blocks_bounded_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    manifest = (
+        result.finalized.session_journal_commit
+        .stored.manifest
+    )
+    sequence = (
+        manifest.journal_evidence.events[0]
+        .global_sequence
+    )
+    key = env.journal._sequence_key(
+        sequence
+    )
+    record = env.backend.get(
+        "decision-journal",
+        key,
+    )
+    wrong_sequence = max(
+        1,
+        sequence - 1,
+    )
+    wrong_root = (
+        env.journal.root_for_sequence(
+            wrong_sequence
+        )
+    )
+    env.backend.compare_and_swap(
+        "decision-journal",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            event_hash=wrong_root,
+        ),
+    )
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.requires_manual_review
+
+
+def test_tampered_receipt_id_index_blocks_bounded_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    step = (
+        result.finalized.session_evidence
+        .steps[0]
+    )
+    receipt_id = step.receipt_ids[0]
+    key = env.receipts._index_key(
+        receipt_id
+    )
+    record = env.backend.get(
+        "receipts",
+        key,
+    )
+    env.backend.compare_and_swap(
+        "receipts",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            receipt_fingerprint=fp(
+                "tampered-receipt"
+            ),
+        ),
+    )
+
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+    ).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.requires_manual_review
+
+
+def test_legacy_recovery_without_manifest_or_proofs_keeps_scan_fallback(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    # Deliberately replace the finalizer with the legacy-compatible mode.
+    legacy_finalizer = AIExecutionEvidenceFinalizer(
+        journal=env.journal,
+        receipt_chain=env.receipts,
+        session_evidence=env.session_evidence,
+        audit_anchors=env.anchors,
+        audit_witnesses=env.witnesses,
+        execution_evidence=env.execution_evidence,
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_journals=None,
+    )
+    env.finalizer = legacy_finalizer
+    _, _, _, _, result = env.execute(
+        session_id="legacy",
+        intent_id="legacy-intent",
+    )
+    assert (
+        result.finalized.recovery_checkpoint
+        .session_journal_manifest_digest
+        == ""
+    )
+    verifier = DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=env.journal,
+        receipt_chain=env.receipts,
+        execution_evidence=env.execution_evidence,
+        session_journals=None,
+    )
+    report = verifier.require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.ok
+
+
+def test_manifest_fast_path_rejects_wrong_configured_store_namespace(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    empty_manifest_store = DurableSessionJournalStore(
+        env.backend,
+        namespace="empty-session-journals",
+    )
+    report = bounded_recovery_verifier(
+        env,
+        proof_operator,
+        journal=NoFullScanJournal(
+            env.journal
+        ),
+        receipts=NoFullScanReceipts(
+            env.receipts
+        ),
+        session_journals=empty_manifest_store,
+    ).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.requires_manual_review
+    assert any(
+        item.code
+        == "session_journal.corruption"
+        for item in report.findings
+    )
+
+
+def test_proof_operator_root_verification_round_trip(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    (
+        checkpoints,
+        _,
+        _,
+        proof_operator,
+    ) = bounded_recovery_proof_runtime(env)
+    seed_and_checkpoint_durable_chains(
+        env,
+        checkpoints,
+    )
+    _, _, _, _, result = env.execute()
+    build_finalization_proofs(
+        env,
+        proof_operator,
+        result,
+    )
+    assert proof_operator.verify_root(
+        "journal",
+        result.finalized.checkpoint.journal_root,
+    )
+    assert proof_operator.verify_root(
+        "receipts",
+        result.finalized.checkpoint.receipt_root,
+    )
+    assert not proof_operator.verify_root(
+        "journal",
+        fp("not-cached"),
+    )
+
+
+def test_manifest_digest_is_cross_bound_in_recovery_and_signed_evidence(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    manifest_digest = (
+        result.finalized.session_journal_commit
+        .stored.manifest.digest
+    )
+    assert (
+        result.finalized.recovery_checkpoint
+        .session_journal_manifest_digest
+        == manifest_digest
+    )
+    assert (
+        result.finalized.execution_evidence
+        .evidence.session_journal_manifest_digest
+        == manifest_digest
+    )
+    assert len(manifest_digest) == 64
+
+
+def test_serialized_finalization_exposes_manifest_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    data = result.finalized.to_dict()
+    commit = data[
+        "session_journal_commit"
+    ]
+    assert commit is not None
+    assert (
+        commit["stored"]["manifest"]
+        ["finalization_id"]
+        == result.finalized.finalization
+        .finalization_id
+    )
+    assert (
+        commit["stored"]["manifest"]
+        ["journal_digest"]
+        == result.finalized.session_journal.digest
+    )
+
