@@ -1410,10 +1410,11 @@ class DurableIncrementalVerifier:
                 raise DurableVerificationCursorError(
                     "incremental verification tail exceeds policy"
                 )
-            segment = chain.snapshot_segment(
-                cursor.root_hash,
+            segment = self._bounded_tail_segment(
+                chain,
+                cursor,
+                sequence,
                 root_hash,
-                max_items=self.policy.max_tail_items,
             )
             after_sequence, after_root = self._head(chain)
             if (
