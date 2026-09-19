@@ -15,11 +15,28 @@ from core.shift_supervisor.context_budget import (
 from core.shift_supervisor.model_gateway import ModelGateway, ModelRequestError
 
 
-def _http_error(*, code: int, retry_after: str | None = None) -> urllib.error.HTTPError:
+def _http_error(
+    *,
+    code: int,
+    retry_after: str | None = None,
+    payload: dict | None = None,
+    request_id: str | None = None,
+) -> urllib.error.HTTPError:
     headers = Message()
     if retry_after is not None:
         headers["Retry-After"] = retry_after
-    return urllib.error.HTTPError("https://example.invalid", code, "error", headers, None)
+    if request_id is not None:
+        headers["x-request-id"] = request_id
+    fp = None
+    if payload is not None:
+        fp = io.BytesIO(json.dumps(payload).encode("utf-8"))
+    return urllib.error.HTTPError(
+        "https://example.invalid",
+        code,
+        "error",
+        headers,
+        fp,
+    )
 
 
 def test_429_honors_retry_after_with_upper_bound() -> None:
@@ -39,6 +56,7 @@ def test_invalid_or_unrelated_retry_after_uses_bounded_backoff() -> None:
 def test_rate_limit_can_use_extended_bounded_retry_budget(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
     monkeypatch.delenv("SHIFT_MODEL_API_URL", raising=False)
+    monkeypatch.delenv("SHIFT_MODEL_FALLBACK_MODELS", raising=False)
     gateway = ModelGateway(max_attempts=6, max_non_rate_limit_attempts=3)
     calls = 0
 
@@ -65,6 +83,7 @@ def test_rate_limit_can_use_extended_bounded_retry_budget(monkeypatch) -> None:
 def test_non_rate_limit_failures_keep_standard_retry_budget(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
     monkeypatch.delenv("SHIFT_MODEL_API_URL", raising=False)
+    monkeypatch.setenv("SHIFT_MODEL_FALLBACK_MODELS", "gpt-5.6-luna")
     gateway = ModelGateway(max_attempts=6, max_non_rate_limit_attempts=3)
     calls = 0
 
@@ -85,6 +104,89 @@ def test_non_rate_limit_failures_keep_standard_retry_budget(monkeypatch) -> None
     assert calls == 3
     assert sleep.call_count == 2
 
+
+
+def test_retryable_429_switches_to_configured_fallback_after_primary_budget(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
+    monkeypatch.setenv("SHIFT_MODEL_NAME", "gpt-5.6")
+    monkeypatch.setenv("SHIFT_MODEL_FALLBACK_MODELS", "gpt-5.6-luna")
+    monkeypatch.delenv("SHIFT_MODEL_API_URL", raising=False)
+    gateway = ModelGateway(max_attempts=6, max_non_rate_limit_attempts=3)
+    models: list[str] = []
+
+    def fake_urlopen(request, timeout):
+        assert timeout == gateway.timeout_seconds
+        body = json.loads(request.data.decode("utf-8"))
+        models.append(body["model"])
+        if len(models) <= 3:
+            raise _http_error(
+                code=429,
+                retry_after="0",
+                payload={
+                    "error": {
+                        "type": "rate_limit_error",
+                        "code": "rate_limit_exceeded",
+                        "message": "temporary rate limit",
+                    }
+                },
+            )
+        return io.BytesIO(json.dumps({"output_text": '{"ok": true}'}).encode("utf-8"))
+
+    with patch("urllib.request.urlopen", fake_urlopen), patch("time.sleep") as sleep:
+        result = gateway.call_json(
+            system_prompt="system",
+            user_prompt="user",
+            correlation_id="corr-fallback",
+        )
+
+    assert result == {"ok": True}
+    assert models == ["gpt-5.6", "gpt-5.6", "gpt-5.6", "gpt-5.6-luna"]
+    assert sleep.call_count == 3
+
+
+def test_quota_429_fails_immediately_with_safe_diagnostics(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
+    monkeypatch.setenv("SHIFT_MODEL_NAME", "gpt-5.6")
+    monkeypatch.setenv("SHIFT_MODEL_FALLBACK_MODELS", "gpt-5.6-luna")
+    monkeypatch.delenv("SHIFT_MODEL_API_URL", raising=False)
+    gateway = ModelGateway(max_attempts=6, max_non_rate_limit_attempts=3)
+    calls = 0
+
+    def fake_urlopen(_request, timeout):
+        nonlocal calls
+        calls += 1
+        assert timeout == gateway.timeout_seconds
+        raise _http_error(
+            code=429,
+            retry_after="30",
+            request_id="req-safe-123",
+            payload={
+                "error": {
+                    "type": "insufficient_quota",
+                    "code": "credit_balance_exhausted",
+                    "message": "sensitive provider prose must not be surfaced",
+                }
+            },
+        )
+
+    with patch("urllib.request.urlopen", fake_urlopen), patch("time.sleep") as sleep:
+        with pytest.raises(ModelRequestError) as exc_info:
+            gateway.call_json(
+                system_prompt="system",
+                user_prompt="user",
+                correlation_id="corr-quota",
+            )
+
+    message = str(exc_info.value)
+    assert "after 1 attempts" in message
+    assert "credit_balance_exhausted" in message
+    assert "insufficient_quota" in message
+    assert "req-safe-123" in message
+    assert "sensitive provider prose" not in message
+    assert calls == 1
+    sleep.assert_not_called()
 
 def test_project_context_is_hard_bounded_and_prefers_recent_evidence() -> None:
     issues = [
