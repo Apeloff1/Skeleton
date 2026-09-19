@@ -264,8 +264,21 @@ def _revalidate_selection(
     if not _snapshot_matches(original, current):
         return None
 
+    if original.stack_relation.value == "child":
+        if original.parent_pr is None:
+            return None
+        try:
+            parent = client.snapshot(original.parent_pr)
+        except Exception:
+            return None
+        if (
+            current.identity.base_ref != parent.identity.head_ref
+            or current.identity.base_sha != parent.identity.head_sha
+        ):
+            return None
+
     # Preserve the topology annotations from the immutable pass only after
-    # proving PR identity and diff evidence did not change.
+    # proving PR identity, diff evidence, and any stack-parent head did not change.
     current = replace(
         current,
         stack_relation=original.stack_relation,
