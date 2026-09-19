@@ -12,6 +12,9 @@ SPEC = importlib.util.spec_from_file_location("check_source_path_inventory", SCR
 assert SPEC and SPEC.loader
 policy = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(policy)
+# Compatibility alias for merge-base variants that still reference the older
+# local name in provenance-path assertions.
+module = policy
 
 
 LIVE_EXAMPLES = (
