@@ -1150,6 +1150,42 @@ class DurableCompactionReservationStore:
             raise ValueError(
                 "reservation group requires unique chain ids"
             )
+        holder_id = _identity(
+            "holder_id",
+            holder_id,
+            maximum=256,
+        )
+        operator_id = _identity(
+            "operator_id",
+            operator_id,
+            maximum=256,
+        )
+        if not isinstance(renew, bool):
+            raise ValueError("renew must be bool")
+
+        # Preflight all currently-active ownership before mutating any head.
+        # This catches ordinary conflicts without creating a partially-held
+        # reservation set. A concurrent race is still possible and is handled
+        # by each chain's CAS.
+        before: dict[
+            str,
+            SignedDurableCompactionReservation | None,
+        ] = {}
+        for chain_id in ordered:
+            item = self.current(chain_id)
+            before[chain_id] = item
+            if (
+                item is not None
+                and (
+                    item.holder_id != holder_id
+                    or item.reservation.operator_id
+                    != operator_id
+                )
+            ):
+                raise DurableCompactionReservationConflict(
+                    "reservation group contains chain held by another owner"
+                )
+
         acquired: list[
             SignedDurableCompactionReservation
         ] = []
@@ -1172,16 +1208,28 @@ class DurableCompactionReservationStore:
                 )
                 acquired.append(item)
         except Exception:
-            for item in reversed(
-                acquired
-            ):
-                try:
-                    self.release(
-                        item.chain_id,
-                        holder_id=holder_id,
-                    )
-                except Exception:
-                    pass
+            # Initial acquisition is rollback-safe for chains that were free
+            # before this call. Never release a pre-existing reservation owned
+            # by this holder. Renewal deliberately keeps any successful new
+            # generations fenced: losing exclusivity after a partial renewal
+            # is less safe than retaining it until retry/expiry.
+            if not renew:
+                for item in reversed(
+                    acquired
+                ):
+                    if (
+                        before[
+                            item.chain_id
+                        ]
+                        is None
+                    ):
+                        try:
+                            self.release(
+                                item.chain_id,
+                                holder_id=holder_id,
+                            )
+                        except Exception:
+                            pass
             raise
         return tuple(acquired)
 
