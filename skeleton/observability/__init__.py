@@ -8,6 +8,19 @@ from skeleton.observability.anomaly import (
 )
 from skeleton.observability.event_bridge import EventMetricsBridge, ObservedEvent
 from skeleton.observability.health import HealthRegistry, ProbeResult, probe
+from skeleton.observability.jvm_accelerator import (
+    AcceleratorStatus,
+    AnomalyScanRow,
+    HistogramSummary,
+    JvmAcceleratorConfig,
+    JvmAcceleratorError,
+    JvmAcceleratorProtocolError,
+    JvmAcceleratorTimeout,
+    JvmAcceleratorUnavailable,
+    JvmObservabilityAccelerator,
+    close_default_accelerator,
+    get_default_accelerator,
+)
 from skeleton.observability.logging import LogEvent, StructuredLogger
 from skeleton.observability.metrics import (
     MetricPoint,
@@ -46,6 +59,17 @@ __all__ = [
     "EventMetricsBridge",
     "ObservedEvent",
     "ObservableOrchestrator",
+    "JvmObservabilityAccelerator",
+    "JvmAcceleratorConfig",
+    "JvmAcceleratorError",
+    "JvmAcceleratorUnavailable",
+    "JvmAcceleratorProtocolError",
+    "JvmAcceleratorTimeout",
+    "HistogramSummary",
+    "AnomalyScanRow",
+    "AcceleratorStatus",
+    "get_default_accelerator",
+    "close_default_accelerator",
     "REDACTED",
     "redact_payload",
     "redact_text",
