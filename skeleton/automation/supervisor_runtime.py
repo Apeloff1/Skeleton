@@ -759,7 +759,59 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
                     f"invalid worker result field: {key}"
                 )
             admitted[key] = item
+
+    # Evidence that claims a mutation must carry the immutable custody proofs
+    # needed to correlate the remote proposal with this exact execution.
+    if status == "pull-request-created":
+        required = (
+            "branch",
+            "proposal_digest",
+            "base_sha",
+            "supervisor_snapshot_fingerprint",
+            "execution_fingerprint",
+            "changed_lines",
+        )
+        missing = [key for key in required if key not in admitted]
+        if missing:
+            raise SupervisorRuntimeError(
+                "created-PR evidence is missing custody proof"
+            )
+        validate_branch(admitted["branch"], label="worker evidence branch")
+        validate_fingerprint(admitted["proposal_digest"])
+        validate_sha(admitted["base_sha"], label="worker evidence base SHA")
+        validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
+        validate_fingerprint(admitted["execution_fingerprint"])
+    elif status == "existing-pr":
+        if "pull_request" not in admitted:
+            raise SupervisorRuntimeError(
+                "existing-PR evidence is missing pull request identity"
+            )
+        if "branch" in admitted:
+            validate_branch(admitted["branch"], label="worker evidence branch")
     return admitted
+
+
+def validate_worker_evidence_custody(
+    evidence: Mapping[str, Any],
+    custody: WorkerCustody,
+) -> None:
+    """Bind admitted worker evidence back to Secretary-issued custody."""
+    if evidence.get("bot") != custody.worker:
+        raise SupervisorRuntimeError("worker evidence custody mismatch")
+    status = evidence.get("status")
+    if status == "pull-request-created":
+        if evidence.get("base_sha") != custody.execution.base_sha:
+            raise SupervisorRuntimeError("worker evidence base mismatch")
+        if (
+            evidence.get("supervisor_snapshot_fingerprint")
+            != custody.snapshot_fingerprint
+        ):
+            raise SupervisorRuntimeError("worker evidence snapshot mismatch")
+        if evidence.get("execution_fingerprint") != custody.execution.fingerprint:
+            raise SupervisorRuntimeError("worker evidence execution mismatch")
+        expected_branch = deterministic_worker_branch(custody)
+        if evidence.get("branch") != expected_branch:
+            raise SupervisorRuntimeError("worker evidence branch mismatch")
 
 
 def sanitized_worker_env(
@@ -811,5 +863,6 @@ __all__ = [
     "validate_run_id",
     "validate_sha",
     "validate_staged_paths",
+    "validate_worker_evidence_custody",
     "worker_branch_prefix",
 ]
