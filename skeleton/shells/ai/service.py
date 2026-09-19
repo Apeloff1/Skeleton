@@ -1303,6 +1303,7 @@ class AIShellService:
         self,
     ) -> tuple[
         DurableEvidenceReadinessReport | None,
+        bool,
         str,
     ]:
         """Best-effort maintenance after terminal execution.
@@ -1316,7 +1317,7 @@ class AIShellService:
             guard is None
             or not self.durable_readiness_reconcile_after_finalization
         ):
-            return None, ""
+            return None, False, ""
         try:
             report = guard.reconcile(
                 self.durable_operations_chains,
@@ -1336,7 +1337,7 @@ class AIShellService:
             )
             self._durable_readiness_report = report
             if report.ready:
-                return report, ""
+                return report, True, ""
             error = "durable_readiness_not_ready"
         except Exception as exc:
             report = None
@@ -1353,7 +1354,7 @@ class AIShellService:
                     "post-execution maintenance failed"
                 ),
             )
-        return report, error
+        return report, True, error
 
     def _durable_verification_health_for_chain(
         self,
@@ -2179,6 +2180,7 @@ class AIShellService:
 
         (
             post_execution_readiness,
+            post_execution_maintenance_attempted,
             post_execution_maintenance_error,
         ) = self._post_execution_durable_readiness()
 
@@ -2189,6 +2191,7 @@ class AIShellService:
             finalized,
             execution_attempt,
             post_execution_readiness,
+            post_execution_maintenance_attempted,
             post_execution_maintenance_error,
         )
 
