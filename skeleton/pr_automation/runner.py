@@ -22,6 +22,7 @@ from urllib.request import Request, urlopen
 
 from .core import CIState, Decision, Evaluation, Mode, PRSnapshot, Policy, evaluate
 from .index import EventIndex
+from .safety import load_operator_safety
 
 
 API = "https://api.github.com"
@@ -984,6 +985,19 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--limit must be between 1 and 1000")
     if bool(args.head_sha) != bool(args.head_ref) and args.pr is None:
         parser.error("workflow_run completions require both --head-sha and --head-ref")
+
+    safety = load_operator_safety()
+    if safety.blocked:
+        print(
+            json.dumps(
+                {
+                    "kind": "pr-automation-operator-hold",
+                    **safety.public_payload(),
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
 
     token = os.getenv("GITHUB_TOKEN", "")
     mode = Mode(os.getenv("PR_AUTOMATION_MODE", "observe").casefold())
