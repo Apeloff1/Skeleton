@@ -27,6 +27,11 @@ from skeleton.shells.ai.durable_archive_store import (
     DurableArchiveStoreReport,
     StoredDurableArchive,
 )
+from skeleton.shells.ai.durable_checkpoint import (
+    DurableCheckpointIndexHealth,
+    DurableCheckpointIndexState,
+    DurableCheckpointLookupIndex,
+)
 from skeleton.shells.ai.durable_compaction import (
     DurableCompactionError,
     DurableCompactionPlanner,
@@ -77,6 +82,9 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "DurableCheckpointIndexHealth": DurableCheckpointIndexHealth,
+    "DurableCheckpointIndexState": DurableCheckpointIndexState,
+    "DurableCheckpointLookupIndex": DurableCheckpointLookupIndex,
     "DurableEvidenceLifecycleCoordinator": DurableEvidenceLifecycleCoordinator,
     "DurableLifecycleAction": DurableLifecycleAction,
     "DurableLifecycleError": DurableLifecycleError,
@@ -943,6 +951,8 @@ def test_archive_repository_constructor_exposes_durable_authority():
         "latest",
         "get_node",
         "snapshot_at",
+        "sequence_for_root",
+        "snapshot_segment",
         "verify_root",
         "root_is_archived",
         "verify_archive",
@@ -968,6 +978,8 @@ def test_archive_repository_public_methods_are_stable(method):
         "root_hash",
         "length",
         "snapshot_at",
+        "sequence_for_root",
+        "snapshot_segment",
         "verify_root",
         "root_is_ancestor",
     ],
@@ -1196,4 +1208,146 @@ def test_archive_root_resolution_public_shape():
         "archive_manifest_digest",
         "replica_index",
     } == set(signature.parameters)
+
+def test_checkpoint_lookup_index_public_shape():
+    signature = inspect.signature(
+        DurableCheckpointLookupIndex
+    )
+    assert tuple(signature.parameters) == (
+        "chain_id",
+        "sequence",
+        "root_hash",
+        "checkpoint_digest",
+        "chain_node_hash",
+    )
+
+
+def test_checkpoint_index_health_public_shape():
+    signature = inspect.signature(
+        DurableCheckpointIndexHealth
+    )
+    assert tuple(signature.parameters) == (
+        "chain_id",
+        "state",
+        "registry_valid",
+        "checkpoint_count",
+        "digest_indexes_present",
+        "root_indexes_present",
+        "missing_digest_indexes",
+        "missing_root_indexes",
+        "corrupt_indexes",
+    )
+
+
+def test_checkpoint_index_state_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableCheckpointIndexState
+    } == {
+        "healthy",
+        "degraded",
+        "invalid",
+    }
+
+
+def test_checkpoint_lookup_index_serialization_contract():
+    item = DurableCheckpointLookupIndex(
+        "journal",
+        7,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+    )
+    assert item.to_dict() == {
+        "chain_id": "journal",
+        "sequence": 7,
+        "root_hash": "a" * 64,
+        "checkpoint_digest": "b" * 64,
+        "chain_node_hash": "c" * 64,
+    }
+
+
+def test_checkpoint_index_health_serialization_contract():
+    item = DurableCheckpointIndexHealth(
+        "journal",
+        DurableCheckpointIndexState.DEGRADED,
+        True,
+        2,
+        1,
+        2,
+        ("a" * 64,),
+        (),
+        (),
+    )
+    data = item.to_dict()
+    assert data["chain_id"] == "journal"
+    assert data["state"] == "degraded"
+    assert data["registry_valid"] is True
+    assert data["checkpoint_count"] == 2
+    assert data["digest_indexes_present"] == 1
+    assert data["root_indexes_present"] == 2
+    assert data["missing"] == 1
+    assert data["corrupt"] == 0
+    assert data["healthy"] is False
+    assert data["repairable"] is True
+    assert len(item.digest) == 64
+
+
+def test_checkpoint_index_health_invalid_not_repairable():
+    item = DurableCheckpointIndexHealth(
+        "journal",
+        DurableCheckpointIndexState.INVALID,
+        True,
+        1,
+        1,
+        1,
+        (),
+        (),
+        ("digest:x:mismatch",),
+    )
+    assert not item.healthy
+    assert not item.repairable
+    assert item.corrupt == 1
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "find_by_digest",
+        "find_by_root",
+        "inspect_lookup_indexes",
+        "repair_lookup_indexes",
+        "verify_lookup_indexes",
+    ],
+)
+def test_checkpoint_index_store_methods_are_public(method):
+    from skeleton.shells.ai.durable_checkpoint import (
+        DurableChainCheckpointStore,
+    )
+
+    assert callable(
+        getattr(
+            DurableChainCheckpointStore,
+            method,
+            None,
+        )
+    )
+
+
+def test_archive_backed_chain_satisfies_incremental_surface():
+    required = {
+        "head",
+        "verify",
+        "snapshot_segment",
+    }
+    assert all(
+        callable(
+            getattr(
+                ArchiveBackedHistoricalChain,
+                method,
+                None,
+            )
+        )
+        for method in required
+    )
 
