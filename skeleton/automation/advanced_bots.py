@@ -17,6 +17,12 @@ ADVANCED_BOTS = (
     AdvancedBot("root-cause", "repeated CI failures", "medium", 6),
     AdvancedBot("dependency-guardian", "dependency/security alerts", "high", 8),
     AdvancedBot("regression-hunter", "new failing tests or flaky jobs", "medium", 6),
+    AdvancedBot(
+        "feature-builder",
+        "maintainer-approved feature or implementation work",
+        "medium",
+        10,
+    ),
     AdvancedBot("architecture-reviewer", "large PR or subsystem drift", "low", 4),
     AdvancedBot("security-auditor", "security/code-scanning signal", "high", 5),
     AdvancedBot("performance-sentinel", "benchmark or timeout regression", "medium", 5),
