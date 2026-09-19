@@ -109,9 +109,30 @@ def build_iteration(
             policy,
             now=now,
         )
-        if graph_errors and policy.allow_stack_child_merge:
-            node = graph.node(candidate.identity.number)
-            if node is not None and (
+        node = graph.node(candidate.identity.number)
+        topology_reasons: list[str] = []
+        if (
+            node is not None
+            and node.relation.value == "root"
+            and candidate.identity.base_ref == policy.default_branch
+            and candidate.identity.base_sha != base_head
+        ):
+            topology_reasons.append(
+                "default_branch_head_moved_since_candidate_snapshot"
+            )
+        if (
+            node is not None
+            and node.relation.value == "child"
+            and node.parent_pr is not None
+        ):
+            parent = graph.node(node.parent_pr)
+            if parent is None:
+                topology_reasons.append("stack_parent_missing_at_evaluation")
+            elif node.base_sha != parent.head_sha:
+                topology_reasons.append("stack_parent_head_moved_since_candidate_snapshot")
+
+        if graph_errors and policy.allow_stack_child_merge and node is not None:
+            if (
                 node.number in graph.orphans
                 or node.relation.value == "cycle"
                 or any(
@@ -119,16 +140,19 @@ def build_iteration(
                     for branch in graph.duplicate_heads
                 )
             ):
-                decision = MergeDecision(
-                    pr_number=decision.pr_number,
-                    kind=DecisionKind.HOLD,
-                    reasons=(*decision.reasons, *graph_errors),
-                    gates=decision.gates,
-                    actions=(),
-                    snapshot_fingerprint=decision.snapshot_fingerprint,
-                    policy_fingerprint=decision.policy_fingerprint,
-                    risk_tier=decision.risk_tier,
-                )
+                topology_reasons.extend(graph_errors)
+
+        if topology_reasons:
+            decision = MergeDecision(
+                pr_number=decision.pr_number,
+                kind=DecisionKind.HOLD,
+                reasons=(*decision.reasons, *tuple(dict.fromkeys(topology_reasons))),
+                gates=decision.gates,
+                actions=(),
+                snapshot_fingerprint=decision.snapshot_fingerprint,
+                policy_fingerprint=decision.policy_fingerprint,
+                risk_tier=decision.risk_tier,
+            )
         decisions.append(decision)
 
     return IterationSnapshot(
