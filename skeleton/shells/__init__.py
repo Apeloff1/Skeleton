@@ -13,7 +13,14 @@ from skeleton.shells.circuit import CircuitBreaker, CircuitPolicy, CircuitRegist
 from skeleton.shells.commands import CommandCatalog, CommandDefinition
 from skeleton.shells.control_plane import ControlPlaneDecision, ShellControlPlane
 from skeleton.shells.dedupe import DedupeConflict, DedupeRecord, DedupeRegistry
-from skeleton.shells.durable_receipts import DistributedReceiptChain
+from skeleton.shells.durable_receipts import (
+    DistributedReceiptChain,
+    DistributedReceiptConflict,
+    DistributedReceiptCorruption,
+    DistributedReceiptHead,
+    ReceiptInclusion,
+    ReceiptIndexEntry,
+)
 from skeleton.shells.evidence_chain import ContentAddressedEvidenceChain, EvidenceConflict, EvidenceCorruption, EvidenceHead, EvidenceNode, EvidenceStateBackend, GENESIS_HASH
 from skeleton.shells.environment import EnvironmentPolicy, EnvironmentValueRule
 from skeleton.shells.errors import (
@@ -104,6 +111,11 @@ from skeleton.shells.worker import (
 
 __all__ = [
     "DistributedReceiptChain",
+    "DistributedReceiptConflict",
+    "DistributedReceiptCorruption",
+    "DistributedReceiptHead",
+    "ReceiptInclusion",
+    "ReceiptIndexEntry",
     "ContentAddressedEvidenceChain",
     "EvidenceConflict",
     "EvidenceCorruption",
