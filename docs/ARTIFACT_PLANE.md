@@ -29,6 +29,14 @@ and `scripts/check_artifact_policy.py`.
 - `skeleton.artifact_plane` imports without Godot, torch, or network.
 - Cards carry `stored_prose=0`.
 
+## GB-8b accept
+
+- No `SEVEN_BY_*.md` at repository root.
+- Lane `docs/archive/seven_by/` exists with `SEVEN_BY_INDEX.md`.
+- Root README links the archive.
+- Index body is moved, not rewritten.
+- `python scripts/check_seven_by_archive.py` exits 0 on a clean root, 2 on sprawl.
+
 ## GB-9 locate card
 
 ```
@@ -45,13 +53,14 @@ exception. Hint may be `missing-godot-binary`, `pointer:<url>`,
 ```bash
 python scripts/check_root_sprawl.py
 python scripts/check_root_sprawl.py --json
-python -m unittest tests.test_gb8_track_e
+python scripts/check_seven_by_archive.py
+python -m unittest tests.test_gb8_track_e tests.test_gb8b_seven_by
 ```
 
-## Forbidden on GB-8
+## Forbidden on GB-8 / GB-8b
 
 - Delete archived harnesses.
-- Move `SEVEN_BY_*.md` (GB-8b).
+- Rewrite SEVEN_BY volume bodies.
 - Commit a Godot engine binary (GB-9).
 - Copy artifact trees into git.
 - Replace operator methods on `skeleton/cortex/deck.py`.
