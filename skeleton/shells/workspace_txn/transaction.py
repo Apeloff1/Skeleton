@@ -28,6 +28,7 @@ from skeleton.shells.workspace_txn.lease import (
     WorkspaceLeaseRegistry,
 )
 from skeleton.shells.workspace_txn.metrics import TransactionMetrics
+from skeleton.shells.workspace_txn.pathing import root_fingerprint
 from skeleton.shells.workspace_txn.policy import WorkspaceMutationPolicy, default_safe_policy
 from skeleton.shells.workspace_txn.rollback import WorkspaceRollback
 from skeleton.shells.workspace_txn.scanner import WorkspaceScanner
@@ -358,12 +359,51 @@ class WorkspaceTransactionManager:
         self,
         root: Path | str,
         result: TransactionResult,
+        *,
+        principal: str = "workspace-compensation",
     ):
         if result.backup is None:
             raise RuntimeError("transaction result has no backup manifest")
-        return self.rollback_engine.rollback(
-            root,
-            result.before,
-            result.changes,
-            result.backup,
-        )
+        root_path = Path(root).expanduser().resolve(strict=True)
+        if not root_path.is_dir():
+            raise ValueError("rollback root must be a directory")
+        if root_fingerprint(root_path) != result.before.root_fingerprint:
+            raise ValueError("rollback root does not match transaction workspace")
+        if result.backup.root_fingerprint != result.before.root_fingerprint:
+            raise RuntimeError("backup manifest is bound to another workspace")
+        self.backup_store.require_external_to_workspace(root_path)
+        if not self.backup_store.verify_manifest(result.backup):
+            raise RuntimeError("transaction backup failed integrity verification")
+
+        workspace_id = hashlib.sha256(str(root_path).encode("utf-8")).hexdigest()
+        lease: WorkspaceLease | None = None
+        heartbeat: WorkspaceLeaseHeartbeat | None = None
+        try:
+            lease = self.leases.acquire(
+                workspace_id,
+                principal,
+                ttl_seconds=self.config.lease_ttl_seconds,
+            )
+            heartbeat = WorkspaceLeaseHeartbeat(
+                self.leases,
+                lease,
+                ttl_seconds=self.config.lease_ttl_seconds,
+                interval_seconds=self.config.lease_renew_interval_seconds,
+            ).start()
+            heartbeat.require_healthy()
+            report = self.rollback_engine.rollback(
+                root_path,
+                result.before,
+                result.changes,
+                result.backup,
+            )
+            heartbeat.require_healthy()
+            return report
+        finally:
+            if heartbeat is not None:
+                heartbeat.stop()
+            if lease is not None:
+                try:
+                    self.leases.release(lease)
+                except Exception:
+                    pass
