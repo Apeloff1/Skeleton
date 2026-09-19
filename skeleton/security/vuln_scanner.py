@@ -239,7 +239,7 @@ class VulnScanner:
             executed += 1
             try:
                 issue = rule.probe(self.root)
-            except BaseException as exc:
+            except Exception as exc:
                 findings.append(
                     Finding(
                         check=rule.name,
