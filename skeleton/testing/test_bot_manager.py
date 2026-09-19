@@ -1,7 +1,9 @@
 from dataclasses import asdict
 
+import pytest
+
 from skeleton.automation import bot_manager as bot_manager_module
-from skeleton.automation.advanced_bots import ADVANCED_BOTS
+from skeleton.automation.advanced_bots import ADVANCED_BOTS, AdvancedBot, allowed
 from skeleton.automation.bot_manager import (
     COOLDOWN_SECONDS,
     DEFAULT_BOTS,
@@ -16,7 +18,48 @@ from skeleton.automation.bot_manager import (
 def test_manager_has_complete_advanced_bot_roster():
     expected = {bot.name for bot in ADVANCED_BOTS}
     assert expected <= set(DEFAULT_BOTS)
-    assert len(expected) == 12
+    assert len(expected) == len(ADVANCED_BOTS) == 13
+
+
+def test_advanced_bot_definition_fails_closed():
+    invalid = (
+        {"name": "Root_Cause"},
+        {"trigger": ""},
+        {"trigger": "bad\ntrigger"},
+        {"risk": "critical"},
+        {"max_files": True},
+        {"max_files": 13},
+        {"requires_tests": 1},
+    )
+    base = {
+        "name": "unit-test",
+        "trigger": "focused test signal",
+        "risk": "low",
+        "max_files": 2,
+        "requires_tests": True,
+    }
+    for override in invalid:
+        with pytest.raises(ValueError):
+            AdvancedBot(**{**base, **override})
+
+
+def test_advanced_bot_path_policy_rejects_ambiguous_and_duplicate_paths():
+    bot = AdvancedBot(
+        "unit-test",
+        "focused test signal",
+        "low",
+        3,
+    )
+    assert allowed(bot, ["skeleton/example.py", "tests/test_example.py"])
+    for paths in (
+        ["skeleton//example.py"],
+        ["skeleton/./example.py"],
+        ["skeleton/../example.py"],
+        ["skeleton/example.py", "skeleton/example.py"],
+        ["skeleton/automation/example.py"],
+        ["backend/example.py"],
+    ):
+        assert allowed(bot, paths) is False
 
 
 def test_manager_limits_due_bots_and_honors_cooldown():
@@ -121,8 +164,6 @@ def test_nonzero_exit_with_success_shaped_evidence_still_fails():
 
 
 def test_worker_outcome_rejects_unregistered_identity():
-    import pytest
-
     with pytest.raises(ValueError):
         record_worker_outcome(
             {},
