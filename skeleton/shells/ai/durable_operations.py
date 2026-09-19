@@ -205,6 +205,14 @@ class DurableChainOperationsReport:
                 )
             # Opaque 64-character checkpoint digest.
         object.__setattr__(self, "findings", tuple(self.findings))
+        if (
+            self.orphan_scan is not None
+            and self.orphan_scan.chain_id
+            != self.chain_id
+        ):
+            raise ValueError(
+                "orphan scan chain_id differs from operations report"
+            )
 
     @property
     def errors(self) -> int:
