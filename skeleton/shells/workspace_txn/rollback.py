@@ -283,6 +283,13 @@ class WorkspaceRollback:
 
         if action.kind is RollbackActionKind.REVERSE_RENAME:
             old = lexical_join_under_root(root, action.source_path)
+            record = manifest.by_path.get(action.source_path)
+            if record is None:
+                return RollbackActionResult(
+                    action,
+                    RollbackActionState.FAILED,
+                    "backup metadata unavailable for rename source",
+                )
             if current is None:
                 return RollbackActionResult(
                     action,
@@ -304,6 +311,8 @@ class WorkspaceRollback:
             try:
                 old.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(absolute, old)
+                if record.kind is WorkspaceEntryKind.FILE:
+                    self._restore_metadata(old, record)
                 return RollbackActionResult(action, RollbackActionState.APPLIED)
             except OSError as exc:
                 return RollbackActionResult(action, RollbackActionState.FAILED, str(exc))
