@@ -102,6 +102,15 @@ class OperationSpec:
 
 
 def constraint(name: str) -> ValueConstraint:
+    if name.startswith("literal:"):
+        literal = name.removeprefix("literal:")
+        if not literal or "\x00" in literal or "\r" in literal or "\n" in literal:
+            raise ValueError("literal constraint must be non-empty and control-free")
+        return ValueConstraint(
+            choices=frozenset({literal}),
+            min_length=len(literal),
+            max_length=len(literal),
+        )
     try:
         return _CONSTRAINTS[name]
     except KeyError as exc:
