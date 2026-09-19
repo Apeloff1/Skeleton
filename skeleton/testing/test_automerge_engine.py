@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import timedelta
-
 import pytest
 
 from skeleton.pr_automation.automerge_engine import (
