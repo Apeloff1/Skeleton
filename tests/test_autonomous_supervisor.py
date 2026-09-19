@@ -555,6 +555,8 @@ class BuildAuthorityTests(unittest.TestCase):
                     "number": 2,
                     "title": "approved",
                     "body": "build this",
+                    "labels": ("automation-approved",),
+                    "updatedAt": "2026-09-19T00:00:00Z",
                     "automation_authorized": True,
                 },
             ),
@@ -571,7 +573,7 @@ class BuildAuthorityTests(unittest.TestCase):
             [2],
         )
 
-    def test_make_envelope_counts_approved_work_items(
+    def test_make_envelope_binds_selected_approved_work_item(
         self,
     ) -> None:
         snapshot = supervisor.SupervisorSnapshot(
@@ -582,6 +584,8 @@ class BuildAuthorityTests(unittest.TestCase):
                     "number": 2,
                     "title": "approved",
                     "body": "build this",
+                    "labels": ("automation-approved",),
+                    "updatedAt": "2026-09-19T00:00:00Z",
                     "automation_authorized": True,
                 },
             ),
