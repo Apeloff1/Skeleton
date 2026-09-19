@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping, Sequence
 _NORMAL_SHIFT_MINUTES = 8 * 60
 _SQUAD_ROLE_FIELDS = (
     ("researcher", "researcher"),
-    ("builder", "builder"),
+    ("builder", "lead"),
     ("reviewer", "reviewer"),
     ("verifier", "verifier"),
 )
@@ -127,7 +127,9 @@ def idle_snapshot(package_path: Path, audit_path: Path) -> dict[str, Any]:
                     continue
                 record = workers.setdefault(worker_id, {"tasks": [], "roles": []})
                 record["tasks"].append(task_id)
-                record["roles"].append(str(raw.get("role", role)) or role)
+                # raw["role"] is the worker's specialist discipline.
+                # Completion authority needs the canonical squad function.
+                record["roles"].append(role)
 
     return {
         "version": 1,
