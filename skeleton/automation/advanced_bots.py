@@ -42,7 +42,18 @@ BLOCKED_PREFIXES = (
     ".env",
     "secrets/",
     "deploy/",
+    # Autonomous workers cannot rewrite the automation/security authority plane.
     "skeleton/automation/",
+    "skeleton/pr_automation/",
+    "skeleton/security/",
+    "skeleton/build/",
+    # Nor may they weaken the canonical merge/unit runners or their own custody
+    # regression suite. These exact file paths are represented as prefixes so
+    # the shared path checks remain single-sourced and fail closed.
+    "tests/run_unit.py",
+    "tests/test_autonomous_supervisor.py",
+    "tests/test_supervisor_runtime.py",
+    "tests/test_cross_subsystem_integration.py",
 )
 SAFE_PREFIXES = ("skeleton/", "tests/", "docs/")
 
