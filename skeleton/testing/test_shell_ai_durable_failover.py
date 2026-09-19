@@ -1818,4 +1818,3 @@ def test_complete_rejects_epoch_from_separate_maintenance_store():
         env.coordinator.issue(
             maintenance_epoch=epoch,
         )
-
