@@ -166,6 +166,7 @@ def test_compile_rejects_contract_timeout_over_absolute_bound(tmp_path: Path):
             executable_paths={"python": str(Path(sys.executable).resolve())},
             cwd_roots=(tmp_path,),
             limits=ToolchainCompilerLimits(
+                default_timeout=1.0,
                 absolute_max_timeout=10.0,
             ),
         )
