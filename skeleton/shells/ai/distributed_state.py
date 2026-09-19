@@ -12,6 +12,11 @@ import threading
 import time
 from typing import Callable, Generic, TypeVar
 
+from skeleton.shells.state_conflicts import (
+    DistributedStateConflict,
+    LeaseConflict,
+)
+
 
 T = TypeVar("T")
 
@@ -57,14 +62,6 @@ class FencedLease:
             "acquired_at": self.acquired_at,
             "expires_at": self.expires_at,
         }
-
-
-class DistributedStateConflict(RuntimeError):
-    pass
-
-
-class LeaseConflict(RuntimeError):
-    pass
 
 
 class InMemoryFencedStore:
