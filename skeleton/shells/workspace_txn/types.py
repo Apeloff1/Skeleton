@@ -529,6 +529,7 @@ class RollbackAction:
     source_path: str = ""
     expected_digest: str = ""
     restore_digest: str = ""
+    expected_state_digest: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -537,6 +538,7 @@ class RollbackAction:
             "source_path": self.source_path,
             "expected_digest": self.expected_digest,
             "restore_digest": self.restore_digest,
+            "expected_state_digest": self.expected_state_digest,
         }
 
 
