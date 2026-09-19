@@ -197,6 +197,8 @@ class DurableCompactionCertificate:
         archive_id: str,
         archive_manifest_digest: str,
         protected_roots_digest: str,
+        issued_at: float,
+        expires_at: float,
     ) -> str:
         payload = {
             "chain_id": chain_id,
@@ -214,6 +216,8 @@ class DurableCompactionCertificate:
             "protected_roots_digest": (
                 protected_roots_digest
             ),
+            "issued_at": float(issued_at),
+            "expires_at": float(expires_at),
             "authority": (
                 "non-destructive-compaction-readiness"
             ),
@@ -1032,6 +1036,57 @@ class DurableCompactionCertificateStore:
                 readiness
             )
         )
+        now = self._clock()
+        if (
+            isinstance(now, bool)
+            or not isinstance(
+                now,
+                (int, float),
+            )
+            or not math.isfinite(
+                float(now)
+            )
+            or float(now) < 0.0
+        ):
+            raise DurableCompactionCertificateError(
+                "certificate clock returned invalid time"
+            )
+        now = float(now)
+
+        latest = self.latest(
+            readiness.chain_id
+        )
+        if latest is not None:
+            previous = latest.certificate
+            if (
+                previous.readiness_digest
+                == readiness.digest
+                and previous.retention_plan_digest
+                == readiness.retention_plan_digest
+                and previous.compaction_policy_digest
+                == readiness.policy_digest
+                and previous.current_sequence
+                == readiness.current_sequence
+                and previous.current_root
+                == readiness.current_root
+                and previous.cutoff_sequence
+                == readiness.cutoff_sequence
+                and previous.cutoff_root
+                == readiness.cutoff_root
+                and previous.archive_id
+                == readiness.archive_id
+                and previous.archive_manifest_digest
+                == readiness.archive_manifest_digest
+                and previous.protected_roots_digest
+                == protected_digest
+                and now < previous.expires_at
+            ):
+                self._verify_signature(
+                    latest
+                )
+                return latest
+
+        expires_at = now + ttl
         certificate_id = (
             DurableCompactionCertificate
             .derive_id(
@@ -1068,30 +1123,10 @@ class DurableCompactionCertificateStore:
                 protected_roots_digest=(
                     protected_digest
                 ),
+                issued_at=now,
+                expires_at=expires_at,
             )
         )
-        existing = self.get(
-            certificate_id
-        )
-        if existing is not None:
-            return existing
-
-        now = self._clock()
-        if (
-            isinstance(now, bool)
-            or not isinstance(
-                now,
-                (int, float),
-            )
-            or not math.isfinite(
-                float(now)
-            )
-            or float(now) < 0.0
-        ):
-            raise DurableCompactionCertificateError(
-                "certificate clock returned invalid time"
-            )
-        now = float(now)
         certificate = (
             DurableCompactionCertificate(
                 1,
@@ -1108,7 +1143,7 @@ class DurableCompactionCertificateStore:
                 readiness.archive_manifest_digest,
                 protected_digest,
                 now,
-                now + ttl,
+                expires_at,
             )
         )
         signature = self.signer.sign(
