@@ -1190,13 +1190,10 @@ def test_service_lifecycle_inspection_exception_fails_start(tmp_path, monkeypatc
         coordinator=fixture.coordinator,
         chains=(("journal", fixture.journal),),
     )
-    with pytest.raises(
-        RuntimeError,
-        match="synthetic lifecycle outage",
-    ):
-        # Startup currently performs direct inspection and surfaces inspection
-        # exceptions; the state remains STARTING until the service handles it.
-        service.start()
+    diagnostics = service.start()
+    assert diagnostics.ok
+    assert service.state.phase is AIServicePhase.FAILED
+    assert service.status().durable_lifecycle is None
 
 
 def test_live_recheck_exception_degrades_service(tmp_path, monkeypatch):
