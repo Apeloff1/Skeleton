@@ -20,8 +20,6 @@ before project dependencies are installed.
 
 from __future__ import annotations
 
-from importlib import import_module
-
 import ast
 import re
 import sys
@@ -442,31 +440,13 @@ def _shim_imports_canonical(
     return bool(imported & canonical_modules) or stem in imported
 
 
-_DEAD_PROBE_IMPORTERS = {
-    "backend.core.ai_provider_compat": lambda: import_module("backend.core.ai_provider_compat"),
-    "backend.emergentintegrations.__init__": lambda: import_module("backend.emergentintegrations.__init__"),
-    "backend.emergentintegrations.llm.__init__": lambda: import_module("backend.emergentintegrations.llm.__init__"),
-    "backend.emergentintegrations.llm.chat": lambda: import_module("backend.emergentintegrations.llm.chat"),
-    "backend.routes.academy_legacy_compat": lambda: import_module("backend.routes.academy_legacy_compat"),
-    "backend.routes.galaxy_studio": lambda: import_module("backend.routes.galaxy_studio"),
-    "backend.server": lambda: import_module("backend.server"),
-    "backend.services.cag": lambda: import_module("backend.services.cag"),
-    "backend.services.mag": lambda: import_module("backend.services.mag"),
-    "skeleton.jeeves.core": lambda: import_module("skeleton.jeeves.core"),
-    "skeleton.kernel.fair_queue": lambda: import_module("skeleton.kernel.fair_queue"),
-    "skeleton.kernel.vclock": lambda: import_module("skeleton.kernel.vclock"),
-    "skeleton.kernel.workqueue": lambda: import_module("skeleton.kernel.workqueue"),
-}
-
 def default_dead_probe(shim: Shim) -> object:
     """Importing a dead shim that still loads is a silent return."""
     if not shim.path.endswith(".py"):
         return shim.path
     module_name = sorted(_module_names_for(shim.path), key=len, reverse=True)[0]
-    importer = _DEAD_PROBE_IMPORTERS.get(module_name)
-    if importer is None:
-        return f"unapproved dead-shim module: {module_name}"
-    return importer()
+    __import__(module_name)
+    return sys.modules[module_name]
 
 
 def collect_violations(
