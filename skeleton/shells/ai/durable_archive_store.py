@@ -166,7 +166,6 @@ class DurableArchivedNode:
 class DurableArchiveRootReplica:
     archive_id: str
     archive_manifest_digest: str
-    replicas: tuple[DurableArchiveRootReplica, ...] = ()
 
     def __post_init__(self) -> None:
         _identity(
@@ -199,6 +198,7 @@ class DurableArchiveRootIndex:
     sequence: int
     archive_id: str
     archive_manifest_digest: str
+    replicas: tuple[DurableArchiveRootReplica, ...] = ()
 
     def __post_init__(self) -> None:
         _identity("chain_id", self.chain_id, maximum=128)
