@@ -1,5 +1,29 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_compaction_lineage_health import (
+    CompactionLineageFleetError,
+    CompactionLineageFleetGuard,
+    CompactionLineageFleetReport,
+    CompactionLineageHealthFinding,
+    CompactionLineageHealthPolicy,
+    CompactionLineageHealthSeverity,
+)
+
+from skeleton.shells.ai.durable_compaction_lineage import (
+    CompactionLineageArtifactState,
+    CompactionLineageFinding,
+    CompactionLineageSeverity,
+    CompactionLineageStatus,
+    DurableCompactionLineageAuditor,
+    DurableCompactionLineageError,
+    DurableCompactionLineageReport,
+)
+
+from skeleton.shells.ai.durable_hot_floor import (
+    DurableHotFloorHistoryIndex,
+    DurableHotFloorHistoryReport,
+)
+
 from skeleton.shells.ai.durable_compaction_operator import DurableCompactionExecution, DurableCompactionOperator, DurableCompactionPrepared, DurableCompactionWorkflow, DurableCompactionWorkflowError, DurableCompactionWorkflowInspection, DurableCompactionWorkflowManualReview, DurableCompactionWorkflowPhase, DurableCompactionWorkflowPlan, DurableCompactionWorkflowStale, StoredDurableCompactionWorkflow
 
 from skeleton.shells.ai.durable_failover_operator import (
