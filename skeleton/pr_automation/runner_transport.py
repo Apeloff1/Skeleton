@@ -695,7 +695,11 @@ class BudgetedGitHubTransport:
     ) -> tuple[list[Mapping[str, Any]], bool]:
         if not key:
             raise ValueError("payload key is required")
+        if not 1 <= per_page <= 100:
+            raise ValueError("per_page must be between 1 and 100")
         page_bound = max_pages or self._limits.max_pages
+        if not 1 <= page_bound <= self._limits.max_pages:
+            raise ValueError("max_pages exceeds runner limit")
         items: list[Mapping[str, Any]] = []
         expected_total: int | None = None
         separator = "&" if "?" in path else "?"
