@@ -173,6 +173,7 @@ def test_repository_python_sast_reuses_module_alias_hardening(tmp_path: Path) ->
     findings = violations(sample)
     assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
 
+
 def test_repository_python_sast_fails_closed_on_scandir_error(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
