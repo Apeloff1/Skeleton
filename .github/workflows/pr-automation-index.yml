@@ -50,6 +50,8 @@ jobs:
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'cancelled'
     permissions:
+      actions: read
+      checks: read
       contents: write
       pull-requests: write
       statuses: write
@@ -72,6 +74,24 @@ jobs:
       PR_AUTOMATION_MAX_LINE_DELTA: ${{ vars.PR_AUTOMATION_MAX_LINE_DELTA || '20000' }}
       PR_AUTOMATION_MAX_MUTATIONS: "1"
       PR_AUTOMATION_MAX_QUEUED_ACTIONS_RUNS: "40"
+      PR_AUTOMATION_RUNNER_V2: "true"
+      PR_RUNNER_MAX_TARGETS: "250"
+      PR_RUNNER_MAX_REQUESTS: "2000"
+      PR_RUNNER_MAX_GRAPHQL_REQUESTS: "200"
+      PR_RUNNER_MAX_PAGES: "20"
+      PR_RUNNER_MAX_RESPONSE_BYTES: "8388608"
+      PR_RUNNER_MAX_EVENTS_EXPORTED: "100000"
+      PR_RUNNER_DEADLINE_SECONDS: "600"
+      PR_RUNNER_PER_TARGET_REQUEST_BUDGET: "100"
+      PR_RUNNER_MIN_RATE_REMAINING: "50"
+      PR_RUNNER_RETRY_ATTEMPTS: "3"
+      PR_RUNNER_RETRY_CEILING_SECONDS: "30"
+      # main is currently not branch-protected; exact live base-head binding remains mandatory.\n      # Set the repository variable to true when branch protection/rulesets are enforced.\n      PR_RUNNER_REQUIRE_PROTECTED_BASE: ${{ vars.PR_RUNNER_REQUIRE_PROTECTED_BASE || 'false' }}
+      PR_RUNNER_REQUIRE_EXACT_BASE_HEAD: "true"
+      PR_RUNNER_QUEUE_PRESSURE_HOLD: "true"
+      PR_RUNNER_PUBLISH_GATE_STATUS: "true"
+      PR_RUNNER_REQUIRE_SAME_REPOSITORY_HEAD: "true"
+      PR_RUNNER_REQUIRE_LATEST_REVIEWS_ON_HEAD: "true"
       SKELETON_AUTOMATION_PAUSED: ${{ vars.SKELETON_AUTOMATION_PAUSED }}
       SKELETON_AUTOMATION_QUARANTINED: ${{ vars.SKELETON_AUTOMATION_QUARANTINED }}
       SKELETON_AUTOMATION_HOLD_REASON: ${{ vars.SKELETON_AUTOMATION_HOLD_REASON }}
@@ -173,6 +193,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr-automation-index-${{ github.run_id }}
-          path: .pr-automation/index.jsonl
+          path: |
+            .pr-automation/index.jsonl
+            .pr-automation/runner-report.json
+            .pr-automation/runner-transport.json
+            .pr-automation/runner-checkpoint.json
           if-no-files-found: warn
           retention-days: 30
