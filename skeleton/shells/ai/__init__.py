@@ -1,5 +1,24 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_destruction import (
+    DESTRUCTION_ARTIFACT_TYPE,
+    DurableDestructionConflict,
+    DurableDestructionCorruption,
+    DurableDestructionError,
+    DurableDestructionHead,
+    DurableDestructionIndexFinding,
+    DurableDestructionIndexHealth,
+    DurableDestructionIndexState,
+    DurableDestructionItem,
+    DurableDestructionItemState,
+    DurableDestructionKind,
+    DurableDestructionLedger,
+    DurableDestructionOperationIndex,
+    DurableDestructionRecord,
+    DurableDestructionVerification,
+    SignedDurableDestructionRecord,
+)
+
 from skeleton.shells.ai.durable_replica_readiness import (
     DurableReplicaReadinessError,
     DurableReplicaReadinessFinding,
