@@ -1647,4 +1647,3 @@ def test_hot_cold_batch_backfill_full_repair_with_cursor_loop(kind):
     ).healthy
     assert batches[-1].next_sequence == 0
     assert batches[-1].next_root == GENESIS
-
