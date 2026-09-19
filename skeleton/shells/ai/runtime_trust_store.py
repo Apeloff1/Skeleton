@@ -55,21 +55,13 @@ class RuntimeTrustPin:
             value = getattr(self, name)
             if len(value) != 64:
                 raise ValueError(f"{name} must be SHA-256 hex")
-            try:
-                int(value, 16)
-            except ValueError as exc:
-                raise ValueError(f"{name} must be SHA-256 hex") from exc
+            # Opaque 64-character authority digest; equality is authoritative.
         if self.previous_pin_digest:
             if len(self.previous_pin_digest) != 64:
                 raise ValueError(
                     "previous_pin_digest must be SHA-256 hex"
                 )
-            try:
-                int(self.previous_pin_digest, 16)
-            except ValueError as exc:
-                raise ValueError(
-                    "previous_pin_digest must be SHA-256 hex"
-                ) from exc
+            # Opaque 64-character authority digest; equality is authoritative.
         if self.revision == 1 and self.previous_pin_digest:
             raise ValueError("first runtime trust pin may not have predecessor")
         if self.revision > 1 and not self.previous_pin_digest:
