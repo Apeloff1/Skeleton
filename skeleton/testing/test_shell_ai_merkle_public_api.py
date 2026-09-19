@@ -460,4 +460,3 @@ def test_package_merkle_health_guard_is_canonical_class():
     )
 
     assert RootImport is DurableMerkleHealthGuard
-
