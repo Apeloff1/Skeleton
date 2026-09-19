@@ -11,6 +11,12 @@ from skeleton.shells.ai.distributed_state import (
     DistributedStateConflict,
     InMemoryFencedStore,
 )
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceConflict,
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStore,
+)
 from skeleton.shells.ai.durable_failover import (
     FAILOVER_ARTIFACT_TYPE,
     DurableFailoverAuthority,
@@ -57,7 +63,15 @@ def receipt(index: int) -> ExecutionReceipt:
 
 
 class Environment:
-    def __init__(self, *, count=2, now=100.0, synced=True):
+    def __init__(
+        self,
+        *,
+        count=2,
+        now=100.0,
+        synced=True,
+        maintenance=False,
+        maintenance_store=None,
+    ):
         self.now = [float(now)]
         self.source_backend = InMemoryFencedStore()
         self.target_backend = InMemoryFencedStore()
@@ -128,12 +142,47 @@ class Environment:
             namespace="failover",
             clock=lambda: self.now[0],
         )
+        self.maintenance = maintenance_store
+        if maintenance and self.maintenance is None:
+            self.maintenance = DurableMaintenanceStore(
+                self.registry_backend,
+                ArtifactSigner(
+                    "maintenance-key",
+                    b"m" * 32,
+                    clock=lambda: self.now[0],
+                ),
+                namespace="maintenance",
+                clock=lambda: self.now[0],
+                nonce_factory=lambda: (
+                    f"maintenance-{self.now[0]}"
+                ),
+            )
         self.coordinator = DurableFailoverCoordinator(
             self.manager,
             self.authority,
             self.registry,
             source_id="primary",
             target_id="replica",
+            maintenance=self.maintenance,
+        )
+
+    def acquire_maintenance(
+        self,
+        *,
+        operation=DurableMaintenanceOperation.FAILOVER,
+        owner_id="failover-operator",
+    ):
+        if self.maintenance is None:
+            raise RuntimeError(
+                "fixture maintenance is not enabled"
+            )
+        return self.maintenance.acquire(
+            operation,
+            owner_id=owner_id,
+            resources=(
+                self.coordinator
+                .maintenance_resources()
+            ),
         )
 
     def advance_source(self):
