@@ -608,6 +608,8 @@ def test_operator_state_wire_values_are_stable():
         "needs_sync",
         "quorum_blocked",
         "target_blocked",
+        "consensus_blocked",
+        "history_blocked",
         "claimed",
         "applied",
         "cancelled",
