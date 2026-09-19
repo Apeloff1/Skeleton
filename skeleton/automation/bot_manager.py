@@ -211,6 +211,43 @@ def record_result(
             item["circuit_open"] = True
 
 
+
+SUCCESSFUL_WORKER_STATUSES = frozenset({
+    "existing-pr",
+    "no-change",
+    "pull-request-created",
+})
+
+
+def record_worker_outcome(
+    state: dict[str, dict],
+    result: object,
+    now: float | None = None,
+) -> None:
+    """Account for one Secretary result using admitted semantic evidence.
+
+    A zero process exit without admitted evidence is not success. Conversely,
+    deduplication and a legitimate no-op are successful autonomous outcomes and
+    must not poison the circuit breaker merely because no new commit was made.
+    """
+    if not isinstance(result, dict):
+        raise ValueError("worker outcome must be an object")
+    name = result.get("bot")
+    if not isinstance(name, str) or name not in DEFAULT_BOTS:
+        raise ValueError("worker outcome has unregistered bot")
+    returncode = result.get("returncode")
+    if isinstance(returncode, bool) or not isinstance(returncode, int):
+        raise ValueError("worker outcome has invalid return code")
+    evidence = result.get("evidence")
+    success = False
+    if returncode == 0 and isinstance(evidence, dict):
+        success = (
+            evidence.get("bot") == name
+            and evidence.get("status") in SUCCESSFUL_WORKER_STATUSES
+        )
+    record_result(state, name, success, now=now)
+
+
 def main() -> int:
     state = load_state()
     due = select_due(state)
