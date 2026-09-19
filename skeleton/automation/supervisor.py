@@ -25,6 +25,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .build_authority import (
+    APPROVED_BUILD_LABELS,
+    BuildAuthorization,
+    authorized_builds,
+    select_build_authorization,
+)
 from .free_model import FreeModelClient, ModelError, redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -39,13 +45,6 @@ MAX_ITEMS = 40
 MAX_ENVELOPE_BYTES = 24_000
 MODEL_TIMEOUT_SECONDS = 90
 MAX_APPROVED_ISSUE_BODY_BYTES = 6_000
-APPROVED_BUILD_LABELS = frozenset(
-    {
-        "automation-approved",
-        "supervisor-approved",
-        "build-approved",
-    }
-)
 
 
 class SupervisorError(RuntimeError):
@@ -91,10 +90,10 @@ class DelegationEnvelope:
     observed_at: int
     plan: str
     execution: ExecutionIdentity
-    approved_build_count: int = 0
+    build_authorization: BuildAuthorization | None = None
 
     def payload(self) -> dict[str, object]:
-        if self.version != 2:
+        if self.version != 3:
             raise SupervisorError("unsupported delegation envelope version")
         if self.repository != self.execution.repository:
             raise SupervisorError("delegation repository/execution mismatch")
@@ -109,13 +108,13 @@ class DelegationEnvelope:
         clean = redact_secrets(self.plan).strip()
         if not clean or len(clean.encode("utf-8")) > MAX_PLAN_BYTES:
             raise SupervisorError("invalid delegation plan")
-        if (
-            isinstance(self.approved_build_count, bool)
-            or not isinstance(self.approved_build_count, int)
-            or self.approved_build_count < 0
-            or self.approved_build_count > MAX_ITEMS
-        ):
-            raise SupervisorError("invalid approved build count")
+        build_payload: dict[str, object] | None = None
+        if self.build_authorization is not None:
+            if self.build_authorization.repository != self.repository:
+                raise SupervisorError(
+                    "build authorization repository mismatch"
+                )
+            build_payload = self.build_authorization.as_dict()
         return {
             "version": self.version,
             "repository": self.repository,
@@ -124,7 +123,7 @@ class DelegationEnvelope:
             "plan": clean,
             "execution": self.execution.as_dict(),
             "execution_fingerprint": self.execution.fingerprint,
-            "approved_build_count": self.approved_build_count,
+            "build_authorization": build_payload,
         }
 
     def as_json(self) -> str:
@@ -197,11 +196,41 @@ def _normalize_issue(item: dict[str, Any]) -> dict[str, Any]:
 def approved_build_items(
     snapshot: SupervisorSnapshot,
 ) -> list[dict[str, Any]]:
+    """Compatibility view of explicitly approved repository issue records."""
     return [
         issue
         for issue in snapshot.issues
         if issue.get("automation_authorized") is True
     ]
+
+
+def selected_build_authorization(
+    snapshot: SupervisorSnapshot,
+) -> BuildAuthorization | None:
+    return select_build_authorization(
+        snapshot.repository,
+        snapshot.issues,
+    )
+
+
+def _planning_issues(
+    snapshot: SupervisorSnapshot,
+) -> list[dict[str, Any]]:
+    """Expose one active approved body; keep the remainder metadata-only."""
+    selected = selected_build_authorization(snapshot)
+    selected_number = (
+        selected.issue_number
+        if selected is not None
+        else None
+    )
+    result: list[dict[str, Any]] = []
+    for source in snapshot.issues:
+        item = dict(source)
+        if item.get("number") != selected_number:
+            item.pop("body", None)
+            item.pop("automation_authorized", None)
+        result.append(item)
+    return result
 
 
 def observe(repository: str) -> SupervisorSnapshot:
@@ -278,7 +307,12 @@ def _context(snapshot: SupervisorSnapshot) -> str:
         },
         "snapshot_fingerprint": snapshot.fingerprint,
         "repository": snapshot.repository,
-        "issues": snapshot.issues,
+        "issues": _planning_issues(snapshot),
+        "build_authorization": (
+            selected_build_authorization(snapshot).as_dict()
+            if selected_build_authorization(snapshot) is not None
+            else None
+        ),
         "pull_requests": snapshot.pull_requests,
         "workflow_runs": snapshot.workflow_runs,
     }
@@ -302,7 +336,11 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
         for pr in snapshot.pull_requests
         if pr.get("mergeStateStatus") in {"BLOCKED", "DIRTY"}
     ][:8]
-    approved = approved_build_items(snapshot)[:8]
+    build_authorization = selected_build_authorization(snapshot)
+    queued_builds = authorized_builds(
+        snapshot.repository,
+        snapshot.issues,
+    )
 
     payload = {
         "version": 1,
@@ -323,7 +361,12 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
             "blocked_pull_requests": blocked,
             "open_issue_count": len(snapshot.issues),
             "open_pull_request_count": len(snapshot.pull_requests),
-            "approved_work_items": approved,
+            "build_authorization": (
+                build_authorization.as_dict()
+                if build_authorization is not None
+                else None
+            ),
+            "queued_approved_work_count": len(queued_builds),
         },
     }
     return _canonical(payload).decode("utf-8")
@@ -378,13 +421,13 @@ def make_envelope(
     execution: ExecutionIdentity,
 ) -> DelegationEnvelope:
     return DelegationEnvelope(
-        version=2,
+        version=3,
         repository=snapshot.repository,
         snapshot_fingerprint=snapshot.fingerprint,
         observed_at=snapshot.observed_at,
         plan=plan,
         execution=execution,
-        approved_build_count=len(approved_build_items(snapshot)),
+        build_authorization=selected_build_authorization(snapshot),
     )
 
 
@@ -476,7 +519,16 @@ def main() -> int:
                 "pull_requests": len(snapshot.pull_requests),
                 "workflow_runs": len(snapshot.workflow_runs),
                 "plan_bytes": len(plan.encode("utf-8")),
-                "approved_build_count": len(approved_build_items(snapshot)),
+                "build_issue_number": (
+                    envelope.build_authorization.issue_number
+                    if envelope.build_authorization is not None
+                    else None
+                ),
+                "build_task_digest": (
+                    envelope.build_authorization.task_digest
+                    if envelope.build_authorization is not None
+                    else None
+                ),
                 "delegation": "secretary",
                 "mutation_authority": False,
             },
