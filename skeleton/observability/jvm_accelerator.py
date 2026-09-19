@@ -94,7 +94,16 @@ class AcceleratorStatus:
     running: bool
     java_binary: str
     source: str
+    closed: bool = False
+    pid: int | None = None
     server_processors: int | None = None
+    starts: int = 0
+    start_failures: int = 0
+    restarts: int = 0
+    requests: int = 0
+    successful_requests: int = 0
+    failed_requests: int = 0
+    timeouts: int = 0
     last_error: str | None = None
 
 
@@ -162,6 +171,13 @@ class JvmObservabilityAccelerator:
         self._last_error: str | None = None
         self._server_processors: int | None = None
         self._closed = False
+        self._starts = 0
+        self._start_failures = 0
+        self._restarts = 0
+        self._requests = 0
+        self._successful_requests = 0
+        self._failed_requests = 0
+        self._timeouts = 0
 
     @property
     def minimum_batch_values(self) -> int:
@@ -181,7 +197,16 @@ class JvmObservabilityAccelerator:
             running=running,
             java_binary=self.config.java_binary,
             source=str(self.config.source),
+            closed=self._closed,
+            pid=process.pid if running and process is not None else None,
             server_processors=self._server_processors,
+            starts=self._starts,
+            start_failures=self._start_failures,
+            restarts=self._restarts,
+            requests=self._requests,
+            successful_requests=self._successful_requests,
+            failed_requests=self._failed_requests,
+            timeouts=self._timeouts,
             last_error=self._last_error,
         )
 
@@ -284,6 +309,7 @@ class JvmObservabilityAccelerator:
 
     def restart(self) -> None:
         with self._request_lock:
+            self._restarts += 1
             self._terminate_process()
             self._closed = False
             self._last_error = None
@@ -298,11 +324,13 @@ class JvmObservabilityAccelerator:
             process = self._process
             assert process is not None and process.stdin is not None
             request_id = self._next_request_id()
+            self._requests += 1
             frame = _HEADER_REQUEST.pack(_MAGIC, _VERSION, op, request_id) + payload
             try:
                 process.stdin.write(frame)
                 process.stdin.flush()
             except (BrokenPipeError, OSError) as exc:
+                self._failed_requests += 1
                 self._last_error = f"accelerator write failed: {type(exc).__name__}"
                 self._terminate_process()
                 raise JvmAcceleratorUnavailable(self._diagnostic(self._last_error)) from exc
@@ -310,22 +338,28 @@ class JvmObservabilityAccelerator:
             try:
                 item = self._responses.get(timeout=self.config.response_timeout_seconds)
             except queue.Empty as exc:
+                self._failed_requests += 1
+                self._timeouts += 1
                 self._last_error = "accelerator response timed out"
                 self._terminate_process()
                 raise JvmAcceleratorTimeout(self._diagnostic(self._last_error)) from exc
 
             if isinstance(item, BaseException):
+                self._failed_requests += 1
                 self._last_error = str(item)
                 self._terminate_process()
                 raise JvmAcceleratorUnavailable(self._diagnostic(str(item))) from item
             if item.request_id != request_id or item.op != op:
+                self._failed_requests += 1
                 self._last_error = "accelerator response correlation mismatch"
                 self._terminate_process()
                 raise JvmAcceleratorProtocolError(self._last_error)
             if item.status != _STATUS_OK:
+                self._failed_requests += 1
                 message = str(item.payload)
                 self._last_error = message
                 raise JvmAcceleratorProtocolError(message)
+            self._successful_requests += 1
             return item
 
     def _ensure_started(self) -> None:
@@ -336,16 +370,20 @@ class JvmObservabilityAccelerator:
 
     def _start_process(self) -> None:
         if not self.config.source.is_file():
-            raise JvmAcceleratorUnavailable(
-                f"accelerator source not found: {self.config.source}"
-            )
+            message = f"accelerator source not found: {self.config.source}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmAcceleratorUnavailable(message)
         java = (
             shutil.which(self.config.java_binary)
             if os.path.sep not in self.config.java_binary
             else self.config.java_binary
         )
         if not java or not Path(java).exists():
-            raise JvmAcceleratorUnavailable(f"java binary not found: {self.config.java_binary}")
+            message = f"java binary not found: {self.config.java_binary}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmAcceleratorUnavailable(message)
 
         self._drain_response_queue()
         self._stderr_tail.clear()
@@ -359,9 +397,13 @@ class JvmObservabilityAccelerator:
                 bufsize=0,
             )
         except OSError as exc:
-            raise JvmAcceleratorUnavailable(f"failed to start Java: {exc}") from exc
+            message = f"failed to start Java: {exc}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmAcceleratorUnavailable(message) from exc
 
         self._process = process
+        self._starts += 1
         self._reader = threading.Thread(
             target=self._reader_loop,
             args=(process,),

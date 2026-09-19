@@ -11,6 +11,7 @@ from skeleton.memory.core import Chunk
 from skeleton.memory.jvm_vector_accelerator import (
     JvmVectorAccelerator,
     JvmVectorConfig,
+    JvmVectorProtocolError,
     VectorHit,
 )
 from skeleton.memory.vector import VectorStore
@@ -566,6 +567,26 @@ def test_real_java_batch_range_search_reuses_candidate_matrix() -> None:
         [1, 2],
     ]
 
+
+def test_real_java_batch_range_bound_preserves_bad_request_detail() -> None:
+    queries = [([1.0, 0.0], 1.0)]
+    candidates = [
+        ([1.0, 0.0], 1.0),
+        ([0.9, 0.1], math.sqrt(0.82)),
+        ([0.8, 0.2], math.sqrt(0.68)),
+    ]
+
+    with JvmVectorAccelerator(_real_config()) as accelerator:
+        with pytest.raises(
+            JvmVectorProtocolError,
+            match="range result bound exceeded",
+        ):
+            accelerator.range_search_many(
+                queries,
+                candidates,
+                -1.0,
+                max_total_hits=2,
+            )
 
 def test_real_java_vector_store_threshold_matches_python_store() -> None:
     baseline = _build_store(accelerated=False)

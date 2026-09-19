@@ -421,6 +421,110 @@ The dedicated CI lane runs:
 3. fake-accelerator parity/fallback tests;
 4. real Java protocol tests.
 
+## Operations registry and health
+
+`skeleton.jvm_accelerators.JvmAcceleratorRegistry` provides a single optional
+operations surface for the three helpers. Importing or constructing the
+registry does not start Java.
+
+```python
+from skeleton.jvm_accelerators import JvmAcceleratorRegistry
+
+registry = JvmAcceleratorRegistry()
+
+# Filesystem/runtime preflight only. No JVM process is started.
+preflight = registry.preflight()
+
+# Status is also non-starting for helpers that have not been initialized.
+status = registry.status()
+
+# Explicitly start and ping one helper.
+registry.warm("vector")
+
+# Restart and close are explicit lifecycle operations.
+registry.restart("vector")
+registry.close("vector")
+```
+
+The registry is intentionally separate from the root `skeleton` exports. This
+keeps ordinary package imports cheap and prevents an operations convenience
+layer from becoming a hidden runtime dependency.
+
+### Preflight versus runtime health
+
+`preflight()` checks only whether:
+
+- the configured Java binary resolves to a real executable file; and
+- the configured accelerator source exists.
+
+It does not compile source, launch a JVM, or send a protocol frame.
+
+`status()` reports initialized/running state plus client-side lifecycle
+telemetry. For an uninitialized helper it combines non-starting preflight
+information with `initialized=False`.
+
+Each runtime status includes:
+
+- process PID when running;
+- Java/source configuration;
+- detected server processor count after a successful ping;
+- JVM process start count;
+- failed JVM process-start attempts;
+- explicit restart count;
+- total protocol requests;
+- successful request count;
+- failed request count;
+- timeout count;
+- the last client-side error.
+
+The counters belong to the Python bridge. They do not require another JVM
+request and therefore cannot create a monitoring feedback loop.
+
+### HealthRegistry integration
+
+The registry can create a probe compatible with Skeleton's existing
+`HealthRegistry`:
+
+```python
+from skeleton.jvm_accelerators import JvmAcceleratorRegistry
+from skeleton.observability import HealthRegistry
+
+jvm = JvmAcceleratorRegistry()
+health = HealthRegistry()
+
+# Readiness means Java + source are provisioned, or an initialized helper is
+# healthy. This call itself does not start Java.
+health.add_readiness(jvm.health_probe("vector"))
+
+# For a deployment where the vector helper must already be running:
+health.add_readiness(
+    jvm.health_probe("vector", require_running=True)
+)
+```
+
+`require_running=False` is appropriate when Java acceleration is optional but
+the deployment wants to verify that the fast path is provisioned. Setting it
+to `True` is an explicit choice to make an already-running JVM helper part of
+readiness.
+
+### Warm behavior
+
+`warm()` calls `ping()` explicitly. With `strict=True` (the default), any
+failed helper causes one aggregated registry exception. With `strict=False`,
+healthy helpers remain available and the returned status snapshot records the
+individual failure instead.
+
+```python
+statuses = registry.warm(strict=False)
+for name, item in statuses.items():
+    print(name, item.running, item.last_error)
+```
+
+Use non-strict warm when acceleration is an optimization and Python fallback
+must preserve service availability. Use strict warm only when a deployment
+has deliberately promoted one or more JVM helpers into a readiness
+requirement.
+
 ## Operational configuration
 
 Shared Java binary:
