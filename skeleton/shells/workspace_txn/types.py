@@ -430,6 +430,7 @@ class BackupRecord:
     storage_key: str
     size: int
     mode: int
+    mtime_ns: int = 0
     link_target: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -440,6 +441,7 @@ class BackupRecord:
             "storage_key": self.storage_key,
             "size": self.size,
             "mode": self.mode,
+            "mtime_ns": self.mtime_ns,
             "link_target": self.link_target,
         }
 
