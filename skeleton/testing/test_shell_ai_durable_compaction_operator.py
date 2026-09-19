@@ -4184,3 +4184,618 @@ def test_compaction_maintenance_lineage_floor_claim_matches_history(kind):
         .history.floors
     }
     assert lineage_floor in history_ids
+
+# ---------------------------------------------------------------------------
+# Cross-operation durable maintenance authority integration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_maintenance_enabled_compaction_requires_epoch(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="maintenance epoch",
+    ):
+        fixture.execute(
+            plan.workflow_id
+        )
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert (
+        stored.workflow.phase
+        is DurableCompactionWorkflowPhase.PREPARED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_maintenance_epoch_allows_compaction_to_complete(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    result = fixture.execute(
+        plan.workflow_id,
+        maintenance_epoch=epoch,
+    )
+    assert result.ok
+    assert result.stored.workflow.complete
+    assert fixture.maintenance.require_active(
+        epoch,
+        operation=(
+            DurableMaintenanceOperation.COMPACTION
+        ),
+        required_resources=(
+            fixture.chain_id,
+        ),
+    ).active
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_compaction_rejects_pruning_only_epoch(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance(
+        operation=(
+            DurableMaintenanceOperation.PRUNING
+        )
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+        match="operation differs",
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    assert (
+        fixture.operator.current(
+            plan.workflow_id
+        ).workflow.phase
+        is DurableCompactionWorkflowPhase.PREPARED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_compaction_rejects_epoch_for_other_chain(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    other = fixture.maintenance.acquire(
+        DurableMaintenanceOperation.COMPACTION,
+        owner_id="operator",
+        resources=(
+            DurableMaintenanceResource(
+                "other-chain",
+                "evidence-chain",
+                1,
+                fp("other-root"),
+                fp("other-state"),
+            ),
+        ),
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+        match="lacks required resources",
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=other,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_growth_after_epoch_invalidates_maintenance_before_execution(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    fixture.append_one()
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+        match="state changed",
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    assert (
+        fixture.operator.current(
+            plan.workflow_id
+        ).workflow.phase
+        is DurableCompactionWorkflowPhase.PREPARED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_released_epoch_blocks_compaction(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    fixture.maintenance.release(epoch)
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    assert (
+        fixture.operator.current(
+            plan.workflow_id
+        ).workflow.phase
+        is DurableCompactionWorkflowPhase.PREPARED
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_renewed_epoch_supersedes_old_compaction_authority(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    old = fixture.acquire_maintenance()
+    renewed = fixture.maintenance.renew(
+        old
+    )
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=old,
+        )
+    result = fixture.execute(
+        plan.workflow_id,
+        maintenance_epoch=renewed,
+    )
+    assert result.ok
+
+
+def test_compaction_operator_adopts_pruning_maintenance_store():
+    fixture = OperatorFixture(
+        maintenance=True,
+    )
+    fresh = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fixture.executor,
+        namespace="maintenance-adopt-operator",
+        clock=lambda: fixture.now[0],
+    )
+    assert fresh.maintenance is fixture.maintenance
+
+
+def test_compaction_operator_rejects_maintenance_when_pruning_is_unprotected():
+    fixture = OperatorFixture()
+    maintenance = DurableMaintenanceStore(
+        fixture.backend,
+        signer(
+            "standalone-maintenance",
+            b"m",
+        ),
+        namespace="standalone-maintenance",
+    )
+    with pytest.raises(
+        ValueError,
+        match="maintenance-enabled pruning",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            fixture.certificate_store,
+            fixture.authorization_store,
+            fixture.executor,
+            maintenance=maintenance,
+            namespace="bad-maintenance-operator",
+        )
+
+
+def test_compaction_operator_rejects_different_pruning_maintenance_store():
+    fixture = OperatorFixture(
+        maintenance=True,
+    )
+    other = DurableMaintenanceStore(
+        fixture.backend,
+        signer(
+            "other-maintenance",
+            b"z",
+        ),
+        namespace="other-maintenance",
+    )
+    with pytest.raises(
+        ValueError,
+        match="share maintenance store",
+    ):
+        DurableCompactionOperator(
+            fixture.backend,
+            fixture.compaction,
+            fixture.certificate_store,
+            fixture.authorization_store,
+            fixture.executor,
+            maintenance=other,
+            namespace="mismatched-maintenance-operator",
+        )
+
+
+def test_pruning_executor_rejects_wrong_maintenance_type():
+    fixture = OperatorFixture()
+    with pytest.raises(
+        TypeError,
+        match="maintenance",
+    ):
+        DurablePruningExecutor(
+            fixture.backend,
+            fixture.authorization_store,
+            fixture.floor_store,
+            maintenance=object(),
+            namespace="bad-maintenance-pruning",
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_fresh_operator_uses_same_epoch_after_restart(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    fresh = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fixture.executor,
+        maintenance=fixture.maintenance,
+        namespace=f"{kind}-operator",
+        clock=lambda: fixture.now[0],
+    )
+    result = fresh.execute(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+        maintenance_epoch=epoch,
+    )
+    assert result.ok
+    assert result.stored.workflow.complete
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_crashed_pruning_resume_requires_same_active_maintenance_epoch(kind):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    backend.fail_enabled = True
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic operator pruning crash",
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    backend.fail_enabled = False
+
+    with pytest.raises(
+        DurableCompactionWorkflowError,
+        match="maintenance epoch",
+    ):
+        fixture.operator.resume(
+            plan.workflow_id,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    result = fixture.operator.resume(
+        plan.workflow_id,
+        fixture.retention,
+        fixture.chain,
+        maintenance_epoch=epoch,
+    )
+    assert result.ok
+    assert result.stored.workflow.complete
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_crashed_pruning_cannot_resume_after_maintenance_release(kind):
+    backend = FailDeleteOnceBackend()
+    fixture = OperatorFixture(
+        kind=kind,
+        backend=backend,
+        maintenance=True,
+    )
+    plan, _ = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    backend.fail_enabled = True
+    with pytest.raises(RuntimeError):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    backend.fail_enabled = False
+    fixture.maintenance.release(epoch)
+
+    with pytest.raises(
+        DurableCompactionWorkflowStale,
+    ):
+        fixture.operator.resume(
+            plan.workflow_id,
+            fixture.retention,
+            fixture.chain,
+            maintenance_epoch=epoch,
+        )
+
+
+class FailThirdMaintenanceCheck(
+    DurableMaintenanceStore
+):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            *args,
+            **kwargs,
+        )
+        self.require_calls = 0
+
+    def require_active(
+        self,
+        *args,
+        **kwargs,
+    ):
+        self.require_calls += 1
+        if self.require_calls >= 3:
+            raise DurableMaintenanceStale(
+                "synthetic mid-pruning maintenance loss"
+            )
+        return super().require_active(
+            *args,
+            **kwargs,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_mid_pruning_maintenance_loss_stops_before_delete_loop(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+    )
+    maintenance = FailThirdMaintenanceCheck(
+        fixture.backend,
+        signer(
+            f"{kind}-fail-maintenance",
+            b"m",
+        ),
+        namespace=f"{kind}-fail-maintenance",
+    )
+    fixture.executor.maintenance = maintenance
+    fixture.operator = DurableCompactionOperator(
+        fixture.backend,
+        fixture.compaction,
+        fixture.certificate_store,
+        fixture.authorization_store,
+        fixture.executor,
+        maintenance=maintenance,
+        namespace=f"{kind}-operator",
+        clock=lambda: fixture.now[0],
+    )
+    fixture.maintenance = maintenance
+
+    plan, prepared = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance()
+    before = fixture.chain.snapshot()
+    with pytest.raises(
+        DurableCompactionWorkflowManualReview,
+        match="maintenance authority",
+    ):
+        fixture.execute(
+            plan.workflow_id,
+            maintenance_epoch=epoch,
+        )
+    after = fixture.chain.snapshot()
+
+    # The authority fails on pruning's second guard, before the hot-floor
+    # commit/deletion loop can mutate the chain.
+    assert after == before
+    stored = fixture.operator.current(
+        plan.workflow_id
+    )
+    assert stored.workflow.requires_manual_review
+    assert prepared.manifest.delete_count > 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_direct_pruning_accepts_parent_compaction_epoch(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    plan, prepared = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance(
+        operation=(
+            DurableMaintenanceOperation.COMPACTION
+        )
+    )
+    authorization = (
+        fixture.authorization_store.get(
+            prepared.stored.workflow.authorization_id
+        )
+    )
+    assert authorization is not None
+    result = fixture.executor.execute(
+        authorization,
+        fixture.retention,
+        fixture.chain,
+        maintenance_epoch=epoch,
+    )
+    assert result.ok
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_direct_pruning_accepts_pruning_epoch(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    _, prepared = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance(
+        operation=(
+            DurableMaintenanceOperation.PRUNING
+        )
+    )
+    authorization = (
+        fixture.authorization_store.get(
+            prepared.stored.workflow.authorization_id
+        )
+    )
+    assert authorization is not None
+    result = fixture.executor.execute(
+        authorization,
+        fixture.retention,
+        fixture.chain,
+        maintenance_epoch=epoch,
+    )
+    assert result.ok
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_direct_pruning_rejects_failover_epoch(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    _, prepared = fixture.through_prepared()
+    epoch = fixture.acquire_maintenance(
+        operation=(
+            DurableMaintenanceOperation.FAILOVER
+        )
+    )
+    authorization = (
+        fixture.authorization_store.get(
+            prepared.stored.workflow.authorization_id
+        )
+    )
+    assert authorization is not None
+    with pytest.raises(
+        DurablePruningError,
+        match="does not authorize pruning",
+    ):
+        fixture.executor.execute(
+            authorization,
+            fixture.retention,
+            fixture.chain,
+            maintenance_epoch=epoch,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_direct_pruning_requires_epoch_when_maintenance_enabled(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    _, prepared = fixture.through_prepared()
+    authorization = (
+        fixture.authorization_store.get(
+            prepared.stored.workflow.authorization_id
+        )
+    )
+    assert authorization is not None
+    with pytest.raises(
+        DurablePruningError,
+        match="maintenance epoch",
+    ):
+        fixture.executor.execute(
+            authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_maintenance_resource_matches_live_chain_head(kind):
+    fixture = OperatorFixture(
+        kind=kind,
+        maintenance=True,
+    )
+    value = fixture.executor.maintenance_resource(
+        fixture.chain_id,
+        fixture.chain,
+    )
+    head = fixture.chain.head()
+    assert value.resource_id == fixture.chain_id
+    assert value.sequence == head.sequence
+    assert value.root_hash == head.root_hash
+    assert len(value.state_digest) == 64
+
