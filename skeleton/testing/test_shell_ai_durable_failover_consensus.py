@@ -14,6 +14,11 @@ from skeleton.shells.ai.durable_failover import (
     DurableFailoverRegistry,
     DurableFailoverTicketError,
 )
+from skeleton.shells.ai.durable_failover_operator import (
+    DurableFailoverOperator,
+    DurableFailoverOperatorReport,
+    DurableFailoverOperatorState,
+)
 from skeleton.shells.ai.durable_replica_consensus import (
     DurableReplicaConsensusEvaluator,
     DurableReplicaConsensusPolicy,
@@ -1138,3 +1143,352 @@ def test_consensus_report_public_helper_returns_live_state():
         report.selected.head.receipt_root
         == env.source.receipts.root_hash()
     )
+
+def make_operator(env: ConsensusFailoverEnvironment):
+    return DurableFailoverOperator(
+        env.target.manager,
+        env.coordinator,
+        fleet=env.fleet,
+        clock=lambda: env.now[0],
+    )
+
+
+def test_operator_reports_live_consensus_before_first_issue():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    report = operator.inspect()
+    assert report.state is DurableFailoverOperatorState.READY
+    assert report.can_issue
+    assert report.consensus is not None
+    assert report.consensus.certifiable
+    assert report.consensus_history is None
+
+
+def test_operator_issue_records_and_surfaces_consensus_history():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    issued = operator.issue()
+    assert issued.report.state is DurableFailoverOperatorState.READY
+    assert issued.report.consensus is not None
+    assert issued.report.consensus_history is not None
+    assert issued.report.consensus_history.epoch.generation == 1
+    assert (
+        issued.report.consensus_history.epoch.consensus_state_digest
+        == issued.ticket.ticket.consensus_state_digest
+    )
+
+
+def test_operator_surfaces_history_block_after_source_growth_and_resync():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    operator.issue()
+    env.grow_and_sync()
+    report = operator.inspect()
+    assert report.state is DurableFailoverOperatorState.HISTORY_BLOCKED
+    assert not report.can_issue
+    assert report.consensus is not None
+    assert report.consensus_history is None
+    assert "history" in report.reason.lower()
+
+
+def test_operator_issue_advances_history_after_explicit_history_block():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    first = operator.issue()
+    env.grow_and_sync()
+    blocked = operator.inspect()
+    assert blocked.state is DurableFailoverOperatorState.HISTORY_BLOCKED
+
+    # The operator intentionally refuses issue while history is stale. The
+    # coordinator issue path is the authority that may advance consensus
+    # history after re-validating the live roots.
+    second_ticket = env.coordinator.issue()
+    refreshed = operator.inspect(
+        ticket_id=second_ticket.ticket.ticket_id
+    )
+    assert refreshed.state is DurableFailoverOperatorState.READY
+    assert refreshed.consensus_history is not None
+    assert refreshed.consensus_history.epoch.generation == 2
+    assert (
+        first.ticket.ticket.journal_root
+        != second_ticket.ticket.journal_root
+    )
+
+
+def test_operator_surfaces_consensus_block_for_split_brain():
+    env = ConsensusFailoverEnvironment()
+    rogue = Source(
+        count=4,
+        now=env.now,
+    )
+    divergent = Replica(
+        "replica-c",
+        "zone-c",
+        rogue,
+    )
+    divergent.sync()
+    env.fleet = DurableReplicaFleet(
+        "primary",
+        (
+            env.replicas["replica-a"].member,
+            env.replicas["replica-b"].member,
+            divergent.member,
+        ),
+        policy=env.fleet_policy,
+        clock=lambda: env.now[0],
+    )
+    env.coordinator.fleet = env.fleet
+    operator = DurableFailoverOperator(
+        env.target.manager,
+        env.coordinator,
+        fleet=env.fleet,
+        clock=lambda: env.now[0],
+    )
+    report = operator.inspect()
+    assert report.state is DurableFailoverOperatorState.CONSENSUS_BLOCKED
+    assert not report.can_issue
+    assert report.consensus is None
+    assert "consensus" in report.reason.lower()
+
+
+def test_operator_split_brain_issue_is_blocked_before_ticket_creation():
+    env = ConsensusFailoverEnvironment()
+    rogue = Source(
+        count=5,
+        now=env.now,
+    )
+    divergent = Replica(
+        "replica-c",
+        "zone-c",
+        rogue,
+    )
+    divergent.sync()
+    env.fleet = DurableReplicaFleet(
+        "primary",
+        (
+            env.replicas["replica-a"].member,
+            env.replicas["replica-b"].member,
+            divergent.member,
+        ),
+        policy=env.fleet_policy,
+        clock=lambda: env.now[0],
+    )
+    env.coordinator.fleet = env.fleet
+    operator = DurableFailoverOperator(
+        env.target.manager,
+        env.coordinator,
+        fleet=env.fleet,
+        clock=lambda: env.now[0],
+    )
+    with pytest.raises(Exception, match="cannot be issued"):
+        operator.issue()
+    assert env.registry.current(fp("0")) is None
+
+
+def test_operator_report_serializes_consensus_commitment():
+    env = ConsensusFailoverEnvironment()
+    report = make_operator(env).inspect()
+    data = report.to_dict()
+    assert data["state"] == "ready"
+    assert data["consensus"] is not None
+    assert data["consensus"]["certifiable"] is True
+    assert data["consensus_history"] is None
+    assert data["digest"] == report.digest
+
+
+def test_operator_report_serializes_consensus_history_after_issue():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    issued = operator.issue()
+    data = issued.report.to_dict()
+    assert data["consensus_history"] is not None
+    assert data["consensus_history"]["epoch"]["generation"] == 1
+    assert (
+        data["consensus_history"]["epoch"]["journal_root"]
+        == issued.ticket.ticket.journal_root
+    )
+
+
+def test_operator_report_digest_binds_consensus_state():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    first = operator.inspect()
+    env.grow_and_sync()
+    second = operator.inspect()
+    assert first.digest != second.digest
+    assert first.consensus.state_digest != second.consensus.state_digest
+
+
+def test_operator_report_digest_binds_history_state():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    before = operator.inspect()
+    env.coordinator.issue()
+    after = operator.inspect()
+    assert before.digest != after.digest
+    assert before.consensus_history is None
+    assert after.consensus_history is not None
+
+
+def test_operator_claimed_state_takes_precedence_over_later_consensus_drift():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    issued = operator.issue()
+    claimed = operator.claim(
+        issued.ticket,
+        consumer_id="operator",
+    )
+    assert claimed.state is DurableFailoverOperatorState.CLAIMED
+    env.grow_and_sync()
+    recovered = operator.inspect(
+        ticket_id=issued.ticket.ticket.ticket_id
+    )
+    assert recovered.state is DurableFailoverOperatorState.CLAIMED
+    assert recovered.failover is not None
+
+
+def test_operator_applied_state_remains_terminal_after_later_growth():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    issued = operator.issue()
+    operator.claim(
+        issued.ticket,
+        consumer_id="operator",
+    )
+    applied = operator.complete(
+        issued.ticket,
+        consumer_id="operator",
+    )
+    assert applied.state is DurableFailoverOperatorState.APPLIED
+    env.grow_and_sync()
+    recovered = operator.inspect(
+        ticket_id=issued.ticket.ticket.ticket_id
+    )
+    assert recovered.state is DurableFailoverOperatorState.APPLIED
+    assert recovered.terminal
+
+
+def test_operator_cancelled_state_remains_terminal_after_consensus_change():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    issued = operator.issue()
+    operator.claim(
+        issued.ticket,
+        consumer_id="operator",
+    )
+    cancelled = operator.cancel(
+        issued.ticket,
+        consumer_id="operator",
+    )
+    assert cancelled.state is DurableFailoverOperatorState.CANCELLED
+    env.grow_and_sync()
+    recovered = operator.inspect(
+        ticket_id=issued.ticket.ticket.ticket_id
+    )
+    assert recovered.state is DurableFailoverOperatorState.CANCELLED
+
+
+def test_operator_without_consensus_preserves_legacy_ready_report():
+    env = ConsensusFailoverEnvironment(
+        strict_history=False
+    )
+    coordinator = DurableFailoverCoordinator(
+        env.target.manager,
+        env.authority,
+        env.registry,
+        source_id="primary",
+        target_id="replica-a",
+        fleet=env.fleet,
+    )
+    operator = DurableFailoverOperator(
+        env.target.manager,
+        coordinator,
+        fleet=env.fleet,
+        clock=lambda: env.now[0],
+    )
+    report = operator.inspect()
+    assert report.state is DurableFailoverOperatorState.READY
+    assert report.consensus is None
+    assert report.consensus_history is None
+
+
+def test_operator_consensus_without_history_reports_consensus_only():
+    env = ConsensusFailoverEnvironment(
+        strict_history=False
+    )
+    coordinator = DurableFailoverCoordinator(
+        env.target.manager,
+        env.authority,
+        env.registry,
+        source_id="primary",
+        target_id="replica-a",
+        fleet=env.fleet,
+        consensus=env.consensus,
+    )
+    operator = DurableFailoverOperator(
+        env.target.manager,
+        coordinator,
+        fleet=env.fleet,
+        clock=lambda: env.now[0],
+    )
+    report = operator.inspect()
+    assert report.can_issue
+    assert report.consensus is not None
+    assert report.consensus_history is None
+
+
+def test_operator_history_corruption_is_history_blocked():
+    env = ConsensusFailoverEnvironment()
+    operator = make_operator(env)
+    operator.issue()
+    current = env.history.current("primary")
+    key = env.history._epoch_key(
+        current.epoch.digest
+    )
+    record = env.registry_backend.get(
+        env.history.namespace,
+        key,
+    )
+    env.registry_backend.compare_and_swap(
+        env.history.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            current.epoch,
+            fleet_policy_digest=fp("9"),
+        ),
+    )
+    report = operator.inspect()
+    assert report.state is DurableFailoverOperatorState.HISTORY_BLOCKED
+    assert not report.can_issue
+
+
+def test_operator_report_type_checks_consensus_fields():
+    env = ConsensusFailoverEnvironment()
+    report = make_operator(env).inspect()
+    with pytest.raises(TypeError, match="consensus"):
+        replace(
+            report,
+            consensus=object(),
+        )
+    with pytest.raises(TypeError, match="consensus_history"):
+        replace(
+            report,
+            consensus_history=object(),
+        )
+
+
+def test_operator_ready_report_consensus_head_matches_replication_head():
+    env = ConsensusFailoverEnvironment()
+    report = make_operator(env).inspect()
+    selected = report.consensus.selected
+    assert selected is not None
+    assert (
+        selected.head.journal_root
+        == report.replication.journal.source_root
+    )
+    assert (
+        selected.head.receipt_root
+        == report.replication.receipts.source_root
+    )
+
