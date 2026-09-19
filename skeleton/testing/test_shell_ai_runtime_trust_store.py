@@ -23,7 +23,8 @@ from skeleton.shells.ai.runtime_trust_store import (
 from skeleton.shells.ai.signed_artifact import ArtifactSigner
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def surface(**changes) -> RuntimeTrustSurface:
