@@ -367,6 +367,43 @@ def test_rollback_restores_parent_directory_mtime_after_created_child(tmp_path: 
     assert result.transaction.rollback.final_snapshot_digest == result.transaction.before.digest
 
 
+def test_reverse_rename_restores_original_file_mode_and_mtime(tmp_path: Path):
+    root, _, plane = _manager(tmp_path)
+    original = root / "old.txt"
+    renamed = root / "new.txt"
+    original.write_text("same-content", encoding="utf-8")
+    original.chmod(0o640)
+    stamp = 1_700_000_003_123_456_789
+    os.utime(original, ns=(stamp, stamp))
+    before_mode = original.stat().st_mode & 0o777
+    before_mtime = original.stat().st_mtime_ns
+
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            (
+                "-c",
+                (
+                    "from pathlib import Path; import os; "
+                    "p=Path('old.txt'); p.chmod(0o600); "
+                    "os.utime(p, ns=(1700000041234567890,1700000041234567890)); "
+                    "p.rename('new.txt')"
+                ),
+            ),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+
+    assert result.rolled_back
+    assert result.transaction.rollback is not None
+    assert result.transaction.rollback.ok
+    assert original.read_text(encoding="utf-8") == "same-content"
+    assert not renamed.exists()
+    assert original.stat().st_mode & 0o777 == before_mode
+    assert original.stat().st_mtime_ns == before_mtime
+
+
 def test_rollback_restores_deleted_file_with_original_mtime(tmp_path: Path):
     root, _, plane = _manager(tmp_path)
     target = root / "delete-me.txt"
