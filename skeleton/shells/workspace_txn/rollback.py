@@ -31,6 +31,17 @@ class RollbackError(RuntimeError):
 
 def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
     actions: list[RollbackAction] = []
+    directory_replacements: set[str] = {
+        change.path
+        for change in changes.changes
+        if (
+            change.kind is WorkspaceChangeKind.TYPE_CHANGED
+            and change.before is not None
+            and change.after is not None
+            and change.before.kind is WorkspaceEntryKind.DIRECTORY
+            and change.after.kind is not WorkspaceEntryKind.DIRECTORY
+        )
+    }
     for change in changes.changes:
         before_digest = "" if change.before is None else change.before.digest
         after_digest = "" if change.after is None else change.after.digest
@@ -88,7 +99,18 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
                     restore_digest=before_digest,
                 )
             )
-    actions.sort(key=lambda action: (-action.path.count("/"), action.path, action.kind.value))
+    # A directory replaced by a file/symlink must be restored before its
+    # deleted descendants can be recreated.  Every other rollback action stays
+    # deep-first so created descendants are removed before restoring a parent
+    # file, directory, or symlink.
+    actions.sort(
+        key=lambda action: (
+            0 if action.path in directory_replacements else 1,
+            action.path.count("/") if action.path in directory_replacements else -action.path.count("/"),
+            action.path,
+            action.kind.value,
+        )
+    )
     return tuple(actions)
 
 
