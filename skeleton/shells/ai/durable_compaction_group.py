@@ -1877,7 +1877,15 @@ class DurableCompactionGroupCoordinator:
             requests,
         )
         reasons: list[str] = []
-        if self.reservations is not None and not group.complete:
+        reservation_required = (
+            self.reservations is not None
+            and not group.complete
+            and _PHASE_ORDER[group.phase]
+            >= _PHASE_ORDER[
+                DurableCompactionGroupPhase.CERTIFIED
+            ]
+        )
+        if reservation_required:
             for member in group.members:
                 status = self.reservations.status(
                     member.chain_id
@@ -1908,7 +1916,11 @@ class DurableCompactionGroupCoordinator:
                     member.workflow_id,
                     request.retention,
                     request.chain,
-                    reservation_holder_id=group.group_id,
+                    reservation_holder_id=(
+                        group.group_id
+                        if reservation_required
+                        else ""
+                    ),
                 )
                 current_values.append(
                     (
