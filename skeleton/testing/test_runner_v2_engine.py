@@ -32,11 +32,15 @@ from skeleton.testing.runner_v2_test_support import (
     identity,
     pr_payload,
     runner_policy,
+    threads_payload,
 )
 
 
 def explicit_transport() -> ScriptedTransport:
     transport = configure_collector_transport(ScriptedTransport())
+    # Engine apply performs one evaluation snapshot and one independent
+    # mutation-boundary refresh, each with its own review-thread query.
+    transport.graphql_queue.append(threads_payload(unresolved=0))
     transport.get_map["queue:Apeloff1/Skeleton"] = 0
     transport.put_map[
         "/repos/Apeloff1/Skeleton/pulls/42/merge"
