@@ -2930,6 +2930,235 @@ class ArchiveBackedHistoricalChain:
             )
         return prefix + suffix
 
+    def root_for_sequence(
+        self,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ) -> str:
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            raise ValueError(
+                "historical sequence must be non-negative integer"
+            )
+        if sequence == 0:
+            return GENESIS_HASH
+        head = self.head()
+        if sequence > int(head.sequence):
+            raise IndexError(
+                "historical sequence is beyond committed head"
+            )
+        floor = self._active_floor()
+        if floor is None:
+            live_method = getattr(
+                self.live_chain,
+                "root_for_sequence",
+                None,
+            )
+            if callable(live_method):
+                try:
+                    return str(
+                        live_method(
+                            sequence,
+                            repair_missing=repair_missing,
+                        )
+                    )
+                except Exception:
+                    pass
+            return self.archives.root_for_sequence(
+                self.chain_id,
+                sequence,
+                repair_missing=repair_missing,
+            )
+        if sequence <= int(floor.sequence):
+            return self.archives.root_for_sequence(
+                self.chain_id,
+                sequence,
+                repair_missing=repair_missing,
+            )
+        live_method = getattr(
+            self.live_chain,
+            "root_for_sequence",
+            None,
+        )
+        if not callable(live_method):
+            raise DurableArchiveStoreError(
+                "live chain does not support indexed root lookup"
+            )
+        root_hash = str(
+            live_method(
+                sequence,
+                repair_missing=repair_missing,
+            )
+        )
+        if sequence == int(floor.sequence) + 1:
+            node = self.live_chain.get_by_sequence(
+                sequence,
+                repair_missing=repair_missing,
+            )
+            if self._previous_hash(node) != str(
+                floor.root_hash
+            ):
+                raise DurableArchiveStoreError(
+                    "live indexed sequence does not continue archive floor"
+                )
+        return root_hash
+
+    def get_by_sequence(
+        self,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ):
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence <= 0
+        ):
+            raise ValueError(
+                "historical sequence must be positive integer"
+            )
+        head = self.head()
+        if sequence > int(head.sequence):
+            raise IndexError(
+                "historical sequence is beyond committed head"
+            )
+        floor = self._active_floor()
+        if floor is not None and sequence <= int(
+            floor.sequence
+        ):
+            node = self.archives.get_by_sequence(
+                self.chain_id,
+                sequence,
+                repair_missing=repair_missing,
+            )
+        else:
+            live_method = getattr(
+                self.live_chain,
+                "get_by_sequence",
+                None,
+            )
+            if callable(live_method):
+                try:
+                    node = live_method(
+                        sequence,
+                        repair_missing=repair_missing,
+                    )
+                except Exception as live_error:
+                    if floor is not None:
+                        raise DurableArchiveStoreError(
+                            "live indexed historical lookup failed above floor: "
+                            f"{type(live_error).__name__}"
+                        ) from live_error
+                    node = self.archives.get_by_sequence(
+                        self.chain_id,
+                        sequence,
+                        repair_missing=repair_missing,
+                    )
+            else:
+                node = self.archives.get_by_sequence(
+                    self.chain_id,
+                    sequence,
+                    repair_missing=repair_missing,
+                )
+        if self._node_sequence(node) != sequence:
+            raise DurableArchiveStoreError(
+                "historical indexed lookup returned wrong sequence"
+            )
+        expected_root = self.root_for_sequence(
+            sequence,
+            repair_missing=repair_missing,
+        )
+        if self._node_hash(node) != expected_root:
+            raise DurableArchiveStoreError(
+                "historical indexed lookup root mismatch"
+            )
+        return node
+
+    def snapshot_range(
+        self,
+        start_sequence: int,
+        end_sequence: int,
+        *,
+        max_items: int = 4096,
+        repair_missing: bool = True,
+    ):
+        if (
+            isinstance(start_sequence, bool)
+            or not isinstance(start_sequence, int)
+            or start_sequence <= 0
+        ):
+            raise ValueError(
+                "start_sequence must be positive integer"
+            )
+        if (
+            isinstance(end_sequence, bool)
+            or not isinstance(end_sequence, int)
+            or end_sequence < start_sequence
+        ):
+            raise ValueError(
+                "end_sequence must be >= start_sequence"
+            )
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        count = end_sequence - start_sequence + 1
+        if count > max_items:
+            raise DurableArchiveStoreError(
+                "historical range exceeds bounded verification window"
+            )
+        head = self.head()
+        if end_sequence > int(head.sequence):
+            raise IndexError(
+                "historical range extends beyond committed head"
+            )
+        start_root = self.root_for_sequence(
+            start_sequence - 1,
+            repair_missing=repair_missing,
+        )
+        end_root = self.root_for_sequence(
+            end_sequence,
+            repair_missing=repair_missing,
+        )
+        items = tuple(
+            self.snapshot_segment(
+                start_root,
+                end_root,
+                max_items=max_items,
+            )
+        )
+        if len(items) != count:
+            raise DurableArchiveStoreError(
+                "historical indexed range length mismatch"
+            )
+        expected_sequence = start_sequence
+        previous = start_root
+        for item in items:
+            if (
+                self._node_sequence(item)
+                != expected_sequence
+                or self._previous_hash(item)
+                != previous
+            ):
+                raise DurableArchiveStoreError(
+                    "historical indexed range is not contiguous"
+                )
+            previous = self._node_hash(item)
+            expected_sequence += 1
+        if previous != end_root:
+            raise DurableArchiveStoreError(
+                "historical indexed range terminal root mismatch"
+            )
+        return items
+
     def sequence_for_root(
         self,
         root_hash: str,
