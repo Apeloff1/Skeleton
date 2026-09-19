@@ -1,5 +1,11 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_recovery import DurableRecoveryFinding, DurableRecoveryStatus, DurableRecoveryVerificationError, DurableSessionRecoveryReport, DurableSessionRecoveryVerifier, RecoveryFindingSeverity
+
+from skeleton.shells.ai.session_integrity import JournalInclusionResult, ReceiptInclusionResult, SessionEvidenceIntegrityError, SessionEvidenceIntegrityReport, SessionEvidenceIntegrityVerifier
+
+from skeleton.shells.ai.distributed_journal import DistributedAIDecisionJournal, DistributedJournalConflict, DistributedJournalCorruption, DistributedJournalHead
+
 from skeleton.shells.ai.sealed_finalization import AISealedFinalizedExecution
 
 from skeleton.shells.ai.recovery_store import AIRecoveryCheckpointStore, RecoveryCheckpointCommit, RecoveryCheckpointConflict, RecoveryCheckpointHead, RecoveryCheckpointRecord, StoredRecoveryCheckpoint
@@ -37,7 +43,6 @@ from skeleton.shells.ai.robust_consensus import ConsensusPolicy, RobustConsensus
 from skeleton.shells.ai.recovery_checkpoint import AIRecoveryCheckpoint
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend, ShellServiceExecutionBackend
 from skeleton.shells.ai.ensemble_planner import EnsembleAIPlanner, EnsembleAttempt, EnsembleMember, EnsemblePlanningResult, EnsemblePolicy
-from skeleton.shells.ai.distributed_journal import DistributedAIDecisionJournal
 from skeleton.shells.ai.audit_anchor import AIAuditAnchor, AIAuditAnchorStore, SignedAIAuditAnchor
 from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector, AIExecutionAssurancePolicy, AssuranceDecision, AssuranceLevel
 from skeleton.shells.ai.approval import AIApprovalError, AIApprovalRegistry, AIPlanApproval
