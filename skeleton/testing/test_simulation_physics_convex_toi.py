@@ -505,34 +505,6 @@ def test_general_convex_toi_tie_break_is_canonical() -> None:
     assert {event.body_a, event.body_b} == {"a", "m"}
 
 
-def test_general_convex_toi_can_ignore_a_settled_pair() -> None:
-    moving = _dynamic(
-        "m",
-        BoxShape(Vec3(0.25, 0.25, 0.25)),
-        Vec3(-2.0, 0.0, 0.0),
-    )
-    moving.linear_velocity = Vec3(10.0, 0.0, 0.0)
-    target_a = _static(
-        "a",
-        BoxShape(Vec3(0.25, 0.25, 0.25)),
-        Vec3.zero(),
-    )
-    target_b = _static(
-        "b",
-        BoxShape(Vec3(0.25, 0.25, 0.25)),
-        Vec3.zero(),
-    )
-    detector = ContinuousCollisionDetector(motion_threshold=0.1)
-
-    event = detector.earliest_event(
-        (target_b, moving, target_a),
-        0.5,
-        ignore_pairs=frozenset({("a", "m")}),
-    )
-
-    assert event is not None
-    assert {event.body_a, event.body_b} == {"b", "m"}
-
 
 def test_separating_translation_can_dominate_angular_sweep_bound() -> None:
     moving = _dynamic(

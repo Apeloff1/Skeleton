@@ -134,10 +134,10 @@ class WorkflowRunEvent:
             "head_branch",
             _branch(self.head_branch),
         )
-        sha = _text(self.head_sha, field_name="head_sha", limit=40)
+        sha = _text(self.head_sha, field_name="head_sha", limit=40).casefold()
         if _SHA_RE.fullmatch(sha) is None:
             raise EventFirewallError(
-                "workflow_run head_sha must be a full lowercase 40-character OID"
+                "workflow_run head_sha must be a full 40-character OID"
             )
         object.__setattr__(self, "head_sha", sha)
 

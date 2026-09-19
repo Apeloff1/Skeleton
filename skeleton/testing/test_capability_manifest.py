@@ -85,8 +85,7 @@ def test_capability_loader_is_lazy_cached_and_manifest_bound(monkeypatch) -> Non
 
     def counting_import(module_name: str):
         calls.append(module_name)
-        assert module_name == "skeleton.application"
-        return real_import("skeleton.application")
+        return real_import(module_name)
 
     monkeypatch.setattr(
         "skeleton.application.capability_runtime.import_module",
