@@ -14,6 +14,10 @@ import json
 import math
 from typing import Iterable
 
+from skeleton.shells.ai.durable_compaction_maintenance import (
+    DurableCompactionMaintenanceGuard,
+    DurableCompactionMaintenanceReport,
+)
 from skeleton.shells.ai.durable_checkpoint import (
     CheckpointableEvidenceChain,
     DurableChainCheckpointStore,
@@ -57,6 +61,7 @@ class DurableOperationsPolicy:
     require_checkpoint_above_warning: bool = False
     require_recovery_health: bool = False
     require_checkpoint_indexes: bool = False
+    require_compaction_maintenance: bool = False
     max_findings: int = 512
 
     def __post_init__(self) -> None:
@@ -65,6 +70,7 @@ class DurableOperationsPolicy:
             "require_checkpoint_above_warning",
             "require_recovery_health",
             "require_checkpoint_indexes",
+            "require_compaction_maintenance",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
@@ -84,6 +90,9 @@ class DurableOperationsPolicy:
             "require_recovery_health": self.require_recovery_health,
             "require_checkpoint_indexes": (
                 self.require_checkpoint_indexes
+            ),
+            "require_compaction_maintenance": (
+                self.require_compaction_maintenance
             ),
             "max_findings": self.max_findings,
         }
@@ -268,6 +277,7 @@ class DurableEvidenceOperationsReport:
     chains: tuple[DurableChainOperationsReport, ...]
     recovery_health: DurableRecoveryHealthReport | None
     findings: tuple[DurableOperationsFinding, ...]
+    compaction_maintenance: DurableCompactionMaintenanceReport | None = None
 
     def __post_init__(self) -> None:
         if len(self.policy_digest) != 64:
@@ -309,6 +319,11 @@ class DurableEvidenceOperationsReport:
             and not self.recovery_health.allowed
         ):
             return False
+        if (
+            self.compaction_maintenance is not None
+            and not self.compaction_maintenance.allowed
+        ):
+            return False
         return True
 
     @property
@@ -336,6 +351,11 @@ class DurableEvidenceOperationsReport:
                 if self.recovery_health is None
                 else self.recovery_health.to_dict()
             ),
+            "compaction_maintenance": (
+                None
+                if self.compaction_maintenance is None
+                else self.compaction_maintenance.to_dict()
+            ),
             "findings": [item.to_dict() for item in self.findings],
         }
         if include_digest:
@@ -358,6 +378,7 @@ class DurableEvidenceOperationsInspector:
         recovery_health: DurableRecoveryHealthGuard | None = None,
         policy: DurableOperationsPolicy | None = None,
         verification_guard: DurableVerificationFleetGuard | None = None,
+        compaction_maintenance: DurableCompactionMaintenanceGuard | None = None,
     ) -> None:
         if not isinstance(checkpoints, DurableChainCheckpointStore):
             raise TypeError("checkpoints must be DurableChainCheckpointStore")
@@ -383,10 +404,21 @@ class DurableEvidenceOperationsInspector:
             raise TypeError(
                 "verification_guard must be DurableVerificationFleetGuard"
             )
+        if (
+            compaction_maintenance is not None
+            and not isinstance(
+                compaction_maintenance,
+                DurableCompactionMaintenanceGuard,
+            )
+        ):
+            raise TypeError(
+                "compaction_maintenance must be DurableCompactionMaintenanceGuard"
+            )
         self.checkpoints = checkpoints
         self.retention = retention
         self.recovery_health = recovery_health
         self.verification_guard = verification_guard
+        self.compaction_maintenance = compaction_maintenance
         self.policy = policy or DurableOperationsPolicy()
 
     @staticmethod
@@ -692,6 +724,7 @@ class DurableEvidenceOperationsInspector:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None = None,
         recovery_finalization_ids: tuple[str, ...] = (),
+        compaction_workflow_ids: tuple[str, ...] = (),
     ) -> DurableEvidenceOperationsReport:
         entries = tuple(chains)
         if not entries:
@@ -776,6 +809,73 @@ class DurableEvidenceOperationsInspector:
                     )
                 )
 
+        compaction_report = None
+        if self.compaction_maintenance is None:
+            if self.policy.require_compaction_maintenance:
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_compaction.maintenance_required",
+                        (
+                            "durable operations policy requires "
+                            "compaction maintenance health"
+                        ),
+                    )
+                )
+            elif compaction_workflow_ids:
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_compaction.guard_missing",
+                        (
+                            "compaction workflow ids were supplied "
+                            "without a compaction maintenance guard"
+                        ),
+                    )
+                )
+        else:
+            try:
+                compaction_report = (
+                    self.compaction_maintenance.inspect(
+                        compaction_workflow_ids,
+                        ids,
+                    )
+                )
+                if not compaction_report.allowed:
+                    findings.append(
+                        DurableOperationsFinding(
+                            DurableOperationsSeverity.ERROR,
+                            "durable_compaction.maintenance_denied",
+                            (
+                                "durable compaction maintenance "
+                                "gate denied admission"
+                            ),
+                        )
+                    )
+                elif compaction_report.warnings:
+                    findings.append(
+                        DurableOperationsFinding(
+                            DurableOperationsSeverity.WARNING,
+                            "durable_compaction.maintenance_warning",
+                            (
+                                "durable compaction maintenance "
+                                f"reported {compaction_report.warnings} warning(s)"
+                            ),
+                        )
+                    )
+            except Exception as exc:
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_compaction.maintenance_error",
+                        (
+                            "durable compaction maintenance "
+                            "inspection raised "
+                            f"{type(exc).__name__}"
+                        ),
+                    )
+                )
+
         if len(findings) + sum(
             len(item.findings) for item in reports
         ) > self.policy.max_findings:
@@ -788,6 +888,7 @@ class DurableEvidenceOperationsInspector:
             reports,
             recovery_report,
             tuple(findings),
+            compaction_report,
         )
 
     def require(
@@ -798,11 +899,13 @@ class DurableEvidenceOperationsInspector:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None = None,
         recovery_finalization_ids: tuple[str, ...] = (),
+        compaction_workflow_ids: tuple[str, ...] = (),
     ) -> DurableEvidenceOperationsReport:
         report = self.inspect(
             chains,
             protected_roots=protected_roots,
             recovery_finalization_ids=recovery_finalization_ids,
+            compaction_workflow_ids=compaction_workflow_ids,
         )
         if not report.allowed:
             all_findings = list(report.findings)
