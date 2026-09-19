@@ -22,7 +22,8 @@ from skeleton.shells.execution_plan import ExecutionPlan, PlanStep
 from skeleton.shells.runner import ShellCommand
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def plan(
