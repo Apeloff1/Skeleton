@@ -8,7 +8,7 @@ import pytest
 
 from skeleton.shells.capabilities import ShellCapability
 from skeleton.shells.errors import ArgumentRejected
-from skeleton.shells.toolchains import build, container, dotnet, git, go, jvm, node, posix, python, rust
+from skeleton.shells.toolchains import archive, artifact, build, container, data, dotnet, git, go, infrastructure, jvm, node, posix, python, quality, rust
 from skeleton.shells.toolchains.all import ALL_CONTRACTS, DEFAULT_CATALOG, executable_keys
 from skeleton.shells.toolchains.catalog import ToolchainBindingError
 from skeleton.shells.toolchains.factory import OperationSpec, build_contract, constraint
@@ -17,7 +17,7 @@ from skeleton.shells.toolchains.recipes import DEFAULT_RECIPES
 from skeleton.shells.toolchains.types import CommandEffect, CommandRisk
 
 
-_MODULES = (git, python, node, rust, go, jvm, dotnet, build, container, posix)
+_MODULES = (git, python, node, rust, go, jvm, dotnet, build, container, posix, infrastructure, data, artifact, archive, quality)
 _BY_NAME = {contract.name: contract for contract in ALL_CONTRACTS}
 _SPECS = {
     spec.logical_name: spec
@@ -230,7 +230,7 @@ def test_contract_git_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_status() -> None:
     """Validate the built-in git.status logical authority contract."""
@@ -243,7 +243,7 @@ def test_contract_git_status() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_diff() -> None:
     """Validate the built-in git.diff logical authority contract."""
@@ -256,7 +256,7 @@ def test_contract_git_diff() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_diff_word() -> None:
     """Validate the built-in git.diff_word logical authority contract."""
@@ -269,7 +269,7 @@ def test_contract_git_diff_word() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_show() -> None:
     """Validate the built-in git.show logical authority contract."""
@@ -282,7 +282,7 @@ def test_contract_git_show() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_log() -> None:
     """Validate the built-in git.log logical authority contract."""
@@ -295,7 +295,7 @@ def test_contract_git_log() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_log_paths() -> None:
     """Validate the built-in git.log_paths logical authority contract."""
@@ -308,7 +308,7 @@ def test_contract_git_log_paths() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_rev_parse() -> None:
     """Validate the built-in git.rev_parse logical authority contract."""
@@ -321,7 +321,7 @@ def test_contract_git_rev_parse() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_rev_list() -> None:
     """Validate the built-in git.rev_list logical authority contract."""
@@ -334,7 +334,7 @@ def test_contract_git_rev_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_ls_files() -> None:
     """Validate the built-in git.ls_files logical authority contract."""
@@ -347,7 +347,7 @@ def test_contract_git_ls_files() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_ls_tree() -> None:
     """Validate the built-in git.ls_tree logical authority contract."""
@@ -360,7 +360,7 @@ def test_contract_git_ls_tree() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_grep() -> None:
     """Validate the built-in git.grep logical authority contract."""
@@ -373,7 +373,7 @@ def test_contract_git_grep() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_branch_list() -> None:
     """Validate the built-in git.branch_list logical authority contract."""
@@ -386,7 +386,7 @@ def test_contract_git_branch_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_tag_list() -> None:
     """Validate the built-in git.tag_list logical authority contract."""
@@ -399,7 +399,7 @@ def test_contract_git_tag_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_remote_list() -> None:
     """Validate the built-in git.remote_list logical authority contract."""
@@ -412,7 +412,7 @@ def test_contract_git_remote_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_remote_get_url() -> None:
     """Validate the built-in git.remote_get_url logical authority contract."""
@@ -425,7 +425,7 @@ def test_contract_git_remote_get_url() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_cat_file_type() -> None:
     """Validate the built-in git.cat_file_type logical authority contract."""
@@ -438,7 +438,7 @@ def test_contract_git_cat_file_type() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_cat_file_size() -> None:
     """Validate the built-in git.cat_file_size logical authority contract."""
@@ -451,7 +451,7 @@ def test_contract_git_cat_file_size() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_cat_file_pretty() -> None:
     """Validate the built-in git.cat_file_pretty logical authority contract."""
@@ -464,7 +464,7 @@ def test_contract_git_cat_file_pretty() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_check_ignore() -> None:
     """Validate the built-in git.check_ignore logical authority contract."""
@@ -477,7 +477,7 @@ def test_contract_git_check_ignore() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_check_attr() -> None:
     """Validate the built-in git.check_attr logical authority contract."""
@@ -490,7 +490,7 @@ def test_contract_git_check_attr() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_describe() -> None:
     """Validate the built-in git.describe logical authority contract."""
@@ -503,7 +503,7 @@ def test_contract_git_describe() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_merge_base() -> None:
     """Validate the built-in git.merge_base logical authority contract."""
@@ -516,7 +516,7 @@ def test_contract_git_merge_base() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_name_rev() -> None:
     """Validate the built-in git.name_rev logical authority contract."""
@@ -529,7 +529,7 @@ def test_contract_git_name_rev() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_add() -> None:
     """Validate the built-in git.add logical authority contract."""
@@ -542,7 +542,7 @@ def test_contract_git_add() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_restore() -> None:
     """Validate the built-in git.restore logical authority contract."""
@@ -555,7 +555,7 @@ def test_contract_git_restore() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_switch() -> None:
     """Validate the built-in git.switch logical authority contract."""
@@ -568,7 +568,7 @@ def test_contract_git_switch() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_branch_create() -> None:
     """Validate the built-in git.branch_create logical authority contract."""
@@ -581,7 +581,7 @@ def test_contract_git_branch_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_branch_delete() -> None:
     """Validate the built-in git.branch_delete logical authority contract."""
@@ -594,7 +594,7 @@ def test_contract_git_branch_delete() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_tag_create() -> None:
     """Validate the built-in git.tag_create logical authority contract."""
@@ -607,7 +607,7 @@ def test_contract_git_tag_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_tag_delete() -> None:
     """Validate the built-in git.tag_delete logical authority contract."""
@@ -620,7 +620,7 @@ def test_contract_git_tag_delete() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_commit() -> None:
     """Validate the built-in git.commit logical authority contract."""
@@ -633,7 +633,7 @@ def test_contract_git_commit() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_merge() -> None:
     """Validate the built-in git.merge logical authority contract."""
@@ -646,7 +646,7 @@ def test_contract_git_merge() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_rebase() -> None:
     """Validate the built-in git.rebase logical authority contract."""
@@ -659,7 +659,7 @@ def test_contract_git_rebase() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_cherry_pick() -> None:
     """Validate the built-in git.cherry_pick logical authority contract."""
@@ -672,7 +672,7 @@ def test_contract_git_cherry_pick() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_revert() -> None:
     """Validate the built-in git.revert logical authority contract."""
@@ -685,7 +685,7 @@ def test_contract_git_revert() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_fetch() -> None:
     """Validate the built-in git.fetch logical authority contract."""
@@ -698,7 +698,7 @@ def test_contract_git_fetch() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_pull_ff_only() -> None:
     """Validate the built-in git.pull_ff_only logical authority contract."""
@@ -711,7 +711,7 @@ def test_contract_git_pull_ff_only() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_push() -> None:
     """Validate the built-in git.push logical authority contract."""
@@ -724,7 +724,7 @@ def test_contract_git_push() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_clean_dry_run() -> None:
     """Validate the built-in git.clean_dry_run logical authority contract."""
@@ -737,7 +737,7 @@ def test_contract_git_clean_dry_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_clean() -> None:
     """Validate the built-in git.clean logical authority contract."""
@@ -750,7 +750,7 @@ def test_contract_git_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_worktree_list() -> None:
     """Validate the built-in git.worktree_list logical authority contract."""
@@ -763,7 +763,7 @@ def test_contract_git_worktree_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_worktree_add() -> None:
     """Validate the built-in git.worktree_add logical authority contract."""
@@ -776,7 +776,7 @@ def test_contract_git_worktree_add() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_worktree_remove() -> None:
     """Validate the built-in git.worktree_remove logical authority contract."""
@@ -789,7 +789,7 @@ def test_contract_git_worktree_remove() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_submodule_status() -> None:
     """Validate the built-in git.submodule_status logical authority contract."""
@@ -802,7 +802,7 @@ def test_contract_git_submodule_status() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_submodule_update() -> None:
     """Validate the built-in git.submodule_update logical authority contract."""
@@ -815,7 +815,7 @@ def test_contract_git_submodule_update() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_stash_list() -> None:
     """Validate the built-in git.stash_list logical authority contract."""
@@ -828,7 +828,7 @@ def test_contract_git_stash_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_stash_show() -> None:
     """Validate the built-in git.stash_show logical authority contract."""
@@ -841,7 +841,7 @@ def test_contract_git_stash_show() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_stash_push() -> None:
     """Validate the built-in git.stash_push logical authority contract."""
@@ -854,7 +854,7 @@ def test_contract_git_stash_push() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_git_stash_pop() -> None:
     """Validate the built-in git.stash_pop logical authority contract."""
@@ -867,7 +867,7 @@ def test_contract_git_stash_pop() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_python_version() -> None:
     """Validate the built-in py.python_version logical authority contract."""
@@ -880,7 +880,7 @@ def test_contract_py_python_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_compileall() -> None:
     """Validate the built-in py.compileall logical authority contract."""
@@ -893,7 +893,7 @@ def test_contract_py_compileall() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_py_compile() -> None:
     """Validate the built-in py.py_compile logical authority contract."""
@@ -906,7 +906,7 @@ def test_contract_py_py_compile() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_module() -> None:
     """Validate the built-in py.module logical authority contract."""
@@ -919,7 +919,7 @@ def test_contract_py_module() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pytest() -> None:
     """Validate the built-in py.pytest logical authority contract."""
@@ -932,7 +932,7 @@ def test_contract_py_pytest() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pytest_collect() -> None:
     """Validate the built-in py.pytest_collect logical authority contract."""
@@ -945,7 +945,7 @@ def test_contract_py_pytest_collect() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_ruff_check() -> None:
     """Validate the built-in py.ruff_check logical authority contract."""
@@ -958,7 +958,7 @@ def test_contract_py_ruff_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_ruff_format_check() -> None:
     """Validate the built-in py.ruff_format_check logical authority contract."""
@@ -971,7 +971,7 @@ def test_contract_py_ruff_format_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_ruff_format() -> None:
     """Validate the built-in py.ruff_format logical authority contract."""
@@ -984,7 +984,7 @@ def test_contract_py_ruff_format() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_mypy() -> None:
     """Validate the built-in py.mypy logical authority contract."""
@@ -997,7 +997,7 @@ def test_contract_py_mypy() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_version() -> None:
     """Validate the built-in py.uv_version logical authority contract."""
@@ -1010,7 +1010,7 @@ def test_contract_py_uv_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_lock_check() -> None:
     """Validate the built-in py.uv_lock_check logical authority contract."""
@@ -1023,7 +1023,7 @@ def test_contract_py_uv_lock_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_lock() -> None:
     """Validate the built-in py.uv_lock logical authority contract."""
@@ -1036,7 +1036,7 @@ def test_contract_py_uv_lock() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_sync() -> None:
     """Validate the built-in py.uv_sync logical authority contract."""
@@ -1049,7 +1049,7 @@ def test_contract_py_uv_sync() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_run() -> None:
     """Validate the built-in py.uv_run logical authority contract."""
@@ -1062,7 +1062,7 @@ def test_contract_py_uv_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_pip_list() -> None:
     """Validate the built-in py.uv_pip_list logical authority contract."""
@@ -1075,7 +1075,7 @@ def test_contract_py_uv_pip_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_pip_check() -> None:
     """Validate the built-in py.uv_pip_check logical authority contract."""
@@ -1088,7 +1088,7 @@ def test_contract_py_uv_pip_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_pip_install() -> None:
     """Validate the built-in py.uv_pip_install logical authority contract."""
@@ -1101,7 +1101,7 @@ def test_contract_py_uv_pip_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_uv_pip_compile() -> None:
     """Validate the built-in py.uv_pip_compile logical authority contract."""
@@ -1114,7 +1114,7 @@ def test_contract_py_uv_pip_compile() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_version() -> None:
     """Validate the built-in py.pip_version logical authority contract."""
@@ -1127,7 +1127,7 @@ def test_contract_py_pip_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_list() -> None:
     """Validate the built-in py.pip_list logical authority contract."""
@@ -1140,7 +1140,7 @@ def test_contract_py_pip_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_check() -> None:
     """Validate the built-in py.pip_check logical authority contract."""
@@ -1153,7 +1153,7 @@ def test_contract_py_pip_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_show() -> None:
     """Validate the built-in py.pip_show logical authority contract."""
@@ -1166,7 +1166,7 @@ def test_contract_py_pip_show() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_download() -> None:
     """Validate the built-in py.pip_download logical authority contract."""
@@ -1179,7 +1179,7 @@ def test_contract_py_pip_download() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_coverage_run() -> None:
     """Validate the built-in py.coverage_run logical authority contract."""
@@ -1192,7 +1192,7 @@ def test_contract_py_coverage_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_coverage_report() -> None:
     """Validate the built-in py.coverage_report logical authority contract."""
@@ -1205,7 +1205,7 @@ def test_contract_py_coverage_report() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_coverage_xml() -> None:
     """Validate the built-in py.coverage_xml logical authority contract."""
@@ -1218,7 +1218,7 @@ def test_contract_py_coverage_xml() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_coverage_json() -> None:
     """Validate the built-in py.coverage_json logical authority contract."""
@@ -1231,7 +1231,7 @@ def test_contract_py_coverage_json() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_black_check() -> None:
     """Validate the built-in py.black_check logical authority contract."""
@@ -1244,7 +1244,7 @@ def test_contract_py_black_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_black_format() -> None:
     """Validate the built-in py.black_format logical authority contract."""
@@ -1257,7 +1257,7 @@ def test_contract_py_black_format() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_isort_check() -> None:
     """Validate the built-in py.isort_check logical authority contract."""
@@ -1270,7 +1270,7 @@ def test_contract_py_isort_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_isort_write() -> None:
     """Validate the built-in py.isort_write logical authority contract."""
@@ -1283,7 +1283,7 @@ def test_contract_py_isort_write() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_bandit_scan() -> None:
     """Validate the built-in py.bandit_scan logical authority contract."""
@@ -1296,7 +1296,7 @@ def test_contract_py_bandit_scan() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_pip_audit() -> None:
     """Validate the built-in py.pip_audit logical authority contract."""
@@ -1309,7 +1309,7 @@ def test_contract_py_pip_audit() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_tox_run() -> None:
     """Validate the built-in py.tox_run logical authority contract."""
@@ -1322,7 +1322,7 @@ def test_contract_py_tox_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_nox_run() -> None:
     """Validate the built-in py.nox_run logical authority contract."""
@@ -1335,7 +1335,7 @@ def test_contract_py_nox_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_poetry_check() -> None:
     """Validate the built-in py.poetry_check logical authority contract."""
@@ -1348,7 +1348,7 @@ def test_contract_py_poetry_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_poetry_lock() -> None:
     """Validate the built-in py.poetry_lock logical authority contract."""
@@ -1361,7 +1361,7 @@ def test_contract_py_poetry_lock() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_poetry_install() -> None:
     """Validate the built-in py.poetry_install logical authority contract."""
@@ -1374,7 +1374,7 @@ def test_contract_py_poetry_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_poetry_run() -> None:
     """Validate the built-in py.poetry_run logical authority contract."""
@@ -1387,7 +1387,7 @@ def test_contract_py_poetry_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_wheel_build() -> None:
     """Validate the built-in py.wheel_build logical authority contract."""
@@ -1400,7 +1400,7 @@ def test_contract_py_wheel_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_twine_check() -> None:
     """Validate the built-in py.twine_check logical authority contract."""
@@ -1413,7 +1413,7 @@ def test_contract_py_twine_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_py_sphinx_build() -> None:
     """Validate the built-in py.sphinx_build logical authority contract."""
@@ -1426,7 +1426,7 @@ def test_contract_py_sphinx_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_node_version() -> None:
     """Validate the built-in node.node_version logical authority contract."""
@@ -1439,7 +1439,7 @@ def test_contract_node_node_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_node_check() -> None:
     """Validate the built-in node.node_check logical authority contract."""
@@ -1452,7 +1452,7 @@ def test_contract_node_node_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_version() -> None:
     """Validate the built-in node.npm_version logical authority contract."""
@@ -1465,7 +1465,7 @@ def test_contract_node_npm_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_ci() -> None:
     """Validate the built-in node.npm_ci logical authority contract."""
@@ -1478,7 +1478,7 @@ def test_contract_node_npm_ci() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_install() -> None:
     """Validate the built-in node.npm_install logical authority contract."""
@@ -1491,7 +1491,7 @@ def test_contract_node_npm_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_test() -> None:
     """Validate the built-in node.npm_test logical authority contract."""
@@ -1504,7 +1504,7 @@ def test_contract_node_npm_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_run() -> None:
     """Validate the built-in node.npm_run logical authority contract."""
@@ -1517,7 +1517,7 @@ def test_contract_node_npm_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_exec() -> None:
     """Validate the built-in node.npm_exec logical authority contract."""
@@ -1530,7 +1530,7 @@ def test_contract_node_npm_exec() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_pack() -> None:
     """Validate the built-in node.npm_pack logical authority contract."""
@@ -1543,7 +1543,7 @@ def test_contract_node_npm_pack() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_audit() -> None:
     """Validate the built-in node.npm_audit logical authority contract."""
@@ -1556,7 +1556,7 @@ def test_contract_node_npm_audit() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_outdated() -> None:
     """Validate the built-in node.npm_outdated logical authority contract."""
@@ -1569,7 +1569,7 @@ def test_contract_node_npm_outdated() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_ls() -> None:
     """Validate the built-in node.npm_ls logical authority contract."""
@@ -1582,7 +1582,7 @@ def test_contract_node_npm_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_view() -> None:
     """Validate the built-in node.npm_view logical authority contract."""
@@ -1595,7 +1595,7 @@ def test_contract_node_npm_view() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npm_cache_verify() -> None:
     """Validate the built-in node.npm_cache_verify logical authority contract."""
@@ -1608,7 +1608,7 @@ def test_contract_node_npm_cache_verify() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_npx_run() -> None:
     """Validate the built-in node.npx_run logical authority contract."""
@@ -1621,7 +1621,7 @@ def test_contract_node_npx_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_pnpm_version() -> None:
     """Validate the built-in node.pnpm_version logical authority contract."""
@@ -1634,7 +1634,7 @@ def test_contract_node_pnpm_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_pnpm_install() -> None:
     """Validate the built-in node.pnpm_install logical authority contract."""
@@ -1647,7 +1647,7 @@ def test_contract_node_pnpm_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_pnpm_test() -> None:
     """Validate the built-in node.pnpm_test logical authority contract."""
@@ -1660,7 +1660,7 @@ def test_contract_node_pnpm_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_pnpm_run() -> None:
     """Validate the built-in node.pnpm_run logical authority contract."""
@@ -1673,7 +1673,7 @@ def test_contract_node_pnpm_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_yarn_version() -> None:
     """Validate the built-in node.yarn_version logical authority contract."""
@@ -1686,7 +1686,7 @@ def test_contract_node_yarn_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_yarn_install() -> None:
     """Validate the built-in node.yarn_install logical authority contract."""
@@ -1699,7 +1699,7 @@ def test_contract_node_yarn_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_yarn_test() -> None:
     """Validate the built-in node.yarn_test logical authority contract."""
@@ -1712,7 +1712,7 @@ def test_contract_node_yarn_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_yarn_run() -> None:
     """Validate the built-in node.yarn_run logical authority contract."""
@@ -1725,7 +1725,7 @@ def test_contract_node_yarn_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_eslint_check() -> None:
     """Validate the built-in node.eslint_check logical authority contract."""
@@ -1738,7 +1738,7 @@ def test_contract_node_eslint_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_eslint_fix() -> None:
     """Validate the built-in node.eslint_fix logical authority contract."""
@@ -1751,7 +1751,7 @@ def test_contract_node_eslint_fix() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_prettier_check() -> None:
     """Validate the built-in node.prettier_check logical authority contract."""
@@ -1764,7 +1764,7 @@ def test_contract_node_prettier_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_prettier_write() -> None:
     """Validate the built-in node.prettier_write logical authority contract."""
@@ -1777,7 +1777,7 @@ def test_contract_node_prettier_write() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_tsc_check() -> None:
     """Validate the built-in node.tsc_check logical authority contract."""
@@ -1790,7 +1790,7 @@ def test_contract_node_tsc_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_tsc_build() -> None:
     """Validate the built-in node.tsc_build logical authority contract."""
@@ -1803,7 +1803,7 @@ def test_contract_node_tsc_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_vitest_run() -> None:
     """Validate the built-in node.vitest_run logical authority contract."""
@@ -1816,7 +1816,7 @@ def test_contract_node_vitest_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_jest_run() -> None:
     """Validate the built-in node.jest_run logical authority contract."""
@@ -1829,7 +1829,7 @@ def test_contract_node_jest_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_webpack_build() -> None:
     """Validate the built-in node.webpack_build logical authority contract."""
@@ -1842,7 +1842,7 @@ def test_contract_node_webpack_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_vite_build() -> None:
     """Validate the built-in node.vite_build logical authority contract."""
@@ -1855,7 +1855,7 @@ def test_contract_node_vite_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_vite_test() -> None:
     """Validate the built-in node.vite_test logical authority contract."""
@@ -1868,7 +1868,7 @@ def test_contract_node_vite_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_rollup_build() -> None:
     """Validate the built-in node.rollup_build logical authority contract."""
@@ -1881,7 +1881,7 @@ def test_contract_node_rollup_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_bun_version() -> None:
     """Validate the built-in node.bun_version logical authority contract."""
@@ -1894,7 +1894,7 @@ def test_contract_node_bun_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_bun_test() -> None:
     """Validate the built-in node.bun_test logical authority contract."""
@@ -1907,7 +1907,7 @@ def test_contract_node_bun_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_bun_run() -> None:
     """Validate the built-in node.bun_run logical authority contract."""
@@ -1920,7 +1920,7 @@ def test_contract_node_bun_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_deno_version() -> None:
     """Validate the built-in node.deno_version logical authority contract."""
@@ -1933,7 +1933,7 @@ def test_contract_node_deno_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_deno_check() -> None:
     """Validate the built-in node.deno_check logical authority contract."""
@@ -1946,7 +1946,7 @@ def test_contract_node_deno_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_node_deno_test() -> None:
     """Validate the built-in node.deno_test logical authority contract."""
@@ -1959,7 +1959,7 @@ def test_contract_node_deno_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_version() -> None:
     """Validate the built-in rust.cargo_version logical authority contract."""
@@ -1972,7 +1972,7 @@ def test_contract_rust_cargo_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_metadata() -> None:
     """Validate the built-in rust.metadata logical authority contract."""
@@ -1985,7 +1985,7 @@ def test_contract_rust_metadata() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_check() -> None:
     """Validate the built-in rust.check logical authority contract."""
@@ -1998,7 +1998,7 @@ def test_contract_rust_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_build() -> None:
     """Validate the built-in rust.build logical authority contract."""
@@ -2011,7 +2011,7 @@ def test_contract_rust_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_test() -> None:
     """Validate the built-in rust.test logical authority contract."""
@@ -2024,7 +2024,7 @@ def test_contract_rust_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_clippy() -> None:
     """Validate the built-in rust.clippy logical authority contract."""
@@ -2037,7 +2037,7 @@ def test_contract_rust_clippy() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_fmt_check() -> None:
     """Validate the built-in rust.fmt_check logical authority contract."""
@@ -2050,7 +2050,7 @@ def test_contract_rust_fmt_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_fmt_write() -> None:
     """Validate the built-in rust.fmt_write logical authority contract."""
@@ -2063,7 +2063,7 @@ def test_contract_rust_fmt_write() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_doc() -> None:
     """Validate the built-in rust.doc logical authority contract."""
@@ -2076,7 +2076,7 @@ def test_contract_rust_doc() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_tree() -> None:
     """Validate the built-in rust.tree logical authority contract."""
@@ -2089,7 +2089,7 @@ def test_contract_rust_tree() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_locate_project() -> None:
     """Validate the built-in rust.locate_project logical authority contract."""
@@ -2102,7 +2102,7 @@ def test_contract_rust_locate_project() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_package_list() -> None:
     """Validate the built-in rust.package_list logical authority contract."""
@@ -2115,7 +2115,7 @@ def test_contract_rust_package_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_package() -> None:
     """Validate the built-in rust.package logical authority contract."""
@@ -2128,7 +2128,7 @@ def test_contract_rust_package() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_update_dry() -> None:
     """Validate the built-in rust.update_dry logical authority contract."""
@@ -2141,7 +2141,7 @@ def test_contract_rust_update_dry() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_update() -> None:
     """Validate the built-in rust.update logical authority contract."""
@@ -2154,7 +2154,7 @@ def test_contract_rust_update() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_fetch() -> None:
     """Validate the built-in rust.fetch logical authority contract."""
@@ -2167,7 +2167,7 @@ def test_contract_rust_fetch() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_clean() -> None:
     """Validate the built-in rust.clean logical authority contract."""
@@ -2180,7 +2180,7 @@ def test_contract_rust_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_bench() -> None:
     """Validate the built-in rust.bench logical authority contract."""
@@ -2193,7 +2193,7 @@ def test_contract_rust_bench() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_run() -> None:
     """Validate the built-in rust.run logical authority contract."""
@@ -2206,7 +2206,7 @@ def test_contract_rust_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_fix() -> None:
     """Validate the built-in rust.fix logical authority contract."""
@@ -2219,7 +2219,7 @@ def test_contract_rust_fix() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_rustc_version() -> None:
     """Validate the built-in rust.rustc_version logical authority contract."""
@@ -2232,7 +2232,7 @@ def test_contract_rust_rustc_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_rustc_verbose() -> None:
     """Validate the built-in rust.rustc_verbose logical authority contract."""
@@ -2245,7 +2245,7 @@ def test_contract_rust_rustc_verbose() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_rustfmt_check() -> None:
     """Validate the built-in rust.rustfmt_check logical authority contract."""
@@ -2258,7 +2258,7 @@ def test_contract_rust_rustfmt_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_rustfmt_write() -> None:
     """Validate the built-in rust.rustfmt_write logical authority contract."""
@@ -2271,7 +2271,7 @@ def test_contract_rust_rustfmt_write() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_clippy_driver_version() -> None:
     """Validate the built-in rust.clippy_driver_version logical authority contract."""
@@ -2284,7 +2284,7 @@ def test_contract_rust_clippy_driver_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_rustdoc_version() -> None:
     """Validate the built-in rust.rustdoc_version logical authority contract."""
@@ -2297,7 +2297,7 @@ def test_contract_rust_rustdoc_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_audit() -> None:
     """Validate the built-in rust.cargo_audit logical authority contract."""
@@ -2310,7 +2310,7 @@ def test_contract_rust_cargo_audit() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_deny_check() -> None:
     """Validate the built-in rust.cargo_deny_check logical authority contract."""
@@ -2323,7 +2323,7 @@ def test_contract_rust_cargo_deny_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_nextest() -> None:
     """Validate the built-in rust.cargo_nextest logical authority contract."""
@@ -2336,7 +2336,7 @@ def test_contract_rust_cargo_nextest() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_expand() -> None:
     """Validate the built-in rust.cargo_expand logical authority contract."""
@@ -2349,7 +2349,7 @@ def test_contract_rust_cargo_expand() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_rust_cargo_msrv() -> None:
     """Validate the built-in rust.cargo_msrv logical authority contract."""
@@ -2362,7 +2362,7 @@ def test_contract_rust_cargo_msrv() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_env() -> None:
     """Validate the built-in go.env logical authority contract."""
@@ -2375,7 +2375,7 @@ def test_contract_go_env() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_version() -> None:
     """Validate the built-in go.version logical authority contract."""
@@ -2388,7 +2388,7 @@ def test_contract_go_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_list() -> None:
     """Validate the built-in go.list logical authority contract."""
@@ -2401,7 +2401,7 @@ def test_contract_go_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_mod_download() -> None:
     """Validate the built-in go.mod_download logical authority contract."""
@@ -2414,7 +2414,7 @@ def test_contract_go_mod_download() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_mod_tidy() -> None:
     """Validate the built-in go.mod_tidy logical authority contract."""
@@ -2427,7 +2427,7 @@ def test_contract_go_mod_tidy() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_mod_verify() -> None:
     """Validate the built-in go.mod_verify logical authority contract."""
@@ -2440,7 +2440,7 @@ def test_contract_go_mod_verify() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_mod_graph() -> None:
     """Validate the built-in go.mod_graph logical authority contract."""
@@ -2453,7 +2453,7 @@ def test_contract_go_mod_graph() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_mod_why() -> None:
     """Validate the built-in go.mod_why logical authority contract."""
@@ -2466,7 +2466,7 @@ def test_contract_go_mod_why() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_work_sync() -> None:
     """Validate the built-in go.work_sync logical authority contract."""
@@ -2479,7 +2479,7 @@ def test_contract_go_work_sync() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_work_use() -> None:
     """Validate the built-in go.work_use logical authority contract."""
@@ -2492,7 +2492,7 @@ def test_contract_go_work_use() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_fmt() -> None:
     """Validate the built-in go.fmt logical authority contract."""
@@ -2505,7 +2505,7 @@ def test_contract_go_fmt() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_fmt_check() -> None:
     """Validate the built-in go.fmt_check logical authority contract."""
@@ -2518,7 +2518,7 @@ def test_contract_go_fmt_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_test() -> None:
     """Validate the built-in go.test logical authority contract."""
@@ -2531,7 +2531,7 @@ def test_contract_go_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_test_short() -> None:
     """Validate the built-in go.test_short logical authority contract."""
@@ -2544,7 +2544,7 @@ def test_contract_go_test_short() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_vet() -> None:
     """Validate the built-in go.vet logical authority contract."""
@@ -2557,7 +2557,7 @@ def test_contract_go_vet() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_build() -> None:
     """Validate the built-in go.build logical authority contract."""
@@ -2570,7 +2570,7 @@ def test_contract_go_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_install() -> None:
     """Validate the built-in go.install logical authority contract."""
@@ -2583,7 +2583,7 @@ def test_contract_go_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_run() -> None:
     """Validate the built-in go.run logical authority contract."""
@@ -2596,7 +2596,7 @@ def test_contract_go_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_generate() -> None:
     """Validate the built-in go.generate logical authority contract."""
@@ -2609,7 +2609,7 @@ def test_contract_go_generate() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_clean() -> None:
     """Validate the built-in go.clean logical authority contract."""
@@ -2622,7 +2622,7 @@ def test_contract_go_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_doc() -> None:
     """Validate the built-in go.doc logical authority contract."""
@@ -2635,7 +2635,7 @@ def test_contract_go_doc() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_tool_cover() -> None:
     """Validate the built-in go.tool_cover logical authority contract."""
@@ -2648,7 +2648,7 @@ def test_contract_go_tool_cover() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_tool_pprof() -> None:
     """Validate the built-in go.tool_pprof logical authority contract."""
@@ -2661,7 +2661,7 @@ def test_contract_go_tool_pprof() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_benchstat() -> None:
     """Validate the built-in go.benchstat logical authority contract."""
@@ -2674,7 +2674,7 @@ def test_contract_go_benchstat() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_staticcheck() -> None:
     """Validate the built-in go.staticcheck logical authority contract."""
@@ -2687,7 +2687,7 @@ def test_contract_go_staticcheck() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_go_govulncheck() -> None:
     """Validate the built-in go.govulncheck logical authority contract."""
@@ -2700,7 +2700,7 @@ def test_contract_go_govulncheck() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_java_version() -> None:
     """Validate the built-in jvm.java_version logical authority contract."""
@@ -2713,7 +2713,7 @@ def test_contract_jvm_java_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_javac_version() -> None:
     """Validate the built-in jvm.javac_version logical authority contract."""
@@ -2726,7 +2726,7 @@ def test_contract_jvm_javac_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_javac_compile() -> None:
     """Validate the built-in jvm.javac_compile logical authority contract."""
@@ -2739,7 +2739,7 @@ def test_contract_jvm_javac_compile() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_jar_list() -> None:
     """Validate the built-in jvm.jar_list logical authority contract."""
@@ -2752,7 +2752,7 @@ def test_contract_jvm_jar_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_jar_create() -> None:
     """Validate the built-in jvm.jar_create logical authority contract."""
@@ -2765,7 +2765,7 @@ def test_contract_jvm_jar_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_jar_update() -> None:
     """Validate the built-in jvm.jar_update logical authority contract."""
@@ -2778,7 +2778,7 @@ def test_contract_jvm_jar_update() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_javadoc() -> None:
     """Validate the built-in jvm.javadoc logical authority contract."""
@@ -2791,7 +2791,7 @@ def test_contract_jvm_javadoc() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_version() -> None:
     """Validate the built-in jvm.mvn_version logical authority contract."""
@@ -2804,7 +2804,7 @@ def test_contract_jvm_mvn_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_validate() -> None:
     """Validate the built-in jvm.mvn_validate logical authority contract."""
@@ -2817,7 +2817,7 @@ def test_contract_jvm_mvn_validate() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_test() -> None:
     """Validate the built-in jvm.mvn_test logical authority contract."""
@@ -2830,7 +2830,7 @@ def test_contract_jvm_mvn_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_verify() -> None:
     """Validate the built-in jvm.mvn_verify logical authority contract."""
@@ -2843,7 +2843,7 @@ def test_contract_jvm_mvn_verify() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_package() -> None:
     """Validate the built-in jvm.mvn_package logical authority contract."""
@@ -2856,7 +2856,7 @@ def test_contract_jvm_mvn_package() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_dependency_tree() -> None:
     """Validate the built-in jvm.mvn_dependency_tree logical authority contract."""
@@ -2869,7 +2869,7 @@ def test_contract_jvm_mvn_dependency_tree() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_dependency_analyze() -> None:
     """Validate the built-in jvm.mvn_dependency_analyze logical authority contract."""
@@ -2882,7 +2882,7 @@ def test_contract_jvm_mvn_dependency_analyze() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_mvn_clean() -> None:
     """Validate the built-in jvm.mvn_clean logical authority contract."""
@@ -2895,7 +2895,7 @@ def test_contract_jvm_mvn_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_version() -> None:
     """Validate the built-in jvm.gradle_version logical authority contract."""
@@ -2908,7 +2908,7 @@ def test_contract_jvm_gradle_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_tasks() -> None:
     """Validate the built-in jvm.gradle_tasks logical authority contract."""
@@ -2921,7 +2921,7 @@ def test_contract_jvm_gradle_tasks() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_dependencies() -> None:
     """Validate the built-in jvm.gradle_dependencies logical authority contract."""
@@ -2934,7 +2934,7 @@ def test_contract_jvm_gradle_dependencies() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_test() -> None:
     """Validate the built-in jvm.gradle_test logical authority contract."""
@@ -2947,7 +2947,7 @@ def test_contract_jvm_gradle_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_check() -> None:
     """Validate the built-in jvm.gradle_check logical authority contract."""
@@ -2960,7 +2960,7 @@ def test_contract_jvm_gradle_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_build() -> None:
     """Validate the built-in jvm.gradle_build logical authority contract."""
@@ -2973,7 +2973,7 @@ def test_contract_jvm_gradle_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_gradle_clean() -> None:
     """Validate the built-in jvm.gradle_clean logical authority contract."""
@@ -2986,7 +2986,7 @@ def test_contract_jvm_gradle_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_junit_console() -> None:
     """Validate the built-in jvm.junit_console logical authority contract."""
@@ -2999,7 +2999,7 @@ def test_contract_jvm_junit_console() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_checkstyle() -> None:
     """Validate the built-in jvm.checkstyle logical authority contract."""
@@ -3012,7 +3012,7 @@ def test_contract_jvm_checkstyle() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_spotbugs() -> None:
     """Validate the built-in jvm.spotbugs logical authority contract."""
@@ -3025,7 +3025,7 @@ def test_contract_jvm_spotbugs() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_jdeps() -> None:
     """Validate the built-in jvm.jdeps logical authority contract."""
@@ -3038,7 +3038,7 @@ def test_contract_jvm_jdeps() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_jvm_jlink() -> None:
     """Validate the built-in jvm.jlink logical authority contract."""
@@ -3051,7 +3051,7 @@ def test_contract_jvm_jlink() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_info() -> None:
     """Validate the built-in dotnet.info logical authority contract."""
@@ -3064,7 +3064,7 @@ def test_contract_dotnet_info() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_version() -> None:
     """Validate the built-in dotnet.version logical authority contract."""
@@ -3077,7 +3077,7 @@ def test_contract_dotnet_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_restore() -> None:
     """Validate the built-in dotnet.restore logical authority contract."""
@@ -3090,7 +3090,7 @@ def test_contract_dotnet_restore() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_build() -> None:
     """Validate the built-in dotnet.build logical authority contract."""
@@ -3103,7 +3103,7 @@ def test_contract_dotnet_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_test() -> None:
     """Validate the built-in dotnet.test logical authority contract."""
@@ -3116,7 +3116,7 @@ def test_contract_dotnet_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_format_check() -> None:
     """Validate the built-in dotnet.format_check logical authority contract."""
@@ -3129,7 +3129,7 @@ def test_contract_dotnet_format_check() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_format_write() -> None:
     """Validate the built-in dotnet.format_write logical authority contract."""
@@ -3142,7 +3142,7 @@ def test_contract_dotnet_format_write() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_pack() -> None:
     """Validate the built-in dotnet.pack logical authority contract."""
@@ -3155,7 +3155,7 @@ def test_contract_dotnet_pack() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_publish() -> None:
     """Validate the built-in dotnet.publish logical authority contract."""
@@ -3168,7 +3168,7 @@ def test_contract_dotnet_publish() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_clean() -> None:
     """Validate the built-in dotnet.clean logical authority contract."""
@@ -3181,7 +3181,7 @@ def test_contract_dotnet_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_list_package() -> None:
     """Validate the built-in dotnet.list_package logical authority contract."""
@@ -3194,7 +3194,7 @@ def test_contract_dotnet_list_package() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_add_package() -> None:
     """Validate the built-in dotnet.add_package logical authority contract."""
@@ -3207,7 +3207,7 @@ def test_contract_dotnet_add_package() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_remove_package() -> None:
     """Validate the built-in dotnet.remove_package logical authority contract."""
@@ -3220,7 +3220,7 @@ def test_contract_dotnet_remove_package() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_tool_list() -> None:
     """Validate the built-in dotnet.tool_list logical authority contract."""
@@ -3233,7 +3233,7 @@ def test_contract_dotnet_tool_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_tool_restore() -> None:
     """Validate the built-in dotnet.tool_restore logical authority contract."""
@@ -3246,7 +3246,7 @@ def test_contract_dotnet_tool_restore() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_nuget_list_source() -> None:
     """Validate the built-in dotnet.nuget_list_source logical authority contract."""
@@ -3259,7 +3259,7 @@ def test_contract_dotnet_nuget_list_source() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_sln_list() -> None:
     """Validate the built-in dotnet.sln_list logical authority contract."""
@@ -3272,7 +3272,7 @@ def test_contract_dotnet_sln_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_sln_add() -> None:
     """Validate the built-in dotnet.sln_add logical authority contract."""
@@ -3285,7 +3285,7 @@ def test_contract_dotnet_sln_add() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_sln_remove() -> None:
     """Validate the built-in dotnet.sln_remove logical authority contract."""
@@ -3298,7 +3298,7 @@ def test_contract_dotnet_sln_remove() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_msbuild() -> None:
     """Validate the built-in dotnet.msbuild logical authority contract."""
@@ -3311,7 +3311,7 @@ def test_contract_dotnet_msbuild() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_new_list() -> None:
     """Validate the built-in dotnet.new_list logical authority contract."""
@@ -3324,7 +3324,7 @@ def test_contract_dotnet_new_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_dotnet_new_create() -> None:
     """Validate the built-in dotnet.new_create logical authority contract."""
@@ -3337,7 +3337,7 @@ def test_contract_dotnet_new_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_cmake_version() -> None:
     """Validate the built-in build.cmake_version logical authority contract."""
@@ -3350,7 +3350,7 @@ def test_contract_build_cmake_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_cmake_configure() -> None:
     """Validate the built-in build.cmake_configure logical authority contract."""
@@ -3363,7 +3363,7 @@ def test_contract_build_cmake_configure() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_cmake_build() -> None:
     """Validate the built-in build.cmake_build logical authority contract."""
@@ -3376,7 +3376,7 @@ def test_contract_build_cmake_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_cmake_install() -> None:
     """Validate the built-in build.cmake_install logical authority contract."""
@@ -3389,7 +3389,7 @@ def test_contract_build_cmake_install() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_cmake_open() -> None:
     """Validate the built-in build.cmake_open logical authority contract."""
@@ -3402,7 +3402,7 @@ def test_contract_build_cmake_open() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_ctest() -> None:
     """Validate the built-in build.ctest logical authority contract."""
@@ -3415,7 +3415,7 @@ def test_contract_build_ctest() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_ninja_version() -> None:
     """Validate the built-in build.ninja_version logical authority contract."""
@@ -3428,7 +3428,7 @@ def test_contract_build_ninja_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_ninja_build() -> None:
     """Validate the built-in build.ninja_build logical authority contract."""
@@ -3441,7 +3441,7 @@ def test_contract_build_ninja_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_ninja_dry_run() -> None:
     """Validate the built-in build.ninja_dry_run logical authority contract."""
@@ -3454,7 +3454,7 @@ def test_contract_build_ninja_dry_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_ninja_clean() -> None:
     """Validate the built-in build.ninja_clean logical authority contract."""
@@ -3467,7 +3467,7 @@ def test_contract_build_ninja_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_make_dry() -> None:
     """Validate the built-in build.make_dry logical authority contract."""
@@ -3480,7 +3480,7 @@ def test_contract_build_make_dry() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_make_build() -> None:
     """Validate the built-in build.make_build logical authority contract."""
@@ -3493,7 +3493,7 @@ def test_contract_build_make_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_make_clean() -> None:
     """Validate the built-in build.make_clean logical authority contract."""
@@ -3506,7 +3506,7 @@ def test_contract_build_make_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_meson_setup() -> None:
     """Validate the built-in build.meson_setup logical authority contract."""
@@ -3519,7 +3519,7 @@ def test_contract_build_meson_setup() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_meson_compile() -> None:
     """Validate the built-in build.meson_compile logical authority contract."""
@@ -3532,7 +3532,7 @@ def test_contract_build_meson_compile() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_meson_test() -> None:
     """Validate the built-in build.meson_test logical authority contract."""
@@ -3545,7 +3545,7 @@ def test_contract_build_meson_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_bazel_query() -> None:
     """Validate the built-in build.bazel_query logical authority contract."""
@@ -3558,7 +3558,7 @@ def test_contract_build_bazel_query() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_bazel_build() -> None:
     """Validate the built-in build.bazel_build logical authority contract."""
@@ -3571,7 +3571,7 @@ def test_contract_build_bazel_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_bazel_test() -> None:
     """Validate the built-in build.bazel_test logical authority contract."""
@@ -3584,7 +3584,7 @@ def test_contract_build_bazel_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_bazel_clean() -> None:
     """Validate the built-in build.bazel_clean logical authority contract."""
@@ -3597,7 +3597,7 @@ def test_contract_build_bazel_clean() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_just_list() -> None:
     """Validate the built-in build.just_list logical authority contract."""
@@ -3610,7 +3610,7 @@ def test_contract_build_just_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_just_dry() -> None:
     """Validate the built-in build.just_dry logical authority contract."""
@@ -3623,7 +3623,7 @@ def test_contract_build_just_dry() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_build_just_run() -> None:
     """Validate the built-in build.just_run logical authority contract."""
@@ -3636,7 +3636,7 @@ def test_contract_build_just_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_version() -> None:
     """Validate the built-in container.docker_version logical authority contract."""
@@ -3649,7 +3649,7 @@ def test_contract_container_docker_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_info() -> None:
     """Validate the built-in container.docker_info logical authority contract."""
@@ -3662,7 +3662,7 @@ def test_contract_container_docker_info() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_ps() -> None:
     """Validate the built-in container.docker_ps logical authority contract."""
@@ -3675,7 +3675,7 @@ def test_contract_container_docker_ps() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_images() -> None:
     """Validate the built-in container.docker_images logical authority contract."""
@@ -3688,7 +3688,7 @@ def test_contract_container_docker_images() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_inspect() -> None:
     """Validate the built-in container.docker_inspect logical authority contract."""
@@ -3701,7 +3701,7 @@ def test_contract_container_docker_inspect() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_logs() -> None:
     """Validate the built-in container.docker_logs logical authority contract."""
@@ -3714,7 +3714,7 @@ def test_contract_container_docker_logs() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_top() -> None:
     """Validate the built-in container.docker_top logical authority contract."""
@@ -3727,7 +3727,7 @@ def test_contract_container_docker_top() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_stats_once() -> None:
     """Validate the built-in container.docker_stats_once logical authority contract."""
@@ -3740,7 +3740,7 @@ def test_contract_container_docker_stats_once() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_history() -> None:
     """Validate the built-in container.docker_history logical authority contract."""
@@ -3753,7 +3753,7 @@ def test_contract_container_docker_history() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_image_inspect() -> None:
     """Validate the built-in container.docker_image_inspect logical authority contract."""
@@ -3766,7 +3766,7 @@ def test_contract_container_docker_image_inspect() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_build() -> None:
     """Validate the built-in container.docker_build logical authority contract."""
@@ -3779,7 +3779,7 @@ def test_contract_container_docker_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_pull() -> None:
     """Validate the built-in container.docker_pull logical authority contract."""
@@ -3792,7 +3792,7 @@ def test_contract_container_docker_pull() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_create() -> None:
     """Validate the built-in container.docker_create logical authority contract."""
@@ -3805,7 +3805,7 @@ def test_contract_container_docker_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_run() -> None:
     """Validate the built-in container.docker_run logical authority contract."""
@@ -3818,7 +3818,7 @@ def test_contract_container_docker_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_start() -> None:
     """Validate the built-in container.docker_start logical authority contract."""
@@ -3831,7 +3831,7 @@ def test_contract_container_docker_start() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_stop() -> None:
     """Validate the built-in container.docker_stop logical authority contract."""
@@ -3844,7 +3844,7 @@ def test_contract_container_docker_stop() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_kill() -> None:
     """Validate the built-in container.docker_kill logical authority contract."""
@@ -3857,7 +3857,7 @@ def test_contract_container_docker_kill() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_rm() -> None:
     """Validate the built-in container.docker_rm logical authority contract."""
@@ -3870,7 +3870,7 @@ def test_contract_container_docker_rm() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_rmi() -> None:
     """Validate the built-in container.docker_rmi logical authority contract."""
@@ -3883,7 +3883,7 @@ def test_contract_container_docker_rmi() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_cp() -> None:
     """Validate the built-in container.docker_cp logical authority contract."""
@@ -3896,7 +3896,7 @@ def test_contract_container_docker_cp() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_exec() -> None:
     """Validate the built-in container.docker_exec logical authority contract."""
@@ -3909,7 +3909,7 @@ def test_contract_container_docker_exec() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_network_ls() -> None:
     """Validate the built-in container.docker_network_ls logical authority contract."""
@@ -3922,7 +3922,7 @@ def test_contract_container_docker_network_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_volume_ls() -> None:
     """Validate the built-in container.docker_volume_ls logical authority contract."""
@@ -3935,7 +3935,7 @@ def test_contract_container_docker_volume_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_docker_system_df() -> None:
     """Validate the built-in container.docker_system_df logical authority contract."""
@@ -3948,7 +3948,7 @@ def test_contract_container_docker_system_df() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_version() -> None:
     """Validate the built-in container.podman_version logical authority contract."""
@@ -3961,7 +3961,7 @@ def test_contract_container_podman_version() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_info() -> None:
     """Validate the built-in container.podman_info logical authority contract."""
@@ -3974,7 +3974,7 @@ def test_contract_container_podman_info() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_ps() -> None:
     """Validate the built-in container.podman_ps logical authority contract."""
@@ -3987,7 +3987,7 @@ def test_contract_container_podman_ps() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_images() -> None:
     """Validate the built-in container.podman_images logical authority contract."""
@@ -4000,7 +4000,7 @@ def test_contract_container_podman_images() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_inspect() -> None:
     """Validate the built-in container.podman_inspect logical authority contract."""
@@ -4013,7 +4013,7 @@ def test_contract_container_podman_inspect() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_logs() -> None:
     """Validate the built-in container.podman_logs logical authority contract."""
@@ -4026,7 +4026,7 @@ def test_contract_container_podman_logs() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_top() -> None:
     """Validate the built-in container.podman_top logical authority contract."""
@@ -4039,7 +4039,7 @@ def test_contract_container_podman_top() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_stats_once() -> None:
     """Validate the built-in container.podman_stats_once logical authority contract."""
@@ -4052,7 +4052,7 @@ def test_contract_container_podman_stats_once() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_history() -> None:
     """Validate the built-in container.podman_history logical authority contract."""
@@ -4065,7 +4065,7 @@ def test_contract_container_podman_history() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_image_inspect() -> None:
     """Validate the built-in container.podman_image_inspect logical authority contract."""
@@ -4078,7 +4078,7 @@ def test_contract_container_podman_image_inspect() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_build() -> None:
     """Validate the built-in container.podman_build logical authority contract."""
@@ -4091,7 +4091,7 @@ def test_contract_container_podman_build() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_pull() -> None:
     """Validate the built-in container.podman_pull logical authority contract."""
@@ -4104,7 +4104,7 @@ def test_contract_container_podman_pull() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_create() -> None:
     """Validate the built-in container.podman_create logical authority contract."""
@@ -4117,7 +4117,7 @@ def test_contract_container_podman_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_run() -> None:
     """Validate the built-in container.podman_run logical authority contract."""
@@ -4130,7 +4130,7 @@ def test_contract_container_podman_run() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_start() -> None:
     """Validate the built-in container.podman_start logical authority contract."""
@@ -4143,7 +4143,7 @@ def test_contract_container_podman_start() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_stop() -> None:
     """Validate the built-in container.podman_stop logical authority contract."""
@@ -4156,7 +4156,7 @@ def test_contract_container_podman_stop() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_kill() -> None:
     """Validate the built-in container.podman_kill logical authority contract."""
@@ -4169,7 +4169,7 @@ def test_contract_container_podman_kill() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_rm() -> None:
     """Validate the built-in container.podman_rm logical authority contract."""
@@ -4182,7 +4182,7 @@ def test_contract_container_podman_rm() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_rmi() -> None:
     """Validate the built-in container.podman_rmi logical authority contract."""
@@ -4195,7 +4195,7 @@ def test_contract_container_podman_rmi() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_cp() -> None:
     """Validate the built-in container.podman_cp logical authority contract."""
@@ -4208,7 +4208,7 @@ def test_contract_container_podman_cp() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_exec() -> None:
     """Validate the built-in container.podman_exec logical authority contract."""
@@ -4221,7 +4221,7 @@ def test_contract_container_podman_exec() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_network_ls() -> None:
     """Validate the built-in container.podman_network_ls logical authority contract."""
@@ -4234,7 +4234,7 @@ def test_contract_container_podman_network_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_volume_ls() -> None:
     """Validate the built-in container.podman_volume_ls logical authority contract."""
@@ -4247,7 +4247,7 @@ def test_contract_container_podman_volume_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_container_podman_system_df() -> None:
     """Validate the built-in container.podman_system_df logical authority contract."""
@@ -4260,7 +4260,7 @@ def test_contract_container_podman_system_df() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_pwd() -> None:
     """Validate the built-in posix.pwd logical authority contract."""
@@ -4273,7 +4273,7 @@ def test_contract_posix_pwd() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_ls() -> None:
     """Validate the built-in posix.ls logical authority contract."""
@@ -4286,7 +4286,7 @@ def test_contract_posix_ls() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_stat() -> None:
     """Validate the built-in posix.stat logical authority contract."""
@@ -4299,7 +4299,7 @@ def test_contract_posix_stat() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_find() -> None:
     """Validate the built-in posix.find logical authority contract."""
@@ -4312,7 +4312,7 @@ def test_contract_posix_find() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_du() -> None:
     """Validate the built-in posix.du logical authority contract."""
@@ -4325,7 +4325,7 @@ def test_contract_posix_du() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_df() -> None:
     """Validate the built-in posix.df logical authority contract."""
@@ -4338,7 +4338,7 @@ def test_contract_posix_df() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_file() -> None:
     """Validate the built-in posix.file logical authority contract."""
@@ -4351,7 +4351,7 @@ def test_contract_posix_file() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_sha256sum() -> None:
     """Validate the built-in posix.sha256sum logical authority contract."""
@@ -4364,7 +4364,7 @@ def test_contract_posix_sha256sum() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_wc() -> None:
     """Validate the built-in posix.wc logical authority contract."""
@@ -4377,7 +4377,7 @@ def test_contract_posix_wc() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_head() -> None:
     """Validate the built-in posix.head logical authority contract."""
@@ -4390,7 +4390,7 @@ def test_contract_posix_head() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_tail() -> None:
     """Validate the built-in posix.tail logical authority contract."""
@@ -4403,7 +4403,7 @@ def test_contract_posix_tail() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_sort() -> None:
     """Validate the built-in posix.sort logical authority contract."""
@@ -4416,7 +4416,7 @@ def test_contract_posix_sort() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_uniq() -> None:
     """Validate the built-in posix.uniq logical authority contract."""
@@ -4429,7 +4429,7 @@ def test_contract_posix_uniq() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_cut() -> None:
     """Validate the built-in posix.cut logical authority contract."""
@@ -4442,7 +4442,7 @@ def test_contract_posix_cut() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_tr() -> None:
     """Validate the built-in posix.tr logical authority contract."""
@@ -4455,7 +4455,7 @@ def test_contract_posix_tr() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_grep() -> None:
     """Validate the built-in posix.grep logical authority contract."""
@@ -4468,7 +4468,7 @@ def test_contract_posix_grep() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_sed_print() -> None:
     """Validate the built-in posix.sed_print logical authority contract."""
@@ -4481,7 +4481,7 @@ def test_contract_posix_sed_print() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_awk() -> None:
     """Validate the built-in posix.awk logical authority contract."""
@@ -4494,7 +4494,7 @@ def test_contract_posix_awk() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_xargs_echo() -> None:
     """Validate the built-in posix.xargs_echo logical authority contract."""
@@ -4507,7 +4507,7 @@ def test_contract_posix_xargs_echo() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_readlink() -> None:
     """Validate the built-in posix.readlink logical authority contract."""
@@ -4520,7 +4520,7 @@ def test_contract_posix_readlink() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_realpath() -> None:
     """Validate the built-in posix.realpath logical authority contract."""
@@ -4533,7 +4533,7 @@ def test_contract_posix_realpath() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_basename() -> None:
     """Validate the built-in posix.basename logical authority contract."""
@@ -4546,7 +4546,7 @@ def test_contract_posix_basename() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_dirname() -> None:
     """Validate the built-in posix.dirname logical authority contract."""
@@ -4559,7 +4559,7 @@ def test_contract_posix_dirname() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_date() -> None:
     """Validate the built-in posix.date logical authority contract."""
@@ -4572,7 +4572,7 @@ def test_contract_posix_date() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_env() -> None:
     """Validate the built-in posix.env logical authority contract."""
@@ -4585,7 +4585,7 @@ def test_contract_posix_env() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_printenv() -> None:
     """Validate the built-in posix.printenv logical authority contract."""
@@ -4598,7 +4598,7 @@ def test_contract_posix_printenv() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_which() -> None:
     """Validate the built-in posix.which logical authority contract."""
@@ -4611,7 +4611,7 @@ def test_contract_posix_which() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_id() -> None:
     """Validate the built-in posix.id logical authority contract."""
@@ -4624,7 +4624,7 @@ def test_contract_posix_id() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_uname() -> None:
     """Validate the built-in posix.uname logical authority contract."""
@@ -4637,7 +4637,7 @@ def test_contract_posix_uname() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_ps() -> None:
     """Validate the built-in posix.ps logical authority contract."""
@@ -4650,7 +4650,7 @@ def test_contract_posix_ps() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_mkdir() -> None:
     """Validate the built-in posix.mkdir logical authority contract."""
@@ -4663,7 +4663,7 @@ def test_contract_posix_mkdir() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_touch() -> None:
     """Validate the built-in posix.touch logical authority contract."""
@@ -4676,7 +4676,7 @@ def test_contract_posix_touch() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_cp() -> None:
     """Validate the built-in posix.cp logical authority contract."""
@@ -4689,7 +4689,7 @@ def test_contract_posix_cp() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_mv() -> None:
     """Validate the built-in posix.mv logical authority contract."""
@@ -4702,7 +4702,7 @@ def test_contract_posix_mv() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_rm() -> None:
     """Validate the built-in posix.rm logical authority contract."""
@@ -4715,7 +4715,7 @@ def test_contract_posix_rm() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_chmod() -> None:
     """Validate the built-in posix.chmod logical authority contract."""
@@ -4728,7 +4728,7 @@ def test_contract_posix_chmod() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_ln() -> None:
     """Validate the built-in posix.ln logical authority contract."""
@@ -4741,7 +4741,7 @@ def test_contract_posix_ln() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_tar_list() -> None:
     """Validate the built-in posix.tar_list logical authority contract."""
@@ -4754,7 +4754,7 @@ def test_contract_posix_tar_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_tar_create() -> None:
     """Validate the built-in posix.tar_create logical authority contract."""
@@ -4767,7 +4767,7 @@ def test_contract_posix_tar_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_tar_extract() -> None:
     """Validate the built-in posix.tar_extract logical authority contract."""
@@ -4780,7 +4780,7 @@ def test_contract_posix_tar_extract() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_gzip_test() -> None:
     """Validate the built-in posix.gzip_test logical authority contract."""
@@ -4793,7 +4793,7 @@ def test_contract_posix_gzip_test() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_gzip_compress() -> None:
     """Validate the built-in posix.gzip_compress logical authority contract."""
@@ -4806,7 +4806,7 @@ def test_contract_posix_gzip_compress() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_unzip_list() -> None:
     """Validate the built-in posix.unzip_list logical authority contract."""
@@ -4819,7 +4819,7 @@ def test_contract_posix_unzip_list() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_unzip_extract() -> None:
     """Validate the built-in posix.unzip_extract logical authority contract."""
@@ -4832,7 +4832,7 @@ def test_contract_posix_unzip_extract() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_zip_create() -> None:
     """Validate the built-in posix.zip_create logical authority contract."""
@@ -4845,7 +4845,7 @@ def test_contract_posix_zip_create() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_diff() -> None:
     """Validate the built-in posix.diff logical authority contract."""
@@ -4858,7 +4858,7 @@ def test_contract_posix_diff() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_contract_posix_cmp() -> None:
     """Validate the built-in posix.cmp logical authority contract."""
@@ -4871,7 +4871,7 @@ def test_contract_posix_cmp() -> None:
     assert contract.risk.value in {"low", "moderate", "high"}
     assert isinstance(contract.environment.allowed_keys(), tuple)
     assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
+    assert contract.arguments.validate(contract.name, _minimal_argv(spec)) == _minimal_argv(spec)
 
 def test_recipe_python_verify() -> None:
     """Validate recipe python.verify against the built-in catalog."""
