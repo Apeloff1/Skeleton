@@ -183,7 +183,10 @@ jobs:
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - name: Compile automation package
-        run: python -m compileall -q skeleton/pr_automation
+        run: >-
+          python -m compileall -q
+          skeleton/pr_automation
+          skeleton/automation
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
       - name: Run PR automation contracts
@@ -203,6 +206,12 @@ jobs:
           skeleton/testing/test_automerge_stack.py
           skeleton/testing/test_automerge_engine.py
           skeleton/testing/test_automerge_contract.py
+          tests/test_autonomous_supervisor.py
+          tests/test_build_authority.py
+          tests/test_supervisor_runtime.py
+          tests/test_worker_health.py
+          skeleton/testing/test_bot_manager.py
+          backend/tests/test_supervisor_workflow_contract.py
 
   readiness:
     name: Merge Readiness
