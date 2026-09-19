@@ -237,6 +237,29 @@ class WorkspaceTransactionManager:
             if not self.backup_store.verify_manifest(backup):
                 raise RuntimeError("pre-mutation backup failed verification")
 
+            # The lease coordinates cooperating shell transactions, but an
+            # unrelated local process can still mutate the workspace while the
+            # snapshot is being backed up. Re-scan immediately before
+            # execution so the backup is proven to describe the exact state
+            # that the command is about to receive.
+            pre_execution = self.scanner.scan(root_path)
+            if pre_execution.digest != before.digest:
+                raise RuntimeError(
+                    "workspace changed while pre-mutation backup was prepared"
+                )
+            if (
+                backup.root_mode is not None
+                and backup.root_mtime_ns is not None
+            ):
+                root_metadata = root_path.stat()
+                if (
+                    int(root_metadata.st_mode) & 0o7777 != backup.root_mode
+                    or int(root_metadata.st_mtime_ns) != backup.root_mtime_ns
+                ):
+                    raise RuntimeError(
+                        "workspace root metadata changed before execution"
+                    )
+
             heartbeat.require_healthy()
             self._journal(
                 transaction_id,
