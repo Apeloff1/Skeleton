@@ -88,18 +88,19 @@ class ArtifactSigner:
         *,
         metadata: Mapping[str, str] | None = None,
     ) -> SignedArtifact:
+        issued_at = float(self._clock())
         payload = {
             "artifact_type": artifact_type,
             "artifact_digest": artifact_digest,
             "key_id": self.key_id,
-            "issued_at": self._clock(),
+            "issued_at": issued_at,
             "metadata": dict(metadata or {}),
         }
         return SignedArtifact(
             artifact_type,
             artifact_digest,
             self.key_id,
-            float(payload["issued_at"]),
+            issued_at,
             dict(payload["metadata"]),
             self._sign(payload),
         )
