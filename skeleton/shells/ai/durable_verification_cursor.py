@@ -1243,6 +1243,124 @@ class DurableIncrementalVerifier:
             "could not full-verify a stable chain head"
         )
 
+    def _bounded_tail_segment(
+        self,
+        chain: IncrementallyVerifiableChain,
+        cursor: DurableVerificationCursor,
+        sequence: int,
+        root_hash: str,
+    ) -> tuple[object, ...]:
+        """Resolve a bounded verified tail, preferring sequence indexes.
+
+        Sequence locators are accelerators only.  When a chain exposes the
+        indexed range surface, both cursor and head roots must resolve to the
+        exact signed/live roots before the hash-linked range is accepted.
+        """
+        snapshot_range = getattr(
+            chain,
+            "snapshot_range",
+            None,
+        )
+        root_for_sequence = getattr(
+            chain,
+            "root_for_sequence",
+            None,
+        )
+        if callable(snapshot_range) and callable(root_for_sequence):
+            try:
+                indexed_cursor_root = str(
+                    root_for_sequence(
+                        cursor.sequence
+                    )
+                )
+                indexed_head_root = str(
+                    root_for_sequence(
+                        sequence
+                    )
+                )
+            except Exception as exc:
+                raise DurableVerificationCursorError(
+                    "indexed tail root resolution failed"
+                ) from exc
+            if indexed_cursor_root != cursor.root_hash:
+                raise DurableVerificationCursorError(
+                    "sequence index disagrees with signed cursor root"
+                )
+            if indexed_head_root != root_hash:
+                raise DurableVerificationCursorError(
+                    "sequence index disagrees with live head root"
+                )
+            try:
+                segment = snapshot_range(
+                    cursor.sequence + 1,
+                    sequence,
+                    max_items=self.policy.max_tail_items,
+                )
+            except Exception as exc:
+                raise DurableVerificationCursorError(
+                    "indexed tail verification failed"
+                ) from exc
+        else:
+            segment = self._bounded_tail_segment(
+                chain,
+                cursor,
+                sequence,
+                root_hash,
+            )
+
+        expected = sequence - cursor.sequence
+        if len(segment) != expected:
+            raise DurableVerificationCursorError(
+                "verified tail length differs from sequence delta"
+            )
+        if segment:
+            first_sequence = getattr(
+                segment[0],
+                "sequence",
+                None,
+            )
+            last_sequence = getattr(
+                segment[-1],
+                "sequence",
+                None,
+            )
+            if (
+                first_sequence != cursor.sequence + 1
+                or last_sequence != sequence
+            ):
+                raise DurableVerificationCursorError(
+                    "verified tail sequence bounds are inconsistent"
+                )
+            previous_hash = getattr(
+                segment[0],
+                "previous_hash",
+                None,
+            )
+            if (
+                previous_hash is not None
+                and previous_hash != cursor.root_hash
+            ):
+                raise DurableVerificationCursorError(
+                    "verified tail does not extend signed cursor root"
+                )
+            terminal_hash = getattr(
+                segment[-1],
+                "event_hash",
+                getattr(
+                    segment[-1],
+                    "receipt_hash",
+                    None,
+                ),
+            )
+            if (
+                terminal_hash is not None
+                and terminal_hash != root_hash
+            ):
+                raise DurableVerificationCursorError(
+                    "verified tail does not terminate at live head root"
+                )
+        return tuple(segment)
+
     def _publish_incremental(
         self,
         chain_id: str,
