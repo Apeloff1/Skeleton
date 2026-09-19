@@ -821,4 +821,3 @@ def test_segment_sequence_starts_after_trusted_root():
         segment[-1].node_hash
         == items[6].node_hash
     )
-
