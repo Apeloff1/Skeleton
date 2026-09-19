@@ -38,6 +38,31 @@ class RunnerTransportError(RuntimeError):
     """Base error for runner transport failures."""
 
 
+class GitHubHTTPError(RunnerTransportError):
+    """A GitHub HTTP response with a known terminal status code.
+
+    Unlike connection loss or timeout errors, this exception proves that an
+    HTTP response was received. Mutation callers can therefore distinguish a
+    definitive 4xx rejection from an ambiguous post-dispatch transport failure.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        detail: str,
+        *,
+        rate_limited: bool = False,
+    ) -> None:
+        self.status_code = status_code
+        self.detail = detail
+        self.rate_limited = rate_limited
+        super().__init__(f"GitHub HTTP {status_code}: {detail}")
+
+    @property
+    def definitive_mutation_rejection(self) -> bool:
+        return 400 <= self.status_code < 500
+
+
 class RequestBudgetExceeded(RunnerTransportError):
     """Raised when a run exceeds its bounded HTTP request budget."""
 
@@ -470,8 +495,10 @@ class BudgetedGitHubTransport:
                     headers=response_headers,
                     error=f"HTTP {exc.code}: {detail}",
                 )
-                raise RunnerTransportError(
-                    f"GitHub HTTP {exc.code}: {detail}"
+                raise GitHubHTTPError(
+                    exc.code,
+                    detail,
+                    rate_limited=is_rate,
                 ) from exc
             except (URLError, TimeoutError, OSError) as exc:
                 last_error = exc
@@ -823,6 +850,7 @@ __all__ = [
     "API",
     "GRAPHQL",
     "BudgetedGitHubTransport",
+    "GitHubHTTPError",
     "GraphQLBudgetExceeded",
     "LegacyClientAdapter",
     "RateLimitFloorReached",
