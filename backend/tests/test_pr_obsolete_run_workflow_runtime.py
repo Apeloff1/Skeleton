@@ -60,5 +60,6 @@ def test_lifecycle_signal_wakes_immediate_drain_only_on_close() -> None:
     text = SIGNAL_WORKFLOW.read_text(encoding="utf-8")
 
     assert "types: [closed]" in text
-    assert "synchronize" not in text
+    trigger_block = text.split("on:", 1)[1].split("concurrency:", 1)[0]
+    assert "synchronize" not in trigger_block
     assert "Superseded synchronize heads are already reclaimed by queue-drain" in text

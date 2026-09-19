@@ -1,0 +1,2426 @@
+"""Long-lived AI shell service facade over planning and shell execution."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import hashlib
+import uuid
+
+from skeleton.shells.ai.approval_quorum import AIApprovalQuorumStore, QuorumApproval
+from skeleton.shells.ai.assurance import AIExecutionAssuranceInspector
+from skeleton.shells.ai.assurance_binding import AssuranceBinding
+from skeleton.shells.ai.authority_health import AIAuthorityHealthGuard, AuthorityHealthReport
+from skeleton.shells.ai.diagnostics import AIDiagnosticsReport, AIShellDiagnostics
+from skeleton.shells.ai.durable_health import (
+    DurableRecoveryHealthGuard,
+    DurableRecoveryHealthReport,
+)
+from skeleton.shells.ai.durable_lifecycle import (
+    DurableEvidenceLifecycleCoordinator,
+    DurableLifecycleReport,
+)
+from skeleton.shells.ai.durable_operations import (
+    DurableEvidenceOperationsInspector,
+    DurableEvidenceOperationsReport,
+)
+from skeleton.shells.ai.durable_readiness import (
+    DurableEvidenceReadinessError,
+    DurableEvidenceReadinessGuard,
+    DurableEvidenceReadinessReport,
+)
+from skeleton.shells.ai.durable_verification_health import (
+    DurableVerificationFleetError,
+    DurableVerificationFleetGuard,
+    DurableVerificationFleetReport,
+)
+from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttempt,
+    AIExecutionAttemptStore,
+    AttemptTrackingExecutionBackend,
+    ExecutionAttemptState,
+)
+from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
+from skeleton.shells.ai.execution_obligation_recovery import (
+    AIExecutionObligationRecoveryInspector,
+    ExecutionObligationRecoverySummary,
+)
+from skeleton.shells.ai.execution_fence import (
+    AIExecutionFence,
+    AIExecutionFenceManager,
+)
+from skeleton.shells.ai.execution_seal import ExecutionSeal, ExecutionSealAuthority
+from skeleton.shells.ai.governance import AIShellGovernance
+from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
+from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
+from skeleton.shells.ai.preconditions import Preconditions, PreconditionChecker, PreconditionReport
+from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
+from skeleton.shells.ai.recovery_requirements import (
+    DurableRecoveryRequirementConflict,
+    DurableRecoveryRequirementStore,
+    SignedDurableRecoveryRequirementManifest,
+)
+from skeleton.shells.ai.runtime_trust import AIRuntimeTrustGuard, RuntimeTrustReport
+from skeleton.shells.ai.sandbox_backend import VerifiedSandboxExecutionBackend
+from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
+from skeleton.shells.ai.sealed_finalization import AISealedFinalizedExecution
+from skeleton.shells.ai.session import AIShellSession
+from skeleton.shells.ai.stale_guard import AIPlanStaleGuard, PlanPin
+from skeleton.shells.ai.startup_release import AIStartupReleaseGuard, RuntimeReleaseExpectation, StartupReleaseReport
+from skeleton.shells.ai.types import AIIntent
+from skeleton.shells.execution_context import ExecutionContext
+
+
+@dataclass(frozen=True)
+class AIServiceStatus:
+    phase: AIServicePhase
+    diagnostics: dict[str, object]
+    governance: dict[str, object]
+    shell_phase: str
+    release: dict[str, object] | None = None
+    runtime_trust: dict[str, object] | None = None
+    authority_health: dict[str, object] | None = None
+    durable_recovery: dict[str, object] | None = None
+    durable_operations: dict[str, object] | None = None
+    durable_recovery_requirements: dict[str, object] | None = None
+    execution_obligations: dict[str, object] | None = None
+    durable_lifecycle: dict[str, object] | None = None
+    durable_verification: dict[str, object] | None = None
+    durable_readiness: dict[str, object] | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        data = {
+            "phase": self.phase.value,
+            "diagnostics": dict(self.diagnostics),
+            "governance": dict(self.governance),
+            "shell_phase": self.shell_phase,
+        }
+        if self.release is not None:
+            data["release"] = dict(self.release)
+        if self.runtime_trust is not None:
+            data["runtime_trust"] = dict(self.runtime_trust)
+        if self.authority_health is not None:
+            data["authority_health"] = dict(self.authority_health)
+        if self.durable_recovery is not None:
+            data["durable_recovery"] = dict(self.durable_recovery)
+        if self.durable_operations is not None:
+            data["durable_operations"] = dict(self.durable_operations)
+        if self.durable_recovery_requirements is not None:
+            data["durable_recovery_requirements"] = dict(
+                self.durable_recovery_requirements
+            )
+        if self.execution_obligations is not None:
+            data["execution_obligations"] = dict(
+                self.execution_obligations
+            )
+        if self.durable_lifecycle is not None:
+            data["durable_lifecycle"] = dict(
+                self.durable_lifecycle
+            )
+        if self.durable_verification is not None:
+            data["durable_verification"] = dict(
+                self.durable_verification
+            )
+        if self.durable_readiness is not None:
+            data["durable_readiness"] = dict(
+                self.durable_readiness
+            )
+        return data
+
+
+class AIShellService:
+    """Explicit service boundary for Jeeves shell planning and execution."""
+
+    def __init__(
+        self,
+        orchestrator: AIShellOrchestrator,
+        diagnostics: AIShellDiagnostics,
+        governance: AIShellGovernance,
+        *,
+        release_guard: AIStartupReleaseGuard | None = None,
+        release_expectation: RuntimeReleaseExpectation | None = None,
+        assurance: AIExecutionAssuranceInspector | None = None,
+        approval_quorum: AIApprovalQuorumStore | None = None,
+        runtime_trust: AIRuntimeTrustGuard | None = None,
+        authority_health: AIAuthorityHealthGuard | None = None,
+        execution_fences: AIExecutionFenceManager | None = None,
+        execution_attempts: AIExecutionAttemptStore | None = None,
+        execution_obligation_recovery: AIExecutionObligationRecoveryInspector | None = None,
+        worker_id: str = "",
+        durable_recovery_guard: DurableRecoveryHealthGuard | None = None,
+        durable_recovery_ids: tuple[str, ...] = (),
+        durable_recovery_requirement_store: DurableRecoveryRequirementStore | None = None,
+        durable_recovery_requirement_scope: str = "",
+        durable_operations_inspector: DurableEvidenceOperationsInspector | None = None,
+        durable_operations_chains: tuple[tuple[str, object], ...] = (),
+        durable_operations_protected_roots: dict[str, tuple[str, ...]] | None = None,
+        durable_lifecycle_coordinator: DurableEvidenceLifecycleCoordinator | None = None,
+        durable_lifecycle_chains: tuple[tuple[str, object], ...] = (),
+        durable_lifecycle_protected_roots: dict[str, tuple[str, ...]] | None = None,
+        durable_lifecycle_capacities: dict[str, int] | None = None,
+        durable_verification_guard: DurableVerificationFleetGuard | None = None,
+        durable_verification_chains: tuple[tuple[str, object], ...] = (),
+        durable_readiness_guard: DurableEvidenceReadinessGuard | None = None,
+        durable_readiness_reconcile_on_start: bool = False,
+        durable_readiness_reconcile_after_internal_writes: bool = False,
+        durable_readiness_reconcile_after_finalization: bool = False,
+    ) -> None:
+        if (release_guard is None) != (release_expectation is None):
+            raise ValueError("release_guard and release_expectation must be configured together")
+        if execution_fences is not None and assurance is None:
+            raise ValueError(
+                "execution fencing requires an assurance inspector"
+            )
+        if (execution_fences is not None or execution_attempts is not None) and (
+            not worker_id or len(worker_id) > 256
+        ):
+            raise ValueError(
+                "distributed execution evidence requires a valid worker_id"
+            )
+        if execution_obligation_recovery is not None:
+            if not isinstance(
+                execution_obligation_recovery,
+                AIExecutionObligationRecoveryInspector,
+            ):
+                raise TypeError(
+                    "execution_obligation_recovery must be "
+                    "AIExecutionObligationRecoveryInspector"
+                )
+            if execution_attempts is None:
+                raise ValueError(
+                    "execution obligation recovery requires execution attempts"
+                )
+            if execution_obligation_recovery.attempts is not execution_attempts:
+                raise ValueError(
+                    "execution obligation recovery must use configured "
+                    "execution attempt store"
+                )
+        durable_verification_chains = tuple(
+            durable_verification_chains
+        )
+        if (
+            durable_verification_guard is None
+            and durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification chains require a durable verification guard"
+            )
+        if (
+            durable_verification_guard is not None
+            and not isinstance(
+                durable_verification_guard,
+                DurableVerificationFleetGuard,
+            )
+        ):
+            raise TypeError(
+                "durable_verification_guard must be DurableVerificationFleetGuard"
+            )
+        if (
+            durable_verification_guard is not None
+            and not durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification guard requires at least one chain"
+            )
+        if any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            for item in durable_verification_chains
+        ):
+            raise ValueError(
+                "durable verification chain entries must be (chain_id, chain) pairs"
+            )
+        verification_chain_ids = tuple(
+            item[0]
+            for item in durable_verification_chains
+        )
+        if len(verification_chain_ids) != len(
+            set(verification_chain_ids)
+        ):
+            raise ValueError(
+                "duplicate durable verification chain_id"
+            )
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 128
+            for item in verification_chain_ids
+        ):
+            raise ValueError(
+                "invalid durable verification chain_id"
+            )
+        durable_verification_chains = tuple(
+            sorted(
+                durable_verification_chains,
+                key=lambda item: item[0],
+            )
+        )
+
+        durable_recovery_ids = tuple(durable_recovery_ids)
+        if durable_recovery_guard is None and durable_recovery_ids:
+            raise ValueError(
+                "durable recovery ids require a durable recovery guard"
+            )
+        if (
+            durable_recovery_requirement_store is None
+            and durable_recovery_requirement_scope
+        ):
+            raise ValueError(
+                "durable recovery requirement scope requires a store"
+            )
+        if durable_recovery_requirement_store is not None:
+            if not isinstance(
+                durable_recovery_requirement_store,
+                DurableRecoveryRequirementStore,
+            ):
+                raise TypeError(
+                    "durable_recovery_requirement_store must be "
+                    "DurableRecoveryRequirementStore"
+                )
+            if durable_recovery_guard is None:
+                raise ValueError(
+                    "durable recovery requirement store requires "
+                    "a durable recovery guard"
+                )
+            if durable_recovery_ids:
+                raise ValueError(
+                    "static durable recovery ids cannot be combined "
+                    "with a signed requirement store"
+                )
+            if (
+                not durable_recovery_requirement_scope
+                or len(durable_recovery_requirement_scope) > 128
+            ):
+                raise ValueError(
+                    "durable recovery requirement scope is required"
+                )
+        if durable_recovery_guard is not None and not isinstance(
+            durable_recovery_guard,
+            DurableRecoveryHealthGuard,
+        ):
+            raise TypeError(
+                "durable_recovery_guard must be DurableRecoveryHealthGuard"
+            )
+        if len(durable_recovery_ids) != len(set(durable_recovery_ids)):
+            raise ValueError("duplicate durable recovery finalization_id")
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 256
+            for item in durable_recovery_ids
+        ):
+            raise ValueError("invalid durable recovery finalization_id")
+        durable_recovery_ids = tuple(sorted(durable_recovery_ids))
+        if (
+            durable_verification_guard is not None
+            and durable_operations_inspector is not None
+        ):
+            if (
+                durable_operations_inspector.verification_guard
+                is not durable_verification_guard
+            ):
+                raise ValueError(
+                    "durable operations inspector must use configured "
+                    "durable verification guard"
+                )
+
+        durable_operations_chains = tuple(
+            durable_operations_chains
+        )
+        if (
+            durable_operations_inspector is None
+            and durable_operations_chains
+        ):
+            raise ValueError(
+                "durable operations chains require a durable operations inspector"
+            )
+        if (
+            durable_operations_inspector is not None
+            and not isinstance(
+                durable_operations_inspector,
+                DurableEvidenceOperationsInspector,
+            )
+        ):
+            raise TypeError(
+                "durable_operations_inspector must be DurableEvidenceOperationsInspector"
+            )
+        if (
+            durable_operations_inspector is not None
+            and not durable_operations_chains
+        ):
+            raise ValueError(
+                "durable operations inspector requires at least one chain"
+            )
+        if any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            for item in durable_operations_chains
+        ):
+            raise ValueError(
+                "durable operations chain entries must be (chain_id, chain) pairs"
+            )
+        operation_chain_ids = tuple(
+            item[0]
+            for item in durable_operations_chains
+        )
+        if len(operation_chain_ids) != len(
+            set(operation_chain_ids)
+        ):
+            raise ValueError(
+                "duplicate durable operations chain_id"
+            )
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 128
+            for item in operation_chain_ids
+        ):
+            raise ValueError(
+                "invalid durable operations chain_id"
+            )
+        durable_operations_chains = tuple(
+            sorted(
+                durable_operations_chains,
+                key=lambda item: item[0],
+            )
+        )
+        if (
+            durable_readiness_guard is not None
+            and not isinstance(
+                durable_readiness_guard,
+                DurableEvidenceReadinessGuard,
+            )
+        ):
+            raise TypeError(
+                "durable_readiness_guard must be DurableEvidenceReadinessGuard"
+            )
+        if not isinstance(
+            durable_readiness_reconcile_on_start,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_on_start must be bool"
+            )
+        if not isinstance(
+            durable_readiness_reconcile_after_internal_writes,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_after_internal_writes must be bool"
+            )
+        if not isinstance(
+            durable_readiness_reconcile_after_finalization,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_after_finalization must be bool"
+            )
+        if durable_readiness_guard is not None:
+            if durable_operations_inspector is None:
+                raise ValueError(
+                    "durable readiness requires a durable operations inspector"
+                )
+            if not durable_operations_chains:
+                raise ValueError(
+                    "durable readiness requires durable operations chains"
+                )
+            if (
+                durable_readiness_guard.operations
+                is not durable_operations_inspector
+            ):
+                raise ValueError(
+                    "durable readiness guard must use configured "
+                    "durable operations inspector"
+                )
+        durable_operations_protected_roots = dict(
+            durable_operations_protected_roots or {}
+        )
+        unknown_protected = (
+            set(durable_operations_protected_roots)
+            - set(operation_chain_ids)
+        )
+        if unknown_protected:
+            raise ValueError(
+                "durable protected roots reference unknown chain"
+            )
+
+        durable_lifecycle_chains = tuple(
+            durable_lifecycle_chains
+        )
+        if (
+            durable_lifecycle_coordinator is None
+            and durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle chains require a durable lifecycle coordinator"
+            )
+        if (
+            durable_lifecycle_coordinator is not None
+            and not isinstance(
+                durable_lifecycle_coordinator,
+                DurableEvidenceLifecycleCoordinator,
+            )
+        ):
+            raise TypeError(
+                "durable_lifecycle_coordinator must be "
+                "DurableEvidenceLifecycleCoordinator"
+            )
+        if (
+            durable_lifecycle_coordinator is not None
+            and not durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle coordinator requires at least one chain"
+            )
+        if any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            for item in durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle chain entries must be (chain_id, chain) pairs"
+            )
+        lifecycle_chain_ids = tuple(
+            item[0]
+            for item in durable_lifecycle_chains
+        )
+        if len(lifecycle_chain_ids) != len(
+            set(lifecycle_chain_ids)
+        ):
+            raise ValueError(
+                "duplicate durable lifecycle chain_id"
+            )
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 128
+            for item in lifecycle_chain_ids
+        ):
+            raise ValueError(
+                "invalid durable lifecycle chain_id"
+            )
+        durable_lifecycle_chains = tuple(
+            sorted(
+                durable_lifecycle_chains,
+                key=lambda item: item[0],
+            )
+        )
+        verification_chain_map = dict(
+            durable_verification_chains
+        )
+        for surface_name, surface_chains in (
+            ("operations", durable_operations_chains),
+            ("lifecycle", durable_lifecycle_chains),
+        ):
+            for chain_id, chain in surface_chains:
+                verified_chain = verification_chain_map.get(
+                    chain_id
+                )
+                if (
+                    verified_chain is not None
+                    and verified_chain is not chain
+                ):
+                    raise ValueError(
+                        "durable verification chain object differs "
+                        f"across service {surface_name} surface: "
+                        f"{chain_id}"
+                    )
+
+        durable_lifecycle_protected_roots = dict(
+            durable_lifecycle_protected_roots or {}
+        )
+        lifecycle_unknown_protected = (
+            set(durable_lifecycle_protected_roots)
+            - set(lifecycle_chain_ids)
+        )
+        if lifecycle_unknown_protected:
+            raise ValueError(
+                "durable lifecycle protected roots reference unknown chain"
+            )
+        for chain_id, roots in (
+            durable_lifecycle_protected_roots.items()
+        ):
+            roots = tuple(roots)
+            if len(roots) != len(set(roots)):
+                raise ValueError(
+                    "duplicate durable lifecycle protected root"
+                )
+            if any(
+                not isinstance(root, str)
+                or len(root) != 64
+                for root in roots
+            ):
+                raise ValueError(
+                    "invalid durable lifecycle protected root"
+                )
+            durable_lifecycle_protected_roots[
+                chain_id
+            ] = roots
+
+        durable_lifecycle_capacities = dict(
+            durable_lifecycle_capacities or {}
+        )
+        lifecycle_unknown_capacity = (
+            set(durable_lifecycle_capacities)
+            - set(lifecycle_chain_ids)
+        )
+        if lifecycle_unknown_capacity:
+            raise ValueError(
+                "durable lifecycle capacities reference unknown chain"
+            )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+            for value in durable_lifecycle_capacities.values()
+        ):
+            raise ValueError(
+                "durable lifecycle capacities must be positive integers"
+            )
+        self.orchestrator = orchestrator
+        self.diagnostics = diagnostics
+        self.governance = governance
+        self.release_guard = release_guard
+        self.release_expectation = release_expectation
+        self.assurance = assurance
+        self.approval_quorum = approval_quorum
+        self.runtime_trust = runtime_trust
+        self.authority_health = authority_health
+        self.execution_fences = execution_fences
+        self.execution_attempts = execution_attempts
+        self.execution_obligation_recovery = execution_obligation_recovery
+        self.worker_id = worker_id
+        self.durable_recovery_guard = durable_recovery_guard
+        self.durable_verification_guard = (
+            durable_verification_guard
+        )
+        self.durable_verification_chains = (
+            durable_verification_chains
+        )
+        self.durable_recovery_ids = durable_recovery_ids
+        self.durable_recovery_requirement_store = (
+            durable_recovery_requirement_store
+        )
+        self.durable_recovery_requirement_scope = (
+            durable_recovery_requirement_scope
+        )
+        self.durable_operations_inspector = durable_operations_inspector
+        self.durable_operations_chains = durable_operations_chains
+        self.durable_readiness_guard = durable_readiness_guard
+        self.durable_readiness_reconcile_on_start = (
+            durable_readiness_reconcile_on_start
+        )
+        self.durable_readiness_reconcile_after_internal_writes = (
+            durable_readiness_reconcile_after_internal_writes
+        )
+        self.durable_readiness_reconcile_after_finalization = (
+            durable_readiness_reconcile_after_finalization
+        )
+        self.durable_operations_protected_roots = (
+            durable_operations_protected_roots
+        )
+        self.durable_lifecycle_coordinator = (
+            durable_lifecycle_coordinator
+        )
+        self.durable_lifecycle_chains = (
+            durable_lifecycle_chains
+        )
+        self.durable_lifecycle_protected_roots = (
+            durable_lifecycle_protected_roots
+        )
+        self.durable_lifecycle_capacities = (
+            durable_lifecycle_capacities
+        )
+        self._release_report: StartupReleaseReport | None = None
+        self._runtime_trust_report: RuntimeTrustReport | None = None
+        self._authority_health_report: AuthorityHealthReport | None = None
+        self._durable_recovery_report: DurableRecoveryHealthReport | None = None
+        self._durable_operations_report: DurableEvidenceOperationsReport | None = None
+        self._durable_verification_report: DurableVerificationFleetReport | None = None
+        self._durable_readiness_report: DurableEvidenceReadinessReport | None = None
+        self._durable_lifecycle_reports: dict[
+            str,
+            DurableLifecycleReport,
+        ] = {}
+        self._durable_recovery_requirement_manifest: (
+            SignedDurableRecoveryRequirementManifest | None
+        ) = None
+        self._execution_obligation_report: (
+            ExecutionObligationRecoverySummary | None
+        ) = None
+        self.state = AIServiceState()
+        self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
+        self.stale_guard = AIPlanStaleGuard()
+        self._pins: dict[str, PlanPin] = {}
+        self._max_pins = 10000
+
+    def start(self) -> AIDiagnosticsReport:
+        if self.state.phase is AIServicePhase.NEW:
+            self.state.transition(AIServicePhase.STARTING)
+        if self.state.phase is not AIServicePhase.STARTING:
+            return self.diagnostics.inspect()
+        report = self.diagnostics.inspect()
+        shell_ready = self.orchestrator.shell_service.state.ready()
+        if report.errors:
+            self.state.transition(AIServicePhase.FAILED, reason="AI diagnostics failed")
+            return report
+        if not shell_ready:
+            self.state.transition(AIServicePhase.DEGRADED, reason="shell service is not ready")
+            return report
+        if self.release_guard is not None and self.release_expectation is not None:
+            self._release_report = self.release_guard.inspect(self.release_expectation)
+            if not self._release_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI release/channel verification failed",
+                )
+                return report
+        if self.runtime_trust is not None:
+            try:
+                self._runtime_trust_report = self.runtime_trust.pin()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI runtime trust verification failed",
+                )
+                return report
+        if self.authority_health is not None:
+            try:
+                self._authority_health_report = self.authority_health.require()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI authority dependency health failed",
+                )
+                return report
+        if self.execution_obligation_recovery is not None:
+            try:
+                self._recover_execution_obligations()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI execution obligation recovery failed",
+                )
+                return report
+        if self.durable_recovery_guard is not None:
+            try:
+                self._resolve_durable_recovery_ids()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI durable recovery requirement verification failed",
+                )
+                return report
+            self._durable_recovery_report = (
+                self.durable_recovery_guard.inspect(
+                    self.durable_recovery_ids
+                )
+            )
+            if not self._durable_recovery_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI durable recovery verification failed",
+                )
+                return report
+        if self.durable_verification_guard is not None:
+            try:
+                self._durable_verification_report = (
+                    self.durable_verification_guard.require(
+                        self.durable_verification_chains
+                    )
+                )
+            except (
+                DurableVerificationFleetError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable verification cursor "
+                        "establishment failed"
+                    ),
+                )
+                return report
+            if not self._durable_verification_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable verification fleet denied startup"
+                    ),
+                )
+                return report
+        if self.durable_operations_inspector is not None:
+            self._durable_operations_report = (
+                self.durable_operations_inspector.inspect(
+                    self.durable_operations_chains,
+                    protected_roots=(
+                        self.durable_operations_protected_roots
+                    ),
+                    recovery_finalization_ids=(
+                        self.durable_recovery_ids
+                        if (
+                            self.durable_operations_inspector
+                            .recovery_health is not None
+                        )
+                        else ()
+                    ),
+                )
+            )
+            if not self._durable_operations_report.allowed:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence operations "
+                        "verification failed"
+                    ),
+                )
+                return report
+        if self.durable_readiness_guard is not None:
+            try:
+                self._durable_readiness_report = (
+                    self.durable_readiness_guard.require_ready(
+                        self.durable_operations_chains,
+                        protected_roots=(
+                            self.durable_operations_protected_roots
+                        ),
+                        recovery_finalization_ids=(
+                            self.durable_recovery_ids
+                            if (
+                                self.durable_operations_inspector
+                                is not None
+                                and self.durable_operations_inspector
+                                .recovery_health is not None
+                            )
+                            else ()
+                        ),
+                        reconcile=(
+                            self.durable_readiness_reconcile_on_start
+                        ),
+                    )
+                )
+            except (
+                DurableEvidenceReadinessError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "verification failed"
+                    ),
+                )
+                return report
+        if self.durable_lifecycle_coordinator is not None:
+            try:
+                self._durable_lifecycle_reports = (
+                    self._inspect_durable_lifecycle()
+                )
+            except Exception:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence lifecycle "
+                        "inspection failed"
+                    ),
+                )
+                return report
+            if not all(
+                item.ok
+                for item in self._durable_lifecycle_reports.values()
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence lifecycle "
+                        "verification failed"
+                    ),
+                )
+                return report
+        self.state.transition(AIServicePhase.READY)
+        return report
+
+    def _release_digest(self) -> str:
+        return "" if self._release_report is None else self._release_report.evidence_digest
+
+    def _runtime_trust_digest(self) -> str:
+        return (
+            ""
+            if self._runtime_trust_report is None
+            else self._runtime_trust_report.epoch_digest
+        )
+
+    def _authority_health_policy_digest(self) -> str:
+        return (
+            ""
+            if self._authority_health_report is None
+            else self._authority_health_report.policy_digest
+        )
+
+    def _require_release_current(self) -> None:
+        if self.release_guard is None or self.release_expectation is None:
+            return
+        report = self.release_guard.inspect(self.release_expectation)
+        self._release_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason="AI release/channel drift detected",
+            )
+        raise RuntimeError("AI release/channel verification failed")
+
+    def _require_runtime_trust_current(self) -> None:
+        if self.runtime_trust is None:
+            return
+        try:
+            report = self.runtime_trust.require_current()
+        except RuntimeError:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason="AI runtime trust drift detected",
+                )
+            raise RuntimeError("AI runtime trust verification failed") from None
+        self._runtime_trust_report = report
+
+    def _require_authority_health(self) -> None:
+        if self.authority_health is None:
+            return
+        try:
+            report = self.authority_health.require()
+        except RuntimeError:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason="AI authority dependency health failed",
+                )
+            raise RuntimeError("AI authority dependency health failed") from None
+        self._authority_health_report = report
+
+    def _enroll_required_finalizations(
+        self,
+        finalization_ids: tuple[str, ...],
+    ) -> None:
+        store = self.durable_recovery_requirement_store
+        if store is None or not finalization_ids:
+            return
+        required = tuple(sorted(set(finalization_ids)))
+        for _ in range(16):
+            current = store.current(
+                self.durable_recovery_requirement_scope
+            )
+            if current is None:
+                raise RuntimeError(
+                    "AI durable recovery requirement scope has no manifest"
+                )
+            _, item = current
+            missing = tuple(
+                value
+                for value in required
+                if value not in item.manifest.finalization_ids
+            )
+            if not missing:
+                self._durable_recovery_requirement_manifest = item
+                self.durable_recovery_ids = item.manifest.finalization_ids
+                return
+            change_material = (
+                item.manifest.digest
+                + ":"
+                + ",".join(missing)
+            )
+            change_id = (
+                "auto-finalization-"
+                + hashlib.sha256(
+                    change_material.encode()
+                ).hexdigest()[:32]
+            )
+            try:
+                item = store.add(
+                    self.durable_recovery_requirement_scope,
+                    missing,
+                    expected_generation=item.manifest.generation,
+                    change_id=change_id,
+                    reason=(
+                        "automatic enrollment of verified execution "
+                        "obligation finalization"
+                    ),
+                )
+                self._durable_recovery_requirement_manifest = item
+                self.durable_recovery_ids = item.manifest.finalization_ids
+                return
+            except DurableRecoveryRequirementConflict:
+                continue
+        raise RuntimeError(
+            "AI durable recovery requirement enrollment retry bound exceeded"
+        )
+
+    def _recover_execution_obligations(self) -> None:
+        recovery = self.execution_obligation_recovery
+        if recovery is None:
+            return
+        try:
+            summary = recovery.recover_safe()
+            self._execution_obligation_report = summary
+            if not summary.allowed:
+                raise RuntimeError(
+                    "execution obligations contain unresolved side effects"
+                )
+            self._enroll_required_finalizations(
+                summary.finalization_ids
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI execution obligation recovery failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI execution obligation recovery failed"
+            ) from exc
+
+    def _resolve_durable_recovery_ids(self) -> tuple[str, ...]:
+        store = self.durable_recovery_requirement_store
+        if store is None:
+            return self.durable_recovery_ids
+        scope = self.durable_recovery_requirement_scope
+        try:
+            current = store.current(scope)
+            if current is None:
+                raise DurableRecoveryRequirementConflict(
+                    "durable recovery requirement scope has no manifest"
+                )
+            manifest = current[1].manifest
+            runtime_expected = (
+                self._runtime_trust_digest()
+                if manifest.runtime_trust_digest
+                else None
+            )
+            release_expected = (
+                self._release_digest()
+                if manifest.release_evidence_digest
+                else None
+            )
+            item = store.require(
+                scope,
+                runtime_trust_digest=runtime_expected,
+                release_evidence_digest=release_expected,
+            )
+        except (
+            DurableRecoveryRequirementConflict,
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable recovery requirement "
+                        "authority drift detected"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable recovery requirement verification failed"
+            ) from exc
+        self._durable_recovery_requirement_manifest = item
+        self.durable_recovery_ids = item.manifest.finalization_ids
+        return self.durable_recovery_ids
+
+    def _require_execution_obligations_current(self) -> None:
+        if self.execution_obligation_recovery is None:
+            return
+        self._recover_execution_obligations()
+
+    def _require_durable_recovery_current(self) -> None:
+        if self.durable_recovery_guard is None:
+            return
+        ids = self._resolve_durable_recovery_ids()
+        report = self.durable_recovery_guard.inspect(ids)
+        self._durable_recovery_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason="AI durable recovery evidence drift detected",
+            )
+        raise RuntimeError(
+            "AI durable recovery verification failed"
+        )
+
+    def _require_durable_verification_current(self) -> None:
+        guard = self.durable_verification_guard
+        if guard is None:
+            return
+        try:
+            report = guard.require(
+                self.durable_verification_chains
+            )
+        except (
+            DurableVerificationFleetError,
+            RuntimeError,
+            ValueError,
+            TypeError,
+        ) as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable verification evidence drift detected"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable verification failed"
+            ) from exc
+        self._durable_verification_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable verification fleet denied admission"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable verification failed"
+        )
+
+    def _require_durable_operations_current(self) -> None:
+        if self.durable_operations_inspector is None:
+            return
+        report = self.durable_operations_inspector.inspect(
+            self.durable_operations_chains,
+            protected_roots=self.durable_operations_protected_roots,
+            recovery_finalization_ids=(
+                self.durable_recovery_ids
+                if (
+                    self.durable_operations_inspector
+                    .recovery_health is not None
+                )
+                else ()
+            ),
+        )
+        self._durable_operations_report = report
+        if report.allowed:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence operations drift detected"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable evidence operations verification failed"
+        )
+
+    def _require_durable_readiness_current(self) -> None:
+        guard = self.durable_readiness_guard
+        if guard is None:
+            return
+        try:
+            report = guard.inspect(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "inspection failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness verification failed"
+            ) from exc
+        self._durable_readiness_report = report
+        if report.ready:
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness drift detected"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable evidence readiness verification failed"
+        )
+
+    def reconcile_durable_readiness(
+        self,
+    ) -> DurableEvidenceReadinessReport:
+        if self.state.phase in {
+            AIServicePhase.FAILED,
+            AIServicePhase.STOPPING,
+            AIServicePhase.STOPPED,
+        }:
+            raise RuntimeError(
+                "AI service phase does not permit durable readiness reconciliation"
+            )
+        guard = self.durable_readiness_guard
+        if guard is None:
+            raise RuntimeError(
+                "durable evidence readiness guard is not configured"
+            )
+        try:
+            report = guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness reconciliation failed"
+            ) from exc
+        self._durable_readiness_report = report
+        if not report.ready:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation incomplete"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence readiness reconciliation incomplete"
+            )
+        if self.state.phase is AIServicePhase.DEGRADED:
+            history = self.state.history()
+            last_reason = (
+                ""
+                if not history
+                else history[-1].reason
+            )
+            if last_reason.startswith(
+                "AI durable evidence readiness"
+            ):
+                self.state.transition(
+                    AIServicePhase.READY,
+                    reason=(
+                        "AI durable evidence readiness "
+                        "reconciliation restored service"
+                    ),
+                )
+        return report
+
+    def _maintain_readiness_after_internal_write(
+        self,
+        *,
+        stage: str,
+    ) -> DurableEvidenceReadinessReport | None:
+        """Best-effort refresh after a trusted service-owned evidence write.
+
+        The completed stage is never converted into an exception solely
+        because readiness maintenance failed.  This prevents duplicate model
+        calls, approvals, or process retries.  Failure degrades the service so
+        the next authority-bearing operation is blocked until reconciliation.
+        """
+        if (
+            self.durable_readiness_guard is None
+            or not self.durable_readiness_reconcile_after_internal_writes
+        ):
+            return None
+        if not stage or len(stage) > 64:
+            raise ValueError(
+                "invalid durable readiness maintenance stage"
+            )
+        try:
+            report = self.durable_readiness_guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+            self._durable_readiness_report = report
+            if report.ready:
+                return report
+        except Exception:
+            report = None
+
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness "
+                    f"maintenance failed after {stage}"
+                ),
+            )
+        return report
+
+    def _post_execution_durable_readiness(
+        self,
+    ) -> tuple[
+        DurableEvidenceReadinessReport | None,
+        bool,
+        str,
+    ]:
+        """Best-effort maintenance after terminal execution.
+
+        This method never raises.  Once a child process and finalization have
+        completed, maintenance failure must not be confused with execution
+        failure or encourage an unsafe retry of side effects.
+        """
+        guard = self.durable_readiness_guard
+        if (
+            guard is None
+            or not self.durable_readiness_reconcile_after_finalization
+        ):
+            return None, False, ""
+        try:
+            report = guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+            self._durable_readiness_report = report
+            if report.ready:
+                return report, True, ""
+            error = "durable_readiness_not_ready"
+        except Exception as exc:
+            report = None
+            error = (
+                "durable_readiness_maintenance_"
+                + type(exc).__name__
+            )[:512]
+
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness "
+                    "post-execution maintenance failed"
+                ),
+            )
+        return report, True, error
+
+    def _durable_verification_health_for_chain(
+        self,
+        chain_id: str,
+    ):
+        report = self._durable_verification_report
+        if report is None:
+            return None
+        for item in report.chains:
+            if item.chain_id == chain_id:
+                return item if item.ok else None
+        return None
+
+    def _inspect_durable_lifecycle(
+        self,
+    ) -> dict[str, DurableLifecycleReport]:
+        coordinator = self.durable_lifecycle_coordinator
+        if coordinator is None:
+            return {}
+        reports: dict[
+            str,
+            DurableLifecycleReport,
+        ] = {}
+        for chain_id, chain in self.durable_lifecycle_chains:
+            reports[chain_id] = coordinator.inspect(
+                chain_id,
+                chain,
+                protected_roots=(
+                    self.durable_lifecycle_protected_roots.get(
+                        chain_id,
+                        (),
+                    )
+                ),
+                capacity=(
+                    self.durable_lifecycle_capacities.get(
+                        chain_id
+                    )
+                ),
+                verified_head=(
+                    self._durable_verification_health_for_chain(
+                        chain_id
+                    )
+                ),
+            )
+        return reports
+
+    def _require_durable_lifecycle_current(self) -> None:
+        if self.durable_lifecycle_coordinator is None:
+            return
+        try:
+            reports = self._inspect_durable_lifecycle()
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence lifecycle "
+                        "inspection failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence lifecycle verification failed"
+            ) from exc
+        self._durable_lifecycle_reports = reports
+        if all(
+            item.ok
+            for item in reports.values()
+        ):
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence lifecycle drift detected"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable evidence lifecycle verification failed"
+        )
+
+    def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        return AIShellSession(session_id or uuid.uuid4().hex, intent)
+
+    def review(self, session: AIShellSession) -> tuple[AIReviewBundle, AIReviewView]:
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        bundle = self.orchestrator.review(session)
+        proposal = bundle.planning.response.proposal
+        self.governance.require_not_quarantined(
+            model_id=proposal.model_id or self.orchestrator.planner.model.model_id,
+            proposal_fingerprint=proposal.fingerprint,
+            commands=tuple(action.command for action in proposal.actions),
+        )
+        view = self.review_builder.build(session.intent, proposal, bundle.critique)
+        if bundle.compiled is not None:
+            if session.session_id not in self._pins and len(self._pins) >= self._max_pins:
+                raise RuntimeError("AI shell plan-pin capacity exhausted")
+            self._pins[session.session_id] = self.stale_guard.pin(
+                session.intent,
+                proposal,
+                bundle.compiled,
+                self.orchestrator.planner.catalog,
+                self.orchestrator.compiler.effects,
+                self.governance.current_policy(),
+            )
+        self._maintain_readiness_after_internal_write(
+            stage="review",
+        )
+        return bundle, view
+
+    def approve(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approved_by: str,
+        ttl_seconds: float = 300.0,
+    ):
+        """Approve through the service boundary and maintain durable readiness."""
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        approval = self.orchestrator.approve(
+            session,
+            review,
+            principal=principal,
+            approved_by=approved_by,
+            ttl_seconds=ttl_seconds,
+        )
+        self._maintain_readiness_after_internal_write(
+            stage="approval",
+        )
+        return approval
+
+    def _validate_human_approval(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approval,
+    ) -> bool:
+        if approval is None:
+            return False
+        proposal = review.planning.response.proposal
+        self.orchestrator.approvals.require(
+            approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+        return True
+
+    def _consume_assurance_only_approval(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        approval,
+    ) -> None:
+        if approval is None or review.critique.policy.requires_approval:
+            return
+        proposal = review.planning.response.proposal
+        self.orchestrator.approvals.consume(
+            approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+
+    def _quorum_digest(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        quorum_approval: QuorumApproval | None,
+    ) -> str:
+        if quorum_approval is None:
+            return ""
+        if self.approval_quorum is None:
+            raise RuntimeError("quorum approval store is not configured")
+        proposal = review.planning.response.proposal
+        current = self.approval_quorum.require(
+            quorum_approval,
+            principal=principal,
+            intent_fingerprint=session.intent.fingerprint,
+            proposal_fingerprint=proposal.fingerprint,
+        )
+        return current.digest
+
+    def acquire_execution_fence(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        ttl_seconds: float | None = None,
+    ) -> AIExecutionFence:
+        if self.execution_fences is None:
+            raise RuntimeError("execution fence manager is not configured")
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_authority_health()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        proposal = review.planning.response.proposal
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
+        return self.execution_fences.acquire(
+            review.compiled.plan,
+            session_id=session.session_id,
+            principal=principal,
+            worker_id=self.worker_id,
+            runtime_trust_digest=self._runtime_trust_digest(),
+            release_evidence_digest=self._release_digest(),
+            ttl_seconds=ttl_seconds,
+        )
+
+    def _execution_fence_digest(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        execution_fence: AIExecutionFence | None,
+    ) -> str:
+        if self.execution_fences is None:
+            if execution_fence is not None:
+                raise RuntimeError(
+                    "execution fence provided but manager is not configured"
+                )
+            return ""
+        if execution_fence is None:
+            raise RuntimeError("distributed execution fence is required")
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        current = self.execution_fences.require(
+            execution_fence,
+            review.compiled.plan,
+            session_id=session.session_id,
+            principal=principal,
+            worker_id=self.worker_id,
+            runtime_trust_digest=self._runtime_trust_digest(),
+            release_evidence_digest=self._release_digest(),
+        )
+        return current.digest
+
+    def _assurance_digest(
+        self,
+        review: AIReviewBundle,
+        *,
+        execution_backend: AIPlanExecutionBackend | None,
+        preconditions_digest: str,
+        approval_id: str,
+        quorum_digest: str,
+        execution_fence_digest: str = "",
+    ) -> str:
+        if self.assurance is None:
+            return quorum_digest
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        active_backend = execution_backend or self.orchestrator.execution_backend
+        sandbox_binding = getattr(active_backend, "binding", None)
+        sandbox_binding_digest = (
+            ""
+            if sandbox_binding is None
+            else getattr(sandbox_binding, "digest", "")
+        )
+        binding = AssuranceBinding(
+            1,
+            review.critique.risk.band,
+            self.assurance.policy.digest,
+            review.compiled.plan.fingerprint,
+            release_evidence_digest=self._release_digest(),
+            preconditions_digest=preconditions_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+            execution_backend_id=active_backend.backend_id,
+            sandbox_binding_digest=sandbox_binding_digest,
+            runtime_trust_digest=self._runtime_trust_digest(),
+            execution_fence_digest=execution_fence_digest,
+        )
+        return binding.digest
+
+    def seal_review(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        principal: str,
+        authority: ExecutionSealAuthority,
+        preconditions: Preconditions | None = None,
+        approval=None,
+        quorum_approval: QuorumApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
+        ttl_seconds: float = 60.0,
+    ) -> ExecutionSeal:
+        """Issue short-lived signed authority for one exact reviewed plan.
+
+        Issuance performs no execution. Approval is validated but not consumed;
+        normal execution consumes it after the seal is consumed.
+        """
+
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_authority_health()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        proposal = review.planning.response.proposal
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
+        approval_id = ""
+        if approval is not None:
+            self._validate_human_approval(
+                session,
+                review,
+                principal=principal,
+                approval=approval,
+            )
+            approval_id = approval.approval_id
+        elif review.critique.policy.requires_approval:
+            raise RuntimeError("human approval is required before execution sealing")
+        quorum_digest = self._quorum_digest(
+            session,
+            review,
+            principal=principal,
+            quorum_approval=quorum_approval,
+        )
+        preconditions_digest = "" if preconditions is None else preconditions.digest
+        execution_fence_digest = self._execution_fence_digest(
+            session,
+            review,
+            principal=principal,
+            execution_fence=execution_fence,
+        )
+        assurance_digest = self._assurance_digest(
+            review,
+            execution_backend=execution_backend,
+            preconditions_digest=preconditions_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+            execution_fence_digest=execution_fence_digest,
+        )
+        return authority.issue(
+            principal=principal,
+            session_id=session.session_id,
+            plan_pin=pin,
+            preconditions_digest=preconditions_digest,
+            approval_id=approval_id,
+            release_evidence_digest=self._release_digest(),
+            assurance_digest=assurance_digest,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def execute_sealed(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        seal: ExecutionSeal,
+        seal_registry: ExecutionSealRegistry,
+        preconditions: Preconditions | None = None,
+        precondition_checker: PreconditionChecker | None = None,
+        approval=None,
+        quorum_approval: QuorumApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
+    ) -> tuple[AIExecutionBundle, PreconditionReport | None, SealUse]:
+        """Execute only after preconditions and a single-use signed seal pass."""
+
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_authority_health()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        if review.compiled is None:
+            raise RuntimeError("AI shell proposal is not executable")
+        pin = self._pins.get(session.session_id)
+        if pin is None:
+            raise RuntimeError("AI shell reviewed plan has no execution pin")
+        proposal = review.planning.response.proposal
+        self.stale_guard.require_current(
+            pin,
+            intent=session.intent,
+            proposal=proposal,
+            compiled=review.compiled,
+            catalog=self.orchestrator.planner.catalog,
+            effects=self.orchestrator.compiler.effects,
+            policy=self.governance.current_policy(),
+        )
+        precondition_report = None
+        precondition_digest = ""
+        if preconditions is not None:
+            if precondition_checker is None:
+                raise RuntimeError("precondition checker is required")
+            precondition_report = precondition_checker.require(preconditions)
+            precondition_digest = preconditions.digest
+        human_approved = self._validate_human_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
+        approval_id = "" if approval is None else approval.approval_id
+        quorum_digest = self._quorum_digest(
+            session,
+            review,
+            principal=context.principal,
+            quorum_approval=quorum_approval,
+        )
+        execution_fence_digest = self._execution_fence_digest(
+            session,
+            review,
+            principal=context.principal,
+            execution_fence=execution_fence,
+        )
+        assurance_digest = self._assurance_digest(
+            review,
+            execution_backend=execution_backend,
+            preconditions_digest=precondition_digest,
+            approval_id=approval_id,
+            quorum_digest=quorum_digest,
+            execution_fence_digest=execution_fence_digest,
+        )
+        try:
+            self._require_assurance(
+                review,
+                execution_backend=execution_backend,
+                sealed=True,
+                preconditions_verified=(
+                    precondition_report is not None
+                    and precondition_report.ok
+                ),
+                human_approved=human_approved,
+                quorum_approved=bool(quorum_digest),
+            )
+        except BaseException:
+            if (
+                execution_fence is not None
+                and self.execution_fences is not None
+            ):
+                self.execution_fences.release(execution_fence)
+            raise
+        attempt: AIExecutionAttempt | None = None
+        tracking_backend: AttemptTrackingExecutionBackend | None = None
+        obligation_store = (
+            None
+            if self.execution_obligation_recovery is None
+            else self.execution_obligation_recovery.obligations
+        )
+        if obligation_store is not None:
+            obligation_store.register(
+                obligation_id=seal.seal_id,
+                session_id=session.session_id,
+                principal=context.principal,
+                plan_fingerprint=review.compiled.plan.fingerprint,
+                execution_seal_id=seal.seal_id,
+                runtime_trust_digest=self._runtime_trust_digest(),
+                release_evidence_digest=self._release_digest(),
+            )
+        try:
+            use = seal_registry.consume(
+                seal,
+                principal=context.principal,
+                session_id=session.session_id,
+                plan_pin=pin,
+                preconditions_digest=precondition_digest,
+                approval_id=approval_id,
+                release_evidence_digest=self._release_digest(),
+                assurance_digest=assurance_digest,
+            )
+            if self.execution_attempts is not None:
+                active_backend = (
+                    execution_backend or self.orchestrator.execution_backend
+                )
+                stored_attempt = self.execution_attempts.reserve(
+                    attempt_id=seal.seal_id,
+                    session_id=session.session_id,
+                    principal=context.principal,
+                    worker_id=self.worker_id,
+                    plan_fingerprint=review.compiled.plan.fingerprint,
+                    execution_seal_id=seal.seal_id,
+                    execution_fence_digest=execution_fence_digest,
+                    fencing_token=(
+                        None
+                        if execution_fence is None
+                        else execution_fence.lease.fencing_token
+                    ),
+                    runtime_trust_digest=self._runtime_trust_digest(),
+                    release_evidence_digest=self._release_digest(),
+                    execution_backend_id=active_backend.backend_id,
+                )
+                attempt = stored_attempt.attempt
+                if obligation_store is not None:
+                    obligation_store.sync_attempt(
+                        seal.seal_id,
+                        attempt,
+                    )
+                tracking_backend = AttemptTrackingExecutionBackend(
+                    self.execution_attempts,
+                    attempt,
+                    active_backend,
+                )
+            if quorum_approval is not None:
+                if self.approval_quorum is None:
+                    raise RuntimeError("quorum approval store is not configured")
+                self.approval_quorum.consume(
+                    quorum_approval,
+                    principal=context.principal,
+                    intent_fingerprint=session.intent.fingerprint,
+                    proposal_fingerprint=(
+                        review.planning.response.proposal.fingerprint
+                    ),
+                )
+            result = self._execute_reviewed(
+                session,
+                review,
+                context=context,
+                approval=approval,
+                execution_backend=(
+                    tracking_backend
+                    if tracking_backend is not None
+                    else execution_backend
+                ),
+                sealed=True,
+                execution_fenced=bool(execution_fence_digest),
+                preconditions_verified=(
+                    precondition_report is not None
+                    and precondition_report.ok
+                ),
+                human_approved=human_approved,
+                quorum_approved=bool(quorum_digest),
+            )
+            if tracking_backend is not None:
+                attempt = tracking_backend.attempt
+                if result.ok:
+                    terminal_attempt = self.execution_attempts.succeed(
+                        attempt,
+                        terminal_evidence_digest=result.provenance.digest,
+                    ).attempt
+                else:
+                    terminal_attempt = self.execution_attempts.fail(
+                        attempt,
+                        error_type="ExecutionOrVerificationFailed",
+                        terminal_evidence_digest=result.provenance.digest,
+                    ).attempt
+                attempt = terminal_attempt
+                if obligation_store is not None:
+                    obligation_store.sync_attempt(
+                        seal.seal_id,
+                        terminal_attempt,
+                    )
+            return result, precondition_report, use
+        except BaseException as exc:
+            if self.execution_attempts is not None and attempt is not None:
+                try:
+                    current = self.execution_attempts.current(
+                        attempt.attempt_id
+                    )
+                    if current is not None:
+                        attempt = current.attempt
+                        if attempt.state is ExecutionAttemptState.AUTHORIZED:
+                            self.execution_attempts.abandon(attempt)
+                        elif (
+                            attempt.state
+                            is ExecutionAttemptState.BOUNDARY_ENTERED
+                        ):
+                            self.execution_attempts.fail(
+                                attempt,
+                                error_type=type(exc).__name__,
+                            )
+                except Exception as ledger_exc:
+                    raise RuntimeError(
+                        "AI execution attempt ledger terminal write failed"
+                    ) from ledger_exc
+                if obligation_store is not None:
+                    try:
+                        current_attempt = self.execution_attempts.current(
+                            attempt.attempt_id
+                        )
+                        if current_attempt is not None:
+                            obligation_store.sync_attempt(
+                                seal.seal_id,
+                                current_attempt.attempt,
+                            )
+                    except Exception as obligation_exc:
+                        raise RuntimeError(
+                            "AI execution obligation terminal write failed"
+                        ) from obligation_exc
+            raise
+        finally:
+            if execution_fence is not None and self.execution_fences is not None:
+                self.execution_fences.release(execution_fence)
+
+    def execute_sealed_and_finalize(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        seal: ExecutionSeal,
+        seal_registry: ExecutionSealRegistry,
+        finalizer: AIExecutionEvidenceFinalizer,
+        preconditions: Preconditions | None = None,
+        precondition_checker: PreconditionChecker | None = None,
+        approval=None,
+        quorum_approval: QuorumApproval | None = None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        execution_fence: AIExecutionFence | None = None,
+        model_attestation_digest: str = "",
+    ) -> AISealedFinalizedExecution:
+        """Execute one sealed plan and commit its recovery/audit evidence.
+
+        Process execution and evidence finalization are intentionally distinct
+        durability domains.  If the child process reaches a terminal state but
+        evidence finalization fails, this method degrades the long-lived
+        service so no new work is admitted until recovery completes.
+        """
+
+        if not isinstance(finalizer, AIExecutionEvidenceFinalizer):
+            raise TypeError("finalizer must be AIExecutionEvidenceFinalizer")
+        execution, precondition_report, seal_use = self.execute_sealed(
+            session,
+            review,
+            context=context,
+            seal=seal,
+            seal_registry=seal_registry,
+            preconditions=preconditions,
+            precondition_checker=precondition_checker,
+            approval=approval,
+            quorum_approval=quorum_approval,
+            execution_backend=execution_backend,
+            execution_fence=execution_fence,
+        )
+
+        execution_attempt = None
+        if self.execution_attempts is not None:
+            stored_attempt = self.execution_attempts.current(seal.seal_id)
+            if stored_attempt is None:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution is missing durable attempt "
+                            "evidence"
+                        ),
+                    )
+                raise RuntimeError(
+                    "terminal execution attempt evidence is missing"
+                )
+            execution_attempt = stored_attempt.attempt
+            if not execution_attempt.terminal:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution attempt is not terminal "
+                            "in durable ledger"
+                        ),
+                    )
+                raise RuntimeError(
+                    "execution attempt did not reach terminal ledger state"
+                )
+
+        active_backend = (
+            execution_backend or self.orchestrator.execution_backend
+        )
+        sandbox_binding = getattr(active_backend, "binding", None)
+        sandbox_binding_digest = (
+            ""
+            if sandbox_binding is None
+            else getattr(sandbox_binding, "digest", "")
+        )
+        quorum_approval_digest = (
+            ""
+            if quorum_approval is None
+            else quorum_approval.digest
+        )
+
+        try:
+            finalized = finalizer.finalize(
+                session,
+                execution,
+                policy_fingerprint=(
+                    self.governance.current_policy().fingerprint
+                ),
+                tool_catalog_digest=self.orchestrator.planner.catalog.digest,
+                effect_digest=self.orchestrator.compiler.effects.digest,
+                release_evidence_digest=self._release_digest(),
+                sandbox_binding_digest=sandbox_binding_digest,
+                model_attestation_digest=model_attestation_digest,
+                execution_seal_id=seal.seal_id,
+                quorum_approval_digest=quorum_approval_digest,
+                runtime_trust_digest=self._runtime_trust_digest(),
+                authority_health_policy_digest=(
+                    self._authority_health_policy_digest()
+                ),
+                execution_attempt=execution_attempt,
+            )
+        except BaseException as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "terminal execution evidence finalization failed: "
+                        f"{type(exc).__name__}"
+                    ),
+                )
+            raise
+
+        if self.execution_obligation_recovery is not None:
+            try:
+                if execution_attempt is None:
+                    raise RuntimeError(
+                        "execution obligation requires terminal attempt evidence"
+                    )
+                if finalized.finalization is None:
+                    raise RuntimeError(
+                        "execution obligation requires durable finalization state"
+                    )
+                obligation_store = (
+                    self.execution_obligation_recovery.obligations
+                )
+                obligation_store.sync_attempt(
+                    seal.seal_id,
+                    execution_attempt,
+                )
+                obligation_store.finalize(
+                    seal.seal_id,
+                    finalized.finalization,
+                )
+                self._execution_obligation_report = (
+                    self.execution_obligation_recovery.summary()
+                )
+                self._enroll_required_finalizations(
+                    (finalized.finalization.finalization_id,)
+                )
+                if self.durable_recovery_guard is not None:
+                    self._require_durable_recovery_current()
+            except Exception as exc:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution obligation finalization failed"
+                        ),
+                    )
+                raise RuntimeError(
+                    "terminal execution obligation finalization failed"
+                ) from exc
+
+        (
+            post_execution_readiness,
+            post_execution_maintenance_attempted,
+            post_execution_maintenance_error,
+        ) = self._post_execution_durable_readiness()
+
+        return AISealedFinalizedExecution(
+            execution,
+            precondition_report,
+            seal_use,
+            finalized,
+            execution_attempt,
+            post_execution_readiness,
+            post_execution_maintenance_attempted,
+            post_execution_maintenance_error,
+        )
+
+    def _require_assurance(
+        self,
+        review: AIReviewBundle,
+        *,
+        execution_backend: AIPlanExecutionBackend | None,
+        sealed: bool,
+        execution_fenced: bool = False,
+        preconditions_verified: bool = False,
+        human_approved: bool = False,
+        quorum_approved: bool = False,
+    ) -> None:
+        if self.assurance is None:
+            return
+        active_backend = execution_backend or self.orchestrator.execution_backend
+        assurance_backend = getattr(
+            active_backend,
+            "assurance_backend",
+            active_backend,
+        )
+        self.assurance.require(
+            review.critique.risk.band,
+            sealed=sealed,
+            sandbox_verified=isinstance(
+                assurance_backend,
+                VerifiedSandboxExecutionBackend,
+            ),
+            backend_id=assurance_backend.backend_id,
+            release_verified=(
+                self._release_report is not None
+                and self._release_report.allowed
+            ),
+            preconditions_verified=preconditions_verified,
+            human_approved=human_approved,
+            quorum_approved=quorum_approved,
+        )
+
+    def execute(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        approval=None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+    ) -> AIExecutionBundle:
+        if self.execution_fences is not None:
+            raise RuntimeError(
+                "configured distributed execution fencing requires execute_sealed"
+            )
+        if self.execution_attempts is not None:
+            raise RuntimeError(
+                "configured execution attempt ledger requires execute_sealed"
+            )
+        human_approved = self._validate_human_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
+        return self._execute_reviewed(
+            session,
+            review,
+            context=context,
+            approval=approval,
+            execution_backend=execution_backend,
+            sealed=False,
+            preconditions_verified=False,
+            human_approved=human_approved,
+            quorum_approved=False,
+        )
+
+    def _execute_reviewed(
+        self,
+        session: AIShellSession,
+        review: AIReviewBundle,
+        *,
+        context: ExecutionContext,
+        approval=None,
+        execution_backend: AIPlanExecutionBackend | None = None,
+        sealed: bool,
+        execution_fenced: bool = False,
+        preconditions_verified: bool = False,
+        human_approved: bool = False,
+        quorum_approved: bool = False,
+    ) -> AIExecutionBundle:
+        if not self.state.ready():
+            raise RuntimeError("AI shell service is not ready")
+        self._require_release_current()
+        self._require_runtime_trust_current()
+        self._require_authority_health()
+        self._require_execution_obligations_current()
+        self._require_durable_recovery_current()
+        self._require_durable_verification_current()
+        self._require_durable_operations_current()
+        self._require_durable_readiness_current()
+        self._require_durable_lifecycle_current()
+        if self.execution_fences is not None and not execution_fenced:
+            raise RuntimeError("distributed execution fence was not verified")
+        self._require_assurance(
+            review,
+            execution_backend=execution_backend,
+            sealed=sealed,
+            preconditions_verified=preconditions_verified,
+            human_approved=human_approved,
+            quorum_approved=quorum_approved,
+        )
+        proposal = review.planning.response.proposal
+        pin = self._pins.get(session.session_id)
+        if review.compiled is not None:
+            if pin is None:
+                raise RuntimeError("AI shell reviewed plan has no execution pin")
+            self.stale_guard.require_current(
+                pin,
+                intent=session.intent,
+                proposal=proposal,
+                compiled=review.compiled,
+                catalog=self.orchestrator.planner.catalog,
+                effects=self.orchestrator.compiler.effects,
+                policy=self.governance.current_policy(),
+            )
+        self.governance.require_not_quarantined(
+            model_id=proposal.model_id or self.orchestrator.planner.model.model_id,
+            proposal_fingerprint=proposal.fingerprint,
+            commands=tuple(action.command for action in proposal.actions),
+        )
+        self._consume_assurance_only_approval(
+            session,
+            review,
+            principal=context.principal,
+            approval=approval,
+        )
+        try:
+            result = self.orchestrator.execute(
+                session,
+                review,
+                context=context,
+                approval=approval,
+                execution_backend=execution_backend,
+                release_evidence_digest=self._release_digest(),
+                runtime_trust_digest=(
+                    ""
+                    if self._runtime_trust_report is None
+                    else self._runtime_trust_report.epoch_digest
+                ),
+                authority_health_policy_digest=(
+                    ""
+                    if self._authority_health_report is None
+                    else self._authority_health_report.policy_digest
+                ),
+            )
+        except BaseException:
+            self._maintain_readiness_after_internal_write(
+                stage="execution_failure",
+            )
+            raise
+        else:
+            self._maintain_readiness_after_internal_write(
+                stage="execution",
+            )
+            return result
+        finally:
+            if session.phase.value in {"complete", "failed", "denied", "cancelled"}:
+                self._pins.pop(session.session_id, None)
+
+    def status(self) -> AIServiceStatus:
+        return AIServiceStatus(
+            self.state.phase,
+            self.diagnostics.inspect().to_dict(),
+            self.governance.snapshot().to_dict(),
+            self.orchestrator.shell_service.state.phase.value,
+            None if self._release_report is None else self._release_report.to_dict(),
+            (
+                None
+                if self._runtime_trust_report is None
+                else self._runtime_trust_report.to_dict()
+            ),
+            (
+                None
+                if self._authority_health_report is None
+                else self._authority_health_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_recovery_report is None
+                else self._durable_recovery_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_operations_report is None
+                else self._durable_operations_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_recovery_requirement_manifest is None
+                else self._durable_recovery_requirement_manifest.to_dict()
+            ),
+            (
+                None
+                if self._execution_obligation_report is None
+                else self._execution_obligation_report.to_dict()
+            ),
+            (
+                None
+                if not self._durable_lifecycle_reports
+                else {
+                    "allowed": all(
+                        item.ok
+                        for item in self._durable_lifecycle_reports.values()
+                    ),
+                    "chains": {
+                        chain_id: item.to_dict()
+                        for chain_id, item
+                        in sorted(
+                            self._durable_lifecycle_reports.items()
+                        )
+                    },
+                }
+            ),
+            (
+                None
+                if self._durable_verification_report is None
+                else self._durable_verification_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_readiness_report is None
+                else self._durable_readiness_report.to_dict()
+            ),
+        )

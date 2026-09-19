@@ -43,7 +43,14 @@ def python_files() -> Iterable[Path]:
         if root.is_symlink():
             raise OSError("required scan root must not be a symlink")
         for path in root.rglob("*.py"):
-            relative = path.relative_to(REPO_ROOT)
+            try:
+                relative = path.relative_to(REPO_ROOT)
+            except ValueError:
+                # Tests and reusable callers may provide required roots outside
+                # the repository. Preserve the root name so the live
+                # skeleton/build exception and generic build exclusion retain
+                # the same semantics without leaking a hard-coded repo root.
+                relative = Path(root.name) / path.relative_to(root)
             parts = relative.parts
             filtered_parts = (
                 (parts[0], *parts[2:])

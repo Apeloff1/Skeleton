@@ -1048,15 +1048,22 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
         if decision.consensus is not None:
             values.append(decision.consensus.normalized_entropy)
             values.append(1.0 - decision.consensus.agreement)
-        if decision.lens_fusion is not None:
-            values.append(decision.lens_fusion.conflict_strength)
+        lens_fusion = getattr(
+            decision,
+            "lens_fusion",
+            None,
+        )
+        if lens_fusion is not None:
+            values.append(
+                lens_fusion.conflict_strength
+            )
             values.append(
                 max(
                     0.0,
                     min(
                         1.0,
-                        decision.lens_fusion.sensitivity_high
-                        - decision.lens_fusion.sensitivity_low,
+                        lens_fusion.sensitivity_high
+                        - lens_fusion.sensitivity_low,
                     ),
                 )
             )

@@ -719,6 +719,43 @@ def test_frontier_uncertainty_uses_strongest_unresolved_signal() -> None:
     assert value == 0.72
 
 
+def test_frontier_uncertainty_includes_optional_lens_fusion_signal() -> None:
+    decision = SimpleNamespace(
+        diagnostics=SimpleNamespace(
+            normalized_entropy=0.20,
+            action_disagreement=0.30,
+            outcome_disagreement=0.10,
+        ),
+        consensus=SimpleNamespace(
+            normalized_entropy=0.25,
+            agreement=0.90,
+        ),
+        lens_fusion=SimpleNamespace(
+            conflict_strength=0.82,
+            sensitivity_low=0.10,
+            sensitivity_high=0.65,
+        ),
+    )
+
+    value = AdaptiveJeevesRuntime._frontier_uncertainty(decision)
+
+    assert value == 0.82
+
+
+def test_frontier_uncertainty_tolerates_explicitly_missing_lens_fusion() -> None:
+    decision = SimpleNamespace(
+        diagnostics=SimpleNamespace(
+            normalized_entropy=0.33,
+            action_disagreement=0.44,
+            outcome_disagreement=0.22,
+        ),
+        consensus=None,
+        lens_fusion=None,
+    )
+
+    assert AdaptiveJeevesRuntime._frontier_uncertainty(decision) == 0.44
+
+
 def test_adaptive_config_has_positive_stagnation_threshold() -> None:
     config = AdaptiveConfig()
 

@@ -170,7 +170,9 @@ from .execution_audit import (
     ReplayReport,
 )
 from .frontier_adjudication import (
-    CandidateAdjudication,
+    FrontierAdjudicationPolicy,
+    FrontierAdjudicationReport,
+    HostCandidateAdjudicationReport,
     HostCandidateAdjudicator,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
