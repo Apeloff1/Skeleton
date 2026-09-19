@@ -469,6 +469,7 @@ Each runtime status includes:
 - Java/source configuration;
 - detected server processor count after a successful ping;
 - JVM process start count;
+- failed JVM process-start attempts;
 - explicit restart count;
 - total protocol requests;
 - successful request count;
