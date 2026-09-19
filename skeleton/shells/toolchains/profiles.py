@@ -153,6 +153,60 @@ PACKAGE_INSPECT = ContractProfile(
     exclude_effects=frozenset({CommandEffect.WRITE, CommandEffect.NETWORK}),
 )
 
+
+INFRA_OBSERVE = ContractProfile(
+    "infra-observe",
+    max_risk=CommandRisk.MODERATE,
+    required_tags=frozenset({"infra"}),
+    exclude_effects=frozenset({
+        CommandEffect.WRITE,
+        CommandEffect.PROCESS,
+    }),
+)
+
+SECURITY_SCAN = ContractProfile(
+    "security-scan",
+    max_risk=CommandRisk.MODERATE,
+    required_tags=frozenset({"security"}),
+    exclude_effects=frozenset({
+        CommandEffect.WRITE,
+        CommandEffect.PROCESS,
+    }),
+)
+
+ARTIFACT_INSPECT = ContractProfile(
+    "artifact-inspect",
+    max_risk=CommandRisk.LOW,
+    required_tags=frozenset({"artifact"}),
+    exclude_effects=frozenset({
+        CommandEffect.WRITE,
+        CommandEffect.PROCESS,
+        CommandEffect.NETWORK,
+    }),
+)
+
+ARCHIVE_INSPECT = ContractProfile(
+    "archive-inspect",
+    max_risk=CommandRisk.LOW,
+    required_tags=frozenset({"archive"}),
+    exclude_effects=frozenset({
+        CommandEffect.WRITE,
+        CommandEffect.PROCESS,
+        CommandEffect.NETWORK,
+    }),
+)
+
+DATA_READ = ContractProfile(
+    "data-read",
+    max_risk=CommandRisk.LOW,
+    required_tags=frozenset({"data"}),
+    exclude_effects=frozenset({
+        CommandEffect.WRITE,
+        CommandEffect.PROCESS,
+        CommandEffect.NETWORK,
+    }),
+)
+
 PROFILES = {
     profile.name: profile
     for profile in (
@@ -169,6 +223,11 @@ PROFILES = {
         LINT_ONLY,
         BUILD_LOCAL,
         PACKAGE_INSPECT,
+        INFRA_OBSERVE,
+        SECURITY_SCAN,
+        ARTIFACT_INSPECT,
+        ARCHIVE_INSPECT,
+        DATA_READ,
     )
 }
 
