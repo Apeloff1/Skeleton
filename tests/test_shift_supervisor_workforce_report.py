@@ -30,11 +30,20 @@ def test_idle_snapshot_accounts_for_all_four_squad_roles(tmp_path):
     workers = {worker["worker_id"]: worker for worker in snapshot["workers"]}
     assert set(workers) == {"idle-0010", "idle-0042", "idle-0800", "idle-0900"}
     assert all(worker["metadata"]["worked_on"] == ["issue:42"] for worker in workers.values())
-    assert workers["idle-0010"]["metadata"]["roles"] == ["research-benchmark"]
-    assert workers["idle-0042"]["metadata"]["roles"] == ["backend"]
-    assert workers["idle-0800"]["metadata"]["roles"] == ["testing"]
-    assert workers["idle-0900"]["metadata"]["roles"] == ["security"]
+    assert workers["idle-0010"]["metadata"]["roles"] == ["researcher"]
+    assert workers["idle-0042"]["metadata"]["roles"] == ["lead"]
+    assert workers["idle-0800"]["metadata"]["roles"] == ["verifier"]
+    assert workers["idle-0900"]["metadata"]["roles"] == ["reviewer"]
     assert all(worker["status"] == "offline" for worker in workers.values())
+    assert all(
+        worker["metadata"]["validation_status"] == "passed"
+        for worker in workers.values()
+    )
+    assert all(
+        worker["metadata"]["validation_source"]
+        == "credential-free-studio-validation"
+        for worker in workers.values()
+    )
 
 
 def test_idle_snapshot_remains_compatible_with_legacy_two_agent_entry(tmp_path):
@@ -81,7 +90,7 @@ def test_night_snapshot_accounts_for_all_four_accepted_patch_workers(tmp_path):
     workers = {worker["worker_id"]: worker for worker in snapshot["workers"]}
     assert set(workers) == {"night-research-2", "night-build-7", "night-review-3", "night-verify-4"}
     assert workers["night-research-2"]["metadata"]["roles"] == ["researcher"]
-    assert workers["night-build-7"]["metadata"]["roles"] == ["builder"]
+    assert workers["night-build-7"]["metadata"]["roles"] == ["lead"]
     assert workers["night-review-3"]["metadata"]["roles"] == ["reviewer"]
     assert workers["night-verify-4"]["metadata"]["roles"] == ["verifier"]
     assert all(worker["metadata"]["worked_on"] == ["task-a"] for worker in workers.values())
