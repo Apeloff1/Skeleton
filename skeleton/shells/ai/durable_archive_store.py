@@ -1181,24 +1181,6 @@ class DurableArchiveRepository:
                     "archived snapshot previous hash is not contiguous"
                 )
             previous = node_hash
-        if limit == 0:
-            terminal = GENESIS_HASH
-        else:
-            terminal = str(
-                getattr(
-                    nodes[-1],
-                    "event_hash",
-                    getattr(
-                        nodes[-1],
-                        "receipt_hash",
-                        getattr(
-                            nodes[-1],
-                            "node_hash",
-                            "",
-                        ),
-                    ),
-                )
-            )
         return nodes
 
     def snapshot_at(
