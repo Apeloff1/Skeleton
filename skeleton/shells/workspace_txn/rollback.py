@@ -92,6 +92,47 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
     return tuple(actions)
 
 
+def build_directory_metadata_actions(
+    changes: ChangeSet,
+    manifest: BackupManifest,
+) -> tuple[RollbackAction, ...]:
+    """Restore pre-existing directory metadata after all structural rollback.
+
+    Creating, deleting, restoring, or renaming a child updates its parent
+    directory mtime.  Directory metadata therefore cannot be restored reliably
+    in the same pass as structural actions: a later child operation may dirty
+    the parent again.  Build a final metadata pass for every backed-up
+    directory that contains an affected path, even when the original snapshot
+    diff did not independently classify the directory as metadata-changed.
+    """
+
+    affected: set[str] = set()
+    for change in changes.changes:
+        affected.add(change.path)
+        if change.old_path:
+            affected.add(change.old_path)
+
+    actions: list[RollbackAction] = []
+    for record in manifest.records:
+        if record.kind is not WorkspaceEntryKind.DIRECTORY:
+            continue
+        prefix = record.path.rstrip("/") + "/"
+        if not any(path == record.path or path.startswith(prefix) for path in affected):
+            continue
+        actions.append(
+            RollbackAction(
+                RollbackActionKind.RESTORE_METADATA,
+                record.path,
+                restore_digest=record.digest,
+            )
+        )
+
+    # Deepest directories first and shallowest last.  This leaves the outermost
+    # affected directory as the final filesystem metadata write in its subtree.
+    actions.sort(key=lambda action: (-action.path.count("/"), action.path))
+    return tuple(actions)
+
+
 class WorkspaceRollback:
     def __init__(
         self,
@@ -303,10 +344,29 @@ class WorkspaceRollback:
     ) -> RollbackReport:
         root_path = Path(root).expanduser().resolve(strict=True)
         started = datetime.now(timezone.utc).isoformat()
-        results = tuple(
-            self._apply_one(root_path, action, manifest)
-            for action in build_rollback_actions(changes)
+        planned = build_rollback_actions(changes)
+        directory_paths = {
+            action.path
+            for action in build_directory_metadata_actions(changes, manifest)
+        }
+        structural = tuple(
+            action
+            for action in planned
+            if not (
+                action.kind is RollbackActionKind.RESTORE_METADATA
+                and action.path in directory_paths
+            )
         )
+        directory_metadata = build_directory_metadata_actions(changes, manifest)
+
+        applied: list[RollbackActionResult] = []
+        for action in structural:
+            applied.append(self._apply_one(root_path, action, manifest))
+        # Directory mtimes/modes are intentionally restored last because every
+        # child create/remove/rename can dirty an ancestor directory again.
+        for action in directory_metadata:
+            applied.append(self._apply_one(root_path, action, manifest))
+        results = tuple(applied)
         final = self.scanner.scan(root_path)
         finished = datetime.now(timezone.utc).isoformat()
         verified = final.digest == before.digest
