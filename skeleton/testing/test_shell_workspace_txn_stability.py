@@ -293,6 +293,34 @@ def test_backup_manifest_publish_failure_leaves_no_partial_final_file(
     assert list(manager.backup_store.manifest_root.glob(".manifest-*.tmp")) == []
 
 
+def test_backup_blob_read_rejects_manifest_storage_key_redirection(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    target = root / "payload.txt"
+    target.write_text("payload", encoding="utf-8")
+    snapshot = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, snapshot)
+    record = manifest.by_path["payload.txt"]
+
+    redirected = replace(record, storage_key="../outside")
+    with pytest.raises(BackupError, match="storage key"):
+        manager.backup_store.read_blob(redirected)
+
+
+def test_backup_blob_read_rejects_size_corruption_before_loading(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    target = root / "payload.txt"
+    target.write_text("payload", encoding="utf-8")
+    snapshot = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, snapshot)
+    record = manifest.by_path["payload.txt"]
+    blob_path = manager.backup_store.storage_root / record.storage_key
+    blob_path.write_bytes(b"payload-corrupted-with-extra-bytes")
+
+    with pytest.raises(BackupError, match="size"):
+        manager.backup_store.read_blob(record)
+    assert not manager.backup_store.verify_manifest(manifest)
+
+
 def test_backup_manifest_root_metadata_is_integrity_bound(tmp_path: Path):
     root, manager, _ = _manager(tmp_path)
     snapshot = manager.scanner.scan(root)
