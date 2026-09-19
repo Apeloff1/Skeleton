@@ -279,6 +279,292 @@ class ContentAddressedEvidenceChain:
             raise EvidenceCorruption("evidence snapshot length differs from head")
         return items
 
+    def sequence_for_root(
+        self,
+        root_hash: str,
+    ) -> int:
+        if len(root_hash) != 64:
+            raise ValueError(
+                "root_hash must be SHA-256 hex"
+            )
+        if root_hash == GENESIS_HASH:
+            return 0
+        return self.get_node(
+            root_hash
+        ).sequence
+
+    def snapshot_at(
+        self,
+        root_hash: str,
+    ) -> tuple[EvidenceNode, ...]:
+        """Return and verify the committed prefix ending at root_hash."""
+        if len(root_hash) != 64:
+            raise ValueError(
+                "root_hash must be SHA-256 hex"
+            )
+        if root_hash == GENESIS_HASH:
+            return ()
+        root = self.get_node(
+            root_hash
+        )
+        current_hash = root_hash
+        expected_sequence = root.sequence
+        reverse: list[EvidenceNode] = []
+        seen: set[str] = set()
+        while current_hash != GENESIS_HASH:
+            if current_hash in seen:
+                raise EvidenceCorruption(
+                    "historical evidence chain contains a cycle"
+                )
+            seen.add(current_hash)
+            node = self.get_node(
+                current_hash
+            )
+            if node.sequence != expected_sequence:
+                raise EvidenceCorruption(
+                    "historical evidence sequence is not contiguous"
+                )
+            reverse.append(node)
+            current_hash = node.previous_hash
+            expected_sequence -= 1
+            if expected_sequence < 0:
+                raise EvidenceCorruption(
+                    "historical evidence chain underflow"
+                )
+        if expected_sequence != 0:
+            raise EvidenceCorruption(
+                "historical evidence chain terminated before genesis"
+            )
+        items = tuple(
+            reversed(reverse)
+        )
+        if (
+            not items
+            or items[-1].node_hash
+            != root_hash
+        ):
+            raise EvidenceCorruption(
+                "historical evidence root mismatch"
+            )
+        return items
+
+    def verify_root(
+        self,
+        root_hash: str,
+    ) -> bool:
+        try:
+            items = self.snapshot_at(
+                root_hash
+            )
+        except (
+            EvidenceCorruption,
+            ValueError,
+        ):
+            return False
+        previous = GENESIS_HASH
+        for sequence, node in enumerate(
+            items,
+            start=1,
+        ):
+            if (
+                node.sequence != sequence
+                or node.previous_hash != previous
+            ):
+                return False
+            expected = self.node_digest(
+                previous,
+                sequence,
+                node.kind,
+                node.payload,
+            )
+            if node.node_hash != expected:
+                return False
+            previous = node.node_hash
+        return (
+            previous == root_hash
+            if items
+            else root_hash == GENESIS_HASH
+        )
+
+    def root_is_ancestor(
+        self,
+        root_hash: str,
+    ) -> bool:
+        if len(root_hash) != 64:
+            raise ValueError(
+                "root_hash must be SHA-256 hex"
+            )
+        if root_hash == GENESIS_HASH:
+            return True
+        if not self.verify_root(
+            root_hash
+        ):
+            return False
+        try:
+            current = self.snapshot()
+        except EvidenceCorruption:
+            return False
+        return any(
+            node.node_hash == root_hash
+            for node in current
+        )
+
+    def snapshot_segment(
+        self,
+        start_exclusive_root: str,
+        end_inclusive_root: str = "",
+        *,
+        max_items: int = 4096,
+    ) -> tuple[EvidenceNode, ...]:
+        """Verify and return only the segment after a trusted root."""
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        if len(start_exclusive_root) != 64:
+            raise ValueError(
+                "start_exclusive_root must be SHA-256 hex"
+            )
+        head = self.head()
+        end_inclusive_root = (
+            end_inclusive_root
+            or head.root_hash
+        )
+        if len(end_inclusive_root) != 64:
+            raise ValueError(
+                "end_inclusive_root must be SHA-256 hex"
+            )
+        start_sequence = self.sequence_for_root(
+            start_exclusive_root
+        )
+        end_sequence = self.sequence_for_root(
+            end_inclusive_root
+        )
+        if end_sequence < start_sequence:
+            raise EvidenceCorruption(
+                "segment end precedes trusted start"
+            )
+        distance = (
+            end_sequence
+            - start_sequence
+        )
+        if distance > max_items:
+            raise EvidenceConflict(
+                "evidence segment exceeds bounded verification window"
+            )
+        if distance == 0:
+            if (
+                end_inclusive_root
+                != start_exclusive_root
+            ):
+                raise EvidenceCorruption(
+                    "equal segment sequence has different roots"
+                )
+            return ()
+
+        current_hash = end_inclusive_root
+        expected_sequence = end_sequence
+        reverse: list[EvidenceNode] = []
+        seen: set[str] = set()
+        while (
+            current_hash
+            != start_exclusive_root
+        ):
+            if len(reverse) >= max_items:
+                raise EvidenceConflict(
+                    "evidence segment exceeds bounded verification window"
+                )
+            if current_hash == GENESIS_HASH:
+                raise EvidenceCorruption(
+                    "trusted segment start is not an ancestor"
+                )
+            if current_hash in seen:
+                raise EvidenceCorruption(
+                    "evidence segment contains a cycle"
+                )
+            seen.add(current_hash)
+            node = self.get_node(
+                current_hash
+            )
+            if (
+                node.sequence
+                != expected_sequence
+            ):
+                raise EvidenceCorruption(
+                    "evidence segment sequence is not contiguous"
+                )
+            reverse.append(node)
+            current_hash = (
+                node.previous_hash
+            )
+            expected_sequence -= 1
+
+        if expected_sequence != start_sequence:
+            raise EvidenceCorruption(
+                "evidence segment did not reach expected start sequence"
+            )
+
+        items = tuple(
+            reversed(reverse)
+        )
+        previous = (
+            start_exclusive_root
+        )
+        sequence = (
+            start_sequence + 1
+        )
+        for node in items:
+            if (
+                node.sequence != sequence
+                or node.previous_hash
+                != previous
+            ):
+                raise EvidenceCorruption(
+                    "evidence segment linkage mismatch"
+                )
+            expected = self.node_digest(
+                previous,
+                sequence,
+                node.kind,
+                node.payload,
+            )
+            if expected != node.node_hash:
+                raise EvidenceCorruption(
+                    "evidence segment digest mismatch"
+                )
+            previous = node.node_hash
+            sequence += 1
+        if previous != end_inclusive_root:
+            raise EvidenceCorruption(
+                "evidence segment terminal root mismatch"
+            )
+        return items
+
+    def verify_segment(
+        self,
+        start_exclusive_root: str,
+        end_inclusive_root: str = "",
+        *,
+        max_items: int = 4096,
+    ) -> bool:
+        try:
+            self.snapshot_segment(
+                start_exclusive_root,
+                end_inclusive_root,
+                max_items=max_items,
+            )
+        except (
+            EvidenceConflict,
+            EvidenceCorruption,
+            ValueError,
+        ):
+            return False
+        return True
+
     def verify(self) -> bool:
         try:
             items = self.snapshot()
