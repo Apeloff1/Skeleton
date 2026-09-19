@@ -66,10 +66,29 @@ class VectorStore:
     over InMemoryTFIDFStore.
     """
 
-    def __init__(self, embedder: Optional[Callable[[str], List[float]]] = None, dims: int = 256):
+    def __init__(
+        self,
+        embedder: Optional[Callable[[str], List[float]]] = None,
+        dims: int = 256,
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+            "batch_attempts": 0,
+            "batch_successes": 0,
+            "range_attempts": 0,
+            "range_successes": 0,
+        }
 
     def add(self, chunk: Chunk) -> None:
         vector = self._embedder_fn(chunk.text)
@@ -89,11 +108,41 @@ class VectorStore:
 
         qv = self._embedder_fn(text)
         qnorm = math.sqrt(sum(v * v for v in qv)) or 1.0
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return []
+
+        if self._use_jvm_acceleration and top_k > 0:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    hits = accelerator.top_k(
+                        qv,
+                        qnorm,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    self._acceleration["successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
-        for entry in self._entries.values():
-            if metadata_filter and not self._matches(entry.chunk.metadata, metadata_filter):
-                continue
+        for entry in candidates:
             dot = sum(q * v for q, v in zip(qv, entry.vector))
             sim = dot / (qnorm * entry.norm)
             scored.append((sim, entry))
@@ -104,12 +153,301 @@ class VectorStore:
             for sim, e in scored[:top_k]
         ]
 
+    def query_many(
+        self,
+        texts: List[str],
+        top_k: int = 5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+    ) -> List[List[ScoredChunk]]:
+        """Query many texts against one candidate snapshot.
+
+        When JVM acceleration is enabled and the candidate set is large enough,
+        all query embeddings share one candidate-matrix transfer. Python still
+        owns embedding, metadata filtering, stable result construction, stats,
+        and the complete fallback path.
+        """
+        queries = list(texts)
+        if not queries:
+            return []
+
+        self._stats["queries"] += len(queries)
+        if not self._entries:
+            return [[] for _ in queries]
+
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return [[] for _ in queries]
+
+        embedded: List[Tuple[List[float], float]] = []
+        for text in queries:
+            vector = self._embedder_fn(text)
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            embedded.append((vector, norm))
+
+        if self._use_jvm_acceleration and top_k > 0:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    self._acceleration["batch_attempts"] += 1
+                    batches = accelerator.top_k_many(
+                        embedded,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError("accelerator returned wrong batch query count")
+                    self._acceleration["successes"] += 1
+                    self._acceleration["batch_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
+
+        output: List[List[ScoredChunk]] = []
+        for query_vector, query_norm in embedded:
+            scored: List[Tuple[float, VectorEntry]] = []
+            for entry in candidates:
+                dot = sum(q * value for q, value in zip(query_vector, entry.vector))
+                similarity = dot / (query_norm * entry.norm)
+                scored.append((similarity, entry))
+            scored.sort(key=lambda item: item[0], reverse=True)
+            output.append(
+                [
+                    ScoredChunk(
+                        chunk=entry.chunk,
+                        score=(similarity + 1.0) / 2.0,
+                        plane="rag",
+                    )
+                    for similarity, entry in scored[:top_k]
+                ]
+            )
+        return output
+
+    def query_threshold(
+        self,
+        text: str,
+        minimum_score: float,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        *,
+        max_results: int = 10_000,
+    ) -> List[ScoredChunk]:
+        """Return all results meeting the normalized [0, 1] score threshold."""
+        if (
+            isinstance(minimum_score, bool)
+            or not isinstance(minimum_score, (int, float))
+            or not math.isfinite(float(minimum_score))
+            or not 0.0 <= float(minimum_score) <= 1.0
+        ):
+            raise ValueError("minimum_score must be finite and within [0, 1]")
+        if (
+            isinstance(max_results, bool)
+            or not isinstance(max_results, int)
+            or max_results < 1
+        ):
+            raise ValueError("max_results must be a positive integer")
+
+        self._stats["queries"] += 1
+        if not self._entries:
+            return []
+
+        qv = self._embedder_fn(text)
+        qnorm = math.sqrt(sum(value * value for value in qv)) or 1.0
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return []
+
+        cosine_threshold = float(minimum_score) * 2.0 - 1.0
+        bounded_results = min(max_results, len(candidates))
+
+        if self._use_jvm_acceleration:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    self._acceleration["range_attempts"] += 1
+                    hits = accelerator.range_search(
+                        qv,
+                        qnorm,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        cosine_threshold,
+                        max_hits=bounded_results,
+                    )
+                    self._acceleration["successes"] += 1
+                    self._acceleration["range_successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
+
+        scored: List[Tuple[float, VectorEntry]] = []
+        for entry in candidates:
+            dot = sum(q * value for q, value in zip(qv, entry.vector))
+            similarity = dot / (qnorm * entry.norm)
+            if similarity + 1e-12 < cosine_threshold:
+                continue
+            scored.append((similarity, entry))
+            if len(scored) > max_results:
+                raise ValueError("threshold result bound exceeded")
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [
+            ScoredChunk(
+                chunk=entry.chunk,
+                score=(similarity + 1.0) / 2.0,
+                plane="rag",
+            )
+            for similarity, entry in scored
+        ]
+
+    def query_threshold_many(
+        self,
+        texts: List[str],
+        minimum_score: float,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        *,
+        max_total_results: int = 100_000,
+    ) -> List[List[ScoredChunk]]:
+        """Threshold-search many queries while reusing one candidate matrix."""
+        if (
+            isinstance(minimum_score, bool)
+            or not isinstance(minimum_score, (int, float))
+            or not math.isfinite(float(minimum_score))
+            or not 0.0 <= float(minimum_score) <= 1.0
+        ):
+            raise ValueError("minimum_score must be finite and within [0, 1]")
+        if (
+            isinstance(max_total_results, bool)
+            or not isinstance(max_total_results, int)
+            or max_total_results < 1
+        ):
+            raise ValueError("max_total_results must be a positive integer")
+
+        queries = list(texts)
+        if not queries:
+            return []
+        self._stats["queries"] += len(queries)
+        if not self._entries:
+            return [[] for _ in queries]
+
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return [[] for _ in queries]
+
+        embedded: List[Tuple[List[float], float]] = []
+        for text in queries:
+            vector = self._embedder_fn(text)
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            embedded.append((vector, norm))
+
+        cosine_threshold = float(minimum_score) * 2.0 - 1.0
+        if self._use_jvm_acceleration:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    self._acceleration["range_attempts"] += 1
+                    batches = accelerator.range_search_many(
+                        embedded,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        cosine_threshold,
+                        max_total_hits=max_total_results,
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError("accelerator returned wrong range batch count")
+                    self._acceleration["successes"] += 1
+                    self._acceleration["range_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
+
+        output: List[List[ScoredChunk]] = []
+        total = 0
+        for query_vector, query_norm in embedded:
+            scored: List[Tuple[float, VectorEntry]] = []
+            for entry in candidates:
+                dot = sum(q * value for q, value in zip(query_vector, entry.vector))
+                similarity = dot / (query_norm * entry.norm)
+                if similarity + 1e-12 < cosine_threshold:
+                    continue
+                total += 1
+                if total > max_total_results:
+                    raise ValueError("threshold batch result bound exceeded")
+                scored.append((similarity, entry))
+            scored.sort(key=lambda item: item[0], reverse=True)
+            output.append(
+                [
+                    ScoredChunk(
+                        chunk=entry.chunk,
+                        score=(similarity + 1.0) / 2.0,
+                        plane="rag",
+                    )
+                    for similarity, entry in scored
+                ]
+            )
+        return output
     def delete(self, chunk_id: str) -> bool:
         return self._entries.pop(chunk_id, None) is not None
 
     @staticmethod
     def _matches(metadata: Dict[str, Any], filt: Dict[str, Any]) -> bool:
         return all(metadata.get(k) == v for k, v in filt.items())
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        """Return optional JVM fast-path counters without changing store stats."""
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.memory.jvm_vector_accelerator import get_default_vector_accelerator
+
+            self._accelerator = get_default_vector_accelerator()
+        return self._accelerator
 
     def stats(self) -> Dict[str, Any]:
         return {

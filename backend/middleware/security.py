@@ -34,7 +34,7 @@ _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_XFF_HOPS = 32
 _MAX_XFF_CHARS = 2048
 _CONTENT_TYPE_MAX_CHARS = 512
-_HTTP_TOKEN_RE = re.compile(r"^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$")
+_HTTP_TOKEN_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 _SYNTHETIC_RATE_LIMIT_EXEMPT_PEERS = frozenset({"testclient"})
 
 

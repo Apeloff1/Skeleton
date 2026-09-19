@@ -34,6 +34,23 @@ def _request(
     )
 
 
+def test_http_token_regex_accepts_rfc_tchar_hyphen_and_rejects_separators() -> None:
+    valid = (
+        "application",
+        "vnd.api+json",
+        "x-custom-token",
+        "!#$%&'*+-.^_`|~",
+        "A09z",
+    )
+    for value in valid:
+        assert legacy_security._HTTP_TOKEN_RE.fullmatch(value), value
+
+    for value in ("", "has space", "a/b", "a;b", "a,b", "a=b", "a\\b"):
+        assert legacy_security._HTTP_TOKEN_RE.fullmatch(value) is None
+
+
+
+
 def test_generated_request_id_corpus_is_always_bounded_and_header_safe() -> None:
     rng = random.Random(0x51D5AFE)
     alphabet = list(

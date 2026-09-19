@@ -62,13 +62,33 @@ def default_sampler() -> Sampler:
 
 
 class MetricsCollector:
-    """Counter, gauge, and histogram aggregation."""
+    """Counter, gauge, and histogram aggregation.
 
-    def __init__(self, retention_seconds: int = 86400):
+    Java acceleration is deliberately opt-in. When enabled, only histogram
+    snapshot math is offloaded, and only once the batch is large enough to
+    amortize process/protocol overhead. Counters, gauges, storage, labels, and
+    the public snapshot shape remain Python-owned.
+    """
+
+    def __init__(
+        self,
+        retention_seconds: int = 86400,
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self._counters: Dict[str, float] = {}
         self._gauges: Dict[str, float] = {}
         self._histograms: Dict[str, Deque[MetricPoint]] = {}
         self._retention = retention_seconds
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+        }
 
     def increment(self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
         key = self._key(name, labels)
@@ -85,6 +105,11 @@ class MetricsCollector:
         self._histograms[key].append(MetricPoint(name=name, value=value, labels=labels or {}))
 
     def snapshot(self) -> Dict[str, Any]:
+        if self._use_jvm_acceleration:
+            return self._snapshot_accelerated()
+        return self._snapshot_python()
+
+    def _snapshot_python(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "counters": dict(self._counters),
             "gauges": dict(self._gauges),
@@ -93,15 +118,80 @@ class MetricsCollector:
         for key, points in self._histograms.items():
             values = [p.value for p in points]
             if values:
-                result["histograms"][key] = {
-                    "count": len(values),
-                    "min": min(values),
-                    "max": max(values),
-                    "mean": statistics.mean(values),
-                    "p50": statistics.median(values),
-                    "p99": sorted(values)[int(len(values) * 0.99)] if len(values) > 1 else values[0],
-                }
+                result["histograms"][key] = self._python_histogram_fields(values)
         return result
+
+    def _snapshot_accelerated(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "counters": dict(self._counters),
+            "gauges": dict(self._gauges),
+            "histograms": {},
+        }
+        keys: list[str] = []
+        series: list[list[float]] = []
+        total_values = 0
+        for key, points in self._histograms.items():
+            values = [point.value for point in points]
+            if not values:
+                continue
+            keys.append(key)
+            series.append(values)
+            total_values += len(values)
+
+        if not series:
+            return result
+
+        try:
+            accelerator = self._resolve_accelerator()
+            minimum = int(getattr(accelerator, "minimum_batch_values", 1))
+            if total_values < minimum:
+                self._acceleration["bypassed_small_batch"] += 1
+                return self._snapshot_python()
+
+            self._acceleration["attempts"] += 1
+            summaries = accelerator.summarize_many(series)
+            if len(summaries) != len(keys):
+                raise RuntimeError("accelerator returned the wrong summary count")
+
+            for key, summary in zip(keys, summaries):
+                fields = summary.metrics_fields()
+                result["histograms"][key] = {
+                    "count": int(fields["count"]),
+                    "min": float(fields["min"]),
+                    "max": float(fields["max"]),
+                    "mean": float(fields["mean"]),
+                    "p50": float(fields["p50"]),
+                    "p99": float(fields["p99"]),
+                }
+            self._acceleration["successes"] += 1
+            return result
+        except Exception:
+            self._acceleration["fallbacks"] += 1
+            return self._snapshot_python()
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.observability.jvm_accelerator import get_default_accelerator
+
+            self._accelerator = get_default_accelerator()
+        return self._accelerator
+
+    @staticmethod
+    def _python_histogram_fields(values: list[float]) -> Dict[str, Any]:
+        return {
+            "count": len(values),
+            "min": min(values),
+            "max": max(values),
+            "mean": statistics.mean(values),
+            "p50": statistics.median(values),
+            "p99": sorted(values)[int(len(values) * 0.99)] if len(values) > 1 else values[0],
+        }
 
     @staticmethod
     def _key(name: str, labels: Optional[Dict[str, str]]) -> str:
@@ -112,40 +202,124 @@ class MetricsCollector:
 
 
 class AnomalyDetector:
-    """Statistical anomaly detection on event streams."""
+    """Statistical anomaly detection on event streams.
 
-    def __init__(self, bus: Optional[EventBus] = None, window_size: int = 100):
+    Single observations stay on the existing Python path. The optional JVM path
+    is only used by observe_many, where one IPC call can cover many rolling
+    window calculations.
+    """
+
+    def __init__(
+        self,
+        bus: Optional[EventBus] = None,
+        window_size: int = 100,
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self._bus = bus
         self._window_size = window_size
         self._values: Deque[float] = deque(maxlen=window_size)
         self._threshold_multiplier = 3.0
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+        }
 
     def observe(self, value: float) -> Optional[str]:
         """Observe a value, return alert if anomalous."""
         if len(self._values) < 10:
             self._values.append(value)
             return None
-        
+
         mean = statistics.mean(self._values)
         try:
             stdev = statistics.stdev(self._values)
         except statistics.StatisticsError:
             stdev = 0
-        
+
         self._values.append(value)
-        
+
         if stdev > 0 and abs(value - mean) > self._threshold_multiplier * stdev:
             alert = f"Anomaly detected: {value:.2f} (mean={mean:.2f}, std={stdev:.2f})"
-            if self._bus:
-                self._bus.emit("observability.anomaly", {
-                    "value": value,
-                    "mean": mean,
-                    "stdev": stdev,
-                    "threshold": self._threshold_multiplier,
-                })
+            self._emit_anomaly(value, mean, stdev)
             return alert
-        
+
         return None
+
+    def observe_many(self, values: List[float]) -> List[Optional[str]]:
+        """Observe a batch, optionally accelerating rolling statistics in Java.
+
+        Results remain ordered one-for-one with input values. The detector's
+        Python deque is updated exactly once per input even when Java computes
+        the rolling means and standard deviations.
+        """
+        batch = list(values)
+        if not batch:
+            return []
+        if not self._use_jvm_acceleration or self._window_size < 10:
+            return [self.observe(value) for value in batch]
+
+        try:
+            accelerator = self._resolve_accelerator()
+            minimum = int(getattr(accelerator, "minimum_batch_values", 1))
+            if len(batch) < minimum:
+                self._acceleration["bypassed_small_batch"] += 1
+                return [self.observe(value) for value in batch]
+
+            self._acceleration["attempts"] += 1
+            rows = accelerator.scan_anomalies(
+                list(self._values),
+                batch,
+                window_size=self._window_size,
+                threshold=self._threshold_multiplier,
+            )
+            if len(rows) != len(batch):
+                raise RuntimeError("accelerator returned the wrong anomaly row count")
+
+            alerts: List[Optional[str]] = []
+            for value, row in zip(batch, rows):
+                self._values.append(value)
+                if row.ready and row.anomalous:
+                    alert = (
+                        f"Anomaly detected: {value:.2f} "
+                        f"(mean={row.mean:.2f}, std={row.stdev:.2f})"
+                    )
+                    self._emit_anomaly(value, row.mean, row.stdev)
+                    alerts.append(alert)
+                else:
+                    alerts.append(None)
+            self._acceleration["successes"] += 1
+            return alerts
+        except Exception:
+            self._acceleration["fallbacks"] += 1
+            return [self.observe(value) for value in batch]
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.observability.jvm_accelerator import get_default_accelerator
+
+            self._accelerator = get_default_accelerator()
+        return self._accelerator
+
+    def _emit_anomaly(self, value: float, mean: float, stdev: float) -> None:
+        if self._bus:
+            self._bus.emit("observability.anomaly", {
+                "value": value,
+                "mean": mean,
+                "stdev": stdev,
+                "threshold": self._threshold_multiplier,
+            })
 
     def stats(self) -> Dict[str, Any]:
         return {

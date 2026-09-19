@@ -107,6 +107,35 @@ jobs:
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
+  java-accelerators:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    name: "Java Batch Accelerators"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Java source self-tests
+        run: |
+          java java-accelerators/observability/AcceleratorMain.java --self-test
+          java java-accelerators/vector/VectorSearchMain.java --self-test
+          java java-accelerators/physics/BroadPhaseMain.java --self-test
+      - name: Python bridge and fallback tests
+        env: {PYTHONPATH: "."}
+        run: |
+          python -m pip install "pytest>=8,<9"
+          python -m compileall -q skeleton/observability skeleton/memory skeleton/simulation/physics
+          python -m pytest -q \
+            skeleton/testing/test_jvm_observability_accelerator.py \
+            skeleton/testing/test_jvm_vector_accelerator.py \
+            skeleton/testing/test_jvm_physics_broadphase_accelerator.py
+
   school-jeeves-test:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Jeeves School Reasoning"
@@ -219,7 +248,7 @@ jobs:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
+    needs: [skeleton-test, java-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:
