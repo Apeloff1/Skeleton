@@ -77,6 +77,11 @@ jobs:
           skeleton/pr_automation/automerge_engine.py
           skeleton/pr_automation/automerge_cli.py
 
+      - name: Install focused test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
       - name: Validate workflow contract
         run: python scripts/check_automerge_contract.py
 
