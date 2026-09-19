@@ -1,0 +1,1295 @@
+"""Signed hot-floor and destructive durable pruning integration tests."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+import hashlib
+
+import pytest
+
+from skeleton.shells.ai.distributed_journal import (
+    DistributedAIDecisionJournal,
+    DistributedJournalConflict,
+)
+from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.durable_archive import DurableArchiveManifestBuilder
+from skeleton.shells.ai.durable_archive_store import (
+    ArchiveBackedHistoricalChain,
+    DurableArchiveRepository,
+)
+from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
+from skeleton.shells.ai.durable_compaction import (
+    DurableCompactionPlanner,
+    DurableCompactionPolicy,
+)
+from skeleton.shells.ai.durable_compaction_certificate import (
+    DurableCompactionCertificateStore,
+)
+from skeleton.shells.ai.durable_hot_floor import (
+    DurableHotFloorError,
+    DurableHotFloorStore,
+    HotFloorPosition,
+)
+from skeleton.shells.ai.durable_pruning import (
+    DurablePruningError,
+    DurablePruningExecutor,
+    DurablePruningManualReview,
+    DurablePruningPhase,
+)
+from skeleton.shells.ai.durable_pruning_authorization import (
+    DurablePruningAuthorizationError,
+    DurablePruningAuthorizationStore,
+)
+from skeleton.shells.ai.durable_retention import (
+    DurableRetentionPlanner,
+    DurableRetentionPolicy,
+)
+from skeleton.shells.ai.signed_artifact import ArtifactSigner
+from skeleton.shells.distributed_receipts import (
+    DistributedReceiptChain,
+    DistributedReceiptConflict,
+)
+from skeleton.shells.receipts import ExecutionReceipt
+
+
+def fp(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def signer(name: str, char: bytes, clock=lambda: 100.0):
+    return ArtifactSigner(
+        name,
+        char * 32,
+        clock=clock,
+    )
+
+
+def append_events(journal, count, *, start=0):
+    result = []
+    for index in range(start, start + count):
+        result.append(
+            journal.append(
+                "pruning.event",
+                session_id=f"session-{index}",
+                intent_id=f"intent-{index}",
+                proposal_id=f"proposal-{index}",
+                summary=f"event {index}",
+                data={"index": index},
+            )
+        )
+    return tuple(result)
+
+
+def receipt(index: int) -> ExecutionReceipt:
+    return ExecutionReceipt(
+        command="python",
+        correlation_id=f"corr-{index}",
+        fingerprint=fp(f"receipt:{index}"),
+        started_at="2026-09-19T00:00:00+00:00",
+        finished_at="2026-09-19T00:00:01+00:00",
+        duration_ms=1.0,
+        returncode=0,
+        ok=True,
+        timed_out=False,
+        output_limited=False,
+        stdout_bytes=index + 1,
+        stderr_bytes=0,
+        attempt=1,
+        receipt_id=f"receipt-{index}",
+        metadata={"index": index},
+    )
+
+
+class Fixture:
+    def __init__(
+        self,
+        *,
+        kind="journal",
+        backend=None,
+        now=400.0,
+        max_items=100,
+    ):
+        self.kind = kind
+        self.now = [float(now)]
+        self.backend = backend or InMemoryFencedStore()
+        self.floor_signer = signer(
+            "hot-floor",
+            b"f",
+            clock=lambda: self.now[0],
+        )
+        self.floor_store = DurableHotFloorStore(
+            self.backend,
+            self.floor_signer,
+            namespace="hot-floors",
+            clock=lambda: self.now[0],
+        )
+        if kind == "journal":
+            self.chain = DistributedAIDecisionJournal(
+                self.backend,
+                namespace="journal",
+                max_events=20,
+                clock=lambda: 10.0,
+                hot_floor_store=self.floor_store,
+                hot_floor_chain_id="journal",
+            )
+            self.chain_id = "journal"
+            self.first = append_events(
+                self.chain,
+                6,
+            )
+        elif kind == "receipts":
+            self.chain = DistributedReceiptChain(
+                self.backend,
+                namespace="receipts",
+                max_receipts=20,
+                hot_floor_store=self.floor_store,
+                hot_floor_chain_id="receipts",
+            )
+            self.chain_id = "receipts"
+            self.first = tuple(
+                self.chain.append(
+                    receipt(index)
+                )
+                for index in range(6)
+            )
+        else:
+            raise ValueError("unknown fixture kind")
+
+        self.checkpoints = DurableChainCheckpointStore(
+            self.backend,
+            signer("checkpoint", b"c"),
+            namespace=f"{kind}-checkpoints",
+            clock=lambda: 100.0,
+        )
+        self.archive_signer = signer(
+            "archive",
+            b"a",
+            clock=lambda: 200.0,
+        )
+        self.archive_builder = DurableArchiveManifestBuilder(
+            self.checkpoints,
+            self.archive_signer,
+            clock=lambda: 200.0,
+        )
+        self.archives = DurableArchiveRepository(
+            self.backend,
+            self.checkpoints,
+            self.archive_signer,
+            namespace=f"{kind}-archives",
+            clock=lambda: 300.0,
+        )
+        checkpoint = self.checkpoints.publish(
+            self.chain_id,
+            self.chain,
+        )
+        archive = self.archive_builder.build(
+            checkpoint,
+            self.chain,
+        )
+        self.archives.put(
+            archive,
+            checkpoint,
+            self.chain,
+        )
+        self.archive = archive
+        if kind == "journal":
+            self.later = append_events(
+                self.chain,
+                2,
+                start=6,
+            )
+        else:
+            self.later = tuple(
+                self.chain.append(
+                    receipt(index)
+                )
+                for index in range(6, 8)
+            )
+
+        self.retention_planner = DurableRetentionPlanner(
+            self.checkpoints,
+            DurableRetentionPolicy(
+                minimum_live_tail=2,
+                minimum_archive_batch=2,
+                target_utilization=0.25,
+                warning_utilization=0.75,
+                critical_utilization=0.95,
+                max_protected_roots=32,
+            ),
+        )
+        self.retention = self.retention_planner.plan(
+            self.chain_id,
+            self.chain,
+        )
+        self.compaction = DurableCompactionPlanner(
+            self.archives,
+            DurableCompactionPolicy(
+                minimum_live_tail=2,
+                maximum_candidate_nodes=20,
+                max_protected_roots=32,
+            ),
+        )
+        assert self.compaction.require_ready(
+            self.retention,
+            self.chain,
+        ).ready
+
+        self.certificate_store = DurableCompactionCertificateStore(
+            self.backend,
+            signer(
+                "certificate",
+                b"s",
+                clock=lambda: self.now[0],
+            ),
+            self.compaction,
+            namespace=f"{kind}-certificates",
+            ttl_seconds=60.0,
+            max_ttl_seconds=3600.0,
+            clock=lambda: self.now[0],
+        )
+        self.certificate = self.certificate_store.issue(
+            self.retention,
+            self.chain,
+        )
+        self.authorization_store = DurablePruningAuthorizationStore(
+            self.backend,
+            signer(
+                "pruning",
+                b"p",
+                clock=lambda: self.now[0],
+            ),
+            self.certificate_store,
+            namespace=f"{kind}-authorizations",
+            ttl_seconds=30.0,
+            max_ttl_seconds=600.0,
+            max_delete_items=max_items,
+            clock=lambda: self.now[0],
+            nonce_factory=lambda: f"nonce-{kind}",
+        )
+        self.authorization = self.authorization_store.issue(
+            self.certificate,
+            self.retention,
+            self.chain,
+            operator_id="operator",
+            max_delete_items=max_items,
+        )
+        self.executor = DurablePruningExecutor(
+            self.backend,
+            self.authorization_store,
+            self.floor_store,
+            namespace=f"{kind}-pruning",
+            max_items=max_items,
+            clock=lambda: self.now[0],
+        )
+
+    @property
+    def cutoff_sequence(self):
+        return self.authorization.authorization.cutoff_sequence
+
+    @property
+    def cutoff_root(self):
+        return self.authorization.authorization.cutoff_root
+
+
+def test_floor_store_starts_at_genesis():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    assert store.current("journal") is None
+    assert store.position("journal") == HotFloorPosition.genesis()
+
+
+def test_floor_advance_is_signed_and_monotonic():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+        clock=lambda: 10.0,
+    )
+    first = store.advance(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    assert first.floor.sequence == 3
+    assert first.floor.previous_sequence == 0
+    assert first.floor.previous_root_hash == "0" * 64
+    assert store.position("journal").root_hash == fp("root-3")
+
+    second = store.advance(
+        chain_id="journal",
+        sequence=5,
+        root_hash=fp("root-5"),
+        archive_id="archive-2",
+        archive_manifest_digest=fp("archive-2"),
+        compaction_certificate_id=fp("certificate-2"),
+        pruning_authorization_id=fp("authorization-2"),
+        operation_id=fp("operation-2"),
+        fencing_token=2,
+        expected_previous_sequence=3,
+        expected_previous_root=fp("root-3"),
+    )
+    assert second.floor.previous_sequence == 3
+    assert second.floor.sequence == 5
+
+
+def test_floor_cannot_move_backwards():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    store.advance(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="backwards",
+    ):
+        store.advance(
+            chain_id="journal",
+            sequence=2,
+            root_hash=fp("root-2"),
+            archive_id="archive",
+            archive_manifest_digest=fp("archive"),
+            compaction_certificate_id=fp("certificate"),
+            pruning_authorization_id=fp("authorization"),
+            operation_id=fp("operation-2"),
+            fencing_token=2,
+        )
+
+
+def test_same_floor_retry_is_idempotent():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+        clock=lambda: 10.0,
+    )
+    kwargs = dict(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    first = store.advance(**kwargs)
+    second = store.advance(**kwargs)
+    assert second == first
+
+
+def test_same_floor_sequence_different_authority_is_rejected():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    store.advance(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="different authority",
+    ):
+        store.advance(
+            chain_id="journal",
+            sequence=3,
+            root_hash=fp("root-3"),
+            archive_id="archive",
+            archive_manifest_digest=fp("archive"),
+            compaction_certificate_id=fp("certificate"),
+            pruning_authorization_id=fp("different"),
+            operation_id=fp("operation"),
+            fencing_token=2,
+        )
+
+
+def test_floor_previous_position_is_fenced():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    store.advance(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="previous sequence",
+    ):
+        store.advance(
+            chain_id="journal",
+            sequence=5,
+            root_hash=fp("root-5"),
+            archive_id="archive",
+            archive_manifest_digest=fp("archive"),
+            compaction_certificate_id=fp("certificate"),
+            pruning_authorization_id=fp("authorization-2"),
+            operation_id=fp("operation-2"),
+            fencing_token=2,
+            expected_previous_sequence=0,
+            expected_previous_root="0" * 64,
+        )
+
+
+def test_floor_signature_tamper_is_detected():
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    item = store.advance(
+        chain_id="journal",
+        sequence=3,
+        root_hash=fp("root-3"),
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    key = store._key("journal")
+    record = backend.get(
+        store.namespace,
+        key,
+    )
+    payload = dict(record.value)
+    payload["floor"] = dict(
+        payload["floor"]
+    )
+    payload["floor"]["root_hash"] = fp(
+        "tampered"
+    )
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    with pytest.raises(DurableHotFloorError):
+        store.current("journal")
+    assert item.floor.root_hash == fp("root-3")
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_signed_floor_is_inert_before_cutoff_node_is_deleted(kind):
+    fixture = Fixture(kind=kind)
+    before = fixture.chain.snapshot()
+    floor = fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=fixture.cutoff_sequence,
+        root_hash=fixture.cutoff_root,
+        archive_id=fixture.authorization.authorization.archive_id,
+        archive_manifest_digest=(
+            fixture.authorization.authorization.archive_manifest_digest
+        ),
+        compaction_certificate_id=(
+            fixture.certificate.certificate_id
+        ),
+        pruning_authorization_id=(
+            fixture.authorization.authorization_id
+        ),
+        operation_id=fp(f"manual-floor-{kind}"),
+        fencing_token=1,
+    )
+    assert floor.floor.sequence == 6
+    assert not fixture.chain._hot_floor_active(
+        fixture.chain.hot_floor()
+    )
+    assert fixture.chain.snapshot() == before
+    assert fixture.chain.verify()
+    assert fixture.chain.hot_length() == 8
+
+
+def activate_manual_floor(fixture):
+    floor = fixture.floor_store.advance(
+        chain_id=fixture.chain_id,
+        sequence=fixture.cutoff_sequence,
+        root_hash=fixture.cutoff_root,
+        archive_id=fixture.authorization.authorization.archive_id,
+        archive_manifest_digest=(
+            fixture.authorization.authorization.archive_manifest_digest
+        ),
+        compaction_certificate_id=(
+            fixture.certificate.certificate_id
+        ),
+        pruning_authorization_id=(
+            fixture.authorization.authorization_id
+        ),
+        operation_id=fp(f"manual-active-{fixture.kind}"),
+        fencing_token=1,
+    )
+    for sequence in range(
+        fixture.cutoff_sequence,
+        0,
+        -1,
+    ):
+        node = fixture.chain.get_by_sequence(
+            sequence
+        )
+        node_hash = (
+            node.event_hash
+            if fixture.kind == "journal"
+            else node.receipt_hash
+        )
+        node_key = (
+            fixture.chain._event_key(node_hash)
+            if fixture.kind == "journal"
+            else fixture.chain._node_key(node_hash)
+        )
+        node_record = fixture.backend.get(
+            fixture.chain.namespace,
+            node_key,
+        )
+        fixture.backend.delete(
+            fixture.chain.namespace,
+            node_key,
+            expected_revision=node_record.revision,
+        )
+        seq_key = fixture.chain._sequence_key(
+            sequence
+        )
+        seq_record = fixture.backend.get(
+            fixture.chain.namespace,
+            seq_key,
+        )
+        if seq_record is not None:
+            fixture.backend.delete(
+                fixture.chain.namespace,
+                seq_key,
+                expected_revision=seq_record.revision,
+            )
+        if fixture.kind == "receipts":
+            idx_key = fixture.chain._index_key(
+                node.receipt.receipt_id
+            )
+            idx_record = fixture.backend.get(
+                fixture.chain.namespace,
+                idx_key,
+            )
+            if idx_record is not None:
+                fixture.backend.delete(
+                    fixture.chain.namespace,
+                    idx_key,
+                    expected_revision=idx_record.revision,
+                )
+    return floor
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_active_floor_verifies_only_live_suffix(kind):
+    fixture = Fixture(kind=kind)
+    activate_manual_floor(fixture)
+    assert fixture.chain._hot_floor_active(
+        fixture.chain.hot_floor()
+    )
+    assert fixture.chain.verify()
+    assert fixture.chain.hot_length() == 2
+    assert fixture.chain.snapshot() == fixture.later
+    assert fixture.chain.length() == 8
+    assert fixture.chain.root_hash() == (
+        fixture.later[-1].event_hash
+        if kind == "journal"
+        else fixture.later[-1].receipt_hash
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_active_floor_root_is_trusted_ancestor(kind):
+    fixture = Fixture(kind=kind)
+    activate_manual_floor(fixture)
+    assert fixture.chain.root_is_ancestor(
+        fixture.cutoff_root
+    )
+    assert fixture.chain.verify_root(
+        fixture.cutoff_root
+    )
+    assert fixture.chain.sequence_for_root(
+        fixture.cutoff_root
+    ) == fixture.cutoff_sequence
+
+
+def test_pruned_journal_sequence_access_fails_closed():
+    fixture = Fixture(kind="journal")
+    activate_manual_floor(fixture)
+    with pytest.raises(
+        DistributedJournalConflict,
+        match="compacted",
+    ):
+        fixture.chain.get_by_sequence(2)
+    with pytest.raises(
+        DistributedJournalConflict,
+        match="compacted",
+    ):
+        fixture.chain.root_for_sequence(2)
+    assert fixture.chain.root_for_sequence(6) == fixture.cutoff_root
+
+
+def test_pruned_receipt_sequence_access_fails_closed():
+    fixture = Fixture(kind="receipts")
+    activate_manual_floor(fixture)
+    with pytest.raises(
+        DistributedReceiptConflict,
+        match="compacted",
+    ):
+        fixture.chain.get_by_sequence(2)
+    with pytest.raises(
+        DistributedReceiptConflict,
+        match="compacted",
+    ):
+        fixture.chain.root_for_sequence(2)
+    assert fixture.chain.root_for_sequence(6) == fixture.cutoff_root
+
+
+def test_pruned_receipt_id_is_absent_from_hot_index():
+    fixture = Fixture(kind="receipts")
+    old_receipt_id = fixture.first[0].receipt.receipt_id
+    live_receipt_id = fixture.later[0].receipt.receipt_id
+    activate_manual_floor(fixture)
+    assert fixture.chain.find_by_receipt_id(
+        old_receipt_id
+    ) is None
+    live = fixture.chain.require_receipt(
+        live_receipt_id
+    )
+    assert live.committed
+    assert live.node.sequence == 7
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_archive_backed_reader_restores_pruned_history(kind):
+    fixture = Fixture(kind=kind)
+    activate_manual_floor(fixture)
+    historical = ArchiveBackedHistoricalChain(
+        fixture.chain_id,
+        fixture.chain,
+        fixture.archives,
+    )
+    snapshot = historical.snapshot_at(
+        fixture.cutoff_root
+    )
+    assert len(snapshot) == 6
+    assert historical.verify_root(
+        fixture.cutoff_root
+    )
+    assert historical.root_is_ancestor(
+        fixture.cutoff_root
+    )
+
+
+def test_journal_capacity_is_reclaimed_after_floor_activates():
+    backend = InMemoryFencedStore()
+    floors = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    journal = DistributedAIDecisionJournal(
+        backend,
+        namespace="journal",
+        max_events=4,
+        clock=lambda: 1.0,
+        hot_floor_store=floors,
+        hot_floor_chain_id="journal",
+    )
+    events = append_events(journal, 4)
+    with pytest.raises(RuntimeError, match="capacity"):
+        append_events(journal, 1, start=4)
+    floors.advance(
+        chain_id="journal",
+        sequence=2,
+        root_hash=events[1].event_hash,
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    for event in reversed(events[:2]):
+        record = backend.get(
+            "journal",
+            journal._event_key(event.event_hash),
+        )
+        backend.delete(
+            "journal",
+            journal._event_key(event.event_hash),
+            expected_revision=record.revision,
+        )
+    assert journal.verify()
+    append_events(journal, 2, start=4)
+    assert journal.hot_length() == 4
+    with pytest.raises(RuntimeError, match="capacity"):
+        append_events(journal, 1, start=6)
+
+
+def test_receipt_capacity_is_reclaimed_after_floor_activates():
+    backend = InMemoryFencedStore()
+    floors = DurableHotFloorStore(
+        backend,
+        signer("floor", b"f"),
+    )
+    chain = DistributedReceiptChain(
+        backend,
+        namespace="receipts",
+        max_receipts=4,
+        hot_floor_store=floors,
+        hot_floor_chain_id="receipts",
+    )
+    items = tuple(
+        chain.append(receipt(i))
+        for i in range(4)
+    )
+    with pytest.raises(RuntimeError, match="capacity"):
+        chain.append(receipt(4))
+    floors.advance(
+        chain_id="receipts",
+        sequence=2,
+        root_hash=items[1].receipt_hash,
+        archive_id="archive",
+        archive_manifest_digest=fp("archive"),
+        compaction_certificate_id=fp("certificate"),
+        pruning_authorization_id=fp("authorization"),
+        operation_id=fp("operation"),
+        fencing_token=1,
+    )
+    for item in reversed(items[:2]):
+        record = backend.get(
+            "receipts",
+            chain._node_key(item.receipt_hash),
+        )
+        backend.delete(
+            "receipts",
+            chain._node_key(item.receipt_hash),
+            expected_revision=record.revision,
+        )
+    assert chain.verify()
+    chain.append(receipt(4))
+    chain.append(receipt(5))
+    assert chain.hot_length() == 4
+    with pytest.raises(RuntimeError, match="capacity"):
+        chain.append(receipt(6))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_authorization_is_explicitly_destructive(kind):
+    fixture = Fixture(kind=kind)
+    auth = fixture.authorization
+    assert auth.destructive_action_authorized
+    assert auth.authorization.destructive_action_authorized
+    assert not fixture.certificate.destructive_action_authorized
+    assert (
+        auth.signature.metadata["authority"]
+        == "destructive-hot-tier-pruning"
+    )
+    report = fixture.authorization_store.require_current(
+        auth,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.allowed
+    assert report.destructive_action_authorized
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_authorization_binds_exact_cutoff_archive_and_head(kind):
+    fixture = Fixture(kind=kind)
+    auth = fixture.authorization.authorization
+    cert = fixture.certificate.certificate
+    assert auth.chain_id == fixture.chain_id
+    assert auth.certificate_id == cert.certificate_id
+    assert auth.certificate_digest == cert.digest
+    assert auth.current_sequence == cert.current_sequence
+    assert auth.current_root == cert.current_root
+    assert auth.cutoff_sequence == cert.cutoff_sequence
+    assert auth.cutoff_root == cert.cutoff_root
+    assert auth.archive_id == cert.archive_id
+    assert (
+        auth.archive_manifest_digest
+        == cert.archive_manifest_digest
+    )
+    assert (
+        auth.protected_roots_digest
+        == cert.protected_roots_digest
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_growth_stales_pruning_authorization(kind):
+    fixture = Fixture(kind=kind)
+    if kind == "journal":
+        append_events(
+            fixture.chain,
+            1,
+            start=8,
+        )
+    else:
+        fixture.chain.append(receipt(8))
+    report = fixture.authorization_store.inspect(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert not report.current
+    assert not report.allowed
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_expired_pruning_authorization_is_rejected(kind):
+    fixture = Fixture(kind=kind)
+    fixture.now[0] = 431.0
+    report = fixture.authorization_store.inspect(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert report.expired
+    assert not report.allowed
+    with pytest.raises(
+        DurablePruningAuthorizationError,
+        match="expired",
+    ):
+        fixture.authorization_store.require_current(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_executor_prunes_authorized_prefix(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.ok
+    assert result.operation.phase is DurablePruningPhase.COMPLETE
+    assert result.operation.deleted_items == 6
+    assert result.operation.next_delete_index == -1
+    assert result.floor.floor.sequence == 6
+    assert fixture.chain.hot_length() == 2
+    assert fixture.chain.verify()
+    assert fixture.chain.snapshot() == fixture.later
+
+    for sequence in range(1, 7):
+        item = result.manifest.items[sequence - 1]
+        assert fixture.backend.get(
+            fixture.chain.namespace,
+            item.node_key,
+        ) is None
+        assert fixture.backend.get(
+            fixture.chain.namespace,
+            item.sequence_key,
+        ) is None
+        if kind == "receipts":
+            assert fixture.backend.get(
+                fixture.chain.namespace,
+                item.receipt_index_key,
+            ) is None
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_executor_is_idempotent_after_completion(kind):
+    fixture = Fixture(kind=kind)
+    first = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    second = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert second.operation == first.operation
+    assert second.manifest == first.manifest
+    assert second.floor == first.floor
+    assert second.ok
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_executor_preserves_archive_history_after_pruning(kind):
+    fixture = Fixture(kind=kind)
+    fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    historical = ArchiveBackedHistoricalChain(
+        fixture.chain_id,
+        fixture.chain,
+        fixture.archives,
+    )
+    assert len(
+        historical.snapshot_at(
+            fixture.cutoff_root
+        )
+    ) == 6
+    assert historical.verify_root(
+        fixture.cutoff_root
+    )
+
+
+class FailDeleteOnceBackend(InMemoryFencedStore):
+    def __init__(self):
+        super().__init__()
+        self.fail_enabled = False
+        self.fail_after = 1
+        self.calls = 0
+        self.failed = False
+
+    def delete(
+        self,
+        namespace,
+        key,
+        *,
+        expected_revision,
+    ):
+        if self.fail_enabled and not self.failed:
+            self.calls += 1
+            if self.calls > self.fail_after:
+                self.failed = True
+                raise RuntimeError(
+                    "synthetic pruning crash"
+                )
+        return super().delete(
+            namespace,
+            key,
+            expected_revision=expected_revision,
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_resume_after_crash_during_deletion(kind):
+    backend = FailDeleteOnceBackend()
+    fixture = Fixture(
+        kind=kind,
+        backend=backend,
+    )
+    backend.fail_enabled = True
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic pruning crash",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+    operation_id = fixture.executor.derive_operation_id(
+        fixture.authorization.authorization_id,
+        previous_floor_sequence=0,
+        previous_floor_root="0" * 64,
+    )
+    partial = fixture.executor.operation(
+        operation_id
+    )
+    assert partial is not None
+    assert partial.phase is DurablePruningPhase.DELETING
+    assert fixture.chain.hot_floor().sequence == 6
+
+    backend.fail_enabled = False
+    result = fixture.executor.resume(
+        operation_id,
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.ok
+    assert result.operation.phase is DurablePruningPhase.COMPLETE
+    assert fixture.chain.verify()
+    assert fixture.chain.snapshot() == fixture.later
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_prepare_is_non_destructive(kind):
+    fixture = Fixture(kind=kind)
+    before = fixture.chain.snapshot()
+    manifest, operation = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert manifest.delete_count == 6
+    assert operation.phase is DurablePruningPhase.PREPARED
+    assert fixture.chain.snapshot() == before
+    assert fixture.chain.hot_floor().sequence == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_manifest_binds_exact_immutable_revisions(kind):
+    fixture = Fixture(kind=kind)
+    manifest, _ = fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert manifest.current_sequence == 8
+    assert manifest.cutoff_sequence == 6
+    assert manifest.cutoff_root == fixture.cutoff_root
+    assert tuple(
+        item.sequence
+        for item in manifest.items
+    ) == tuple(range(1, 7))
+    assert all(
+        item.node_revision > 0
+        for item in manifest.items
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_head_change_after_prepare_blocks_floor_commit(kind):
+    fixture = Fixture(kind=kind)
+    fixture.executor.prepare(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    if kind == "journal":
+        append_events(
+            fixture.chain,
+            1,
+            start=8,
+        )
+    else:
+        fixture.chain.append(receipt(8))
+    with pytest.raises(
+        DurablePruningManualReview,
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+    assert fixture.chain.hot_floor().sequence == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_chain_must_use_executor_floor_store(kind):
+    fixture = Fixture(kind=kind)
+    other_floors = DurableHotFloorStore(
+        fixture.backend,
+        fixture.floor_signer,
+        namespace="other-floors",
+    )
+    other_executor = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        other_floors,
+        namespace="other-pruning",
+    )
+    with pytest.raises(
+        DurablePruningError,
+        match="hot floor store",
+    ):
+        other_executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+def test_receipt_pruning_removes_old_receipt_index_but_keeps_new():
+    fixture = Fixture(kind="receipts")
+    old_id = fixture.first[0].receipt.receipt_id
+    new_id = fixture.later[0].receipt.receipt_id
+    fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert fixture.chain.find_by_receipt_id(
+        old_id
+    ) is None
+    assert fixture.chain.require_receipt(
+        new_id
+    ).committed
+
+
+def test_journal_append_continues_monotonic_sequence_after_pruning():
+    fixture = Fixture(kind="journal")
+    fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    event = append_events(
+        fixture.chain,
+        1,
+        start=8,
+    )[0]
+    assert event.sequence == 9
+    assert fixture.chain.verify()
+    assert fixture.chain.hot_length() == 3
+
+
+def test_receipt_append_continues_monotonic_sequence_after_pruning():
+    fixture = Fixture(kind="receipts")
+    fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    item = fixture.chain.append(
+        receipt(8)
+    )
+    assert item.sequence == 9
+    assert fixture.chain.verify()
+    assert fixture.chain.hot_length() == 3
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_operation_and_manifest_survive_fresh_executor(kind):
+    fixture = Fixture(kind=kind)
+    first = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    fresh = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        fixture.floor_store,
+        namespace=f"{kind}-pruning",
+        clock=lambda: fixture.now[0],
+    )
+    operation = fresh.operation(
+        first.operation.operation_id
+    )
+    manifest = fresh.manifest(
+        first.operation.operation_id
+    )
+    assert operation == first.operation
+    assert manifest == first.manifest
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_floor_metadata_binds_pruning_operation(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    floor = result.floor.floor
+    assert floor.operation_id == result.operation.operation_id
+    assert (
+        floor.pruning_authorization_id
+        == fixture.authorization.authorization_id
+    )
+    assert (
+        floor.compaction_certificate_id
+        == fixture.certificate.certificate_id
+    )
+    assert floor.archive_id == fixture.archive.manifest.archive_id
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_result_serializes_authority_and_progress(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    data = result.to_dict()
+    assert data["ok"] is True
+    assert data["operation"]["phase"] == "complete"
+    assert data["manifest"]["delete_count"] if "delete_count" in data["manifest"] else True
+    assert data["floor"]["floor"]["sequence"] == 6
