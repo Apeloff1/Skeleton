@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 import heapq
+import math
 import threading
 import time
 from typing import Callable
@@ -41,8 +42,8 @@ class QueueItem:
 
 class ShellWorkQueue:
     def __init__(self, *, max_items: int = 4096, clock: Callable[[], float] = time.monotonic) -> None:
-        if max_items <= 0:
-            raise ValueError("max_items must be positive")
+        if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0:
+            raise ValueError("max_items must be a positive integer")
         self.max_items = max_items
         self._clock = clock
         self._items: dict[str, QueueItem] = {}
@@ -51,6 +52,12 @@ class ShellWorkQueue:
         self._lock = threading.RLock()
 
     def enqueue(self, command: ShellCommand, *, priority: int = 100, item_id: str | None = None) -> QueueItem:
+        if not isinstance(command, ShellCommand):
+            raise TypeError("command must be ShellCommand")
+        if isinstance(priority, bool) or not isinstance(priority, int):
+            raise ValueError("priority must be an integer")
+        if item_id is not None and (not isinstance(item_id, str) or not item_id.strip() or len(item_id) > 512):
+            raise ValueError("item_id must be a non-empty string up to 512 characters")
         with self._lock:
             active = sum(1 for item in self._items.values() if item.state in {QueueState.QUEUED, QueueState.CLAIMED})
             if active >= self.max_items:
@@ -66,8 +73,10 @@ class ShellWorkQueue:
             return item
 
     def claim(self, owner: str) -> QueueItem | None:
-        if not owner:
+        if not isinstance(owner, str) or not owner.strip():
             raise ValueError("queue owner is required")
+        if len(owner) > 256:
+            raise ValueError("queue owner is too long")
         with self._lock:
             while self._heap:
                 _, _, item_id = heapq.heappop(self._heap)
@@ -91,6 +100,8 @@ class ShellWorkQueue:
             return None
 
     def _transition(self, item: QueueItem, state: QueueState) -> QueueItem:
+        if priority is not None and (isinstance(priority, bool) or not isinstance(priority, int)):
+            raise ValueError("priority must be an integer")
         with self._lock:
             current = self._items.get(item.item_id)
             if current is None or current.claim_id != item.claim_id or current.state is not QueueState.CLAIMED:
@@ -188,9 +199,14 @@ class ShellWorkQueue:
         Any stale worker retaining the old QueueItem will therefore fail the
         claim-token check if it later tries to complete or fail the item.
         """
-        if max_age_seconds <= 0:
-            raise ValueError("max_age_seconds must be positive")
-        if not isinstance(priority_delta, int):
+        if (
+            isinstance(max_age_seconds, bool)
+            or not isinstance(max_age_seconds, (int, float))
+            or not math.isfinite(float(max_age_seconds))
+            or float(max_age_seconds) <= 0.0
+        ):
+            raise ValueError("max_age_seconds must be finite and positive")
+        if isinstance(priority_delta, bool) or not isinstance(priority_delta, int):
             raise ValueError("priority_delta must be an integer")
 
         with self._lock:
@@ -227,7 +243,8 @@ class ShellWorkQueue:
             return tuple(recovered)
 
     def get(self, item_id: str) -> QueueItem:
-        return self._items[item_id]
+        with self._lock:
+            return self._items[item_id]
 
     def counts(self) -> dict[str, int]:
         with self._lock:
