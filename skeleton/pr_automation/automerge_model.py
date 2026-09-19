@@ -58,7 +58,16 @@ def valid_sha(value: str) -> bool:
 
 
 def valid_ref(value: str) -> bool:
-    return bool(_REF_RE.fullmatch(value)) and not value.startswith("/") and ".." not in value.split("/")
+    if not _REF_RE.fullmatch(value):
+        return False
+    if value.startswith("/") or value.endswith("/") or value.endswith("."):
+        return False
+    if ".." in value or "@{" in value:
+        return False
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} or part.endswith(".lock") for part in parts):
+        return False
+    return True
 
 
 def valid_context(value: str) -> bool:
