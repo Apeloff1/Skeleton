@@ -100,8 +100,6 @@ class ShellWorkQueue:
             return None
 
     def _transition(self, item: QueueItem, state: QueueState) -> QueueItem:
-        if priority is not None and (isinstance(priority, bool) or not isinstance(priority, int)):
-            raise ValueError("priority must be an integer")
         with self._lock:
             current = self._items.get(item.item_id)
             if current is None or current.claim_id != item.claim_id or current.state is not QueueState.CLAIMED:
@@ -134,6 +132,8 @@ class ShellWorkQueue:
         issues a fresh sequence number so stale claim objects cannot mutate the
         item after it becomes runnable again.
         """
+        if priority is not None and (isinstance(priority, bool) or not isinstance(priority, int)):
+            raise ValueError("priority must be an integer")
         with self._lock:
             current = self._items.get(item.item_id)
             if current is None or current.claim_id != item.claim_id or current.state is not QueueState.CLAIMED:
