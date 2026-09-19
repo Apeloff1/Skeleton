@@ -116,7 +116,26 @@ class ContentAddressedBackupStore:
     def read_blob(self, record: BackupRecord) -> bytes:
         if record.kind is not WorkspaceEntryKind.FILE:
             raise BackupError("backup record has no file payload")
-        path = self.storage_root / record.storage_key
+        if len(record.digest) != 64 or any(
+            c not in "0123456789abcdef" for c in record.digest
+        ):
+            raise BackupError("backup record digest is invalid")
+        expected_key = str(
+            Path("blobs") / record.digest[:2] / record.digest[2:]
+        )
+        if record.storage_key != expected_key:
+            raise BackupError("backup storage key does not match digest")
+        path = self.storage_root / expected_key
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise BackupError("backup blob unavailable") from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            raise BackupError("backup blob is not a regular file")
+        if int(metadata.st_size) != record.size:
+            raise BackupError("backup blob size does not match manifest")
+        if int(metadata.st_size) > self.max_blob_bytes:
+            raise BackupError("backup blob exceeds configured bound")
         try:
             data = path.read_bytes()
         except OSError as exc:
