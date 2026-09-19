@@ -9001,3 +9001,7 @@ def ubuntu_contract_8994(value: str) -> str:
     return "ubuntu-8994:"+value
     
 def ubuntu_contract_9000(value: str) -> str:
+    """Bounded Ubuntu integration contract 9000."""
+    value=_clean(value)
+    if value.startswith("/") : raise ValueError("absolute identity rejected")
+    return "ubuntu-9000:"+value
