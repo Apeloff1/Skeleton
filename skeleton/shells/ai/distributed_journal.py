@@ -66,6 +66,85 @@ class DistributedJournalHead:
         }
 
 
+@dataclass(frozen=True)
+class DistributedJournalSequenceIndex:
+    sequence: int
+    event_hash: str
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence <= 0
+        ):
+            raise ValueError("journal sequence index must be positive")
+        object.__setattr__(
+            self,
+            "event_hash",
+            _sha256_hex("event_hash", self.event_hash),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "sequence": self.sequence,
+            "event_hash": self.event_hash,
+        }
+
+
+@dataclass(frozen=True)
+class DistributedJournalIndexHealth:
+    head_sequence: int
+    inspected: int
+    indexed: int
+    missing: int
+    corrupt: int
+    first_missing_sequence: int | None = None
+    first_corrupt_sequence: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "head_sequence",
+            "inspected",
+            "indexed",
+            "missing",
+            "corrupt",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(f"{name} must be non-negative integer")
+        for name in (
+            "first_missing_sequence",
+            "first_corrupt_sequence",
+        ):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+            ):
+                raise ValueError(f"{name} must be positive when present")
+
+    @property
+    def healthy(self) -> bool:
+        return self.missing == 0 and self.corrupt == 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "head_sequence": self.head_sequence,
+            "inspected": self.inspected,
+            "indexed": self.indexed,
+            "missing": self.missing,
+            "corrupt": self.corrupt,
+            "first_missing_sequence": self.first_missing_sequence,
+            "first_corrupt_sequence": self.first_corrupt_sequence,
+            "healthy": self.healthy,
+        }
+
+
 class DistributedJournalConflict(RuntimeError):
     pass
 
@@ -111,6 +190,106 @@ class DistributedAIDecisionJournal:
     @staticmethod
     def _event_key(event_hash: str) -> str:
         return "event:" + _sha256_hex("event_hash", event_hash)
+
+    @staticmethod
+    def _sequence_key(sequence: int) -> str:
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence <= 0
+        ):
+            raise ValueError("sequence must be positive integer")
+        return f"sequence:{sequence:020d}"
+
+    def _sequence_index(
+        self,
+        sequence: int,
+    ) -> DistributedJournalSequenceIndex | None:
+        record = self.backend.get(
+            self.namespace,
+            self._sequence_key(sequence),
+        )
+        if record is None:
+            return None
+        if not isinstance(
+            record.value,
+            DistributedJournalSequenceIndex,
+        ):
+            raise DistributedJournalCorruption(
+                "journal sequence index has invalid value type"
+            )
+        if record.value.sequence != sequence:
+            raise DistributedJournalCorruption(
+                "journal sequence index key/value mismatch"
+            )
+        return record.value
+
+    def _put_sequence_index(
+        self,
+        event: AIDecisionEvent,
+    ) -> DistributedJournalSequenceIndex:
+        entry = DistributedJournalSequenceIndex(
+            event.sequence,
+            event.event_hash,
+        )
+        key = self._sequence_key(event.sequence)
+        existing = self.backend.get(
+            self.namespace,
+            key,
+        )
+        if existing is None:
+            try:
+                self.backend.put_if_absent(
+                    self.namespace,
+                    key,
+                    entry,
+                )
+                return entry
+            except DistributedStateConflict:
+                existing = self.backend.get(
+                    self.namespace,
+                    key,
+                )
+                if existing is None:
+                    raise
+        if not isinstance(
+            existing.value,
+            DistributedJournalSequenceIndex,
+        ):
+            raise DistributedJournalCorruption(
+                "journal sequence index has invalid value type"
+            )
+        if existing.value != entry:
+            raise DistributedJournalCorruption(
+                "journal sequence already indexes a different event"
+            )
+        return existing.value
+
+    def _repair_sequence_index(
+        self,
+        sequence: int,
+    ) -> DistributedJournalSequenceIndex:
+        head = self.head()
+        if sequence > head.sequence:
+            raise IndexError(
+                "journal sequence is beyond committed head"
+            )
+        current_hash = head.root_hash
+        current_sequence = head.sequence
+        while current_sequence > sequence:
+            event = self.get_event(current_hash)
+            if event.sequence != current_sequence:
+                raise DistributedJournalCorruption(
+                    "journal sequence repair encountered non-contiguous chain"
+                )
+            current_hash = event.previous_hash
+            current_sequence -= 1
+        event = self.get_event(current_hash)
+        if event.sequence != sequence:
+            raise DistributedJournalCorruption(
+                "journal sequence repair reached wrong sequence"
+            )
+        return self._put_sequence_index(event)
 
     def _head_record(self):
         return self.backend.get(self.namespace, "head")
@@ -250,6 +429,7 @@ class DistributedAIDecisionJournal:
                     expected_revision=revision,
                     value=next_head,
                 )
+                self._put_sequence_index(event)
                 return event
             except DistributedStateConflict:
                 current_revision, current = self._head_revision()
@@ -258,6 +438,7 @@ class DistributedAIDecisionJournal:
                     and current.root_hash == event_hash
                     and current_revision >= revision
                 ):
+                    self._put_sequence_index(event)
                     return event
                 if (
                     current_revision == revision
