@@ -341,6 +341,106 @@ class DistributedAIDecisionJournal:
             )
         return events
 
+    def snapshot_at(
+        self,
+        root_hash: str,
+    ) -> tuple[AIDecisionEvent, ...]:
+        """Return and verify the committed prefix ending at root_hash."""
+        root_hash = _sha256_hex(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return ()
+        root_event = self.get_event(root_hash)
+        expected_sequence = root_event.sequence
+        current_hash = root_hash
+        reverse: list[AIDecisionEvent] = []
+        seen: set[str] = set()
+        while current_hash != GENESIS_HASH:
+            if current_hash in seen:
+                raise DistributedJournalCorruption(
+                    "historical decision journal contains a cycle"
+                )
+            seen.add(current_hash)
+            event = self.get_event(current_hash)
+            if event.sequence != expected_sequence:
+                raise DistributedJournalCorruption(
+                    "historical decision journal sequence is not contiguous"
+                )
+            reverse.append(event)
+            current_hash = event.previous_hash
+            expected_sequence -= 1
+            if expected_sequence < 0:
+                raise DistributedJournalCorruption(
+                    "historical decision journal sequence underflow"
+                )
+        if expected_sequence != 0:
+            raise DistributedJournalCorruption(
+                "historical decision journal terminated before genesis"
+            )
+        events = tuple(reversed(reverse))
+        if not events or events[-1].event_hash != root_hash:
+            raise DistributedJournalCorruption(
+                "historical decision journal root mismatch"
+            )
+        return events
+
+    def verify_root(
+        self,
+        root_hash: str,
+    ) -> bool:
+        try:
+            events = self.snapshot_at(root_hash)
+        except (
+            DistributedJournalCorruption,
+            ValueError,
+        ):
+            return False
+        previous = GENESIS_HASH
+        for sequence, event in enumerate(events, start=1):
+            if (
+                event.sequence != sequence
+                or event.previous_hash != previous
+            ):
+                return False
+            expected = AIDecisionJournal._hash(
+                previous,
+                sequence,
+                event.kind,
+                event.observed_at,
+                event.session_id,
+                event.intent_id,
+                event.proposal_id,
+                event.summary,
+                event.data,
+            )
+            if expected != event.event_hash:
+                return False
+            previous = event.event_hash
+        return previous == root_hash
+
+    def root_is_ancestor(
+        self,
+        root_hash: str,
+    ) -> bool:
+        root_hash = _sha256_hex(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return True
+        if not self.verify_root(root_hash):
+            return False
+        try:
+            current = self.snapshot()
+        except DistributedJournalCorruption:
+            return False
+        return any(
+            event.event_hash == root_hash
+            for event in current
+        )
+
     def verify(self) -> bool:
         try:
             events = self.snapshot()
@@ -387,12 +487,19 @@ class DistributedAIDecisionJournal:
     def events_for_session(
         self,
         session_id: str,
+        *,
+        root_hash: str = "",
     ) -> tuple[AIDecisionEvent, ...]:
         if not session_id or len(session_id) > 160:
             raise ValueError("invalid session_id")
+        events = (
+            self.snapshot()
+            if not root_hash
+            else self.snapshot_at(root_hash)
+        )
         return tuple(
             event
-            for event in self.snapshot()
+            for event in events
             if event.session_id == session_id
         )
 
