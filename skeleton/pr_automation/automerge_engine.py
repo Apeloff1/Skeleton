@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable, Iterable, Sequence
 
-from .automerge_github import AutoMergeGitHubError, GitHubAutoMergeClient
+from .automerge_github import GitHubAutoMergeClient
 from .automerge_ledger import MergeLedger
 from .automerge_model import (
     AutoMergePolicy,
