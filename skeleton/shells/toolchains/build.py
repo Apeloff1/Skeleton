@@ -9,7 +9,7 @@ SPECS = (
     OperationSpec(
         logical_name="build.cmake_version",
         executable_key="cmake",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
@@ -81,7 +81,7 @@ SPECS = (
     OperationSpec(
         logical_name="build.ninja_version",
         executable_key="ninja",
-        options=(OptionSpec("--version"),),
+        subcommand="--version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
