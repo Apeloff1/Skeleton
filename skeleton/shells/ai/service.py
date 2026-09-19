@@ -26,6 +26,10 @@ from skeleton.shells.ai.execution_attempt import (
     ExecutionAttemptState,
 )
 from skeleton.shells.ai.execution_backend import AIPlanExecutionBackend
+from skeleton.shells.ai.execution_obligation_recovery import (
+    AIExecutionObligationRecoveryInspector,
+    ExecutionObligationRecoverySummary,
+)
 from skeleton.shells.ai.execution_fence import (
     AIExecutionFence,
     AIExecutionFenceManager,
@@ -64,6 +68,7 @@ class AIServiceStatus:
     durable_recovery: dict[str, object] | None = None
     durable_operations: dict[str, object] | None = None
     durable_recovery_requirements: dict[str, object] | None = None
+    execution_obligations: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -86,6 +91,10 @@ class AIServiceStatus:
             data["durable_recovery_requirements"] = dict(
                 self.durable_recovery_requirements
             )
+        if self.execution_obligations is not None:
+            data["execution_obligations"] = dict(
+                self.execution_obligations
+            )
         return data
 
 
@@ -106,6 +115,7 @@ class AIShellService:
         authority_health: AIAuthorityHealthGuard | None = None,
         execution_fences: AIExecutionFenceManager | None = None,
         execution_attempts: AIExecutionAttemptStore | None = None,
+        execution_obligation_recovery: AIExecutionObligationRecoveryInspector | None = None,
         worker_id: str = "",
         durable_recovery_guard: DurableRecoveryHealthGuard | None = None,
         durable_recovery_ids: tuple[str, ...] = (),
@@ -127,6 +137,24 @@ class AIShellService:
             raise ValueError(
                 "distributed execution evidence requires a valid worker_id"
             )
+        if execution_obligation_recovery is not None:
+            if not isinstance(
+                execution_obligation_recovery,
+                AIExecutionObligationRecoveryInspector,
+            ):
+                raise TypeError(
+                    "execution_obligation_recovery must be "
+                    "AIExecutionObligationRecoveryInspector"
+                )
+            if execution_attempts is None:
+                raise ValueError(
+                    "execution obligation recovery requires execution attempts"
+                )
+            if execution_obligation_recovery.attempts is not execution_attempts:
+                raise ValueError(
+                    "execution obligation recovery must use configured "
+                    "execution attempt store"
+                )
         durable_recovery_ids = tuple(durable_recovery_ids)
         if durable_recovery_guard is None and durable_recovery_ids:
             raise ValueError(
@@ -264,6 +292,7 @@ class AIShellService:
         self.authority_health = authority_health
         self.execution_fences = execution_fences
         self.execution_attempts = execution_attempts
+        self.execution_obligation_recovery = execution_obligation_recovery
         self.worker_id = worker_id
         self.durable_recovery_guard = durable_recovery_guard
         self.durable_recovery_ids = durable_recovery_ids
@@ -285,6 +314,9 @@ class AIShellService:
         self._durable_operations_report: DurableEvidenceOperationsReport | None = None
         self._durable_recovery_requirement_manifest: (
             SignedDurableRecoveryRequirementManifest | None
+        ) = None
+        self._execution_obligation_report: (
+            ExecutionObligationRecoverySummary | None
         ) = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
@@ -329,6 +361,15 @@ class AIShellService:
                 self.state.transition(
                     AIServicePhase.FAILED,
                     reason="AI authority dependency health failed",
+                )
+                return report
+        if self.execution_obligation_recovery is not None:
+            try:
+                self._recover_execution_obligations()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI execution obligation recovery failed",
                 )
                 return report
         if self.durable_recovery_guard is not None:
@@ -439,6 +480,89 @@ class AIShellService:
             raise RuntimeError("AI authority dependency health failed") from None
         self._authority_health_report = report
 
+    def _enroll_required_finalizations(
+        self,
+        finalization_ids: tuple[str, ...],
+    ) -> None:
+        store = self.durable_recovery_requirement_store
+        if store is None or not finalization_ids:
+            return
+        required = tuple(sorted(set(finalization_ids)))
+        for _ in range(16):
+            current = store.current(
+                self.durable_recovery_requirement_scope
+            )
+            if current is None:
+                raise RuntimeError(
+                    "AI durable recovery requirement scope has no manifest"
+                )
+            _, item = current
+            missing = tuple(
+                value
+                for value in required
+                if value not in item.manifest.finalization_ids
+            )
+            if not missing:
+                self._durable_recovery_requirement_manifest = item
+                self.durable_recovery_ids = item.manifest.finalization_ids
+                return
+            change_material = (
+                item.manifest.digest
+                + ":"
+                + ",".join(missing)
+            )
+            change_id = (
+                "auto-finalization-"
+                + __import__("hashlib").sha256(
+                    change_material.encode()
+                ).hexdigest()[:32]
+            )
+            try:
+                item = store.add(
+                    self.durable_recovery_requirement_scope,
+                    missing,
+                    expected_generation=item.manifest.generation,
+                    change_id=change_id,
+                    reason=(
+                        "automatic enrollment of verified execution "
+                        "obligation finalization"
+                    ),
+                )
+                self._durable_recovery_requirement_manifest = item
+                self.durable_recovery_ids = item.manifest.finalization_ids
+                return
+            except DurableRecoveryRequirementConflict:
+                continue
+        raise RuntimeError(
+            "AI durable recovery requirement enrollment retry bound exceeded"
+        )
+
+    def _recover_execution_obligations(self) -> None:
+        recovery = self.execution_obligation_recovery
+        if recovery is None:
+            return
+        try:
+            summary = recovery.recover_safe()
+            self._execution_obligation_report = summary
+            if not summary.allowed:
+                raise RuntimeError(
+                    "execution obligations contain unresolved side effects"
+                )
+            self._enroll_required_finalizations(
+                summary.finalization_ids
+            )
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI execution obligation recovery failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI execution obligation recovery failed"
+            ) from exc
+
     def _resolve_durable_recovery_ids(self) -> tuple[str, ...]:
         store = self.durable_recovery_requirement_store
         if store is None:
@@ -485,6 +609,11 @@ class AIShellService:
         self._durable_recovery_requirement_manifest = item
         self.durable_recovery_ids = item.manifest.finalization_ids
         return self.durable_recovery_ids
+
+    def _require_execution_obligations_current(self) -> None:
+        if self.execution_obligation_recovery is None:
+            return
+        self._recover_execution_obligations()
 
     def _require_durable_recovery_current(self) -> None:
         if self.durable_recovery_guard is None:
@@ -537,6 +666,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
@@ -546,6 +676,7 @@ class AIShellService:
             raise RuntimeError("AI shell service is not ready")
         self._require_release_current()
         self._require_runtime_trust_current()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         bundle = self.orchestrator.review(session)
@@ -642,6 +773,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         if review.compiled is None:
@@ -760,6 +892,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         if review.compiled is None:
@@ -842,6 +975,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         if review.compiled is None:
@@ -914,6 +1048,21 @@ class AIShellService:
             raise
         attempt: AIExecutionAttempt | None = None
         tracking_backend: AttemptTrackingExecutionBackend | None = None
+        obligation_store = (
+            None
+            if self.execution_obligation_recovery is None
+            else self.execution_obligation_recovery.obligations
+        )
+        if obligation_store is not None:
+            obligation_store.register(
+                obligation_id=seal.seal_id,
+                session_id=session.session_id,
+                principal=context.principal,
+                plan_fingerprint=review.compiled.plan.fingerprint,
+                execution_seal_id=seal.seal_id,
+                runtime_trust_digest=self._runtime_trust_digest(),
+                release_evidence_digest=self._release_digest(),
+            )
         try:
             use = seal_registry.consume(
                 seal,
@@ -947,6 +1096,11 @@ class AIShellService:
                     execution_backend_id=active_backend.backend_id,
                 )
                 attempt = stored_attempt.attempt
+                if obligation_store is not None:
+                    obligation_store.sync_attempt(
+                        seal.seal_id,
+                        attempt,
+                    )
                 tracking_backend = AttemptTrackingExecutionBackend(
                     self.execution_attempts,
                     attempt,
@@ -985,15 +1139,21 @@ class AIShellService:
             if tracking_backend is not None:
                 attempt = tracking_backend.attempt
                 if result.ok:
-                    self.execution_attempts.succeed(
+                    terminal_attempt = self.execution_attempts.succeed(
                         attempt,
                         terminal_evidence_digest=result.provenance.digest,
-                    )
+                    ).attempt
                 else:
-                    self.execution_attempts.fail(
+                    terminal_attempt = self.execution_attempts.fail(
                         attempt,
                         error_type="ExecutionOrVerificationFailed",
                         terminal_evidence_digest=result.provenance.digest,
+                    ).attempt
+                attempt = terminal_attempt
+                if obligation_store is not None:
+                    obligation_store.sync_attempt(
+                        seal.seal_id,
+                        terminal_attempt,
                     )
             return result, precondition_report, use
         except BaseException as exc:
@@ -1018,6 +1178,20 @@ class AIShellService:
                     raise RuntimeError(
                         "AI execution attempt ledger terminal write failed"
                     ) from ledger_exc
+                if obligation_store is not None:
+                    try:
+                        current_attempt = self.execution_attempts.current(
+                            attempt.attempt_id
+                        )
+                        if current_attempt is not None:
+                            obligation_store.sync_attempt(
+                                seal.seal_id,
+                                current_attempt.attempt,
+                            )
+                    except Exception as obligation_exc:
+                        raise RuntimeError(
+                            "AI execution obligation terminal write failed"
+                        ) from obligation_exc
             raise
         finally:
             if execution_fence is not None and self.execution_fences is not None:
@@ -1139,6 +1313,47 @@ class AIShellService:
                 )
             raise
 
+        if self.execution_obligation_recovery is not None:
+            try:
+                if execution_attempt is None:
+                    raise RuntimeError(
+                        "execution obligation requires terminal attempt evidence"
+                    )
+                if finalized.finalization is None:
+                    raise RuntimeError(
+                        "execution obligation requires durable finalization state"
+                    )
+                obligation_store = (
+                    self.execution_obligation_recovery.obligations
+                )
+                obligation_store.sync_attempt(
+                    seal.seal_id,
+                    execution_attempt,
+                )
+                obligation_store.finalize(
+                    seal.seal_id,
+                    finalized.finalization,
+                )
+                self._execution_obligation_report = (
+                    self.execution_obligation_recovery.summary()
+                )
+                self._enroll_required_finalizations(
+                    (finalized.finalization.finalization_id,)
+                )
+                if self.durable_recovery_guard is not None:
+                    self._require_durable_recovery_current()
+            except Exception as exc:
+                if self.state.phase is AIServicePhase.READY:
+                    self.state.transition(
+                        AIServicePhase.DEGRADED,
+                        reason=(
+                            "terminal execution obligation finalization failed"
+                        ),
+                    )
+                raise RuntimeError(
+                    "terminal execution obligation finalization failed"
+                ) from exc
+
         return AISealedFinalizedExecution(
             execution,
             precondition_report,
@@ -1237,6 +1452,7 @@ class AIShellService:
         self._require_release_current()
         self._require_runtime_trust_current()
         self._require_authority_health()
+        self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
         if self.execution_fences is not None and not execution_fenced:
@@ -1328,5 +1544,10 @@ class AIShellService:
                 None
                 if self._durable_recovery_requirement_manifest is None
                 else self._durable_recovery_requirement_manifest.to_dict()
+            ),
+            (
+                None
+                if self._execution_obligation_report is None
+                else self._execution_obligation_report.to_dict()
             ),
         )
