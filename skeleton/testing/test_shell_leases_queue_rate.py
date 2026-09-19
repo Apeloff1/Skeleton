@@ -83,6 +83,56 @@ def test_work_queue_capacity_counts_active_only():
     assert queue.counts()["queued"] == 1
 
 
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_work_queue_rejects_invalid_capacity(value):
+    with pytest.raises(ValueError):
+        ShellWorkQueue(max_items=value)
+
+
+@pytest.mark.parametrize("priority", [True, 1.5, "1"])
+def test_work_queue_rejects_non_integer_priority(priority):
+    queue = ShellWorkQueue()
+    with pytest.raises(ValueError):
+        queue.enqueue(ShellCommand("python"), priority=priority)
+
+
+@pytest.mark.parametrize("item_id", ["", "   ", 123])
+def test_work_queue_rejects_invalid_item_id(item_id):
+    queue = ShellWorkQueue()
+    with pytest.raises(ValueError):
+        queue.enqueue(ShellCommand("python"), item_id=item_id)
+
+
+@pytest.mark.parametrize("owner", ["", "   ", 123])
+def test_work_queue_rejects_invalid_owner(owner):
+    queue = ShellWorkQueue()
+    queue.enqueue(ShellCommand("python"))
+    with pytest.raises(ValueError):
+        queue.claim(owner)
+
+
+def test_work_queue_requeue_rejects_non_integer_priority():
+    queue = ShellWorkQueue()
+    queue.enqueue(ShellCommand("python"), item_id="a")
+    claimed = queue.claim("worker")
+    assert claimed is not None
+    with pytest.raises(ValueError):
+        queue.requeue(claimed, priority=True)
+
+
+@pytest.mark.parametrize("max_age", [0, -1, True, float("nan"), float("inf")])
+def test_work_queue_stale_recovery_rejects_invalid_age(max_age):
+    queue = ShellWorkQueue()
+    with pytest.raises(ValueError):
+        queue.requeue_stale_claims(max_age_seconds=max_age)
+
+
+def test_work_queue_stale_recovery_rejects_boolean_priority_delta():
+    queue = ShellWorkQueue()
+    with pytest.raises(ValueError):
+        queue.requeue_stale_claims(max_age_seconds=1, priority_delta=True)
+
+
 def test_token_bucket_consumes_and_refills():
     now = [0.0]
     bucket = TokenBucket(RateLimitPolicy(capacity=2, refill_per_second=1), clock=lambda: now[0])
