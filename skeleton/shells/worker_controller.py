@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import math
 import time
 from typing import Callable
 
@@ -30,9 +31,31 @@ class WorkerSubmission:
     created_at:float=0.0
 
     def __post_init__(self)->None:
-        if not self.submission_id or len(self.submission_id)>256:raise ValueError("invalid submission_id")
-        if not self.principal or len(self.principal)>256:raise ValueError("invalid principal")
-        if not self.work_class or len(self.work_class)>128:raise ValueError("invalid work_class")
+        for name,value,limit in (
+            ("submission_id",self.submission_id,256),
+            ("principal",self.principal,256),
+            ("work_class",self.work_class,128),
+        ):
+            if (
+                not isinstance(value,str)
+                or not value.strip()
+                or len(value)>limit
+                or "\x00" in value
+            ):
+                raise ValueError(f"invalid {name}")
+        if not isinstance(self.command,ShellCommand):
+            raise TypeError("command must be ShellCommand")
+        if isinstance(self.priority,bool) or not isinstance(self.priority,int):
+            raise ValueError("priority must be an integer")
+        if not isinstance(self.demand,CapacityDemand):
+            raise TypeError("demand must be CapacityDemand")
+        if (
+            isinstance(self.created_at,bool)
+            or not isinstance(self.created_at,(int,float))
+            or not math.isfinite(float(self.created_at))
+            or float(self.created_at)<0.0
+        ):
+            raise ValueError("created_at must be finite and non-negative")
 
 
 @dataclass(frozen=True)
@@ -107,6 +130,15 @@ class WorkerController:
         backpressure:BackpressureDecision|None=None,
         delay_seconds:float=0.0,
     )->SubmissionDecision:
+        if not isinstance(submission,WorkerSubmission):
+            raise TypeError("submission must be WorkerSubmission")
+        if (
+            isinstance(delay_seconds,bool)
+            or not isinstance(delay_seconds,(int,float))
+            or not math.isfinite(float(delay_seconds))
+            or float(delay_seconds)<0.0
+        ):
+            raise ValueError("delay_seconds must be finite and non-negative")
         admission=self.inspect(submission,backpressure=backpressure)
         if not admission.allowed:
             self.events.emit("worker.submission.denied",data={
