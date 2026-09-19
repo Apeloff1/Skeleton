@@ -66,10 +66,27 @@ class VectorStore:
     over InMemoryTFIDFStore.
     """
 
-    def __init__(self, embedder: Optional[Callable[[str], List[float]]] = None, dims: int = 256):
+    def __init__(
+        self,
+        embedder: Optional[Callable[[str], List[float]]] = None,
+        dims: int = 256,
+        *,
+        use_jvm_acceleration: bool = False,
+        accelerator: Any = None,
+    ):
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+            "batch_attempts": 0,
+            "batch_successes": 0,
+        }
 
     def add(self, chunk: Chunk) -> None:
         vector = self._embedder_fn(chunk.text)
@@ -89,11 +106,41 @@ class VectorStore:
 
         qv = self._embedder_fn(text)
         qnorm = math.sqrt(sum(v * v for v in qv)) or 1.0
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return []
+
+        if self._use_jvm_acceleration and top_k > 0:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    hits = accelerator.top_k(
+                        qv,
+                        qnorm,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    self._acceleration["successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
-        for entry in self._entries.values():
-            if metadata_filter and not self._matches(entry.chunk.metadata, metadata_filter):
-                continue
+        for entry in candidates:
             dot = sum(q * v for q, v in zip(qv, entry.vector))
             sim = dot / (qnorm * entry.norm)
             scored.append((sim, entry))
@@ -104,12 +151,112 @@ class VectorStore:
             for sim, e in scored[:top_k]
         ]
 
+    def query_many(
+        self,
+        texts: List[str],
+        top_k: int = 5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+    ) -> List[List[ScoredChunk]]:
+        """Query many texts against one candidate snapshot.
+
+        When JVM acceleration is enabled and the candidate set is large enough,
+        all query embeddings share one candidate-matrix transfer. Python still
+        owns embedding, metadata filtering, stable result construction, stats,
+        and the complete fallback path.
+        """
+        queries = list(texts)
+        if not queries:
+            return []
+
+        self._stats["queries"] += len(queries)
+        if not self._entries:
+            return [[] for _ in queries]
+
+        candidates = [
+            entry
+            for entry in self._entries.values()
+            if not metadata_filter or self._matches(entry.chunk.metadata, metadata_filter)
+        ]
+        if not candidates:
+            return [[] for _ in queries]
+
+        embedded: List[Tuple[List[float], float]] = []
+        for text in queries:
+            vector = self._embedder_fn(text)
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            embedded.append((vector, norm))
+
+        if self._use_jvm_acceleration and top_k > 0:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(getattr(accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    self._acceleration["batch_attempts"] += 1
+                    batches = accelerator.top_k_many(
+                        embedded,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError("accelerator returned wrong batch query count")
+                    self._acceleration["successes"] += 1
+                    self._acceleration["batch_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
+
+        output: List[List[ScoredChunk]] = []
+        for query_vector, query_norm in embedded:
+            scored: List[Tuple[float, VectorEntry]] = []
+            for entry in candidates:
+                dot = sum(q * value for q, value in zip(query_vector, entry.vector))
+                similarity = dot / (query_norm * entry.norm)
+                scored.append((similarity, entry))
+            scored.sort(key=lambda item: item[0], reverse=True)
+            output.append(
+                [
+                    ScoredChunk(
+                        chunk=entry.chunk,
+                        score=(similarity + 1.0) / 2.0,
+                        plane="rag",
+                    )
+                    for similarity, entry in scored[:top_k]
+                ]
+            )
+        return output
+
     def delete(self, chunk_id: str) -> bool:
         return self._entries.pop(chunk_id, None) is not None
 
     @staticmethod
     def _matches(metadata: Dict[str, Any], filt: Dict[str, Any]) -> bool:
         return all(metadata.get(k) == v for k, v in filt.items())
+
+    def acceleration_stats(self) -> Dict[str, int | bool]:
+        """Return optional JVM fast-path counters without changing store stats."""
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def _resolve_accelerator(self) -> Any:
+        if self._accelerator is None:
+            from skeleton.memory.jvm_vector_accelerator import get_default_vector_accelerator
+
+            self._accelerator = get_default_vector_accelerator()
+        return self._accelerator
 
     def stats(self) -> Dict[str, Any]:
         return {
