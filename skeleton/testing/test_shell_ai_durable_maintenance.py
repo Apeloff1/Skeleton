@@ -1724,3 +1724,266 @@ def test_get_rejects_wrong_record_value_type():
         DurableMaintenanceConflict,
     ):
         store.get(epoch_id)
+
+class ResourceHead:
+    def __init__(self, sequence, root_hash):
+        self.sequence = sequence
+        self.root_hash = root_hash
+
+
+class ResourceChain:
+    def __init__(self, sequence=7, root_hash=None):
+        self._head = ResourceHead(
+            sequence,
+            root_hash or fp("r"),
+        )
+
+    def head(self):
+        return self._head
+
+
+def test_maintenance_resource_from_chain_builds_live_commitment():
+    chain = ResourceChain(
+        sequence=7,
+        root_hash=fp("r"),
+    )
+    item = DurableMaintenanceResource.from_chain(
+        "journal",
+        chain,
+    )
+    assert item.resource_id == "journal"
+    assert item.resource_kind == "evidence-chain"
+    assert item.sequence == 7
+    assert item.root_hash == fp("r")
+    assert len(item.state_digest) == 64
+
+
+def test_maintenance_resource_from_chain_digest_changes_with_head():
+    first = DurableMaintenanceResource.from_chain(
+        "journal",
+        ResourceChain(
+            sequence=7,
+            root_hash=fp("a"),
+        ),
+    )
+    second = DurableMaintenanceResource.from_chain(
+        "journal",
+        ResourceChain(
+            sequence=8,
+            root_hash=fp("b"),
+        ),
+    )
+    assert first.state_digest != second.state_digest
+    assert first != second
+
+
+def test_maintenance_resource_from_chain_custom_kind():
+    item = DurableMaintenanceResource.from_chain(
+        "journal",
+        ResourceChain(),
+        resource_kind="orphan-gc-chain",
+    )
+    assert item.resource_kind == "orphan-gc-chain"
+
+
+def test_maintenance_resource_from_chain_requires_head():
+    with pytest.raises(
+        TypeError,
+        match="head",
+    ):
+        DurableMaintenanceResource.from_chain(
+            "journal",
+            object(),
+        )
+
+
+def test_maintenance_resource_from_chain_requires_head_shape():
+    class Bad:
+        def head(self):
+            return object()
+
+    with pytest.raises(
+        TypeError,
+        match="sequence and root_hash",
+    ):
+        DurableMaintenanceResource.from_chain(
+            "journal",
+            Bad(),
+        )
+
+
+@pytest.mark.parametrize(
+    "chain_id",
+    ["", "x" * 257],
+)
+def test_maintenance_resource_from_chain_validates_chain_id(chain_id):
+    with pytest.raises(ValueError, match="chain_id"):
+        DurableMaintenanceResource.from_chain(
+            chain_id,
+            ResourceChain(),
+        )
+
+
+def test_maintenance_resource_replicated_chain_binds_both_sides():
+    item = DurableMaintenanceResource.replicated_chain(
+        "journal",
+        source_sequence=10,
+        source_root=fp("a"),
+        target_sequence=8,
+        target_root=fp("b"),
+        replication_state_digest=fp("c"),
+    )
+    assert item.resource_id == "journal"
+    assert item.resource_kind == "replicated-evidence-chain"
+    assert item.sequence == 10
+    assert item.state_digest == fp("c")
+    assert item.root_hash not in {
+        fp("a"),
+        fp("b"),
+    }
+
+
+def test_maintenance_resource_replicated_chain_derives_state_when_missing():
+    item = DurableMaintenanceResource.replicated_chain(
+        "journal",
+        source_sequence=2,
+        source_root=fp("a"),
+        target_sequence=2,
+        target_root=fp("b"),
+    )
+    assert len(item.state_digest) == 64
+    assert item.state_digest == item.root_hash
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("source_sequence", -1),
+        ("source_sequence", True),
+        ("target_sequence", -1),
+        ("target_sequence", True),
+    ],
+)
+def test_maintenance_resource_replicated_chain_validates_sequences(name, value):
+    kwargs = dict(
+        chain_id="journal",
+        source_sequence=1,
+        source_root=fp("a"),
+        target_sequence=1,
+        target_root=fp("b"),
+    )
+    kwargs[name] = value
+    with pytest.raises(ValueError):
+        DurableMaintenanceResource.replicated_chain(
+            **kwargs
+        )
+
+
+def test_maintenance_resource_replica_binds_journal_and_receipts():
+    item = DurableMaintenanceResource.replica(
+        "replica-a",
+        journal_sequence=20,
+        journal_root=fp("j"),
+        receipt_sequence=18,
+        receipt_root=fp("r"),
+        replication_state_digest=fp("s"),
+    )
+    assert item.resource_id == "replica-a"
+    assert item.resource_kind == "evidence-replica"
+    assert item.sequence == 20
+    assert item.state_digest == fp("s")
+    assert len(item.root_hash) == 64
+
+
+def test_maintenance_resource_replica_derived_state_changes_with_receipt_root():
+    first = DurableMaintenanceResource.replica(
+        "replica-a",
+        journal_sequence=20,
+        journal_root=fp("j"),
+        receipt_sequence=18,
+        receipt_root=fp("r"),
+    )
+    second = DurableMaintenanceResource.replica(
+        "replica-a",
+        journal_sequence=20,
+        journal_root=fp("j"),
+        receipt_sequence=18,
+        receipt_root=fp("x"),
+    )
+    assert first.state_digest != second.state_digest
+    assert first.root_hash != second.root_hash
+
+
+def test_orphan_gc_is_first_class_maintenance_operation():
+    _, _, _, store = environment()
+    item = resource(
+        "journal",
+        kind="orphan-gc-chain",
+        root=fp("j"),
+    )
+    signed = acquire(
+        store,
+        operation=DurableMaintenanceOperation.ORPHAN_GC,
+        resources=(item,),
+    )
+    status = store.require_active(
+        signed,
+        operation=DurableMaintenanceOperation.ORPHAN_GC,
+        required_resources=("journal",),
+        live_resources=(item,),
+    )
+    assert status.active
+    assert status.destructive_action_authorized
+    assert signed.epoch.operation.value == "orphan_gc"
+
+
+def test_orphan_gc_epoch_rejects_other_operation_check():
+    _, _, _, store = environment()
+    item = resource(
+        "journal",
+        kind="orphan-gc-chain",
+        root=fp("j"),
+    )
+    signed = acquire(
+        store,
+        operation=DurableMaintenanceOperation.ORPHAN_GC,
+        resources=(item,),
+    )
+    with pytest.raises(
+        DurableMaintenanceStale,
+        match="operation",
+    ):
+        store.require_active(
+            signed,
+            operation=DurableMaintenanceOperation.PRUNING,
+            required_resources=("journal",),
+            live_resources=(item,),
+        )
+
+
+def test_resource_helpers_are_not_policy_methods():
+    assert not hasattr(
+        DurableMaintenancePolicy,
+        "from_chain",
+    )
+    assert not hasattr(
+        DurableMaintenancePolicy,
+        "replicated_chain",
+    )
+    assert not hasattr(
+        DurableMaintenancePolicy,
+        "replica",
+    )
+    assert hasattr(
+        DurableMaintenanceResource,
+        "from_chain",
+    )
+    assert hasattr(
+        DurableMaintenanceResource,
+        "replicated_chain",
+    )
+    assert hasattr(
+        DurableMaintenanceResource,
+        "replica",
+    )
+
