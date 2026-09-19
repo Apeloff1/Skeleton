@@ -33,6 +33,14 @@ from skeleton.shells.ai.durable_compaction import (
     DurableCompactionRootCoverage,
     DurableCompactionState,
 )
+from skeleton.shells.ai.durable_lifecycle import (
+    DurableEvidenceLifecycleCoordinator,
+    DurableLifecycleAction,
+    DurableLifecycleError,
+    DurableLifecyclePolicy,
+    DurableLifecycleReport,
+    DurableLifecycleState,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryFinding,
     DurableRecoveryStatus,
@@ -59,6 +67,12 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "DurableEvidenceLifecycleCoordinator": DurableEvidenceLifecycleCoordinator,
+    "DurableLifecycleAction": DurableLifecycleAction,
+    "DurableLifecycleError": DurableLifecycleError,
+    "DurableLifecyclePolicy": DurableLifecyclePolicy,
+    "DurableLifecycleReport": DurableLifecycleReport,
+    "DurableLifecycleState": DurableLifecycleState,
     "DurableCompactionError": DurableCompactionError,
     "DurableCompactionPlanner": DurableCompactionPlanner,
     "DurableCompactionPolicy": DurableCompactionPolicy,
@@ -1015,3 +1029,72 @@ def test_compaction_readiness_exposes_non_destructive_authority_property():
         DurableCompactionReadiness.destructive_action_authorized,
         property,
     )
+
+def test_durable_lifecycle_coordinator_constructor_contract():
+    signature = inspect.signature(
+        DurableEvidenceLifecycleCoordinator
+    )
+    assert {
+        "checkpoints",
+        "retention",
+        "archive_builder",
+        "archives",
+        "compaction",
+        "policy",
+    }.issubset(signature.parameters)
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["inspect", "prepare", "require_operational"],
+)
+def test_durable_lifecycle_coordinator_public_methods(method):
+    assert callable(
+        getattr(
+            DurableEvidenceLifecycleCoordinator,
+            method,
+            None,
+        )
+    )
+
+
+def test_durable_lifecycle_state_wire_values_public_contract():
+    assert {
+        item.value
+        for item in DurableLifecycleState
+    } == {
+        "healthy",
+        "checkpoint_required",
+        "checkpoint_primed",
+        "archive_required",
+        "archive_stored",
+        "compaction_ready",
+        "blocked",
+    }
+
+
+def test_durable_lifecycle_action_wire_values_public_contract():
+    assert {
+        item.value
+        for item in DurableLifecycleAction
+    } == {
+        "none",
+        "checkpoint_published",
+        "archive_persisted",
+        "archive_reused",
+    }
+
+
+def test_durable_lifecycle_report_is_explicitly_non_destructive():
+    assert isinstance(
+        DurableLifecycleReport.destructive_action_authorized,
+        property,
+    )
+
+
+def test_durable_lifecycle_error_is_runtime_error_public_contract():
+    assert issubclass(
+        DurableLifecycleError,
+        RuntimeError,
+    )
+
