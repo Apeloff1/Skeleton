@@ -808,12 +808,12 @@ def test_static_ticket_verification_checks_consensus_metadata():
     forged = SignedDurableFailoverTicket(
         signed.ticket,
         SignedArtifact(
-            signed.signature.artifact_type,
-            signed.signature.artifact_digest,
-            signed.signature.signer_id,
-            signed.signature.issued_at,
-            signed.signature.signature,
-            metadata,
+            artifact_type=signed.signature.artifact_type,
+            artifact_digest=signed.signature.artifact_digest,
+            key_id=signed.signature.key_id,
+            issued_at=signed.signature.issued_at,
+            metadata=metadata,
+            signature=signed.signature.signature,
         ),
     )
     with pytest.raises(
