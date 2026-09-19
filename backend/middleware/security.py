@@ -33,7 +33,121 @@ log = logging.getLogger("middleware.security")
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_XFF_HOPS = 32
 _MAX_XFF_CHARS = 2048
+_CONTENT_TYPE_MAX_CHARS = 512
+_HTTP_TOKEN_RE = re.compile(r"^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$")
 _SYNTHETIC_RATE_LIMIT_EXEMPT_PEERS = frozenset({"testclient"})
+
+
+def _split_content_type_parts(raw: str) -> list[str] | None:
+    """Split a bounded Content-Type value without splitting quoted semicolons."""
+    if not raw or len(raw) > _CONTENT_TYPE_MAX_CHARS or not raw.isascii():
+        return None
+    if any(
+        (ord(character) < 32 and character != "\t") or ord(character) == 127
+        for character in raw
+    ):
+        return None
+
+    parts: list[str] = []
+    current: list[str] = []
+    in_quote = False
+    escaped = False
+    for character in raw:
+        if escaped:
+            current.append(character)
+            escaped = False
+            continue
+        if in_quote and character == "\\":
+            current.append(character)
+            escaped = True
+            continue
+        if character == '"':
+            current.append(character)
+            in_quote = not in_quote
+            continue
+        if character == ";" and not in_quote:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(character)
+
+    if in_quote or escaped:
+        return None
+    parts.append("".join(current))
+    return parts
+
+
+def _decode_content_type_parameter(value: str) -> str | None:
+    value = value.strip(" \t")
+    if not value:
+        return None
+    if value.startswith('"'):
+        if len(value) < 2 or not value.endswith('"'):
+            return None
+        inner = value[1:-1]
+        decoded: list[str] = []
+        escaped = False
+        for character in inner:
+            if escaped:
+                if ord(character) < 32 or ord(character) == 127:
+                    return None
+                decoded.append(character)
+                escaped = False
+                continue
+            if character == "\\":
+                escaped = True
+                continue
+            if character == '"':
+                return None
+            if ord(character) < 32 or ord(character) == 127:
+                return None
+            decoded.append(character)
+        if escaped:
+            return None
+        return "".join(decoded)
+    if not _HTTP_TOKEN_RE.fullmatch(value):
+        return None
+    return value
+
+
+def _validated_content_type(raw: str) -> tuple[str, dict[str, str]] | None:
+    """Validate media-type framing without imposing a global MIME allowlist."""
+    parts = _split_content_type_parts(raw)
+    if not parts:
+        return None
+
+    media = parts[0].strip(" \t").lower()
+    if media.count("/") != 1:
+        return None
+    type_name, subtype = media.split("/", 1)
+    if not _HTTP_TOKEN_RE.fullmatch(type_name) or not _HTTP_TOKEN_RE.fullmatch(subtype):
+        return None
+
+    parameters: dict[str, str] = {}
+    for raw_parameter in parts[1:]:
+        parameter = raw_parameter.strip(" \t")
+        if not parameter or "=" not in parameter:
+            return None
+        name, value = parameter.split("=", 1)
+        name = name.strip(" \t").lower()
+        if not _HTTP_TOKEN_RE.fullmatch(name) or name in parameters:
+            return None
+        decoded = _decode_content_type_parameter(value)
+        if decoded is None:
+            return None
+        parameters[name] = decoded
+
+    if media == "multipart/form-data":
+        boundary = parameters.get("boundary")
+        if (
+            boundary is None
+            or not 1 <= len(boundary) <= 70
+            or boundary.endswith(" ")
+            or any(ord(character) < 32 or ord(character) == 127 for character in boundary)
+        ):
+            return None
+
+    return media, parameters
 
 
 def _matches_route_boundary(path: str, route: str) -> bool:
@@ -583,8 +697,17 @@ class SizeLimitMiddleware:
             for key, value in raw_headers
             if key.lower() == b"transfer-encoding"
         ]
+        content_types = [
+            value.decode("latin-1").strip(" \t")
+            for key, value in raw_headers
+            if key.lower() == b"content-type"
+        ]
 
-        if len(content_lengths) > 1 or len(transfer_encodings) > 1:
+        if (
+            len(content_lengths) > 1
+            or len(transfer_encodings) > 1
+            or len(content_types) > 1
+        ):
             await self._reject(
                 scope,
                 receive,
@@ -600,6 +723,16 @@ class SizeLimitMiddleware:
                 send,
                 status_code=400,
                 content={"error": "invalid_request_framing"},
+            )
+            return
+
+        if content_types and _validated_content_type(content_types[0]) is None:
+            await self._reject(
+                scope,
+                receive,
+                send,
+                status_code=400,
+                content={"error": "invalid_content_type"},
             )
             return
 
