@@ -61,6 +61,13 @@ from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionWorkflowStale,
     StoredDurableCompactionWorkflow,
 )
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceConflict,
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStale,
+    DurableMaintenanceStore,
+)
 from skeleton.shells.ai.durable_hot_floor import (
     DurableHotFloorStore,
 )
@@ -193,6 +200,8 @@ class OperatorFixture:
         backend=None,
         now=400.0,
         max_items=100,
+        maintenance=False,
+        maintenance_store=None,
     ):
         self.kind = kind
         self.now = [float(now)]
@@ -422,11 +431,24 @@ class OperatorFixture:
                 nonce_factory=nonce,
             )
         )
+        self.maintenance = maintenance_store
+        if maintenance and self.maintenance is None:
+            self.maintenance = DurableMaintenanceStore(
+                self.backend,
+                signer(
+                    f"{kind}-maintenance",
+                    b"m",
+                ),
+                namespace=(
+                    f"{kind}-maintenance-epochs"
+                ),
+            )
         self.executor = (
             DurablePruningExecutor(
                 self.backend,
                 self.authorization_store,
                 self.floor_store,
+                maintenance=self.maintenance,
                 namespace=(
                     f"{kind}-pruning"
                 ),
@@ -441,6 +463,7 @@ class OperatorFixture:
                 self.certificate_store,
                 self.authorization_store,
                 self.executor,
+                maintenance=self.maintenance,
                 namespace=(
                     f"{kind}-operator"
                 ),
@@ -498,11 +521,35 @@ class OperatorFixture:
     def execute(
         self,
         workflow_id,
+        *,
+        maintenance_epoch=None,
     ):
         return self.operator.execute(
             workflow_id,
             self.retention,
             self.chain,
+            maintenance_epoch=maintenance_epoch,
+        )
+
+    def acquire_maintenance(
+        self,
+        *,
+        operation=DurableMaintenanceOperation.COMPACTION,
+        owner_id="operator",
+    ):
+        if self.maintenance is None:
+            raise RuntimeError(
+                "fixture maintenance is not enabled"
+            )
+        return self.maintenance.acquire(
+            operation,
+            owner_id=owner_id,
+            resources=(
+                DurableMaintenanceResource.from_chain(
+                    self.chain_id,
+                    self.chain,
+                ),
+            ),
         )
 
     def through_prepared(self):
