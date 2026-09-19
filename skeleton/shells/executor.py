@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import math
 import time
 from typing import Callable
 import uuid
@@ -30,12 +31,25 @@ class ExecutorConfig:
     max_retry_sleep_seconds: float = 30.0
 
     def __post_init__(self) -> None:
-        if self.long_running_threshold_seconds <= 0:
-            raise ValueError("long-running threshold must be positive")
-        if self.large_output_threshold_bytes <= 0:
-            raise ValueError("large-output threshold must be positive")
-        if self.max_retry_sleep_seconds < 0:
-            raise ValueError("retry sleep limit must be non-negative")
+        for name, value, allow_zero in (
+            ("long_running_threshold_seconds", self.long_running_threshold_seconds, False),
+            ("max_retry_sleep_seconds", self.max_retry_sleep_seconds, True),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) < (0.0 if allow_zero else 0.0)
+                or (not allow_zero and float(value) == 0.0)
+            ):
+                qualifier = "finite and non-negative" if allow_zero else "finite and positive"
+                raise ValueError(f"{name} must be {qualifier}")
+        if (
+            isinstance(self.large_output_threshold_bytes, bool)
+            or not isinstance(self.large_output_threshold_bytes, int)
+            or self.large_output_threshold_bytes <= 0
+        ):
+            raise ValueError("large_output_threshold_bytes must be a positive integer")
 
 
 @dataclass(frozen=True)
