@@ -283,6 +283,11 @@ class DurableVerificationCursor:
                 )
 
     @property
+    def verified_item_count(self) -> int:
+        """Backward-compatible alias for the verified segment size."""
+        return self.segment_items
+
+    @property
     def digest(self) -> str:
         return _stable_digest(self.to_dict())
 
