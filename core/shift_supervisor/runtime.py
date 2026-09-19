@@ -33,6 +33,6 @@ def build_supervisor(
         manager=manager,
         secretary=secretary,
         project_context_supplier=project_context_supplier,
-        research_supplier=lambda: broker.collect(project_context_supplier()),
+        research_from_context=broker.collect,
         cadence=cadence,
     )
