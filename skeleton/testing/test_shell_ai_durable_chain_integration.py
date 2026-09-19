@@ -42,8 +42,19 @@ from skeleton.shells.ai.effects import (
     EffectRegistry,
 )
 from skeleton.shells.ai.evidence_finalizer import AIExecutionEvidenceFinalizer
-from skeleton.shells.ai.execution_attempt import AIExecutionAttemptStore
+from skeleton.shells.ai.execution_attempt import (
+    AIExecutionAttemptStore,
+    ExecutionAttemptState,
+)
 from skeleton.shells.ai.execution_evidence import AIExecutionEvidenceStore
+from skeleton.shells.ai.execution_obligation import (
+    AIExecutionObligationStore,
+    ExecutionObligationState,
+)
+from skeleton.shells.ai.execution_obligation_recovery import (
+    AIExecutionObligationRecoveryInspector,
+    ExecutionObligationRecoveryDisposition,
+)
 from skeleton.shells.ai.execution_seal import ExecutionSealAuthority
 from skeleton.shells.ai.finalization_reconciler import (
     AIExecutionFinalizationReconciler,
@@ -2855,4 +2866,633 @@ def test_archive_repository_can_add_later_prefix_without_breaking_first_recovery
     ).require_verified(second_id)
     assert first_report.ok
     assert second_report.ok
+
+def obligation_runtime(env, *, namespace="execution-obligations"):
+    requirements = DurableRecoveryRequirementStore(
+        env.backend,
+        ArtifactSigner(
+            "obligation-requirements",
+            b"o" * 32,
+            clock=lambda: 30.0,
+        ),
+        namespace=f"{namespace}-requirements",
+        clock=lambda: 30.0,
+    )
+    if requirements.current("prod") is None:
+        requirements.initialize("prod", ())
+    obligations = AIExecutionObligationStore(
+        env.backend,
+        namespace=namespace,
+        clock=lambda: 30.0,
+    )
+    recovery = AIExecutionObligationRecoveryInspector(
+        obligations,
+        env.attempts,
+        env.finalizations,
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=DistributedAIDecisionJournal(
+                env.backend,
+                namespace="decision-journal",
+            ),
+            receipt_chain=DistributedReceiptChain(
+                env.backend,
+                namespace="receipts",
+            ),
+            execution_evidence=env.execution_evidence,
+        ),
+    )
+    service = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-obligation",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    return service, obligations, recovery, requirements
+
+
+def execute_with_obligation_service(
+    env,
+    service,
+    *,
+    session_id="obligation-session",
+    intent_id="obligation-intent",
+    finalize=True,
+):
+    session = service.new_session(
+        make_intent(intent_id=intent_id),
+        session_id=session_id,
+    )
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"z" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    if finalize:
+        result = service.execute_sealed_and_finalize(
+            session,
+            review,
+            context=ExecutionContext(
+                f"context-{session_id}",
+                principal="alice",
+            ),
+            seal=seal,
+            seal_registry=registry,
+            finalizer=env.finalizer,
+        )
+    else:
+        result = service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext(
+                f"context-{session_id}",
+                principal="alice",
+            ),
+            seal=seal,
+            seal_registry=registry,
+        )
+    return session, review, seal, registry, result
+
+
+def test_obligation_service_registers_before_process_and_finalizes_after_evidence(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, recovery, requirements = obligation_runtime(env)
+    service.start()
+    assert service.state.ready()
+
+    session, _, seal, _, result = execute_with_obligation_service(
+        env,
+        service,
+    )
+    assert result.ok
+
+    stored = obligations.current(seal.seal_id)
+    assert stored is not None
+    obligation = stored.obligation
+    assert obligation.state is ExecutionObligationState.FINALIZED
+    assert obligation.session_id == session.session_id
+    assert obligation.attempt_state == "succeeded"
+    assert obligation.terminal_evidence_digest == result.execution.provenance.digest
+    assert (
+        obligation.finalization_id
+        == result.finalized.finalization.finalization_id
+    )
+    assert recovery.inspect(seal.seal_id).disposition is (
+        ExecutionObligationRecoveryDisposition.VERIFIED_FINALIZED
+    )
+    assert requirements.require("prod").manifest.finalization_ids == (
+        result.finalized.finalization.finalization_id,
+    )
+
+
+def test_obligation_service_status_exposes_terminal_summary(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, _, _, _ = obligation_runtime(env)
+    service.start()
+    _, _, _, _, result = execute_with_obligation_service(
+        env,
+        service,
+    )
+    status = service.status().to_dict()
+    summary = status["execution_obligations"]
+    assert summary["allowed"] is True
+    assert summary["verified_finalized"] == 1
+    assert summary["retired"] == 0
+    assert summary["unresolved"] == 0
+    assert summary["finalization_ids"] == [
+        result.finalized.finalization.finalization_id
+    ]
+
+
+def test_plain_sealed_execution_leaves_terminal_unfinalized_obligation(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, recovery, _ = obligation_runtime(env)
+    service.start()
+    _, _, seal, _, execution_tuple = execute_with_obligation_service(
+        env,
+        service,
+        finalize=False,
+    )
+    execution = execution_tuple[0]
+    assert execution.ok
+
+    stored = obligations.current(seal.seal_id)
+    assert stored.obligation.state is ExecutionObligationState.ATTEMPT_BOUND
+    assert stored.obligation.attempt_state == "succeeded"
+    report = recovery.inspect(seal.seal_id)
+    assert report.disposition is (
+        ExecutionObligationRecoveryDisposition.TERMINAL_UNFINALIZED
+    )
+
+
+def test_terminal_unfinalized_obligation_blocks_next_admission(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, _, _, _ = obligation_runtime(env)
+    service.start()
+    execute_with_obligation_service(
+        env,
+        service,
+        finalize=False,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="execution obligation recovery failed",
+    ):
+        service.new_session(
+            make_intent(intent_id="blocked"),
+            session_id="blocked",
+        )
+    assert service.state.phase is AIServicePhase.DEGRADED
+
+
+def test_restart_blocks_terminal_unfinalized_obligation(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, _, _, requirements = obligation_runtime(env)
+    service.start()
+    execute_with_obligation_service(
+        env,
+        service,
+        finalize=False,
+    )
+
+    restarted, _, _, _ = obligation_runtime(env)
+    # Reuse the exact signed requirement authority namespace produced above.
+    restarted.durable_recovery_requirement_store = requirements
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+    assert (
+        "execution obligation"
+        in restarted.state.reason.lower()
+    )
+
+
+def test_manual_finalization_after_terminal_execution_is_discovered_on_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, recovery, requirements = obligation_runtime(env)
+    service.start()
+    session, review, seal, _, execution_tuple = execute_with_obligation_service(
+        env,
+        service,
+        finalize=False,
+    )
+    execution = execution_tuple[0]
+    terminal_attempt = env.attempts.current(seal.seal_id).attempt
+    finalized = env.finalizer.finalize(
+        session,
+        execution,
+        policy_fingerprint=service.governance.current_policy().fingerprint,
+        tool_catalog_digest=service.orchestrator.planner.catalog.digest,
+        effect_digest=service.orchestrator.compiler.effects.digest,
+        execution_seal_id=seal.seal_id,
+        execution_attempt=terminal_attempt,
+    )
+    assert finalized.finalization is not None
+    assert obligations.current(
+        seal.seal_id
+    ).obligation.state is ExecutionObligationState.ATTEMPT_BOUND
+    assert recovery.inspect(seal.seal_id).disposition is (
+        ExecutionObligationRecoveryDisposition.FINALIZATION_DISCOVERED
+    )
+
+    restarted = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-obligation-restart",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    restarted.start()
+    assert restarted.state.ready()
+    assert obligations.current(
+        seal.seal_id
+    ).obligation.state is ExecutionObligationState.FINALIZED
+    assert (
+        finalized.finalization.finalization_id
+        in requirements.require("prod").manifest.finalization_ids
+    )
+
+
+def test_preboundary_catalog_only_crash_is_retired_on_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, obligations, recovery, requirements = obligation_runtime(env)
+    entry = obligations._append_catalog(
+        obligation_id="catalog-only",
+        session_id="catalog-session",
+        principal="alice",
+        plan_fingerprint=fp("catalog-plan"),
+        execution_seal_id="catalog-only",
+        runtime_trust_digest="",
+        release_evidence_digest="",
+    )
+    assert entry.obligation_id == "catalog-only"
+    assert env.backend.get(
+        obligations.namespace,
+        obligations._state_key("catalog-only"),
+    ) is None
+
+    restarted = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-catalog-restart",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    restarted.start()
+    assert restarted.state.ready()
+    recovered = obligations.current("catalog-only")
+    assert recovered.obligation.state is ExecutionObligationState.RETIRED
+    assert recovered.obligation.retirement_proof_digest
+
+
+def test_registered_before_attempt_is_retired_on_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, obligations, recovery, requirements = obligation_runtime(env)
+    obligations.register(
+        obligation_id="registered-only",
+        session_id="registered-session",
+        principal="alice",
+        plan_fingerprint=fp("registered-plan"),
+        execution_seal_id="registered-only",
+    )
+    restarted = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-registered-restart",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    restarted.start()
+    assert restarted.state.ready()
+    assert obligations.current(
+        "registered-only"
+    ).obligation.state is ExecutionObligationState.RETIRED
+
+
+def test_authorized_attempt_is_abandoned_then_retired_on_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, obligations, recovery, requirements = obligation_runtime(env)
+    obligations.register(
+        obligation_id="authorized-only",
+        session_id="authorized-session",
+        principal="alice",
+        plan_fingerprint=fp("authorized-plan"),
+        execution_seal_id="authorized-only",
+    )
+    stored_attempt = env.attempts.reserve(
+        attempt_id="authorized-only",
+        session_id="authorized-session",
+        principal="alice",
+        worker_id="worker-obligation",
+        plan_fingerprint=fp("authorized-plan"),
+        execution_seal_id="authorized-only",
+    )
+    obligations.sync_attempt(
+        "authorized-only",
+        stored_attempt.attempt,
+    )
+
+    restarted = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-authorized-restart",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    restarted.start()
+    assert restarted.state.ready()
+    assert env.attempts.current(
+        "authorized-only"
+    ).attempt.state is ExecutionAttemptState.ABANDONED
+    assert obligations.current(
+        "authorized-only"
+    ).obligation.state is ExecutionObligationState.RETIRED
+
+
+def test_boundary_entered_attempt_blocks_restart_and_is_never_replayed(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, obligations, recovery, requirements = obligation_runtime(env)
+    obligations.register(
+        obligation_id="boundary",
+        session_id="boundary-session",
+        principal="alice",
+        plan_fingerprint=fp("boundary-plan"),
+        execution_seal_id="boundary",
+    )
+    reserved = env.attempts.reserve(
+        attempt_id="boundary",
+        session_id="boundary-session",
+        principal="alice",
+        worker_id="worker-obligation",
+        plan_fingerprint=fp("boundary-plan"),
+        execution_seal_id="boundary",
+    )
+    boundary = env.attempts.enter_boundary(
+        reserved.attempt
+    ).attempt
+    obligations.sync_attempt("boundary", boundary)
+
+    restarted = AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        execution_obligation_recovery=recovery,
+        worker_id="worker-boundary-restart",
+        durable_recovery_guard=DurableRecoveryHealthGuard(
+            recovery.durable_recovery,
+            DurableRecoveryHealthPolicy(),
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope="prod",
+    )
+    receipt_count = env.receipts.length()
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+    assert env.attempts.current(
+        "boundary"
+    ).attempt.state is ExecutionAttemptState.BOUNDARY_ENTERED
+    assert obligations.current(
+        "boundary"
+    ).obligation.state is ExecutionObligationState.ATTEMPT_BOUND
+    assert env.receipts.length() == receipt_count
+
+
+def test_consumed_seal_failure_leaves_safe_registered_obligation(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, recovery, _ = obligation_runtime(env)
+    service.start()
+
+    session = service.new_session(
+        make_intent(intent_id="consume-failure"),
+        session_id="consume-failure",
+    )
+    review, _ = service.review(session)
+    authority = ExecutionSealAuthority(b"x" * 32)
+    registry = ExecutionSealRegistry(authority)
+    seal = service.seal_review(
+        session,
+        review,
+        principal="alice",
+        authority=authority,
+    )
+    # Consume once before service execution. The service will catalog the
+    # obligation, then its consume attempt must fail before any child starts.
+    registry.consume(
+        seal,
+        principal="alice",
+        session_id=session.session_id,
+        plan_pin=service._pins[session.session_id],
+    )
+    before = env.receipts.length()
+    with pytest.raises(Exception):
+        service.execute_sealed(
+            session,
+            review,
+            context=ExecutionContext(
+                "consume-failure-context",
+                principal="alice",
+            ),
+            seal=seal,
+            seal_registry=registry,
+        )
+    assert env.receipts.length() == before
+    obligation = obligations.current(seal.seal_id).obligation
+    assert obligation.state is ExecutionObligationState.REGISTERED
+    assert recovery.inspect(seal.seal_id).safe_to_replan
+
+
+def test_safe_registered_obligation_is_retired_before_next_session(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, _, _ = obligation_runtime(env)
+    service.start()
+    obligations.register(
+        obligation_id="safe-orphan",
+        session_id="safe-orphan-session",
+        principal="alice",
+        plan_fingerprint=fp("safe-orphan-plan"),
+        execution_seal_id="safe-orphan",
+    )
+    session = service.new_session(
+        make_intent(intent_id="after-safe-orphan"),
+        session_id="after-safe-orphan",
+    )
+    assert session.session_id == "after-safe-orphan"
+    assert obligations.current(
+        "safe-orphan"
+    ).obligation.state is ExecutionObligationState.RETIRED
+    assert service.state.ready()
+
+
+def test_obligation_finalization_auto_enrolls_signed_requirement_manifest(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, _, _, requirements = obligation_runtime(env)
+    service.start()
+    _, _, _, _, result = execute_with_obligation_service(
+        env,
+        service,
+    )
+    finalization_id = result.finalized.finalization.finalization_id
+    manifest = requirements.require("prod").manifest
+    assert manifest.generation == 2
+    assert manifest.finalization_ids == (finalization_id,)
+    assert manifest.change_id.startswith("auto-finalization-")
+
+
+def test_multiple_obligation_finalizations_accumulate_required_proofs(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, obligations, recovery, requirements = obligation_runtime(env)
+    service.start()
+    _, _, seal_one, _, first = execute_with_obligation_service(
+        env,
+        service,
+        session_id="obligation-one",
+        intent_id="obligation-one-intent",
+    )
+    _, _, seal_two, _, second = execute_with_obligation_service(
+        env,
+        service,
+        session_id="obligation-two",
+        intent_id="obligation-two-intent",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    second_id = second.finalized.finalization.finalization_id
+    assert requirements.require("prod").manifest.finalization_ids == tuple(
+        sorted((first_id, second_id))
+    )
+    assert obligations.current(
+        seal_one.seal_id
+    ).obligation.state is ExecutionObligationState.FINALIZED
+    assert obligations.current(
+        seal_two.seal_id
+    ).obligation.state is ExecutionObligationState.FINALIZED
+    summary = recovery.summary()
+    assert summary.allowed
+    assert summary.verified_finalized == 2
+    assert summary.finalization_ids == tuple(
+        sorted((first_id, second_id))
+    )
+
+
+def test_requirement_enrollment_is_idempotent_on_repeated_obligation_recovery(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    service, _, recovery, requirements = obligation_runtime(env)
+    service.start()
+    _, _, _, _, result = execute_with_obligation_service(
+        env,
+        service,
+    )
+    first_generation = requirements.require("prod").manifest.generation
+    assert first_generation == 2
+    service._recover_execution_obligations()
+    service._recover_execution_obligations()
+    assert requirements.require("prod").manifest.generation == first_generation
+    assert recovery.summary().allowed
+
+
+def test_obligation_constructor_requires_same_attempt_store(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, recovery, requirements = obligation_runtime(env)
+    other_attempts = AIExecutionAttemptStore(
+        env.backend,
+        namespace="other-attempts",
+    )
+    with pytest.raises(
+        ValueError,
+        match="must use configured execution attempt store",
+    ):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_attempts=other_attempts,
+            execution_obligation_recovery=recovery,
+            worker_id="worker-mismatch",
+            durable_recovery_guard=DurableRecoveryHealthGuard(
+                recovery.durable_recovery,
+                DurableRecoveryHealthPolicy(),
+            ),
+            durable_recovery_requirement_store=requirements,
+            durable_recovery_requirement_scope="prod",
+        )
+
+
+def test_obligation_recovery_requires_attempt_store(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, recovery, requirements = obligation_runtime(env)
+    with pytest.raises(
+        ValueError,
+        match="requires execution attempts",
+    ):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_obligation_recovery=recovery,
+            worker_id="worker-no-attempts",
+            durable_recovery_guard=DurableRecoveryHealthGuard(
+                recovery.durable_recovery,
+                DurableRecoveryHealthPolicy(),
+            ),
+            durable_recovery_requirement_store=requirements,
+            durable_recovery_requirement_scope="prod",
+        )
+
+
+def test_obligation_recovery_type_validation(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env)
+    with pytest.raises(TypeError, match="execution_obligation_recovery"):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_attempts=env.attempts,
+            execution_obligation_recovery=object(),
+            worker_id="worker-bad-obligation-recovery",
+            durable_recovery_guard=recovery_requirement_guard(env),
+            durable_recovery_requirement_store=requirements,
+            durable_recovery_requirement_scope="prod",
+        )
 
