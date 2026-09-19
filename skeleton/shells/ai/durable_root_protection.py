@@ -619,10 +619,28 @@ class DurableFinalizationRootProtections:
                 "journal and receipt protection chain ids must differ"
             )
 
+    def binding_dict(self) -> dict[str, object]:
+        return {
+            "finalization_id": self.finalization_id,
+            "journal_claim_id": self.journal_claim.claim_id,
+            "journal_chain_id": self.journal_claim.chain_id,
+            "journal_root": self.journal_claim.root_hash,
+            "journal_source_digest": (
+                self.journal_claim.source_digest
+            ),
+            "receipt_claim_id": self.receipt_claim.claim_id,
+            "receipt_chain_id": self.receipt_claim.chain_id,
+            "receipt_root": self.receipt_claim.root_hash,
+            "receipt_source_digest": (
+                self.receipt_claim.source_digest
+            ),
+            "authority": "finalization-root-protection",
+        }
+
     @property
     def digest(self) -> str:
         return _stable_digest(
-            self.to_dict(include_digest=False)
+            self.binding_dict()
         )
 
     def to_dict(
@@ -887,11 +905,25 @@ class DurableRootProtectionStore:
                 == claim.claim_id
             )
             if existing:
-                if existing[0].source_digest != claim.source_digest:
+                current_claim = existing[0]
+                if (
+                    current_claim.source_digest
+                    != claim.source_digest
+                    or current_claim.kind is not claim.kind
+                    or current_claim.source_id
+                    != claim.source_id
+                ):
                     raise DurableRootProtectionConflict(
-                        "claim identity binds different source digest"
+                        "claim identity binds different source authority"
                     )
-                return existing[0]
+                if (
+                    current_claim.expires_at
+                    != claim.expires_at
+                ):
+                    raise DurableRootProtectionConflict(
+                        "claim identity binds different expiry semantics"
+                    )
+                return current_claim
             if (
                 len(current.claims)
                 >= self.max_claims_per_root
