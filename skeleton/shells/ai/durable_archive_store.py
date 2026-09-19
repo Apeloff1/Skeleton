@@ -1172,11 +1172,16 @@ class DurableArchiveRepository:
     def _sequence_index(
         raw: dict[str, object],
     ) -> DurableArchiveSequenceIndex:
-        return DurableArchiveSequenceIndex(
-            str(raw["chain_id"]),
-            int(raw["sequence"]),
-            str(raw["root_hash"]),
-        )
+        try:
+            return DurableArchiveSequenceIndex(
+                str(raw["chain_id"]),
+                int(raw["sequence"]),
+                str(raw["root_hash"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise DurableArchiveStoreError(
+                "archive sequence index is malformed"
+            ) from exc
 
     @staticmethod
     def _head(raw: dict[str, object]) -> DurableArchiveHead:
