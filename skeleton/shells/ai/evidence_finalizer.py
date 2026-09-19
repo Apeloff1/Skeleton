@@ -10,6 +10,15 @@ from skeleton.shells.ai.audit_witness import (
     SignedAIAuditWitness,
 )
 from skeleton.shells.ai.checkpoint import AISessionCheckpoint
+from skeleton.shells.ai.durable_session_commit import (
+    DurableSessionCommitBuilder,
+    DurableSessionCommitPublication,
+    DurableSessionCommitStore,
+)
+from skeleton.shells.ai.durable_session_journal import (
+    DurableSessionJournalCommit,
+    DurableSessionJournalStore,
+)
 from skeleton.shells.ai.execution_attempt import (
     AIExecutionAttempt,
     ExecutionAttemptState,
@@ -51,6 +60,7 @@ class FinalizedAIExecutionEvidence:
     recovery_commit: RecoveryCheckpointCommit | None = None
     session_integrity: SessionEvidenceIntegrityReport | None = None
     session_journal_commit: DurableSessionJournalCommit | None = None
+    session_commit: DurableSessionCommitPublication | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -93,6 +103,11 @@ class FinalizedAIExecutionEvidence:
                 if self.session_journal_commit is None
                 else self.session_journal_commit.to_dict()
             ),
+            "session_commit": (
+                None
+                if self.session_commit is None
+                else self.session_commit.to_dict()
+            ),
         }
 
 
@@ -117,6 +132,8 @@ class AIExecutionEvidenceFinalizer:
         recovery_checkpoints: AIRecoveryCheckpointStore | None = None,
         integrity_verifier: SessionEvidenceIntegrityVerifier | None = None,
         session_journals: DurableSessionJournalStore | None = None,
+        session_commits: DurableSessionCommitStore | None = None,
+        session_commit_builder: DurableSessionCommitBuilder | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -130,6 +147,45 @@ class AIExecutionEvidenceFinalizer:
         self.finalizations = finalizations
         self.recovery_checkpoints = recovery_checkpoints
         self.session_journals = session_journals
+        self.session_commits = session_commits
+        self.session_commit_builder = (
+            session_commit_builder
+            or DurableSessionCommitBuilder()
+        )
+        policy = self.session_commit_builder.policy
+        if self.session_commits is not None:
+            if self.finalizations is None:
+                raise ValueError(
+                    "durable session commits require finalization store"
+                )
+            if (
+                policy.require_recovery_checkpoint
+                and self.recovery_checkpoints is None
+            ):
+                raise ValueError(
+                    "session commit policy requires recovery checkpoint store"
+                )
+            if (
+                policy.require_session_journal_manifest
+                and self.session_journals is None
+            ):
+                raise ValueError(
+                    "session commit policy requires durable session-journal store"
+                )
+            if (
+                policy.require_audit_witness
+                and self.audit_witnesses is None
+            ):
+                raise ValueError(
+                    "session commit policy requires audit witness store"
+                )
+            if (
+                policy.require_signed_execution_evidence
+                and self.execution_evidence is None
+            ):
+                raise ValueError(
+                    "session commit policy requires signed execution evidence store"
+                )
         self.integrity_verifier = (
             integrity_verifier
             or SessionEvidenceIntegrityVerifier(
@@ -593,6 +649,73 @@ class AIExecutionEvidenceFinalizer:
                     else signed_execution_evidence.chain_node_hash
                 ),
             ).finalization
+        session_commit = None
+        if self.session_commits is not None:
+            stored_finalization = self.finalizations.current(
+                finalization_id
+            )
+            if stored_finalization is None:
+                raise RuntimeError(
+                    "complete finalization disappeared before session commit"
+                )
+            if (
+                stored_finalization.finalization.phase
+                is not FinalizationPhase.COMPLETE
+            ):
+                raise RuntimeError(
+                    "session commit requires complete finalization"
+                )
+            commit = self.session_commit_builder.build(
+                finalization=stored_finalization.finalization,
+                finalization_revision=stored_finalization.revision,
+                recovery_checkpoint_digest=recovery.digest,
+                recovery_revision=(
+                    None
+                    if recovery_commit is None
+                    else recovery_commit.stored.revision
+                ),
+                session_evidence_digest=evidence.digest,
+                session_evidence_revision=stored.revision,
+                session_journal_digest=session_journal.digest,
+                session_journal_manifest_digest=(
+                    session_journal_manifest_digest
+                ),
+                session_journal_revision=(
+                    None
+                    if session_journal_commit is None
+                    else session_journal_commit.stored.revision
+                ),
+                session_integrity_digest=session_integrity.digest,
+                journal_root=checkpoint.journal_root,
+                receipt_root=checkpoint.receipt_root,
+                audit_anchor_digest=anchor.anchor.digest,
+                audit_chain_node_hash=anchor.chain_node_hash,
+                audit_root=audit_root,
+                audit_witness_digest=(
+                    ""
+                    if audit_witness is None
+                    else audit_witness.witness.digest
+                ),
+                audit_witness_sequence=(
+                    None
+                    if audit_witness is None
+                    else audit_witness.witness.sequence
+                ),
+                execution_evidence_digest=(
+                    ""
+                    if signed_execution_evidence is None
+                    else signed_execution_evidence.evidence.digest
+                ),
+                execution_evidence_chain_node_hash=(
+                    ""
+                    if signed_execution_evidence is None
+                    else signed_execution_evidence.chain_node_hash
+                ),
+            )
+            session_commit = self.session_commits.publish(
+                commit
+            )
+            finalization = stored_finalization.finalization
         return FinalizedAIExecutionEvidence(
             checkpoint,
             recovery,
@@ -605,4 +728,5 @@ class AIExecutionEvidenceFinalizer:
             recovery_commit,
             session_integrity,
             session_journal_commit,
+            session_commit,
         )
