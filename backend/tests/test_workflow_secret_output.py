@@ -18,11 +18,21 @@ spec.loader.exec_module(scanner)
         "echo '${{ secrets.API_TOKEN }}'",
         'printf "%s\\n" "$API_TOKEN"',
         "printenv DB_PASSWORD",
+        "printenv -0",
         "env",
+        "env -0",
         "set",
+        "export -p",
+        "declare -x",
+        "typeset -xp",
         "set -x",
         "set -euxo pipefail",
         "bash -x ./script.sh",
+        'cat <<< "$WEBHOOK_SECRET"',
+        'Write-Host $env:API_TOKEN',
+        'Write-Output "${{ secrets.SIGNING_KEY }}"',
+        "Get-ChildItem Env:",
+        "gci Env:",
     ],
 )
 def test_dangerous_output_commands_are_rejected(command: str) -> None:
@@ -38,6 +48,9 @@ def test_dangerous_output_commands_are_rejected(command: str) -> None:
         "env MODE=ci python -m pytest",
         "set -euo pipefail",
         "tee report.txt < result.txt",
+        "cat report.txt",
+        "export MODE=ci",
+        "Write-Host $env:GITHUB_SHA",
     ],
 )
 def test_secret_consumption_and_benign_output_remain_allowed(command: str) -> None:
@@ -61,6 +74,17 @@ def test_block_run_is_scanned_and_stops_at_next_step() -> None:
 """
     assert scanner.workflow_violations_text(text) == [
         "line 4: workflow output command exposes secret-like variable SIGNING_KEY"
+    ]
+
+
+def test_powershell_pipeline_secret_is_scanned() -> None:
+    text = """steps:
+  - shell: pwsh
+    run: |
+      $env:API_TOKEN | Write-Host
+"""
+    assert scanner.workflow_violations_text(text) == [
+        "line 4: workflow output command exposes secret-like variable API_TOKEN"
     ]
 
 
