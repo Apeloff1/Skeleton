@@ -157,7 +157,8 @@ def admit_build_authorization(
                 "build authorization exceeds byte budget"
             )
         payload = json.loads(
-            raw.decode("utf-8")
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
         )
         authorization = BuildAuthorization.from_payload(
             payload
@@ -219,6 +220,19 @@ def _bounded_text(
     return clean
 
 
+def _unique_json_object(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(
+                f"duplicate JSON field: {key}"
+            )
+        result[key] = value
+    return result
+
+
 def _decode_model_object(raw: str) -> dict[str, Any]:
     """Decode one JSON object without greedy regular-expression extraction."""
     if not isinstance(raw, str):
@@ -233,7 +247,9 @@ def _decode_model_object(raw: str) -> dict[str, Any]:
     if start < 0:
         raise ValueError("specialist returned no JSON object")
 
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(
+        object_pairs_hook=_unique_json_object,
+    )
     try:
         value, end = decoder.raw_decode(text[start:])
     except json.JSONDecodeError as exc:
@@ -535,6 +551,17 @@ def _publication_env() -> dict[str, str]:
             "worker mutation token unavailable"
         )
     env["GH_TOKEN"] = token
+    identity = {
+        "GIT_AUTHOR_NAME": "skeleton-specialist-bot",
+        "GIT_AUTHOR_EMAIL": (
+            "skeleton-specialist-bot@users.noreply.github.com"
+        ),
+        "GIT_COMMITTER_NAME": "skeleton-specialist-bot",
+        "GIT_COMMITTER_EMAIL": (
+            "skeleton-specialist-bot@users.noreply.github.com"
+        ),
+    }
+    env.update(identity)
     return env
 
 
@@ -550,6 +577,18 @@ def _run_git(
         env=env,
         timeout=timeout,
     )
+
+
+def _hookless_git_args(
+    hooks: Path,
+    *args: str,
+) -> list[str]:
+    """Scope hook suppression to one Git invocation without shared config writes."""
+    return [
+        "-c",
+        f"core.hooksPath={hooks}",
+        *args,
+    ]
 
 
 def _verify_single_parent(base_sha: str) -> None:
@@ -788,39 +827,13 @@ def main() -> int:
         )
 
         _run_git(
-            [
-                "config",
-                "core.hooksPath",
-                str(hooks),
-            ],
-            env=publish_env,
-        )
-        _run_git(
-            [
+            _hookless_git_args(
+                hooks,
                 "switch",
                 "--create",
                 branch,
                 execution.base_sha,
-            ],
-            env=publish_env,
-        )
-        _run_git(
-            [
-                "config",
-                "user.name",
-                "skeleton-specialist-bot",
-            ],
-            env=publish_env,
-        )
-        _run_git(
-            [
-                "config",
-                "user.email",
-                (
-                    "skeleton-specialist-bot"
-                    "@users.noreply.github.com"
-                ),
-            ],
+            ),
             env=publish_env,
         )
 
@@ -871,7 +884,8 @@ def main() -> int:
         require_remote_base_unchanged(execution)
 
         _run_git(
-            [
+            _hookless_git_args(
+                hooks,
                 "commit",
                 "--no-verify",
                 "-m",
@@ -879,7 +893,7 @@ def main() -> int:
                     f"bot({spec.name}): "
                     "specialist maintenance"
                 ),
-            ],
+            ),
             env=publish_env,
             timeout=60,
         )
@@ -899,12 +913,13 @@ def main() -> int:
             )
         require_remote_base_unchanged(execution)
         _run_git(
-            [
+            _hookless_git_args(
+                hooks,
                 "push",
                 "--set-upstream",
                 "origin",
                 branch,
-            ],
+            ),
             env=publish_env,
             timeout=120,
         )
