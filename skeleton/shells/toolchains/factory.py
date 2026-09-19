@@ -99,35 +99,98 @@ def _option(spec: OptionSpec) -> OptionRule:
 
 def _argument_policy(spec: OperationSpec) -> ArgumentPolicy:
     positional: list[ValueConstraint] = []
+    option_rules = {item.name: _option(item) for item in spec.options}
+    consumed_positionals = 0
+    prefix_positionals = 0
+
+    # ArgumentPolicy treats every dash-prefixed token as an option. Model
+    # literal CLI prefixes accordingly instead of pretending "-m", "--build",
+    # "--version", and similar tokens are positional argv values.
     if spec.subcommand is not None:
-        positional.append(
-            ValueConstraint(
-                choices=frozenset({spec.subcommand}),
-                min_length=1,
-                max_length=len(spec.subcommand),
+        if spec.subcommand.startswith("-"):
+            option_rules.setdefault(spec.subcommand, OptionRule(spec.subcommand))
+        else:
+            positional.append(
+                ValueConstraint(
+                    choices=frozenset({spec.subcommand}),
+                    min_length=1,
+                    max_length=len(spec.subcommand),
+                )
             )
-        )
-    for token in spec.fixed_prefix:
-        positional.append(
-            ValueConstraint(
-                choices=frozenset({token}),
-                min_length=1,
-                max_length=len(token),
+            prefix_positionals += 1
+
+    fixed = list(spec.fixed_prefix)
+    index = 0
+    while index < len(fixed):
+        token = fixed[index]
+        if token.startswith("-"):
+            if token == "-m":
+                if index + 1 < len(fixed) and not fixed[index + 1].startswith("-"):
+                    literal = fixed[index + 1]
+                    option_rules.setdefault(
+                        token,
+                        OptionRule(
+                            token,
+                            takes_value=True,
+                            value=ValueConstraint(
+                                choices=frozenset({literal}),
+                                min_length=1,
+                                max_length=len(literal),
+                            ),
+                        ),
+                    )
+                    index += 2
+                    continue
+                if spec.positionals:
+                    option_rules.setdefault(
+                        token,
+                        OptionRule(
+                            token,
+                            takes_value=True,
+                            value=constraint(spec.positionals[0]),
+                        ),
+                    )
+                    consumed_positionals = 1
+                    index += 1
+                    continue
+            option_rules.setdefault(token, OptionRule(token))
+        else:
+            positional.append(
+                ValueConstraint(
+                    choices=frozenset({token}),
+                    min_length=1,
+                    max_length=len(token),
+                )
             )
-        )
-    positional.extend(constraint(kind) for kind in spec.positionals)
-    prefix_count = (1 if spec.subcommand is not None else 0) + len(spec.fixed_prefix)
-    minimum = (
-        prefix_count + len(spec.positionals)
-        if spec.min_positionals is None
-        else spec.min_positionals
+            prefix_positionals += 1
+        index += 1
+
+    positional.extend(
+        constraint(kind)
+        for kind in spec.positionals[consumed_positionals:]
     )
+    if spec.min_positionals is None:
+        minimum = prefix_positionals + len(spec.positionals) - consumed_positionals
+    else:
+        declared_prefix = (1 if spec.subcommand is not None else 0) + len(spec.fixed_prefix)
+        nonpositional_prefix = declared_prefix - prefix_positionals
+        minimum = max(
+            0,
+            spec.min_positionals - nonpositional_prefix - consumed_positionals,
+        )
     maximum = spec.max_positionals
+    if maximum is not None and spec.min_positionals is not None:
+        declared_prefix = (1 if spec.subcommand is not None else 0) + len(spec.fixed_prefix)
+        nonpositional_prefix = declared_prefix - prefix_positionals
+        maximum = max(
+            0,
+            maximum - nonpositional_prefix - consumed_positionals,
+        )
     variadic = None if spec.variadic is None else constraint(spec.variadic)
     if maximum is None and variadic is None:
         maximum = len(positional)
     return ArgumentPolicy(
-        options={item.name: _option(item) for item in spec.options},
+        options=option_rules,
         positional=tuple(positional),
         variadic=variadic,
         min_positionals=minimum,
