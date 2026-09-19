@@ -1,59 +1,268 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
 
+class PolicyKind(str,Enum):
+    PRIMARY="primary"
+    SECONDARY="secondary"
+    TERTIARY="tertiary"
+    BLOCKING="blocking"
+    ADVISORY="advisory"
 
-class PolicyKind(str, Enum):
-    PRIMARY = "primary"
-    SECONDARY = "secondary"
-    TERTIARY = "tertiary"
-    BLOCKING = "blocking"
-    ADVISORY = "advisory"
-
-
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True,slots=True)
 class PolicyRule:
-    name: str
-    kind: PolicyKind
-    threshold: float
-    rationale: str
+    name:str
+    kind:PolicyKind
+    threshold:float
+    rationale:str
+    def applies(self,value:float)->bool:
+        if not isinstance(value,(int,float)) or isinstance(value,bool) or not isfinite(float(value)): raise ValueError("value must be finite")
+        return float(value)>=self.threshold
 
-    def applies(self, value: float) -> bool:
-        if (
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not isfinite(float(value))
-        ):
-            raise ValueError("value must be finite")
-        return float(value) >= self.threshold
-
-
-_KIND_CYCLE = (
-    PolicyKind.PRIMARY,
-    PolicyKind.SECONDARY,
-    PolicyKind.TERTIARY,
-    PolicyKind.BLOCKING,
-    PolicyKind.ADVISORY,
+RULES=(
+    PolicyRule("policy_001",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded policy rule 1"),
+    PolicyRule("policy_002",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded policy rule 2"),
+    PolicyRule("policy_003",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded policy rule 3"),
+    PolicyRule("policy_004",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded policy rule 4"),
+    PolicyRule("policy_005",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded policy rule 5"),
+    PolicyRule("policy_006",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded policy rule 6"),
+    PolicyRule("policy_007",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded policy rule 7"),
+    PolicyRule("policy_008",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded policy rule 8"),
+    PolicyRule("policy_009",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded policy rule 9"),
+    PolicyRule("policy_010",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded policy rule 10"),
+    PolicyRule("policy_011",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded policy rule 11"),
+    PolicyRule("policy_012",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded policy rule 12"),
+    PolicyRule("policy_013",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded policy rule 13"),
+    PolicyRule("policy_014",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded policy rule 14"),
+    PolicyRule("policy_015",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded policy rule 15"),
+    PolicyRule("policy_016",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded policy rule 16"),
+    PolicyRule("policy_017",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded policy rule 17"),
+    PolicyRule("policy_018",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded policy rule 18"),
+    PolicyRule("policy_019",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded policy rule 19"),
+    PolicyRule("policy_020",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded policy rule 20"),
+    PolicyRule("policy_021",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded policy rule 21"),
+    PolicyRule("policy_022",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded policy rule 22"),
+    PolicyRule("policy_023",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded policy rule 23"),
+    PolicyRule("policy_024",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded policy rule 24"),
+    PolicyRule("policy_025",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded policy rule 25"),
+    PolicyRule("policy_026",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded policy rule 26"),
+    PolicyRule("policy_027",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded policy rule 27"),
+    PolicyRule("policy_028",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded policy rule 28"),
+    PolicyRule("policy_029",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded policy rule 29"),
+    PolicyRule("policy_030",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded policy rule 30"),
+    PolicyRule("policy_031",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded policy rule 31"),
+    PolicyRule("policy_032",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded policy rule 32"),
+    PolicyRule("policy_033",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded policy rule 33"),
+    PolicyRule("policy_034",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded policy rule 34"),
+    PolicyRule("policy_035",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded policy rule 35"),
+    PolicyRule("policy_036",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded policy rule 36"),
+    PolicyRule("policy_037",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded policy rule 37"),
+    PolicyRule("policy_038",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded policy rule 38"),
+    PolicyRule("policy_039",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded policy rule 39"),
+    PolicyRule("policy_040",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded policy rule 40"),
+    PolicyRule("policy_041",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded policy rule 41"),
+    PolicyRule("policy_042",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded policy rule 42"),
+    PolicyRule("policy_043",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded policy rule 43"),
+    PolicyRule("policy_044",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded policy rule 44"),
+    PolicyRule("policy_045",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded policy rule 45"),
+    PolicyRule("policy_046",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded policy rule 46"),
+    PolicyRule("policy_047",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded policy rule 47"),
+    PolicyRule("policy_048",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded policy rule 48"),
+    PolicyRule("policy_049",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded policy rule 49"),
+    PolicyRule("policy_050",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded policy rule 50"),
+    PolicyRule("policy_051",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded policy rule 51"),
+    PolicyRule("policy_052",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded policy rule 52"),
+    PolicyRule("policy_053",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded policy rule 53"),
+    PolicyRule("policy_054",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded policy rule 54"),
+    PolicyRule("policy_055",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded policy rule 55"),
+    PolicyRule("policy_056",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded policy rule 56"),
+    PolicyRule("policy_057",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded policy rule 57"),
+    PolicyRule("policy_058",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded policy rule 58"),
+    PolicyRule("policy_059",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded policy rule 59"),
+    PolicyRule("policy_060",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded policy rule 60"),
+    PolicyRule("policy_061",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded policy rule 61"),
+    PolicyRule("policy_062",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded policy rule 62"),
+    PolicyRule("policy_063",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded policy rule 63"),
+    PolicyRule("policy_064",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded policy rule 64"),
+    PolicyRule("policy_065",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded policy rule 65"),
+    PolicyRule("policy_066",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded policy rule 66"),
+    PolicyRule("policy_067",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded policy rule 67"),
+    PolicyRule("policy_068",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded policy rule 68"),
+    PolicyRule("policy_069",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded policy rule 69"),
+    PolicyRule("policy_070",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded policy rule 70"),
+    PolicyRule("policy_071",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded policy rule 71"),
+    PolicyRule("policy_072",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded policy rule 72"),
+    PolicyRule("policy_073",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded policy rule 73"),
+    PolicyRule("policy_074",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded policy rule 74"),
+    PolicyRule("policy_075",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded policy rule 75"),
+    PolicyRule("policy_076",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded policy rule 76"),
+    PolicyRule("policy_077",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded policy rule 77"),
+    PolicyRule("policy_078",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded policy rule 78"),
+    PolicyRule("policy_079",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded policy rule 79"),
+    PolicyRule("policy_080",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded policy rule 80"),
+    PolicyRule("policy_081",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.81,"bounded policy rule 81"),
+    PolicyRule("policy_082",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.82,"bounded policy rule 82"),
+    PolicyRule("policy_083",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.83,"bounded policy rule 83"),
+    PolicyRule("policy_084",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.84,"bounded policy rule 84"),
+    PolicyRule("policy_085",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.85,"bounded policy rule 85"),
+    PolicyRule("policy_086",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.86,"bounded policy rule 86"),
+    PolicyRule("policy_087",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.87,"bounded policy rule 87"),
+    PolicyRule("policy_088",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.88,"bounded policy rule 88"),
+    PolicyRule("policy_089",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.89,"bounded policy rule 89"),
+    PolicyRule("policy_090",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.9,"bounded policy rule 90"),
+    PolicyRule("policy_091",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.91,"bounded policy rule 91"),
+    PolicyRule("policy_092",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.92,"bounded policy rule 92"),
+    PolicyRule("policy_093",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.93,"bounded policy rule 93"),
+    PolicyRule("policy_094",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.94,"bounded policy rule 94"),
+    PolicyRule("policy_095",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.95,"bounded policy rule 95"),
+    PolicyRule("policy_096",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.96,"bounded policy rule 96"),
+    PolicyRule("policy_097",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.97,"bounded policy rule 97"),
+    PolicyRule("policy_098",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.98,"bounded policy rule 98"),
+    PolicyRule("policy_099",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.99,"bounded policy rule 99"),
+    PolicyRule("policy_100",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0,"bounded policy rule 100"),
+    PolicyRule("policy_101",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded policy rule 101"),
+    PolicyRule("policy_102",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded policy rule 102"),
+    PolicyRule("policy_103",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded policy rule 103"),
+    PolicyRule("policy_104",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded policy rule 104"),
+    PolicyRule("policy_105",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded policy rule 105"),
+    PolicyRule("policy_106",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded policy rule 106"),
+    PolicyRule("policy_107",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded policy rule 107"),
+    PolicyRule("policy_108",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded policy rule 108"),
+    PolicyRule("policy_109",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded policy rule 109"),
+    PolicyRule("policy_110",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded policy rule 110"),
+    PolicyRule("policy_111",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded policy rule 111"),
+    PolicyRule("policy_112",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded policy rule 112"),
+    PolicyRule("policy_113",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded policy rule 113"),
+    PolicyRule("policy_114",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded policy rule 114"),
+    PolicyRule("policy_115",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded policy rule 115"),
+    PolicyRule("policy_116",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded policy rule 116"),
+    PolicyRule("policy_117",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded policy rule 117"),
+    PolicyRule("policy_118",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded policy rule 118"),
+    PolicyRule("policy_119",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded policy rule 119"),
+    PolicyRule("policy_120",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded policy rule 120"),
+    PolicyRule("policy_121",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded policy rule 121"),
+    PolicyRule("policy_122",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded policy rule 122"),
+    PolicyRule("policy_123",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded policy rule 123"),
+    PolicyRule("policy_124",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded policy rule 124"),
+    PolicyRule("policy_125",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded policy rule 125"),
+    PolicyRule("policy_126",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded policy rule 126"),
+    PolicyRule("policy_127",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded policy rule 127"),
+    PolicyRule("policy_128",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded policy rule 128"),
+    PolicyRule("policy_129",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded policy rule 129"),
+    PolicyRule("policy_130",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded policy rule 130"),
+    PolicyRule("policy_131",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded policy rule 131"),
+    PolicyRule("policy_132",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded policy rule 132"),
+    PolicyRule("policy_133",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded policy rule 133"),
+    PolicyRule("policy_134",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded policy rule 134"),
+    PolicyRule("policy_135",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded policy rule 135"),
+    PolicyRule("policy_136",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded policy rule 136"),
+    PolicyRule("policy_137",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded policy rule 137"),
+    PolicyRule("policy_138",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded policy rule 138"),
+    PolicyRule("policy_139",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded policy rule 139"),
+    PolicyRule("policy_140",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded policy rule 140"),
+    PolicyRule("policy_141",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded policy rule 141"),
+    PolicyRule("policy_142",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded policy rule 142"),
+    PolicyRule("policy_143",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded policy rule 143"),
+    PolicyRule("policy_144",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded policy rule 144"),
+    PolicyRule("policy_145",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded policy rule 145"),
+    PolicyRule("policy_146",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded policy rule 146"),
+    PolicyRule("policy_147",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded policy rule 147"),
+    PolicyRule("policy_148",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded policy rule 148"),
+    PolicyRule("policy_149",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded policy rule 149"),
+    PolicyRule("policy_150",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded policy rule 150"),
+    PolicyRule("policy_151",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded policy rule 151"),
+    PolicyRule("policy_152",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded policy rule 152"),
+    PolicyRule("policy_153",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded policy rule 153"),
+    PolicyRule("policy_154",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded policy rule 154"),
+    PolicyRule("policy_155",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded policy rule 155"),
+    PolicyRule("policy_156",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded policy rule 156"),
+    PolicyRule("policy_157",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded policy rule 157"),
+    PolicyRule("policy_158",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded policy rule 158"),
+    PolicyRule("policy_159",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded policy rule 159"),
+    PolicyRule("policy_160",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded policy rule 160"),
+    PolicyRule("policy_161",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded policy rule 161"),
+    PolicyRule("policy_162",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded policy rule 162"),
+    PolicyRule("policy_163",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded policy rule 163"),
+    PolicyRule("policy_164",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded policy rule 164"),
+    PolicyRule("policy_165",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded policy rule 165"),
+    PolicyRule("policy_166",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded policy rule 166"),
+    PolicyRule("policy_167",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded policy rule 167"),
+    PolicyRule("policy_168",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded policy rule 168"),
+    PolicyRule("policy_169",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded policy rule 169"),
+    PolicyRule("policy_170",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded policy rule 170"),
+    PolicyRule("policy_171",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded policy rule 171"),
+    PolicyRule("policy_172",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded policy rule 172"),
+    PolicyRule("policy_173",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded policy rule 173"),
+    PolicyRule("policy_174",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded policy rule 174"),
+    PolicyRule("policy_175",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded policy rule 175"),
+    PolicyRule("policy_176",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded policy rule 176"),
+    PolicyRule("policy_177",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded policy rule 177"),
+    PolicyRule("policy_178",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded policy rule 178"),
+    PolicyRule("policy_179",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded policy rule 179"),
+    PolicyRule("policy_180",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded policy rule 180"),
+    PolicyRule("policy_181",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.81,"bounded policy rule 181"),
+    PolicyRule("policy_182",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.82,"bounded policy rule 182"),
+    PolicyRule("policy_183",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.83,"bounded policy rule 183"),
+    PolicyRule("policy_184",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.84,"bounded policy rule 184"),
+    PolicyRule("policy_185",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.85,"bounded policy rule 185"),
+    PolicyRule("policy_186",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.86,"bounded policy rule 186"),
+    PolicyRule("policy_187",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.87,"bounded policy rule 187"),
+    PolicyRule("policy_188",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.88,"bounded policy rule 188"),
+    PolicyRule("policy_189",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.89,"bounded policy rule 189"),
+    PolicyRule("policy_190",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.9,"bounded policy rule 190"),
+    PolicyRule("policy_191",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.91,"bounded policy rule 191"),
+    PolicyRule("policy_192",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.92,"bounded policy rule 192"),
+    PolicyRule("policy_193",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.93,"bounded policy rule 193"),
+    PolicyRule("policy_194",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.94,"bounded policy rule 194"),
+    PolicyRule("policy_195",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.95,"bounded policy rule 195"),
+    PolicyRule("policy_196",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.96,"bounded policy rule 196"),
+    PolicyRule("policy_197",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.97,"bounded policy rule 197"),
+    PolicyRule("policy_198",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.98,"bounded policy rule 198"),
+    PolicyRule("policy_199",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.99,"bounded policy rule 199"),
+    PolicyRule("policy_200",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0,"bounded policy rule 200"),
+    PolicyRule("policy_201",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded policy rule 201"),
+    PolicyRule("policy_202",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded policy rule 202"),
+    PolicyRule("policy_203",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded policy rule 203"),
+    PolicyRule("policy_204",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded policy rule 204"),
+    PolicyRule("policy_205",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded policy rule 205"),
+    PolicyRule("policy_206",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded policy rule 206"),
+    PolicyRule("policy_207",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded policy rule 207"),
+    PolicyRule("policy_208",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded policy rule 208"),
+    PolicyRule("policy_209",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded policy rule 209"),
+    PolicyRule("policy_210",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded policy rule 210"),
+    PolicyRule("policy_211",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded policy rule 211"),
+    PolicyRule("policy_212",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded policy rule 212"),
+    PolicyRule("policy_213",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded policy rule 213"),
+    PolicyRule("policy_214",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded policy rule 214"),
+    PolicyRule("policy_215",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded policy rule 215"),
+    PolicyRule("policy_216",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded policy rule 216"),
+    PolicyRule("policy_217",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded policy rule 217"),
+    PolicyRule("policy_218",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded policy rule 218"),
+    PolicyRule("policy_219",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded policy rule 219"),
+    PolicyRule("policy_220",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded policy rule 220"),
+    PolicyRule("policy_221",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded policy rule 221"),
+    PolicyRule("policy_222",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded policy rule 222"),
+    PolicyRule("policy_223",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded policy rule 223"),
+    PolicyRule("policy_224",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded policy rule 224"),
+    PolicyRule("policy_225",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded policy rule 225"),
+    PolicyRule("policy_226",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded policy rule 226"),
+    PolicyRule("policy_227",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded policy rule 227"),
+    PolicyRule("policy_228",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded policy rule 228"),
+    PolicyRule("policy_229",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded policy rule 229"),
+    PolicyRule("policy_230",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded policy rule 230"),
+    PolicyRule("policy_231",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded policy rule 231"),
+    PolicyRule("policy_232",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded policy rule 232"),
+    PolicyRule("policy_233",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded policy rule 233"),
+    PolicyRule("policy_234",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded policy rule 234"),
+    PolicyRule("policy_235",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded policy rule 235"),
+    PolicyRule("policy_236",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded policy rule 236"),
+    PolicyRule("policy_237",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded policy rule 237"),
+    PolicyRule("policy_238",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded policy rule 238"),
+    PolicyRule("policy_239",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded policy rule 239"),
+    PolicyRule("policy_240",PolicyKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded policy rule 240"),
 )
 
-_RULE_COUNT = 240
+def active(value:float): return tuple(r.name for r in RULES if r.applies(value))
 
-RULES = tuple(
-    PolicyRule(
-        name=f"policy_{index:03d}",
-        kind=_KIND_CYCLE[index % len(_KIND_CYCLE)],
-        threshold=(index % 100) / 100,
-        rationale=f"bounded policy rule {index}",
-    )
-    for index in range(1, _RULE_COUNT + 1)
-)
-
-
-def active(value: float):
-    return tuple(rule.name for rule in RULES if rule.applies(value))
-
-
-def by_kind(kind: PolicyKind):
-    return tuple(rule for rule in RULES if rule.kind is kind)
+def by_kind(kind:PolicyKind): return tuple(r for r in RULES if r.kind is kind)
