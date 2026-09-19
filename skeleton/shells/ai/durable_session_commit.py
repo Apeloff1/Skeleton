@@ -456,6 +456,13 @@ class DurableSessionCommit:
                 self.release_evidence_digest
             ),
             "policy_digest": self.policy_digest,
+            "recovery_revision": self.recovery_revision,
+            "session_evidence_revision": (
+                self.session_evidence_revision
+            ),
+            "session_journal_revision": (
+                self.session_journal_revision
+            ),
         }
 
     @property
@@ -470,15 +477,6 @@ class DurableSessionCommit:
             "digest": self.digest,
             "finalization_revision": (
                 self.finalization_revision
-            ),
-            "recovery_revision": (
-                self.recovery_revision
-            ),
-            "session_evidence_revision": (
-                self.session_evidence_revision
-            ),
-            "session_journal_revision": (
-                self.session_journal_revision
             ),
         }
 
