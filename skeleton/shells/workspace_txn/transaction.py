@@ -7,7 +7,7 @@ state.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 from pathlib import Path
@@ -87,6 +87,22 @@ class WorkspaceTransactionManager:
     @staticmethod
     def _receipt_digest(receipt: TransactionReceipt) -> str:
         return hashlib.sha256(canonical_json(receipt.payload())).hexdigest()
+
+    @staticmethod
+    def _bind_command_to_workspace(
+        root: Path,
+        command: ShellCommand,
+    ) -> ShellCommand:
+        if command.cwd is None:
+            return replace(command, cwd=root)
+        cwd = Path(command.cwd).expanduser().resolve(strict=True)
+        if not cwd.is_dir():
+            raise ValueError("transaction command cwd must be a directory")
+        if cwd != root and root not in cwd.parents:
+            raise ValueError(
+                "transaction command cwd must be inside the protected workspace"
+            )
+        return replace(command, cwd=cwd)
 
     def _journal(
         self,
@@ -169,6 +185,9 @@ class WorkspaceTransactionManager:
         policy: WorkspaceMutationPolicy | None = None,
     ) -> TransactionResult:
         root_path = Path(root).expanduser().resolve(strict=True)
+        if not root_path.is_dir():
+            raise ValueError("transaction root must be a directory")
+        command = self._bind_command_to_workspace(root_path, command)
         self.backup_store.require_external_to_workspace(root_path)
         transaction_id = uuid.uuid4().hex
         correlation = correlation_id or uuid.uuid4().hex
