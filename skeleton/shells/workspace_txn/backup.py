@@ -13,6 +13,7 @@ from typing import Iterable
 import uuid
 
 from skeleton.shells.provenance import canonical_json
+from skeleton.shells.workspace_txn.scanner import snapshot_digest
 from skeleton.shells.workspace_txn.pathing import (
     lexical_join_under_root,
     normalize_relative_path,
@@ -21,6 +22,7 @@ from skeleton.shells.workspace_txn.pathing import (
 from skeleton.shells.workspace_txn.types import (
     BackupManifest,
     BackupRecord,
+    ScanStatistics,
     SnapshotEntry,
     WorkspaceEntryKind,
     WorkspaceSnapshot,
@@ -279,6 +281,8 @@ class ContentAddressedBackupStore:
             "",
             root_mode=root_mode,
             root_mtime_ns=root_mtime_ns,
+            snapshot_digest=snapshot.digest,
+            complete_snapshot=paths is None,
         )
         digest = hashlib.sha256(
             canonical_json(unsigned_manifest.integrity_payload())
@@ -292,6 +296,8 @@ class ContentAddressedBackupStore:
             digest,
             root_mode=root_mode,
             root_mtime_ns=root_mtime_ns,
+            snapshot_digest=snapshot.digest,
+            complete_snapshot=paths is None,
         )
         self._publish_manifest(manifest)
         return manifest
@@ -418,6 +424,18 @@ class ContentAddressedBackupStore:
             else self._manifest_int(root_mtime_raw, field="root_mtime_ns")
         )
 
+        snapshot_digest_value = payload.get("snapshot_digest", "")
+        complete_snapshot = payload.get("complete_snapshot", False)
+        if snapshot_digest_value:
+            snapshot_digest_value = self._manifest_hex64(
+                snapshot_digest_value,
+                field="snapshot_digest",
+            )
+        elif complete_snapshot:
+            raise BackupError("complete backup manifest lacks snapshot digest")
+        if not isinstance(complete_snapshot, bool):
+            raise BackupError("complete_snapshot must be boolean")
+
         records_raw = payload.get("records")
         if not isinstance(records_raw, list):
             raise BackupError("backup manifest records must be a list")
@@ -518,10 +536,74 @@ class ContentAddressedBackupStore:
             digest,
             root_mode=root_mode,
             root_mtime_ns=root_mtime_ns,
+            snapshot_digest=snapshot_digest_value,
+            complete_snapshot=complete_snapshot,
         )
         if not self.verify_manifest(manifest):
             raise BackupError("backup manifest integrity verification failed")
         return manifest
+
+    def reconstruct_snapshot(
+        self,
+        manifest: BackupManifest,
+        *,
+        expected_digest: str | None = None,
+    ) -> WorkspaceSnapshot:
+        """Rebuild restorable pre-mutation state from a complete backup."""
+
+        if not manifest.complete_snapshot:
+            raise BackupError("partial backup cannot reconstruct full snapshot")
+        if not manifest.snapshot_digest:
+            raise BackupError("backup manifest has no source snapshot digest")
+        if not self.verify_manifest(manifest):
+            raise BackupError("backup manifest integrity verification failed")
+        entries = tuple(
+            SnapshotEntry(
+                record.path,
+                record.kind,
+                record.size,
+                record.mode,
+                record.mtime_ns,
+                digest=record.digest,
+                link_target=record.link_target,
+            )
+            for record in manifest.records
+        )
+        files = sum(1 for entry in entries if entry.kind is WorkspaceEntryKind.FILE)
+        directories = sum(
+            1 for entry in entries if entry.kind is WorkspaceEntryKind.DIRECTORY
+        )
+        symlinks = sum(
+            1 for entry in entries if entry.kind is WorkspaceEntryKind.SYMLINK
+        )
+        other = len(entries) - files - directories - symlinks
+        statistics = ScanStatistics(
+            files=files,
+            directories=directories,
+            symlinks=symlinks,
+            other=other,
+            hashed_bytes=sum(
+                entry.size
+                for entry in entries
+                if entry.kind is WorkspaceEntryKind.FILE
+            ),
+        )
+        reconstructed_digest = snapshot_digest(
+            entries,
+            manifest.root_fingerprint,
+        )
+        if reconstructed_digest != manifest.snapshot_digest:
+            raise BackupError("reconstructed snapshot digest does not match manifest")
+        if expected_digest is not None and reconstructed_digest != expected_digest:
+            raise BackupError("reconstructed snapshot does not match recovery evidence")
+        return WorkspaceSnapshot(
+            root_fingerprint=manifest.root_fingerprint,
+            created_at=manifest.created_at,
+            snapshot_id=f"recovered-{manifest.backup_id}",
+            entries=entries,
+            statistics=statistics,
+            digest=reconstructed_digest,
+        )
 
     def delete_manifest(self, backup_id: str) -> bool:
         safe_id = self._safe_backup_id(backup_id)
