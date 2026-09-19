@@ -25,6 +25,17 @@ on:
       - 'backend/tests/test_branch_flow_contract.py'
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
+      - 'backend/tests/test_supervisor_workflow_contract.py'
+      - 'skeleton/automation/supervisor.py'
+      - 'skeleton/automation/build_authority.py'
+      - 'skeleton/automation/supervisor_runtime.py'
+      - 'skeleton/automation/secretary.py'
+      - 'skeleton/automation/specialist_bots.py'
+      - 'skeleton/automation/advanced_bots.py'
+      - 'skeleton/automation/bot_manager.py'
+      - 'tests/test_autonomous_supervisor.py'
+      - 'tests/test_build_authority.py'
+      - 'tests/test_supervisor_runtime.py'
       - 'core/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
       - 'skeleton/automation/chatgpt_adapter.py'
@@ -52,6 +63,17 @@ on:
       - 'backend/tests/test_branch_flow_contract.py'
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
+      - 'backend/tests/test_supervisor_workflow_contract.py'
+      - 'skeleton/automation/supervisor.py'
+      - 'skeleton/automation/build_authority.py'
+      - 'skeleton/automation/supervisor_runtime.py'
+      - 'skeleton/automation/secretary.py'
+      - 'skeleton/automation/specialist_bots.py'
+      - 'skeleton/automation/advanced_bots.py'
+      - 'skeleton/automation/bot_manager.py'
+      - 'tests/test_autonomous_supervisor.py'
+      - 'tests/test_build_authority.py'
+      - 'tests/test_supervisor_runtime.py'
       - 'core/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
       - 'skeleton/automation/chatgpt_adapter.py'
@@ -97,6 +119,7 @@ jobs:
           tests/test_branch_flow_contract.py
           tests/test_workflow_run_branch_completions_contract.py
           tests/test_bot_activation_security.py
+          tests/test_supervisor_workflow_contract.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
       - name: Enforce reviewed action repository allowlist
