@@ -711,12 +711,13 @@ class MutationIntent:
         policy: RunnerPolicy,
     ) -> "MutationIntent":
         snapshot = item.snapshot
+        policy_snapshot_fingerprint = snapshot_policy_fingerprint(snapshot)
         material = {
             "repository": snapshot.core.repository,
             "pr": snapshot.core.number,
             "head": snapshot.core.head_sha,
             "base": snapshot.core.base_sha,
-            "snapshot": snapshot.fingerprint(),
+            "snapshot": policy_snapshot_fingerprint,
             "policy": policy.fingerprint(),
             "kind": "merge",
             "method": policy.merge_method,
@@ -728,7 +729,7 @@ class MutationIntent:
             pr_number=snapshot.core.number,
             expected_head_sha=snapshot.core.head_sha,
             expected_base_sha=snapshot.core.base_sha,
-            snapshot_fingerprint=snapshot.fingerprint(),
+            snapshot_fingerprint=policy_snapshot_fingerprint,
             policy_fingerprint=policy.fingerprint(),
             merge_method=policy.merge_method,
             created_at=utcnow().isoformat(),
