@@ -135,6 +135,8 @@ def compute_preconditions(
     protected: bool | None,
     observed_base_head: str | None,
     observation: QueueObservation,
+    expected_policy_fingerprint: str | None = None,
+    expected_snapshot_fingerprint: str | None = None,
 ) -> Preconditions:
     queue_ok = (
         not policy.queue_pressure_hold
@@ -160,51 +162,21 @@ def compute_preconditions(
         and current.core.base_sha == original.core.base_sha
     )
     head_matches = current.core.head_sha == original.core.head_sha
+    policy_matches = (
+        expected_policy_fingerprint is None
+        or expected_policy_fingerprint == policy.fingerprint()
+    )
+    if expected_snapshot_fingerprint is not None:
+        policy_matches = (
+            policy_matches
+            and expected_snapshot_fingerprint == original.fingerprint()
+        )
     return Preconditions(
         protected_base=protected_ok,
         base_head_matches=base_matches,
         head_matches=head_matches,
         snapshot_matches=_snapshot_matches(original, current),
-        policy_matches=(
-            policy.fingerprint()
-            == MutationIntent.from_work_item(
-                WorkItem(
-                    target=__import__(
-                        "skeleton.pr_automation.runner_contracts",
-                        fromlist=["Target"],
-                    ).Target(
-                        number=current.core.number,
-                        reason="precondition",
-                        priority=__import__(
-                            "skeleton.pr_automation.runner_contracts",
-                            fromlist=["PriorityBand"],
-                        ).PriorityBand.RECOVERY,
-                    ),
-                    snapshot=current,
-                    evaluation=__import__(
-                        "skeleton.pr_automation.core",
-                        fromlist=["Evaluation"],
-                    ).Evaluation(
-                        decision=Decision.MERGE,
-                        reasons=("precondition",),
-                        actions=(),
-                        snapshot_fingerprint=current.core.fingerprint(),
-                        policy_fingerprint=policy.core.fingerprint(),
-                    ),
-                    state=__import__(
-                        "skeleton.pr_automation.runner_contracts",
-                        fromlist=["WorkState"],
-                    ).WorkState.READY,
-                    score=0,
-                    reasons=(),
-                    observed_queue_depth=observation.queued_actions,
-                    observed_rate_remaining=observation.rate_remaining,
-                    created_at=utcnow().isoformat(),
-                    updated_at=utcnow().isoformat(),
-                ),
-                policy,
-            ).policy_fingerprint
-        ),
+        policy_matches=policy_matches,
         checks_still_passing=_checks_valid(original, current),
         reviews_still_valid=_reviews_valid(original, current, policy),
         queue_within_limit=queue_ok,
@@ -212,10 +184,6 @@ def compute_preconditions(
     )
 
 
-# The helper above intentionally avoided passing an intent just to preserve a
-# simple standalone test surface.  The actual transaction performs a stronger
-# direct policy fingerprint comparison and replaces the synthetic
-# policy_matches value below.
 def compute_transaction_preconditions(
     *,
     intent: MutationIntent,
@@ -226,27 +194,15 @@ def compute_transaction_preconditions(
     observed_base_head: str | None,
     observation: QueueObservation,
 ) -> Preconditions:
-    base = compute_preconditions(
+    return compute_preconditions(
         original=original,
         current=current,
         policy=policy,
         protected=protected,
         observed_base_head=observed_base_head,
         observation=observation,
-    )
-    return Preconditions(
-        protected_base=base.protected_base,
-        base_head_matches=base.base_head_matches,
-        head_matches=base.head_matches,
-        snapshot_matches=base.snapshot_matches,
-        policy_matches=(
-            intent.policy_fingerprint == policy.fingerprint()
-            and intent.snapshot_fingerprint == original.fingerprint()
-        ),
-        checks_still_passing=base.checks_still_passing,
-        reviews_still_valid=base.reviews_still_valid,
-        queue_within_limit=base.queue_within_limit,
-        rate_limit_safe=base.rate_limit_safe,
+        expected_policy_fingerprint=intent.policy_fingerprint,
+        expected_snapshot_fingerprint=intent.snapshot_fingerprint,
     )
 
 
