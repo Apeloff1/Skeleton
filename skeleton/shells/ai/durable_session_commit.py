@@ -769,16 +769,16 @@ class DurableSessionCommitBuilder:
                 "signed execution evidence differs from finalization"
             )
 
-        if (
-            self.policy.require_recovery_checkpoint
-            and not recovery_checkpoint_digest
+        if self.policy.require_recovery_checkpoint and (
+            not recovery_checkpoint_digest
+            or recovery_revision is None
         ):
             raise DurableSessionCommitConflict(
-                "session commit requires recovery checkpoint"
+                "session commit requires durably stored recovery checkpoint"
             )
-        if (
-            self.policy.require_session_journal_manifest
-            and not session_journal_manifest_digest
+        if self.policy.require_session_journal_manifest and (
+            not session_journal_manifest_digest
+            or session_journal_revision is None
         ):
             raise DurableSessionCommitConflict(
                 "session commit requires durable session-journal manifest"
