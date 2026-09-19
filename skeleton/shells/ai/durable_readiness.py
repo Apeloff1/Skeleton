@@ -376,6 +376,7 @@ class DurableEvidenceReadinessGuard:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None,
         recovery_finalization_ids: tuple[str, ...],
+        compaction_workflow_ids: tuple[str, ...],
         sequence_report: DurableSequenceIndexFleetReport | None = None,
         verification_report: DurableVerificationOperatorReport | None = None,
         verification_refresh: DurableVerificationRefreshReport | None = None,
@@ -396,6 +397,9 @@ class DurableEvidenceReadinessGuard:
                 protected_roots=protected_roots,
                 recovery_finalization_ids=(
                     recovery_finalization_ids
+                ),
+                compaction_workflow_ids=(
+                    compaction_workflow_ids
                 ),
             )
             if not operations_report.allowed:
@@ -537,12 +541,14 @@ class DurableEvidenceReadinessGuard:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None = None,
         recovery_finalization_ids: tuple[str, ...] = (),
+        compaction_workflow_ids: tuple[str, ...] = (),
     ) -> DurableEvidenceReadinessReport:
         entries = self._entries(chains)
         return self._evaluate(
             entries,
             protected_roots=protected_roots,
             recovery_finalization_ids=recovery_finalization_ids,
+            compaction_workflow_ids=compaction_workflow_ids,
         )
 
     def reconcile(
@@ -601,6 +607,7 @@ class DurableEvidenceReadinessGuard:
             entries,
             protected_roots=protected_roots,
             recovery_finalization_ids=recovery_finalization_ids,
+            compaction_workflow_ids=compaction_workflow_ids,
             sequence_report=sequence_report,
             verification_report=verification_report,
             verification_refresh=verification_refresh,
@@ -613,6 +620,7 @@ class DurableEvidenceReadinessGuard:
         *,
         protected_roots: dict[str, tuple[str, ...]] | None = None,
         recovery_finalization_ids: tuple[str, ...] = (),
+        compaction_workflow_ids: tuple[str, ...] = (),
         reconcile: bool = False,
     ) -> DurableEvidenceReadinessReport:
         report = (
@@ -620,12 +628,14 @@ class DurableEvidenceReadinessGuard:
                 chains,
                 protected_roots=protected_roots,
                 recovery_finalization_ids=recovery_finalization_ids,
+                compaction_workflow_ids=compaction_workflow_ids,
             )
             if reconcile
             else self.inspect(
                 chains,
                 protected_roots=protected_roots,
                 recovery_finalization_ids=recovery_finalization_ids,
+                compaction_workflow_ids=compaction_workflow_ids,
             )
         )
         if not report.ready:
