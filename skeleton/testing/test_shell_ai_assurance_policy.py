@@ -221,6 +221,7 @@ def test_assurance_decision_to_dict_contains_evidence_flags():
         release=True,
         preconditions=True,
         approval=True,
+        quorum=True,
     )
     data = decision.to_dict()
     assert data["sealed"] is True
