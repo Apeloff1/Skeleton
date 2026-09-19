@@ -141,6 +141,11 @@ class WorkspaceRollback:
                     os.fsync(handle.fileno())
                 os.chmod(temporary, record.mode)
                 os.replace(temporary, absolute)
+                os.utime(
+                    absolute,
+                    ns=(record.mtime_ns, record.mtime_ns),
+                    follow_symlinks=False,
+                )
             finally:
                 try:
                     os.unlink(temporary)
