@@ -658,7 +658,7 @@ class BudgetedGitHubTransport:
             raise ValueError("GitHub API path must start with /")
         if not 1 <= per_page <= 100:
             raise ValueError("per_page must be between 1 and 100")
-        page_bound = max_pages or self._limits.max_pages
+        page_bound = self._limits.max_pages if max_pages is None else max_pages
         if not 1 <= page_bound <= self._limits.max_pages:
             raise ValueError("max_pages exceeds runner limit")
 
@@ -697,7 +697,7 @@ class BudgetedGitHubTransport:
             raise ValueError("payload key is required")
         if not 1 <= per_page <= 100:
             raise ValueError("per_page must be between 1 and 100")
-        page_bound = max_pages or self._limits.max_pages
+        page_bound = self._limits.max_pages if max_pages is None else max_pages
         if not 1 <= page_bound <= self._limits.max_pages:
             raise ValueError("max_pages exceeds runner limit")
         items: list[Mapping[str, Any]] = []
