@@ -2559,3 +2559,333 @@ def test_hot_floor_history_detects_signed_history_tamper():
         "lookup raised" in issue
         for issue in report.issues
     )
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_emits_signed_destruction_record(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert result.destruction_record_id
+    assert result.destruction_record_digest
+    stored = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        result.operation.operation_id,
+    )
+    assert stored is not None
+    assert stored.record_id == result.destruction_record_id
+    assert stored.record.digest == result.destruction_record_digest
+    assert stored.record.authority_id == fixture.authorization.authorization_id
+    assert stored.record.authority_digest == fixture.authorization.authorization.digest
+    assert stored.record.manifest_digest == result.manifest.digest
+    assert stored.record.archive_id == result.manifest.archive_id
+    assert (
+        stored.record.archive_manifest_digest
+        == result.manifest.archive_manifest_digest
+    )
+    assert stored.record.post_verified
+    assert stored.record.fencing_token == result.operation.fencing_token
+    assert fixture.destruction_ledger.require_verified(
+        fixture.chain_id
+    ).ok
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_destruction_record_binds_floor_transition(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    record = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        result.operation.operation_id,
+    ).record
+    assert (
+        record.before_floor_sequence
+        == result.manifest.previous_floor_sequence
+    )
+    assert (
+        record.before_floor_root
+        == result.manifest.previous_floor_root
+    )
+    assert (
+        record.after_floor_sequence
+        == result.manifest.cutoff_sequence
+    )
+    assert (
+        record.after_floor_root
+        == result.manifest.cutoff_root
+    )
+    assert record.after_sequence >= result.manifest.current_sequence
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_destruction_items_cover_deleted_backend_records(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    record = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        result.operation.operation_id,
+    ).record
+    keys = {
+        item.backend_key
+        for item in record.items
+    }
+    for manifest_item in result.manifest.items:
+        assert manifest_item.node_key in keys
+        if manifest_item.sequence_revision is not None:
+            assert manifest_item.sequence_key in keys
+        if (
+            kind == "receipts"
+            and manifest_item.receipt_index_revision is not None
+        ):
+            assert manifest_item.receipt_index_key in keys
+    assert all(item.archived for item in record.items)
+    assert record.deleted_count == len(record.items)
+    assert record.already_absent_count == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_result_serializes_destruction_evidence(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    data = result.to_dict()
+    assert (
+        data["destruction_record_id"]
+        == result.destruction_record_id
+    )
+    assert (
+        data["destruction_record_digest"]
+        == result.destruction_record_digest
+    )
+    assert len(data["destruction_record_id"]) == 64
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_retry_reuses_same_destruction_record(kind):
+    fixture = Fixture(kind=kind)
+    first = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    second = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert second.destruction_record_id == first.destruction_record_id
+    assert (
+        second.destruction_record_digest
+        == first.destruction_record_digest
+    )
+    assert len(
+        fixture.destruction_ledger.snapshot(
+            fixture.chain_id
+        )
+    ) == 1
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_retry_after_chain_growth_reuses_original_destruction_record(kind):
+    fixture = Fixture(kind=kind)
+    first = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    if kind == "journal":
+        append_events(
+            fixture.chain,
+            1,
+            start=100,
+        )
+    else:
+        fixture.chain.append(
+            receipt(100)
+        )
+    assert fixture.chain.head().sequence > first.manifest.current_sequence
+    second = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert second.destruction_record_id == first.destruction_record_id
+    stored = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        first.operation.operation_id,
+    )
+    assert stored.record.after_sequence == first.manifest.current_sequence
+    assert (
+        stored.record.after_root
+        == first.manifest.current_root
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_fresh_pruning_executor_reuses_destruction_ledger_record(kind):
+    fixture = Fixture(kind=kind)
+    first = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    fresh_ledger = DurableDestructionLedger(
+        fixture.backend,
+        signer(
+            "destruction",
+            b"d",
+            clock=lambda: fixture.now[0],
+        ),
+        namespace=f"{kind}-destruction",
+        clock=lambda: fixture.now[0],
+    )
+    fresh = DurablePruningExecutor(
+        fixture.backend,
+        fixture.authorization_store,
+        fixture.floor_store,
+        destruction_ledger=fresh_ledger,
+        namespace=f"{kind}-pruning",
+        max_items=100,
+        clock=lambda: fixture.now[0],
+    )
+    second = fresh.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    assert second.destruction_record_id == first.destruction_record_id
+    assert fresh_ledger.require_verified(
+        fixture.chain_id
+    ).ok
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_destruction_index_repairs_after_loss(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    stored = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        result.operation.operation_id,
+    )
+    key = fixture.destruction_ledger._operation_index_key(
+        stored.operation_key
+    )
+    record = fixture.backend.get(
+        fixture.destruction_ledger.namespace,
+        key,
+    )
+    fixture.backend.delete(
+        fixture.destruction_ledger.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    repaired = fixture.destruction_ledger.find_operation(
+        fixture.chain_id,
+        "pruning",
+        result.operation.operation_id,
+    )
+    assert repaired.record_id == result.destruction_record_id
+    assert fixture.backend.get(
+        fixture.destruction_ledger.namespace,
+        key,
+    ) is not None
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_pruning_retry_fails_closed_on_destruction_signature_tamper(kind):
+    fixture = Fixture(kind=kind)
+    result = fixture.executor.execute(
+        fixture.authorization,
+        fixture.retention,
+        fixture.chain,
+    )
+    key = fixture.destruction_ledger._record_key(
+        result.destruction_record_id
+    )
+    stored = fixture.backend.get(
+        fixture.destruction_ledger.namespace,
+        key,
+    )
+    raw = dict(stored.value)
+    signature = dict(raw["signature"])
+    signature["signature"] = "f" * 64
+    raw["signature"] = signature
+    fixture.backend.compare_and_swap(
+        fixture.destruction_ledger.namespace,
+        key,
+        expected_revision=stored.revision,
+        value=raw,
+    )
+    with pytest.raises(
+        DurablePruningManualReview,
+        match="destruction evidence",
+    ):
+        fixture.executor.execute(
+            fixture.authorization,
+            fixture.retention,
+            fixture.chain,
+        )
+
+
+def test_pruning_executor_rejects_wrong_destruction_ledger_type():
+    fixture = Fixture(kind="journal")
+    with pytest.raises(
+        TypeError,
+        match="destruction_ledger",
+    ):
+        DurablePruningExecutor(
+            fixture.backend,
+            fixture.authorization_store,
+            fixture.floor_store,
+            destruction_ledger=object(),
+        )
+
