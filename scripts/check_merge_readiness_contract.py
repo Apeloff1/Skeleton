@@ -133,6 +133,17 @@ def main() -> int:
     require("--noconftest" in pr_automation, "PR automation tests must avoid unrelated conftest state", failures)
     for test_path in PR_AUTOMATION_TESTS:
         require(test_path in pr_automation, f"PR automation gate missing {test_path}", failures)
+    require(
+        "name: Run supervisor workflow contract in isolated import namespace" in pr_automation,
+        "supervisor workflow contract must run in an isolated pytest invocation",
+        failures,
+    )
+    require(
+        "--import-mode=importlib" in pr_automation
+        and "backend/tests/test_supervisor_workflow_contract.py" in pr_automation,
+        "backend supervisor workflow contract must use collision-safe import isolation",
+        failures,
+    )
 
     readiness = job_block(text, "readiness")
     require(bool(readiness), "readiness job missing", failures)
