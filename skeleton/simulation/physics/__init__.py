@@ -101,6 +101,17 @@ from .gameplay import (
     JumpTuning,
     ProjectileSolution,
 )
+from .jvm_broadphase_accelerator import (
+    BroadPhaseIndexPair,
+    JvmBroadPhaseAccelerator,
+    JvmBroadPhaseConfig,
+    JvmBroadPhaseError,
+    JvmBroadPhaseProtocolError,
+    JvmBroadPhaseTimeout,
+    JvmBroadPhaseUnavailable,
+    close_default_broadphase_accelerator,
+    get_default_broadphase_accelerator,
+)
 from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .islands import (
     IslandGraph,
@@ -219,6 +230,13 @@ __all__ = [
     "IslandGraph",
     "IslandGraphStats",
     "IslandSolveReceipt",
+    "JvmBroadPhaseAccelerator",
+    "JvmBroadPhaseConfig",
+    "JvmBroadPhaseError",
+    "JvmBroadPhaseUnavailable",
+    "JvmBroadPhaseProtocolError",
+    "JvmBroadPhaseTimeout",
+    "BroadPhaseIndexPair",
     "JumpTuning",
     "KinematicCapsuleController",
     "KinematicCharacterMotor",
@@ -301,5 +319,7 @@ __all__ = [
     "step_physics_with_commands",
     "verify_character_state",
     "verify_snapshot",
+    "get_default_broadphase_accelerator",
+    "close_default_broadphase_accelerator",
     "world_inertia",
 ]
