@@ -1941,38 +1941,19 @@ def test_historical_root_falls_back_when_primary_archive_record_is_tampered():
     ) == first_events[:1]
 
 
-def test_historical_root_falls_back_when_primary_archive_node_is_tampered():
+def test_shared_archived_node_corruption_invalidates_all_replicas():
     (
         backend,
         _,
         repository,
-        first_events,
-        first_archive,
-        second_archive,
+        _,
+        _,
+        _,
         root,
     ) = two_replica_journal_fixture()
-    node_key = repository._node_key(
-        "journal",
-        root,
-    )
-    # Nodes are content-addressed and shared by replicas, so corrupting the
-    # shared node correctly invalidates every replica. This test instead
-    # corrupts a primary-only later node so primary archive verification fails
-    # while the one-node historical prefix remains reconstructable from replica
-    # metadata in the second archive.
-    primary = repository.require(
-        first_archive.manifest.archive_id
-    )
-    primary_only_hash = (
-        primary.node_hashes[-1]
-    )
-    if primary_only_hash == root:
-        pytest.skip(
-            "fixture has no primary-only node"
-        )
     key = repository._node_key(
         "journal",
-        primary_only_hash,
+        root,
     )
     record = backend.get(
         repository.namespace,
@@ -1980,7 +1961,7 @@ def test_historical_root_falls_back_when_primary_archive_node_is_tampered():
     )
     raw = dict(record.value)
     payload = dict(raw["payload"])
-    payload["summary"] = "tampered-primary-only"
+    payload["summary"] = "tampered-shared-node"
     raw["payload"] = payload
     backend.compare_and_swap(
         repository.namespace,
@@ -1988,19 +1969,18 @@ def test_historical_root_falls_back_when_primary_archive_node_is_tampered():
         expected_revision=record.revision,
         value=raw,
     )
-    resolution = repository.resolve_root(
+    with pytest.raises(
+        DurableArchiveStoreError,
+        match="all archive replicas",
+    ):
+        repository.resolve_root(
+            "journal",
+            root,
+        )
+    assert not repository.verify_root(
         "journal",
         root,
     )
-    assert (
-        resolution.archive_id
-        == second_archive.manifest.archive_id
-    )
-    assert repository.snapshot_at(
-        "journal",
-        root,
-    ) == first_events[:1]
-
 
 def test_historical_root_fails_closed_when_all_archive_records_are_missing():
     (
