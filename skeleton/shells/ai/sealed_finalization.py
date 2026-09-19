@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from skeleton.shells.ai.durable_readiness import DurableEvidenceReadinessReport
 from skeleton.shells.ai.evidence_finalizer import FinalizedAIExecutionEvidence
 from skeleton.shells.ai.execution_attempt import AIExecutionAttempt
 from skeleton.shells.ai.orchestrator import AIExecutionBundle
@@ -18,6 +19,24 @@ class AISealedFinalizedExecution:
     seal_use: SealUse
     finalized: FinalizedAIExecutionEvidence
     execution_attempt: AIExecutionAttempt | None = None
+    durable_readiness: DurableEvidenceReadinessReport | None = None
+    post_execution_maintenance_error: str = ""
+
+    def __post_init__(self) -> None:
+        if len(self.post_execution_maintenance_error) > 512:
+            raise ValueError(
+                "post_execution_maintenance_error too long"
+            )
+
+    @property
+    def post_execution_maintenance_ok(self) -> bool:
+        return (
+            not self.post_execution_maintenance_error
+            and (
+                self.durable_readiness is None
+                or self.durable_readiness.ready
+            )
+        )
 
     @property
     def ok(self) -> bool:
@@ -46,5 +65,16 @@ class AISealedFinalizedExecution:
                 None
                 if self.execution_attempt is None
                 else self.execution_attempt.to_dict()
+            ),
+            "durable_readiness": (
+                None
+                if self.durable_readiness is None
+                else self.durable_readiness.to_dict()
+            ),
+            "post_execution_maintenance_ok": (
+                self.post_execution_maintenance_ok
+            ),
+            "post_execution_maintenance_error": (
+                self.post_execution_maintenance_error
             ),
         }
