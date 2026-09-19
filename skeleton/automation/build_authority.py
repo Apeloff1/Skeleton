@@ -11,6 +11,8 @@ module name, permission, token, ref, or arbitrary routing instruction.
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
@@ -176,6 +178,22 @@ class BuildAuthorization:
             raise BuildAuthorityError(
                 "build authorization digest mismatch"
             )
+        if self.issue_number != number:
+            raise BuildAuthorityError(
+                "build authorization issue number is not normalized"
+            )
+        if self.title != title or self.body != body:
+            raise BuildAuthorityError(
+                "build authorization text is not normalized"
+            )
+        if self.labels != labels:
+            raise BuildAuthorityError(
+                "build authorization labels are not normalized"
+            )
+        if self.updated_at != updated_at:
+            raise BuildAuthorityError(
+                "build authorization timestamp is not normalized"
+            )
 
     @property
     def task_digest(self) -> str:
@@ -327,6 +345,91 @@ def authorized_builds(
     return tuple(result)
 
 
+def _github_issue_payload(
+    repository: str,
+    issue_number: int,
+    *,
+    timeout: int = 30,
+) -> dict[str, Any]:
+    """Fetch one issue with enough state to revalidate build authority."""
+    try:
+        raw = subprocess.check_output(
+            [
+                "gh",
+                "issue",
+                "view",
+                str(_issue_number(issue_number)),
+                "--repo",
+                validate_repository(repository),
+                "--json",
+                "number,title,body,labels,updatedAt,state",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+        )
+        value = json.loads(raw)
+    except (
+        OSError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+        SupervisorRuntimeError,
+    ) as exc:
+        raise BuildAuthorityError(
+            "unable to revalidate live build issue"
+        ) from exc
+    if not isinstance(value, dict):
+        raise BuildAuthorityError(
+            "live build issue returned invalid shape"
+        )
+    return value
+
+
+def revalidate_live_build_authorization(
+    authorization: BuildAuthorization,
+    *,
+    timeout: int = 30,
+) -> BuildAuthorization:
+    """Require the approved issue to remain open, unchanged, and approved.
+
+    This closes the issue-state TOCTOU window between read-only planning and
+    mutation. Removing an approval label, editing the task, or closing the issue
+    immediately revokes autonomous build authority.
+    """
+    value = _github_issue_payload(
+        authorization.repository,
+        authorization.issue_number,
+        timeout=timeout,
+    )
+    state = value.get("state")
+    if not isinstance(state, str) or state.upper() != "OPEN":
+        raise BuildAuthorityError(
+            "authorized build issue is no longer open"
+        )
+
+    labels = _labels(value.get("labels", ()))
+    candidate = {
+        "number": value.get("number"),
+        "title": value.get("title"),
+        "body": value.get("body"),
+        "labels": labels,
+        "updatedAt": value.get("updatedAt", ""),
+        "automation_authorized": bool(
+            APPROVED_BUILD_LABELS.intersection(labels)
+        ),
+    }
+    current = BuildAuthorization.from_issue(
+        authorization.repository,
+        candidate,
+    )
+    if current != authorization:
+        raise BuildAuthorityError(
+            "authorized build issue changed after Supervisor observation"
+        )
+    return current
+
+
 def select_build_authorization(
     repository: str,
     issues: Iterable[Mapping[str, Any]],
@@ -347,5 +450,6 @@ __all__ = [
     "MAX_BUILD_BODY_BYTES",
     "MAX_BUILD_TITLE_BYTES",
     "authorized_builds",
+    "revalidate_live_build_authorization",
     "select_build_authorization",
 ]
