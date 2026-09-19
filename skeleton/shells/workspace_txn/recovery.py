@@ -5,15 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from skeleton.shells.workspace_txn.journal import JournalEvent, TransactionJournal
+from skeleton.shells.workspace_txn.state_machine import TransactionStateMachine
 from skeleton.shells.workspace_txn.types import WorkspaceTransactionState
 
-_TERMINAL = {
-    WorkspaceTransactionState.ACCEPTED.value,
-    WorkspaceTransactionState.REJECTED.value,
-    WorkspaceTransactionState.ROLLED_BACK.value,
-    WorkspaceTransactionState.ROLLBACK_FAILED.value,
-    WorkspaceTransactionState.ABORTED.value,
-}
+_STATE_MACHINE = TransactionStateMachine()
+_TERMINAL = frozenset(
+    state.value
+    for state in WorkspaceTransactionState
+    if _STATE_MACHINE.terminal(state)
+)
 
 
 @dataclass(frozen=True)
