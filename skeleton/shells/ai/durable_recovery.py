@@ -20,6 +20,11 @@ from skeleton.shells.ai.durable_archive_store import (
 from skeleton.shells.ai.durable_proof_window_operator import (
     DurableProofWindowOperator,
 )
+from skeleton.shells.ai.durable_session_commit import (
+    DurableSessionCommitCorruption,
+    DurableSessionCommitStore,
+    finalization_evidence_digest,
+)
 from skeleton.shells.ai.durable_session_journal import (
     DurableSessionJournalStore,
 )
@@ -112,6 +117,9 @@ class DurableSessionRecoveryReport:
     receipt_root: str
     integrity: SessionEvidenceIntegrityReport | None
     findings: tuple[DurableRecoveryFinding, ...]
+    session_commit_id: str = ""
+    session_commit_digest: str = ""
+    session_commit_verified: bool = False
 
     def __post_init__(self) -> None:
         if not self.finalization_id or len(self.finalization_id) > 256:
@@ -242,6 +250,9 @@ class DurableSessionRecoveryReport:
                 item.to_dict()
                 for item in self.findings
             ],
+            "session_commit_id": self.session_commit_id,
+            "session_commit_digest": self.session_commit_digest,
+            "session_commit_verified": self.session_commit_verified,
         }
         if include_digest:
             data["digest"] = self.digest
@@ -272,6 +283,8 @@ class DurableSessionRecoveryVerifier:
         proof_windows: DurableProofWindowOperator | None = None,
         journal_proof_chain_id: str = "",
         receipt_proof_chain_id: str = "",
+        session_commits: DurableSessionCommitStore | None = None,
+        require_session_commit: bool = False,
     ) -> None:
         if (journal_archive is None) != (not journal_chain_id):
             raise ValueError(
@@ -350,6 +363,29 @@ class DurableSessionRecoveryVerifier:
             )
         )
         self.execution_evidence = execution_evidence
+        if (
+            session_commits is not None
+            and not isinstance(
+                session_commits,
+                DurableSessionCommitStore,
+            )
+        ):
+            raise TypeError(
+                "session_commits must be DurableSessionCommitStore"
+            )
+        if not isinstance(require_session_commit, bool):
+            raise ValueError(
+                "require_session_commit must be bool"
+            )
+        if (
+            require_session_commit
+            and session_commits is None
+        ):
+            raise ValueError(
+                "required session commit store is not configured"
+            )
+        self.session_commits = session_commits
+        self.require_session_commit = require_session_commit
         if (
             session_journals is not None
             and not isinstance(
@@ -997,6 +1033,266 @@ class DurableSessionRecoveryVerifier:
                     "signed execution evidence chain node differs from finalization",
                 )
 
+        session_commit_id = ""
+        session_commit_digest = ""
+        session_commit_verified = False
+        if self.session_commits is None:
+            if self.require_session_commit:
+                self._finding(
+                    findings,
+                    "session_commit.store_missing",
+                    RecoveryFindingSeverity.MISSING,
+                    "required durable session commit store is unavailable",
+                )
+        else:
+            try:
+                stored_commit = self.session_commits.get(
+                    finalization_id
+                )
+            except DurableSessionCommitCorruption as exc:
+                self._finding(
+                    findings,
+                    "session_commit.corruption",
+                    RecoveryFindingSeverity.CORRUPTION,
+                    str(exc),
+                )
+                stored_commit = None
+            if stored_commit is None:
+                if self.require_session_commit:
+                    self._finding(
+                        findings,
+                        "session_commit.missing",
+                        RecoveryFindingSeverity.MISSING,
+                        "required durable session commit is missing",
+                    )
+            else:
+                commit = stored_commit.signed.commit
+                session_commit_id = commit.commit_id
+                session_commit_digest = commit.digest
+                commit_conflicts_before = len(findings)
+                expected_pairs = (
+                    (
+                        "session_commit.session",
+                        commit.session_id,
+                        session_id,
+                        "session commit session differs from finalization",
+                    ),
+                    (
+                        "session_commit.provenance",
+                        commit.provenance_digest,
+                        finalization.provenance_digest,
+                        "session commit provenance differs from finalization",
+                    ),
+                    (
+                        "session_commit.finalization_semantics",
+                        commit.finalization_evidence_digest,
+                        finalization_evidence_digest(finalization),
+                        "session commit finalization evidence binding differs",
+                    ),
+                    (
+                        "session_commit.recovery",
+                        commit.recovery_checkpoint_digest,
+                        recovery_digest,
+                        "session commit recovery checkpoint differs",
+                    ),
+                    (
+                        "session_commit.session_evidence",
+                        commit.session_evidence_digest,
+                        (
+                            ""
+                            if session_evidence_value is None
+                            else session_evidence_value.digest
+                        ),
+                        "session commit session evidence differs",
+                    ),
+                    (
+                        "session_commit.session_journal",
+                        commit.session_journal_digest,
+                        session_journal_digest,
+                        "session commit journal digest differs",
+                    ),
+                    (
+                        "session_commit.session_journal_manifest",
+                        commit.session_journal_manifest_digest,
+                        recovery.session_journal_manifest_digest,
+                        "session commit journal manifest differs from recovery",
+                    ),
+                    (
+                        "session_commit.session_integrity",
+                        commit.session_integrity_digest,
+                        session_integrity_digest,
+                        "session commit integrity digest differs",
+                    ),
+                    (
+                        "session_commit.journal_root",
+                        commit.journal_root,
+                        journal_root,
+                        "session commit journal root differs",
+                    ),
+                    (
+                        "session_commit.receipt_root",
+                        commit.receipt_root,
+                        receipt_root,
+                        "session commit receipt root differs",
+                    ),
+                    (
+                        "session_commit.audit_anchor",
+                        commit.audit_anchor_digest,
+                        finalization.audit_anchor_digest,
+                        "session commit audit anchor differs",
+                    ),
+                    (
+                        "session_commit.audit_chain_node",
+                        commit.audit_chain_node_hash,
+                        finalization.audit_chain_node_hash,
+                        "session commit audit chain node differs",
+                    ),
+                    (
+                        "session_commit.audit_root",
+                        commit.audit_root,
+                        finalization.audit_root,
+                        "session commit audit root differs",
+                    ),
+                    (
+                        "session_commit.audit_witness",
+                        commit.audit_witness_digest,
+                        finalization.audit_witness_digest,
+                        "session commit audit witness differs",
+                    ),
+                    (
+                        "session_commit.audit_witness_sequence",
+                        commit.audit_witness_sequence,
+                        finalization.audit_witness_sequence,
+                        "session commit audit witness sequence differs",
+                    ),
+                    (
+                        "session_commit.execution_evidence",
+                        commit.execution_evidence_digest,
+                        signed_digest,
+                        "session commit signed execution evidence differs",
+                    ),
+                    (
+                        "session_commit.execution_chain_node",
+                        commit.execution_evidence_chain_node_hash,
+                        finalization.execution_evidence_chain_node_hash,
+                        "session commit execution evidence chain node differs",
+                    ),
+                    (
+                        "session_commit.runtime_trust",
+                        commit.runtime_trust_digest,
+                        finalization.runtime_trust_digest,
+                        "session commit runtime trust differs",
+                    ),
+                    (
+                        "session_commit.release",
+                        commit.release_evidence_digest,
+                        finalization.release_evidence_digest,
+                        "session commit release evidence differs",
+                    ),
+                    (
+                        "session_commit.attempt",
+                        commit.execution_attempt_id,
+                        finalization.execution_attempt_id,
+                        "session commit execution attempt differs",
+                    ),
+                )
+                for code, expected, actual, message in expected_pairs:
+                    if expected != actual:
+                        self._finding(
+                            findings,
+                            code,
+                            RecoveryFindingSeverity.CONFLICT,
+                            message,
+                        )
+
+                revision_checks = (
+                    (
+                        "session_commit.finalization_revision_regressed",
+                        stored_finalization.revision,
+                        commit.finalization_revision,
+                        "finalization revision is older than signed session commit",
+                    ),
+                    (
+                        "session_commit.recovery_revision_regressed",
+                        stored_recovery.revision,
+                        commit.recovery_revision,
+                        "recovery checkpoint revision is older than signed session commit",
+                    ),
+                    (
+                        "session_commit.session_evidence_revision_regressed",
+                        session_evidence_revision,
+                        commit.session_evidence_revision,
+                        "session evidence revision is older than signed session commit",
+                    ),
+                )
+                for code, current_revision, committed_revision, message in revision_checks:
+                    if (
+                        committed_revision is not None
+                        and (
+                            current_revision is None
+                            or current_revision < committed_revision
+                        )
+                    ):
+                        self._finding(
+                            findings,
+                            code,
+                            RecoveryFindingSeverity.CORRUPTION,
+                            message,
+                        )
+
+                if commit.session_journal_revision is not None:
+                    if self.session_journals is None:
+                        self._finding(
+                            findings,
+                            "session_commit.session_journal_store_missing",
+                            RecoveryFindingSeverity.MISSING,
+                            "session commit binds journal manifest revision but store is unavailable",
+                        )
+                    else:
+                        current_journal = self.session_journals.get(
+                            finalization_id
+                        )
+                        if (
+                            current_journal is None
+                            or current_journal.revision
+                            < commit.session_journal_revision
+                        ):
+                            self._finding(
+                                findings,
+                                "session_commit.session_journal_revision_regressed",
+                                RecoveryFindingSeverity.CORRUPTION,
+                                "durable session-journal revision is older than signed session commit",
+                            )
+                        elif (
+                            current_journal.manifest.digest
+                            != commit.session_journal_manifest_digest
+                        ):
+                            self._finding(
+                                findings,
+                                "session_commit.session_journal_manifest_conflict",
+                                RecoveryFindingSeverity.CONFLICT,
+                                "durable session-journal manifest differs from signed session commit",
+                            )
+
+                try:
+                    self.session_commits.require(
+                        finalization_id,
+                        commit_digest=commit.digest,
+                    )
+                except Exception as exc:
+                    self._finding(
+                        findings,
+                        "session_commit.publication_corruption",
+                        RecoveryFindingSeverity.CORRUPTION,
+                        "durable session commit publication is invalid: "
+                        f"{type(exc).__name__}",
+                    )
+
+                session_commit_verified = (
+                    len(findings)
+                    == commit_conflicts_before
+                )
+
         findings_tuple = tuple(findings)
         status = self._status(
             finalization,
@@ -1024,6 +1320,9 @@ class DurableSessionRecoveryVerifier:
             receipt_root,
             integrity_report,
             findings_tuple,
+            session_commit_id,
+            session_commit_digest,
+            session_commit_verified,
         )
 
     def require_verified(
