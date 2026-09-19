@@ -30,6 +30,7 @@ from .shapes import (
 _AXIS_EPSILON_SQ = 1.0e-16
 _CONTACT_POSITION_EPSILON_SQ = 1.0e-18
 MAX_BROAD_PHASE_PAIRS = 1_000_000
+MAX_BROAD_PHASE_QUERY_HITS = 1_000_000
 MAX_MANIFOLD_POINTS = 4
 
 
@@ -151,6 +152,8 @@ class SweepAndPruneBroadPhase:
             "successes": 0,
             "fallbacks": 0,
             "bypassed_small_batch": 0,
+            "spatial_attempts": 0,
+            "spatial_successes": 0,
         }
 
     def _add_pair(self, pairs: set[BroadPhasePair], pair: BroadPhasePair) -> None:
@@ -206,6 +209,112 @@ class SweepAndPruneBroadPhase:
             "enabled": self._use_jvm_acceleration,
             **self._acceleration,
         }
+
+    def query_aabbs(
+        self,
+        bodies: tuple[RigidBody, ...],
+        queries: tuple[AABB, ...],
+        *,
+        max_total_hits: int = MAX_BROAD_PHASE_QUERY_HITS,
+    ) -> tuple[tuple[str, ...], ...]:
+        """Return finite-body IDs overlapping each query AABB.
+
+        Infinite planes intentionally remain absent, matching the existing
+        PhysicsWorld.query_aabb semantics. Results for each query are in stable
+        body-ID order.
+        """
+        if (
+            isinstance(max_total_hits, bool)
+            or not isinstance(max_total_hits, int)
+            or not 1 <= max_total_hits <= MAX_BROAD_PHASE_QUERY_HITS
+        ):
+            raise PhysicsValidationError(
+                "max_total_hits outside supported range"
+            )
+        batch = tuple(queries)
+        if not all(isinstance(bounds, AABB) for bounds in batch):
+            raise PhysicsValidationError("queries must contain AABB values")
+        if not batch:
+            return ()
+
+        ordered_bodies = tuple(sorted(bodies, key=lambda row: row.body_id))
+        finite: list[tuple[RigidBody, AABB]] = []
+        for body in ordered_bodies:
+            bounds = body.shape.aabb(body.transform)
+            if bounds is not None:
+                finite.append((body, bounds))
+
+        def python_query() -> tuple[tuple[str, ...], ...]:
+            total = 0
+            output: list[tuple[str, ...]] = []
+            for query in batch:
+                hits: list[str] = []
+                for body, bounds in finite:
+                    if not bounds.overlaps(query):
+                        continue
+                    total += 1
+                    if total > max_total_hits:
+                        raise PhysicsValidationError(
+                            "AABB query total-hit bound exceeded"
+                        )
+                    hits.append(body.body_id)
+                output.append(tuple(hits))
+            return tuple(output)
+
+        if not self._use_jvm_acceleration or not finite:
+            return python_query()
+
+        try:
+            accelerator = self._resolve_accelerator()
+            minimum = int(getattr(accelerator, "minimum_bodies", 1))
+            if len(finite) < minimum:
+                self._acceleration["bypassed_small_batch"] += 1
+                return python_query()
+
+            self._acceleration["attempts"] += 1
+            self._acceleration["spatial_attempts"] += 1
+            index_batches = accelerator.query_overlaps_many(
+                [bounds for _, bounds in finite],
+                batch,
+                max_total_hits=max_total_hits,
+            )
+            if len(index_batches) != len(batch):
+                raise RuntimeError(
+                    "accelerator returned wrong AABB query count"
+                )
+
+            total = 0
+            output: list[tuple[str, ...]] = []
+            for indices in index_batches:
+                if not isinstance(indices, (list, tuple)):
+                    raise TypeError("invalid accelerated AABB hit batch")
+                previous = -1
+                hits: list[str] = []
+                for index in indices:
+                    if (
+                        isinstance(index, bool)
+                        or not isinstance(index, int)
+                        or not 0 <= index < len(finite)
+                        or index <= previous
+                    ):
+                        raise ValueError(
+                            "invalid accelerated AABB hit index"
+                        )
+                    previous = index
+                    total += 1
+                    if total > max_total_hits:
+                        raise ValueError(
+                            "accelerated AABB total-hit bound exceeded"
+                        )
+                    hits.append(finite[index][0].body_id)
+                output.append(tuple(hits))
+
+            self._acceleration["successes"] += 1
+            self._acceleration["spatial_successes"] += 1
+            return tuple(output)
+        except Exception:
+            self._acceleration["fallbacks"] += 1
+            return python_query()
 
     def compute_pairs(
         self,
