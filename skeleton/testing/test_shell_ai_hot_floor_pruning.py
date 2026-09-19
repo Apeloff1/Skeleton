@@ -1293,3 +1293,496 @@ def test_pruning_result_serializes_authority_and_progress(kind):
     assert data["operation"]["phase"] == "complete"
     assert data["manifest"]["delete_count"] if "delete_count" in data["manifest"] else True
     assert data["floor"]["floor"]["sequence"] == 6
+
+
+def _history_store(clock=lambda: 10.0):
+    backend = InMemoryFencedStore()
+    store = DurableHotFloorStore(
+        backend,
+        signer("history-floor", b"h", clock=clock),
+        namespace="history-floors",
+        clock=clock,
+    )
+    return backend, store
+
+
+def _advance_history_floor(
+    store,
+    *,
+    sequence,
+    root,
+    suffix,
+    fencing_token,
+    previous_sequence=None,
+    previous_root="",
+):
+    return store.advance(
+        chain_id="journal",
+        sequence=sequence,
+        root_hash=root,
+        archive_id=f"archive-{suffix}",
+        archive_manifest_digest=fp(f"archive-{suffix}"),
+        compaction_certificate_id=fp(f"certificate-{suffix}"),
+        pruning_authorization_id=fp(f"authorization-{suffix}"),
+        operation_id=fp(f"operation-{suffix}"),
+        fencing_token=fencing_token,
+        expected_previous_sequence=previous_sequence,
+        expected_previous_root=previous_root,
+    )
+
+
+def test_floor_history_persists_current_floor_by_id():
+    _, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    assert store.get(item.floor.floor_id) == item
+
+
+def test_floor_history_persists_current_floor_by_sequence():
+    _, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    assert store.floor_at("journal", 3) == item
+
+
+def test_displaced_floor_remains_available_by_id():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("root-5"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    assert store.current("journal") == second
+    assert store.get(first.floor.floor_id) == first
+
+
+def test_displaced_floor_remains_available_by_sequence():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("root-5"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    assert store.floor_at("journal", 3) == first
+
+
+def test_multiple_floor_history_survives_fresh_reader():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("root-5"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    third = _advance_history_floor(
+        store,
+        sequence=7,
+        root=fp("root-7"),
+        suffix="three",
+        fencing_token=3,
+        previous_sequence=5,
+        previous_root=fp("root-5"),
+    )
+    fresh = DurableHotFloorStore(
+        backend,
+        store.signer,
+        namespace="history-floors",
+        clock=lambda: 10.0,
+    )
+    assert fresh.get(first.floor.floor_id) == first
+    assert fresh.get(second.floor.floor_id) == second
+    assert fresh.get(third.floor.floor_id) == third
+    assert fresh.floor_at("journal", 3) == first
+    assert fresh.floor_at("journal", 5) == second
+    assert fresh.floor_at("journal", 7) == third
+
+
+def test_floor_history_preserves_previous_floor_binding():
+    _, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=6,
+        root=fp("root-6"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    historical = store.get(second.floor.floor_id)
+    assert historical.floor.previous_sequence == first.floor.sequence
+    assert historical.floor.previous_root_hash == first.floor.root_hash
+
+
+def test_same_sequence_retry_does_not_duplicate_history_authority():
+    backend, store = _history_store()
+    kwargs = dict(
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    first = _advance_history_floor(store, **kwargs)
+    second = _advance_history_floor(store, **kwargs)
+    assert second == first
+    history = backend.get(
+        store.namespace,
+        store._history_key(first.floor.floor_id),
+    )
+    index = backend.get(
+        store.namespace,
+        store._sequence_key("journal", 3),
+    )
+    assert history is not None
+    assert index is not None
+
+
+def test_floor_history_missing_sequence_returns_none():
+    _, store = _history_store()
+    _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    assert store.floor_at("journal", 2) is None
+
+
+def test_floor_history_missing_id_returns_none():
+    _, store = _history_store()
+    assert store.get(fp("missing-floor")) is None
+
+
+def test_floor_at_repairs_missing_current_sequence_index():
+    backend, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    backend.delete(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    assert backend.get(store.namespace, key) is None
+    repaired = store.floor_at("journal", 3)
+    assert repaired == item
+    assert backend.get(store.namespace, key) is not None
+
+
+def test_floor_at_repairs_missing_current_history_record():
+    backend, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    history_key = store._history_key(item.floor.floor_id)
+    index_key = store._sequence_key("journal", 3)
+    history_record = backend.get(
+        store.namespace,
+        history_key,
+    )
+    index_record = backend.get(
+        store.namespace,
+        index_key,
+    )
+    backend.delete(
+        store.namespace,
+        history_key,
+        expected_revision=history_record.revision,
+    )
+    backend.delete(
+        store.namespace,
+        index_key,
+        expected_revision=index_record.revision,
+    )
+    repaired = store.floor_at("journal", 3)
+    assert repaired == item
+    assert backend.get(store.namespace, history_key) is not None
+    assert backend.get(store.namespace, index_key) is not None
+
+
+def test_displacing_floor_repairs_previous_history_before_cas():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    history_key = store._history_key(first.floor.floor_id)
+    index_key = store._sequence_key("journal", 3)
+    history_record = backend.get(store.namespace, history_key)
+    index_record = backend.get(store.namespace, index_key)
+    backend.delete(
+        store.namespace,
+        history_key,
+        expected_revision=history_record.revision,
+    )
+    backend.delete(
+        store.namespace,
+        index_key,
+        expected_revision=index_record.revision,
+    )
+    _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("root-5"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    assert store.get(first.floor.floor_id) == first
+    assert store.floor_at("journal", 3) == first
+
+
+def test_floor_history_signature_tamper_is_rejected():
+    backend, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    key = store._history_key(item.floor.floor_id)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    floor = dict(payload["floor"])
+    floor["archive_id"] = "tampered-archive"
+    payload["floor"] = floor
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="signature",
+    ):
+        store.get(item.floor.floor_id)
+
+
+def test_floor_history_index_wrong_value_type_is_rejected():
+    backend, store = _history_store()
+    item = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value={"bad": True},
+    )
+    with pytest.raises(
+        (DurableHotFloorError, KeyError),
+    ):
+        store.floor_at("journal", 3)
+    assert item.floor.sequence == 3
+
+
+def test_floor_history_index_floor_id_substitution_is_rejected():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    second = _advance_history_floor(
+        store,
+        sequence=5,
+        root=fp("root-5"),
+        suffix="two",
+        fencing_token=2,
+        previous_sequence=3,
+        previous_root=fp("root-3"),
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    payload["floor_id"] = second.floor.floor_id
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="index/content",
+    ):
+        store.floor_at("journal", 3)
+    assert store.get(first.floor.floor_id) == first
+
+
+def test_floor_history_index_root_substitution_is_rejected():
+    backend, store = _history_store()
+    _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    payload["root_hash"] = fp("other-root")
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="index/content",
+    ):
+        store.floor_at("journal", 3)
+
+
+def test_floor_history_sequence_index_conflict_blocks_later_advance():
+    backend, store = _history_store()
+    first = _advance_history_floor(
+        store,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    key = store._sequence_key("journal", 3)
+    record = backend.get(store.namespace, key)
+    payload = dict(record.value)
+    payload["floor_id"] = fp("foreign-floor")
+    backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=payload,
+    )
+    with pytest.raises(
+        DurableHotFloorError,
+        match="different floor",
+    ):
+        _advance_history_floor(
+            store,
+            sequence=5,
+            root=fp("root-5"),
+            suffix="two",
+            fencing_token=2,
+            previous_sequence=3,
+            previous_root=fp("root-3"),
+        )
+    assert store.current("journal") == first
+
+
+@pytest.mark.parametrize("sequence", [0, -1, True])
+def test_floor_history_sequence_validation(sequence):
+    _, store = _history_store()
+    with pytest.raises(ValueError, match="positive"):
+        store.floor_at("journal", sequence)
+
+
+def test_floor_history_chain_validation():
+    _, store = _history_store()
+    with pytest.raises(ValueError, match="chain_id"):
+        store.floor_at("", 1)
+
+
+def test_floor_history_id_validation():
+    _, store = _history_store()
+    with pytest.raises(ValueError, match="64-character"):
+        store.get("bad")
+
+
+def test_floor_history_is_namespaced():
+    backend = InMemoryFencedStore()
+    first = DurableHotFloorStore(
+        backend,
+        signer("first-history", b"1"),
+        namespace="first-history",
+        clock=lambda: 10.0,
+    )
+    second = DurableHotFloorStore(
+        backend,
+        signer("second-history", b"2"),
+        namespace="second-history",
+        clock=lambda: 10.0,
+    )
+    item = _advance_history_floor(
+        first,
+        sequence=3,
+        root=fp("root-3"),
+        suffix="one",
+        fencing_token=1,
+    )
+    assert first.get(item.floor.floor_id) == item
+    assert second.get(item.floor.floor_id) is None
