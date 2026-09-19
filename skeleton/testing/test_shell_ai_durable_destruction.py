@@ -377,7 +377,7 @@ def test_operation_index_repairs_after_post_head_crash_window():
     ) is not None
 
 
-def test_missing_index_is_repaired_by_verify():
+def test_verify_is_read_only_when_operation_index_is_missing():
     backend = InMemoryFencedStore()
     store = ledger(backend)
     signed = append_pruning(store)
@@ -394,11 +394,22 @@ def test_missing_index_is_repaired_by_verify():
         expected_revision=record.revision,
     )
     report = store.verify("journal")
-    assert report.ok
+    assert not report.ok
+    assert not report.operation_indexes_valid
+    assert backend.get(
+        store.namespace,
+        key,
+    ) is None
+
+    repaired = store.repair_operation_indexes(
+        "journal"
+    )
+    assert repaired.healthy
     assert backend.get(
         store.namespace,
         key,
     ) is not None
+    assert store.verify("journal").ok
 
 
 def test_unreachable_candidate_is_not_authoritative():
