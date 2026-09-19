@@ -15,6 +15,10 @@ from skeleton.shells.ai.durable_health import (
     DurableRecoveryHealthGuard,
     DurableRecoveryHealthReport,
 )
+from skeleton.shells.ai.durable_lifecycle import (
+    DurableEvidenceLifecycleCoordinator,
+    DurableLifecycleReport,
+)
 from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableEvidenceOperationsReport,
@@ -70,6 +74,7 @@ class AIServiceStatus:
     durable_operations: dict[str, object] | None = None
     durable_recovery_requirements: dict[str, object] | None = None
     execution_obligations: dict[str, object] | None = None
+    durable_lifecycle: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -95,6 +100,10 @@ class AIServiceStatus:
         if self.execution_obligations is not None:
             data["execution_obligations"] = dict(
                 self.execution_obligations
+            )
+        if self.durable_lifecycle is not None:
+            data["durable_lifecycle"] = dict(
+                self.durable_lifecycle
             )
         return data
 
@@ -125,6 +134,10 @@ class AIShellService:
         durable_operations_inspector: DurableEvidenceOperationsInspector | None = None,
         durable_operations_chains: tuple[tuple[str, object], ...] = (),
         durable_operations_protected_roots: dict[str, tuple[str, ...]] | None = None,
+        durable_lifecycle_coordinator: DurableEvidenceLifecycleCoordinator | None = None,
+        durable_lifecycle_chains: tuple[tuple[str, object], ...] = (),
+        durable_lifecycle_protected_roots: dict[str, tuple[str, ...]] | None = None,
+        durable_lifecycle_capacities: dict[str, int] | None = None,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -282,6 +295,119 @@ class AIShellService:
             raise ValueError(
                 "durable protected roots reference unknown chain"
             )
+
+        durable_lifecycle_chains = tuple(
+            durable_lifecycle_chains
+        )
+        if (
+            durable_lifecycle_coordinator is None
+            and durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle chains require a durable lifecycle coordinator"
+            )
+        if (
+            durable_lifecycle_coordinator is not None
+            and not isinstance(
+                durable_lifecycle_coordinator,
+                DurableEvidenceLifecycleCoordinator,
+            )
+        ):
+            raise TypeError(
+                "durable_lifecycle_coordinator must be "
+                "DurableEvidenceLifecycleCoordinator"
+            )
+        if (
+            durable_lifecycle_coordinator is not None
+            and not durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle coordinator requires at least one chain"
+            )
+        if any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            for item in durable_lifecycle_chains
+        ):
+            raise ValueError(
+                "durable lifecycle chain entries must be (chain_id, chain) pairs"
+            )
+        lifecycle_chain_ids = tuple(
+            item[0]
+            for item in durable_lifecycle_chains
+        )
+        if len(lifecycle_chain_ids) != len(
+            set(lifecycle_chain_ids)
+        ):
+            raise ValueError(
+                "duplicate durable lifecycle chain_id"
+            )
+        if any(
+            not isinstance(item, str)
+            or not item
+            or len(item) > 128
+            for item in lifecycle_chain_ids
+        ):
+            raise ValueError(
+                "invalid durable lifecycle chain_id"
+            )
+        durable_lifecycle_chains = tuple(
+            sorted(
+                durable_lifecycle_chains,
+                key=lambda item: item[0],
+            )
+        )
+        durable_lifecycle_protected_roots = dict(
+            durable_lifecycle_protected_roots or {}
+        )
+        lifecycle_unknown_protected = (
+            set(durable_lifecycle_protected_roots)
+            - set(lifecycle_chain_ids)
+        )
+        if lifecycle_unknown_protected:
+            raise ValueError(
+                "durable lifecycle protected roots reference unknown chain"
+            )
+        for chain_id, roots in (
+            durable_lifecycle_protected_roots.items()
+        ):
+            roots = tuple(roots)
+            if len(roots) != len(set(roots)):
+                raise ValueError(
+                    "duplicate durable lifecycle protected root"
+                )
+            if any(
+                not isinstance(root, str)
+                or len(root) != 64
+                for root in roots
+            ):
+                raise ValueError(
+                    "invalid durable lifecycle protected root"
+                )
+            durable_lifecycle_protected_roots[
+                chain_id
+            ] = roots
+
+        durable_lifecycle_capacities = dict(
+            durable_lifecycle_capacities or {}
+        )
+        lifecycle_unknown_capacity = (
+            set(durable_lifecycle_capacities)
+            - set(lifecycle_chain_ids)
+        )
+        if lifecycle_unknown_capacity:
+            raise ValueError(
+                "durable lifecycle capacities reference unknown chain"
+            )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value <= 0
+            for value in durable_lifecycle_capacities.values()
+        ):
+            raise ValueError(
+                "durable lifecycle capacities must be positive integers"
+            )
         self.orchestrator = orchestrator
         self.diagnostics = diagnostics
         self.governance = governance
@@ -308,11 +434,27 @@ class AIShellService:
         self.durable_operations_protected_roots = (
             durable_operations_protected_roots
         )
+        self.durable_lifecycle_coordinator = (
+            durable_lifecycle_coordinator
+        )
+        self.durable_lifecycle_chains = (
+            durable_lifecycle_chains
+        )
+        self.durable_lifecycle_protected_roots = (
+            durable_lifecycle_protected_roots
+        )
+        self.durable_lifecycle_capacities = (
+            durable_lifecycle_capacities
+        )
         self._release_report: StartupReleaseReport | None = None
         self._runtime_trust_report: RuntimeTrustReport | None = None
         self._authority_health_report: AuthorityHealthReport | None = None
         self._durable_recovery_report: DurableRecoveryHealthReport | None = None
         self._durable_operations_report: DurableEvidenceOperationsReport | None = None
+        self._durable_lifecycle_reports: dict[
+            str,
+            DurableLifecycleReport,
+        ] = {}
         self._durable_recovery_requirement_manifest: (
             SignedDurableRecoveryRequirementManifest | None
         ) = None
@@ -415,6 +557,22 @@ class AIShellService:
                     AIServicePhase.FAILED,
                     reason=(
                         "AI durable evidence operations "
+                        "verification failed"
+                    ),
+                )
+                return report
+        if self.durable_lifecycle_coordinator is not None:
+            self._durable_lifecycle_reports = (
+                self._inspect_durable_lifecycle()
+            )
+            if not all(
+                item.ok
+                for item in self._durable_lifecycle_reports.values()
+            ):
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason=(
+                        "AI durable evidence lifecycle "
                         "verification failed"
                     ),
                 )
@@ -662,6 +820,68 @@ class AIShellService:
             "AI durable evidence operations verification failed"
         )
 
+    def _inspect_durable_lifecycle(
+        self,
+    ) -> dict[str, DurableLifecycleReport]:
+        coordinator = self.durable_lifecycle_coordinator
+        if coordinator is None:
+            return {}
+        reports: dict[
+            str,
+            DurableLifecycleReport,
+        ] = {}
+        for chain_id, chain in self.durable_lifecycle_chains:
+            reports[chain_id] = coordinator.inspect(
+                chain_id,
+                chain,
+                protected_roots=(
+                    self.durable_lifecycle_protected_roots.get(
+                        chain_id,
+                        (),
+                    )
+                ),
+                capacity=(
+                    self.durable_lifecycle_capacities.get(
+                        chain_id
+                    )
+                ),
+            )
+        return reports
+
+    def _require_durable_lifecycle_current(self) -> None:
+        if self.durable_lifecycle_coordinator is None:
+            return
+        try:
+            reports = self._inspect_durable_lifecycle()
+        except Exception as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable evidence lifecycle "
+                        "inspection failed"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable evidence lifecycle verification failed"
+            ) from exc
+        self._durable_lifecycle_reports = reports
+        if all(
+            item.ok
+            for item in reports.values()
+        ):
+            return
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence lifecycle drift detected"
+                ),
+            )
+        raise RuntimeError(
+            "AI durable evidence lifecycle verification failed"
+        )
+
     def new_session(self, intent: AIIntent, *, session_id: str | None = None) -> AIShellSession:
         if not self.state.ready():
             raise RuntimeError("AI shell service is not ready")
@@ -670,6 +890,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         return AIShellSession(session_id or uuid.uuid4().hex, intent)
 
     def review(self, session: AIShellSession) -> tuple[AIReviewBundle, AIReviewView]:
@@ -680,6 +901,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         bundle = self.orchestrator.review(session)
         proposal = bundle.planning.response.proposal
         self.governance.require_not_quarantined(
@@ -777,6 +999,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -896,6 +1119,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         proposal = review.planning.response.proposal
@@ -979,6 +1203,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         if review.compiled is None:
             raise RuntimeError("AI shell proposal is not executable")
         pin = self._pins.get(session.session_id)
@@ -1456,6 +1681,7 @@ class AIShellService:
         self._require_execution_obligations_current()
         self._require_durable_recovery_current()
         self._require_durable_operations_current()
+        self._require_durable_lifecycle_current()
         if self.execution_fences is not None and not execution_fenced:
             raise RuntimeError("distributed execution fence was not verified")
         self._require_assurance(
@@ -1550,5 +1776,22 @@ class AIShellService:
                 None
                 if self._execution_obligation_report is None
                 else self._execution_obligation_report.to_dict()
+            ),
+            (
+                None
+                if not self._durable_lifecycle_reports
+                else {
+                    "allowed": all(
+                        item.ok
+                        for item in self._durable_lifecycle_reports.values()
+                    ),
+                    "chains": {
+                        chain_id: item.to_dict()
+                        for chain_id, item
+                        in sorted(
+                            self._durable_lifecycle_reports.items()
+                        )
+                    },
+                }
             ),
         )
