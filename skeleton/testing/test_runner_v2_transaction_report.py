@@ -22,7 +22,6 @@ from scripts.check_runner_v2_contract import (
 from skeleton.pr_automation.core import Decision, Mode
 from skeleton.pr_automation.index import EventIndex
 from skeleton.pr_automation.runner_contracts import (
-    AdmissionState,
     MutationIntent,
     MutationState,
     Preconditions,
