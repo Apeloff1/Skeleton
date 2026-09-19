@@ -695,6 +695,36 @@ def test_file_to_directory_type_change_removes_children_before_parent_restore(tm
     assert target.read_text(encoding="utf-8") == "before"
 
 
+def test_rollback_conflicts_on_post_review_file_metadata_drift(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    target = root / "state.txt"
+    target.write_text("before", encoding="utf-8")
+    target.chmod(0o644)
+    before = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, before)
+
+    target.write_text("after", encoding="utf-8")
+    target.chmod(0o600)
+    after = manager.scanner.scan(root)
+    changes = manager.differ.diff(before, after)
+
+    # Simulate an unrelated actor changing only metadata after review but
+    # before rollback begins. Content remains exactly as reviewed.
+    target.chmod(0o640)
+    report = manager.rollback_engine.rollback(
+        root,
+        before,
+        changes,
+        manifest,
+    )
+
+    assert not report.ok
+    assert report.conflicts
+    assert report.conflicts[0].action.path == "state.txt"
+    assert target.read_text(encoding="utf-8") == "after"
+    assert target.stat().st_mode & 0o777 == 0o640
+
+
 def test_reverse_rename_restores_original_file_mode_and_mtime(tmp_path: Path):
     root, _, plane = _manager(tmp_path)
     original = root / "old.txt"
