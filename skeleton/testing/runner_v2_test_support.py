@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from io import BytesIO
 import json
 from typing import Any, Mapping
 
