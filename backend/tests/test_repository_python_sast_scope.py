@@ -172,3 +172,89 @@ def test_repository_python_sast_reuses_module_alias_hardening(tmp_path: Path) ->
 
     findings = violations(sample)
     assert any("requests.get" in finding and "verify=False" in finding for finding in findings)
+
+def test_repository_python_sast_fails_closed_on_scandir_error(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    namespace = _scanner_namespace()
+    main = namespace["main"]
+    root = tmp_path / "skeleton"
+    blocked = root / "blocked"
+    root.mkdir()
+    blocked.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+
+    os_module = main.__globals__["os"]
+    original_scandir = os_module.scandir
+
+    def selective_scandir(path):
+        if Path(path) == blocked:
+            raise PermissionError("sensitive traversal detail")
+        return original_scandir(path)
+
+    monkeypatch.setitem(main.__globals__, "SCAN_ROOTS", (root,))
+    monkeypatch.setattr(os_module, "scandir", selective_scandir)
+
+    assert main() == 1
+    error = capsys.readouterr().err
+    assert "source traversal failure" in error
+    assert "sensitive traversal detail" not in error
+
+
+def test_repository_python_sast_rejects_symlinked_subtree(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    namespace = _scanner_namespace()
+    main = namespace["main"]
+    root = tmp_path / "skeleton"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (outside / "hidden.py").write_text("value = eval(user_input)\n", encoding="utf-8")
+    link = root / "linked"
+
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        import pytest
+
+        pytest.skip(f"symlinks unavailable: {type(exc).__name__}")
+
+    monkeypatch.setitem(main.__globals__, "SCAN_ROOTS", (root,))
+
+    assert main() == 1
+    error = capsys.readouterr().err
+    assert "source traversal encountered symlink" in error
+    assert str(outside) not in error
+
+
+def test_repository_python_sast_rejects_non_directory_root(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    namespace = _scanner_namespace()
+    main = namespace["main"]
+    not_a_directory = tmp_path / "skeleton"
+    not_a_directory.write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setitem(main.__globals__, "SCAN_ROOTS", (not_a_directory,))
+
+    assert main() == 1
+    assert "required scan root is not a directory" in capsys.readouterr().err
+
+
+def test_repository_python_sast_redacts_bootstrap_exception_detail(
+    monkeypatch, capsys
+) -> None:
+    namespace = _scanner_namespace()
+    main = namespace["main"]
+
+    def broken_loader():
+        raise RuntimeError("sensitive bootstrap detail")
+
+    monkeypatch.setitem(main.__globals__, "_load_violation_engine", broken_loader)
+
+    assert main() == 2
+    error = capsys.readouterr().err
+    assert "Repository Python SAST bootstrap failed: RuntimeError" in error
+    assert "sensitive bootstrap detail" not in error
+
