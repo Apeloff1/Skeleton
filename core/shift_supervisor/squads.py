@@ -65,6 +65,7 @@ class SquadLease:
         payload["fingerprint"] = self.fingerprint
         return payload
 
+
 def safe_squad_capacity(
     workers: Iterable[WorkerState],
     team: str,
@@ -102,7 +103,19 @@ class SquadCoordinator:
         default_lease_minutes: int = 45,
     ) -> None:
         self.store = store
-        self.overtime_soft_limit_minutes = self._policy_minutes(\n            overtime_soft_limit_minutes,\n            name="overtime_soft_limit_minutes",\n            minimum=0,\n            maximum=24 * 60,\n        )\n        self.default_lease_minutes = self._policy_minutes(\n            default_lease_minutes,\n            name="default_lease_minutes",\n            minimum=5,\n            maximum=240,\n        )\n
+        self.overtime_soft_limit_minutes = self._policy_minutes(
+            overtime_soft_limit_minutes,
+            name="overtime_soft_limit_minutes",
+            minimum=0,
+            maximum=24 * 60,
+        )
+        self.default_lease_minutes = self._policy_minutes(
+            default_lease_minutes,
+            name="default_lease_minutes",
+            minimum=5,
+            maximum=240,
+        )
+
     def safe_capacity(self, team: str) -> int:
         return safe_squad_capacity(
             self.store.snapshot_workers(),
@@ -125,7 +138,17 @@ class SquadCoordinator:
         if not generation:
             raise ValueError("plan_generation is required")
         moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        lease_for = (\n            self.default_lease_minutes\n            if lease_minutes is None\n            else self._policy_minutes(\n                lease_minutes,\n                name="lease_minutes",\n                minimum=5,\n                maximum=240,\n            )\n        )\n
+        lease_for = (
+            self.default_lease_minutes
+            if lease_minutes is None
+            else self._policy_minutes(
+                lease_minutes,
+                name="lease_minutes",
+                minimum=5,
+                maximum=240,
+            )
+        )
+
         with self.store._lock:  # noqa: SLF001
             self._reclaim_expired_locked(moment)
             self._require_current_generation_locked(generation)
@@ -210,7 +233,17 @@ class SquadCoordinator:
         now: datetime | None = None,
     ) -> SquadLease:
         moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        extend = (\n            self.default_lease_minutes\n            if minutes is None\n            else self._policy_minutes(\n                minutes,\n                name="minutes",\n                minimum=5,\n                maximum=240,\n            )\n        )\n        with self.store._lock:  # noqa: SLF001
+        extend = (
+            self.default_lease_minutes
+            if minutes is None
+            else self._policy_minutes(
+                minutes,
+                name="minutes",
+                minimum=5,
+                maximum=240,
+            )
+        )
+        with self.store._lock:  # noqa: SLF001
             item = self._require_owned_item_locked(squad_id, task_id)
             lease = self._lease_from_item(item)
             self._require_live_lease(lease, moment)
@@ -564,4 +597,13 @@ class SquadCoordinator:
                 bounded[name] = str(raw)[:2_000]
         return bounded
 
-    @staticmethod\n    def _nonnegative_int(value: Any) -> int:\n        if isinstance(value, bool):\n            return 0\n        if isinstance(value, int):\n            return max(0, value)\n        try:\n            return max(0, int(value))\n        except (TypeError, ValueError, OverflowError):\n            return 0
+    @staticmethod
+    def _nonnegative_int(value: Any) -> int:
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return max(0, value)
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError, OverflowError):
+            return 0
