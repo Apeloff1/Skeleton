@@ -1494,6 +1494,32 @@ class DurableFailoverCoordinator:
             self.source_id
         )
 
+    def verify_consensus_history_current(
+        self,
+        consensus_report: DurableReplicaConsensusReport | None = None,
+    ) -> StoredDurableReplicaConsensusEpoch | None:
+        """Verify live consensus against the existing monotonic history head.
+
+        An empty history is valid before the first ticket is issued; issue()
+        will create generation one. Once history exists, this method never
+        advances it and fails closed if the live consensus differs.
+        """
+        if self.consensus_history is None:
+            return None
+        current = self.consensus_history.current(
+            self.source_id
+        )
+        if current is None:
+            return None
+        report = (
+            consensus_report
+            if consensus_report is not None
+            else self._consensus_report()
+        )
+        return self._require_consensus_history(
+            report
+        )
+
     def _require_ticket_fleet(
         self,
         ticket: DurableFailoverTicket,
