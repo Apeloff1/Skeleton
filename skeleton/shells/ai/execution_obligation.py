@@ -1007,6 +1007,14 @@ class AIExecutionObligationStore:
                     "finalized obligation attempt authority mismatch"
                 )
             return current
+        if (
+            obligation.state is ExecutionObligationState.ATTEMPT_BOUND
+            and obligation.attempt_authority_digest == attempt.authority_digest
+            and obligation.attempt_state == attempt.state.value
+            and obligation.terminal_evidence_digest
+            == attempt.terminal_evidence_digest
+        ):
+            return current
         if obligation.state is ExecutionObligationState.RETIRED:
             raise ExecutionObligationConflict(
                 "retired obligation may not bind execution attempt"
@@ -1059,6 +1067,18 @@ class AIExecutionObligationStore:
         if obligation.state is ExecutionObligationState.RETIRED:
             raise ExecutionObligationConflict(
                 "retired obligation may not be finalized"
+            )
+        if obligation.state is ExecutionObligationState.FINALIZED:
+            digest = self._finalization_digest(finalization)
+            if (
+                obligation.finalization_id == finalization.finalization_id
+                and obligation.finalization_digest == digest
+                and obligation.attempt_authority_digest
+                == finalization.execution_attempt_authority_digest
+            ):
+                return current
+            raise ExecutionObligationConflict(
+                "execution obligation already finalized differently"
             )
         if obligation.state is ExecutionObligationState.REGISTERED:
             raise ExecutionObligationConflict(
@@ -1120,6 +1140,15 @@ class AIExecutionObligationStore:
         if obligation.state is ExecutionObligationState.FINALIZED:
             raise ExecutionObligationConflict(
                 "finalized obligation may not be retired"
+            )
+        if obligation.state is ExecutionObligationState.RETIRED:
+            if (
+                obligation.retirement_proof_digest == proof_digest
+                and obligation.retirement_reason == reason
+            ):
+                return current
+            raise ExecutionObligationConflict(
+                "execution obligation already retired differently"
             )
         updated = replace(
             obligation,
