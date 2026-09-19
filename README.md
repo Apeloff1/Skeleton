@@ -69,6 +69,12 @@ npc = LorebuffaNpcPipeline().run(
 
 The adapter reuses Skeleton's existing NPC verification and repair path instead of bypassing the control plane. Lorebuffa's game transport/UI/backend persistence code is intentionally not pulled into Skeleton's AI core.
 
+## Optional Java accelerators
+
+Skeleton remains Python-first, with opt-in Java 21 kernels for large observability/statistical batches, dense VectorStore top-K scoring, and finite-AABB physics broad phase. Small workloads and all accelerator failures stay on the existing Python paths.
+
+See `docs/java-accelerators.md` for enablement, bounds, failure semantics, deterministic parity rules, and the crossover benchmark.
+
 ## ARM64 / Ubuntu
 
 Skeleton is validated on native Ubuntu ARM64 (`aarch64`) in CI. The Python job installs the repository package from its declared metadata so the ARM run exercises the same runtime dependency contract as supported hosts. The Docker runtime paths use pinned multi-platform base images, and the ARM64 CI job compiles the full Skeleton package, runs focused regression tests, and builds all three application images natively.

@@ -40,6 +40,16 @@ LIVE_EXAMPLES = (
 
 
 class SourcePathInventoryTests(unittest.TestCase):
+    def test_java_accelerators_are_first_party_not_canonical(self) -> None:
+        self.assertEqual(
+            module.classify_path("java-accelerators/observability/AcceleratorMain.java"),
+            "first-party",
+        )
+        self.assertEqual(
+            module.classify_path("java-accelerators/vector/VectorSearchMain.java"),
+            "first-party",
+        )
+
     def test_closed_class_set_is_ordered_and_exclusive(self) -> None:
         self.assertEqual(
             policy.CLASSES,

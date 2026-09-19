@@ -122,9 +122,21 @@ def _needs_physical_pair(left: RigidBody, right: RigidBody) -> bool:
 
 
 class SweepAndPruneBroadPhase:
-    """Stable one-axis sweep with full-AABB rejection."""
+    """Stable one-axis sweep with optional JVM acceleration for large finite sets.
 
-    def __init__(self, *, max_pairs: int = 250_000) -> None:
+    Java is only allowed to compute finite-AABB candidate indices. Python keeps
+    body identity, plane handling, physical-pair policy, bounds, and final pair
+    construction. Any accelerator failure falls back to this class's original
+    Python sweep.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_pairs: int = 250_000,
+        use_jvm_acceleration: bool = False,
+        accelerator: object | None = None,
+    ) -> None:
         if (
             isinstance(max_pairs, bool)
             or not isinstance(max_pairs, int)
@@ -132,6 +144,14 @@ class SweepAndPruneBroadPhase:
         ):
             raise PhysicsValidationError("max_pairs outside supported range")
         self.max_pairs = max_pairs
+        self._use_jvm_acceleration = bool(use_jvm_acceleration)
+        self._accelerator = accelerator
+        self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+        }
 
     def _add_pair(self, pairs: set[BroadPhasePair], pair: BroadPhasePair) -> None:
         if pair in pairs:
@@ -140,42 +160,138 @@ class SweepAndPruneBroadPhase:
             raise PhysicsValidationError("broad-phase pair bound exceeded")
         pairs.add(pair)
 
-    def compute_pairs(self, bodies: tuple[RigidBody, ...]) -> tuple[BroadPhasePair, ...]:
-        finite: list[tuple[float, str, RigidBody, AABB]] = []
-        planes: list[RigidBody] = []
-
-        for body in sorted(bodies, key=lambda row: row.body_id):
-            bounds = body.shape.aabb(body.transform)
-            if bounds is None:
-                planes.append(body)
-            else:
-                finite.append((bounds.minimum.x, body.body_id, body, bounds))
-
-        finite.sort(key=lambda row: (row[0], row[1]))
+    def _compute_finite_pairs_python(
+        self,
+        finite: list[tuple[RigidBody, AABB]],
+        pairs: set[BroadPhasePair],
+    ) -> None:
+        ordered = [
+            (bounds.minimum.x, body.body_id, body, bounds)
+            for body, bounds in finite
+        ]
+        ordered.sort(key=lambda row: (row[0], row[1]))
         active: list[tuple[float, str, RigidBody, AABB]] = []
-        pairs: set[BroadPhasePair] = set()
 
-        for _, _, body, bounds in finite:
-            active = [row for row in active if row[0] + EPSILON >= bounds.minimum.x]
+        for _, _, body, bounds in ordered:
+            active = [
+                row
+                for row in active
+                if row[0] + EPSILON >= bounds.minimum.x
+            ]
             for _, _, other, other_bounds in active:
                 if not _needs_physical_pair(body, other):
                     continue
                 if bounds.overlaps(other_bounds):
                     left, right = _ordered_pair(body, other)
-                    self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
-            active.append((bounds.maximum.x, body.body_id, body, bounds))
+                    self._add_pair(
+                        pairs,
+                        BroadPhasePair(left.body_id, right.body_id),
+                    )
+            active.append(
+                (bounds.maximum.x, body.body_id, body, bounds)
+            )
             active.sort(key=lambda row: (row[0], row[1]))
 
-        for plane in sorted(planes, key=lambda row: row.body_id):
-            for body in sorted(bodies, key=lambda row: row.body_id):
-                if body.body_id == plane.body_id or isinstance(body.shape, PlaneShape):
+    def _resolve_accelerator(self) -> object:
+        if self._accelerator is None:
+            from .jvm_broadphase_accelerator import (
+                get_default_broadphase_accelerator,
+            )
+
+            self._accelerator = get_default_broadphase_accelerator()
+        return self._accelerator
+
+    def acceleration_stats(self) -> dict[str, int | bool]:
+        return {
+            "enabled": self._use_jvm_acceleration,
+            **self._acceleration,
+        }
+
+    def compute_pairs(
+        self,
+        bodies: tuple[RigidBody, ...],
+    ) -> tuple[BroadPhasePair, ...]:
+        ordered_bodies = tuple(sorted(bodies, key=lambda row: row.body_id))
+        finite: list[tuple[RigidBody, AABB]] = []
+        planes: list[RigidBody] = []
+
+        for body in ordered_bodies:
+            bounds = body.shape.aabb(body.transform)
+            if bounds is None:
+                planes.append(body)
+            else:
+                finite.append((body, bounds))
+
+        pairs: set[BroadPhasePair] = set()
+        accelerated_pairs: object | None = None
+
+        if self._use_jvm_acceleration and finite:
+            try:
+                accelerator = self._resolve_accelerator()
+                minimum = int(
+                    getattr(accelerator, "minimum_bodies", 1)
+                )
+                if len(finite) >= minimum:
+                    self._acceleration["attempts"] += 1
+                    accelerated_pairs = accelerator.compute_pairs(
+                        [
+                            (
+                                bounds,
+                                body.body_type is BodyType.DYNAMIC,
+                            )
+                            for body, bounds in finite
+                        ],
+                        max_pairs=self.max_pairs,
+                        epsilon=EPSILON,
+                    )
+                else:
+                    self._acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._acceleration["fallbacks"] += 1
+                accelerated_pairs = None
+
+        if accelerated_pairs is None:
+            self._compute_finite_pairs_python(finite, pairs)
+        else:
+            try:
+                for index_pair in accelerated_pairs:
+                    left_body = finite[index_pair.left][0]
+                    right_body = finite[index_pair.right][0]
+                    left, right = _ordered_pair(left_body, right_body)
+                    self._add_pair(
+                        pairs,
+                        BroadPhasePair(left.body_id, right.body_id),
+                    )
+            except (AttributeError, IndexError, TypeError) as exc:
+                # An injected/custom accelerator may violate the bridge
+                # contract. Discard partial candidates and recompute in Python.
+                pairs.clear()
+                self._acceleration["fallbacks"] += 1
+                self._compute_finite_pairs_python(finite, pairs)
+            else:
+                self._acceleration["successes"] += 1
+
+        # Infinite planes are intentionally kept in Python. Their candidate
+        # semantics are domain-specific ("plane against every non-plane body")
+        # rather than a finite-AABB numeric kernel.
+        for plane in planes:
+            for body in ordered_bodies:
+                if (
+                    body.body_id == plane.body_id
+                    or isinstance(body.shape, PlaneShape)
+                ):
                     continue
                 if not _needs_physical_pair(plane, body):
                     continue
                 left, right = _ordered_pair(plane, body)
-                self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
+                self._add_pair(
+                    pairs,
+                    BroadPhasePair(left.body_id, right.body_id),
+                )
 
-        return tuple(sorted(pairs, key=lambda row: (row.body_a, row.body_b)))
+        return tuple(
+            sorted(pairs, key=lambda row: (row.body_a, row.body_b))
+        )
 
 
 def _contact_material(a: RigidBody, b: RigidBody) -> ContactMaterial:
