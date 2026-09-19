@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -10,7 +11,9 @@ from skeleton.artifact_plane.cards import plane_card
 
 PLANES = ("organism", "social", "galaxy")
 SCORES = frozenset({"KEEP", "SHIM", "FOLD", "QUARANTINE"})
-LEDGER_REL = Path("docs/lineage/plane_audit.jsonl")
+LEDGER_JSONL = Path("docs/lineage/plane_audit.jsonl")
+LEDGER_MD = Path("docs/lineage/plane_audit.md")
+_MD_ROW = re.compile(r"- `([^`]+)` (KEEP|SHIM|FOLD|QUARANTINE)")
 
 
 def _iter_plane_files(root: Path) -> list[Path]:
@@ -27,21 +30,45 @@ def _iter_plane_files(root: Path) -> list[Path]:
     return sorted(found)
 
 
+def _rows_from_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rows.append(json.loads(line))
+    return rows
+
+
+def _rows_from_md(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for match in _MD_ROW.finditer(path.read_text(encoding="utf-8")):
+        file_path = match.group(1)
+        parts = file_path.split("/")
+        plane = parts[1] if len(parts) > 1 else "unknown"
+        rows.append(
+            {
+                "plane": plane,
+                "path": file_path,
+                "score": match.group(2),
+                "stored_prose": 0,
+            }
+        )
+    return rows
+
+
 class PlaneAudit:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
-        self.ledger_path = self.root / LEDGER_REL
+        self.ledger_path = self.root / LEDGER_JSONL
+        self.markdown_path = self.root / LEDGER_MD
 
     def load_ledger(self) -> list[dict[str, Any]]:
-        if not self.ledger_path.is_file():
-            return []
-        rows: list[dict[str, Any]] = []
-        for line in self.ledger_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-        return rows
+        if self.ledger_path.is_file():
+            return _rows_from_jsonl(self.ledger_path)
+        if self.markdown_path.is_file():
+            return _rows_from_md(self.markdown_path)
+        return []
 
     def audit(self) -> dict[str, Any]:
         rows = self.load_ledger()
@@ -62,6 +89,7 @@ class PlaneAudit:
         counts: dict[str, int] = {}
         for r in rows:
             counts[str(r.get("score"))] = counts.get(str(r.get("score")), 0) + 1
+        present = self.ledger_path.is_file() or self.markdown_path.is_file()
         return plane_card(
             kind="plane-audit",
             hit=hit,
@@ -74,7 +102,7 @@ class PlaneAudit:
                 "missing_fields": missing_fields,
                 "prose": prose,
                 "unscored_on_disk": missing_on_disk,
-                "ledger_present": self.ledger_path.is_file(),
+                "ledger_present": present,
             },
         )
 
