@@ -53,3 +53,26 @@ def test_repo_bots_workflow_keeps_matrix_context_at_step_scope():
     )
     assert f"\n    {matrix_guard}\n" not in source
     assert source.count(f"\n        {matrix_guard}\n") == 3
+
+
+def test_repo_bots_job_keeps_only_required_read_signal_scopes() -> None:
+    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "repo-bots.yml"
+    source = workflow.read_text(encoding="utf-8")
+
+    assert "permissions:\n  contents: read\n" in source
+    assert (
+        "  bot:\n"
+        "    permissions:\n"
+        "      actions: read\n"
+        "      contents: write\n"
+        "      issues: read\n"
+        "      pull-requests: write\n"
+    ) in source
+
+    # triage reads Issues and ci reads Actions. These reads must remain
+    # available after write scopes are narrowed to the bot job.
+    from skeleton.automation import repo_bots
+
+    text = Path(repo_bots.__file__).read_text(encoding="utf-8")
+    assert "/issues?state=open" in text
+    assert "/actions/runs?per_page=20" in text
