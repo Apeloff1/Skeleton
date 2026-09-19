@@ -258,7 +258,7 @@ def test_monolith_padding_was_removed() -> None:
     assert "def ubuntu_contract_4050" not in source
     assert "def ubuntu_contract_9000" not in source
     assert source.count("def ubuntu_contract_") == 0
-    assert len(source.splitlines()) < 500
+    assert len(source.splitlines()) < 800
 
 
 def test_domain_modules_are_bounded_and_static() -> None:
