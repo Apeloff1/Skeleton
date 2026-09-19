@@ -81,6 +81,9 @@ class DurablePruningAuthorization:
     current_root: str
     cutoff_sequence: int
     cutoff_root: str
+    previous_floor_sequence: int
+    previous_floor_root: str
+    delete_count: int
     archive_id: str
     archive_manifest_digest: str
     protected_roots_digest: str
@@ -103,6 +106,7 @@ class DurablePruningAuthorization:
             "compaction_policy_digest",
             "current_root",
             "cutoff_root",
+            "previous_floor_root",
             "archive_manifest_digest",
             "protected_roots_digest",
         ):
@@ -134,6 +138,8 @@ class DurablePruningAuthorization:
         for name in (
             "current_sequence",
             "cutoff_sequence",
+            "previous_floor_sequence",
+            "delete_count",
             "max_delete_items",
         ):
             value = getattr(self, name)
@@ -149,9 +155,27 @@ class DurablePruningAuthorization:
             raise ValueError(
                 "pruning cutoff exceeds authorized head"
             )
-        if self.cutoff_sequence > self.max_delete_items:
+        if self.previous_floor_sequence >= self.cutoff_sequence:
             raise ValueError(
-                "pruning cutoff exceeds authorization delete bound"
+                "pruning authorization must advance previous floor"
+            )
+        if self.delete_count != (
+            self.cutoff_sequence
+            - self.previous_floor_sequence
+        ):
+            raise ValueError(
+                "delete_count differs from authorized floor interval"
+            )
+        if self.delete_count > self.max_delete_items:
+            raise ValueError(
+                "pruning interval exceeds authorization delete bound"
+            )
+        if (
+            self.previous_floor_sequence == 0
+            and self.previous_floor_root != "0" * 64
+        ):
+            raise ValueError(
+                "genesis previous floor must use genesis root"
             )
         for name in (
             "issued_at",
@@ -189,6 +213,9 @@ class DurablePruningAuthorization:
         current_root: str,
         cutoff_sequence: int,
         cutoff_root: str,
+        previous_floor_sequence: int,
+        previous_floor_root: str,
+        delete_count: int,
         archive_id: str,
         archive_manifest_digest: str,
         protected_roots_digest: str,
@@ -208,6 +235,9 @@ class DurablePruningAuthorization:
             "current_root": current_root,
             "cutoff_sequence": cutoff_sequence,
             "cutoff_root": cutoff_root,
+            "previous_floor_sequence": previous_floor_sequence,
+            "previous_floor_root": previous_floor_root,
+            "delete_count": delete_count,
             "archive_id": archive_id,
             "archive_manifest_digest": archive_manifest_digest,
             "protected_roots_digest": protected_roots_digest,
@@ -242,6 +272,9 @@ class DurablePruningAuthorization:
             "current_root": self.current_root,
             "cutoff_sequence": self.cutoff_sequence,
             "cutoff_root": self.cutoff_root,
+            "previous_floor_sequence": self.previous_floor_sequence,
+            "previous_floor_root": self.previous_floor_root,
+            "delete_count": self.delete_count,
             "archive_id": self.archive_id,
             "archive_manifest_digest": self.archive_manifest_digest,
             "protected_roots_digest": self.protected_roots_digest,
@@ -552,6 +585,9 @@ class DurablePruningAuthorizationStore:
             str(auth_raw["current_root"]),
             int(auth_raw["cutoff_sequence"]),
             str(auth_raw["cutoff_root"]),
+            int(auth_raw["previous_floor_sequence"]),
+            str(auth_raw["previous_floor_root"]),
+            int(auth_raw["delete_count"]),
             str(auth_raw["archive_id"]),
             str(auth_raw["archive_manifest_digest"]),
             str(auth_raw["protected_roots_digest"]),
@@ -770,9 +806,46 @@ class DurablePruningAuthorizationStore:
             raise ValueError(
                 "max_delete_items outside supported range"
             )
-        if cert.cutoff_sequence > limit:
+        floor_method = getattr(
+            chain,
+            "hot_floor",
+            None,
+        )
+        if callable(floor_method):
+            floor = floor_method()
+            active_method = getattr(
+                chain,
+                "_hot_floor_active",
+                None,
+            )
+            if (
+                floor.sequence > 0
+                and callable(active_method)
+                and not active_method(floor)
+            ):
+                raise DurablePruningAuthorizationError(
+                    "existing hot floor is not active; prior pruning must be resolved"
+                )
+            previous_floor_sequence = int(
+                floor.sequence
+            )
+            previous_floor_root = str(
+                floor.root_hash
+            )
+        else:
+            previous_floor_sequence = 0
+            previous_floor_root = "0" * 64
+        delete_count = (
+            cert.cutoff_sequence
+            - previous_floor_sequence
+        )
+        if delete_count <= 0:
             raise DurablePruningAuthorizationError(
-                "compaction cutoff exceeds requested delete bound"
+                "compaction cutoff does not advance current hot floor"
+            )
+        if delete_count > limit:
+            raise DurablePruningAuthorizationError(
+                "compaction interval exceeds requested delete bound"
             )
 
         ttl = (
@@ -832,6 +905,13 @@ class DurablePruningAuthorizationStore:
                 current_root=cert.current_root,
                 cutoff_sequence=cert.cutoff_sequence,
                 cutoff_root=cert.cutoff_root,
+                previous_floor_sequence=(
+                    previous_floor_sequence
+                ),
+                previous_floor_root=(
+                    previous_floor_root
+                ),
+                delete_count=delete_count,
                 archive_id=cert.archive_id,
                 archive_manifest_digest=(
                     cert.archive_manifest_digest
@@ -858,6 +938,9 @@ class DurablePruningAuthorizationStore:
             cert.current_root,
             cert.cutoff_sequence,
             cert.cutoff_root,
+            previous_floor_sequence,
+            previous_floor_root,
+            delete_count,
             cert.archive_id,
             cert.archive_manifest_digest,
             protected_digest,
@@ -980,6 +1063,26 @@ class DurablePruningAuthorizationStore:
                     == auth.cutoff_sequence
                     and cert.cutoff_root
                     == auth.cutoff_root
+                    and (
+                        not callable(
+                            getattr(
+                                chain,
+                                "hot_floor",
+                                None,
+                            )
+                        )
+                        or (
+                            chain.hot_floor().sequence
+                            == auth.previous_floor_sequence
+                            and chain.hot_floor().root_hash
+                            == auth.previous_floor_root
+                        )
+                    )
+                    and auth.delete_count
+                    == (
+                        auth.cutoff_sequence
+                        - auth.previous_floor_sequence
+                    )
                     and cert.archive_id
                     == auth.archive_id
                     and cert.archive_manifest_digest
