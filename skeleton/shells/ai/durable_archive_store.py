@@ -1600,6 +1600,222 @@ class DurableArchiveRepository:
             )
         return nodes
 
+    def sequence_for_root(
+        self,
+        chain_id: str,
+        root_hash: str,
+    ) -> int:
+        _identity("chain_id", chain_id, maximum=128)
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return 0
+        resolution = self.resolve_root(
+            chain_id,
+            root_hash,
+        )
+        return resolution.sequence
+
+    def snapshot_segment(
+        self,
+        chain_id: str,
+        start_exclusive_root: str,
+        end_inclusive_root: str,
+        *,
+        max_items: int = 4096,
+    ) -> tuple[object, ...]:
+        """Verify and load only one bounded archived chain segment."""
+        _identity("chain_id", chain_id, maximum=128)
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        start_exclusive_root = _digest(
+            "start_exclusive_root",
+            start_exclusive_root,
+        )
+        end_inclusive_root = _digest(
+            "end_inclusive_root",
+            end_inclusive_root,
+        )
+        if (
+            start_exclusive_root
+            == end_inclusive_root
+        ):
+            return ()
+        if end_inclusive_root == GENESIS_HASH:
+            raise DurableArchiveStoreError(
+                "archive segment end precedes non-genesis start"
+            )
+
+        index = self.root_index(
+            chain_id,
+            end_inclusive_root,
+        )
+        if index is None:
+            raise DurableArchiveStoreError(
+                "archive segment end root is not indexed"
+            )
+
+        failures: list[str] = []
+        for replica in index.replicas:
+            try:
+                stored = self.get(
+                    replica.archive_id
+                )
+                if stored is None:
+                    raise DurableArchiveStoreError(
+                        "archive segment replica is missing"
+                    )
+                manifest = stored.manifest.manifest
+                if manifest.chain_id != chain_id:
+                    raise DurableArchiveStoreError(
+                        "archive segment chain mismatch"
+                    )
+                if (
+                    manifest.digest
+                    != replica.archive_manifest_digest
+                ):
+                    raise DurableArchiveStoreError(
+                        "archive segment replica manifest mismatch"
+                    )
+
+                try:
+                    end_position = (
+                        stored.node_hashes.index(
+                            end_inclusive_root
+                        )
+                        + 1
+                    )
+                except ValueError as exc:
+                    raise DurableArchiveStoreError(
+                        "archive segment end root is absent from replica"
+                    ) from exc
+
+                if start_exclusive_root == GENESIS_HASH:
+                    start_position = 0
+                else:
+                    try:
+                        start_position = (
+                            stored.node_hashes.index(
+                                start_exclusive_root,
+                                0,
+                                end_position,
+                            )
+                            + 1
+                        )
+                    except ValueError as exc:
+                        raise DurableArchiveStoreError(
+                            "archive segment start root is not an ancestor "
+                            "inside replica"
+                        ) from exc
+
+                if end_position < start_position:
+                    raise DurableArchiveStoreError(
+                        "archive segment end precedes start"
+                    )
+                distance = (
+                    end_position - start_position
+                )
+                if distance > max_items:
+                    raise DurableArchiveStoreError(
+                        "archive segment exceeds bounded verification window"
+                    )
+                if distance == 0:
+                    raise DurableArchiveStoreError(
+                        "archive segment roots differ at equal position"
+                    )
+
+                hashes = stored.node_hashes[
+                    start_position:end_position
+                ]
+                signed_entries = manifest.entries[
+                    start_position:end_position
+                ]
+                if (
+                    len(hashes) != distance
+                    or len(signed_entries) != distance
+                ):
+                    raise DurableArchiveStoreError(
+                        "archive segment metadata length mismatch"
+                    )
+
+                nodes: list[object] = []
+                previous = start_exclusive_root
+                expected_sequence = start_position + 1
+                for (
+                    node_hash,
+                    signed_entry,
+                ) in zip(
+                    hashes,
+                    signed_entries,
+                    strict=True,
+                ):
+                    node = self.get_node(
+                        chain_id,
+                        node_hash,
+                    )
+                    encoded = self._encode_node(
+                        chain_id,
+                        node,
+                    )
+                    if (
+                        encoded.sequence
+                        != expected_sequence
+                        or encoded.previous_hash
+                        != previous
+                        or encoded.node_hash
+                        != node_hash
+                    ):
+                        raise DurableArchiveStoreError(
+                            "archive segment native linkage mismatch"
+                        )
+                    kind = (
+                        str(
+                            encoded.payload.get(
+                                "kind",
+                                "execution.receipt",
+                            )
+                        )
+                        if encoded.node_type
+                        is not DurableArchivedNodeType.EXECUTION_RECEIPT
+                        else "execution.receipt"
+                    )
+                    actual_entry = DurableArchiveEntry(
+                        encoded.sequence,
+                        encoded.previous_hash,
+                        encoded.node_hash,
+                        kind,
+                        encoded.object_digest,
+                    )
+                    if actual_entry != signed_entry:
+                        raise DurableArchiveStoreError(
+                            "archive segment node differs from signed manifest"
+                        )
+                    nodes.append(node)
+                    previous = encoded.node_hash
+                    expected_sequence += 1
+
+                if previous != end_inclusive_root:
+                    raise DurableArchiveStoreError(
+                        "archive segment terminal root mismatch"
+                    )
+                return tuple(nodes)
+            except Exception as exc:
+                failures.append(
+                    f"{replica.archive_id}:"
+                    f"{type(exc).__name__}"
+                )
+
+        raise DurableArchiveStoreError(
+            "all archive replicas failed bounded segment resolution: "
+            + ",".join(failures)
+        )
+
     def verify_root(
         self,
         chain_id: str,
@@ -1813,6 +2029,90 @@ class ArchiveBackedHistoricalChain:
                     f"{type(live_error).__name__}/"
                     f"{type(archive_error).__name__}"
                 ) from archive_error
+
+    def sequence_for_root(
+        self,
+        root_hash: str,
+    ) -> int:
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
+        if root_hash == GENESIS_HASH:
+            return 0
+        live_sequence = getattr(
+            self.live_chain,
+            "sequence_for_root",
+            None,
+        )
+        if callable(live_sequence):
+            try:
+                return int(
+                    live_sequence(root_hash)
+                )
+            except Exception:
+                pass
+        return self.archives.sequence_for_root(
+            self.chain_id,
+            root_hash,
+        )
+
+    def snapshot_segment(
+        self,
+        start_exclusive_root: str,
+        end_inclusive_root: str = "",
+        *,
+        max_items: int = 4096,
+    ):
+        """Resolve a bounded segment from live storage or verified archive."""
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError(
+                "max_items must be positive integer"
+            )
+        start_exclusive_root = _digest(
+            "start_exclusive_root",
+            start_exclusive_root,
+        )
+        end_inclusive_root = _digest(
+            "end_inclusive_root",
+            end_inclusive_root
+            or self.root_hash(),
+        )
+
+        live_segment = getattr(
+            self.live_chain,
+            "snapshot_segment",
+            None,
+        )
+        live_error: Exception | None = None
+        if callable(live_segment):
+            try:
+                return live_segment(
+                    start_exclusive_root,
+                    end_inclusive_root,
+                    max_items=max_items,
+                )
+            except Exception as exc:
+                live_error = exc
+
+        try:
+            return self.archives.snapshot_segment(
+                self.chain_id,
+                start_exclusive_root,
+                end_inclusive_root,
+                max_items=max_items,
+            )
+        except Exception as archive_error:
+            raise DurableArchiveStoreError(
+                "bounded historical segment unavailable from live chain "
+                "and archive: "
+                f"{type(live_error).__name__ if live_error else 'unsupported'}/"
+                f"{type(archive_error).__name__}"
+            ) from archive_error
 
     def verify_root(
         self,
