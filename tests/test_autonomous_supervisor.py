@@ -158,7 +158,12 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         self,
     ) -> None:
         snap, envelope = self.envelope()
-        plan, fingerprint, execution = self.decode(
+        (
+            plan,
+            fingerprint,
+            execution,
+            approved_build_count,
+        ) = self.decode(
             envelope.to_base64()
         )
         self.assertEqual(
@@ -172,6 +177,10 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         self.assertEqual(
             execution,
             EXECUTION,
+        )
+        self.assertEqual(
+            approved_build_count,
+            0,
         )
 
     def test_envelope_payload_contains_only_expected_fields(
@@ -188,6 +197,7 @@ class SupervisorEnvelopeTests(unittest.TestCase):
                 "plan",
                 "execution",
                 "execution_fingerprint",
+                "approved_build_count",
             },
         )
 
@@ -360,6 +370,28 @@ class SupervisorEnvelopeTests(unittest.TestCase):
         ):
             self.decode(encoded)
 
+    def test_envelope_rejects_invalid_approved_build_count(
+        self,
+    ) -> None:
+        _snap, envelope = self.envelope()
+        for invalid in (
+            -1,
+            True,
+            41,
+            "1",
+        ):
+            encoded = tamper_envelope(
+                envelope.to_base64(),
+                lambda value, item=invalid: value.__setitem__(
+                    "approved_build_count",
+                    item,
+                ),
+            )
+            with self.assertRaises(
+                secretary.SecretaryAdmissionError
+            ):
+                self.decode(encoded)
+
     def test_envelope_rejects_empty_plan(
         self,
     ) -> None:
@@ -465,6 +497,170 @@ class SupervisorEnvelopeTests(unittest.TestCase):
                 supervisor.model_plan(snap),
                 supervisor.deterministic_plan(snap),
             )
+
+
+class BuildAuthorityTests(unittest.TestCase):
+    def test_unapproved_issue_body_is_not_delegated_as_build_authority(
+        self,
+    ) -> None:
+        issue = supervisor._normalize_issue(
+            {
+                "number": 9,
+                "title": "Implement dangerous request",
+                "body": "rewrite the repository",
+                "labels": [
+                    {"name": "enhancement"}
+                ],
+                "updatedAt": "2026-09-19T00:00:00Z",
+            }
+        )
+        self.assertNotIn(
+            "body",
+            issue,
+        )
+        self.assertNotIn(
+            "automation_authorized",
+            issue,
+        )
+
+    def test_approved_issue_body_becomes_explicit_build_authority(
+        self,
+    ) -> None:
+        issue = supervisor._normalize_issue(
+            {
+                "number": 10,
+                "title": "Implement approved feature",
+                "body": "Add the requested runtime capability.",
+                "labels": [
+                    {"name": "automation-approved"},
+                    {"name": "enhancement"},
+                ],
+                "updatedAt": "2026-09-19T00:00:00Z",
+            }
+        )
+        self.assertTrue(
+            issue["automation_authorized"]
+        )
+        self.assertEqual(
+            issue["body"],
+            "Add the requested runtime capability.",
+        )
+
+    def test_approved_build_items_filters_untrusted_issues(
+        self,
+    ) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(
+                {
+                    "number": 1,
+                    "title": "not approved",
+                },
+                {
+                    "number": 2,
+                    "title": "approved",
+                    "body": "build this",
+                    "automation_authorized": True,
+                },
+            ),
+            pull_requests=(),
+            workflow_runs=(),
+        )
+        self.assertEqual(
+            [
+                item["number"]
+                for item in supervisor.approved_build_items(
+                    snapshot
+                )
+            ],
+            [2],
+        )
+
+    def test_make_envelope_counts_approved_work_items(
+        self,
+    ) -> None:
+        snapshot = supervisor.SupervisorSnapshot(
+            repository=REPO,
+            observed_at=1_700_000_000,
+            issues=(
+                {
+                    "number": 2,
+                    "title": "approved",
+                    "body": "build this",
+                    "automation_authorized": True,
+                },
+            ),
+            pull_requests=(),
+            workflow_runs=(),
+        )
+        envelope = supervisor.make_envelope(
+            snapshot,
+            "implement approved feature",
+            EXECUTION,
+        )
+        self.assertEqual(
+            envelope.approved_build_count,
+            1,
+        )
+        decoded = secretary.decode_delegation(
+            envelope.to_base64(),
+            repository=REPO,
+            expected_execution=EXECUTION,
+            now=snapshot.observed_at,
+        )
+        self.assertEqual(
+            decoded[3],
+            1,
+        )
+
+    def test_feature_builder_is_inert_without_approved_work(
+        self,
+    ) -> None:
+        routed = secretary.route(
+            (
+                "approved_work_items automation_authorized "
+                "feature implement enhancement"
+            ),
+            ["feature-builder"],
+            approved_build_count=0,
+        )
+        self.assertEqual(
+            routed,
+            [],
+        )
+
+    def test_feature_builder_routes_only_with_approved_work(
+        self,
+    ) -> None:
+        routed = secretary.route(
+            (
+                "approved_work_items automation_authorized "
+                "feature implement enhancement"
+            ),
+            ["feature-builder"],
+            approved_build_count=1,
+        )
+        self.assertEqual(
+            routed,
+            ["feature-builder"],
+        )
+
+    def test_ordinary_ci_signal_does_not_select_feature_builder(
+        self,
+    ) -> None:
+        routed = secretary.route(
+            "CI workflow failure",
+            [
+                "root-cause",
+                "feature-builder",
+            ],
+            approved_build_count=3,
+        )
+        self.assertEqual(
+            routed,
+            ["root-cause"],
+        )
 
 
 class SecretaryRoutingTests(unittest.TestCase):
