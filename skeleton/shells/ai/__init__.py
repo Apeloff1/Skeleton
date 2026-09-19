@@ -1,5 +1,57 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_consistency_barrier import (
+    DurableConsistencyBarrier,
+    DurableConsistencyBarrierConflict,
+    DurableConsistencyBarrierCoordinator,
+    DurableConsistencyBarrierCorruption,
+    DurableConsistencyBarrierHead,
+    DurableConsistencyBarrierMember,
+    DurableConsistencyBarrierPolicy,
+    DurableConsistencyBarrierPublication,
+    DurableConsistencyBarrierState,
+    DurableConsistencyBarrierStore,
+    DurableConsistencyBarrierUnstable,
+    SignedDurableConsistencyBarrier,
+    StoredDurableConsistencyBarrier,
+)
+from skeleton.shells.ai.durable_backup_manifest import (
+    DurableBackupChainManifest,
+    DurableBackupManifest,
+    DurableBackupManifestBuilder,
+    DurableBackupManifestConflict,
+    DurableBackupManifestCorruption,
+    DurableBackupManifestHead,
+    DurableBackupManifestPolicy,
+    DurableBackupManifestPublication,
+    DurableBackupManifestStore,
+    SignedDurableBackupManifest,
+    StoredDurableBackupManifest,
+)
+from skeleton.shells.ai.durable_restore_validation import (
+    DurableRestoreChainReport,
+    DurableRestoreChainState,
+    DurableRestoreFinding,
+    DurableRestoreMode,
+    DurableRestorePolicy,
+    DurableRestoreReport,
+    DurableRestoreState,
+    DurableRestoreValidationError,
+    DurableRestoreVerifier,
+)
+from skeleton.shells.ai.durable_recovery_drill import (
+    DurableRecoveryDrill,
+    DurableRecoveryDrillConflict,
+    DurableRecoveryDrillCorruption,
+    DurableRecoveryDrillHead,
+    DurableRecoveryDrillMember,
+    DurableRecoveryDrillOperator,
+    DurableRecoveryDrillPolicy,
+    DurableRecoveryDrillStore,
+    SignedDurableRecoveryDrill,
+    StoredDurableRecoveryDrill,
+)
+
 from skeleton.shells.ai.durable_receipt_inclusion import (
     DurableReceiptInclusion,
     DurableReceiptInclusionAuthority,
