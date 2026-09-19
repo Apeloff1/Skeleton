@@ -45,6 +45,14 @@ from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceStore,
     SignedDurableMaintenanceEpoch,
 )
+from skeleton.shells.ai.durable_destruction import (
+    DurableDestructionConflict,
+    DurableDestructionItem,
+    DurableDestructionItemState,
+    DurableDestructionKind,
+    DurableDestructionLedger,
+    SignedDurableDestructionRecord,
+)
 from skeleton.shells.ai.durable_hot_floor import (
     DurableHotFloorError,
     DurableHotFloorStore,
@@ -531,6 +539,8 @@ class DurablePruningResult:
     manifest: DurablePruningManifest
     floor: SignedDurableHotFloor
     live_verified: bool
+    destruction_record_id: str = ""
+    destruction_record_digest: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -561,6 +571,25 @@ class DurablePruningResult:
             raise ValueError(
                 "live_verified must be bool"
             )
+        for name in (
+            "destruction_record_id",
+            "destruction_record_digest",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _digest(
+                    name,
+                    getattr(self, name),
+                    optional=True,
+                ),
+            )
+        if bool(self.destruction_record_id) != bool(
+            self.destruction_record_digest
+        ):
+            raise ValueError(
+                "destruction record id/digest must be paired"
+            )
 
     @property
     def ok(self) -> bool:
@@ -576,6 +605,12 @@ class DurablePruningResult:
             "manifest": self.manifest.to_dict(),
             "floor": self.floor.to_dict(),
             "live_verified": self.live_verified,
+            "destruction_record_id": (
+                self.destruction_record_id
+            ),
+            "destruction_record_digest": (
+                self.destruction_record_digest
+            ),
         }
 
 
@@ -700,6 +735,7 @@ class DurablePruningExecutor:
         hot_floors: DurableHotFloorStore,
         *,
         maintenance: DurableMaintenanceStore | None = None,
+        destruction_ledger: DurableDestructionLedger | None = None,
         namespace: str = "shell-ai-durable-pruning-operations",
         lease_ttl_seconds: float = 60.0,
         max_items: int = 100_000,
@@ -773,6 +809,16 @@ class DurablePruningExecutor:
             raise TypeError(
                 "maintenance must be DurableMaintenanceStore"
             )
+        if (
+            destruction_ledger is not None
+            and not isinstance(
+                destruction_ledger,
+                DurableDestructionLedger,
+            )
+        ):
+            raise TypeError(
+                "destruction_ledger must be DurableDestructionLedger"
+            )
         self.backend = backend
         self.authorizations = authorizations
         self.hot_floors = hot_floors
@@ -799,6 +845,7 @@ class DurablePruningExecutor:
             )
         self.archives = archives
         self.maintenance = maintenance
+        self.destruction_ledger = destruction_ledger
         self.namespace = namespace
         self.lease_ttl_seconds = float(
             lease_ttl_seconds
@@ -1847,6 +1894,264 @@ class DurablePruningExecutor:
                         "receipt index appeared after pruning manifest creation"
                     )
 
+    @staticmethod
+    def _destruction_index_hash(
+        *,
+        item_kind: str,
+        backend_key: str,
+        expected_revision: int,
+        node_hash: str,
+    ) -> str:
+        raw = json.dumps(
+            {
+                "item_kind": item_kind,
+                "backend_key": backend_key,
+                "expected_revision": expected_revision,
+                "node_hash": node_hash,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def _destruction_items(
+        self,
+        manifest: DurablePruningManifest,
+        chain: object,
+    ) -> tuple[DurableDestructionItem, ...]:
+        namespace = str(
+            getattr(chain, "namespace", "")
+        )
+        _identity(
+            "chain namespace",
+            namespace,
+            maximum=256,
+        )
+        result: list[DurableDestructionItem] = []
+        for item in manifest.items:
+            result.append(
+                DurableDestructionItem(
+                    item.kind.value,
+                    namespace,
+                    item.node_key,
+                    item.node_hash,
+                    DurableDestructionItemState.DELETED,
+                    item.node_revision,
+                    item.sequence,
+                    item.receipt_id,
+                    True,
+                )
+            )
+            if item.sequence_revision is not None:
+                result.append(
+                    DurableDestructionItem(
+                        (
+                            "journal_sequence_index"
+                            if item.kind
+                            is DurablePruningItemKind.JOURNAL_EVENT
+                            else "receipt_sequence_index"
+                        ),
+                        namespace,
+                        item.sequence_key,
+                        self._destruction_index_hash(
+                            item_kind="sequence_index",
+                            backend_key=item.sequence_key,
+                            expected_revision=item.sequence_revision,
+                            node_hash=item.node_hash,
+                        ),
+                        DurableDestructionItemState.DELETED,
+                        item.sequence_revision,
+                        item.sequence,
+                        item.receipt_id,
+                        True,
+                    )
+                )
+            if (
+                item.kind
+                is DurablePruningItemKind.RECEIPT_NODE
+                and item.receipt_index_revision
+                is not None
+            ):
+                result.append(
+                    DurableDestructionItem(
+                        "receipt_id_index",
+                        namespace,
+                        item.receipt_index_key,
+                        self._destruction_index_hash(
+                            item_kind="receipt_id_index",
+                            backend_key=item.receipt_index_key,
+                            expected_revision=item.receipt_index_revision,
+                            node_hash=item.node_hash,
+                        ),
+                        DurableDestructionItemState.DELETED,
+                        item.receipt_index_revision,
+                        item.sequence,
+                        item.receipt_id,
+                        True,
+                    )
+                )
+        return tuple(result)
+
+    @staticmethod
+    def _destruction_verify_digest(
+        *,
+        operation: DurablePruningOperation,
+        manifest: DurablePruningManifest,
+        floor: SignedDurableHotFloor,
+        archive_guard: DurablePruningArchiveRecovery,
+        head_sequence: int,
+        head_root: str,
+        live_verified: bool,
+    ) -> str:
+        raw = json.dumps(
+            {
+                "operation": operation.to_dict(),
+                "manifest_digest": manifest.digest,
+                "floor_id": floor.floor_id,
+                "archive_recovery": archive_guard.to_dict(),
+                "head_sequence": head_sequence,
+                "head_root": head_root,
+                "live_verified": live_verified,
+                "authority": "pruning-post-delete-verification",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def _record_destruction(
+        self,
+        *,
+        authorization: SignedDurablePruningAuthorization,
+        operation: DurablePruningOperation,
+        manifest: DurablePruningManifest,
+        floor: SignedDurableHotFloor,
+        archive_guard: DurablePruningArchiveRecovery,
+        chain: object,
+        live_verified: bool,
+    ) -> SignedDurableDestructionRecord | None:
+        if self.destruction_ledger is None:
+            return None
+        auth = authorization.authorization
+        expected_items = self._destruction_items(
+            manifest,
+            chain,
+        )
+        existing = self.destruction_ledger.find_operation(
+            manifest.chain_id,
+            DurableDestructionKind.PRUNING,
+            manifest.operation_id,
+        )
+        if existing is not None:
+            record = existing.record
+            if (
+                record.authority_id != auth.authorization_id
+                or record.authority_digest != auth.digest
+                or record.manifest_digest != manifest.digest
+                or record.archive_id != manifest.archive_id
+                or record.archive_manifest_digest
+                != manifest.archive_manifest_digest
+                or tuple(
+                    item.digest
+                    for item in record.items
+                )
+                != tuple(
+                    item.digest
+                    for item in expected_items
+                )
+            ):
+                raise DurablePruningManualReview(
+                    "stored destruction evidence differs from pruning authority"
+                )
+            return existing
+
+        head = chain.head()
+        after_floor = chain.hot_floor()
+        post_verify_digest = self._destruction_verify_digest(
+            operation=operation,
+            manifest=manifest,
+            floor=floor,
+            archive_guard=archive_guard,
+            head_sequence=int(head.sequence),
+            head_root=str(head.root_hash),
+            live_verified=live_verified,
+        )
+        try:
+            return self.destruction_ledger.append(
+                chain_id=manifest.chain_id,
+                operation_kind=DurableDestructionKind.PRUNING,
+                operation_id=manifest.operation_id,
+                authority_id=auth.authorization_id,
+                authority_digest=auth.digest,
+                manifest_digest=manifest.digest,
+                before_sequence=manifest.current_sequence,
+                before_root=manifest.current_root,
+                before_floor_sequence=(
+                    manifest.previous_floor_sequence
+                ),
+                before_floor_root=(
+                    manifest.previous_floor_root
+                ),
+                after_sequence=int(head.sequence),
+                after_root=str(head.root_hash),
+                after_floor_sequence=int(
+                    after_floor.sequence
+                ),
+                after_floor_root=str(
+                    after_floor.root_hash
+                ),
+                items=expected_items,
+                archive_id=manifest.archive_id,
+                archive_manifest_digest=(
+                    manifest.archive_manifest_digest
+                ),
+                post_verify_digest=post_verify_digest,
+                post_verified=live_verified,
+                fencing_token=operation.fencing_token,
+                completed_at=operation.updated_at,
+            )
+        except DurableDestructionConflict as exc:
+            raise DurablePruningManualReview(
+                "destruction evidence conflicted with committed pruning record"
+            ) from exc
+
+    def _result(
+        self,
+        *,
+        authorization: SignedDurablePruningAuthorization,
+        operation: DurablePruningOperation,
+        manifest: DurablePruningManifest,
+        floor: SignedDurableHotFloor,
+        archive_guard: DurablePruningArchiveRecovery,
+        chain: object,
+        live_verified: bool,
+    ) -> DurablePruningResult:
+        destruction = self._record_destruction(
+            authorization=authorization,
+            operation=operation,
+            manifest=manifest,
+            floor=floor,
+            archive_guard=archive_guard,
+            chain=chain,
+            live_verified=live_verified,
+        )
+        return DurablePruningResult(
+            operation,
+            manifest,
+            floor,
+            live_verified,
+            (
+                ""
+                if destruction is None
+                else destruction.record_id
+            ),
+            (
+                ""
+                if destruction is None
+                else destruction.record.digest
+            ),
+        )
+
     def prepare(
         self,
         authorization: SignedDurablePruningAuthorization,
@@ -2092,11 +2397,15 @@ class DurablePruningExecutor:
                 lease,
             )
             if operation.complete:
-                return DurablePruningResult(
-                    operation,
-                    manifest,
-                    floor,
-                    bool(chain.verify()),
+                live_verified = bool(chain.verify())
+                return self._result(
+                    authorization=authorization,
+                    operation=operation,
+                    manifest=manifest,
+                    floor=floor,
+                    archive_guard=archive_guard,
+                    chain=chain,
+                    live_verified=live_verified,
                 )
 
             if (
@@ -2222,11 +2531,14 @@ class DurablePruningExecutor:
                 ),
                 last_error="",
             )
-            return DurablePruningResult(
-                operation,
-                manifest,
-                floor,
-                live_verified,
+            return self._result(
+                authorization=authorization,
+                operation=operation,
+                manifest=manifest,
+                floor=floor,
+                archive_guard=archive_guard,
+                chain=chain,
+                live_verified=live_verified,
             )
         except DurablePruningManualReview as exc:
             if operation is not None and (
