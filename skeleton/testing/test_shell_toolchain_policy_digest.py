@@ -124,3 +124,36 @@ def test_catalog_digest_is_stable_across_mapping_insertion_order() -> None:
         ToolchainCatalog((left,)).snapshot().digest
         == ToolchainCatalog((right,)).snapshot().digest
     )
+
+
+def test_contract_rejects_non_finite_and_boolean_timeouts() -> None:
+    for value in (True, float("inf"), float("-inf"), float("nan"), 0.0, -1.0):
+        try:
+            _contract(
+                arguments=ArgumentPolicy(),
+            ).__class__(
+                name="python-test",
+                executable_key="python",
+                arguments=ArgumentPolicy(),
+                max_timeout=value,
+            )
+        except ValueError:
+            continue
+        raise AssertionError(f"expected max_timeout={value!r} to be rejected")
+
+
+def test_contract_normalizes_string_enum_values() -> None:
+    contract = LogicalCommandContract(
+        name="python-test",
+        executable_key="python",
+        arguments=ArgumentPolicy(),
+        required_capabilities=frozenset({"execute"}),
+        effects=frozenset({"test"}),
+        risk="moderate",
+    )
+
+    assert sorted(capability.value for capability in contract.required_capabilities) == [
+        "execute"
+    ]
+    assert sorted(effect.value for effect in contract.effects) == ["test"]
+    assert contract.risk.value == "moderate"
