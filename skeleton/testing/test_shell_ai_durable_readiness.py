@@ -1890,4 +1890,3 @@ def test_require_ready_can_reconcile_required_proofs():
     )
     assert report.ready
     assert report.proof_windows.ok
-
