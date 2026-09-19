@@ -915,8 +915,13 @@ class PhysicsWorld:
                 if effective_inverse_mass <= EPSILON:
                     continue
 
+                # Bias the projected speed slightly into separation.
+                # Targeting exact zero is numerically fragile across CPU
+                # architectures: a changed curved-shape witness can otherwise
+                # observe a tiny negative speed and emit another zero-time TOI.
                 impulse_magnitude = (
-                    -normal_speed / effective_inverse_mass
+                    (-normal_speed + EPSILON)
+                    / effective_inverse_mass
                 )
                 if (
                     not math.isfinite(impulse_magnitude)
