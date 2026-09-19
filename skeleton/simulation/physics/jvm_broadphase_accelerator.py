@@ -30,6 +30,7 @@ _OP_PAIRS = 2
 _OP_SHUTDOWN = 3
 _OP_QUERY_AABBS = 4
 _OP_RAY_AABBS = 5
+_OP_SPHERE_CAST_AABBS = 6
 _STATUS_OK = 0
 _MAX_BODIES = 100_000
 _MAX_PAIRS = 1_000_000
@@ -42,6 +43,7 @@ _INT = struct.Struct(">i")
 _PING = struct.Struct(">qi")
 _REQUEST_PREFIX = struct.Struct(">iid")
 _QUERY_PREFIX = struct.Struct(">iii")
+_SPHERE_QUERY_PREFIX = struct.Struct(">iiid")
 _BOX = struct.Struct(">?6d")
 _BOUNDS = struct.Struct(">6d")
 _RAY = struct.Struct(">7d")
@@ -308,6 +310,72 @@ class JvmBroadPhaseAccelerator:
         )
         return batches
 
+    def sphere_cast_candidates_many(
+        self,
+        body_bounds: Sequence[AABB],
+        rays: Sequence[Ray],
+        radius: float,
+        *,
+        max_total_candidates: int = _MAX_QUERY_HITS,
+    ) -> list[list[int]]:
+        """Return stable finite-body coarse candidates for sphere casts."""
+        body_count = len(body_bounds)
+        ray_count = len(rays)
+        radius_value = float(radius)
+        if not math.isfinite(radius_value) or radius_value <= 0.0:
+            raise ValueError("sphere cast radius must be finite and positive")
+        if body_count > self.config.max_bodies:
+            raise ValueError("body count exceeds accelerator bound")
+        if not 1 <= ray_count <= _MAX_QUERIES:
+            raise ValueError("ray count outside accelerator bound")
+        if not 1 <= max_total_candidates <= _MAX_QUERY_HITS:
+            raise ValueError("max_total_candidates outside accelerator bound")
+        if body_count * ray_count > _MAX_SPATIAL_TESTS:
+            raise ValueError("spatial test bound exceeded")
+
+        payload = bytearray(
+            _SPHERE_QUERY_PREFIX.pack(
+                body_count,
+                ray_count,
+                max_total_candidates,
+                radius_value,
+            )
+        )
+        for bounds in body_bounds:
+            payload.extend(self._encode_bounds(bounds))
+        for ray in rays:
+            if not isinstance(ray, Ray):
+                raise TypeError("sphere cast batch must contain Ray values")
+            payload.extend(
+                _RAY.pack(
+                    ray.origin.x,
+                    ray.origin.y,
+                    ray.origin.z,
+                    ray.direction.x,
+                    ray.direction.y,
+                    ray.direction.z,
+                    ray.max_distance,
+                )
+            )
+
+        response = self._request(
+            _OP_SPHERE_CAST_AABBS,
+            bytes(payload),
+        )
+        if not isinstance(response.payload, list):
+            raise JvmBroadPhaseProtocolError(
+                "sphere-cast candidate response type mismatch"
+            )
+        batches = response.payload
+        self._validate_index_batches(
+            batches,
+            batch_count=ray_count,
+            body_count=body_count,
+            max_total=max_total_candidates,
+            label="sphere-cast candidate",
+        )
+        return batches
+
     def close(self) -> None:
         with self._request_lock:
             if self._closed:
@@ -484,7 +552,11 @@ class JvmBroadPhaseAccelerator:
                 except ValueError as exc:
                     raise JvmBroadPhaseProtocolError(str(exc)) from exc
             return pairs
-        if op in {_OP_QUERY_AABBS, _OP_RAY_AABBS}:
+        if op in {
+            _OP_QUERY_AABBS,
+            _OP_RAY_AABBS,
+            _OP_SPHERE_CAST_AABBS,
+        }:
             batch_count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
             if not 0 <= batch_count <= _MAX_QUERIES:
                 raise JvmBroadPhaseProtocolError("invalid spatial batch count")
