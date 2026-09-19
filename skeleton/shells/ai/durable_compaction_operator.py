@@ -36,6 +36,13 @@ from skeleton.shells.ai.durable_compaction_certificate import (
     DurableCompactionCertificateStore,
     SignedDurableCompactionCertificate,
 )
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStale,
+    DurableMaintenanceStore,
+    SignedDurableMaintenanceEpoch,
+)
 from skeleton.shells.ai.durable_pruning import (
     DurablePruningError,
     DurablePruningExecutor,
@@ -816,6 +823,7 @@ class DurableCompactionOperator:
         authorizations: DurablePruningAuthorizationStore,
         pruning: DurablePruningExecutor,
         *,
+        maintenance: DurableMaintenanceStore | None = None,
         reservations: DurableCompactionReservationStore | None = None,
         workflow_index: DurableCompactionWorkflowIndex | None = None,
         namespace: str = (
@@ -871,6 +879,32 @@ class DurableCompactionOperator:
             raise ValueError(
                 "pruning executor is wired to a different authorization store"
             )
+        pruning_maintenance = getattr(
+            pruning,
+            "maintenance",
+            None,
+        )
+        if (
+            maintenance is not None
+            and not isinstance(
+                maintenance,
+                DurableMaintenanceStore,
+            )
+        ):
+            raise TypeError(
+                "maintenance must be DurableMaintenanceStore"
+            )
+        if maintenance is None:
+            maintenance = pruning_maintenance
+        elif pruning_maintenance is None:
+            raise ValueError(
+                "maintenance-enabled compaction requires maintenance-enabled pruning"
+            )
+        elif maintenance is not pruning_maintenance:
+            raise ValueError(
+                "compaction and pruning must share maintenance store"
+            )
+
         if (
             reservations is not None
             and not isinstance(
@@ -920,6 +954,7 @@ class DurableCompactionOperator:
         self.certificates = certificates
         self.authorizations = authorizations
         self.pruning = pruning
+        self.maintenance = maintenance
         self.reservations = reservations
         self.namespace = namespace
         self.workflow_index = (
@@ -935,6 +970,59 @@ class DurableCompactionOperator:
         )
         self.max_cas_retries = max_cas_retries
         self._clock = clock
+
+    def maintenance_resource(
+        self,
+        workflow: DurableCompactionWorkflow,
+        chain: CheckpointableEvidenceChain,
+    ) -> DurableMaintenanceResource:
+        return DurableMaintenanceResource.from_chain(
+            workflow.chain_id,
+            chain,
+            resource_kind="evidence-chain",
+        )
+
+    def _require_maintenance(
+        self,
+        workflow: DurableCompactionWorkflow,
+        chain: CheckpointableEvidenceChain,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ),
+    ):
+        if self.maintenance is None:
+            return None
+        if maintenance_epoch is None:
+            raise DurableCompactionWorkflowError(
+                "durable maintenance epoch is required for compaction"
+            )
+        if not isinstance(
+            maintenance_epoch,
+            SignedDurableMaintenanceEpoch,
+        ):
+            raise TypeError(
+                "maintenance_epoch must be SignedDurableMaintenanceEpoch"
+            )
+        resource = self.maintenance_resource(
+            workflow,
+            chain,
+        )
+        try:
+            return self.maintenance.require_active(
+                maintenance_epoch,
+                operation=(
+                    DurableMaintenanceOperation.COMPACTION
+                ),
+                required_resources=(
+                    workflow.chain_id,
+                ),
+                live_resources=(resource,),
+            )
+        except DurableMaintenanceStale as exc:
+            raise DurableCompactionWorkflowStale(
+                "durable maintenance authority is stale: "
+                + str(exc)
+            ) from exc
 
     @staticmethod
     def _key(workflow_id: str) -> str:
@@ -2034,6 +2122,9 @@ class DurableCompactionOperator:
         chain: CheckpointableEvidenceChain,
         *,
         reservation_holder_id: str = "",
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> DurableCompactionExecution:
         stored = self._require(
             workflow_id
@@ -2042,6 +2133,11 @@ class DurableCompactionOperator:
         self._require_reservation(
             workflow,
             reservation_holder_id=reservation_holder_id,
+        )
+        self._require_maintenance(
+            workflow,
+            chain,
+            maintenance_epoch,
         )
         if (
             workflow.phase
@@ -2056,6 +2152,7 @@ class DurableCompactionOperator:
                     retention,
                     chain,
                     reservation_holder_id=reservation_holder_id,
+                    maintenance_epoch=maintenance_epoch,
                 )
             raise DurableCompactionWorkflowError(
                 "workflow must be prepared before destructive execution"
@@ -2093,6 +2190,7 @@ class DurableCompactionOperator:
                 authorization,
                 retention,
                 chain,
+                maintenance_epoch=maintenance_epoch,
             )
         except DurablePruningManualReview as exc:
             self._note_error(
@@ -2122,6 +2220,9 @@ class DurableCompactionOperator:
         chain: CheckpointableEvidenceChain,
         *,
         reservation_holder_id: str = "",
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> DurableCompactionExecution:
         stored = self._require(
             workflow_id
@@ -2130,6 +2231,11 @@ class DurableCompactionOperator:
         self._require_reservation(
             workflow,
             reservation_holder_id=reservation_holder_id,
+        )
+        self._require_maintenance(
+            workflow,
+            chain,
+            maintenance_epoch,
         )
         if workflow.complete:
             authorization = self._bound_authorization(
@@ -2143,6 +2249,7 @@ class DurableCompactionOperator:
                 authorization,
                 retention,
                 chain,
+                maintenance_epoch=maintenance_epoch,
             )
             return DurableCompactionExecution(
                 stored,
@@ -2171,6 +2278,7 @@ class DurableCompactionOperator:
                 authorization,
                 retention,
                 chain,
+                maintenance_epoch=maintenance_epoch,
             )
         except DurablePruningManualReview as exc:
             self._note_error(
