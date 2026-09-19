@@ -61,6 +61,11 @@ from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionWorkflowStale,
     StoredDurableCompactionWorkflow,
 )
+from skeleton.shells.ai.durable_operations import (
+    DurableEvidenceOperationsError,
+    DurableEvidenceOperationsInspector,
+    DurableOperationsPolicy,
+)
 from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceConflict,
     DurableMaintenanceOperation,
@@ -3807,6 +3812,182 @@ def test_lineage_fleet_mixed_manual_review_denies_even_with_incomplete_tolerance
     )
     assert not report.allowed
     assert report.manual_review == 1
+
+
+def operations_with_compaction_health(
+    fixture,
+    *,
+    require=True,
+):
+    return DurableEvidenceOperationsInspector(
+        fixture.checkpoints,
+        fixture.retention_planner,
+        compaction_maintenance=maintenance_guard(
+            fixture
+        ),
+        policy=DurableOperationsPolicy(
+            require_compaction_maintenance=require,
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_global_operations_accept_complete_compaction_history(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, result = fixture.through_complete()
+    assert result.ok
+    assert fixture.chain.verify()
+
+    inspector = operations_with_compaction_health(
+        fixture
+    )
+    report = inspector.require(
+        ((fixture.chain_id, fixture.chain),),
+        compaction_workflow_ids=(
+            plan.workflow_id,
+        ),
+    )
+
+    assert report.allowed
+    assert report.compaction_maintenance is not None
+    assert report.compaction_maintenance.allowed
+    assert report.errors == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_global_operations_block_lost_archive_even_when_live_suffix_is_valid(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, result = fixture.through_complete()
+    assert result.ok
+    assert fixture.chain.verify()
+
+    _delete_operator_archive_record(
+        fixture,
+        plan.workflow_id,
+    )
+    assert fixture.chain.verify()
+
+    inspector = operations_with_compaction_health(
+        fixture
+    )
+    report = inspector.inspect(
+        ((fixture.chain_id, fixture.chain),),
+        compaction_workflow_ids=(
+            plan.workflow_id,
+        ),
+    )
+
+    assert not report.allowed
+    assert report.compaction_maintenance is not None
+    assert not report.compaction_maintenance.allowed
+    assert any(
+        item.code
+        == "durable_compaction.maintenance_denied"
+        for item in report.findings
+    )
+    lineage = (
+        report.compaction_maintenance
+        .lineage.reports[0]
+    )
+    assert not lineage.archive.verified
+    assert any(
+        item.code == "archive.missing"
+        for item in lineage.findings
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_global_operations_require_raises_on_lost_compaction_archive(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    _delete_operator_archive_record(
+        fixture,
+        plan.workflow_id,
+    )
+    inspector = operations_with_compaction_health(
+        fixture
+    )
+
+    with pytest.raises(
+        DurableEvidenceOperationsError,
+        match="compaction maintenance",
+    ):
+        inspector.require(
+            ((fixture.chain_id, fixture.chain),),
+            compaction_workflow_ids=(
+                plan.workflow_id,
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_global_operations_block_unclaimed_hot_floor_when_workflow_set_missing(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    assert fixture.chain.hot_floor().sequence > 0
+
+    inspector = operations_with_compaction_health(
+        fixture
+    )
+    report = inspector.inspect(
+        ((fixture.chain_id, fixture.chain),),
+        compaction_workflow_ids=(),
+    )
+
+    assert not report.allowed
+    assert report.compaction_maintenance is not None
+    assert report.compaction_maintenance.unclaimed_floors == 1
+    assert any(
+        item.code
+        == "maintenance.floor_without_workflow"
+        for item in report.compaction_maintenance.chains[0].findings
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["journal", "receipts"],
+)
+def test_global_operations_digest_changes_when_compaction_health_degrades(kind):
+    fixture = OperatorFixture(kind=kind)
+    plan, _, _ = fixture.through_complete()
+    inspector = operations_with_compaction_health(
+        fixture
+    )
+    healthy = inspector.require(
+        ((fixture.chain_id, fixture.chain),),
+        compaction_workflow_ids=(
+            plan.workflow_id,
+        ),
+    )
+
+    _delete_operator_archive_record(
+        fixture,
+        plan.workflow_id,
+    )
+    degraded = inspector.inspect(
+        ((fixture.chain_id, fixture.chain),),
+        compaction_workflow_ids=(
+            plan.workflow_id,
+        ),
+    )
+
+    assert healthy.digest != degraded.digest
+    assert healthy.compaction_maintenance.digest != (
+        degraded.compaction_maintenance.digest
+    )
 
 
 def maintenance_guard(
