@@ -387,8 +387,6 @@ class ContinuousCollisionDetector:
         self,
         bodies: tuple[RigidBody, ...],
         dt: float,
-        *,
-        ignore_pairs: frozenset[tuple[str, str]] = frozenset(),
     ) -> TOIEvent | None:
         """Return one stable earliest TOI across all eligible continuous pairs."""
 
@@ -405,8 +403,6 @@ class ContinuousCollisionDetector:
                     continue
 
                 pair = tuple(sorted((moving.body_id, target.body_id)))
-                if pair in ignore_pairs:
-                    continue
                 if pair in events and isinstance(target.shape, SphereShape):
                     # A two-continuous-sphere pair may be visited in both
                     # directions. One canonical event is sufficient.
@@ -441,8 +437,6 @@ class ContinuousCollisionDetector:
         for index, body_a in enumerate(ordered):
             for body_b in ordered[index + 1 :]:
                 pair = (body_a.body_id, body_b.body_id)
-                if pair in ignore_pairs:
-                    continue
                 if pair in events:
                     continue
                 if not self._pair_requires_general_ccd(
@@ -503,8 +497,6 @@ class ContinuousCollisionDetector:
                 pair = tuple(
                     sorted((convex.body_id, plane.body_id))
                 )
-                if pair in ignore_pairs:
-                    continue
                 if pair in events:
                     # Exact sphere/static-plane sweeps and any earlier
                     # canonical event remain authoritative.
