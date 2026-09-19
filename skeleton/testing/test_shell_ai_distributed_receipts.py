@@ -895,3 +895,148 @@ def test_index_to_dict():
         "receipt_fingerprint": fp("b"),
         "sequence": 2,
     }
+
+def test_receipt_snapshot_at_genesis_is_empty():
+    chain = DistributedReceiptChain(
+        InMemoryFencedStore()
+    )
+    assert chain.snapshot_at(GENESIS_HASH) == ()
+    assert chain.verify_root(GENESIS_HASH)
+    assert chain.root_is_ancestor(GENESIS_HASH)
+
+
+def test_receipt_snapshot_at_historical_root_returns_prefix():
+    chain = DistributedReceiptChain(
+        InMemoryFencedStore()
+    )
+    first = chain.append(receipt("first"))
+    second = chain.append(receipt("second"))
+    chain.append(receipt("third"))
+    assert chain.snapshot_at(
+        first.receipt_hash
+    ) == (first,)
+    assert chain.snapshot_at(
+        second.receipt_hash
+    ) == (first, second)
+    assert chain.verify_root(
+        first.receipt_hash
+    )
+    assert chain.root_is_ancestor(
+        first.receipt_hash
+    )
+
+
+def test_receipt_verify_root_rejects_missing_hash():
+    chain = DistributedReceiptChain(
+        InMemoryFencedStore()
+    )
+    assert not chain.verify_root(fp("f"))
+    assert not chain.root_is_ancestor(fp("f"))
+
+
+def test_self_consistent_orphan_receipt_root_is_not_ancestor():
+    backend = InMemoryFencedStore()
+    chain = DistributedReceiptChain(
+        backend,
+        namespace="receipts",
+    )
+    first = chain.append(receipt("first"))
+    orphan_receipt = receipt(
+        "orphan",
+        correlation_id="orphan",
+        fingerprint=fp("f"),
+    )
+    orphan_hash = ReceiptChain._hash(
+        first.receipt_hash,
+        2,
+        orphan_receipt,
+    )
+    backend.put_if_absent(
+        "receipts",
+        chain._node_key(orphan_hash),
+        ChainedReceipt(
+            2,
+            first.receipt_hash,
+            orphan_hash,
+            orphan_receipt,
+        ),
+    )
+    assert chain.verify_root(orphan_hash)
+    assert not chain.root_is_ancestor(
+        orphan_hash
+    )
+
+
+def test_historical_receipt_corruption_is_detected():
+    backend = InMemoryFencedStore()
+    chain = DistributedReceiptChain(
+        backend,
+        namespace="receipts",
+    )
+    first = chain.append(receipt("first"))
+    chain.append(receipt("second"))
+    key = chain._node_key(
+        first.receipt_hash
+    )
+    record = backend.get(
+        "receipts",
+        key,
+    )
+    backend.compare_and_swap(
+        "receipts",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            first,
+            receipt=replace(
+                first.receipt,
+                stderr_bytes=7,
+            ),
+        ),
+    )
+    assert not chain.verify_root(
+        first.receipt_hash
+    )
+    assert not chain.root_is_ancestor(
+        first.receipt_hash
+    )
+
+
+def test_receipt_snapshot_at_rejects_malformed_root():
+    chain = DistributedReceiptChain(
+        InMemoryFencedStore()
+    )
+    with pytest.raises(ValueError, match="SHA-256"):
+        chain.snapshot_at("bad")
+
+
+def test_historical_receipt_root_stays_valid_after_later_appends():
+    chain = DistributedReceiptChain(
+        InMemoryFencedStore()
+    )
+    first = chain.append(receipt("first"))
+    for index in range(20):
+        chain.append(
+            receipt(
+                f"later-{index}",
+                correlation_id=f"corr-{index}",
+            )
+        )
+    assert chain.verify_root(
+        first.receipt_hash
+    )
+    assert chain.root_is_ancestor(
+        first.receipt_hash
+    )
+    assert chain.snapshot_at(
+        first.receipt_hash
+    ) == (first,)
+
+
+def test_durable_receipt_compatibility_import_is_same_class():
+    from skeleton.shells.durable_receipts import (
+        DistributedReceiptChain as CompatibilityChain,
+    )
+
+    assert CompatibilityChain is DistributedReceiptChain
+
