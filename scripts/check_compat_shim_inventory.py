@@ -443,31 +443,19 @@ def _shim_imports_canonical(
 
 
 _DEAD_PROBE_IMPORTERS = {
-    "backend.core.ai_provider": lambda: import_module("backend.core.ai_provider"),
     "backend.core.ai_provider_compat": lambda: import_module("backend.core.ai_provider_compat"),
     "backend.emergentintegrations.__init__": lambda: import_module("backend.emergentintegrations.__init__"),
     "backend.emergentintegrations.llm.__init__": lambda: import_module("backend.emergentintegrations.llm.__init__"),
     "backend.emergentintegrations.llm.chat": lambda: import_module("backend.emergentintegrations.llm.chat"),
     "backend.routes.academy_legacy_compat": lambda: import_module("backend.routes.academy_legacy_compat"),
-    "backend.routes.academy_v3": lambda: import_module("backend.routes.academy_v3"),
     "backend.routes.galaxy_studio": lambda: import_module("backend.routes.galaxy_studio"),
-    "backend.routes.galaxy_studio_state": lambda: import_module("backend.routes.galaxy_studio_state"),
     "backend.server": lambda: import_module("backend.server"),
-    "backend.services.ai_assistant_svc": lambda: import_module("backend.services.ai_assistant_svc"),
-    "backend.services.ai_hub_svc": lambda: import_module("backend.services.ai_hub_svc"),
     "backend.services.cag": lambda: import_module("backend.services.cag"),
-    "backend.services.import_export_svc": lambda: import_module("backend.services.import_export_svc"),
     "backend.services.mag": lambda: import_module("backend.services.mag"),
-    "backend.services.quantum_compiler_svc": lambda: import_module("backend.services.quantum_compiler_svc"),
-    "backend.services.self_healer_svc": lambda: import_module("backend.services.self_healer_svc"),
     "skeleton.jeeves.core": lambda: import_module("skeleton.jeeves.core"),
-    "skeleton.kernel.clocks": lambda: import_module("skeleton.kernel.clocks"),
     "skeleton.kernel.fair_queue": lambda: import_module("skeleton.kernel.fair_queue"),
     "skeleton.kernel.vclock": lambda: import_module("skeleton.kernel.vclock"),
-    "skeleton.kernel.work_queue": lambda: import_module("skeleton.kernel.work_queue"),
     "skeleton.kernel.workqueue": lambda: import_module("skeleton.kernel.workqueue"),
-    "skeleton.memory.prefix_renderer": lambda: import_module("skeleton.memory.prefix_renderer"),
-    "skeleton.memory.warmer": lambda: import_module("skeleton.memory.warmer"),
 }
 
 def default_dead_probe(shim: Shim) -> object:
