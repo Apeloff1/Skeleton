@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import os
 from pathlib import Path
 import stat
 import tempfile
 
+from skeleton.shells.provenance import canonical_json
 from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.pathing import lexical_join_under_root
-from skeleton.shells.workspace_txn.scanner import WorkspaceScanner
+from skeleton.shells.workspace_txn.scanner import WorkspaceScanner, snapshot_entry_state
 from skeleton.shells.workspace_txn.types import (
     BackupManifest,
     ChangeSet,
@@ -29,6 +31,14 @@ class RollbackError(RuntimeError):
     pass
 
 
+def _endpoint_state_digest(entry) -> str:
+    if entry is None or entry.kind is WorkspaceEntryKind.DIRECTORY:
+        return ""
+    return hashlib.sha256(
+        canonical_json(snapshot_entry_state(entry))
+    ).hexdigest()
+
+
 def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
     actions: list[RollbackAction] = []
     directory_replacements: set[str] = {
@@ -45,6 +55,7 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
     for change in changes.changes:
         before_digest = "" if change.before is None else change.before.digest
         after_digest = "" if change.after is None else change.after.digest
+        after_state_digest = _endpoint_state_digest(change.after)
         if change.kind is WorkspaceChangeKind.CREATED:
             kind = (
                 RollbackActionKind.REMOVE_CREATED_DIRECTORY
@@ -56,6 +67,7 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
                     kind,
                     change.path,
                     expected_digest=after_digest,
+                    expected_state_digest=after_state_digest,
                 )
             )
         elif change.kind is WorkspaceChangeKind.DELETED:
@@ -79,6 +91,7 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
                     source_path=change.old_path,
                     expected_digest=after_digest,
                     restore_digest=before_digest,
+                    expected_state_digest=after_state_digest,
                 )
             )
         elif change.kind in {WorkspaceChangeKind.MODIFIED, WorkspaceChangeKind.TYPE_CHANGED}:
@@ -88,6 +101,7 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
                     change.path,
                     expected_digest=after_digest,
                     restore_digest=before_digest,
+                    expected_state_digest=after_state_digest,
                 )
             )
         elif change.kind is WorkspaceChangeKind.METADATA_CHANGED:
@@ -97,6 +111,7 @@ def build_rollback_actions(changes: ChangeSet) -> tuple[RollbackAction, ...]:
                     change.path,
                     expected_digest=after_digest,
                     restore_digest=before_digest,
+                    expected_state_digest=after_state_digest,
                 )
             )
     # A directory replaced by a file/symlink must be restored before its
@@ -167,6 +182,17 @@ class WorkspaceRollback:
     def _current(self, root: Path, path: str):
         entries = self.scanner.rescan_paths(root, (path,))
         return entries[0] if entries else None
+
+    @staticmethod
+    def _matches_expected_state(current, action: RollbackAction) -> bool:
+        if action.expected_state_digest:
+            return (
+                _endpoint_state_digest(current)
+                == action.expected_state_digest
+            )
+        if action.expected_digest:
+            return current.digest == action.expected_digest
+        return True
 
     @staticmethod
     def _remove_path(path: Path) -> None:
@@ -291,7 +317,7 @@ class WorkspaceRollback:
                     RollbackActionState.SKIPPED,
                     "created path already absent",
                 )
-            if action.expected_digest and current.digest != action.expected_digest:
+            if not self._matches_expected_state(current, action):
                 return RollbackActionResult(
                     action,
                     RollbackActionState.CONFLICT,
@@ -318,7 +344,7 @@ class WorkspaceRollback:
                     RollbackActionState.CONFLICT,
                     "renamed destination is absent",
                 )
-            if action.expected_digest and current.digest != action.expected_digest:
+            if not self._matches_expected_state(current, action):
                 return RollbackActionResult(
                     action,
                     RollbackActionState.CONFLICT,
@@ -344,7 +370,10 @@ class WorkspaceRollback:
             RollbackActionKind.RESTORE_DELETED,
             RollbackActionKind.RESTORE_DIRECTORY,
         }:
-            if current is not None and action.expected_digest and current.digest != action.expected_digest:
+            if (
+                current is not None
+                and not self._matches_expected_state(current, action)
+            ):
                 return RollbackActionResult(
                     action,
                     RollbackActionState.CONFLICT,
@@ -372,11 +401,11 @@ class WorkspaceRollback:
                     RollbackActionState.CONFLICT,
                     "path disappeared",
                 )
-            if action.expected_digest and current.digest != action.expected_digest:
+            if not self._matches_expected_state(current, action):
                 return RollbackActionResult(
                     action,
                     RollbackActionState.CONFLICT,
-                    "content changed after transaction",
+                    "path state changed after transaction",
                 )
             try:
                 self._restore_metadata(
