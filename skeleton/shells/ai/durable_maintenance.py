@@ -239,6 +239,80 @@ class DurableMaintenancePolicy:
         )
 
     @classmethod
+    def replicated_chain(
+        cls,
+        chain_id: str,
+        *,
+        source_sequence: int,
+        source_root: str,
+        target_sequence: int,
+        target_root: str,
+        replication_state_digest: str = "",
+    ) -> "DurableMaintenanceResource":
+        chain_id = _identity(
+            "chain_id",
+            chain_id,
+            maximum=256,
+        )
+        for name, value in (
+            ("source_sequence", source_sequence),
+            ("target_sequence", target_sequence),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        source_root = _digest(
+            "source_root",
+            source_root,
+        )
+        target_root = _digest(
+            "target_root",
+            target_root,
+        )
+        replication_state_digest = _digest(
+            "replication_state_digest",
+            replication_state_digest,
+            optional=True,
+        )
+        binding = {
+            "chain_id": chain_id,
+            "source_sequence": source_sequence,
+            "source_root": source_root,
+            "target_sequence": target_sequence,
+            "target_root": target_root,
+            "replication_state_digest": (
+                replication_state_digest
+            ),
+        }
+        raw = json.dumps(
+            binding,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        combined_root = hashlib.sha256(
+            raw
+        ).hexdigest()
+        state_digest = (
+            replication_state_digest
+            or combined_root
+        )
+        return cls(
+            chain_id,
+            "replicated-evidence-chain",
+            max(
+                source_sequence,
+                target_sequence,
+            ),
+            combined_root,
+            state_digest,
+        )
+
+    @classmethod
     def replica(
         cls,
         replica_id: str,
