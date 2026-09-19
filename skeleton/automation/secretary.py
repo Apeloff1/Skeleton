@@ -25,6 +25,7 @@ from .advanced_bots import ADVANCED_BOTS
 from .build_authority import (
     BuildAuthorization,
     BuildAuthorityError,
+    revalidate_live_build_authorization,
 )
 from .bot_manager import (
     load_state,
@@ -635,6 +636,11 @@ def dispatch(
             "invalid dispatch snapshot fingerprint"
         ) from exc
 
+    if "feature-builder" in assignments and build_authorization is None:
+        raise SecretaryAdmissionError(
+            "feature-builder assignment lacks exact build authority"
+        )
+
     results: list[dict[str, Any]] = []
     for name in assignments:
         results.append(
@@ -696,6 +702,16 @@ def main() -> int:
         raise SecretaryAdmissionError(
             "Secretary requires Supervisor custody"
         )
+
+    if build_authorization is not None:
+        try:
+            build_authorization = revalidate_live_build_authorization(
+                build_authorization
+            )
+        except BuildAuthorityError as exc:
+            raise SecretaryAdmissionError(
+                "build authorization was revoked or changed"
+            ) from exc
 
     state = load_state()
     due = select_specialists_due(state)
