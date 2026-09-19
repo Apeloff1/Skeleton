@@ -1,7 +1,7 @@
 import pytest
 from collections.abc import Mapping
 
-from skeleton.jeeves.ai.contracts import Authority, ContractLedger, ContractRecord, ContractState, validate_contract
+from skeleton.jeeves.ai.contracts import Authority, ContractLedger, ContractRecord, ContractState, MAX_CONTRACTS, validate_contract
 from skeleton.jeeves.ai.evaluation import EvalLedger, EvalRecord, EvalState, validate_eval
 from skeleton.jeeves.ai.orchestration import OrchestrLedger, OrchestrRecord, OrchestrState, validate_orchestr
 
@@ -70,6 +70,12 @@ def test_contract_ledger_rejects_duplicate_names():
     record = ContractRecord("same")
     with pytest.raises(ValueError, match="duplicate"):
         ContractLedger((record, record))
+
+
+def test_contract_ledger_is_resource_bounded_before_record_walk():
+    record = ContractRecord("same")
+    with pytest.raises(ValueError, match="invalid contract records"):
+        ContractLedger((record,) * (MAX_CONTRACTS + 1))
 
 
 def test_supervisor_secretary_worker_hierarchy_is_preserved():
