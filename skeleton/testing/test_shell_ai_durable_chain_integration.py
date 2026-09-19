@@ -5073,4 +5073,3 @@ def test_require_session_commit_must_be_bool(tmp_path):
             session_commits=env.session_commits,
             require_session_commit="yes",
         )
-
