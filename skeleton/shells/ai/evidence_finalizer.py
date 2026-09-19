@@ -50,6 +50,7 @@ class FinalizedAIExecutionEvidence:
     finalization: AIExecutionFinalization | None = None
     recovery_commit: RecoveryCheckpointCommit | None = None
     session_integrity: SessionEvidenceIntegrityReport | None = None
+    session_journal_commit: DurableSessionJournalCommit | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -87,6 +88,11 @@ class FinalizedAIExecutionEvidence:
                 if self.session_integrity is None
                 else self.session_integrity.to_dict()
             ),
+            "session_journal_commit": (
+                None
+                if self.session_journal_commit is None
+                else self.session_journal_commit.to_dict()
+            ),
         }
 
 
@@ -110,6 +116,7 @@ class AIExecutionEvidenceFinalizer:
         finalizations: AIExecutionFinalizationStore | None = None,
         recovery_checkpoints: AIRecoveryCheckpointStore | None = None,
         integrity_verifier: SessionEvidenceIntegrityVerifier | None = None,
+        session_journals: DurableSessionJournalStore | None = None,
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -122,6 +129,7 @@ class AIExecutionEvidenceFinalizer:
         )
         self.finalizations = finalizations
         self.recovery_checkpoints = recovery_checkpoints
+        self.session_journals = session_journals
         self.integrity_verifier = (
             integrity_verifier
             or SessionEvidenceIntegrityVerifier(
@@ -349,6 +357,24 @@ class AIExecutionEvidenceFinalizer:
             session_journal,
             evidence,
         )
+        session_journal_commit = None
+        session_journal_manifest_digest = ""
+        if self.session_journals is not None:
+            session_journal_commit = self.session_journals.put(
+                finalization_id=finalization_id,
+                journal_root=session_integrity.journal_root,
+                journal_evidence=session_journal,
+            )
+            session_journal_manifest_digest = (
+                session_journal_commit.stored.manifest.digest
+            )
+            if (
+                session_journal_commit.stored.manifest.journal_digest
+                != session_journal.digest
+            ):
+                raise RuntimeError(
+                    "stored durable session journal differs from final evidence"
+                )
         checkpoint = AISessionCheckpoint.capture(
             session,
             journal_root=session_integrity.journal_root,
@@ -370,6 +396,9 @@ class AIExecutionEvidenceFinalizer:
                 execution_attempt_authority_digest
             ),
             session_integrity_digest=session_integrity.digest,
+            session_journal_manifest_digest=(
+                session_journal_manifest_digest
+            ),
         )
         recovery_commit = None
         if self.recovery_checkpoints is not None:
@@ -499,6 +528,9 @@ class AIExecutionEvidenceFinalizer:
                 ),
                 execution_attempt_state=execution_attempt_state,
                 session_integrity_digest=session_integrity.digest,
+                session_journal_manifest_digest=(
+                    session_journal_manifest_digest
+                ),
             )
             signed_execution_evidence = self.execution_evidence.append_once(
                 final_bundle
@@ -572,4 +604,5 @@ class AIExecutionEvidenceFinalizer:
             finalization,
             recovery_commit,
             session_integrity,
+            session_journal_commit,
         )
