@@ -74,6 +74,48 @@ jobs:
           PYTHONPATH: "."
         run: python tests/run_unit.py
 
+  shell_stability:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    name: Shell Stability
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Install focused shell stability runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Compile shell execution packages
+        run: python -m compileall -q skeleton/shells
+      - name: Run shell execution stability regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_shell_runner.py
+          skeleton/testing/test_shell_executor.py
+          skeleton/testing/test_shell_arguments_environment.py
+          skeleton/testing/test_shell_capabilities_registry.py
+          skeleton/testing/test_shell_limits_retry_circuit.py
+          skeleton/testing/test_shell_toolchain_factory.py
+          skeleton/testing/test_shell_toolchain_policy_digest.py
+          skeleton/testing/test_shell_toolchain_contract_matrix.py
+          skeleton/testing/test_shell_extended_toolchain_contract_matrix.py
+          skeleton/testing/test_shell_toolchain_compiler_execution.py
+          skeleton/testing/test_shell_toolchain_attestation.py
+          skeleton/testing/test_shell_toolchain_transactional.py
+          skeleton/testing/test_shell_workspace_provenance.py
+          skeleton/testing/test_shell_workspace_transaction_state_matrix.py
+          skeleton/testing/test_shell_workspace_txn_stability.py
+
   integration_smoke:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
@@ -202,6 +244,7 @@ jobs:
     needs:
       - quarantine_policy
       - unit
+      - shell_stability
       - integration_smoke
       - quality_security
       - pr_automation
@@ -212,6 +255,7 @@ jobs:
         env:
           QUARANTINE_RESULT: ${{ needs.quarantine_policy.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
+          SHELL_STABILITY_RESULT: ${{ needs.shell_stability.result }}
           INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
           QUALITY_RESULT: ${{ needs.quality_security.result }}
           PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
@@ -223,6 +267,7 @@ jobs:
           results = {
               "quarantine_policy": os.environ["QUARANTINE_RESULT"],
               "unit": os.environ["UNIT_RESULT"],
+              "shell_stability": os.environ["SHELL_STABILITY_RESULT"],
               "integration_smoke": os.environ["INTEGRATION_RESULT"],
               "quality_security": os.environ["QUALITY_RESULT"],
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
