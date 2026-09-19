@@ -1229,7 +1229,7 @@ class DurableDestructionLedger:
     def _put_record(
         self,
         item: SignedDurableDestructionRecord,
-    ) -> bool:
+    ) -> SignedDurableDestructionRecord:
         key = self._record_key(
             item.record_id
         )
@@ -1245,7 +1245,7 @@ class DurableDestructionLedger:
                     key,
                     value,
                 )
-                return True
+                return item
             except DistributedStateConflict:
                 existing = self.backend.get(
                     self.namespace,
@@ -1263,11 +1263,17 @@ class DurableDestructionLedger:
         current = self._signed(
             dict(existing.value)
         )
-        if current != item:
+        if current.record != item.record:
             raise DurableDestructionCorruption(
                 "destruction digest collision"
             )
-        return False
+        self._verify_signature(
+            current
+        )
+        self._verify_signature(
+            item
+        )
+        return current
 
     def _put_operation_index(
         self,
@@ -1670,7 +1676,7 @@ class DurableDestructionLedger:
                     signature,
                 )
             )
-            self._put_record(
+            item = self._put_record(
                 item
             )
             next_head = DurableDestructionHead(
