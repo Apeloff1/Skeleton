@@ -21,6 +21,19 @@ from skeleton.shells.shell_snapshot import ShellSnapshotter
 from skeleton.shells.status import ShellPlaneStatus
 
 
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_service_state_rejects_invalid_history_bound(value):
+    with pytest.raises(ValueError):
+        ShellServiceState(max_history=value)
+
+
+@pytest.mark.parametrize("reason", ["bad\x00reason", 123])
+def test_service_state_rejects_invalid_transition_reason(reason):
+    state = ShellServiceState()
+    with pytest.raises(ValueError):
+        state.transition(ShellServicePhase.STARTING, reason=reason)
+
+
 def test_service_state_happy_path():
     state = ShellServiceState()
     state.transition(ShellServicePhase.STARTING)
