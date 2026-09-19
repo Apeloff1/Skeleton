@@ -37,6 +37,7 @@ public final class BroadPhaseMain {
     static final int MAX_PAIRS = 1_000_000;
     static final int MAX_QUERIES = 4096;
     static final int MAX_QUERY_HITS = 1_000_000;
+    static final long MAX_SPATIAL_TESTS = 50_000_000L;
     static final int MAX_ERROR_BYTES = 8192;
 
     private BroadPhaseMain() {}
@@ -237,6 +238,9 @@ public final class BroadPhaseMain {
         if (maxTotalHits < 1 || maxTotalHits > MAX_QUERY_HITS) {
             throw new IllegalArgumentException("maxTotalHits");
         }
+        if ((long) bodies.length * queries.length > MAX_SPATIAL_TESTS) {
+            throw new IllegalArgumentException("spatial test bound exceeded");
+        }
         for (Box body : bodies) {
             if (body == null) throw new IllegalArgumentException("null body box");
             body.validate();
@@ -341,6 +345,9 @@ public final class BroadPhaseMain {
         }
         if (maxTotalHits < 1 || maxTotalHits > MAX_QUERY_HITS) {
             throw new IllegalArgumentException("maxTotalHits");
+        }
+        if ((long) bodies.length * rays.length > MAX_SPATIAL_TESTS) {
+            throw new IllegalArgumentException("spatial test bound exceeded");
         }
         for (Box body : bodies) {
             if (body == null) throw new IllegalArgumentException("null body box");
