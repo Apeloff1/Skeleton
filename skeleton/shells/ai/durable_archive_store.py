@@ -791,11 +791,42 @@ class DurableArchiveRepository:
         self,
         item: DurableArchiveRootIndex,
     ) -> bool:
-        return self._put_immutable(
-            self._root_key(item.chain_id, item.root_hash),
-            item.to_dict(),
-            conflict_message="archive root already binds different archive",
+        key = self._root_key(item.chain_id, item.root_hash)
+        existing = self.backend.get(self.namespace, key)
+        if existing is None:
+            try:
+                self.backend.put_if_absent(
+                    self.namespace,
+                    key,
+                    item.to_dict(),
+                )
+                return True
+            except DistributedStateConflict:
+                existing = self.backend.get(
+                    self.namespace,
+                    key,
+                )
+                if existing is None:
+                    raise
+        if not isinstance(existing.value, dict):
+            raise DurableArchiveStoreError(
+                "archive root index must be mapping"
+            )
+        current = self._root_index(
+            dict(existing.value)
         )
+        if (
+            current.chain_id != item.chain_id
+            or current.root_hash != item.root_hash
+            or current.sequence != item.sequence
+        ):
+            raise DurableArchiveStoreError(
+                "archive root already binds incompatible historical position"
+            )
+        # The same committed historical root can legitimately be represented
+        # by many later archives. Keep the first immutable index because it is
+        # sufficient to reconstruct that prefix and avoids index churn.
+        return False
 
     def _update_head(
         self,
@@ -881,6 +912,37 @@ class DurableArchiveRepository:
         for archived in archived_nodes:
             self._decode_node(archived)
             self._put_node(archived)
+
+        existing_archive = self.get(
+            manifest.archive_id
+        )
+        if existing_archive is not None:
+            if (
+                existing_archive.manifest != item
+                or existing_archive.checkpoint != checkpoint
+                or existing_archive.node_hashes
+                != tuple(
+                    node.node_hash
+                    for node in archived_nodes
+                )
+            ):
+                raise DurableArchiveStoreError(
+                    "archive_id already binds incompatible archive state"
+                )
+            repaired_indexes = self.repair_indexes(
+                manifest.archive_id
+            )
+            return DurableArchiveStoreReport(
+                manifest.archive_id,
+                manifest.chain_id,
+                manifest.checkpoint_sequence,
+                manifest.checkpoint_root,
+                manifest.node_count,
+                manifest.digest,
+                checkpoint.checkpoint.digest,
+                False,
+                repaired_indexes,
+            )
 
         now = self._clock()
         if (
@@ -1073,7 +1135,11 @@ class DurableArchiveRepository:
         index = self.root_index(chain_id, root_hash)
         if index is None:
             raise DurableArchiveStoreError("historical root is not archived")
-        stored = self.require(index.archive_id)
+        stored = self.get(index.archive_id)
+        if stored is None:
+            raise DurableArchiveStoreError(
+                "archive root index references missing archive"
+            )
         if stored.manifest.manifest.digest != index.archive_manifest_digest:
             raise DurableArchiveStoreError("root index manifest digest mismatch")
         if index.sequence > len(stored.node_hashes):
