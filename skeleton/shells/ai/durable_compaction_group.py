@@ -32,6 +32,10 @@ from typing import Callable, Mapping, Sequence
 
 from skeleton.shells.ai.distributed_state import DistributedStateConflict
 from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain
+from skeleton.shells.ai.durable_compaction_reservation import (
+    DurableCompactionReservationConflict,
+    DurableCompactionReservationStore,
+)
 from skeleton.shells.ai.durable_compaction_operator import (
     DurableCompactionExecution,
     DurableCompactionOperator,
@@ -730,6 +734,7 @@ class DurableCompactionGroupCoordinator:
         self,
         backend: VersionedStateBackend,
         *,
+        reservations: DurableCompactionReservationStore | None = None,
         namespace: str = (
             "shell-ai-durable-compaction-groups"
         ),
@@ -743,6 +748,16 @@ class DurableCompactionGroupCoordinator:
         ):
             raise TypeError(
                 "backend must satisfy VersionedStateBackend"
+            )
+        if (
+            reservations is not None
+            and not isinstance(
+                reservations,
+                DurableCompactionReservationStore,
+            )
+        ):
+            raise TypeError(
+                "reservations must be DurableCompactionReservationStore"
             )
         if (
             not namespace
@@ -770,10 +785,79 @@ class DurableCompactionGroupCoordinator:
         if not callable(clock):
             raise TypeError("clock must be callable")
         self.backend = backend
+        self.reservations = reservations
         self.namespace = namespace
         self.max_members = max_members
         self.max_cas_retries = max_cas_retries
         self._clock = clock
+
+    def _require_reservation_wiring(
+        self,
+        request_map: Mapping[
+            str,
+            DurableCompactionGroupRequest,
+        ],
+    ) -> None:
+        if self.reservations is None:
+            return
+        for request in request_map.values():
+            if (
+                request.operator.reservations
+                is not self.reservations
+            ):
+                raise DurableCompactionGroupError(
+                    "group member operator is not wired to coordinator reservation store"
+                )
+
+    def _ensure_reservations(
+        self,
+        group: DurableCompactionGroup,
+        request_map: Mapping[
+            str,
+            DurableCompactionGroupRequest,
+        ],
+        *,
+        renew: bool,
+    ) -> None:
+        if self.reservations is None:
+            return
+        self._require_reservation_wiring(
+            request_map
+        )
+        try:
+            self.reservations.acquire_many(
+                (
+                    member.chain_id
+                    for member in group.members
+                ),
+                holder_id=group.group_id,
+                operator_id=group.operator_id,
+                renew=renew,
+            )
+        except DurableCompactionReservationConflict as exc:
+            raise DurableCompactionGroupStale(
+                "group lost exclusive compaction reservation for one or more member chains"
+            ) from exc
+
+    def _release_completed_reservations(
+        self,
+        group: DurableCompactionGroup,
+    ) -> None:
+        if self.reservations is None:
+            return
+        for member in group.members:
+            status = self.reservations.status(
+                member.chain_id
+            )
+            if (
+                status.active
+                and status.holder_id
+                == group.group_id
+            ):
+                self.reservations.release(
+                    member.chain_id,
+                    holder_id=group.group_id,
+                )
 
     @staticmethod
     def _key(group_id: str) -> str:
@@ -1192,6 +1276,9 @@ class DurableCompactionGroupCoordinator:
         request_map = self._request_map(
             requests
         )
+        self._require_reservation_wiring(
+            request_map
+        )
         if not 2 <= len(request_map) <= self.max_members:
             raise ValueError(
                 "group member count outside supported range"
@@ -1273,6 +1360,11 @@ class DurableCompactionGroupCoordinator:
             group,
             requests,
         )
+        self._ensure_reservations(
+            group,
+            request_map,
+            renew=False,
+        )
         for member in group.members:
             request = request_map[
                 member.chain_id
@@ -1281,6 +1373,7 @@ class DurableCompactionGroupCoordinator:
                 member.workflow_id,
                 request.retention,
                 request.chain,
+                reservation_holder_id=group.group_id,
             )
         synced = self._sync_members(
             group,
@@ -1332,6 +1425,11 @@ class DurableCompactionGroupCoordinator:
             group,
             requests,
         )
+        self._ensure_reservations(
+            group,
+            request_map,
+            renew=True,
+        )
         for member in group.members:
             request = request_map[
                 member.chain_id
@@ -1340,6 +1438,7 @@ class DurableCompactionGroupCoordinator:
                 member.workflow_id,
                 request.retention,
                 request.chain,
+                reservation_holder_id=group.group_id,
             )
         synced = self._sync_members(
             group,
@@ -1389,6 +1488,11 @@ class DurableCompactionGroupCoordinator:
             group,
             requests,
         )
+        self._ensure_reservations(
+            group,
+            request_map,
+            renew=True,
+        )
 
         # Freeze every member manifest before any group execution may start.
         for member in group.members:
@@ -1399,6 +1503,7 @@ class DurableCompactionGroupCoordinator:
                 member.workflow_id,
                 request.retention,
                 request.chain,
+                reservation_holder_id=group.group_id,
             )
         synced = self._sync_members(
             group,
@@ -1473,6 +1578,7 @@ class DurableCompactionGroupCoordinator:
                         member.workflow_id,
                         request.retention,
                         request.chain,
+                        reservation_holder_id=current.group_id,
                     )
                 elif workflow.workflow.phase in {
                     DurableCompactionWorkflowPhase.EXECUTING,
@@ -1481,12 +1587,14 @@ class DurableCompactionGroupCoordinator:
                         member.workflow_id,
                         request.retention,
                         request.chain,
+                        reservation_holder_id=current.group_id,
                     )
                 else:
                     result = request.operator.execute(
                         member.workflow_id,
                         request.retention,
                         request.chain,
+                        reservation_holder_id=current.group_id,
                     )
                 if not isinstance(
                     result,
@@ -1591,7 +1699,7 @@ class DurableCompactionGroupCoordinator:
             raise DurableCompactionGroupError(
                 "group execution ended before every member completed"
             )
-        return self._replace(
+        completed = self._replace(
             current,
             phase=(
                 DurableCompactionGroupPhase.COMPLETE
@@ -1600,6 +1708,10 @@ class DurableCompactionGroupCoordinator:
             next_member_index=len(synced),
             completed_members=len(synced),
         )
+        self._release_completed_reservations(
+            completed.group
+        )
+        return completed
 
     def execute(
         self,
@@ -1633,6 +1745,11 @@ class DurableCompactionGroupCoordinator:
             group,
             requests,
         )
+        self._ensure_reservations(
+            group,
+            request_map,
+            renew=True,
+        )
         return self._execute_from(
             group,
             request_map,
@@ -1651,6 +1768,9 @@ class DurableCompactionGroupCoordinator:
         )
         group = stored.group
         if group.complete:
+            self._release_completed_reservations(
+                group
+            )
             return stored
         if group.phase not in {
             DurableCompactionGroupPhase.EXECUTING,
@@ -1662,6 +1782,11 @@ class DurableCompactionGroupCoordinator:
         request_map = self._require_requests(
             group,
             requests,
+        )
+        self._ensure_reservations(
+            group,
+            request_map,
+            renew=True,
         )
         synced = self._sync_members(
             group,
@@ -1694,7 +1819,7 @@ class DurableCompactionGroupCoordinator:
                 start_index = index
                 break
         else:
-            return self._replace(
+            completed = self._replace(
                 group,
                 phase=(
                     DurableCompactionGroupPhase.COMPLETE
@@ -1703,6 +1828,10 @@ class DurableCompactionGroupCoordinator:
                 next_member_index=len(synced),
                 completed_members=len(synced),
             )
+            self._release_completed_reservations(
+                completed.group
+            )
+            return completed
 
         updated = self._replace(
             group,
@@ -1748,6 +1877,21 @@ class DurableCompactionGroupCoordinator:
             requests,
         )
         reasons: list[str] = []
+        if self.reservations is not None and not group.complete:
+            for member in group.members:
+                status = self.reservations.status(
+                    member.chain_id
+                )
+                if (
+                    not status.active
+                    or status.holder_id
+                    != group.group_id
+                    or status.operator_id
+                    != group.operator_id
+                ):
+                    reasons.append(
+                        f"{member.chain_id}: group reservation status is not active for this holder"
+                    )
         current_values: list[
             tuple[str, bool]
         ] = []
@@ -1764,6 +1908,7 @@ class DurableCompactionGroupCoordinator:
                     member.workflow_id,
                     request.retention,
                     request.chain,
+                    reservation_holder_id=group.group_id,
                 )
                 current_values.append(
                     (
