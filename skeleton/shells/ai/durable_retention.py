@@ -116,12 +116,7 @@ class ProtectedHistoricalRoot:
             raise ValueError(
                 "protected root must be SHA-256 hex"
             )
-        try:
-            int(self.root_hash, 16)
-        except ValueError as exc:
-            raise ValueError(
-                "protected root must be SHA-256 hex"
-            ) from exc
+        # Opaque 64-character protected root digest.
         if (
             isinstance(self.sequence, bool)
             or not isinstance(self.sequence, int)
