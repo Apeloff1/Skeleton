@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import hashlib
 import json
 import os
 import sys
@@ -27,6 +28,7 @@ from skeleton.shells.toolchains.types import (
 import skeleton.shells.workspace_txn.backup as backup_module
 from skeleton.shells.workspace_txn.backup import BackupError, ContentAddressedBackupStore
 from skeleton.shells.workspace_txn.lease import (
+    WorkspaceLeaseError,
     WorkspaceLeaseHeartbeat,
     WorkspaceLeaseRegistry,
 )
@@ -723,6 +725,72 @@ def test_transaction_rejects_command_cwd_outside_protected_root(tmp_path: Path):
 
     assert manager.journal.length() == 0
     assert root.exists()
+
+
+def test_manual_rollback_refuses_to_race_active_workspace_lease(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            ("-c", "print('accepted')"),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+    assert result.transaction.accepted
+
+    workspace_id = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()
+    held = manager.leases.acquire(
+        workspace_id,
+        "other-owner",
+        ttl_seconds=5.0,
+    )
+    try:
+        with pytest.raises(WorkspaceLeaseError, match="already leased"):
+            manager.rollback_result(root, result.transaction)
+    finally:
+        manager.leases.release(held)
+
+
+def test_manual_rollback_rejects_different_workspace_root(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            ("-c", "print('accepted')"),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+    other = tmp_path / "other-workspace"
+    other.mkdir()
+
+    with pytest.raises(ValueError, match="does not match transaction workspace"):
+        manager.rollback_result(other, result.transaction)
+
+
+def test_manual_rollback_rejects_tampered_backup_manifest(tmp_path: Path):
+    root, manager, plane = _manager(tmp_path)
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            ("-c", "print('accepted')"),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+    assert result.transaction.backup is not None
+    bad_backup = replace(
+        result.transaction.backup,
+        digest="0" * 64,
+    )
+    bad_result = replace(
+        result.transaction,
+        backup=bad_backup,
+    )
+
+    with pytest.raises(RuntimeError, match="integrity verification"):
+        manager.rollback_result(root, bad_result)
 
 
 def test_transaction_manager_binds_missing_cwd_to_root(tmp_path: Path):
