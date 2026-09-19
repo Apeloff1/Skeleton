@@ -688,7 +688,7 @@ def validate_staged_paths(
                 "cannot parse staged git mode"
             )
         new_mode = fields[1]
-        if new_mode not in {"100644", "100755"}:
+        if new_mode != "100644":
             raise SupervisorRuntimeError(
                 f"staged path has forbidden git mode: {path or '<unknown>'}"
             )
@@ -716,7 +716,12 @@ def safe_write_text(target: Path, content: str) -> None:
         handle.write(content)
         handle.flush()
         os.fsync(handle.fileno())
-    os.chmod(target, 0o644)
+        try:
+            os.fchmod(handle.fileno(), 0o644)
+        except (AttributeError, OSError) as exc:
+            raise SupervisorRuntimeError(
+                "unable to normalize mutation target mode safely"
+            ) from exc
 
 
 
@@ -726,6 +731,19 @@ WORKER_RESULT_STATUSES = frozenset({
     "pull-request-created",
 })
 MAX_WORKER_RESULT_BYTES = 16_384
+
+
+def _unique_worker_result_object(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise SupervisorRuntimeError(
+                f"duplicate worker result field: {key}"
+            )
+        result[key] = value
+    return result
 
 
 def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
@@ -745,7 +763,10 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
     if not lines:
         raise SupervisorRuntimeError("worker emitted no result evidence")
     try:
-        value = json.loads(lines[-1])
+        value = json.loads(
+            lines[-1],
+            object_pairs_hook=_unique_worker_result_object,
+        )
     except json.JSONDecodeError as exc:
         raise SupervisorRuntimeError("worker result is not JSON") from exc
     if not isinstance(value, dict):
