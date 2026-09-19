@@ -225,13 +225,31 @@ class WorkspaceTransactionManager:
             self._journal(transaction_id, WorkspaceTransactionState.SNAPSHOTTING)
             before = self.scanner.scan(root_path)
 
-            self._journal(transaction_id, WorkspaceTransactionState.BACKING_UP)
+            self._journal(
+                transaction_id,
+                WorkspaceTransactionState.BACKING_UP,
+                before_snapshot_digest=before.digest,
+                root_fingerprint=before.root_fingerprint,
+            )
             backup = self.backup_store.create_manifest(root_path, before)
             if not self.backup_store.verify_manifest(backup):
                 raise RuntimeError("pre-mutation backup failed verification")
 
             heartbeat.require_healthy()
-            self._journal(transaction_id, WorkspaceTransactionState.EXECUTING)
+            self._journal(
+                transaction_id,
+                WorkspaceTransactionState.EXECUTING,
+                before_snapshot_digest=before.digest,
+                root_fingerprint=before.root_fingerprint,
+                backup_id=backup.backup_id,
+                backup_digest=backup.digest,
+                command_fingerprint=command_fingerprint(
+                    command.command,
+                    command.args,
+                    cwd=command.cwd,
+                    env_keys=tuple(command.env),
+                ),
+            )
             execution = self.executor.execute(
                 command,
                 retry=retry,
