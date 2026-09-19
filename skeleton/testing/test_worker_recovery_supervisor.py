@@ -9,7 +9,7 @@ from skeleton.shells.runner import ShellCommand
 from skeleton.shells.worker_heartbeat import HeartbeatPolicy,HeartbeatRegistry
 from skeleton.shells.worker_identity import WorkerIdentity,WorkerRegistry
 from skeleton.shells.worker_recovery import RecoveryPolicy,WorkerRecoveryCoordinator
-from skeleton.shells.worker_supervisor import SupervisionState,SupervisorPolicy,WorkerSupervisor
+from skeleton.shells.worker_supervisor import SupervisionState,SupervisorPolicy,WorkerFault,WorkerSupervisor
 
 
 def ident(worker="w",generation=1):
@@ -141,6 +141,43 @@ def test_recovery_policy_rejects_conflicting_actions():
         RecoveryPolicy(disable_stale_workers=True,unregister_stale_workers=True)
 
 
+@pytest.mark.parametrize("field", ["max_faults", "max_restarts"])
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_supervisor_policy_rejects_invalid_integer_limits(field,value):
+    kwargs={field:value}
+    with pytest.raises(ValueError):
+        SupervisorPolicy(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["fault_window_seconds", "quarantine_seconds", "restart_window_seconds"],
+)
+@pytest.mark.parametrize("value", [0, -1, True, float("nan"), float("inf")])
+def test_supervisor_policy_rejects_invalid_time_windows(field,value):
+    kwargs={field:value}
+    with pytest.raises(ValueError):
+        SupervisorPolicy(**kwargs)
+
+
+@pytest.mark.parametrize("observed_at", [-1, True, float("nan"), float("inf")])
+def test_worker_fault_rejects_invalid_timestamp(observed_at):
+    with pytest.raises(ValueError):
+        WorkerFault(observed_at,"failure")
+
+
+@pytest.mark.parametrize("kind", ["", "   ", "bad\x00kind", 123])
+def test_worker_fault_rejects_invalid_kind(kind):
+    with pytest.raises(ValueError):
+        WorkerFault(0.0,kind)
+
+
+@pytest.mark.parametrize("detail", ["bad\x00detail", 123])
+def test_worker_fault_rejects_invalid_detail(detail):
+    with pytest.raises(ValueError):
+        WorkerFault(0.0,"failure",detail)
+
+
 def setup_supervisor(now,policy=None):
     workers=WorkerRegistry(clock=lambda:now[0])
     item=ident()
@@ -216,6 +253,45 @@ def test_supervisor_restart_budget_quarantines():
     state=supervisor.restart(item)
     assert state.state is SupervisionState.QUARANTINED
     assert not workers.get("w").enabled
+
+
+def test_supervisor_cannot_restart_quarantined_worker():
+    now=[0.0]
+    policy=SupervisorPolicy(max_faults=1,quarantine_seconds=10)
+    workers,item,supervisor=setup_supervisor(now,policy)
+    state=supervisor.fault(item,"x")
+    assert state.state is SupervisionState.QUARANTINED
+    assert workers.get("w").enabled is False
+
+    with pytest.raises(RuntimeError,match="cannot restart"):
+        supervisor.restart(item)
+
+    assert supervisor.require(item).state is SupervisionState.QUARANTINED
+    assert workers.get("w").enabled is False
+
+
+def test_supervisor_cannot_restart_stopped_worker():
+    now=[0.0]
+    _,item,supervisor=setup_supervisor(now)
+    supervisor.begin_stop(item)
+    supervisor.stopped(item)
+
+    with pytest.raises(RuntimeError,match="cannot restart"):
+        supervisor.restart(item)
+
+    assert supervisor.require(item).state is SupervisionState.STOPPED
+
+
+def test_supervisor_cannot_fault_stopped_worker():
+    now=[0.0]
+    _,item,supervisor=setup_supervisor(now)
+    supervisor.begin_stop(item)
+    supervisor.stopped(item)
+
+    with pytest.raises(RuntimeError,match="cannot record faults"):
+        supervisor.fault(item,"late-fault")
+
+    assert supervisor.require(item).state is SupervisionState.STOPPED
 
 
 def test_supervisor_stop_path():
