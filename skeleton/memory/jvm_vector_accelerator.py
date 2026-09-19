@@ -69,6 +69,24 @@ class VectorHit:
 
 
 @dataclass(frozen=True, slots=True)
+class VectorAcceleratorStatus:
+    running: bool
+    java_binary: str
+    source: str
+    closed: bool = False
+    pid: int | None = None
+    server_processors: int | None = None
+    starts: int = 0
+    start_failures: int = 0
+    restarts: int = 0
+    requests: int = 0
+    successful_requests: int = 0
+    failed_requests: int = 0
+    timeouts: int = 0
+    last_error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class JvmVectorConfig:
     java_binary: str
     source: Path
@@ -134,6 +152,14 @@ class JvmVectorAccelerator:
         self._stderr_tail: deque[str] = deque(maxlen=20)
         self._closed = False
         self._last_error: str | None = None
+        self._server_processors: int | None = None
+        self._starts = 0
+        self._start_failures = 0
+        self._restarts = 0
+        self._requests = 0
+        self._successful_requests = 0
+        self._failed_requests = 0
+        self._timeouts = 0
 
     @property
     def minimum_candidates(self) -> int:
@@ -146,11 +172,32 @@ class JvmVectorAccelerator:
     def __exit__(self, *_: object) -> None:
         self.close()
 
+    def status(self) -> VectorAcceleratorStatus:
+        process = self._process
+        running = process is not None and process.poll() is None
+        return VectorAcceleratorStatus(
+            running=running,
+            java_binary=self.config.java_binary,
+            source=str(self.config.source),
+            closed=self._closed,
+            pid=process.pid if running and process is not None else None,
+            server_processors=self._server_processors,
+            starts=self._starts,
+            start_failures=self._start_failures,
+            restarts=self._restarts,
+            requests=self._requests,
+            successful_requests=self._successful_requests,
+            failed_requests=self._failed_requests,
+            timeouts=self._timeouts,
+            last_error=self._last_error,
+        )
+
     def ping(self) -> int:
         response = self._request(_OP_PING, b"")
         if not isinstance(response.payload, tuple):
             raise JvmVectorProtocolError("ping response type mismatch")
         _server_nanos, processors = response.payload
+        self._server_processors = int(processors)
         return int(processors)
 
     def top_k(
@@ -409,6 +456,7 @@ class JvmVectorAccelerator:
 
     def restart(self) -> None:
         with self._request_lock:
+            self._restarts += 1
             self._terminate_process()
             self._closed = False
             self._last_error = None
@@ -423,6 +471,7 @@ class JvmVectorAccelerator:
             process = self._process
             assert process is not None and process.stdin is not None
             request_id = self._next_request_id()
+            self._requests += 1
 
             try:
                 process.stdin.write(
@@ -431,6 +480,7 @@ class JvmVectorAccelerator:
                 process.stdin.write(payload)
                 process.stdin.flush()
             except (BrokenPipeError, OSError) as exc:
+                self._failed_requests += 1
                 self._last_error = f"vector accelerator write failed: {type(exc).__name__}"
                 self._terminate_process()
                 raise JvmVectorUnavailable(self._diagnostic(self._last_error)) from exc
@@ -438,21 +488,27 @@ class JvmVectorAccelerator:
             try:
                 item = self._responses.get(timeout=self.config.response_timeout_seconds)
             except queue.Empty as exc:
+                self._failed_requests += 1
+                self._timeouts += 1
                 self._last_error = "vector accelerator response timed out"
                 self._terminate_process()
                 raise JvmVectorTimeout(self._diagnostic(self._last_error)) from exc
 
             if isinstance(item, BaseException):
+                self._failed_requests += 1
                 self._last_error = str(item)
                 self._terminate_process()
                 raise JvmVectorUnavailable(self._diagnostic(str(item))) from item
             if item.request_id != request_id or item.op != op:
+                self._failed_requests += 1
                 self._last_error = "vector response correlation mismatch"
                 self._terminate_process()
                 raise JvmVectorProtocolError(self._last_error)
             if item.status != _STATUS_OK:
+                self._failed_requests += 1
                 self._last_error = str(item.payload)
                 raise JvmVectorProtocolError(str(item.payload))
+            self._successful_requests += 1
             return item
 
     def _ensure_started(self) -> None:
@@ -463,16 +519,20 @@ class JvmVectorAccelerator:
 
     def _start_process(self) -> None:
         if not self.config.source.is_file():
-            raise JvmVectorUnavailable(
-                f"vector accelerator source not found: {self.config.source}"
-            )
+            message = f"vector accelerator source not found: {self.config.source}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmVectorUnavailable(message)
         java = (
             shutil.which(self.config.java_binary)
             if os.path.sep not in self.config.java_binary
             else self.config.java_binary
         )
         if not java or not Path(java).exists():
-            raise JvmVectorUnavailable(f"java binary not found: {self.config.java_binary}")
+            message = f"java binary not found: {self.config.java_binary}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmVectorUnavailable(message)
 
         self._drain_response_queue()
         self._stderr_tail.clear()
@@ -486,9 +546,13 @@ class JvmVectorAccelerator:
                 bufsize=0,
             )
         except OSError as exc:
-            raise JvmVectorUnavailable(f"failed to start Java: {exc}") from exc
+            message = f"failed to start Java: {exc}"
+            self._start_failures += 1
+            self._last_error = message
+            raise JvmVectorUnavailable(message) from exc
 
         self._process = process
+        self._starts += 1
         self._reader = threading.Thread(
             target=self._reader_loop,
             args=(process,),
