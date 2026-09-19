@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
+import subprocess
 import unittest
+from unittest.mock import patch
 
 from skeleton.automation.build_authority import (
     APPROVED_BUILD_LABELS,
@@ -10,6 +13,7 @@ from skeleton.automation.build_authority import (
     MAX_BUILD_BODY_BYTES,
     MAX_BUILD_LABELS,
     authorized_builds,
+    revalidate_live_build_authorization,
     select_build_authorization,
 )
 
@@ -448,6 +452,177 @@ class BuildAuthorizationPayloadTests(unittest.TestCase):
             value,
             before,
         )
+
+
+class LiveBuildAuthorityTests(unittest.TestCase):
+    def authorization(self) -> BuildAuthorization:
+        return BuildAuthorization.from_issue(
+            REPO,
+            issue(),
+        )
+
+    def live_payload(
+        self,
+        **overrides,
+    ) -> dict:
+        value = {
+            "number": 10,
+            "title": "Build capability",
+            "body": "Implement the requested capability with tests.",
+            "labels": [
+                {"name": "automation-approved"},
+                {"name": "enhancement"},
+            ],
+            "updatedAt": "2026-09-19T12:00:00Z",
+            "state": "OPEN",
+        }
+        value.update(overrides)
+        return value
+
+    def test_unchanged_open_issue_revalidates(self) -> None:
+        authorization = self.authorization()
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload()
+            ),
+        ) as call:
+            current = revalidate_live_build_authorization(
+                authorization
+            )
+        self.assertEqual(
+            current,
+            authorization,
+        )
+        args = call.call_args.args[0]
+        self.assertEqual(
+            args[:4],
+            [
+                "gh",
+                "issue",
+                "view",
+                "10",
+            ],
+        )
+        self.assertIn(
+            REPO,
+            args,
+        )
+
+    def test_closed_issue_revokes_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(state="CLOSED")
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_removed_approval_label_revokes_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(
+                    labels=[
+                        {"name": "enhancement"}
+                    ]
+                )
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_body_edit_revokes_existing_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(
+                    body="Changed task after approval"
+                )
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_title_edit_revokes_existing_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(
+                    title="Different capability"
+                )
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_timestamp_change_revokes_existing_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(
+                    updatedAt="2026-09-19T12:01:00Z"
+                )
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_issue_number_mismatch_revokes_authority(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value=json.dumps(
+                self.live_payload(number=11)
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_invalid_live_json_fails_closed(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value="{not-json",
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_non_object_live_json_fails_closed(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            return_value="[]",
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
+
+    def test_github_command_failure_fails_closed(self) -> None:
+        with patch(
+            "skeleton.automation.build_authority.subprocess.check_output",
+            side_effect=subprocess.CalledProcessError(
+                1,
+                ["gh"],
+            ),
+        ):
+            with self.assertRaises(BuildAuthorityError):
+                revalidate_live_build_authorization(
+                    self.authorization()
+                )
 
 
 class BuildSelectionTests(unittest.TestCase):
