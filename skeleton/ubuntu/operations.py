@@ -367,6 +367,10 @@ from .ci import __all__ as _ci_all
 
 MAX_CONTRACT_ID = 9000
 _CONTRACT_NAME_RE = re.compile(r"^ubuntu_contract_(\d+)$")
+_COMPAT_CONTRACT_NAMES = tuple(
+    f"ubuntu_contract_{contract_id}"
+    for contract_id in range(4050, MAX_CONTRACT_ID + 1, 6)
+)
 
 _RESOURCE_IDS = (
     "package_apt",
@@ -656,6 +660,11 @@ def __getattr__(name: str) -> object:
     return value
 
 
+def __dir__() -> list[str]:
+    """Expose historical compatibility attributes without eager function bodies."""
+    return sorted(set(globals()) | set(_COMPAT_CONTRACT_NAMES))
+
+
 _DOMAIN_EXPORTS = (
     *_package_all,
     *_service_all,
@@ -688,4 +697,5 @@ __all__ = [
     "validate_plan",
     "validate_resource_reference",
     *_DOMAIN_EXPORTS,
+    *_COMPAT_CONTRACT_NAMES,
 ]
