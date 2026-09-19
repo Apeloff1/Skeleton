@@ -426,9 +426,18 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Build routing is authorized by repository state, not by model
-            # wording. It wins one bounded slot whenever an approved task exists.
-            score = 100
+            # Repository state grants build authority; plan text only selects
+            # whether the authorized builder is relevant to this dispatch.
+            # Ordinary CI/root-cause work must not wake a feature builder merely
+            # because some unrelated approved build task exists.
+            matches = sum(
+                1
+                for word in KEYWORDS.get(spec.name, ())
+                if word in text
+            )
+            if not matches:
+                continue
+            score = 100 + matches
         else:
             score = sum(
                 1

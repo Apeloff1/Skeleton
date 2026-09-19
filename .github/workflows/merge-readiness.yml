@@ -211,6 +211,12 @@ jobs:
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           skeleton/testing/test_bot_manager.py
+      - name: Run supervisor workflow contract in isolated import namespace
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest --import-mode=importlib
           backend/tests/test_supervisor_workflow_contract.py
 
   readiness:

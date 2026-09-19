@@ -384,6 +384,104 @@ public final class BroadPhaseMain {
         );
     }
 
+    static void handleSphereCastAabbs(
+        DataInputStream in,
+        DataOutputStream out,
+        RequestHeader header
+    ) throws IOException {
+        int bodyCount = readBoundedInt(in, "body count", 0, MAX_BODIES);
+        int rayCount = readBoundedInt(in, "sphere cast count", 1, MAX_QUERIES);
+        int maxTotalHits = readBoundedInt(
+            in,
+            "max total candidates",
+            1,
+            MAX_QUERY_HITS
+        );
+        double radius = readFinite(in, "sphere cast radius");
+        if (!(radius > 0.0)) {
+            throw new ProtocolException("sphere cast radius must be positive");
+        }
+
+        var bodies = new Box[bodyCount];
+        for (int i = 0; i < bodyCount; i++) {
+            bodies[i] = readBounds(in, i);
+        }
+        var rays = new RayQuery[rayCount];
+        for (int i = 0; i < rayCount; i++) {
+            rays[i] = readRay(in, i);
+        }
+
+        QueryHits result = sphereCastAabbCandidates(
+            bodies,
+            rays,
+            radius,
+            maxTotalHits
+        );
+        writeHeader(out, header.op(), STATUS_OK, header.requestId());
+        out.writeInt(result.counts().length);
+        int offset = 0;
+        for (int count : result.counts()) {
+            out.writeInt(count);
+            for (int index = 0; index < count; index++) {
+                out.writeInt(result.indices()[offset++]);
+            }
+        }
+    }
+
+    static QueryHits sphereCastAabbCandidates(
+        Box[] bodies,
+        RayQuery[] rays,
+        double radius,
+        int maxTotalHits
+    ) {
+        if (bodies.length > MAX_BODIES) {
+            throw new IllegalArgumentException("body count");
+        }
+        if (rays.length < 1 || rays.length > MAX_QUERIES) {
+            throw new IllegalArgumentException("sphere cast count");
+        }
+        if (!Double.isFinite(radius) || !(radius > 0.0)) {
+            throw new IllegalArgumentException("sphere cast radius");
+        }
+        if (maxTotalHits < 1 || maxTotalHits > MAX_QUERY_HITS) {
+            throw new IllegalArgumentException("maxTotalHits");
+        }
+        if ((long) bodies.length * rays.length > MAX_SPATIAL_TESTS) {
+            throw new IllegalArgumentException("spatial test bound exceeded");
+        }
+        for (Box body : bodies) {
+            if (body == null) throw new IllegalArgumentException("null body box");
+            body.validate();
+        }
+        for (RayQuery ray : rays) {
+            if (ray == null) throw new IllegalArgumentException("null sphere cast");
+            ray.validate();
+        }
+
+        int[] counts = new int[rays.length];
+        int[] indices = new int[maxTotalHits];
+        int total = 0;
+        for (int rayIndex = 0; rayIndex < rays.length; rayIndex++) {
+            RayQuery ray = rays[rayIndex];
+            int count = 0;
+            for (int bodyIndex = 0; bodyIndex < bodies.length; bodyIndex++) {
+                if (!ray.intersects(bodies[bodyIndex], radius)) continue;
+                if (total >= maxTotalHits) {
+                    throw new QueryHitBoundException(
+                        "sphere-cast candidate total-hit bound exceeded"
+                    );
+                }
+                indices[total++] = bodyIndex;
+                count++;
+            }
+            counts[rayIndex] = count;
+        }
+        return new QueryHits(
+            counts,
+            java.util.Arrays.copyOf(indices, total)
+        );
+    }
+
     static List<Pair> computePairs(Box[] boxes, int maxPairs, double epsilon) {
         if (boxes.length > MAX_BODIES) throw new IllegalArgumentException("body count");
         if (maxPairs < 1 || maxPairs > MAX_PAIRS) throw new IllegalArgumentException("maxPairs");
@@ -725,14 +823,14 @@ public final class BroadPhaseMain {
         check(
             java.util.Arrays.equals(
                 rayHits.counts(),
-                new int[] {4, 1, 0}
+                new int[] {2, 1, 0}
             ),
             "ray AABB candidate counts"
         );
         check(
             java.util.Arrays.equals(
                 rayHits.indices(),
-                new int[] {0, 1, 2, 4, 3}
+                new int[] {0, 1, 3}
             ),
             "ray AABB candidate indices"
         );

@@ -624,7 +624,7 @@ def test_stack_child_requires_parent_identity():
 
 def test_stack_child_can_be_disabled():
     candidate = replace(
-        snapshot(base_ref="feature/parent"),
+        snapshot(number=2, base_ref="feature/parent"),
         stack_relation=StackRelation.CHILD,
         parent_pr=1,
     )
