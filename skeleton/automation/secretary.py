@@ -43,6 +43,7 @@ from .supervisor_runtime import (
     require_remote_base_unchanged,
     sanitized_worker_env,
     validate_fingerprint,
+    validate_worker_evidence_custody,
 )
 
 MAX_PLAN = 18_000
@@ -590,6 +591,14 @@ def _dispatch_one(
                 evidence = parse_worker_result(
                     process.stdout,
                     worker=name,
+                )
+                validate_worker_evidence_custody(
+                    evidence,
+                    WorkerCustody(
+                        worker=name,
+                        snapshot_fingerprint=supervisor_fingerprint,
+                        execution=execution,
+                    ),
                 )
             return {
                 "bot": name,
