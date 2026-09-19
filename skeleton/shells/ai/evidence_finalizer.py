@@ -10,6 +10,10 @@ from skeleton.shells.ai.audit_witness import (
     SignedAIAuditWitness,
 )
 from skeleton.shells.ai.checkpoint import AISessionCheckpoint
+from skeleton.shells.ai.durable_root_protection import (
+    DurableFinalizationRootProtections,
+    DurableRootProtectionStore,
+)
 from skeleton.shells.ai.durable_session_commit import (
     DurableSessionCommitBuilder,
     DurableSessionCommitPublication,
@@ -61,6 +65,7 @@ class FinalizedAIExecutionEvidence:
     session_integrity: SessionEvidenceIntegrityReport | None = None
     session_journal_commit: DurableSessionJournalCommit | None = None
     session_commit: DurableSessionCommitPublication | None = None
+    root_protections: DurableFinalizationRootProtections | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -108,6 +113,11 @@ class FinalizedAIExecutionEvidence:
                 if self.session_commit is None
                 else self.session_commit.to_dict()
             ),
+            "root_protections": (
+                None
+                if self.root_protections is None
+                else self.root_protections.to_dict()
+            ),
         }
 
 
@@ -134,6 +144,9 @@ class AIExecutionEvidenceFinalizer:
         session_journals: DurableSessionJournalStore | None = None,
         session_commits: DurableSessionCommitStore | None = None,
         session_commit_builder: DurableSessionCommitBuilder | None = None,
+        root_protection_store: DurableRootProtectionStore | None = None,
+        journal_chain_id: str = "",
+        receipt_chain_id: str = "",
     ) -> None:
         self.journal = journal
         self.receipt_chain = receipt_chain
@@ -152,6 +165,37 @@ class AIExecutionEvidenceFinalizer:
             session_commit_builder
             or DurableSessionCommitBuilder()
         )
+        if root_protection_store is not None and not isinstance(
+            root_protection_store,
+            DurableRootProtectionStore,
+        ):
+            raise TypeError(
+                "root_protection_store must be DurableRootProtectionStore"
+            )
+        if root_protection_store is None:
+            if journal_chain_id or receipt_chain_id:
+                raise ValueError(
+                    "root protection chain ids require root_protection_store"
+                )
+        else:
+            if not journal_chain_id or not receipt_chain_id:
+                raise ValueError(
+                    "root protection store requires journal and receipt chain ids"
+                )
+            if (
+                len(journal_chain_id) > 128
+                or len(receipt_chain_id) > 128
+            ):
+                raise ValueError(
+                    "root protection chain id too long"
+                )
+            if journal_chain_id == receipt_chain_id:
+                raise ValueError(
+                    "journal and receipt protection chain ids must differ"
+                )
+        self.root_protection_store = root_protection_store
+        self.journal_chain_id = journal_chain_id
+        self.receipt_chain_id = receipt_chain_id
         policy = self.session_commit_builder.policy
         if self.session_commits is not None:
             if self.finalizations is None:
@@ -185,6 +229,13 @@ class AIExecutionEvidenceFinalizer:
             ):
                 raise ValueError(
                     "session commit policy requires signed execution evidence store"
+                )
+            if (
+                policy.require_root_protection
+                and self.root_protection_store is None
+            ):
+                raise ValueError(
+                    "session commit policy requires root protection store"
                 )
         self.integrity_verifier = (
             integrity_verifier
@@ -413,6 +464,20 @@ class AIExecutionEvidenceFinalizer:
             session_journal,
             evidence,
         )
+        root_protections = None
+        root_protection_digest = ""
+        if self.root_protection_store is not None:
+            root_protections = (
+                self.root_protection_store.protect_finalization(
+                    finalization_id=finalization_id,
+                    source_digest=execution.provenance.digest,
+                    journal_chain_id=self.journal_chain_id,
+                    journal_root=session_integrity.journal_root,
+                    receipt_chain_id=self.receipt_chain_id,
+                    receipt_root=session_integrity.receipt_root,
+                )
+            )
+            root_protection_digest = root_protections.digest
         session_journal_commit = None
         session_journal_manifest_digest = ""
         if self.session_journals is not None:
@@ -454,6 +519,9 @@ class AIExecutionEvidenceFinalizer:
             session_integrity_digest=session_integrity.digest,
             session_journal_manifest_digest=(
                 session_journal_manifest_digest
+            ),
+            root_protection_digest=(
+                root_protection_digest
             ),
         )
         recovery_commit = None
@@ -587,6 +655,9 @@ class AIExecutionEvidenceFinalizer:
                 session_journal_manifest_digest=(
                     session_journal_manifest_digest
                 ),
+                root_protection_digest=(
+                    root_protection_digest
+                ),
             )
             signed_execution_evidence = self.execution_evidence.append_once(
                 final_bundle
@@ -711,6 +782,9 @@ class AIExecutionEvidenceFinalizer:
                     if signed_execution_evidence is None
                     else signed_execution_evidence.chain_node_hash
                 ),
+                root_protection_digest=(
+                    root_protection_digest
+                ),
             )
             session_commit = self.session_commits.publish(
                 commit
@@ -729,4 +803,5 @@ class AIExecutionEvidenceFinalizer:
             session_integrity,
             session_journal_commit,
             session_commit,
+            root_protections,
         )
