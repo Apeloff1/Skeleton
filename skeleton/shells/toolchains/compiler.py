@@ -287,6 +287,12 @@ def compile_toolchain(
         environment_policies[contract.name] = contract.environment
         allowed_env.update(contract.environment.allowed_keys())
         capabilities.update(contract.required_capabilities)
+        if contract.environment.allowed_keys():
+            capabilities.add(ShellCapability.CUSTOM_ENV)
+        if contract.allow_stdin:
+            capabilities.add(ShellCapability.STDIN)
+        if contract.allow_nonzero_success:
+            capabilities.add(ShellCapability.NONZERO_SUCCESS)
         if contract.max_timeout is not None:
             max_contract_timeout = max(max_contract_timeout, contract.max_timeout)
             if contract.max_timeout > compiler_limits.long_running_threshold_seconds:
