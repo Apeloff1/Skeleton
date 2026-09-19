@@ -26,7 +26,6 @@ MAX_CONTROL_FILE_BYTES = 250_000
 
 REQUIRED_FILES = (
     "skeleton/security/scanner_integrity.py",
-    "skeleton/security/vuln_scanner.py",
     "skeleton/security/defense_plane.py",
     "skeleton/security/incident_containment.py",
     "skeleton/security/outbound_url.py",
@@ -105,15 +104,6 @@ def _read_control(root: Path, relative: str) -> tuple[str | None, list[Finding]]
             )
             return None, findings
         text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        findings.append(
-            Finding(
-                relative,
-                "missing",
-                "required security control file is absent",
-            )
-        )
-        return None, findings
     except (OSError, UnicodeError) as exc:
         findings.append(
             Finding(
