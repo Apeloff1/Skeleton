@@ -69,7 +69,8 @@ from skeleton.shells.shell_service import ShellService
 from skeleton.shells.receipts import ExecutionReceipt, ReceiptChain
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def make_intent(
