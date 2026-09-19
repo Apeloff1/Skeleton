@@ -163,6 +163,36 @@ class DurableArchivedNode:
 
 
 @dataclass(frozen=True)
+class DurableArchiveRootReplica:
+    archive_id: str
+    archive_manifest_digest: str
+    replicas: tuple[DurableArchiveRootReplica, ...] = ()
+
+    def __post_init__(self) -> None:
+        _identity(
+            "archive_id",
+            self.archive_id,
+            maximum=256,
+        )
+        object.__setattr__(
+            self,
+            "archive_manifest_digest",
+            _digest(
+                "archive_manifest_digest",
+                self.archive_manifest_digest,
+            ),
+        )
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "archive_id": self.archive_id,
+            "archive_manifest_digest": (
+                self.archive_manifest_digest
+            ),
+        }
+
+
+@dataclass(frozen=True)
 class DurableArchiveRootIndex:
     chain_id: str
     root_hash: str
@@ -192,6 +222,32 @@ class DurableArchiveRootIndex:
                 self.archive_manifest_digest,
             ),
         )
+        replicas = tuple(self.replicas)
+        primary = DurableArchiveRootReplica(
+            self.archive_id,
+            self.archive_manifest_digest,
+        )
+        if not replicas:
+            replicas = (primary,)
+        elif replicas[0] != primary:
+            raise ValueError(
+                "archive root replica list must begin with primary archive"
+            )
+        archive_ids = tuple(
+            item.archive_id
+            for item in replicas
+        )
+        if len(archive_ids) != len(
+            set(archive_ids)
+        ):
+            raise ValueError(
+                "duplicate archive root replica"
+            )
+        object.__setattr__(
+            self,
+            "replicas",
+            replicas,
+        )
         if self.sequence == 0 and self.root_hash != GENESIS_HASH:
             raise ValueError("genesis archive root index must use genesis hash")
         if self.sequence > 0 and self.root_hash == GENESIS_HASH:
@@ -204,6 +260,10 @@ class DurableArchiveRootIndex:
             "sequence": self.sequence,
             "archive_id": self.archive_id,
             "archive_manifest_digest": self.archive_manifest_digest,
+            "replicas": [
+                item.to_dict()
+                for item in self.replicas
+            ],
         }
 
 
@@ -717,12 +777,42 @@ class DurableArchiveRepository:
 
     @staticmethod
     def _root_index(raw: dict[str, object]) -> DurableArchiveRootIndex:
+        replicas_raw = raw.get(
+            "replicas",
+            (),
+        )
+        if not isinstance(
+            replicas_raw,
+            (list, tuple),
+        ):
+            raise DurableArchiveStoreError(
+                "archive root replicas must be a sequence"
+            )
+        replicas = tuple(
+            DurableArchiveRootReplica(
+                str(item["archive_id"]),
+                str(
+                    item[
+                        "archive_manifest_digest"
+                    ]
+                ),
+            )
+            for item in replicas_raw
+            if isinstance(item, dict)
+        )
+        if len(replicas) != len(
+            replicas_raw
+        ):
+            raise DurableArchiveStoreError(
+                "archive root replica must be mapping"
+            )
         return DurableArchiveRootIndex(
             str(raw["chain_id"]),
             str(raw["root_hash"]),
             int(raw["sequence"]),
             str(raw["archive_id"]),
             str(raw["archive_manifest_digest"]),
+            replicas,
         )
 
     @staticmethod
@@ -820,42 +910,91 @@ class DurableArchiveRepository:
         self,
         item: DurableArchiveRootIndex,
     ) -> bool:
-        key = self._root_key(item.chain_id, item.root_hash)
-        existing = self.backend.get(self.namespace, key)
-        if existing is None:
+        key = self._root_key(
+            item.chain_id,
+            item.root_hash,
+        )
+        candidate_replica = (
+            DurableArchiveRootReplica(
+                item.archive_id,
+                item.archive_manifest_digest,
+            )
+        )
+        for _ in range(
+            self.max_cas_retries
+        ):
+            existing = self.backend.get(
+                self.namespace,
+                key,
+            )
+            if existing is None:
+                try:
+                    self.backend.put_if_absent(
+                        self.namespace,
+                        key,
+                        item.to_dict(),
+                    )
+                    return True
+                except DistributedStateConflict:
+                    continue
+            if not isinstance(
+                existing.value,
+                dict,
+            ):
+                raise DurableArchiveStoreError(
+                    "archive root index must be mapping"
+                )
+            current = self._root_index(
+                dict(existing.value)
+            )
+            if (
+                current.chain_id
+                != item.chain_id
+                or current.root_hash
+                != item.root_hash
+                or current.sequence
+                != item.sequence
+            ):
+                raise DurableArchiveStoreError(
+                    "archive root already binds incompatible historical position"
+                )
+            for replica in current.replicas:
+                if (
+                    replica.archive_id
+                    == item.archive_id
+                ):
+                    if (
+                        replica.archive_manifest_digest
+                        != item.archive_manifest_digest
+                    ):
+                        raise DurableArchiveStoreError(
+                            "archive root replica id binds different manifest"
+                        )
+                    return False
+            updated = DurableArchiveRootIndex(
+                current.chain_id,
+                current.root_hash,
+                current.sequence,
+                current.archive_id,
+                current.archive_manifest_digest,
+                current.replicas
+                + (candidate_replica,),
+            )
             try:
-                self.backend.put_if_absent(
+                self.backend.compare_and_swap(
                     self.namespace,
                     key,
-                    item.to_dict(),
+                    expected_revision=(
+                        existing.revision
+                    ),
+                    value=updated.to_dict(),
                 )
                 return True
             except DistributedStateConflict:
-                existing = self.backend.get(
-                    self.namespace,
-                    key,
-                )
-                if existing is None:
-                    raise
-        if not isinstance(existing.value, dict):
-            raise DurableArchiveStoreError(
-                "archive root index must be mapping"
-            )
-        current = self._root_index(
-            dict(existing.value)
+                continue
+        raise DurableArchiveStoreError(
+            "archive root replica CAS retry budget exhausted"
         )
-        if (
-            current.chain_id != item.chain_id
-            or current.root_hash != item.root_hash
-            or current.sequence != item.sequence
-        ):
-            raise DurableArchiveStoreError(
-                "archive root already binds incompatible historical position"
-            )
-        # The same committed historical root can legitimately be represented
-        # by many later archives. Keep the first immutable index because it is
-        # sufficient to reconstruct that prefix and avoids index churn.
-        return False
 
     def _update_head(
         self,
@@ -1255,53 +1394,84 @@ class DurableArchiveRepository:
         chain_id: str,
         root_hash: str,
     ) -> tuple[object, ...]:
-        root_hash = _digest("root_hash", root_hash)
+        root_hash = _digest(
+            "root_hash",
+            root_hash,
+        )
         if root_hash == GENESIS_HASH:
             return ()
-        index = self.root_index(chain_id, root_hash)
-        if index is None:
-            raise DurableArchiveStoreError("historical root is not archived")
-        stored = self.get(index.archive_id)
-        if stored is None:
-            raise DurableArchiveStoreError(
-                "archive root index references missing archive"
-            )
-        if stored.manifest.manifest.digest != index.archive_manifest_digest:
-            raise DurableArchiveStoreError(
-                "root index manifest digest mismatch"
-            )
-        if index.sequence > len(stored.node_hashes):
-            raise DurableArchiveStoreError(
-                "root index sequence exceeds archive"
-            )
-        nodes = self._stored_nodes(
-            stored,
-            through_sequence=index.sequence,
+        index = self.root_index(
+            chain_id,
+            root_hash,
         )
-        terminal = (
-            GENESIS_HASH
-            if not nodes
-            else str(
-                getattr(
-                    nodes[-1],
-                    "event_hash",
-                    getattr(
-                        nodes[-1],
-                        "receipt_hash",
-                        getattr(
-                            nodes[-1],
-                            "node_hash",
-                            "",
-                        ),
+        if index is None:
+            raise DurableArchiveStoreError(
+                "historical root is not archived"
+            )
+
+        failures: list[str] = []
+        for replica in index.replicas:
+            try:
+                stored = self.get(
+                    replica.archive_id
+                )
+                if stored is None:
+                    raise DurableArchiveStoreError(
+                        "archive replica is missing"
+                    )
+                if (
+                    stored.manifest.manifest.digest
+                    != replica.archive_manifest_digest
+                ):
+                    raise DurableArchiveStoreError(
+                        "root replica manifest digest mismatch"
+                    )
+                if (
+                    index.sequence
+                    > len(stored.node_hashes)
+                ):
+                    raise DurableArchiveStoreError(
+                        "root index sequence exceeds archive replica"
+                    )
+                nodes = self._stored_nodes(
+                    stored,
+                    through_sequence=(
+                        index.sequence
                     ),
                 )
-            )
+                terminal = (
+                    GENESIS_HASH
+                    if not nodes
+                    else str(
+                        getattr(
+                            nodes[-1],
+                            "event_hash",
+                            getattr(
+                                nodes[-1],
+                                "receipt_hash",
+                                getattr(
+                                    nodes[-1],
+                                    "node_hash",
+                                    "",
+                                ),
+                            ),
+                        )
+                    )
+                )
+                if terminal != root_hash:
+                    raise DurableArchiveStoreError(
+                        "archive replica does not terminate at root"
+                    )
+                return nodes
+            except Exception as exc:
+                failures.append(
+                    f"{replica.archive_id}:"
+                    f"{type(exc).__name__}"
+                )
+        raise DurableArchiveStoreError(
+            "all archive replicas failed historical reconstruction: "
+            + ",".join(failures)
         )
-        if terminal != root_hash:
-            raise DurableArchiveStoreError(
-                "archived snapshot does not terminate at root"
-            )
-        return nodes
 
     def verify_root(
         self,
