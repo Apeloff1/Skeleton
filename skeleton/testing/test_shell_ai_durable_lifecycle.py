@@ -986,7 +986,7 @@ def test_lifecycle_blocks_compaction_when_archive_root_index_missing():
     journal = fixture[1]
     archives = fixture[5]
     coordinator = fixture[7]
-    root = ready.archive.manifest.entries[0].root_hash
+    root = ready.archive.manifest.entries[0].node_hash
     key = archives._root_key(
         "journal",
         root,
@@ -1028,7 +1028,7 @@ def test_lifecycle_returns_to_ready_after_archive_index_repair():
     journal = fixture[1]
     archives = fixture[5]
     coordinator = fixture[7]
-    root = ready.archive.manifest.entries[0].root_hash
+    root = ready.archive.manifest.entries[0].node_hash
     key = archives._root_key(
         "journal",
         root,
@@ -1072,7 +1072,7 @@ def test_lifecycle_blocks_invalid_archive_root_index():
     journal = fixture[1]
     archives = fixture[5]
     coordinator = fixture[7]
-    root = ready.archive.manifest.entries[0].root_hash
+    root = ready.archive.manifest.entries[0].node_hash
     key = archives._root_key(
         "journal",
         root,
@@ -1242,7 +1242,7 @@ def test_lifecycle_report_digest_changes_with_archive_index_health():
     journal = fixture[1]
     archives = fixture[5]
     coordinator = fixture[7]
-    root = ready.archive.manifest.entries[0].root_hash
+    root = ready.archive.manifest.entries[0].node_hash
     key = archives._root_key(
         "journal",
         root,
