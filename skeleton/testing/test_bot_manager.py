@@ -6,6 +6,7 @@ from skeleton.automation.bot_manager import (
     COOLDOWN_SECONDS,
     DEFAULT_BOTS,
     BotHealth,
+    bounded_health_summary,
     record_result,
     record_worker_outcome,
     select_due,
@@ -134,3 +135,63 @@ def test_worker_outcome_rejects_unregistered_identity():
                 },
             },
         )
+
+
+def test_health_summary_is_bounded_non_authoritative_and_deterministic():
+    state = {
+        "security-auditor": {
+            "name": "security-auditor",
+            "enabled": True,
+            "failures": 2,
+            "last_run": 900.0,
+            "circuit_open": False,
+            "secret": "must-not-propagate",
+        },
+        "attacker-worker": {
+            "name": "attacker-worker",
+            "enabled": True,
+            "failures": 999,
+            "last_run": 999.0,
+            "circuit_open": False,
+        },
+    }
+    summary = bounded_health_summary(state, now=1000.0)
+    assert summary["non_authoritative"] is True
+    assert summary["worker_count"] == len(DEFAULT_BOTS)
+    names = [item["name"] for item in summary["workers"]]
+    assert names == sorted(DEFAULT_BOTS)
+    assert "attacker-worker" not in names
+    security = next(
+        item for item in summary["workers"]
+        if item["name"] == "security-auditor"
+    )
+    assert security == {
+        "name": "security-auditor",
+        "enabled": True,
+        "failures": 2,
+        "circuit_open": False,
+        "seconds_since_last_run": 100,
+    }
+    assert "secret" not in security
+
+
+def test_health_summary_normalizes_malformed_state():
+    summary = bounded_health_summary(
+        {
+            "root-cause": {
+                "enabled": "yes",
+                "failures": -5,
+                "last_run": float("nan"),
+                "circuit_open": "no",
+            }
+        },
+        now=1000.0,
+    )
+    root = next(
+        item for item in summary["workers"]
+        if item["name"] == "root-cause"
+    )
+    assert root["enabled"] is True
+    assert root["failures"] == 0
+    assert root["circuit_open"] is False
+    assert root["seconds_since_last_run"] is None
