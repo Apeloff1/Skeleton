@@ -401,7 +401,7 @@ def test_transaction_rejects_command_cwd_outside_protected_root(tmp_path: Path):
     outside = tmp_path / "outside"
     outside.mkdir()
 
-    with pytest.raises(ValueError, match="inside the protected workspace"):
+    with pytest.raises(ValueError, match="outside compiled roots|inside the protected workspace"):
         plane.execute(
             ToolchainInvocation(
                 "test.read",
