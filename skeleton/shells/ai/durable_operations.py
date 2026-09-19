@@ -28,6 +28,10 @@ from skeleton.shells.ai.durable_retention import (
     DurableRetentionPlanner,
     DurableRetentionState,
 )
+from skeleton.shells.ai.durable_verification_health import (
+    DurableChainVerificationHealth,
+    DurableVerificationFleetGuard,
+)
 
 
 class DurableOperationsSeverity(str, Enum):
@@ -129,6 +133,7 @@ class DurableChainOperationsReport:
     checkpoint_verification: DurableCheckpointVerification | None
     retention: DurableRetentionPlan | None
     findings: tuple[DurableOperationsFinding, ...]
+    verification_health: DurableChainVerificationHealth | None = None
 
     def __post_init__(self) -> None:
         if not self.chain_id or len(self.chain_id) > 128:
@@ -226,6 +231,11 @@ class DurableChainOperationsReport:
                 None
                 if self.checkpoint_verification is None
                 else self.checkpoint_verification.to_dict()
+            ),
+            "verification_health": (
+                None
+                if self.verification_health is None
+                else self.verification_health.to_dict()
             ),
             "retention": (
                 None
@@ -334,6 +344,7 @@ class DurableEvidenceOperationsInspector:
         *,
         recovery_health: DurableRecoveryHealthGuard | None = None,
         policy: DurableOperationsPolicy | None = None,
+        verification_guard: DurableVerificationFleetGuard | None = None,
     ) -> None:
         if not isinstance(checkpoints, DurableChainCheckpointStore):
             raise TypeError("checkpoints must be DurableChainCheckpointStore")
@@ -349,9 +360,20 @@ class DurableEvidenceOperationsInspector:
             raise TypeError(
                 "recovery_health must be DurableRecoveryHealthGuard"
             )
+        if (
+            verification_guard is not None
+            and not isinstance(
+                verification_guard,
+                DurableVerificationFleetGuard,
+            )
+        ):
+            raise TypeError(
+                "verification_guard must be DurableVerificationFleetGuard"
+            )
         self.checkpoints = checkpoints
         self.retention = retention
         self.recovery_health = recovery_health
+        self.verification_guard = verification_guard
         self.policy = policy or DurableOperationsPolicy()
 
     @staticmethod
@@ -379,13 +401,21 @@ class DurableEvidenceOperationsInspector:
         protected_roots: tuple[str, ...] = (),
     ) -> DurableChainOperationsReport:
         findings: list[DurableOperationsFinding] = []
+        verification_health: DurableChainVerificationHealth | None = None
         try:
-            chain_valid = bool(chain.verify())
             head = chain.head()
             sequence = int(head.sequence)
             root_hash = str(head.root_hash)
             capacity = self._capacity(chain)
             utilization = sequence / capacity
+            if self.verification_guard is None:
+                chain_valid = bool(chain.verify())
+            else:
+                verification_report = self.verification_guard.inspect(
+                    ((chain_id, chain),)
+                )
+                verification_health = verification_report.chains[0]
+                chain_valid = verification_health.ok
         except Exception as exc:
             return DurableChainOperationsReport(
                 chain_id,
@@ -409,14 +439,25 @@ class DurableEvidenceOperationsInspector:
                         chain_id,
                     ),
                 ),
+                verification_health,
             )
 
         if not chain_valid:
+            code = (
+                "durable_verification.cursor_not_current"
+                if verification_health is not None
+                else "durable_chain.integrity"
+            )
+            message = (
+                "signed durable verification cursor is not current"
+                if verification_health is not None
+                else "durable evidence chain failed integrity verification"
+            )
             findings.append(
                 DurableOperationsFinding(
                     DurableOperationsSeverity.ERROR,
-                    "durable_chain.integrity",
-                    "durable evidence chain failed integrity verification",
+                    code,
+                    message,
                     chain_id,
                 )
             )
@@ -461,6 +502,14 @@ class DurableEvidenceOperationsInspector:
                 chain,
                 protected_roots=protected_roots,
                 capacity=capacity,
+                verified_head=(
+                    verification_health
+                    if (
+                        verification_health is not None
+                        and verification_health.ok
+                    )
+                    else None
+                ),
             )
         except Exception as exc:
             findings.append(
@@ -563,6 +612,7 @@ class DurableEvidenceOperationsInspector:
             checkpoint_verification,
             retention_plan,
             tuple(findings),
+            verification_health,
         )
 
     def inspect(
