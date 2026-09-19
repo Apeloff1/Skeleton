@@ -4455,3 +4455,622 @@ def test_serialized_finalization_exposes_manifest_commit(tmp_path):
         ["journal_digest"]
         == result.finalized.session_journal.digest
     )
+
+def test_finalization_publishes_signed_cross_store_session_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    publication = result.finalized.session_commit
+    assert publication is not None
+    assert publication.stored.signed.commit.session_id == "session"
+    assert (
+        publication.stored.signed.commit.finalization_id
+        == result.finalized.finalization.finalization_id
+    )
+    assert env.session_commits.verify(
+        result.finalized.finalization.finalization_id
+    )
+
+
+def test_session_commit_binds_every_finalized_evidence_layer(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, seal, _, result = env.execute()
+    finalized = result.finalized
+    commit = finalized.session_commit.stored.signed.commit
+    assert commit.execution_attempt_id == seal.seal_id
+    assert commit.provenance_digest == result.execution.provenance.digest
+    assert (
+        commit.recovery_checkpoint_digest
+        == finalized.recovery_checkpoint.digest
+    )
+    assert (
+        commit.session_evidence_digest
+        == finalized.session_evidence.digest
+    )
+    assert (
+        commit.session_journal_digest
+        == finalized.session_journal.digest
+    )
+    assert (
+        commit.session_journal_manifest_digest
+        == finalized.session_journal_commit.stored.manifest.digest
+    )
+    assert (
+        commit.session_integrity_digest
+        == finalized.session_integrity.digest
+    )
+    assert commit.journal_root == finalized.checkpoint.journal_root
+    assert commit.receipt_root == finalized.checkpoint.receipt_root
+    assert (
+        commit.audit_anchor_digest
+        == finalized.audit_anchor.anchor.digest
+    )
+    assert (
+        commit.audit_chain_node_hash
+        == finalized.audit_anchor.chain_node_hash
+    )
+    assert (
+        commit.audit_root
+        == finalized.finalization.audit_root
+    )
+    assert (
+        commit.audit_witness_digest
+        == finalized.audit_witness.witness.digest
+    )
+    assert (
+        commit.audit_witness_sequence
+        == finalized.audit_witness.witness.sequence
+    )
+    assert (
+        commit.execution_evidence_digest
+        == finalized.execution_evidence.evidence.digest
+    )
+    assert (
+        commit.execution_evidence_chain_node_hash
+        == finalized.execution_evidence.chain_node_hash
+    )
+    assert (
+        commit.runtime_trust_digest
+        == finalized.finalization.runtime_trust_digest
+    )
+    assert (
+        commit.release_evidence_digest
+        == finalized.finalization.release_evidence_digest
+    )
+
+
+def test_session_commit_records_signed_immutable_store_revisions(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    finalized = result.finalized
+    commit = finalized.session_commit.stored.signed.commit
+    assert (
+        commit.recovery_revision
+        == finalized.recovery_commit.stored.revision
+    )
+    assert (
+        commit.session_evidence_revision
+        == env.session_evidence.current(
+            session.session_id
+        ).revision
+    )
+    assert (
+        commit.session_journal_revision
+        == finalized.session_journal_commit.stored.revision
+    )
+    assert commit.finalization_revision >= 1
+
+
+def test_finalized_result_serializes_session_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    data = result.finalized.to_dict()
+    commit = data["session_commit"]
+    assert commit is not None
+    assert (
+        commit["stored"]["signed"]["commit_digest"]
+        == result.finalized.session_commit.stored.signed.commit.digest
+    )
+    assert commit["head"]["session_id"] == "session"
+    assert commit["head_created"] is True
+
+
+def test_fresh_session_commit_store_verifies_publication(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    fresh = DurableSessionCommitStore(
+        env.backend,
+        ArtifactSigner(
+            "session-commit",
+            b"c" * 32,
+            clock=lambda: 99.0,
+        ),
+        namespace="session-commits",
+    )
+    stored = fresh.require(finalization_id)
+    assert (
+        stored.signed.commit.digest
+        == result.finalized.session_commit.stored.signed.commit.digest
+    )
+    assert fresh.verify(finalization_id)
+
+
+def test_required_session_commit_is_verified_during_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    report = durable_verifier(env).require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.session_commit_verified
+    assert (
+        report.session_commit_id
+        == result.finalized.session_commit.stored.signed.commit.commit_id
+    )
+    assert (
+        report.session_commit_digest
+        == result.finalized.session_commit.stored.signed.commit.digest
+    )
+
+
+def test_session_commit_remains_valid_after_unrelated_chain_growth(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="commit-first",
+        intent_id="commit-first",
+    )
+    first_commit = first.finalized.session_commit.stored.signed.commit
+    env.execute(
+        session_id="commit-second",
+        intent_id="commit-second",
+    )
+    report = durable_verifier(env).require_verified(
+        first.finalized.finalization.finalization_id
+    )
+    assert report.session_commit_verified
+    assert report.session_commit_digest == first_commit.digest
+
+
+def test_two_sessions_publish_independent_session_commit_heads(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="head-first",
+        intent_id="head-first",
+    )
+    _, _, _, _, second = env.execute(
+        session_id="head-second",
+        intent_id="head-second",
+    )
+    first_stored = env.session_commits.require_session(
+        "head-first"
+    )
+    second_stored = env.session_commits.require_session(
+        "head-second"
+    )
+    assert (
+        first_stored.signed.commit.finalization_id
+        == first.finalized.finalization.finalization_id
+    )
+    assert (
+        second_stored.signed.commit.finalization_id
+        == second.finalized.finalization.finalization_id
+    )
+    assert (
+        first_stored.signed.commit.commit_id
+        != second_stored.signed.commit.commit_id
+    )
+
+
+def test_operational_finalization_error_note_does_not_invalidate_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    before = env.session_commits.require(
+        finalization_id
+    ).signed.commit
+    current = env.finalizations.current(
+        finalization_id
+    )
+    updated = env.finalizations.note_error(
+        current.finalization,
+        RuntimeError("post-commit diagnostic"),
+    )
+    assert updated.revision > current.revision
+    report = durable_verifier(env).require_verified(
+        finalization_id
+    )
+    assert report.session_commit_verified
+    after = env.session_commits.require(
+        finalization_id
+    ).signed.commit
+    assert after.digest == before.digest
+    assert after.commit_id == before.commit_id
+
+
+def test_missing_required_session_commit_record_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    commit = result.finalized.session_commit.stored.signed.commit
+    key = env.session_commits._commit_key(
+        finalization_id
+    )
+    record = env.backend.get(
+        env.session_commits.namespace,
+        key,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert not report.session_commit_verified
+    assert any(
+        item.code == "session_commit.missing"
+        for item in report.findings
+    )
+    assert commit.digest
+
+
+def test_missing_session_commit_head_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    commit = result.finalized.session_commit.stored.signed.commit
+    key = env.session_commits._head_key(
+        commit.session_id
+    )
+    record = env.backend.get(
+        env.session_commits.namespace,
+        key,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.publication_corruption"
+        for item in report.findings
+    )
+
+
+def test_tampered_session_commit_signature_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    key = env.session_commits._commit_key(
+        finalization_id
+    )
+    record = env.backend.get(
+        env.session_commits.namespace,
+        key,
+    )
+    signed = record.value
+    tampered = replace(
+        signed,
+        signature=replace(
+            signed.signature,
+            signature="0" * 64,
+        ),
+    )
+    env.backend.compare_and_swap(
+        env.session_commits.namespace,
+        key,
+        expected_revision=record.revision,
+        value=tampered,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.corruption"
+        for item in report.findings
+    )
+
+
+def test_tampered_session_commit_head_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    commit = result.finalized.session_commit.stored.signed.commit
+    key = env.session_commits._head_key(
+        commit.session_id
+    )
+    record = env.backend.get(
+        env.session_commits.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        env.session_commits.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            commit_digest=fp("tampered-commit-head"),
+        ),
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.publication_corruption"
+        for item in report.findings
+    )
+
+
+def test_semantic_finalization_substitution_breaks_session_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    key = env.finalizations.key(
+        finalization_id
+    )
+    record = env.backend.get(
+        env.finalizations.namespace,
+        key,
+    )
+    substituted = replace(
+        record.value,
+        runtime_trust_digest=fp("substituted-runtime-trust"),
+    )
+    env.backend.compare_and_swap(
+        env.finalizations.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.finalization_semantics"
+        for item in report.findings
+    )
+
+
+def test_recovery_revision_floor_is_signed_and_enforced(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    original = result.finalized.session_commit.stored.signed.commit
+
+    commit_key = env.session_commits._commit_key(
+        finalization_id
+    )
+    head_key = env.session_commits._head_key(
+        original.session_id
+    )
+    commit_record = env.backend.get(
+        env.session_commits.namespace,
+        commit_key,
+    )
+    head_record = env.backend.get(
+        env.session_commits.namespace,
+        head_key,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        head_key,
+        expected_revision=head_record.revision,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        commit_key,
+        expected_revision=commit_record.revision,
+    )
+
+    raised_floor = replace(
+        original,
+        recovery_revision=(
+            original.recovery_revision + 10
+        ),
+    )
+    env.session_commits.publish(
+        raised_floor
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.recovery_revision_regressed"
+        for item in report.findings
+    )
+
+
+def test_session_evidence_revision_floor_is_signed_and_enforced(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    original = result.finalized.session_commit.stored.signed.commit
+
+    commit_key = env.session_commits._commit_key(finalization_id)
+    head_key = env.session_commits._head_key(original.session_id)
+    commit_record = env.backend.get(
+        env.session_commits.namespace,
+        commit_key,
+    )
+    head_record = env.backend.get(
+        env.session_commits.namespace,
+        head_key,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        head_key,
+        expected_revision=head_record.revision,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        commit_key,
+        expected_revision=commit_record.revision,
+    )
+    env.session_commits.publish(
+        replace(
+            original,
+            session_evidence_revision=(
+                original.session_evidence_revision + 10
+            ),
+        )
+    )
+    report = durable_verifier(env).verify(finalization_id)
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.session_evidence_revision_regressed"
+        for item in report.findings
+    )
+
+
+def test_session_journal_revision_floor_is_signed_and_enforced(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    original = result.finalized.session_commit.stored.signed.commit
+    commit_key = env.session_commits._commit_key(finalization_id)
+    head_key = env.session_commits._head_key(original.session_id)
+    commit_record = env.backend.get(
+        env.session_commits.namespace,
+        commit_key,
+    )
+    head_record = env.backend.get(
+        env.session_commits.namespace,
+        head_key,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        head_key,
+        expected_revision=head_record.revision,
+    )
+    env.backend.delete(
+        env.session_commits.namespace,
+        commit_key,
+        expected_revision=commit_record.revision,
+    )
+    env.session_commits.publish(
+        replace(
+            original,
+            session_journal_revision=(
+                original.session_journal_revision + 10
+            ),
+        )
+    )
+    report = durable_verifier(env).verify(finalization_id)
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "session_commit.session_journal_revision_regressed"
+        for item in report.findings
+    )
+
+
+def test_deleted_session_journal_manifest_is_detected_by_commit(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    key = env.session_journals._manifest_key(
+        finalization_id
+    )
+    record = env.backend.get(
+        env.session_journals.namespace,
+        key,
+    )
+    env.backend.delete(
+        env.session_journals.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    report = durable_verifier(env).verify(finalization_id)
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code in {
+            "session_commit.session_journal_revision_regressed",
+            "session_journal.corruption",
+        }
+        for item in report.findings
+    )
+
+
+def test_session_commit_report_digest_stable_after_later_work(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="stable-commit-first",
+        intent_id="stable-commit-first",
+    )
+    verifier = durable_verifier(env)
+    before = verifier.require_verified(
+        first.finalized.finalization.finalization_id
+    )
+    env.execute(
+        session_id="stable-commit-second",
+        intent_id="stable-commit-second",
+    )
+    after = verifier.require_verified(
+        first.finalized.finalization.finalization_id
+    )
+    assert before.session_commit_digest == after.session_commit_digest
+    assert before.session_commit_id == after.session_commit_id
+
+
+def test_session_commit_required_store_constructor_guard(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        ValueError,
+        match="session commit store",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            session_journals=env.session_journals,
+            require_session_commit=True,
+        )
+
+
+def test_session_commit_store_type_guard(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        TypeError,
+        match="session_commits",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            session_journals=env.session_journals,
+            session_commits=object(),
+        )
+
+
+def test_require_session_commit_must_be_bool(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        ValueError,
+        match="bool",
+    ):
+        DurableSessionRecoveryVerifier(
+            finalizations=env.finalizations,
+            recovery_checkpoints=env.recovery,
+            session_evidence=env.session_evidence,
+            journal=env.journal,
+            receipt_chain=env.receipts,
+            execution_evidence=env.execution_evidence,
+            session_journals=env.session_journals,
+            session_commits=env.session_commits,
+            require_session_commit="yes",
+        )
+
