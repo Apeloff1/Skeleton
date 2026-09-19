@@ -202,12 +202,7 @@ class AIExecutionEvidenceFinalizer:
                 raise ValueError(
                     "execution_attempt_authority_digest must be SHA-256 hex"
                 )
-            try:
-                int(explicit_attempt_authority_digest, 16)
-            except ValueError as exc:
-                raise ValueError(
-                    "execution_attempt_authority_digest must be SHA-256 hex"
-                ) from exc
+            # Opaque 64-character attempt authority digest.
             explicit_attempt_authority_digest = (
                 explicit_attempt_authority_digest.lower()
             )
