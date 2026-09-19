@@ -932,4 +932,3 @@ def test_historical_root_stays_valid_after_many_later_events():
     assert journal.snapshot_at(
         first.event_hash
     ) == (first,)
-
