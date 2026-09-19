@@ -130,6 +130,12 @@ jobs:
       - name: GitHub Actions workflow security gate
         run: python scripts/check_workflow_security.py
 
+      - name: GitHub Actions repository allowlist
+        run: python scripts/check_workflow_action_allowlist.py
+
+      - name: GitHub Actions token permissions
+        run: python scripts/check_workflow_permissions.py
+
       - name: GitHub Actions trigger-fanout audit
         run: python scripts/check_workflow_trigger_fanout.py
 
@@ -179,6 +185,11 @@ jobs:
           tests/test_workflow_quoted_key_security.py
           tests/test_workflow_flow_uses_security.py
           tests/test_workflow_trigger_security.py
+          tests/test_workflow_security_checkout_credentials.py
+          tests/test_workflow_input_security_gate.py
+          tests/test_workflow_event_shell_security.py
+          tests/test_workflow_action_allowlist.py
+          tests/test_workflow_permissions_gate.py
           tests/test_workflow_trigger_fanout_gate.py
           tests/test_workflow_concurrency_gate.py
           tests/test_workflow_run_branch_completions_contract.py
