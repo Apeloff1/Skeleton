@@ -11,14 +11,56 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-from typing import Iterable
+from typing import Iterable, Protocol
 
-from skeleton.shells.ai.distributed_state import DistributedStateConflict
-from skeleton.shells.ai.durable_hot_floor import (
-    DurableHotFloorStore,
-    HotFloorPosition,
-)
-from skeleton.shells.ai.store_protocol import VersionedStateBackend
+
+class VersionedStateBackend(Protocol):
+    def get(self, namespace: str, key: str): ...
+
+    def put_if_absent(
+        self,
+        namespace: str,
+        key: str,
+        value: object,
+    ): ...
+
+    def compare_and_swap(
+        self,
+        namespace: str,
+        key: str,
+        *,
+        expected_revision: int,
+        value: object,
+    ): ...
+
+    def delete(
+        self,
+        namespace: str,
+        key: str,
+        *,
+        expected_revision: int,
+    ) -> bool: ...
+
+
+class DurableHotFloorStore(Protocol):
+    def position(self, chain_id: str): ...
+
+
+@dataclass(frozen=True)
+class HotFloorPosition:
+    sequence: int
+    root_hash: str
+
+    @classmethod
+    def genesis(cls) -> "HotFloorPosition":
+        return cls(0, "0" * 64)
+
+
+def _distributed_state_conflict_type():
+    """Resolve the AI store conflict lazily to avoid package import cycles."""
+    from skeleton.shells.ai.distributed_state import DistributedStateConflict
+
+    return DistributedStateConflict
 from skeleton.shells.sequence_index import SequenceIndexBackfillBatch
 from skeleton.shells.receipts import (
     ChainedReceipt,
@@ -280,12 +322,11 @@ class DistributedReceiptChain:
             raise ValueError(
                 "hot_floor_store and hot_floor_chain_id must be configured together"
             )
-        if hot_floor_store is not None and not isinstance(
-            hot_floor_store,
-            DurableHotFloorStore,
+        if hot_floor_store is not None and not callable(
+            getattr(hot_floor_store, "position", None)
         ):
             raise TypeError(
-                "hot_floor_store must be DurableHotFloorStore"
+                "hot_floor_store must provide position(chain_id)"
             )
         if hot_floor_chain_id and len(hot_floor_chain_id) > 128:
             raise ValueError("hot_floor_chain_id too long")
@@ -387,7 +428,7 @@ class DistributedReceiptChain:
                     entry,
                 )
                 return entry
-            except DistributedStateConflict:
+            except _distributed_state_conflict_type():
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -482,7 +523,7 @@ class DistributedReceiptChain:
                     item,
                 )
                 return
-            except DistributedStateConflict:
+            except _distributed_state_conflict_type():
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -526,7 +567,7 @@ class DistributedReceiptChain:
                     entry,
                 )
                 return
-            except DistributedStateConflict:
+            except _distributed_state_conflict_type():
                 existing = self.backend.get(
                     self.namespace,
                     key,
@@ -605,7 +646,7 @@ class DistributedReceiptChain:
                     expected_revision=revision,
                     value=next_head,
                 )
-            except DistributedStateConflict:
+            except _distributed_state_conflict_type():
                 current_revision, current = (
                     self._head_revision()
                 )
@@ -1429,7 +1470,7 @@ class DistributedReceiptChain:
                         expected_revision=revision,
                         value=next_head,
                     )
-                except DistributedStateConflict:
+                except _distributed_state_conflict_type():
                     continue
                 self._put_sequence_index(item)
                 self._put_index(item)
