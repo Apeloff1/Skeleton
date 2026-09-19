@@ -310,14 +310,20 @@ def test_durable_receipt_multiple_hashes_match_local_chain():
 def test_durable_receipt_outer_node_tamper_fails_verify():
     store = InMemoryFencedStore()
     durable = DistributedReceiptChain(store, namespace="receipts")
-    durable.append(receipt())
-    outer = durable._chain.snapshot()[0]
-    record = store.get("receipts", f"node:{outer.node_hash}")
+    outer = durable.append(receipt())
+    key = durable._node_key(outer.receipt_hash)
+    record = store.get("receipts", key)
     store.compare_and_swap(
         "receipts",
-        f"node:{outer.node_hash}",
+        key,
         expected_revision=record.revision,
-        value=replace(outer, payload={"receipt": {"bad": True}}),
+        value=replace(
+            outer,
+            receipt=replace(
+                outer.receipt,
+                stdout_bytes=outer.receipt.stdout_bytes + 1,
+            ),
+        ),
     )
     assert not durable.verify()
 
