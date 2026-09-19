@@ -18,6 +18,10 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedAIDecisionJournal,
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.durable_health import (
+    DurableRecoveryHealthGuard,
+    DurableRecoveryHealthPolicy,
+)
 from skeleton.shells.ai.durable_recovery import (
     DurableRecoveryStatus,
     DurableRecoveryVerificationError,
@@ -38,12 +42,16 @@ from skeleton.shells.ai.finalization_reconciler import (
 )
 from skeleton.shells.ai.finalization_state import AIExecutionFinalizationStore
 from skeleton.shells.ai.governance import AIShellGovernance
+from skeleton.shells.ai.lifecycle import AIServicePhase
 from skeleton.shells.ai.model_port import CallableAIModelPort
 from skeleton.shells.ai.orchestrator import AIShellOrchestrator
 from skeleton.shells.ai.planner import AIPlanner
 from skeleton.shells.ai.policy import AIShellPolicy, AutonomyMode
 from skeleton.shells.ai.policy_store import AIPolicyStore
 from skeleton.shells.ai.protocol import AIModelResponse
+from skeleton.shells.ai.recovery_requirements import (
+    DurableRecoveryRequirementStore,
+)
 from skeleton.shells.ai.recovery_store import AIRecoveryCheckpointStore
 from skeleton.shells.ai.router import AIToolRouter
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry
@@ -1356,3 +1364,480 @@ def test_durable_recovery_report_digest_survives_unrelated_later_work(tmp_path):
     )
     assert second.digest == first.digest
     assert second.session_integrity_digest == first.session_integrity_digest
+
+def recovery_requirement_guard(env, *, policy=None):
+    verifier = DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=DistributedAIDecisionJournal(
+            env.backend,
+            namespace="decision-journal",
+        ),
+        receipt_chain=DistributedReceiptChain(
+            env.backend,
+            namespace="receipts",
+        ),
+        execution_evidence=env.execution_evidence,
+    )
+    return DurableRecoveryHealthGuard(
+        verifier,
+        policy or DurableRecoveryHealthPolicy(),
+    )
+
+
+def recovery_requirement_store(env, *, scope="prod", ids=()):
+    requirements = DurableRecoveryRequirementStore(
+        env.backend,
+        ArtifactSigner(
+            "recovery-requirements",
+            b"m" * 32,
+            clock=lambda: 20.0,
+        ),
+        namespace="recovery-requirements",
+        clock=lambda: 20.0,
+    )
+    requirements.initialize(scope, ids)
+    return requirements
+
+
+def restart_service_with_requirements(
+    env,
+    requirements,
+    *,
+    scope="prod",
+    policy=None,
+):
+    return AIShellService(
+        env.orchestrator,
+        env.service.diagnostics,
+        env.service.governance,
+        execution_attempts=env.attempts,
+        worker_id="worker-restart",
+        durable_recovery_guard=recovery_requirement_guard(
+            env,
+            policy=policy,
+        ),
+        durable_recovery_requirement_store=requirements,
+        durable_recovery_requirement_scope=scope,
+    )
+
+
+def test_service_restart_uses_signed_recovery_requirement_manifest(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.READY
+    assert restarted.durable_recovery_ids == (finalization_id,)
+    status = restarted.status().to_dict()
+    manifest = status["durable_recovery_requirements"]["manifest"]
+    assert manifest["generation"] == 1
+    assert manifest["finalization_ids"] == [finalization_id]
+    assert status["durable_recovery"]["allowed"] is True
+
+
+def test_live_manifest_addition_of_missing_proof_degrades_service(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.ready()
+
+    requirements.add(
+        "prod",
+        ("missing-finalization",),
+        expected_generation=1,
+        change_id="require-missing",
+        reason="operator requires additional proof",
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="durable recovery verification failed",
+    ):
+        restarted.new_session(
+            make_intent(intent_id="blocked"),
+            session_id="blocked",
+        )
+    assert restarted.state.phase is AIServicePhase.DEGRADED
+    assert restarted.durable_recovery_ids == (
+        finalization_id,
+        "missing-finalization",
+    )
+
+
+def test_live_manifest_addition_of_verified_proof_is_adopted(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="first",
+        intent_id="first-intent",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(first_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.ready()
+
+    _, _, _, _, second = env.execute(
+        session_id="second",
+        intent_id="second-intent",
+    )
+    second_id = second.finalized.finalization.finalization_id
+    requirements.add(
+        "prod",
+        (second_id,),
+        expected_generation=1,
+        change_id="require-second",
+        reason="second terminal execution joined recovery set",
+    )
+
+    session = restarted.new_session(
+        make_intent(intent_id="after-add"),
+        session_id="after-add",
+    )
+    assert session.session_id == "after-add"
+    assert restarted.state.phase is AIServicePhase.READY
+    assert restarted.durable_recovery_ids == tuple(
+        sorted((first_id, second_id))
+    )
+    assert (
+        restarted.status()
+        .durable_recovery_requirements["manifest"]["generation"]
+        == 2
+    )
+
+
+def test_tampered_manifest_head_degrades_live_service(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.ready()
+
+    key = requirements._head_key("prod")
+    record = env.backend.get(
+        requirements.namespace,
+        key,
+    )
+    raw = dict(record.value)
+    signature = dict(raw["signature"])
+    signature["signature"] = "0" * 64
+    raw["signature"] = signature
+    env.backend.compare_and_swap(
+        requirements.namespace,
+        key,
+        expected_revision=record.revision,
+        value=raw,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="requirement verification failed",
+    ):
+        restarted.new_session(
+            make_intent(intent_id="tampered"),
+            session_id="tampered",
+        )
+    assert restarted.state.phase is AIServicePhase.DEGRADED
+
+
+def test_signed_old_manifest_replay_degrades_live_service(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    first = requirements.require("prod")
+    requirements.add(
+        "prod",
+        ("missing-finalization",),
+        expected_generation=1,
+        change_id="generation-two",
+        reason="advance manifest",
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+
+    # Restore a clean worker setup at generation two, then replace the head
+    # value with the correctly signed generation-one artifact. CAS revision
+    # fencing must reject this rollback even though the signature is valid.
+    requirements.remove(
+        "prod",
+        ("missing-finalization",),
+        expected_generation=2,
+        change_id="generation-three",
+        reason="remove missing proof after archive decision",
+    )
+    clean = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    clean.start()
+    assert clean.state.ready()
+
+    key = requirements._head_key("prod")
+    record = env.backend.get(
+        requirements.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        requirements.namespace,
+        key,
+        expected_revision=record.revision,
+        value=first.to_dict(),
+    )
+    with pytest.raises(RuntimeError):
+        clean.new_session(
+            make_intent(intent_id="rollback"),
+            session_id="rollback",
+        )
+    assert clean.state.phase is AIServicePhase.DEGRADED
+
+
+def test_explicit_signed_removal_allows_clean_restart(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(finalization_id,),
+    )
+    requirements.add(
+        "prod",
+        ("missing-finalization",),
+        expected_generation=1,
+        change_id="temporary-proof",
+        reason="require temporary proof",
+    )
+    failed = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    failed.start()
+    assert failed.state.phase is AIServicePhase.FAILED
+
+    requirements.remove(
+        "prod",
+        ("missing-finalization",),
+        expected_generation=2,
+        change_id="retire-temporary-proof",
+        reason="explicit operator retirement after investigation",
+    )
+    clean = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    clean.start()
+    assert clean.state.phase is AIServicePhase.READY
+    assert clean.durable_recovery_ids == (finalization_id,)
+    status = clean.status().to_dict()
+    assert (
+        status["durable_recovery_requirements"]["manifest"]["generation"]
+        == 3
+    )
+
+
+def test_requirement_manifest_bound_runtime_without_runtime_guard_fails_start(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = DurableRecoveryRequirementStore(
+        env.backend,
+        ArtifactSigner(
+            "recovery-requirements",
+            b"m" * 32,
+            clock=lambda: 20.0,
+        ),
+        namespace="recovery-requirements",
+        clock=lambda: 20.0,
+    )
+    requirements.initialize(
+        "prod",
+        (finalization_id,),
+        runtime_trust_digest=fp("runtime-bound"),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+
+
+def test_requirement_manifest_bound_release_without_release_guard_fails_start(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    requirements = DurableRecoveryRequirementStore(
+        env.backend,
+        ArtifactSigner(
+            "recovery-requirements",
+            b"m" * 32,
+            clock=lambda: 20.0,
+        ),
+        namespace="recovery-requirements",
+        clock=lambda: 20.0,
+    )
+    requirements.initialize(
+        "prod",
+        (finalization_id,),
+        release_evidence_digest=fp("release-bound"),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+
+
+def test_service_rejects_static_ids_plus_signed_requirement_store(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env)
+    with pytest.raises(
+        ValueError,
+        match="cannot be combined",
+    ):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_attempts=env.attempts,
+            worker_id="worker-static-conflict",
+            durable_recovery_guard=recovery_requirement_guard(env),
+            durable_recovery_ids=("static",),
+            durable_recovery_requirement_store=requirements,
+            durable_recovery_requirement_scope="prod",
+        )
+
+
+def test_service_requires_guard_for_requirement_store(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env)
+    with pytest.raises(
+        ValueError,
+        match="requires a durable recovery guard",
+    ):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_attempts=env.attempts,
+            worker_id="worker-no-guard",
+            durable_recovery_requirement_store=requirements,
+            durable_recovery_requirement_scope="prod",
+        )
+
+
+def test_service_requires_store_for_requirement_scope(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        ValueError,
+        match="scope requires a store",
+    ):
+        AIShellService(
+            env.orchestrator,
+            env.service.diagnostics,
+            env.service.governance,
+            execution_attempts=env.attempts,
+            worker_id="worker-no-store",
+            durable_recovery_guard=recovery_requirement_guard(env),
+            durable_recovery_requirement_scope="prod",
+        )
+
+
+def test_manifest_empty_set_obeys_health_policy(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    requirements = recovery_requirement_store(env, ids=())
+    strict = DurableRecoveryHealthPolicy(
+        require_nonempty=True,
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+        policy=strict,
+    )
+    restarted.start()
+    assert restarted.state.phase is AIServicePhase.FAILED
+
+
+def test_manifest_generation_is_live_in_status_after_adoption(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="first",
+        intent_id="first",
+    )
+    first_id = first.finalized.finalization.finalization_id
+    requirements = recovery_requirement_store(
+        env,
+        ids=(first_id,),
+    )
+    restarted = restart_service_with_requirements(
+        env,
+        requirements,
+    )
+    restarted.start()
+
+    _, _, _, _, second = env.execute(
+        session_id="second",
+        intent_id="second",
+    )
+    second_id = second.finalized.finalization.finalization_id
+    requirements.add(
+        "prod",
+        (second_id,),
+        expected_generation=1,
+        change_id="second",
+        reason="second verified finalization",
+    )
+    restarted.new_session(
+        make_intent(intent_id="refresh"),
+        session_id="refresh",
+    )
+    status = restarted.status().to_dict()
+    requirement_status = status["durable_recovery_requirements"]
+    assert requirement_status["manifest"]["generation"] == 2
+    assert requirement_status["manifest"]["finalization_ids"] == list(
+        sorted((first_id, second_id))
+    )
+    assert requirement_status["manifest_digest"] == (
+        requirements.require("prod").manifest.digest
+    )
+
