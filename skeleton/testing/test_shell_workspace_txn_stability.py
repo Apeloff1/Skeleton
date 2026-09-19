@@ -481,6 +481,34 @@ def test_execution_journal_binds_snapshot_backup_and_command_evidence(tmp_path: 
     assert len(payload["command_fingerprint"]) == 64
 
 
+def test_journal_event_payload_is_immutable_and_chain_stays_valid():
+    journal = TransactionJournal()
+    event = journal.append(
+        "txn-immutable",
+        WorkspaceTransactionState.CREATED.value,
+        {"correlation_id": "corr-1"},
+    )
+
+    with pytest.raises(TypeError):
+        event.payload["correlation_id"] = "tampered"
+
+    assert journal.verify()
+    assert event.payload["correlation_id"] == "corr-1"
+
+
+def test_recovery_refuses_corrupted_journal_chain():
+    journal = TransactionJournal()
+    event = journal.append(
+        "txn-corrupt",
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    journal._events[0] = replace(event, event_hash="0" * 64)
+
+    with pytest.raises(RuntimeError, match="integrity verification failed"):
+        TransactionRecoveryInspector(journal).candidates()
+
+
 def test_recovery_candidate_reports_bound_execution_evidence():
     journal = TransactionJournal()
     transaction_id = "txn-evidence"
