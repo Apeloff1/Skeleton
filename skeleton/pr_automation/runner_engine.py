@@ -88,6 +88,8 @@ def publish_status(
     *,
     delivery_id: str,
     server_url: str = "https://github.com",
+    force_state: str | None = None,
+    description: str | None = None,
 ) -> None:
     repository = item.snapshot.core.repository
     sha = item.snapshot.core.head_sha
@@ -97,10 +99,16 @@ def publish_status(
         if delivery_id and delivery_id.split(":", 1)[0].isdigit()
         else None
     )
+    state = force_state or _status_state(item.evaluation)
+    if state not in {"error", "failure", "pending", "success"}:
+        raise ValueError(f"invalid commit status state: {state}")
     body: dict[str, Any] = {
-        "state": _status_state(item.evaluation),
+        "state": state,
         "context": GATE_CONTEXT,
-        "description": _status_description(item.evaluation),
+        "description": bounded_text(
+            description or _status_description(item.evaluation),
+            limit=140,
+        ),
     }
     if target_url is not None:
         body["target_url"] = target_url
@@ -392,6 +400,16 @@ class RunnerEngine:
                     now=_now(self.clock),
                 )
                 if not allowed.allowed:
+                    if self.policy.publish_gate_status:
+                        publish_status(
+                            self.transport,
+                            item,
+                            delivery_id=delivery,
+                            force_state="pending",
+                            description=allowed.reasons[0]
+                            if allowed.reasons
+                            else "mutation deferred",
+                        )
                     finished = _now(self.clock)
                     return _deferred_result(
                         item,
@@ -411,6 +429,24 @@ class RunnerEngine:
                 )
                 if result.state is not MutationState.DUPLICATE:
                     self.budget.consume_mutation()
+                if (
+                    self.policy.publish_gate_status
+                    and result.state
+                    not in {MutationState.APPLIED, MutationState.DUPLICATE}
+                ):
+                    publish_status(
+                        self.transport,
+                        item,
+                        delivery_id=delivery,
+                        force_state=(
+                            "error"
+                            if result.state is MutationState.FAILED
+                            else "pending"
+                        ),
+                        description=(
+                            f"mutation {result.state.value}: {result.message}"
+                        ),
+                    )
 
             finished = _now(self.clock)
             return _result_from_item(
