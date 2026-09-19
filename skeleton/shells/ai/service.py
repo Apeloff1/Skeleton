@@ -162,6 +162,7 @@ class AIShellService:
         durable_verification_chains: tuple[tuple[str, object], ...] = (),
         durable_readiness_guard: DurableEvidenceReadinessGuard | None = None,
         durable_readiness_reconcile_on_start: bool = False,
+        durable_readiness_reconcile_after_finalization: bool = False,
     ) -> None:
         if (release_guard is None) != (release_expectation is None):
             raise ValueError("release_guard and release_expectation must be configured together")
@@ -399,6 +400,13 @@ class AIShellService:
             raise ValueError(
                 "durable_readiness_reconcile_on_start must be bool"
             )
+        if not isinstance(
+            durable_readiness_reconcile_after_finalization,
+            bool,
+        ):
+            raise ValueError(
+                "durable_readiness_reconcile_after_finalization must be bool"
+            )
         if durable_readiness_guard is not None:
             if durable_operations_inspector is None:
                 raise ValueError(
@@ -593,6 +601,9 @@ class AIShellService:
         self.durable_readiness_guard = durable_readiness_guard
         self.durable_readiness_reconcile_on_start = (
             durable_readiness_reconcile_on_start
+        )
+        self.durable_readiness_reconcile_after_finalization = (
+            durable_readiness_reconcile_after_finalization
         )
         self.durable_operations_protected_roots = (
             durable_operations_protected_roots
@@ -1222,6 +1233,62 @@ class AIShellService:
                     ),
                 )
         return report
+
+    def _post_execution_durable_readiness(
+        self,
+    ) -> tuple[
+        DurableEvidenceReadinessReport | None,
+        str,
+    ]:
+        """Best-effort maintenance after terminal execution.
+
+        This method never raises.  Once a child process and finalization have
+        completed, maintenance failure must not be confused with execution
+        failure or encourage an unsafe retry of side effects.
+        """
+        guard = self.durable_readiness_guard
+        if (
+            guard is None
+            or not self.durable_readiness_reconcile_after_finalization
+        ):
+            return None, ""
+        try:
+            report = guard.reconcile(
+                self.durable_operations_chains,
+                protected_roots=(
+                    self.durable_operations_protected_roots
+                ),
+                recovery_finalization_ids=(
+                    self.durable_recovery_ids
+                    if (
+                        self.durable_operations_inspector
+                        is not None
+                        and self.durable_operations_inspector
+                        .recovery_health is not None
+                    )
+                    else ()
+                ),
+            )
+            self._durable_readiness_report = report
+            if report.ready:
+                return report, ""
+            error = "durable_readiness_not_ready"
+        except Exception as exc:
+            report = None
+            error = (
+                "durable_readiness_maintenance_"
+                + type(exc).__name__
+            )[:512]
+
+        if self.state.phase is AIServicePhase.READY:
+            self.state.transition(
+                AIServicePhase.DEGRADED,
+                reason=(
+                    "AI durable evidence readiness "
+                    "post-execution maintenance failed"
+                ),
+            )
+        return report, error
 
     def _durable_verification_health_for_chain(
         self,
@@ -2010,12 +2077,19 @@ class AIShellService:
                     "terminal execution obligation finalization failed"
                 ) from exc
 
+        (
+            post_execution_readiness,
+            post_execution_maintenance_error,
+        ) = self._post_execution_durable_readiness()
+
         return AISealedFinalizedExecution(
             execution,
             precondition_report,
             seal_use,
             finalized,
             execution_attempt,
+            post_execution_readiness,
+            post_execution_maintenance_error,
         )
 
     def _require_assurance(
