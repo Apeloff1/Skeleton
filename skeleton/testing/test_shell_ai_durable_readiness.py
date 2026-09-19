@@ -13,6 +13,14 @@ from skeleton.shells.ai.distributed_journal import (
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
+from skeleton.shells.ai.durable_proof_window import (
+    DurableHistoricalProofAuthority,
+    DurableHistoricalProofStore,
+)
+from skeleton.shells.ai.durable_proof_window_operator import (
+    DurableProofWindowOperator,
+    DurableProofWindowPolicy,
+)
 from skeleton.shells.ai.durable_orphan_scan import (
     DurableOrphanScanner,
 )
@@ -1348,4 +1356,538 @@ def test_readiness_digest_changes_when_orphan_appears():
     assert before.digest != after.digest
     assert before.ready
     assert after.degraded
+
+class ProofEnvironment(Environment):
+    def __init__(
+        self,
+        *,
+        readiness_policy=None,
+        proof_policy=None,
+    ):
+        super().__init__(
+            readiness_policy=readiness_policy
+        )
+        self.proof_store = DurableHistoricalProofStore(
+            self.backend,
+            namespace="proof-windows",
+        )
+        self.proof_authority = DurableHistoricalProofAuthority(
+            self.checkpoints,
+            ArtifactSigner(
+                "proof-window",
+                b"p" * 32,
+                clock=lambda: 100.0,
+            ),
+            max_window_items=32,
+            clock=lambda: 100.0,
+        )
+        self.proof_operator = DurableProofWindowOperator(
+            self.proof_authority,
+            self.proof_store,
+            {
+                "journal": self.journal,
+                "receipts": self.receipts,
+            },
+            policy=(
+                proof_policy
+                or DurableProofWindowPolicy(
+                    max_targets=16,
+                )
+            ),
+        )
+        self.guard = DurableEvidenceReadinessGuard(
+            self.operations,
+            self.sequence_indexes,
+            self.verification,
+            readiness_policy,
+            proof_windows=self.proof_operator,
+        )
+
+    def publish_checkpoints(self):
+        return (
+            self.checkpoints.publish(
+                "journal",
+                self.journal,
+            ),
+            self.checkpoints.publish(
+                "receipts",
+                self.receipts,
+            ),
+        )
+
+
+def proof_protected_roots(env):
+    return {
+        "journal": (
+            env.journal.root_hash(),
+        ),
+        "receipts": (
+            env.receipts.root_hash(),
+        ),
+    }
+
+
+def test_required_proof_windows_block_when_operator_is_absent():
+    env = Environment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.initialize_verification()
+    report = env.guard.inspect(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.blocked
+    assert any(
+        item.code
+        == "readiness.proof_windows_unavailable"
+        for item in report.findings
+    )
+
+
+def test_optional_proof_windows_do_not_require_operator():
+    env = Environment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=False,
+        )
+    )
+    env.append(2)
+    env.initialize_verification()
+    report = env.guard.inspect(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.ready
+    assert report.proof_windows is None
+
+
+def test_required_proof_windows_missing_cache_blocks_inspection():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    env.initialize_verification()
+    report = env.guard.inspect(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.blocked
+    assert report.proof_windows is not None
+    assert report.proof_windows.missing == 2
+    assert any(
+        item.code
+        == "readiness.proof_windows_unhealthy"
+        for item in report.findings
+    )
+
+
+def test_reconcile_builds_missing_required_proof_windows():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+            allow_proof_window_build=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.ready
+    assert report.proof_windows is not None
+    assert report.proof_windows.ok
+    assert report.proof_windows.current == 2
+    assert "proof_window_build" in report.mutations
+    assert "verification_full_refresh" in report.mutations
+
+
+def test_reconcile_proof_build_is_idempotent():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+            allow_proof_window_build=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    roots = proof_protected_roots(env)
+    first = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    second = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert first.ready
+    assert second.ready
+    assert "proof_window_build" in first.mutations
+    assert "proof_window_build" not in second.mutations
+    assert second.proof_windows.ok
+
+
+def test_disabled_proof_build_blocks_required_reconcile():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+            allow_proof_window_build=False,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    with pytest.raises(
+        DurableEvidenceReadinessError,
+        match="proof-window build",
+    ):
+        env.guard.reconcile(
+            env.entries,
+            protected_roots=proof_protected_roots(
+                env
+            ),
+        )
+
+
+def test_optional_missing_proof_windows_degrade_not_block():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=False,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    env.initialize_verification()
+    report = env.guard.inspect(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.degraded
+    assert not report.blocked
+    assert report.warnings == 1
+    assert report.proof_windows.missing == 2
+
+
+def test_optional_reconcile_can_build_proof_windows_to_ready():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=False,
+            allow_proof_window_build=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.ready
+    assert report.proof_windows.ok
+    assert "proof_window_build" in report.mutations
+
+
+def test_no_protected_roots_need_no_proof_windows():
+    env = Environment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.initialize_verification()
+    report = env.guard.inspect(
+        env.entries
+    )
+    assert report.ready
+    assert report.proof_windows is None
+
+
+def test_checkpoint_root_can_use_zero_length_proof():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.initialize_verification()
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    assert report.ready
+    assert all(
+        item.checked_items == 0
+        for item in report.proof_windows.reports
+    )
+
+
+def test_protected_root_deduplication_does_not_duplicate_targets():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    env.initialize_verification()
+    roots = {
+        "journal": (
+            env.journal.root_hash(),
+            env.journal.root_hash(),
+        ),
+        "receipts": (
+            env.receipts.root_hash(),
+            env.receipts.root_hash(),
+        ),
+    }
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert report.ready
+    assert len(
+        report.proof_windows.reports
+    ) == 2
+
+
+def test_proof_window_report_is_serialized_in_readiness():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+    )
+    data = report.to_dict()
+    assert data["proof_windows"] is not None
+    assert data["proof_windows"]["ok"] is True
+    assert len(
+        data["proof_windows"]["reports"]
+    ) == 2
+
+
+def test_readiness_digest_binds_proof_window_state():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=False,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    env.initialize_verification()
+    roots = proof_protected_roots(env)
+    before = env.guard.inspect(
+        env.entries,
+        protected_roots=roots,
+    )
+    after = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert before.digest != after.digest
+    assert before.proof_windows.missing == 2
+    assert after.proof_windows.ok
+
+
+def test_corrupt_cached_proof_blocks_when_required():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    env.initialize_verification()
+    roots = proof_protected_roots(env)
+    ready = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert ready.ready
+    target = ready.proof_windows.reports[0].target
+    item = env.proof_store.find_target(
+        target.chain_id,
+        target.target_root,
+    )
+    key = env.proof_store._proof_key(
+        item.proof.digest
+    )
+    record = env.backend.get(
+        "proof-windows",
+        key,
+    )
+    env.backend.compare_and_swap(
+        "proof-windows",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            item,
+            signature=replace(
+                item.signature,
+                signature="0" * 64,
+            ),
+        ),
+    )
+    report = env.guard.inspect(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert report.blocked
+    assert report.proof_windows.invalid >= 1
+
+
+def test_corrupt_cached_proof_is_not_overwritten_by_reconcile():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        ),
+        proof_policy=DurableProofWindowPolicy(
+            refresh_invalid=True,
+        ),
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    roots = proof_protected_roots(env)
+    ready = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    target = ready.proof_windows.reports[0].target
+    item = env.proof_store.find_target(
+        target.chain_id,
+        target.target_root,
+    )
+    key = env.proof_store._proof_key(
+        item.proof.digest
+    )
+    record = env.backend.get(
+        "proof-windows",
+        key,
+    )
+    env.backend.compare_and_swap(
+        "proof-windows",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            item,
+            signature=replace(
+                item.signature,
+                signature="0" * 64,
+            ),
+        ),
+    )
+    report = env.guard.reconcile(
+        env.entries,
+        protected_roots=roots,
+    )
+    assert report.blocked
+    assert report.proof_windows.invalid + report.proof_windows.errors >= 1
+
+
+def test_guard_rejects_wrong_proof_window_operator_type():
+    env = Environment()
+    with pytest.raises(
+        TypeError,
+        match="proof_windows",
+    ):
+        DurableEvidenceReadinessGuard(
+            env.operations,
+            env.sequence_indexes,
+            env.verification,
+            proof_windows=object(),
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "require_proof_windows",
+        "allow_proof_window_build",
+    ],
+)
+def test_readiness_policy_validates_proof_window_bools(field):
+    values = dict(
+        require_proof_windows=False,
+        allow_proof_window_build=True,
+    )
+    values[field] = "yes"
+    with pytest.raises(ValueError):
+        DurableEvidenceReadinessPolicy(
+            **values
+        )
+
+
+def test_policy_digest_changes_with_proof_window_requirement():
+    optional = DurableEvidenceReadinessPolicy(
+        require_proof_windows=False,
+    )
+    required = DurableEvidenceReadinessPolicy(
+        require_proof_windows=True,
+    )
+    assert optional.digest != required.digest
+
+
+def test_policy_to_dict_exposes_proof_window_controls():
+    policy = DurableEvidenceReadinessPolicy(
+        require_proof_windows=True,
+        allow_proof_window_build=False,
+    )
+    data = policy.to_dict()
+    assert data["require_proof_windows"] is True
+    assert data["allow_proof_window_build"] is False
+
+
+def test_require_ready_can_reconcile_required_proofs():
+    env = ProofEnvironment(
+        readiness_policy=DurableEvidenceReadinessPolicy(
+            require_proof_windows=True,
+        )
+    )
+    env.append(2)
+    env.publish_checkpoints()
+    env.append(1)
+    report = env.guard.require_ready(
+        env.entries,
+        protected_roots=proof_protected_roots(
+            env
+        ),
+        reconcile=True,
+    )
+    assert report.ready
+    assert report.proof_windows.ok
 
