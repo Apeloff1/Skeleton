@@ -47,6 +47,7 @@ from skeleton.shells.ai.durable_maintenance import (
 )
 from skeleton.shells.ai.durable_destruction import (
     DurableDestructionConflict,
+    DurableDestructionCorruption,
     DurableDestructionItem,
     DurableDestructionItemState,
     DurableDestructionKind,
@@ -2110,9 +2111,12 @@ class DurablePruningExecutor:
                 fencing_token=operation.fencing_token,
                 completed_at=operation.updated_at,
             )
-        except DurableDestructionConflict as exc:
+        except (
+            DurableDestructionConflict,
+            DurableDestructionCorruption,
+        ) as exc:
             raise DurablePruningManualReview(
-                "destruction evidence conflicted with committed pruning record"
+                "destruction evidence failed committed pruning verification"
             ) from exc
 
     def _result(
