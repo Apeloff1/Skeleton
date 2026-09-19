@@ -86,6 +86,13 @@ class AIServiceState:
         with self._lock:
             return self._phase
 
+    @property
+    def reason(self) -> str:
+        with self._lock:
+            if not self._history:
+                return ""
+            return self._history[-1].reason
+
     def ready(self) -> bool:
         return self.phase is AIServicePhase.READY
 
