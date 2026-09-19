@@ -156,8 +156,8 @@ def _report_signature(report: object) -> object:
     return (
         report.metric_name,
         report.observed_value,
-        pytest.approx(report.expected_range[0], rel=1e-10, abs=1e-10),
-        pytest.approx(report.expected_range[1], rel=1e-10, abs=1e-10),
+        report.expected_range[0],
+        report.expected_range[1],
         report.severity,
         report.context,
     )
