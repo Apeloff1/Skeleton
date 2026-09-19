@@ -41,6 +41,8 @@ _SAMPLES = {
 
 
 def _sample(kind: str) -> str:
+    if kind.startswith("literal:"):
+        return kind.removeprefix("literal:")
     return _SAMPLES[kind]
 
 
@@ -58,6 +60,7 @@ def _minimal_argv(spec: OperationSpec) -> tuple[str, ...]:
 def _assert_contract(name: str) -> None:
     contract = _BY_NAME[name]
     spec = _SPECS[name]
+    argv = _minimal_argv(spec)
     assert contract.name == name
     assert contract.executable_key == spec.executable_key
     assert ShellCapability.EXECUTE in contract.required_capabilities
@@ -72,9 +75,12 @@ def _assert_contract(name: str) -> None:
     assert "path" not in payload
     assert payload["name"] == name
     assert payload["executable_key"] == spec.executable_key
-    assert contract.arguments.validate(name, _minimal_argv(spec)) == _minimal_argv(spec)
+    assert contract.arguments.validate(name, argv) == argv
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(name, ("--definitely-unknown-shell-option",))
+    if argv:
+        with pytest.raises(ArgumentRejected):
+            contract.arguments.validate(name, argv[1:])
 
 
 def _assert_recipe(name: str) -> None:
@@ -152,6 +158,13 @@ def test_constraint_lookup_fails_closed() -> None:
         constraint("definitely-not-a-real-constraint")
 
 
+def test_literal_constraint_is_exact() -> None:
+    value = constraint("literal:package")
+    assert value.accepts("package")
+    assert not value.accepts("remove")
+    assert not value.accepts("package-extra")
+
+
 def test_operation_spec_rejects_unknown_positional_constraint() -> None:
     with pytest.raises(ValueError):
         OperationSpec(
@@ -189,6 +202,19 @@ def test_build_contract_adds_nonzero_success_capability() -> None:
     )
     contract = build_contract(spec)
     assert ShellCapability.NONZERO_SUCCESS in contract.required_capabilities
+
+
+def test_prefix_bound_contract_rejects_missing_prefix() -> None:
+    spec = OperationSpec(
+        logical_name="test.prefix",
+        executable_key="python",
+        fixed_prefix=("-m", "compileall"),
+        variadic="path",
+    )
+    contract = build_contract(spec)
+    assert contract.arguments.validate("test.prefix", ("-m", "compileall", "src"))
+    with pytest.raises(ArgumentRejected, match="required logical command prefix"):
+        contract.arguments.validate("test.prefix", ("src",))
 
 
 
@@ -3923,19 +3949,6 @@ def test_contract_container_docker_system_df() -> None:
     assert contract.to_dict()["description"] == contract.description
     assert contract.arguments.validate(contract.name, _minimal_argv(spec))
 
-def test_contract_container_docker_system_prune_dry() -> None:
-    """Validate the built-in container.docker_system_prune_dry logical authority contract."""
-    _assert_contract("container.docker_system_prune_dry")
-    contract = _BY_NAME["container.docker_system_prune_dry"]
-    spec = _SPECS["container.docker_system_prune_dry"]
-    assert contract.required_capabilities
-    assert contract.executable_key == spec.executable_key
-    assert tuple(sorted(effect.value for effect in contract.effects))
-    assert contract.risk.value in {"low", "moderate", "high"}
-    assert isinstance(contract.environment.allowed_keys(), tuple)
-    assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
-
 def test_contract_container_podman_version() -> None:
     """Validate the built-in container.podman_version logical authority contract."""
     _assert_contract("container.podman_version")
@@ -4240,19 +4253,6 @@ def test_contract_container_podman_system_df() -> None:
     _assert_contract("container.podman_system_df")
     contract = _BY_NAME["container.podman_system_df"]
     spec = _SPECS["container.podman_system_df"]
-    assert contract.required_capabilities
-    assert contract.executable_key == spec.executable_key
-    assert tuple(sorted(effect.value for effect in contract.effects))
-    assert contract.risk.value in {"low", "moderate", "high"}
-    assert isinstance(contract.environment.allowed_keys(), tuple)
-    assert contract.to_dict()["description"] == contract.description
-    assert contract.arguments.validate(contract.name, _minimal_argv(spec))
-
-def test_contract_container_podman_system_prune_dry() -> None:
-    """Validate the built-in container.podman_system_prune_dry logical authority contract."""
-    _assert_contract("container.podman_system_prune_dry")
-    contract = _BY_NAME["container.podman_system_prune_dry"]
-    spec = _SPECS["container.podman_system_prune_dry"]
     assert contract.required_capabilities
     assert contract.executable_key == spec.executable_key
     assert tuple(sorted(effect.value for effect in contract.effects))
