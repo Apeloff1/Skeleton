@@ -3,16 +3,22 @@
 The high-confidence scanner lives in ``backend/scripts/check_sast_security.py``.
 Historically its Python file enumeration covered only ``backend/`` which left the
 production ``skeleton/`` package and top-level repository tooling outside that
-security boundary.  Reuse the same violation engine here so the policy remains
+security boundary. Reuse the same violation engine here so the policy remains
 single-sourced while coverage spans the rest of the Python runtime/tooling
 surface.
+
+Enumeration is deliberately implemented with explicit ``os.scandir`` traversal
+rather than pathlib globbing. Security scanners must not interpret an unreadable,
+raced, or symlinked source subtree as an empty/clean subtree.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+import os
 from pathlib import Path
 import runpy
+import stat
 import sys
-from collections.abc import Callable, Iterable
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -33,26 +39,83 @@ SKIP_DIRS = {
     ".expo",
     "coverage",
 }
+SAFE_SCAN_ERRORS = {
+    "required scan root missing",
+    "required scan root must not be a symlink",
+    "required scan root is not a directory",
+    "required scan root metadata failure",
+    "source traversal failure",
+    "source traversal metadata failure",
+    "source traversal encountered symlink",
+}
+
+
+def _validate_root(root: Path) -> None:
+    """Validate one required scan root without following symlinks."""
+    try:
+        metadata = root.lstat()
+    except FileNotFoundError:
+        raise OSError("required scan root missing") from None
+    except OSError:
+        raise OSError("required scan root metadata failure") from None
+
+    if stat.S_ISLNK(metadata.st_mode):
+        raise OSError("required scan root must not be a symlink")
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise OSError("required scan root is not a directory")
+
+
+def _is_intentional_live_build(root: Path, path: Path) -> bool:
+    """Keep ``skeleton/build`` in scope while skipping generated build trees."""
+    return (
+        root.name == "skeleton"
+        and path.parent == root
+        and path.name == "build"
+    )
+
+
+def _skip_directory(root: Path, path: Path) -> bool:
+    return path.name in SKIP_DIRS and not _is_intentional_live_build(root, path)
+
+
+def _walk_python_files(root: Path) -> Iterable[Path]:
+    """Walk Python files deterministically and fail closed on traversal ambiguity."""
+    _validate_root(root)
+    stack = [root]
+
+    while stack:
+        current = stack.pop()
+        try:
+            entries = sorted(os.scandir(current), key=lambda entry: entry.name)
+        except OSError:
+            raise OSError("source traversal failure") from None
+
+        child_dirs: list[Path] = []
+        for entry in entries:
+            path = Path(entry.path)
+            if _skip_directory(root, path):
+                continue
+
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError:
+                raise OSError("source traversal metadata failure") from None
+
+            if stat.S_ISLNK(metadata.st_mode):
+                raise OSError("source traversal encountered symlink")
+            if stat.S_ISDIR(metadata.st_mode):
+                child_dirs.append(path)
+                continue
+            if stat.S_ISREG(metadata.st_mode) and path.suffix.lower() == ".py":
+                yield path
+
+        stack.extend(reversed(child_dirs))
 
 
 def python_files() -> Iterable[Path]:
-    """Yield required core/tooling Python files, failing closed on missing roots."""
+    """Yield required core/tooling Python files with fail-closed enumeration."""
     for root in SCAN_ROOTS:
-        if not root.exists():
-            raise OSError("required scan root missing")
-        if root.is_symlink():
-            raise OSError("required scan root must not be a symlink")
-        for path in root.rglob("*.py"):
-            relative = path.relative_to(REPO_ROOT)
-            parts = relative.parts
-            filtered_parts = (
-                (parts[0], *parts[2:])
-                if len(parts) >= 2 and parts[:2] == ("skeleton", "build")
-                else parts
-            )
-            if any(part in SKIP_DIRS for part in filtered_parts):
-                continue
-            yield path
+        yield from _walk_python_files(root)
 
 
 def _root_label(root: Path) -> Path:
@@ -64,7 +127,7 @@ def _root_label(root: Path) -> Path:
 
 def _load_violation_engine() -> Callable[[Path], list[str]]:
     if not BASE_SCANNER.is_file():
-        raise RuntimeError(f"canonical SAST scanner missing: {BASE_SCANNER}")
+        raise RuntimeError("canonical SAST scanner missing")
     namespace: dict[str, Any] = runpy.run_path(str(BASE_SCANNER))
     engine = namespace.get("violations")
     if not callable(engine):
@@ -76,18 +139,17 @@ def main() -> int:
     try:
         violations = _load_violation_engine()
     except Exception as exc:
-        print(f"Repository Python SAST bootstrap failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(
+            f"Repository Python SAST bootstrap failed: {type(exc).__name__}",
+            file=sys.stderr,
+        )
         return 2
 
     try:
         files = list(python_files())
     except OSError as exc:
         detail = str(exc)
-        safe_details = {
-            "required scan root missing",
-            "required scan root must not be a symlink",
-        }
-        suffix = f": {detail}" if detail in safe_details else ""
+        suffix = f": {detail}" if detail in SAFE_SCAN_ERRORS else ""
         print(
             f"Repository Python SAST scan failed: {type(exc).__name__}{suffix}",
             file=sys.stderr,
