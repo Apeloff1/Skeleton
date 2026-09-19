@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .supervisor_runtime import SupervisorRuntimeError, validate_worker_name
+
+
+_RISKS = frozenset({"low", "medium", "high"})
+_MAX_TRIGGER_BYTES = 256
+_MAX_FILES = 12
+
 
 @dataclass(frozen=True)
 class AdvancedBot:
@@ -11,6 +18,30 @@ class AdvancedBot:
     risk: str
     max_files: int
     requires_tests: bool = True
+
+    def __post_init__(self) -> None:
+        try:
+            validate_worker_name(self.name)
+        except SupervisorRuntimeError as exc:
+            raise ValueError("invalid specialist name") from exc
+        if (
+            not isinstance(self.trigger, str)
+            or not self.trigger.strip()
+            or len(self.trigger.encode("utf-8")) > _MAX_TRIGGER_BYTES
+            or any(ord(char) < 32 or ord(char) == 127 for char in self.trigger)
+        ):
+            raise ValueError("invalid specialist trigger")
+        if self.risk not in _RISKS:
+            raise ValueError("invalid specialist risk")
+        if (
+            isinstance(self.max_files, bool)
+            or not isinstance(self.max_files, int)
+            or self.max_files < 0
+            or self.max_files > _MAX_FILES
+        ):
+            raise ValueError("invalid specialist file budget")
+        if not isinstance(self.requires_tests, bool):
+            raise ValueError("invalid specialist test policy")
 
 
 ADVANCED_BOTS = (
@@ -59,13 +90,27 @@ SAFE_PREFIXES = ("skeleton/", "tests/", "docs/")
 
 
 def allowed(bot: AdvancedBot, changed_files: list[str]) -> bool:
-    """Reject control-plane, traversal, and oversized proposals before execution."""
+    """Reject ambiguous, duplicate, privileged, or oversized proposal paths."""
+    if not isinstance(bot, AdvancedBot) or not isinstance(changed_files, list):
+        return False
     if len(changed_files) > bot.max_files:
         return False
+    seen: set[str] = set()
     for path in changed_files:
-        if not isinstance(path, str) or "\\" in path or "\x00" in path or path.startswith("/"):
+        if (
+            not isinstance(path, str)
+            or "\\" in path
+            or "\x00" in path
+            or path.startswith("/")
+        ):
             return False
-        if ".." in path.split("/") or path.startswith(BLOCKED_PREFIXES):
+        parts = path.split("/")
+        if any(part in {"", ".", ".."} for part in parts):
+            return False
+        if path in seen:
+            return False
+        seen.add(path)
+        if path.startswith(BLOCKED_PREFIXES):
             return False
         if not path.startswith(SAFE_PREFIXES):
             return False
