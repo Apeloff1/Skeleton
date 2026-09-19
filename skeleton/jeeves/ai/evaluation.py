@@ -1,21 +1,20 @@
 """Bounded evaluation/evidence records for Jeeves.
 
-Evaluation is evidence, not execution authority.  Results are immutable snapshots with
-canonical identities and explicit pass/fail thresholds; callers decide how a verified
-result influences Supervisor planning.
+Evaluation is evidence, not execution authority.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from hashlib import sha256
-import json
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
+
+from ._canonical import bounded_text, canonical_digest, frozen_mapping
 
 MAX_TEXT = 8192
 MAX_CASES = 4096
 MAX_EVIDENCE = 256
+MAX_PAYLOAD_BYTES = 64 * 1024
 
 
 class EvalState(str, Enum):
@@ -27,12 +26,6 @@ class EvalState(str, Enum):
     FAILED = "failed"
 
 
-def _text(value: str, name: str) -> str:
-    if not isinstance(value, str) or not value or len(value) > MAX_TEXT or "\x00" in value:
-        raise ValueError(f"invalid {name}")
-    return value
-
-
 def _finite_score(value: float, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"invalid {name}")
@@ -42,21 +35,8 @@ def _finite_score(value: float, name: str) -> float:
     return value
 
 
-def _freeze(value: Mapping[str, Any]) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValueError("payload must be a mapping")
-    try:
-        raw = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
-        detached = json.loads(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("payload must be finite JSON") from exc
-    if len(raw.encode()) > 64 * 1024:
-        raise ValueError("payload too large")
-    return MappingProxyType(detached)
-
-
 def _digest(value: Any) -> str:
-    return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return canonical_digest(value, max_bytes=MAX_PAYLOAD_BYTES)
 
 
 @dataclass(frozen=True)
@@ -70,14 +50,14 @@ class EvalRecord:
     suite: str = "default"
 
     def __post_init__(self) -> None:
-        _text(self.name, "eval name")
-        _text(self.suite, "suite")
+        bounded_text(self.name, "eval name")
+        bounded_text(self.suite, "suite")
         if not isinstance(self.state, EvalState):
             raise ValueError("invalid eval state")
         if not isinstance(self.evidence, tuple) or len(self.evidence) > MAX_EVIDENCE:
             raise ValueError("invalid evidence")
-        object.__setattr__(self, "evidence", tuple(_text(x, "evidence") for x in self.evidence))
-        object.__setattr__(self, "payload", _freeze(self.payload))
+        object.__setattr__(self, "evidence", tuple(bounded_text(x, "evidence") for x in self.evidence))
+        object.__setattr__(self, "payload", frozen_mapping(self.payload, max_bytes=MAX_PAYLOAD_BYTES))
         if (self.score is None) != (self.threshold is None):
             raise ValueError("score and threshold must be supplied together")
         if self.score is not None:
@@ -94,18 +74,16 @@ class EvalRecord:
 
     @property
     def digest(self) -> str:
-        return _digest(
-            {
-                "evidence": self.evidence,
-                "name": self.name,
-                "payload": dict(self.payload),
-                "score": self.score,
-                "state": self.state.value,
-                "suite": self.suite,
-                "threshold": self.threshold,
-                "v": 1,
-            }
-        )
+        return _digest({
+            "evidence": self.evidence,
+            "name": self.name,
+            "payload": dict(self.payload),
+            "score": self.score,
+            "state": self.state.value,
+            "suite": self.suite,
+            "threshold": self.threshold,
+            "v": 1,
+        })
 
 
 @dataclass(frozen=True)
