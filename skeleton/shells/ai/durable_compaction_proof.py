@@ -560,7 +560,16 @@ class DurableCompactionProofBuilder:
             self.proof_signer.verify(
                 item.signature
             )
-            proof_signature_valid = True
+            proof_signature_valid = (
+                item.signature.artifact_type
+                == "shell-ai-durable-compaction-proof"
+                and item.signature.artifact_digest
+                == item.proof.digest
+            )
+            if not proof_signature_valid:
+                reasons.append(
+                    "proof signature artifact binding mismatch"
+                )
         except ArtifactSignatureError:
             proof_signature_valid = False
             reasons.append(
@@ -917,16 +926,6 @@ class DurableCompactionProofBuilder:
             )
             authority_binding_valid = False
 
-        proof_payload = self.proof_signer.verify(
-            item.signature
-        ) if proof_signature_valid else None
-        if proof_payload is not None:
-            if proof_payload != proof.to_dict():
-                reasons.append(
-                    "proof signed payload differs from proof"
-                )
-                proof_signature_valid = False
-
         valid = all(
             (
                 proof_signature_valid,
@@ -1020,7 +1019,14 @@ class DurableCompactionProofBuilder:
         signed = SignedDurableCompactionProof(
             proof,
             self.proof_signer.sign(
-                proof.to_dict()
+                "shell-ai-durable-compaction-proof",
+                proof.digest,
+                metadata={
+                    "proof_id": proof.proof_id,
+                    "chain_id": proof.chain_id,
+                    "workflow_id": proof.workflow_id,
+                    "authority": proof.authority,
+                },
             ),
         )
         verification = self.inspect(
