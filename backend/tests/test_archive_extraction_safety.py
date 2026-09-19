@@ -293,6 +293,8 @@ def test_discovery_rejects_symlinked_python_files(tmp_path: Path) -> None:
 
     with pytest.raises(scanner.ArchiveExtractionScanError, match="source symlink encountered"):
         list(scanner.production_python_files(root))
+
+
 def test_rejects_assigned_tarfile_module_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
