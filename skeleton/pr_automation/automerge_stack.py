@@ -21,6 +21,7 @@ from .automerge_model import (
 class StackNode:
     number: int
     base_ref: str
+    base_sha: str
     head_ref: str
     head_sha: str
     parent_pr: int | None
@@ -216,6 +217,7 @@ def build_stack_graph(
             StackNode(
                 number=number,
                 base_ref=identity.base_ref,
+                base_sha=identity.base_sha,
                 head_ref=identity.head_ref,
                 head_sha=identity.head_sha,
                 parent_pr=parent,
@@ -443,6 +445,12 @@ def validate_graph(graph: StackGraph) -> tuple[str, ...]:
             reasons.append(f"root_has_parent:{node.number}")
         if node.relation is StackRelation.CHILD and node.parent_pr not in by_number:
             reasons.append(f"child_missing_parent:{node.number}")
+        if node.relation is StackRelation.CHILD and node.parent_pr in by_number:
+            parent = by_number[node.parent_pr]
+            if node.base_sha != parent.head_sha:
+                reasons.append(
+                    f"child_base_sha_mismatch:{node.number}:{node.base_sha}:{parent.head_sha}"
+                )
         for child in node.children:
             child_node = by_number.get(child)
             if child_node is None or child_node.parent_pr != node.number:
