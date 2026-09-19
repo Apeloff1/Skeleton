@@ -381,7 +381,11 @@ public final class VectorSearchMain {
             Thread.currentThread().interrupt();
             throw new IOException("batch range scoring interrupted", interrupted);
         } catch (ExecutionException failed) {
-            throw new IOException("batch range scoring failed", failed.getCause());
+            Throwable cause = failed.getCause();
+            if (cause instanceof IllegalArgumentException badRequest) {
+                throw badRequest;
+            }
+            throw new IOException("batch range scoring failed", cause);
         }
 
         writeHeader(out, header.op(), STATUS_OK, header.requestId());
