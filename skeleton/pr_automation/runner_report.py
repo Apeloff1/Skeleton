@@ -11,7 +11,7 @@ runner contracts and may therefore be rendered offline.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -338,9 +338,6 @@ class Checkpoint:
     def to_json(self) -> str:
         return canonical_json(asdict(self))
 
-
-# dataclass imported late to keep the primary report imports visually grouped.
-from dataclasses import dataclass
 
 
 def load_checkpoint(path: str | Path) -> Checkpoint | None:
