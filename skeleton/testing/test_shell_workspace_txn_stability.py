@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import os
 import sys
@@ -227,6 +228,48 @@ def test_rollback_restores_existing_file_bytes_and_mtime(tmp_path: Path):
     assert target.read_text(encoding="utf-8") == "before"
     assert target.stat().st_mtime_ns == before_mtime
     assert result.transaction.rollback.final_snapshot_digest == result.transaction.before.digest
+
+
+def test_rollback_restores_workspace_root_mtime_after_top_level_create(tmp_path: Path):
+    root, _, plane = _manager(tmp_path)
+    stamp = 1_700_000_000_987_654_321
+    os.utime(root, ns=(stamp, stamp))
+    before_mtime = root.stat().st_mtime_ns
+
+    result = plane.execute(
+        ToolchainInvocation(
+            "test.read",
+            (
+                "-c",
+                "from pathlib import Path; Path('top-level.txt').write_text('unexpected')",
+            ),
+            cwd=root,
+            timeout=1.0,
+        )
+    )
+
+    assert result.rolled_back
+    assert result.transaction.rollback is not None
+    assert result.transaction.rollback.ok
+    assert not (root / "top-level.txt").exists()
+    assert result.transaction.backup is not None
+    assert result.transaction.backup.root_mtime_ns == before_mtime
+    assert root.stat().st_mtime_ns == before_mtime
+
+
+def test_backup_manifest_root_metadata_is_integrity_bound(tmp_path: Path):
+    root, manager, _ = _manager(tmp_path)
+    snapshot = manager.scanner.scan(root)
+    manifest = manager.backup_store.create_manifest(root, snapshot)
+    assert manager.backup_store.verify_manifest(manifest)
+    assert manifest.root_mode is not None
+    assert manifest.root_mtime_ns is not None
+
+    tampered = replace(
+        manifest,
+        root_mtime_ns=manifest.root_mtime_ns + 1,
+    )
+    assert not manager.backup_store.verify_manifest(tampered)
 
 
 def test_rollback_restores_parent_directory_mtime_after_created_child(tmp_path: Path):
