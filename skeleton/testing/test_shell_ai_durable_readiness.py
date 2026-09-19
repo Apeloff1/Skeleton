@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import MappingProxyType
 
 import pytest
 
@@ -12,6 +13,9 @@ from skeleton.shells.ai.distributed_journal import (
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
 from skeleton.shells.ai.durable_checkpoint import DurableChainCheckpointStore
+from skeleton.shells.ai.durable_orphan_scan import (
+    DurableOrphanScanner,
+)
 from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableOperationsPolicy,
@@ -37,6 +41,10 @@ from skeleton.shells.ai.durable_verification_cursor import (
     DurableIncrementalVerifier,
     DurableVerificationCursorStore,
     DurableVerificationPolicy,
+)
+from skeleton.shells.ai.journal import (
+    AIDecisionEvent,
+    AIDecisionJournal,
 )
 from skeleton.shells.ai.durable_verification_operator import (
     DurableVerificationOperator,
@@ -98,6 +106,7 @@ class Environment:
         sequence_policy=None,
         operations_policy=None,
         verification_policy=None,
+        orphan_scanner=None,
     ):
         self.backend = InMemoryFencedStore()
         self.journal = DistributedAIDecisionJournal(
@@ -138,6 +147,7 @@ class Environment:
                 operations_policy
                 or DurableOperationsPolicy()
             ),
+            orphan_scanner=orphan_scanner,
         )
         self.cursor_store = DurableVerificationCursorStore(
             self.backend,
@@ -1081,3 +1091,261 @@ def test_report_mutation_order_is_deterministic():
         "sequence_index_repair",
         "verification_full_refresh",
     )
+
+def inject_journal_orphan(
+    env: Environment,
+    *,
+    name: str = "orphan",
+):
+    payload = MappingProxyType({"name": name})
+    digest = AIDecisionJournal._hash(
+        "0" * 64,
+        1,
+        f"orphan.{name}",
+        11.0,
+        f"orphan-session-{name}",
+        f"orphan-intent-{name}",
+        "",
+        name,
+        payload,
+    )
+    event = AIDecisionEvent(
+        1,
+        "0" * 64,
+        digest,
+        f"orphan.{name}",
+        11.0,
+        f"orphan-session-{name}",
+        f"orphan-intent-{name}",
+        "",
+        name,
+        payload,
+    )
+    env.backend.put_if_absent(
+        env.journal.namespace,
+        env.journal._event_key(digest),
+        event,
+    )
+    return event
+
+
+def test_orphan_scanner_keeps_clean_initialized_readiness_ready():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    report = env.guard.inspect(env.entries)
+    assert report.ready
+    journal_report = next(
+        item
+        for item in report.operations.chains
+        if item.chain_id == "journal"
+    )
+    assert journal_report.orphan_scan is not None
+    assert journal_report.orphan_scan.orphan_candidates == 0
+    assert journal_report.orphan_scan.healthy
+
+
+def test_orphan_candidate_degrades_readiness_without_blocking():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    orphan = inject_journal_orphan(env)
+    report = env.guard.inspect(env.entries)
+    assert report.degraded
+    assert not report.blocked
+    assert report.operations.allowed
+    assert report.operations.warnings >= 1
+    journal_report = next(
+        item
+        for item in report.operations.chains
+        if item.chain_id == "journal"
+    )
+    assert journal_report.orphan_scan.orphan_candidates == 1
+    assert (
+        journal_report.orphan_scan
+        .safe_delete_candidates[0]
+        .node_hash
+        == orphan.event_hash
+    )
+    assert any(
+        item.code == "durable_orphan.candidates"
+        for item in journal_report.findings
+    )
+    assert any(
+        item.code == "readiness.operations_warning"
+        for item in report.findings
+    )
+
+
+def test_orphan_index_conflict_blocks_readiness():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    orphan = inject_journal_orphan(env)
+    key = env.journal._sequence_key(1)
+    record = env.backend.get(
+        env.journal.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        env.journal.namespace,
+        key,
+        expected_revision=record.revision,
+        value=DistributedJournalSequenceIndex(
+            1,
+            orphan.event_hash,
+        ),
+    )
+    report = env.guard.inspect(env.entries)
+    assert report.blocked
+    assert not report.operations.allowed
+    journal_report = next(
+        item
+        for item in report.operations.chains
+        if item.chain_id == "journal"
+    )
+    assert journal_report.orphan_scan.requires_manual_review
+    assert journal_report.orphan_scan.index_conflicts == 1
+    assert any(
+        item.code == "durable_orphan.manual_review"
+        for item in journal_report.findings
+    )
+
+
+def test_corrupt_orphan_record_blocks_readiness():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    env.backend.put_if_absent(
+        env.journal.namespace,
+        "event:" + ("f" * 64),
+        {"bad": True},
+    )
+    report = env.guard.inspect(env.entries)
+    assert report.blocked
+    journal_report = next(
+        item
+        for item in report.operations.chains
+        if item.chain_id == "journal"
+    )
+    assert journal_report.orphan_scan.corrupt == 1
+    assert any(
+        item.code == "durable_orphan.manual_review"
+        for item in journal_report.findings
+    )
+
+
+def test_required_orphan_scan_without_scanner_blocks_readiness():
+    env = Environment(
+        operations_policy=DurableOperationsPolicy(
+            require_orphan_scan=True,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    report = env.guard.inspect(env.entries)
+    assert report.blocked
+    assert not report.operations.allowed
+    assert all(
+        any(
+            finding.code == "durable_orphan.scan_required"
+            for finding in chain.findings
+        )
+        for chain in report.operations.chains
+    )
+
+
+def test_disabling_orphan_candidate_warning_keeps_readiness_ready():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+        operations_policy=DurableOperationsPolicy(
+            warn_on_orphan_candidates=False,
+        ),
+    )
+    env.append(2)
+    env.initialize_verification()
+    inject_journal_orphan(env)
+    report = env.guard.inspect(env.entries)
+    assert report.ready
+    journal_report = next(
+        item
+        for item in report.operations.chains
+        if item.chain_id == "journal"
+    )
+    assert journal_report.orphan_scan.orphan_candidates == 1
+    assert not any(
+        item.code == "durable_orphan.candidates"
+        for item in journal_report.findings
+    )
+
+
+def test_orphan_scan_is_serialized_in_readiness_operations_report():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(1)
+    env.initialize_verification()
+    inject_journal_orphan(env)
+    report = env.guard.inspect(env.entries)
+    data = report.to_dict()
+    journal = next(
+        item
+        for item in data["operations"]["chains"]
+        if item["chain_id"] == "journal"
+    )
+    assert journal["orphan_scan"] is not None
+    assert journal["orphan_scan"]["orphan_candidates"] == 1
+    assert len(journal["orphan_scan"]["digest"]) == 64
+
+
+def test_require_ready_rejects_degraded_orphan_pressure():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(1)
+    env.initialize_verification()
+    inject_journal_orphan(env)
+    with pytest.raises(
+        DurableEvidenceReadinessError,
+        match="warning",
+    ):
+        env.guard.require_ready(env.entries)
+
+
+def test_readiness_digest_changes_when_orphan_appears():
+    env = Environment(
+        orphan_scanner=DurableOrphanScanner(
+            clock=lambda: 100.0,
+        ),
+    )
+    env.append(1)
+    env.initialize_verification()
+    before = env.guard.inspect(env.entries)
+    inject_journal_orphan(env)
+    after = env.guard.inspect(env.entries)
+    assert before.digest != after.digest
+    assert before.ready
+    assert after.degraded
+
