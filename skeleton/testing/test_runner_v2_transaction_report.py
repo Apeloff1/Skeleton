@@ -33,7 +33,6 @@ from skeleton.pr_automation.runner_contracts import (
 )
 from skeleton.pr_automation.runner_report import (
     append_step_summary,
-    applied_merge_shas,
     assert_report_invariants,
     checkpoint_compatible,
     checkpoint_from_report,
