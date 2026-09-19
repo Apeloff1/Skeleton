@@ -33,6 +33,13 @@ from skeleton.shells.ai.distributed_state import (
     FencedLease,
     LeaseConflict,
 )
+from skeleton.shells.ai.durable_maintenance import (
+    DurableMaintenanceOperation,
+    DurableMaintenanceResource,
+    DurableMaintenanceStale,
+    DurableMaintenanceStore,
+    SignedDurableMaintenanceEpoch,
+)
 from skeleton.shells.ai.durable_hot_floor import (
     DurableHotFloorError,
     DurableHotFloorStore,
@@ -586,6 +593,7 @@ class DurablePruningExecutor:
         authorizations: DurablePruningAuthorizationStore,
         hot_floors: DurableHotFloorStore,
         *,
+        maintenance: DurableMaintenanceStore | None = None,
         namespace: str = "shell-ai-durable-pruning-operations",
         lease_ttl_seconds: float = 60.0,
         max_items: int = 100_000,
@@ -649,9 +657,20 @@ class DurablePruningExecutor:
             )
         if not callable(clock):
             raise TypeError("clock must be callable")
+        if (
+            maintenance is not None
+            and not isinstance(
+                maintenance,
+                DurableMaintenanceStore,
+            )
+        ):
+            raise TypeError(
+                "maintenance must be DurableMaintenanceStore"
+            )
         self.backend = backend
         self.authorizations = authorizations
         self.hot_floors = hot_floors
+        self.maintenance = maintenance
         self.namespace = namespace
         self.lease_ttl_seconds = float(
             lease_ttl_seconds
@@ -661,6 +680,61 @@ class DurablePruningExecutor:
             max_cas_retries
         )
         self._clock = clock
+
+    def maintenance_resource(
+        self,
+        chain_id: str,
+        chain: object,
+    ) -> DurableMaintenanceResource:
+        return DurableMaintenanceResource.from_chain(
+            chain_id,
+            chain,
+            resource_kind="evidence-chain",
+        )
+
+    def _require_maintenance(
+        self,
+        chain_id: str,
+        chain: object,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ),
+    ):
+        if self.maintenance is None:
+            return None
+        if maintenance_epoch is None:
+            raise DurablePruningError(
+                "durable maintenance epoch is required for pruning"
+            )
+        if not isinstance(
+            maintenance_epoch,
+            SignedDurableMaintenanceEpoch,
+        ):
+            raise TypeError(
+                "maintenance_epoch must be SignedDurableMaintenanceEpoch"
+            )
+        if maintenance_epoch.epoch.operation not in {
+            DurableMaintenanceOperation.PRUNING,
+            DurableMaintenanceOperation.COMPACTION,
+        }:
+            raise DurablePruningError(
+                "maintenance epoch does not authorize pruning"
+            )
+        resource = self.maintenance_resource(
+            chain_id,
+            chain,
+        )
+        try:
+            return self.maintenance.require_active(
+                maintenance_epoch,
+                required_resources=(chain_id,),
+                live_resources=(resource,),
+            )
+        except DurableMaintenanceStale as exc:
+            raise DurablePruningManualReview(
+                "durable maintenance authority is stale: "
+                + str(exc)
+            ) from exc
 
     @staticmethod
     def derive_operation_id(
@@ -1647,12 +1721,21 @@ class DurablePruningExecutor:
         authorization: SignedDurablePruningAuthorization,
         retention: DurableRetentionPlan,
         chain: object,
+        *,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> DurablePruningResult:
         auth = authorization.authorization
         self._require_floor_configuration(
             chain,
             auth.chain_id,
             self.hot_floors,
+        )
+        self._require_maintenance(
+            auth.chain_id,
+            chain,
+            maintenance_epoch,
         )
         operation_id = self.derive_operation_id(
             auth.authorization_id,
@@ -1704,6 +1787,11 @@ class DurablePruningExecutor:
                     or "pruning operation requires manual review"
                 )
 
+            self._require_maintenance(
+                auth.chain_id,
+                chain,
+                maintenance_epoch,
+            )
             operation, floor = self._ensure_floor(
                 manifest,
                 operation,
@@ -1739,6 +1827,11 @@ class DurablePruningExecutor:
                 lease = self._renew(lease)
                 self.backend.require_fence(
                     lease
+                )
+                self._require_maintenance(
+                    auth.chain_id,
+                    chain,
+                    maintenance_epoch,
                 )
                 index = (
                     operation.next_delete_index
@@ -1875,6 +1968,10 @@ class DurablePruningExecutor:
         authorization: SignedDurablePruningAuthorization,
         retention: DurableRetentionPlan,
         chain: object,
+        *,
+        maintenance_epoch: (
+            SignedDurableMaintenanceEpoch | None
+        ) = None,
     ) -> DurablePruningResult:
         operation_id = _digest(
             "operation_id",
@@ -1903,4 +2000,5 @@ class DurablePruningExecutor:
             authorization,
             retention,
             chain,
+            maintenance_epoch=maintenance_epoch,
         )
