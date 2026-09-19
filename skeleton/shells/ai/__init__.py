@@ -1,5 +1,7 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_operations import DurableChainOperationalState, DurableChainOperationsReport, DurableEvidenceOperationsError, DurableEvidenceOperationsInspector, DurableEvidenceOperationsReport, DurableOperationsFinding, DurableOperationsPolicy, DurableOperationsSeverity
+
 from skeleton.shells.ai.durable_retention import DurableRetentionError, DurableRetentionPlan, DurableRetentionPlanner, DurableRetentionPolicy, DurableRetentionState, ProtectedHistoricalRoot
 
 from skeleton.shells.ai.durable_checkpoint import CheckpointableEvidenceChain, DurableChainCheckpoint, DurableChainCheckpointStore, DurableCheckpointError, DurableCheckpointVerification, SignedDurableChainCheckpoint
