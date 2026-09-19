@@ -256,14 +256,20 @@ class RunnerLimits:
             "retry_ceiling_seconds": self.retry_ceiling_seconds,
         }
         for name, value in positive.items():
-            if isinstance(value, bool) or value <= 0:
+            if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
-        if isinstance(self.max_mutations, bool) or self.max_mutations < 0:
+        if type(self.max_mutations) is not int or self.max_mutations < 0:
             raise ValueError("max_mutations must be a non-negative integer")
-        if isinstance(self.queue_pressure_threshold, bool) or self.queue_pressure_threshold < 0:
-            raise ValueError("queue_pressure_threshold must be non-negative")
-        if isinstance(self.retry_attempts, bool) or not 0 <= self.retry_attempts <= 10:
-            raise ValueError("retry_attempts must be between 0 and 10")
+        if (
+            type(self.queue_pressure_threshold) is not int
+            or self.queue_pressure_threshold < 0
+        ):
+            raise ValueError("queue_pressure_threshold must be a non-negative integer")
+        if (
+            type(self.retry_attempts) is not int
+            or not 0 <= self.retry_attempts <= 10
+        ):
+            raise ValueError("retry_attempts must be an integer between 0 and 10")
 
 
 @dataclass(frozen=True, slots=True)
