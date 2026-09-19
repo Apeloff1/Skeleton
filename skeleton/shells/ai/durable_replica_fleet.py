@@ -338,6 +338,36 @@ class DurableReplicaFleetReport:
         return not self.ready_members
 
     @property
+    def state_digest(self) -> str:
+        raw = json.dumps(
+            {
+                "source_id": self.source_id,
+                "members": [
+                    member.to_dict()
+                    for member in self.members
+                ],
+                "findings": [
+                    finding.to_dict()
+                    for finding in self.findings
+                ],
+                "policy_digest": self.policy_digest,
+                "min_ready_replicas": self.min_ready_replicas,
+                "min_ready_failure_domains": (
+                    self.min_ready_failure_domains
+                ),
+                "ready_targets": list(self.ready_targets),
+                "ready_failure_domains": list(
+                    self.ready_failure_domains
+                ),
+                "required_ready": self.required_ready,
+                "quorum_ready": self.quorum_ready,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    @property
     def digest(self) -> str:
         raw = json.dumps(
             self.to_dict(include_digest=False),
@@ -384,6 +414,7 @@ class DurableReplicaFleetReport:
             "quorum_ready": self.quorum_ready,
             "degraded": self.degraded,
             "blocked": self.blocked,
+            "state_digest": self.state_digest,
         }
         if include_digest:
             data["digest"] = self.digest
