@@ -10,7 +10,6 @@ import pytest
 from skeleton.pr_automation.automerge_model import (
     CandidateClass,
     DecisionKind,
-    GateRequirement,
     MergeMode,
     RiskTier,
     StackRelation,
