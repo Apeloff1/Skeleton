@@ -125,7 +125,7 @@ class Environment:
             None,
             "",
             "",
-            fp("p"),
+            fp("d"),
         )
 
     def replication_report(self):
@@ -142,7 +142,7 @@ class Environment:
                 receipt_head.sequence,
                 receipt_head.root_hash,
             ),
-            fp("p"),
+            fp("d"),
         )
 
     def consensus_report(
