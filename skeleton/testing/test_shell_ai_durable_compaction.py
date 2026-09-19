@@ -1170,4 +1170,3 @@ def test_compaction_readiness_fails_when_all_archive_replicas_are_missing():
         is DurableCompactionState.ARCHIVE_INVALID
     )
     assert not report.ready
-
