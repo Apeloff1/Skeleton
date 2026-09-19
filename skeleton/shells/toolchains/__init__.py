@@ -40,6 +40,13 @@ from skeleton.shells.toolchains.execution import (
 )
 from skeleton.shells.toolchains.profiles import ContractProfile, PROFILES, profile
 from skeleton.shells.toolchains.recipes import DEFAULT_RECIPES, RECIPES, RecipeCatalog, ToolchainRecipe, ToolchainStep
+from skeleton.shells.toolchains.transactional import (
+    ToolchainMutationPolicyRouter,
+    TransactionalToolchainError,
+    TransactionalToolchainExecutionPlane,
+    TransactionalToolchainResult,
+    zero_mutation_policy,
+)
 from skeleton.shells.toolchains.types import BoundToolchain, CommandEffect, CommandRisk, LogicalCommandContract
 
 __all__ = [
@@ -78,6 +85,11 @@ __all__ = [
     "diff_authority_manifests",
     "require_no_authority_widening",
     "verify_authority_manifest",
+    "ToolchainMutationPolicyRouter",
+    "TransactionalToolchainError",
+    "TransactionalToolchainExecutionPlane",
+    "TransactionalToolchainResult",
+    "zero_mutation_policy",
     "ContractProfile",
     "PROFILES",
     "profile",
