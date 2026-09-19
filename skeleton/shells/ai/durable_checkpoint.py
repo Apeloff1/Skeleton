@@ -877,6 +877,93 @@ class DurableChainCheckpointStore:
             tuple(corrupt),
         )
 
+    def repair_missing_lookup_indexes(
+        self,
+        chain_id: str,
+        *,
+        max_repairs: int = 4096,
+    ) -> int:
+        """Repair only absent exact indexes for one chain.
+
+        Existing malformed or conflicting records are never overwritten.
+        Operators must investigate those as integrity failures rather than
+        treating them as cache misses.
+        """
+        if not chain_id or len(chain_id) > 128:
+            raise ValueError("invalid chain_id")
+        if (
+            isinstance(max_repairs, bool)
+            or not isinstance(max_repairs, int)
+            or max_repairs <= 0
+        ):
+            raise ValueError(
+                "max_repairs must be positive integer"
+            )
+        health = self.inspect_lookup_indexes(
+            chain_id
+        )
+        if not health.registry_valid:
+            raise DurableCheckpointError(
+                "cannot repair indexes from invalid checkpoint registry"
+            )
+        if health.corrupt_indexes:
+            raise DurableCheckpointError(
+                "cannot auto-repair conflicting checkpoint indexes"
+            )
+        if health.missing > max_repairs:
+            raise DurableCheckpointError(
+                "checkpoint index repair exceeds bounded repair limit"
+            )
+        if health.missing == 0:
+            return 0
+
+        by_digest = {
+            item.checkpoint.digest: item
+            for item in self.snapshot()
+            if item.checkpoint.chain_id == chain_id
+        }
+        by_root = {
+            item.checkpoint.root_hash: item
+            for item in by_digest.values()
+        }
+        repaired = 0
+        for digest in health.missing_digest_indexes:
+            item = by_digest.get(digest)
+            if item is None:
+                raise DurableCheckpointError(
+                    "missing digest index has no canonical checkpoint"
+                )
+            lookup = self._lookup_for(item)
+            if self._put_lookup(
+                self._digest_lookup_key(digest),
+                lookup,
+            ):
+                repaired += 1
+        for root_hash in health.missing_root_indexes:
+            item = by_root.get(root_hash)
+            if item is None:
+                raise DurableCheckpointError(
+                    "missing root index has no canonical checkpoint"
+                )
+            lookup = self._lookup_for(item)
+            if self._put_lookup(
+                self._root_lookup_key(
+                    chain_id,
+                    root_hash,
+                ),
+                lookup,
+            ):
+                repaired += 1
+
+        after = self.inspect_lookup_indexes(
+            chain_id
+        )
+        if not after.healthy:
+            raise DurableCheckpointError(
+                "checkpoint index repair did not restore healthy state"
+            )
+        return repaired
+
     def repair_lookup_indexes(
         self,
     ) -> int:
