@@ -198,9 +198,8 @@ class EventAdmission:
             field_name="event_fingerprint",
             limit=64,
         ).casefold()
-        if _SHA_RE.fullmatch(digest[:40]) is None or len(digest) != 64:
-            if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-                raise EventFirewallError("event fingerprint must be sha256 hex")
+        if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise EventFirewallError("event fingerprint must be sha256 hex")
         object.__setattr__(self, "event_fingerprint", digest)
 
     @property
