@@ -12,7 +12,6 @@ runner contracts and may therefore be rendered offline.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
