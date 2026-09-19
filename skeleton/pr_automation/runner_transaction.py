@@ -33,7 +33,7 @@ from .runner_contracts import (
 )
 from .runner_evidence import EvidenceCollector
 from .runner_scheduler import QueueObservation
-from .runner_transport import BudgetedGitHubTransport, RunnerTransportError
+from .runner_transport import (\n    BudgetedGitHubTransport,\n    GitHubHTTPError,\n    RunnerTransportError,\n)
 
 
 class MutationError(RuntimeError):
@@ -428,6 +428,47 @@ class MergeTransaction:
                 merge_sha=merge_sha,
                 message=str(result.get("message") or "merged"),
                 preconditions=preconditions,
+            )
+        except GitHubHTTPError as exc:
+            message = f"{type(exc).__name__}: {exc}"
+            if mutation_dispatched and exc.definitive_mutation_rejection:
+                self._finish(intent, success=False, error=message)
+                return receipt(
+                    intent,
+                    MutationState.REJECTED,
+                    started=started,
+                    finished=_time(self.clock),
+                    current=None,
+                    message=message,
+                )
+            if mutation_dispatched:
+                uncertain_message = (
+                    "mutation outcome uncertain after merge request dispatch; "
+                    "fresh repository reconciliation is required before any further mutation: "
+                    + message
+                )
+                self._finish(
+                    intent,
+                    success=False,
+                    error=uncertain_message,
+                    uncertain=True,
+                )
+                return receipt(
+                    intent,
+                    MutationState.UNCERTAIN,
+                    started=started,
+                    finished=_time(self.clock),
+                    current=None,
+                    message=uncertain_message,
+                )
+            self._finish(intent, success=False, error=message)
+            return receipt(
+                intent,
+                MutationState.FAILED,
+                started=started,
+                finished=_time(self.clock),
+                current=None,
+                message=message,
             )
         except Exception as exc:
             message = f"{type(exc).__name__}: {exc}"
