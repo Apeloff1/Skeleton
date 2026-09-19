@@ -78,9 +78,10 @@ def _assert_contract(name: str) -> None:
     assert contract.arguments.validate(name, argv) == argv
     with pytest.raises(ArgumentRejected):
         contract.arguments.validate(name, ("--definitely-unknown-shell-option",))
-    if argv:
-        with pytest.raises(ArgumentRejected):
-            contract.arguments.validate(name, argv[1:])
+    required_prefix = getattr(contract.arguments, "required_prefix", ())
+    if required_prefix:
+        with pytest.raises(ArgumentRejected, match="required logical command prefix"):
+            contract.arguments.validate(name, argv[len(required_prefix):])
 
 
 def _assert_recipe(name: str) -> None:
