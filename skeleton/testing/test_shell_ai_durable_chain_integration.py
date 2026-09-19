@@ -1355,4 +1355,3 @@ def test_durable_recovery_report_digest_survives_unrelated_later_work(tmp_path):
     )
     assert second.digest == first.digest
     assert second.session_integrity_digest == first.session_integrity_digest
-
