@@ -760,3 +760,176 @@ def test_reader_namespace_isolation():
         second.snapshot()[0].session_id
         == "two"
     )
+
+def test_snapshot_at_genesis_is_empty():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore()
+    )
+    assert journal.snapshot_at(GENESIS_HASH) == ()
+    assert journal.verify_root(GENESIS_HASH)
+    assert journal.root_is_ancestor(GENESIS_HASH)
+
+
+def test_snapshot_at_historical_root_returns_exact_prefix():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore(),
+        clock=lambda: 11.0,
+    )
+    first = append_one(journal, kind="first")
+    second = append_one(journal, kind="second")
+    append_one(journal, kind="third")
+    assert journal.snapshot_at(
+        first.event_hash
+    ) == (first,)
+    assert journal.snapshot_at(
+        second.event_hash
+    ) == (first, second)
+    assert journal.verify_root(
+        first.event_hash
+    )
+    assert journal.root_is_ancestor(
+        first.event_hash
+    )
+
+
+def test_verify_root_rejects_missing_hash():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore()
+    )
+    assert not journal.verify_root("f" * 64)
+    assert not journal.root_is_ancestor("f" * 64)
+
+
+def test_historical_session_filter_stops_at_requested_root():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore(),
+        clock=lambda: 12.0,
+    )
+    first = append_one(
+        journal,
+        kind="first",
+        session_id="session",
+    )
+    cutoff = append_one(
+        journal,
+        kind="cutoff",
+        session_id="other",
+    )
+    append_one(
+        journal,
+        kind="later",
+        session_id="session",
+    )
+    historical = journal.events_for_session(
+        "session",
+        root_hash=cutoff.event_hash,
+    )
+    assert historical == (first,)
+
+
+def test_self_consistent_orphan_root_is_not_committed_ancestor():
+    backend = InMemoryFencedStore()
+    journal = DistributedAIDecisionJournal(
+        backend,
+        namespace="journal",
+        clock=lambda: 13.0,
+    )
+    committed = append_one(journal)
+    payload = MappingProxyType({})
+    orphan_hash = AIDecisionJournal._hash(
+        committed.event_hash,
+        2,
+        "orphan",
+        14.0,
+        "orphan-session",
+        "orphan-intent",
+        "",
+        "",
+        payload,
+    )
+    orphan = AIDecisionEvent(
+        2,
+        committed.event_hash,
+        orphan_hash,
+        "orphan",
+        14.0,
+        "orphan-session",
+        "orphan-intent",
+        "",
+        "",
+        payload,
+    )
+    backend.put_if_absent(
+        "journal",
+        f"event:{orphan_hash}",
+        orphan,
+    )
+    assert journal.verify_root(orphan_hash)
+    assert not journal.root_is_ancestor(
+        orphan_hash
+    )
+
+
+def test_historical_root_corruption_is_detected():
+    backend = InMemoryFencedStore()
+    journal = DistributedAIDecisionJournal(
+        backend,
+        namespace="journal",
+        clock=lambda: 15.0,
+    )
+    first = append_one(journal, kind="first")
+    append_one(journal, kind="second")
+    key = journal._event_key(
+        first.event_hash
+    )
+    record = backend.get(
+        "journal",
+        key,
+    )
+    backend.compare_and_swap(
+        "journal",
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            first,
+            summary="tampered historical",
+        ),
+    )
+    assert not journal.verify_root(
+        first.event_hash
+    )
+    assert not journal.root_is_ancestor(
+        first.event_hash
+    )
+
+
+def test_snapshot_at_rejects_malformed_root():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore()
+    )
+    with pytest.raises(ValueError, match="SHA-256"):
+        journal.snapshot_at("bad")
+
+
+def test_historical_root_stays_valid_after_many_later_events():
+    journal = DistributedAIDecisionJournal(
+        InMemoryFencedStore(),
+        clock=lambda: 16.0,
+    )
+    first = append_one(journal, kind="first")
+    for index in range(20):
+        append_one(
+            journal,
+            kind=f"later-{index}",
+            session_id=f"session-{index}",
+        )
+    assert journal.verify_root(
+        first.event_hash
+    )
+    assert journal.root_is_ancestor(
+        first.event_hash
+    )
+    assert journal.snapshot_at(
+        first.event_hash
+    ) == (first,)
+
