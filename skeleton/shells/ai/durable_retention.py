@@ -155,6 +155,8 @@ class DurableRetentionPlan:
     protected_roots: tuple[ProtectedHistoricalRoot, ...]
     local_deletion_safe: bool
     reasons: tuple[str, ...]
+    hot_floor_sequence: int = 0
+    hot_node_count: int = -1
 
     def __post_init__(self) -> None:
         if not self.chain_id or len(self.chain_id) > 128:
@@ -228,6 +230,37 @@ class DurableRetentionPlan:
             "protected_roots",
             tuple(self.protected_roots),
         )
+        if (
+            isinstance(self.hot_floor_sequence, bool)
+            or not isinstance(self.hot_floor_sequence, int)
+            or self.hot_floor_sequence < 0
+            or self.hot_floor_sequence > self.current_sequence
+        ):
+            raise ValueError(
+                "hot_floor_sequence must be within current chain"
+            )
+        hot_node_count = self.hot_node_count
+        if hot_node_count == -1:
+            hot_node_count = (
+                self.current_sequence
+                - self.hot_floor_sequence
+            )
+            object.__setattr__(
+                self,
+                "hot_node_count",
+                hot_node_count,
+            )
+        if (
+            isinstance(hot_node_count, bool)
+            or not isinstance(hot_node_count, int)
+            or hot_node_count < 0
+            or hot_node_count
+            != self.current_sequence
+            - self.hot_floor_sequence
+        ):
+            raise ValueError(
+                "hot_node_count must equal current sequence minus hot floor"
+            )
         if self.archive_node_count != self.archive_through_sequence:
             raise ValueError(
                 "archive count must match prefix sequence"
@@ -268,7 +301,7 @@ class DurableRetentionPlan:
     def capacity_remaining(self) -> int:
         return max(
             0,
-            self.capacity - self.current_sequence,
+            self.capacity - self.hot_node_count,
         )
 
     @property
@@ -299,6 +332,8 @@ class DurableRetentionPlan:
             "policy_digest": self.policy_digest,
             "current_sequence": self.current_sequence,
             "current_root": self.current_root,
+            "hot_floor_sequence": self.hot_floor_sequence,
+            "hot_node_count": self.hot_node_count,
             "capacity": self.capacity,
             "utilization": self.utilization,
             "capacity_remaining": self.capacity_remaining,
@@ -384,6 +419,56 @@ class DurableRetentionPlanner:
                 "chain capacity is unavailable; provide capacity"
             )
         return value
+
+    @staticmethod
+    def _hot_occupancy(
+        chain,
+        current_sequence: int,
+    ) -> tuple[int, int]:
+        floor_sequence = 0
+        floor_method = getattr(
+            chain,
+            "hot_floor",
+            None,
+        )
+        active_method = getattr(
+            chain,
+            "_hot_floor_active",
+            None,
+        )
+        if callable(floor_method):
+            floor = floor_method()
+            candidate = int(
+                getattr(floor, "sequence", 0)
+            )
+            if candidate > 0:
+                if callable(active_method):
+                    if bool(active_method(floor)):
+                        floor_sequence = candidate
+                else:
+                    floor_sequence = candidate
+        hot_length = getattr(
+            chain,
+            "hot_length",
+            None,
+        )
+        if callable(hot_length):
+            hot_nodes = int(hot_length())
+        else:
+            hot_nodes = (
+                current_sequence - floor_sequence
+            )
+        if (
+            floor_sequence < 0
+            or floor_sequence > current_sequence
+            or hot_nodes < 0
+            or hot_nodes
+            != current_sequence - floor_sequence
+        ):
+            raise DurableRetentionError(
+                "live hot-tier occupancy is inconsistent with chain head"
+            )
+        return floor_sequence, hot_nodes
 
     def _protected(
         self,
@@ -483,8 +568,15 @@ class DurableRetentionPlanner:
             chain,
             capacity,
         )
+        (
+            hot_floor_sequence,
+            hot_node_count,
+        ) = self._hot_occupancy(
+            chain,
+            current_sequence,
+        )
         utilization = (
-            current_sequence / chain_capacity
+            hot_node_count / chain_capacity
         )
         protected = self._protected(
             chain,
@@ -502,7 +594,8 @@ class DurableRetentionPlanner:
         ):
             checkpoint = item.checkpoint
             if (
-                checkpoint.sequence
+                hot_floor_sequence
+                < checkpoint.sequence
                 <= maximum_archive_sequence
             ):
                 verification = (
@@ -551,6 +644,7 @@ class DurableRetentionPlanner:
         elif pressure and selected is not None:
             if (
                 selected.checkpoint.sequence
+                - hot_floor_sequence
                 >= self.policy.minimum_archive_batch
             ):
                 archive_sequence = (
@@ -564,7 +658,7 @@ class DurableRetentionPlanner:
                 )
             else:
                 reasons.append(
-                    "eligible checkpoint prefix is below minimum archive batch"
+                    "eligible checkpoint interval is below minimum archive batch"
                 )
 
         if utilization >= self.policy.critical_utilization:
@@ -590,7 +684,7 @@ class DurableRetentionPlanner:
                 )
 
         reasons.append(
-            "local deletion remains unsafe without an archive-backed historical reader"
+            "retention planning never authorizes deletion; destructive pruning requires separate signed authority"
         )
 
         return DurableRetentionPlan(
@@ -611,4 +705,6 @@ class DurableRetentionPlanner:
             protected,
             False,
             tuple(reasons),
+            hot_floor_sequence,
+            hot_node_count,
         )
