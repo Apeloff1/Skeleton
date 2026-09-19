@@ -117,6 +117,22 @@ class TransactionJournal:
     def recovered_truncated_tail(self) -> bool:
         return self._recovered_truncated_tail
 
+    def _require_parent_directory(self) -> Path:
+        assert self.storage_path is not None
+        parent = self.storage_path.parent
+        parent.mkdir(parents=True, exist_ok=True)
+        try:
+            metadata = parent.lstat()
+        except OSError as exc:
+            raise JournalPersistenceError(
+                "transaction journal parent is unavailable"
+            ) from exc
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise JournalPersistenceError(
+                "transaction journal parent must be a real directory"
+            )
+        return parent
+
     def require_external_to_workspace(self, workspace_root: Path | str) -> None:
         if self.storage_path is None:
             return
@@ -215,7 +231,14 @@ class TransactionJournal:
         good_end = 0
         truncated_tail = False
         try:
-            with self.storage_path.open("rb") as handle:
+            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(self.storage_path, flags)
+            with os.fdopen(fd, "rb") as handle:
+                metadata = os.fstat(handle.fileno())
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise JournalPersistenceError(
+                        "transaction journal must be a regular file"
+                    )
                 while True:
                     start = handle.tell()
                     line = handle.readline(self.max_record_bytes + 2)
@@ -271,7 +294,9 @@ class TransactionJournal:
             )
         if truncated_tail:
             try:
-                with self.storage_path.open("r+b") as handle:
+                flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+                fd = os.open(self.storage_path, flags)
+                with os.fdopen(fd, "r+b") as handle:
                     handle.truncate(good_end)
                     handle.flush()
                     if self.fsync:
@@ -292,8 +317,13 @@ class TransactionJournal:
                 "transaction journal event exceeds record byte bound"
             )
         try:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            self._require_parent_directory()
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_APPEND
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
             fd = os.open(self.storage_path, flags, 0o600)
             try:
                 metadata = os.fstat(fd)
