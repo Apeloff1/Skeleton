@@ -27,10 +27,13 @@ _OP_PING = 1
 _OP_TOP_K = 2
 _OP_SHUTDOWN = 3
 _OP_BATCH_TOP_K = 4
+_OP_RANGE = 5
+_OP_BATCH_RANGE = 6
 _STATUS_OK = 0
 _MAX_DIMENSIONS = 4096
 _MAX_CANDIDATES = 100_000
 _MAX_QUERIES = 512
+_MAX_RANGE_HITS = 1_000_000
 _MAX_ELEMENTS = 4_000_000
 _HEADER_REQUEST = struct.Struct(">IhBq")
 _HEADER_RESPONSE = struct.Struct(">IhBBq")
@@ -38,6 +41,8 @@ _INT = struct.Struct(">i")
 _PING = struct.Struct(">qi")
 _TOP_K_PREFIX = struct.Struct(">iiid")
 _BATCH_TOP_K_PREFIX = struct.Struct(">iiii")
+_RANGE_PREFIX = struct.Struct(">iiidd")
+_BATCH_RANGE_PREFIX = struct.Struct(">iiiid")
 _HIT = struct.Struct(">id")
 
 
@@ -252,6 +257,134 @@ class JvmVectorAccelerator:
             self._validate_hits(hits, candidate_count, top_k)
         return batches
 
+    def range_search(
+        self,
+        query: Sequence[float],
+        query_norm: float,
+        candidates: Sequence[tuple[Sequence[float], float]],
+        similarity_threshold: float,
+        *,
+        max_hits: int = _MAX_RANGE_HITS,
+    ) -> list[VectorHit]:
+        """Return all candidates at or above a cosine similarity threshold."""
+        dimensions = len(query)
+        candidate_count = len(candidates)
+        threshold = float(similarity_threshold)
+
+        if not 1 <= dimensions <= self.config.max_dimensions:
+            raise ValueError("query dimensions outside supported range")
+        if not 1 <= candidate_count <= self.config.max_candidates:
+            raise ValueError("candidate count outside supported range")
+        if dimensions * candidate_count > self.config.max_elements:
+            raise ValueError("vector element count exceeds accelerator bound")
+        if not 1 <= max_hits <= min(candidate_count, _MAX_RANGE_HITS):
+            raise ValueError("max_hits outside candidate range")
+        if not math.isfinite(threshold) or not -1.0 <= threshold <= 1.0:
+            raise ValueError("similarity_threshold outside [-1, 1]")
+        if not math.isfinite(query_norm) or query_norm <= 0:
+            raise ValueError("query_norm must be finite and positive")
+
+        payload = bytearray(
+            _RANGE_PREFIX.pack(
+                dimensions,
+                candidate_count,
+                max_hits,
+                threshold,
+                float(query_norm),
+            )
+        )
+        payload.extend(self._encode_vector(query, dimensions))
+        for vector, norm in candidates:
+            if len(vector) != dimensions:
+                raise ValueError("candidate dimension mismatch")
+            norm_value = float(norm)
+            if not math.isfinite(norm_value) or norm_value <= 0:
+                raise ValueError("candidate norm must be finite and positive")
+            payload.extend(struct.pack(">d", norm_value))
+            payload.extend(self._encode_vector(vector, dimensions))
+
+        response = self._request(_OP_RANGE, bytes(payload))
+        hits = response.payload
+        self._validate_range_hits(
+            hits,
+            candidate_count=candidate_count,
+            threshold=threshold,
+            max_hits=max_hits,
+        )
+        return hits
+
+    def range_search_many(
+        self,
+        queries: Sequence[tuple[Sequence[float], float]],
+        candidates: Sequence[tuple[Sequence[float], float]],
+        similarity_threshold: float,
+        *,
+        max_total_hits: int = _MAX_RANGE_HITS,
+    ) -> list[list[VectorHit]]:
+        """Threshold-search many queries against one shared candidate matrix."""
+        query_count = len(queries)
+        candidate_count = len(candidates)
+        threshold = float(similarity_threshold)
+
+        if not 1 <= query_count <= _MAX_QUERIES:
+            raise ValueError("query count outside supported range")
+        if not 1 <= candidate_count <= self.config.max_candidates:
+            raise ValueError("candidate count outside supported range")
+        if not 1 <= max_total_hits <= _MAX_RANGE_HITS:
+            raise ValueError("max_total_hits outside supported range")
+        if not math.isfinite(threshold) or not -1.0 <= threshold <= 1.0:
+            raise ValueError("similarity_threshold outside [-1, 1]")
+
+        dimensions = len(queries[0][0])
+        if not 1 <= dimensions <= self.config.max_dimensions:
+            raise ValueError("query dimensions outside supported range")
+        if dimensions * (query_count + candidate_count) > self.config.max_elements:
+            raise ValueError("vector element count exceeds accelerator bound")
+
+        payload = bytearray(
+            _BATCH_RANGE_PREFIX.pack(
+                dimensions,
+                query_count,
+                candidate_count,
+                max_total_hits,
+                threshold,
+            )
+        )
+        for query, norm in queries:
+            if len(query) != dimensions:
+                raise ValueError("query dimension mismatch")
+            norm_value = float(norm)
+            if not math.isfinite(norm_value) or norm_value <= 0:
+                raise ValueError("query_norm must be finite and positive")
+            payload.extend(struct.pack(">d", norm_value))
+            payload.extend(self._encode_vector(query, dimensions))
+        for vector, norm in candidates:
+            if len(vector) != dimensions:
+                raise ValueError("candidate dimension mismatch")
+            norm_value = float(norm)
+            if not math.isfinite(norm_value) or norm_value <= 0:
+                raise ValueError("candidate norm must be finite and positive")
+            payload.extend(struct.pack(">d", norm_value))
+            payload.extend(self._encode_vector(vector, dimensions))
+
+        response = self._request(_OP_BATCH_RANGE, bytes(payload))
+        batches = response.payload
+        if not isinstance(batches, list) or len(batches) != query_count:
+            raise JvmVectorProtocolError("batch range query count mismatch")
+
+        total = 0
+        for hits in batches:
+            self._validate_range_hits(
+                hits,
+                candidate_count=candidate_count,
+                threshold=threshold,
+                max_hits=min(candidate_count, max_total_hits),
+            )
+            total += len(hits)
+            if total > max_total_hits:
+                raise JvmVectorProtocolError("batch range result bound exceeded")
+        return batches
+
     def close(self) -> None:
         with self._request_lock:
             if self._closed:
@@ -419,7 +552,7 @@ class JvmVectorAccelerator:
     def _read_success_payload(self, stream: object, op: int) -> object:
         if op == _OP_PING:
             return _PING.unpack(self._read_exact(stream, _PING.size))
-        if op == _OP_TOP_K:
+        if op in {_OP_TOP_K, _OP_RANGE}:
             count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
             if not 0 <= count <= self.config.max_candidates:
                 raise JvmVectorProtocolError("invalid hit count")
@@ -428,7 +561,7 @@ class JvmVectorAccelerator:
                 index, similarity = _HIT.unpack(self._read_exact(stream, _HIT.size))
                 hits.append(VectorHit(index=index, similarity=similarity))
             return hits
-        if op == _OP_BATCH_TOP_K:
+        if op in {_OP_BATCH_TOP_K, _OP_BATCH_RANGE}:
             query_count = _INT.unpack(self._read_exact(stream, _INT.size))[0]
             if not 0 <= query_count <= _MAX_QUERIES:
                 raise JvmVectorProtocolError("invalid batch query count")
@@ -491,6 +624,42 @@ class JvmVectorAccelerator:
                 )
             ):
                 raise JvmVectorProtocolError("top-k response is not stably ordered")
+            seen.add(hit.index)
+            previous = hit
+
+    @staticmethod
+    def _validate_range_hits(
+        hits: object,
+        *,
+        candidate_count: int,
+        threshold: float,
+        max_hits: int,
+    ) -> None:
+        if not isinstance(hits, list) or len(hits) > max_hits:
+            raise JvmVectorProtocolError("invalid range-search response")
+        seen: set[int] = set()
+        previous: VectorHit | None = None
+        for hit in hits:
+            if not isinstance(hit, VectorHit):
+                raise JvmVectorProtocolError("invalid range-search hit")
+            if not 0 <= hit.index < candidate_count:
+                raise JvmVectorProtocolError("range hit index outside candidate range")
+            if hit.index in seen:
+                raise JvmVectorProtocolError("duplicate range hit index")
+            if not math.isfinite(hit.similarity):
+                raise JvmVectorProtocolError("non-finite range similarity")
+            if hit.similarity + 1e-12 < threshold:
+                raise JvmVectorProtocolError("range hit below requested threshold")
+            if hit.similarity < -1.000000000001 or hit.similarity > 1.000000000001:
+                raise JvmVectorProtocolError("range cosine outside supported range")
+            if previous is not None and (
+                hit.similarity > previous.similarity
+                or (
+                    hit.similarity == previous.similarity
+                    and hit.index < previous.index
+                )
+            ):
+                raise JvmVectorProtocolError("range response is not stably ordered")
             seen.add(hit.index)
             previous = hit
 
