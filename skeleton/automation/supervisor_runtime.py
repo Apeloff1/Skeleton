@@ -814,21 +814,73 @@ def validate_worker_evidence_custody(
 def sanitized_worker_env(
     source: Mapping[str, str],
 ) -> dict[str, str]:
-    """Remove process-injection variables while retaining required credentials."""
-    result = dict(source)
-    for key in (
+    """Remove child-process injection controls while retaining required identity.
+
+    The Secretary later installs an exact worktree PYTHONPATH and the worker
+    publication path rebuilds GH_TOKEN from GITHUB_TOKEN. Blocked variables
+    can otherwise redirect imports, Git configuration, authentication helpers,
+    executables, or dynamic libraries.
+    """
+    result = {
+        key: value
+        for key, value in source.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+    blocked = {
         "PYTHONINSPECT",
         "PYTHONSTARTUP",
         "PYTHONBREAKPOINT",
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONWARNINGS",
         "BASH_ENV",
         "ENV",
         "GIT_CONFIG_COUNT",
-        "GIT_CONFIG_KEY_0",
-        "GIT_CONFIG_VALUE_0",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+        "GIT_CONFIG_NOSYSTEM",
+        "GIT_EDITOR",
+        "GIT_SEQUENCE_EDITOR",
+        "GIT_PAGER",
+        "GIT_PROXY_COMMAND",
+        "GIT_ALLOW_PROTOCOL",
+        "GIT_PROTOCOL_FROM_USER",
+        "GIT_TERMINAL_PROMPT",
+        "GIT_CURL_VERBOSE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_SSH",
+        "GIT_SSH_COMMAND",
+        "GIT_ASKPASS",
+        "GIT_EXEC_PATH",
+        "GIT_TEMPLATE_DIR",
+        "GH_CONFIG_DIR",
+        "GH_HOST",
+        "GH_TOKEN",
+        "SSH_ASKPASS",
+        "SSH_ASKPASS_REQUIRE",
+        "SSH_AUTH_SOCK",
         "LD_PRELOAD",
         "LD_LIBRARY_PATH",
-    ):
-        result.pop(key, None)
+    }
+    for key in tuple(result):
+        if (
+            key in blocked
+            or key.startswith("GIT_CONFIG_KEY_")
+            or key.startswith("GIT_CONFIG_VALUE_")
+            or key.startswith("DYLD_")
+            or key.startswith("GIT_TRACE")
+        ):
+            result.pop(key, None)
     return result
 
 
