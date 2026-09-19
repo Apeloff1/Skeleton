@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
@@ -11,6 +12,7 @@ from skeleton.shells.ai.durable_destruction import (
     DESTRUCTION_ARTIFACT_TYPE,
     DurableDestructionHead,
     DurableDestructionItem,
+    DurableDestructionIndexState,
     DurableDestructionItemState,
     DurableDestructionKind,
     DurableDestructionLedger,
@@ -28,7 +30,9 @@ from skeleton.shells.ai.signed_artifact import ArtifactSigner
 
 
 def fp(char: str) -> str:
-    return char * 64
+    if len(char) == 1 and char.lower() in "0123456789abcdef":
+        return char.lower() * 64
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def make_ledger(
