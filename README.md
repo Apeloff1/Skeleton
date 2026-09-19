@@ -38,6 +38,8 @@ python -m skeleton test
 | `skeleton.swarm` | Multi-agent coordination |
 | `skeleton.forge` | Blueprint-based system composition |
 | `skeleton.resilience` | Security and fault tolerance |
+| `skeleton.shells` | Policy-bound, argv-only host process execution |
+| `skeleton.shells.ai` | Jeeves/model planning, deterministic review, sealed execution, evals, MCP tooling |
 | `skeleton.observability` | Metrics and anomaly detection |
 | `skeleton.api` | REST API surface |
 | `skeleton.cortex` | Observability hub |
@@ -52,6 +54,25 @@ python -m skeleton test
 | `skeleton.context` | Questionnaire and intake |
 | `skeleton.config` | Layered configuration |
 | `skeleton.content` | Reusable domain knowledge packs |
+
+## AI-ready shell
+
+The shell execution plane now has a dedicated AI control layer for Jeeves and external structured-tool agents. Models propose logical commands; deterministic effect/risk policy, optional human approval, stale-plan pins, signed execution seals, workspace preconditions, and the existing ShellService decide what can actually execute. The model-facing catalog never exposes host executable paths or resolved environment secrets.
+
+Key references:
+
+- `docs/SHELL_AI_2026_ARCHITECTURE.md`
+- `docs/SHELL_AI_THREAT_MODEL.md`
+- `docs/SHELL_AI_OPERATIONS.md`
+- `docs/SHELL_AI_EVALS.md`
+- `docs/SHELL_AI_MCP_2026.md`
+- `docs/SHELL_AI_HIGH_ASSURANCE_RUNBOOK.md`
+- `docs/SHELL_AI_RUNTIME_TRUST_EPOCHS.md`
+- `docs/SHELL_AI_DISTRIBUTED_AUTHORITY_OPERATIONS.md`
+- `docs/SHELL_AI_DURABLE_EVIDENCE.md`
+- `docs/SHELL_AI_DURABLE_EVIDENCE_LIFECYCLE.md`
+
+The canonical quality gate runs every `skeleton/testing/test_shell_*.py` regression, so AI-shell security and execution tests are mandatory rather than optional.
 
 ## Lorebuffa AI Domain Pack
 
