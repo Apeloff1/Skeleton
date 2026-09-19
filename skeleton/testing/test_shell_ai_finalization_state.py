@@ -20,7 +20,8 @@ from skeleton.shells.ai.finalization_state import (
 )
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def reserve(store, **changes):
