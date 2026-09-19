@@ -2090,4 +2090,3 @@ def test_root_replica_manifest_conflict_is_rejected():
         repository._put_root_index(
             conflicting
         )
-
