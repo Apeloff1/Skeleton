@@ -1015,4 +1015,3 @@ def test_compaction_readiness_exposes_non_destructive_authority_property():
         DurableCompactionReadiness.destructive_action_authorized,
         property,
     )
-
