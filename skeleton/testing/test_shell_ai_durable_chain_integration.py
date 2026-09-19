@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import sys
 
 import pytest
@@ -16,6 +17,11 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedAIDecisionJournal,
 )
 from skeleton.shells.ai.distributed_state import InMemoryFencedStore
+from skeleton.shells.ai.durable_recovery import (
+    DurableRecoveryStatus,
+    DurableRecoveryVerificationError,
+    DurableSessionRecoveryVerifier,
+)
 from skeleton.shells.ai.effects import (
     EffectContract,
     EffectKind,
@@ -941,3 +947,412 @@ def test_historical_integrity_digest_remains_stable_after_journal_advance(tmp_pa
         ),
     )
     assert historical.digest == before.digest
+
+def durable_verifier(env):
+    return DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=DistributedAIDecisionJournal(
+            env.backend,
+            namespace="decision-journal",
+        ),
+        receipt_chain=DistributedReceiptChain(
+            env.backend,
+            namespace="receipts",
+        ),
+        execution_evidence=env.execution_evidence,
+    )
+
+
+def test_durable_recovery_verifier_accepts_complete_execution(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    report = durable_verifier(env).require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.ok
+    assert report.status is DurableRecoveryStatus.VERIFIED
+    assert report.findings == ()
+    assert report.integrity is not None
+    assert report.integrity.ok
+    assert (
+        report.session_integrity_digest
+        == result.finalized.session_integrity.digest
+    )
+
+
+def test_durable_recovery_verifier_survives_later_chain_growth(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first = env.execute(
+        session_id="first",
+        intent_id="intent-first",
+    )
+    env.execute(
+        session_id="second",
+        intent_id="intent-second",
+    )
+    report = durable_verifier(env).require_verified(
+        first.finalized.finalization.finalization_id
+    )
+    assert report.ok
+    assert report.journal_root == first.finalized.checkpoint.journal_root
+    assert report.receipt_root == first.finalized.checkpoint.receipt_root
+    assert (
+        report.session_integrity_digest
+        == first.finalized.session_integrity.digest
+    )
+
+
+def test_unknown_finalization_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    report = durable_verifier(env).verify(
+        "unknown-finalization"
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert report.safe_to_resume
+    assert not report.ok
+    assert report.findings[0].code == "finalization.missing"
+
+
+def test_missing_recovery_checkpoint_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    key = env.recovery._item_key(finalization_id)
+    record = env.backend.get(
+        env.recovery.namespace,
+        key,
+    )
+    env.backend.delete(
+        env.recovery.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert report.safe_to_resume
+    assert any(
+        item.code == "recovery.missing"
+        for item in report.findings
+    )
+
+
+def test_missing_session_evidence_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    record = env.backend.get(
+        env.session_evidence.namespace,
+        session.session_id,
+    )
+    env.backend.delete(
+        env.session_evidence.namespace,
+        session.session_id,
+        expected_revision=record.revision,
+    )
+    report = durable_verifier(env).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert any(
+        item.code == "session_evidence.missing"
+        for item in report.findings
+    )
+
+
+def test_substituted_session_evidence_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    record = env.backend.get(
+        env.session_evidence.namespace,
+        session.session_id,
+    )
+    substituted = replace(
+        record.value,
+        plan_fingerprint=fp("x"),
+    )
+    env.backend.compare_and_swap(
+        env.session_evidence.namespace,
+        session.session_id,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = durable_verifier(env).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert report.requires_manual_review
+    assert any(
+        "session_evidence" in item.code
+        for item in report.findings
+    )
+
+
+def test_substituted_recovery_checkpoint_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    key = env.recovery._item_key(finalization_id)
+    record = env.backend.get(
+        env.recovery.namespace,
+        key,
+    )
+    substituted_checkpoint = replace(
+        record.value.checkpoint,
+        session_integrity_digest=fp("x"),
+    )
+    substituted_record = replace(
+        record.value,
+        checkpoint=substituted_checkpoint,
+    )
+    env.backend.compare_and_swap(
+        env.recovery.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted_record,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "recovery.digest_conflict"
+        for item in report.findings
+    )
+
+
+def test_corrupted_historical_journal_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    root = result.finalized.checkpoint.journal_root
+    root_event = env.journal.get_event(root)
+    key = env.journal._event_key(root)
+    record = env.backend.get(
+        env.journal.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        env.journal.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            root_event,
+            summary="tampered",
+        ),
+    )
+    report = durable_verifier(env).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.severity.value == "corruption"
+        for item in report.findings
+    )
+
+
+def test_corrupted_historical_receipt_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    root = result.finalized.checkpoint.receipt_root
+    item = env.receipts.get_node(root)
+    key = env.receipts._node_key(root)
+    record = env.backend.get(
+        env.receipts.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        env.receipts.namespace,
+        key,
+        expected_revision=record.revision,
+        value=replace(
+            item,
+            receipt=replace(
+                item.receipt,
+                stdout_bytes=item.receipt.stdout_bytes + 1,
+            ),
+        ),
+    )
+    report = durable_verifier(env).verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code.startswith("session_integrity")
+        for item in report.findings
+    )
+
+
+def test_required_signed_evidence_store_unavailable_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    verifier = DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=env.journal,
+        receipt_chain=env.receipts,
+        execution_evidence=None,
+    )
+    report = verifier.verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert any(
+        item.code == "signed_evidence.store_missing"
+        for item in report.findings
+    )
+
+
+def test_missing_required_signed_evidence_is_incomplete(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    # Use a separate empty signed evidence namespace to model lost durable state.
+    empty = AIExecutionEvidenceStore(
+        env.backend,
+        ArtifactSigner(
+            "other-execution",
+            b"q" * 32,
+            clock=lambda: 10.0,
+        ),
+        namespace="missing-execution-evidence",
+    )
+    verifier = DurableSessionRecoveryVerifier(
+        finalizations=env.finalizations,
+        recovery_checkpoints=env.recovery,
+        session_evidence=env.session_evidence,
+        journal=env.journal,
+        receipt_chain=env.receipts,
+        execution_evidence=empty,
+    )
+    report = verifier.verify(
+        result.finalized.finalization.finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.INCOMPLETE
+    assert any(
+        item.code == "signed_evidence.missing"
+        for item in report.findings
+    )
+
+
+def test_signed_evidence_digest_substitution_is_manual_review(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    finalization_id = result.finalized.finalization.finalization_id
+    stored = env.finalizations.current(
+        finalization_id
+    )
+    substituted = replace(
+        stored.finalization,
+        execution_evidence_digest=fp("x"),
+    )
+    key = env.finalizations.key(finalization_id)
+    record = env.backend.get(
+        env.finalizations.namespace,
+        key,
+    )
+    env.backend.compare_and_swap(
+        env.finalizations.namespace,
+        key,
+        expected_revision=record.revision,
+        value=substituted,
+    )
+    report = durable_verifier(env).verify(
+        finalization_id
+    )
+    assert report.status is DurableRecoveryStatus.MANUAL_REVIEW
+    assert any(
+        item.code == "signed_evidence.finalization_digest"
+        for item in report.findings
+    )
+
+
+def test_require_verified_raises_for_incomplete_state(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    with pytest.raises(
+        DurableRecoveryVerificationError,
+        match="missing",
+    ):
+        durable_verifier(env).require_verified(
+            "missing"
+        )
+
+
+def test_require_verified_raises_for_conflicting_state(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    session, _, _, _, result = env.execute()
+    record = env.backend.get(
+        env.session_evidence.namespace,
+        session.session_id,
+    )
+    env.backend.compare_and_swap(
+        env.session_evidence.namespace,
+        session.session_id,
+        expected_revision=record.revision,
+        value=replace(
+            record.value,
+            plan_fingerprint=fp("x"),
+        ),
+    )
+    with pytest.raises(
+        DurableRecoveryVerificationError,
+    ):
+        durable_verifier(env).require_verified(
+            result.finalized.finalization.finalization_id
+        )
+
+
+def test_durable_recovery_report_serializes_full_proof(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    report = durable_verifier(env).require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    data = report.to_dict()
+    assert data["status"] == "verified"
+    assert data["ok"] is True
+    assert data["safe_to_resume"] is False
+    assert data["requires_manual_review"] is False
+    assert data["integrity"]["ok"] is True
+    assert data["digest"] == report.digest
+    assert len(data["finalization_digest"]) == 64
+    assert len(data["recovery_checkpoint_digest"]) == 64
+    assert len(data["signed_execution_evidence_digest"]) == 64
+
+
+def test_durable_recovery_report_digest_is_stable(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, result = env.execute()
+    verifier = durable_verifier(env)
+    first = verifier.require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    second = verifier.require_verified(
+        result.finalized.finalization.finalization_id
+    )
+    assert first.digest == second.digest
+    assert first == second
+
+
+def test_durable_recovery_report_digest_survives_unrelated_later_work(tmp_path):
+    env = DurableEnvironment(tmp_path)
+    _, _, _, _, first_result = env.execute(
+        session_id="first",
+        intent_id="intent-first",
+    )
+    verifier = durable_verifier(env)
+    first = verifier.require_verified(
+        first_result.finalized.finalization.finalization_id
+    )
+    env.execute(
+        session_id="second",
+        intent_id="intent-second",
+    )
+    second = verifier.require_verified(
+        first_result.finalized.finalization.finalization_id
+    )
+    assert second.digest == first.digest
+    assert second.session_integrity_digest == first.session_integrity_digest
+
