@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 import json
 
 import pytest
@@ -488,7 +488,7 @@ def test_stack_relation_enum_has_fail_closed_states():
 
 
 def test_serializable_policy_contract():
-    payload = json.loads(canonical_json(policy()))
+    payload = json.loads(canonical_json(asdict(policy())))
     assert payload["default_branch"] == "main"
     assert payload["merge_method"] == "squash"
     assert payload["mode"] == "merge_direct"
