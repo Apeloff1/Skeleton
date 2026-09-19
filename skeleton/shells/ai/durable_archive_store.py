@@ -920,22 +920,28 @@ class DurableArchiveRepository:
         self,
         checkpoint: SignedDurableChainCheckpoint,
     ) -> None:
-        if not self.checkpoints.verify():
-            raise DurableArchiveStoreError("durable checkpoint registry is invalid")
-        matches = tuple(
-            item
-            for item in self.checkpoints.for_chain(
-                checkpoint.checkpoint.chain_id
+        try:
+            canonical = self.checkpoints.find_by_digest(
+                checkpoint.checkpoint.digest
             )
-            if item.checkpoint.digest == checkpoint.checkpoint.digest
-        )
-        if len(matches) != 1:
+        except Exception as exc:
             raise DurableArchiveStoreError(
-                "archive checkpoint is not uniquely present in canonical registry"
+                "archive checkpoint canonical lookup failed"
+            ) from exc
+        if canonical is None:
+            raise DurableArchiveStoreError(
+                "archive checkpoint is not present in canonical registry"
             )
-        if matches[0] != checkpoint:
+        if canonical != checkpoint:
             raise DurableArchiveStoreError(
                 "archive checkpoint differs from canonical registry item"
+            )
+        if (
+            canonical.checkpoint.chain_id
+            != checkpoint.checkpoint.chain_id
+        ):
+            raise DurableArchiveStoreError(
+                "archive checkpoint canonical chain mismatch"
             )
 
     def _put_immutable(
