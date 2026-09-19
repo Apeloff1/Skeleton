@@ -333,10 +333,17 @@ def test_workflow_runs_only_from_trusted_default_branch_context() -> None:
 
 def test_churn_recovery_control_plane_uses_broad_runner_pool() -> None:
     root = Path(__file__).resolve().parents[2]
-    for relative in (
-        ".github/workflows/pr-churn-control.yml",
-        ".github/workflows/queue-drain.yml",
-    ):
-        workflow = (root / relative).read_text(encoding="utf-8")
-        assert "runs-on: ubuntu-latest" in workflow
-        assert "runs-on: ubuntu-24.04-arm" not in workflow
+
+    churn_workflow = (
+        root / ".github/workflows/pr-churn-control.yml"
+    ).read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in churn_workflow
+    assert "runs-on: ubuntu-24.04-arm" not in churn_workflow
+
+    queue_workflow = (
+        root / ".github/workflows/queue-drain.yml"
+    ).read_text(encoding="utf-8")
+    primary, helper = queue_workflow.split("  wake-housekeeping:", 1)
+    assert "runs-on: ubuntu-latest" in primary
+    assert "runs-on: ubuntu-24.04-arm" not in primary
+    assert "runs-on: ubuntu-24.04-arm" in helper
