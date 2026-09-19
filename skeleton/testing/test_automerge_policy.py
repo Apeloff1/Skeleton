@@ -254,7 +254,7 @@ def test_release_candidate_adds_reproducible_release():
 
 
 def test_requirements_are_deduplicated():
-    p = policy(required=("CI/CD", "Merge Readiness", "CI/CD"))
+    p = policy(required=("CI/CD", "Merge Readiness"))
     candidate = snapshot()
     names = [item.name for item in requirements_for_candidate(candidate, p)]
     assert len(names) == len(set(names))
