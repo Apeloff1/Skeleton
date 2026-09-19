@@ -1,5 +1,9 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_session_journal import DurableSessionJournalCommit, DurableSessionJournalConflict, DurableSessionJournalCorruption, DurableSessionJournalHead, DurableSessionJournalManifest, DurableSessionJournalStore, StoredDurableSessionJournal
+from skeleton.shells.ai.durable_proof_window import PROOF_ARTIFACT_TYPE, DurableHistoricalProofAuthority, DurableHistoricalProofError, DurableHistoricalProofIndex, DurableHistoricalProofStore, DurableHistoricalProofVerification, DurableHistoricalProofWindow, ProofWindowChain, SignedDurableHistoricalProofWindow
+from skeleton.shells.ai.durable_proof_window_operator import DurableProofWindowFleetReport, DurableProofWindowFinding, DurableProofWindowOperator, DurableProofWindowOperatorError, DurableProofWindowPolicy, DurableProofWindowReport, DurableProofWindowState, DurableProofWindowTarget
+
 from skeleton.shells.ai.durable_compaction_maintenance import (
     CompactionChainMaintenanceHealth,
     CompactionMaintenanceFinding,
