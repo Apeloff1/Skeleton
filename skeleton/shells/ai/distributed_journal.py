@@ -25,6 +25,7 @@ from skeleton.shells.ai.durable_hot_floor import (
 )
 from skeleton.shells.ai.journal import AIDecisionEvent, AIDecisionJournal
 from skeleton.shells.ai.store_protocol import VersionedStateBackend
+from skeleton.shells.sequence_index import SequenceIndexBackfillBatch
 
 
 GENESIS_HASH = AIDecisionJournal.GENESIS
@@ -667,6 +668,107 @@ class DistributedAIDecisionJournal:
             start_root,
             end_root,
             max_items=max_items,
+        )
+
+    def backfill_sequence_indexes_batch(
+        self,
+        *,
+        end_sequence: int | None = None,
+        end_root: str = "",
+        max_items: int = 1024,
+    ) -> SequenceIndexBackfillBatch:
+        if (
+            isinstance(max_items, bool)
+            or not isinstance(max_items, int)
+            or max_items <= 0
+        ):
+            raise ValueError("max_items must be positive integer")
+        head = self.head()
+        if end_sequence is None:
+            end_sequence = head.sequence
+            end_root = head.root_hash
+        if (
+            isinstance(end_sequence, bool)
+            or not isinstance(end_sequence, int)
+            or end_sequence < 0
+            or end_sequence > head.sequence
+        ):
+            raise ValueError(
+                "end_sequence outside committed journal range"
+            )
+        if end_sequence == 0:
+            if end_root and end_root != GENESIS_HASH:
+                raise DistributedJournalConflict(
+                    "zero-sequence backfill root must be genesis"
+                )
+            return SequenceIndexBackfillBatch(
+                0,
+                GENESIS_HASH,
+                None,
+                None,
+                0,
+                0,
+                0,
+                GENESIS_HASH,
+                True,
+            )
+        if not end_root:
+            if end_sequence != head.sequence:
+                raise ValueError(
+                    "historical journal backfill requires explicit end_root"
+                )
+            end_root = head.root_hash
+        end_root = _sha256_hex(
+            "end_root",
+            end_root,
+        )
+        terminal = self.get_event(end_root)
+        if terminal.sequence != end_sequence:
+            raise DistributedJournalCorruption(
+                "journal backfill root/sequence mismatch"
+            )
+
+        requested_end_sequence = end_sequence
+        requested_end_root = end_root
+        current_sequence = end_sequence
+        current_root = end_root
+        indexed = 0
+        already_indexed = 0
+        processed = 0
+
+        while current_sequence > 0 and processed < max_items:
+            event = self.get_event(current_root)
+            if event.sequence != current_sequence:
+                raise DistributedJournalCorruption(
+                    "journal backfill encountered non-contiguous sequence"
+                )
+            entry = self._sequence_index(
+                current_sequence
+            )
+            if entry is None:
+                self._put_sequence_index(event)
+                indexed += 1
+            elif entry.event_hash != event.event_hash:
+                raise DistributedJournalCorruption(
+                    "journal backfill found conflicting sequence index"
+                )
+            else:
+                already_indexed += 1
+            current_root = event.previous_hash
+            current_sequence -= 1
+            processed += 1
+
+        covered_start = current_sequence + 1
+        return SequenceIndexBackfillBatch(
+            requested_end_sequence,
+            requested_end_root,
+            covered_start,
+            requested_end_sequence,
+            indexed,
+            already_indexed,
+            current_sequence,
+            current_root,
+            current_sequence == 0,
         )
 
     def inspect_sequence_indexes(
