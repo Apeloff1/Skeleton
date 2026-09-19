@@ -51,6 +51,8 @@ def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     assert "cancel-in-progress: false" in text
     assert "branches-ignore:\n      - main" in text
     assert 'branches:\n      - "*"\n      - "**"' not in text
+    assert "github.event.workflow_run.conclusion != 'cancelled'" in text
+    assert "github.event_name != 'workflow_run'" in text
 
 
 def test_workflow_resolves_all_branch_completions_from_head_identity():
@@ -93,3 +95,12 @@ def test_manual_pr_input_crosses_shell_boundary_through_env_and_is_validated():
     assert "INPUT_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr || '' }}" in text
     assert '[[ "$pr" =~ ^[0-9]+$ ]]' in text
     assert "${{ inputs.pr }}" not in text
+
+
+def test_cancelled_merge_readiness_tombstones_do_not_allocate_evaluation_runner():
+    text = _workflow()
+    assert """    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled'
+""" in text
+    assert "The scheduled reconciliation remains the durable fallback." in text

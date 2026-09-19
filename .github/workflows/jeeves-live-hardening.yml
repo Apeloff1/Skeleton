@@ -2,6 +2,7 @@ name: Jeeves Live Hardening
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     paths:
       - "skeleton/jeeves/llm_core.py"
@@ -33,6 +34,7 @@ concurrency:
 
 jobs:
   focused-regression:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Provider and capability regressions
     runs-on: ubuntu-latest
     timeout-minutes: 8

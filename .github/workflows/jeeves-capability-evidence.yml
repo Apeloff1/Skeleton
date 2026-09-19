@@ -2,6 +2,7 @@ name: Jeeves Capability Evidence
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "skeleton/jeeves/evidence_core.py"
       - "skeleton/jeeves/llm_core.py"
@@ -24,6 +25,7 @@ concurrency:
 
 jobs:
   capability-evidence-contract:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Capability evidence contract
     runs-on: ubuntu-latest
     timeout-minutes: 8

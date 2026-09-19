@@ -29,30 +29,35 @@ and `scripts/check_artifact_policy.py`.
 - `skeleton.artifact_plane` imports without Godot, torch, or network.
 - Cards carry `stored_prose=0`.
 
+## GB-9 accept
+
+- `backend/godot` is not a tracked Git blob.
+- Pointers exist: `godot.pointer` and `backend/godot.artifact.json`.
+- Binary may live locally at `backend/godot` (gitignored) or via
+  `SKELETON_GODOT_BIN` / `GODOT_BINARY` / `PATH`.
+- `GodotLocator.locate()` / `godot_engine.binary.locate()` never raise.
+- `found=0` is a card. Hint is `pointer:<url>` or `missing-godot-binary`.
+- `python scripts/check_godot_pointer.py` exits 0 when pointers exist.
+
 ## GB-9 locate card
 
 ```
 {kind:godot-binary, found:0|1, hint, stored_prose:0}
 ```
 
-`GodotLocator.locate()` / `godot_engine.binary.locate()` equivalent:
-`skeleton.artifact_plane.godot_locate`. `found=0` is a card, not an
-exception. Hint may be `missing-godot-binary`, `pointer:<url>`,
-`env:SKELETON_GODOT_BIN`, or a relative path.
-
 ## Commands
 
 ```bash
 python scripts/check_root_sprawl.py
-python scripts/check_root_sprawl.py --json
-python -m unittest tests.test_gb8_track_e
+python scripts/check_godot_pointer.py
+python -m unittest tests.test_gb8_track_e tests.test_gb9_godot_pointer
 ```
 
-## Forbidden on GB-8
+## Forbidden
 
 - Delete archived harnesses.
-- Move `SEVEN_BY_*.md` (GB-8b).
-- Commit a Godot engine binary (GB-9).
+- Rewrite SEVEN_BY volume bodies.
+- Commit a Godot engine binary.
 - Copy artifact trees into git.
 - Replace operator methods on `skeleton/cortex/deck.py`.
-- Fork occupied PR branches.
+- Fork occupied PR branches (including closed #1008 branch).

@@ -2,6 +2,7 @@ name: Reproducible Release
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "pyproject.toml"
       - "requirements.txt"
@@ -27,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: reproducible-release-${{ github.workflow }}-${{ github.ref }}
+  group: reproducible-release-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -39,6 +40,7 @@ env:
 
 jobs:
   reproducible-release:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Reproducible Release
     runs-on: ubuntu-24.04
     steps:

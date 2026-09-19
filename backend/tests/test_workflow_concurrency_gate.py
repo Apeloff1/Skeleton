@@ -196,6 +196,34 @@ jobs: {}
     assert any("opaque concurrency group expression" in finding for finding in findings)
 
 
+def test_rejects_sha_scoped_group_when_preemption_is_enabled() -> None:
+    text = """name: ineffective-preemption
+on:
+  pull_request:
+concurrency:
+  group: ineffective-${{ github.event.pull_request.number }}-${{ github.sha }}
+  cancel-in-progress: true
+jobs: {}
+"""
+    findings = _scan(text, "ineffective.yml")
+    assert any(
+        "every commit gets a unique slot so superseded runs cannot preempt" in finding
+        for finding in findings
+    )
+
+
+def test_allows_sha_scoped_group_when_preemption_is_disabled() -> None:
+    text = """name: per-generation-evidence
+on:
+  push:
+concurrency:
+  group: evidence-${{ github.sha }}
+  cancel-in-progress: false
+jobs: {}
+"""
+    assert _scan(text, "evidence.yml") == []
+
+
 def test_rejects_missing_cancel_in_progress() -> None:
     text = """name: unsafe
 on: [push]

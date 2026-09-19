@@ -489,6 +489,31 @@ from .semantic_lens_topology import (
     SemanticTopologySnapshot,
 )
 
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
+)
+
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
+    SemanticLearningScope,
+    SemanticScopePoolSnapshot,
+)
+
+from .semantic_topology_learning import (
+    LearnedTopologyRule,
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
+    TopologyBridgeDomainReport,
+    TopologyBridgePolicy,
+    TopologyBridgePrediction,
+    TopologyBridgeReport,
+    TopologyBridgeStatus,
+    TopologyBridgeTrial,
+)
+
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
     FrontierLensRouter,
@@ -509,6 +534,7 @@ from .semantic_maximal import (
 )
 from .semantic_plane import (
     FindingRejection,
+    LearnedCompanionActivation,
     SemanticFindingAudit,
     SemanticLensPlane,
     SemanticPlaneCoverage,

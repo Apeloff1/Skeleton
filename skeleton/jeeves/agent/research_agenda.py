@@ -313,6 +313,8 @@ class ResearchAgenda:
                     last_probe_id=probe.probe_id if probe is not None else None,
                     metadata={
                         "source_frontier": frontier.fingerprint,
+                        "obligation_fingerprint": obligation.fingerprint,
+                        "obligation_metadata": dict(obligation.metadata),
                         "gap_signal": gap.signal,
                         "gap_severity": gap.severity,
                     },
@@ -342,6 +344,8 @@ class ResearchAgenda:
                     metadata={
                         **dict(existing.metadata),
                         "source_frontier": frontier.fingerprint,
+                        "obligation_fingerprint": obligation.fingerprint,
+                        "obligation_metadata": dict(obligation.metadata),
                         "gap_signal": gap.signal,
                         "gap_severity": gap.severity,
                     },

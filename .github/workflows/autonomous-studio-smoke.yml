@@ -2,6 +2,7 @@ name: Autonomous Studio Smoke
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - 'skeleton/automation/studio_*.py'
       - 'skeleton/automation/chatgpt_adapter.py'
@@ -23,6 +24,7 @@ permissions:
 
 jobs:
   smoke:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:

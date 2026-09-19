@@ -15,6 +15,7 @@ on:
       - "backend/tests/test_portable_finality_proof.py"
       - ".github/workflows/epistemic-finality.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
@@ -36,6 +37,7 @@ concurrency:
 
 jobs:
   epistemic-finality:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:

@@ -21,7 +21,9 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .core import CIState, Decision, Evaluation, Mode, PRSnapshot, Policy, evaluate
+from .event_firewall import admit_workflow_run, event_from_env
 from .index import EventIndex
+from .safety import load_operator_safety
 
 
 API = "https://api.github.com"
@@ -985,8 +987,46 @@ def main(argv: list[str] | None = None) -> int:
     if bool(args.head_sha) != bool(args.head_ref) and args.pr is None:
         parser.error("workflow_run completions require both --head-sha and --head-ref")
 
-    token = os.getenv("GITHUB_TOKEN", "")
+    safety = load_operator_safety()
+    if safety.blocked:
+        print(
+            json.dumps(
+                {
+                    "kind": "pr-automation-operator-hold",
+                    **safety.public_payload(),
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
+
+    admission = None
+    if args.head_sha and args.head_ref:
+        event = event_from_env(
+            os.environ,
+            repository=args.repo,
+            head_sha=str(args.head_sha),
+            head_branch=str(args.head_ref),
+            pr_hints_json=str(args.pr_hints_json or ""),
+        )
+        admission = admit_workflow_run(event)
+        if admission.dropped:
+            print(
+                json.dumps(
+                    {
+                        "kind": "pr-automation-event-admission",
+                        **admission.public_payload(),
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0
+
     mode = Mode(os.getenv("PR_AUTOMATION_MODE", "observe").casefold())
+    if admission is not None and not admission.mutation_authorized:
+        mode = Mode.OBSERVE
+
+    token = os.getenv("GITHUB_TOKEN", "")
     max_mutations = _int_env("PR_AUTOMATION_MAX_MUTATIONS", 1, minimum=0, maximum=10)
     merge_method = os.getenv("PR_AUTOMATION_MERGE_METHOD", "squash").casefold()
     if merge_method not in {"merge", "squash", "rebase"}:

@@ -20,6 +20,7 @@ on:
       - 'backend/tests/test_workflow_permissions_gate.py'
       - 'backend/tests/test_workflow_trigger_fanout_gate.py'
       - 'backend/tests/test_workflow_concurrency_gate.py'
+      - 'backend/tests/test_pr_close_tombstone_workflows.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
@@ -46,6 +47,7 @@ on:
       - 'backend/tests/test_workflow_permissions_gate.py'
       - 'backend/tests/test_workflow_trigger_fanout_gate.py'
       - 'backend/tests/test_workflow_concurrency_gate.py'
+      - 'backend/tests/test_pr_close_tombstone_workflows.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
@@ -90,6 +92,7 @@ jobs:
           tests/test_workflow_permissions_gate.py
           tests/test_workflow_trigger_fanout_gate.py
           tests/test_workflow_concurrency_gate.py
+          tests/test_pr_close_tombstone_workflows.py
           tests/test_repo_attention_contract.py
           tests/test_branch_flow_contract.py
           tests/test_workflow_run_branch_completions_contract.py

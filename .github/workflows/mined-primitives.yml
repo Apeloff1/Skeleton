@@ -10,6 +10,7 @@ on:
       - "frontend/scripts/ui-regression-verdict.test.mjs"
       - ".github/workflows/mined-primitives.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/worm_audit.py"
       - "backend/tests/test_worm_audit.py"
@@ -26,6 +27,7 @@ concurrency:
 
 jobs:
   backend-worm-audit:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     defaults:
@@ -44,6 +46,7 @@ jobs:
         run: python -m pytest -q --noconftest tests/test_worm_audit.py
 
   frontend-ui-verdict:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     defaults:

@@ -25,6 +25,7 @@ on:
       - "backend/tests/test_transparency_log.py"
       - ".github/workflows/portable-truth-proofs.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/sparse_merkle.py"
       - "backend/core/epistemic_claim_index.py"
@@ -56,6 +57,7 @@ concurrency:
 
 jobs:
   portable-truth-proofs:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     defaults:
       run:

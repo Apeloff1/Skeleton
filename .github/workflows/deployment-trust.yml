@@ -50,6 +50,7 @@ on:
       - ".github/workflows/deployment-trust.yml"
       - ".github/workflows/product-convergence.yml"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
@@ -106,6 +107,7 @@ concurrency:
 
 jobs:
   deployment-trust:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

@@ -279,3 +279,64 @@ def test_secretary_rejects_entire_cyclic_batch() -> None:
     with pytest.raises(ValueError, match="cyclic plan dependencies rejected"):
         secretary.enrich_plan({})
     assert store.snapshot_items() == []
+
+def test_manager_parser_preserves_council_and_epistemic_evidence_with_squad_contract() -> None:
+    task = _task("reviewed-runtime", domain="runtime")
+    task["_planning_council"] = {
+        "version": 2,
+        "decision": "accept",
+        "confidence": 97,
+        "roles": {"researcher": {}, "lead": {}, "reviewer": {}, "verifier": {}},
+        "failure_modes": ["runtime contract regression"],
+        "success_metrics": ["focused suite passes"],
+    }
+    task["_epistemic_gate"] = {
+        "status": "ready",
+        "checks": {"confidence": True},
+    }
+
+    items = SMBShiftManager._parse_tasks(
+        [task],
+        "manager-reviewed",
+        existing_ids=set(),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.metadata["squad_size"] == SQUAD_SIZE
+    assert item.metadata["squad_roles"] == list(SQUAD_ROLES)
+    assert item.metadata["planning_council"]["confidence"] == 97
+    assert item.metadata["epistemic_gate"]["status"] == "ready"
+    assert item.metadata["task_key"] == "reviewed-runtime"
+    assert item.metadata["conflict_domain"] == "runtime"
+
+
+def test_secretary_parser_preserves_council_and_epistemic_evidence_with_squad_contract() -> None:
+    task = _task("reviewed-test", domain="tests")
+    task["_planning_council"] = {
+        "version": 2,
+        "decision": "revise",
+        "confidence": 91,
+        "roles": {"researcher": {}, "lead": {}, "reviewer": {}, "verifier": {}},
+        "failure_modes": ["coverage gap"],
+        "success_metrics": ["focused regression passes"],
+    }
+    task["_epistemic_gate"] = {
+        "status": "ready",
+        "checks": {"validation": True},
+    }
+
+    items = SecretaryBot._parse_tasks(
+        [task],
+        "secretary-reviewed",
+        existing_ids=set(),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.metadata["squad_size"] == SQUAD_SIZE
+    assert item.metadata["squad_roles"] == list(SQUAD_ROLES)
+    assert item.metadata["planning_council"]["decision"] == "revise"
+    assert item.metadata["epistemic_gate"]["status"] == "ready"
+    assert item.metadata["task_key"] == "reviewed-test"
+    assert item.metadata["conflict_domain"] == "tests"
