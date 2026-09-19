@@ -101,6 +101,20 @@ class ExecutionIdentityTests(unittest.TestCase):
                 }
             )
 
+    def test_from_mapping_rejects_non_string_identity_fields(self) -> None:
+        with self.assertRaises(
+            runtime.SupervisorRuntimeError
+        ):
+            runtime.ExecutionIdentity.from_mapping(
+                {
+                    "GITHUB_REPOSITORY": REPO,
+                    "GITHUB_SHA": BASE,
+                    "GITHUB_RUN_ID": 7,
+                    "GITHUB_RUN_ATTEMPT": "1",
+                    "SUPERVISOR_DEFAULT_BRANCH": "main",
+                }
+            )
+
     def test_from_mapping_prefers_supervisor_base(self) -> None:
         value = runtime.ExecutionIdentity.from_mapping(
             {
@@ -668,12 +682,34 @@ class RemoteObservationTests(unittest.TestCase):
         payload = (
             '[{"number":1,"html_url":"https://example.invalid/1",'
             '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
-            '"head":{"ref":"bot/specialist-root-cause-a",'
+            '"head":{"ref":"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
             '"repo":{"full_name":"Apeloff1/Skeleton"}},'
             '"base":{"ref":"main"}},'
             '{"number":2,"html_url":"https://example.invalid/2",'
             '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
-            '"head":{"ref":"bot/specialist-root-cause-b",'
+            '"head":{"ref":"bot/specialist-root-cause-bbbbbbbbbbbbbbbb",'
+            '"repo":{"full_name":"Apeloff1/Skeleton"}},'
+            '"base":{"ref":"main"}}]'
+        )
+        with patch(
+            "skeleton.automation.supervisor_runtime.subprocess.check_output",
+            return_value=payload,
+        ):
+            with self.assertRaises(
+                runtime.SupervisorRuntimeError
+            ):
+                runtime.find_open_pr_for_worker(
+                    REPO,
+                    "root-cause",
+                )
+
+    def test_find_open_worker_pr_rejects_malformed_reserved_branch(
+        self,
+    ) -> None:
+        payload = (
+            '[{"number":4,"html_url":"https://example.invalid/4",'
+            '"draft":false,"updated_at":"2026-09-19T00:00:00Z",'
+            '"head":{"ref":"bot/specialist-root-cause-not-a-digest",'
             '"repo":{"full_name":"Apeloff1/Skeleton"}},'
             '"base":{"ref":"main"}}]'
         )
@@ -729,6 +765,9 @@ class WorkerResultEvidenceTests(unittest.TestCase):
             "pull_request": 42,
             "changed_lines": 17,
             "proposal_digest": "a" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+            "execution_fingerprint": "c" * 64,
         })
         result = runtime.parse_worker_result(
             payload + "\n",
@@ -755,6 +794,22 @@ class WorkerResultEvidenceTests(unittest.TestCase):
             result,
             {"status": "no-change", "bot": "security-auditor"},
         )
+
+    def test_rejects_duplicate_worker_result_keys(self) -> None:
+        payload = (
+            '{"status":"no-change","status":"existing-pr",'
+            '"bot":"root-cause","branch":'
+            '"bot/specialist-root-cause-aaaaaaaaaaaaaaaa",'
+            '"pull_request":7,'
+            '"supervisor_snapshot_fingerprint":"'
+            + ("b" * 64)
+            + '"}'
+        )
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(
+                payload,
+                worker="root-cause",
+            )
 
     def test_rejects_worker_identity_confusion(self) -> None:
         payload = json.dumps({
@@ -783,7 +838,9 @@ class WorkerResultEvidenceTests(unittest.TestCase):
         payload = json.dumps({
             "status": "existing-pr",
             "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
             "pull_request": 7,
+            "supervisor_snapshot_fingerprint": "b" * 64,
             "provider_raw_output": "must-not-propagate",
             "token": "must-not-propagate",
         })
@@ -791,6 +848,63 @@ class WorkerResultEvidenceTests(unittest.TestCase):
         self.assertNotIn("provider_raw_output", result)
         self.assertNotIn("token", result)
         self.assertEqual(result["pull_request"], 7)
+
+    def test_existing_pr_evidence_binds_worker_namespace_and_snapshot(self) -> None:
+        custody = runtime.WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint="b" * 64,
+            execution=execution(),
+        )
+        payload = json.dumps({
+            "status": "existing-pr",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            "pull_request": 7,
+            "supervisor_snapshot_fingerprint": "b" * 64,
+        })
+        evidence = runtime.parse_worker_result(
+            payload,
+            worker="root-cause",
+        )
+        runtime.validate_worker_evidence_custody(evidence, custody)
+
+        altered = dict(evidence)
+        altered["supervisor_snapshot_fingerprint"] = "c" * 64
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.validate_worker_evidence_custody(altered, custody)
+
+    def test_existing_pr_requires_positive_pr_and_canonical_branch(self) -> None:
+        for payload in (
+            {
+                "status": "existing-pr",
+                "bot": "root-cause",
+                "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+                "pull_request": 0,
+                "supervisor_snapshot_fingerprint": "b" * 64,
+            },
+            {
+                "status": "existing-pr",
+                "bot": "root-cause",
+                "branch": "bot/specialist-security-auditor-aaaaaaaaaaaaaaaa",
+                "pull_request": 7,
+                "supervisor_snapshot_fingerprint": "b" * 64,
+            },
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(runtime.SupervisorRuntimeError):
+                    runtime.parse_worker_result(
+                        json.dumps(payload),
+                        worker="root-cause",
+                    )
+
+    def test_no_change_rejects_cross_status_custody_fields(self) -> None:
+        payload = json.dumps({
+            "status": "no-change",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+        })
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.parse_worker_result(payload, worker="root-cause")
 
     def test_rejects_negative_numeric_evidence(self) -> None:
         payload = json.dumps({
