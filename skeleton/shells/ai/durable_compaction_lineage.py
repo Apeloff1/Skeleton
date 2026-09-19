@@ -1367,6 +1367,45 @@ class DurableCompactionLineageAuditor:
         floor_item: SignedDurableHotFloor = item
         floor = floor_item.floor
         ok = True
+        try:
+            history = self.hot_floors.inspect_history(
+                workflow.chain_id
+            )
+        except Exception as exc:
+            history = None
+            self._add(
+                findings,
+                "floor.history_corruption",
+                CompactionLineageSeverity.CORRUPTION,
+                "hot floor history inspection raised "
+                f"{type(exc).__name__}",
+            )
+            ok = False
+        if history is not None:
+            if not history.ok:
+                self._add(
+                    findings,
+                    "floor.history_incomplete",
+                    CompactionLineageSeverity.CORRUPTION,
+                    (
+                        history.issues[0]
+                        if history.issues
+                        else "hot floor history is incomplete"
+                    ),
+                )
+                ok = False
+            elif not any(
+                historical.floor.floor_id
+                == floor.floor_id
+                for historical in history.floors
+            ):
+                self._add(
+                    findings,
+                    "floor.not_committed_ancestor",
+                    CompactionLineageSeverity.CONFLICT,
+                    "historical floor is not on committed floor lineage",
+                )
+                ok = False
         checks = (
             (
                 "floor.id",
