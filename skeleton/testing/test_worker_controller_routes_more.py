@@ -53,6 +53,33 @@ def test_controller_duplicate_submission_id_fails_queue_insert():
         controller.submit(second)
 
 
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_schedule_rejects_invalid_capacity(value):
+    with pytest.raises(ValueError):
+        WorkerSchedule(max_items=value)
+
+
+@pytest.mark.parametrize("delay", [-1, True, float("nan"), float("inf"), "1"])
+def test_schedule_rejects_invalid_delay(delay):
+    schedule=WorkerSchedule()
+    with pytest.raises(ValueError):
+        schedule.schedule("x",ShellCommand("python"),delay_seconds=delay)
+
+
+@pytest.mark.parametrize("priority", [True, 1.5, "1"])
+def test_schedule_rejects_invalid_priority(priority):
+    schedule=WorkerSchedule()
+    with pytest.raises(ValueError):
+        schedule.schedule("x",ShellCommand("python"),priority=priority)
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5])
+def test_schedule_rejects_invalid_release_limit(limit):
+    schedule=WorkerSchedule()
+    with pytest.raises(ValueError):
+        schedule.pop_ready(limit=limit)
+
+
 def test_schedule_limit_on_release():
     now=[0.0]
     schedule=WorkerSchedule(clock=lambda:now[0])
