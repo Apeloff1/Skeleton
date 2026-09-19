@@ -36,6 +36,11 @@ from skeleton.shells.ai.lifecycle import AIServicePhase, AIServiceState
 from skeleton.shells.ai.orchestrator import AIExecutionBundle, AIReviewBundle, AIShellOrchestrator
 from skeleton.shells.ai.preconditions import Preconditions, PreconditionChecker, PreconditionReport
 from skeleton.shells.ai.review import AIReviewBuilder, AIReviewView
+from skeleton.shells.ai.recovery_requirements import (
+    DurableRecoveryRequirementConflict,
+    DurableRecoveryRequirementStore,
+    SignedDurableRecoveryRequirementManifest,
+)
 from skeleton.shells.ai.runtime_trust import AIRuntimeTrustGuard, RuntimeTrustReport
 from skeleton.shells.ai.sandbox_backend import VerifiedSandboxExecutionBackend
 from skeleton.shells.ai.seal_registry import ExecutionSealRegistry, SealUse
@@ -58,6 +63,7 @@ class AIServiceStatus:
     authority_health: dict[str, object] | None = None
     durable_recovery: dict[str, object] | None = None
     durable_operations: dict[str, object] | None = None
+    durable_recovery_requirements: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         data = {
@@ -76,6 +82,10 @@ class AIServiceStatus:
             data["durable_recovery"] = dict(self.durable_recovery)
         if self.durable_operations is not None:
             data["durable_operations"] = dict(self.durable_operations)
+        if self.durable_recovery_requirements is not None:
+            data["durable_recovery_requirements"] = dict(
+                self.durable_recovery_requirements
+            )
         return data
 
 
@@ -99,6 +109,8 @@ class AIShellService:
         worker_id: str = "",
         durable_recovery_guard: DurableRecoveryHealthGuard | None = None,
         durable_recovery_ids: tuple[str, ...] = (),
+        durable_recovery_requirement_store: DurableRecoveryRequirementStore | None = None,
+        durable_recovery_requirement_scope: str = "",
         durable_operations_inspector: DurableEvidenceOperationsInspector | None = None,
         durable_operations_chains: tuple[tuple[str, object], ...] = (),
         durable_operations_protected_roots: dict[str, tuple[str, ...]] | None = None,
@@ -120,6 +132,39 @@ class AIShellService:
             raise ValueError(
                 "durable recovery ids require a durable recovery guard"
             )
+        if (
+            durable_recovery_requirement_store is None
+            and durable_recovery_requirement_scope
+        ):
+            raise ValueError(
+                "durable recovery requirement scope requires a store"
+            )
+        if durable_recovery_requirement_store is not None:
+            if not isinstance(
+                durable_recovery_requirement_store,
+                DurableRecoveryRequirementStore,
+            ):
+                raise TypeError(
+                    "durable_recovery_requirement_store must be "
+                    "DurableRecoveryRequirementStore"
+                )
+            if durable_recovery_guard is None:
+                raise ValueError(
+                    "durable recovery requirement store requires "
+                    "a durable recovery guard"
+                )
+            if durable_recovery_ids:
+                raise ValueError(
+                    "static durable recovery ids cannot be combined "
+                    "with a signed requirement store"
+                )
+            if (
+                not durable_recovery_requirement_scope
+                or len(durable_recovery_requirement_scope) > 128
+            ):
+                raise ValueError(
+                    "durable recovery requirement scope is required"
+                )
         if durable_recovery_guard is not None and not isinstance(
             durable_recovery_guard,
             DurableRecoveryHealthGuard,
@@ -222,6 +267,12 @@ class AIShellService:
         self.worker_id = worker_id
         self.durable_recovery_guard = durable_recovery_guard
         self.durable_recovery_ids = durable_recovery_ids
+        self.durable_recovery_requirement_store = (
+            durable_recovery_requirement_store
+        )
+        self.durable_recovery_requirement_scope = (
+            durable_recovery_requirement_scope
+        )
         self.durable_operations_inspector = durable_operations_inspector
         self.durable_operations_chains = durable_operations_chains
         self.durable_operations_protected_roots = (
@@ -232,6 +283,9 @@ class AIShellService:
         self._authority_health_report: AuthorityHealthReport | None = None
         self._durable_recovery_report: DurableRecoveryHealthReport | None = None
         self._durable_operations_report: DurableEvidenceOperationsReport | None = None
+        self._durable_recovery_requirement_manifest: (
+            SignedDurableRecoveryRequirementManifest | None
+        ) = None
         self.state = AIServiceState()
         self.review_builder = AIReviewBuilder(orchestrator.compiler.effects)
         self.stale_guard = AIPlanStaleGuard()
@@ -278,6 +332,14 @@ class AIShellService:
                 )
                 return report
         if self.durable_recovery_guard is not None:
+            try:
+                self._resolve_durable_recovery_ids()
+            except RuntimeError:
+                self.state.transition(
+                    AIServicePhase.FAILED,
+                    reason="AI durable recovery requirement verification failed",
+                )
+                return report
             self._durable_recovery_report = (
                 self.durable_recovery_guard.inspect(
                     self.durable_recovery_ids
@@ -377,12 +439,58 @@ class AIShellService:
             raise RuntimeError("AI authority dependency health failed") from None
         self._authority_health_report = report
 
+    def _resolve_durable_recovery_ids(self) -> tuple[str, ...]:
+        store = self.durable_recovery_requirement_store
+        if store is None:
+            return self.durable_recovery_ids
+        scope = self.durable_recovery_requirement_scope
+        try:
+            current = store.current(scope)
+            if current is None:
+                raise DurableRecoveryRequirementConflict(
+                    "durable recovery requirement scope has no manifest"
+                )
+            manifest = current[1].manifest
+            runtime_expected = (
+                self._runtime_trust_digest()
+                if manifest.runtime_trust_digest
+                else None
+            )
+            release_expected = (
+                self._release_digest()
+                if manifest.release_evidence_digest
+                else None
+            )
+            item = store.require(
+                scope,
+                runtime_trust_digest=runtime_expected,
+                release_evidence_digest=release_expected,
+            )
+        except (
+            DurableRecoveryRequirementConflict,
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            if self.state.phase is AIServicePhase.READY:
+                self.state.transition(
+                    AIServicePhase.DEGRADED,
+                    reason=(
+                        "AI durable recovery requirement "
+                        "authority drift detected"
+                    ),
+                )
+            raise RuntimeError(
+                "AI durable recovery requirement verification failed"
+            ) from exc
+        self._durable_recovery_requirement_manifest = item
+        self.durable_recovery_ids = item.manifest.finalization_ids
+        return self.durable_recovery_ids
+
     def _require_durable_recovery_current(self) -> None:
         if self.durable_recovery_guard is None:
             return
-        report = self.durable_recovery_guard.inspect(
-            self.durable_recovery_ids
-        )
+        ids = self._resolve_durable_recovery_ids()
+        report = self.durable_recovery_guard.inspect(ids)
         self._durable_recovery_report = report
         if report.allowed:
             return
@@ -1215,5 +1323,10 @@ class AIShellService:
                 None
                 if self._durable_operations_report is None
                 else self._durable_operations_report.to_dict()
+            ),
+            (
+                None
+                if self._durable_recovery_requirement_manifest is None
+                else self._durable_recovery_requirement_manifest.to_dict()
             ),
         )
