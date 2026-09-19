@@ -28,6 +28,11 @@ from skeleton.shells.ai.distributed_journal import (
     DistributedAIDecisionJournal,
     DistributedJournalCorruption,
 )
+from skeleton.shells.ai.durable_archive_store import (
+    DurableArchiveRepository,
+    DurableArchiveStoreError,
+    StoredDurableArchive,
+)
 from skeleton.shells.ai.distributed_state import (
     DistributedStateConflict,
     FencedLease,
@@ -670,6 +675,28 @@ class DurablePruningExecutor:
         self.backend = backend
         self.authorizations = authorizations
         self.hot_floors = hot_floors
+        archives = getattr(
+            getattr(
+                authorizations,
+                "certificates",
+                None,
+            ),
+            "planner",
+            None,
+        )
+        archives = getattr(
+            archives,
+            "archives",
+            None,
+        )
+        if not isinstance(
+            archives,
+            DurableArchiveRepository,
+        ):
+            raise TypeError(
+                "pruning authorization stack must expose DurableArchiveRepository"
+            )
+        self.archives = archives
         self.maintenance = maintenance
         self.namespace = namespace
         self.lease_ttl_seconds = float(
@@ -1436,6 +1463,127 @@ class DurablePruningExecutor:
             ttl_seconds=self.lease_ttl_seconds,
         )
 
+    def _require_archive_recoverability(
+        self,
+        manifest: DurablePruningManifest,
+    ) -> StoredDurableArchive:
+        """Prove the exact bound archive can recover every pruning item."""
+        if not isinstance(
+            manifest,
+            DurablePruningManifest,
+        ):
+            raise TypeError(
+                "manifest must be DurablePruningManifest"
+            )
+        try:
+            stored = self.archives.require(
+                manifest.archive_id
+            )
+            archived_manifest = (
+                stored.manifest.manifest
+            )
+            if (
+                archived_manifest.chain_id
+                != manifest.chain_id
+                or archived_manifest.digest
+                != manifest.archive_manifest_digest
+                or archived_manifest.checkpoint_sequence
+                != manifest.cutoff_sequence
+                or archived_manifest.checkpoint_root
+                != manifest.cutoff_root
+            ):
+                raise DurableArchiveStoreError(
+                    "bound archive metadata differs from pruning manifest"
+                )
+            if len(stored.node_hashes) < manifest.cutoff_sequence:
+                raise DurableArchiveStoreError(
+                    "bound archive is shorter than pruning cutoff"
+                )
+            for item in manifest.items:
+                position = item.sequence - 1
+                if (
+                    position < 0
+                    or position >= len(stored.node_hashes)
+                    or stored.node_hashes[position]
+                    != item.node_hash
+                ):
+                    raise DurableArchiveStoreError(
+                        "pruning item is not bound to exact archive position"
+                    )
+            if not self.archives.verify_root(
+                manifest.chain_id,
+                manifest.cutoff_root,
+            ):
+                raise DurableArchiveStoreError(
+                    "bound archive cannot verify pruning cutoff root"
+                )
+            return stored
+        except DurableArchiveStoreError as exc:
+            raise DurablePruningManualReview(
+                "bound archive is not recoverable: "
+                + str(exc)
+            ) from exc
+
+    def _require_archived_item(
+        self,
+        manifest: DurablePruningManifest,
+        item: DurablePruningItem,
+        stored: StoredDurableArchive,
+    ) -> None:
+        """Require one exact archived object immediately before hot deletion."""
+        if (
+            stored.manifest.manifest.archive_id
+            != manifest.archive_id
+            or stored.manifest.manifest.digest
+            != manifest.archive_manifest_digest
+        ):
+            raise DurablePruningManualReview(
+                "archive guard no longer matches pruning manifest"
+            )
+        position = item.sequence - 1
+        if (
+            position < 0
+            or position >= len(stored.node_hashes)
+            or stored.node_hashes[position]
+            != item.node_hash
+        ):
+            raise DurablePruningManualReview(
+                "pruning item is outside bound archive"
+            )
+        try:
+            archived = self.archives.get_node(
+                manifest.chain_id,
+                item.node_hash,
+            )
+        except DurableArchiveStoreError as exc:
+            raise DurablePruningManualReview(
+                "archived pruning item is unreadable: "
+                + str(exc)
+            ) from exc
+        archived_hash = str(
+            getattr(
+                archived,
+                "event_hash",
+                getattr(
+                    archived,
+                    "receipt_hash",
+                    getattr(
+                        archived,
+                        "node_hash",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if (
+            int(getattr(archived, "sequence", -1))
+            != item.sequence
+            or archived_hash != item.node_hash
+        ):
+            raise DurablePruningManualReview(
+                "archived pruning item identity differs from manifest"
+            )
+
     def _record_matches(
         self,
         namespace: str,
@@ -1787,6 +1935,9 @@ class DurablePruningExecutor:
                     or "pruning operation requires manual review"
                 )
 
+            archive_guard = self._require_archive_recoverability(
+                manifest
+            )
             self._require_maintenance(
                 auth.chain_id,
                 chain,
@@ -1842,6 +1993,11 @@ class DurablePruningExecutor:
                     )
                 item = manifest.items[index]
                 try:
+                    self._require_archived_item(
+                        manifest,
+                        item,
+                        archive_guard,
+                    )
                     self._delete_item(
                         lease,
                         chain,
@@ -1877,6 +2033,12 @@ class DurablePruningExecutor:
                     last_error="",
                 )
 
+            # Re-prove the bound archive after the final destructive
+            # mutation. Completion means both the surviving live suffix and
+            # the archived prefix are independently recoverable.
+            self._require_archive_recoverability(
+                manifest
+            )
             live_verified = bool(
                 chain.verify()
             )
