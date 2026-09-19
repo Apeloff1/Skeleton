@@ -10,6 +10,7 @@ archive-backed reader is configured.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 import json
 import math
@@ -273,6 +274,143 @@ class DurableCheckpointLookupIndex:
             "checkpoint_digest": self.checkpoint_digest,
             "chain_node_hash": self.chain_node_hash,
         }
+
+
+class DurableCheckpointIndexState(str, Enum):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True)
+class DurableCheckpointIndexHealth:
+    chain_id: str
+    state: DurableCheckpointIndexState
+    registry_valid: bool
+    checkpoint_count: int
+    digest_indexes_present: int
+    root_indexes_present: int
+    missing_digest_indexes: tuple[str, ...]
+    missing_root_indexes: tuple[str, ...]
+    corrupt_indexes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.chain_id or len(self.chain_id) > 128:
+            raise ValueError(
+                "invalid checkpoint index health chain_id"
+            )
+        object.__setattr__(
+            self,
+            "state",
+            DurableCheckpointIndexState(
+                self.state
+            ),
+        )
+        if not isinstance(
+            self.registry_valid,
+            bool,
+        ):
+            raise ValueError(
+                "registry_valid must be bool"
+            )
+        for name in (
+            "checkpoint_count",
+            "digest_indexes_present",
+            "root_indexes_present",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        for name in (
+            "missing_digest_indexes",
+            "missing_root_indexes",
+            "corrupt_indexes",
+        ):
+            values = tuple(
+                getattr(self, name)
+            )
+            if any(
+                not isinstance(item, str)
+                or not item
+                or len(item) > 512
+                for item in values
+            ):
+                raise ValueError(
+                    f"invalid {name}"
+                )
+            object.__setattr__(
+                self,
+                name,
+                values,
+            )
+
+    @property
+    def missing(self) -> int:
+        return (
+            len(self.missing_digest_indexes)
+            + len(self.missing_root_indexes)
+        )
+
+    @property
+    def corrupt(self) -> int:
+        return len(self.corrupt_indexes)
+
+    @property
+    def healthy(self) -> bool:
+        return (
+            self.state
+            is DurableCheckpointIndexState.HEALTHY
+        )
+
+    @property
+    def repairable(self) -> bool:
+        return (
+            self.registry_valid
+            and not self.corrupt_indexes
+            and self.missing > 0
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "state": self.state.value,
+            "registry_valid": self.registry_valid,
+            "checkpoint_count": self.checkpoint_count,
+            "digest_indexes_present": (
+                self.digest_indexes_present
+            ),
+            "root_indexes_present": (
+                self.root_indexes_present
+            ),
+            "missing_digest_indexes": list(
+                self.missing_digest_indexes
+            ),
+            "missing_root_indexes": list(
+                self.missing_root_indexes
+            ),
+            "corrupt_indexes": list(
+                self.corrupt_indexes
+            ),
+            "missing": self.missing,
+            "corrupt": self.corrupt,
+            "healthy": self.healthy,
+            "repairable": self.repairable,
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
 
 
 class DurableChainCheckpointStore:
@@ -608,6 +746,136 @@ class DurableChainCheckpointStore:
             matches[0]
         )
         return matches[0]
+
+    def inspect_lookup_indexes(
+        self,
+        chain_id: str,
+    ) -> DurableCheckpointIndexHealth:
+        if not chain_id or len(chain_id) > 128:
+            raise ValueError("invalid chain_id")
+        registry_valid = self.verify()
+        if not registry_valid:
+            return DurableCheckpointIndexHealth(
+                chain_id,
+                DurableCheckpointIndexState.INVALID,
+                False,
+                0,
+                0,
+                0,
+                (),
+                (),
+                (
+                    "canonical checkpoint registry failed integrity",
+                ),
+            )
+
+        items = tuple(
+            item
+            for item in self.snapshot()
+            if (
+                item.checkpoint.chain_id
+                == chain_id
+            )
+        )
+        missing_digest: list[str] = []
+        missing_root: list[str] = []
+        corrupt: list[str] = []
+        digest_present = 0
+        root_present = 0
+
+        for item in items:
+            expected = self._lookup_for(
+                item
+            )
+            checks = (
+                (
+                    "digest",
+                    self._digest_lookup_key(
+                        item.checkpoint.digest
+                    ),
+                    item.checkpoint.digest,
+                ),
+                (
+                    "root",
+                    self._root_lookup_key(
+                        chain_id,
+                        item.checkpoint.root_hash,
+                    ),
+                    item.checkpoint.root_hash,
+                ),
+            )
+            for (
+                kind,
+                key,
+                identity,
+            ) in checks:
+                record = self._backend.get(
+                    self._namespace,
+                    key,
+                )
+                if record is None:
+                    if kind == "digest":
+                        missing_digest.append(
+                            identity
+                        )
+                    else:
+                        missing_root.append(
+                            identity
+                        )
+                    continue
+                if kind == "digest":
+                    digest_present += 1
+                else:
+                    root_present += 1
+                if not isinstance(
+                    record.value,
+                    dict,
+                ):
+                    corrupt.append(
+                        f"{kind}:{identity}:type"
+                    )
+                    continue
+                try:
+                    actual = self._lookup(
+                        dict(record.value)
+                    )
+                except Exception as exc:
+                    corrupt.append(
+                        f"{kind}:{identity}:"
+                        f"{type(exc).__name__}"
+                    )
+                    continue
+                if actual != expected:
+                    corrupt.append(
+                        f"{kind}:{identity}:mismatch"
+                    )
+
+        if corrupt:
+            state = (
+                DurableCheckpointIndexState.INVALID
+            )
+        elif (
+            missing_digest
+            or missing_root
+        ):
+            state = (
+                DurableCheckpointIndexState.DEGRADED
+            )
+        else:
+            state = (
+                DurableCheckpointIndexState.HEALTHY
+            )
+        return DurableCheckpointIndexHealth(
+            chain_id,
+            state,
+            True,
+            len(items),
+            digest_present,
+            root_present,
+            tuple(missing_digest),
+            tuple(missing_root),
+            tuple(corrupt),
+        )
 
     def repair_lookup_indexes(
         self,
