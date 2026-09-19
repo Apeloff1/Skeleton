@@ -848,10 +848,10 @@ def test_permit_json_duplicate_fields_fail_closed() -> None:
     forged_encoded = base64.urlsafe_b64encode(
         duplicate_json.encode("utf-8")
     ).decode("ascii").rstrip("=")
-    forged_signature = __import__("hmac").new(
+    forged_signature = hmac.new(
         KEY.secret,
         f"v1.{forged_encoded}".encode("ascii"),
-        __import__("hashlib").sha256,
+        hashlib.sha256,
     ).hexdigest()
 
     with pytest.raises(AutomationControlError, match="duplicate permit field"):
