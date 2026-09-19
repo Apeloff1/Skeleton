@@ -166,6 +166,11 @@ jobs:
       - name: Repository malware and IOC gate
         run: python scripts/check_malware_iocs.py
 
+      - name: Live-service backend test boundary
+        run: |
+          python scripts/check_live_service_test_boundaries.py
+          python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
+
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
