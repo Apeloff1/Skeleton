@@ -136,12 +136,14 @@ class AIRiskAssessor:
         if unknown:
             reasons.append("one or more commands have no declared effect contract")
 
-        score = min(100, sum(min(40, value) for value in dimensions.values()))
+        if not reversible:
+            dimensions[RiskDimension.REVERSIBILITY.value] += 10
+        score = min(
+            100,
+            sum(min(40, value) for value in dimensions.values()),
+        )
         if reversible:
             score = max(0, score - 5)
-        else:
-            dimensions[RiskDimension.REVERSIBILITY.value] += 10
-            score = min(100, score + 5)
         return RiskAssessment(
             score=score,
             band=self._band(score),
