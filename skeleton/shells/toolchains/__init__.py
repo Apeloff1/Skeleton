@@ -1,6 +1,16 @@
 """Built-in portable toolchain contracts for the shell execution plane."""
 
 from skeleton.shells.toolchains.all import ALL_CONTRACTS, DEFAULT_CATALOG, all_contracts, default_catalog
+from skeleton.shells.toolchains.attestation import (
+    AttestedToolchainExecutionPlane,
+    ExecutableAttestation,
+    ExecutableAttestationError,
+    ExecutableAttestationPolicy,
+    ExecutableAttestationSet,
+    ExecutableAttestor,
+    ExecutableVerification,
+    attest_compiled_toolchain,
+)
 from skeleton.shells.toolchains.catalog import ToolchainBindingError, ToolchainCatalog, ToolchainCatalogSnapshot
 from skeleton.shells.toolchains.compiler import (
     CommandEnvironmentPolicySet,
@@ -35,6 +45,14 @@ from skeleton.shells.toolchains.types import BoundToolchain, CommandEffect, Comm
 __all__ = [
     "ALL_CONTRACTS",
     "DEFAULT_CATALOG",
+    "AttestedToolchainExecutionPlane",
+    "ExecutableAttestation",
+    "ExecutableAttestationError",
+    "ExecutableAttestationPolicy",
+    "ExecutableAttestationSet",
+    "ExecutableAttestor",
+    "ExecutableVerification",
+    "attest_compiled_toolchain",
     "all_contracts",
     "default_catalog",
     "ToolchainBindingError",
