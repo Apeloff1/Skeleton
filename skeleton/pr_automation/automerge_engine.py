@@ -372,6 +372,10 @@ def reconcile(
             continue
 
         receipt = _execute(client, current, policy)
+        receipt = replace(
+            receipt,
+            action_key=current.action.idempotency_key,
+        )
         receipts.append(receipt)
         ledger.append_receipt(receipt)
 
