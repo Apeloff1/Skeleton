@@ -17,6 +17,8 @@ from typing import Iterable
 from skeleton.shells.ai.durable_checkpoint import (
     CheckpointableEvidenceChain,
     DurableChainCheckpointStore,
+    DurableCheckpointIndexHealth,
+    DurableCheckpointIndexState,
     DurableCheckpointVerification,
 )
 from skeleton.shells.ai.durable_health import (
@@ -54,6 +56,7 @@ class DurableOperationsPolicy:
     block_capacity_critical: bool = True
     require_checkpoint_above_warning: bool = False
     require_recovery_health: bool = False
+    require_checkpoint_indexes: bool = False
     max_findings: int = 512
 
     def __post_init__(self) -> None:
@@ -61,6 +64,7 @@ class DurableOperationsPolicy:
             "block_capacity_critical",
             "require_checkpoint_above_warning",
             "require_recovery_health",
+            "require_checkpoint_indexes",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
@@ -78,6 +82,9 @@ class DurableOperationsPolicy:
                 self.require_checkpoint_above_warning
             ),
             "require_recovery_health": self.require_recovery_health,
+            "require_checkpoint_indexes": (
+                self.require_checkpoint_indexes
+            ),
             "max_findings": self.max_findings,
         }
 
@@ -134,6 +141,7 @@ class DurableChainOperationsReport:
     retention: DurableRetentionPlan | None
     findings: tuple[DurableOperationsFinding, ...]
     verification_health: DurableChainVerificationHealth | None = None
+    checkpoint_index_health: DurableCheckpointIndexHealth | None = None
 
     def __post_init__(self) -> None:
         if not self.chain_id or len(self.chain_id) > 128:
@@ -236,6 +244,11 @@ class DurableChainOperationsReport:
                 None
                 if self.verification_health is None
                 else self.verification_health.to_dict()
+            ),
+            "checkpoint_index_health": (
+                None
+                if self.checkpoint_index_health is None
+                else self.checkpoint_index_health.to_dict()
             ),
             "retention": (
                 None
@@ -495,6 +508,61 @@ class DurableEvidenceOperationsInspector:
                 )
             )
 
+        checkpoint_index_health = None
+        try:
+            checkpoint_index_health = (
+                self.checkpoints
+                .inspect_lookup_indexes(
+                    chain_id
+                )
+            )
+            if (
+                checkpoint_index_health.state
+                is DurableCheckpointIndexState.INVALID
+            ):
+                findings.append(
+                    DurableOperationsFinding(
+                        DurableOperationsSeverity.ERROR,
+                        "durable_checkpoint.index_invalid",
+                        (
+                            "durable checkpoint exact indexes conflict "
+                            "with canonical registry"
+                        ),
+                        chain_id,
+                    )
+                )
+            elif (
+                checkpoint_index_health.state
+                is DurableCheckpointIndexState.DEGRADED
+            ):
+                findings.append(
+                    DurableOperationsFinding(
+                        (
+                            DurableOperationsSeverity.ERROR
+                            if self.policy.require_checkpoint_indexes
+                            else DurableOperationsSeverity.WARNING
+                        ),
+                        "durable_checkpoint.index_repair_required",
+                        (
+                            "durable checkpoint exact indexes are incomplete "
+                            f"({checkpoint_index_health.missing} missing)"
+                        ),
+                        chain_id,
+                    )
+                )
+        except Exception as exc:
+            findings.append(
+                DurableOperationsFinding(
+                    DurableOperationsSeverity.ERROR,
+                    "durable_checkpoint.index_inspect_error",
+                    (
+                        "durable checkpoint index inspection raised "
+                        f"{type(exc).__name__}"
+                    ),
+                    chain_id,
+                )
+            )
+
         retention_plan = None
         try:
             retention_plan = self.retention.plan(
@@ -613,6 +681,7 @@ class DurableEvidenceOperationsInspector:
             retention_plan,
             tuple(findings),
             verification_health,
+            checkpoint_index_health,
         )
 
     def inspect(
