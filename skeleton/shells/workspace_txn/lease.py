@@ -112,3 +112,95 @@ class WorkspaceLeaseRegistry:
             for workspace_id in tuple(self._active):
                 self._purge_expired(workspace_id)
             return tuple(sorted(self._active.values(), key=lambda lease: lease.workspace_id))
+
+
+class WorkspaceLeaseHeartbeat:
+    """Keep an in-process workspace lease alive across long blocking work.
+
+    The lease id and fencing generation remain stable across renewals, so the
+    original WorkspaceLease token remains a valid capability while the registry
+    advances only its expiration timestamp.
+    """
+
+    def __init__(
+        self,
+        registry: WorkspaceLeaseRegistry,
+        lease: WorkspaceLease,
+        *,
+        ttl_seconds: float,
+        interval_seconds: float | None = None,
+    ) -> None:
+        if isinstance(ttl_seconds, bool) or ttl_seconds <= 0:
+            raise ValueError("heartbeat ttl must be positive")
+        interval = (
+            min(float(ttl_seconds) / 3.0, 30.0)
+            if interval_seconds is None
+            else float(interval_seconds)
+        )
+        if interval <= 0 or interval >= float(ttl_seconds):
+            raise ValueError("heartbeat interval must be positive and below ttl")
+        self.registry = registry
+        self.lease = lease
+        self.ttl_seconds = float(ttl_seconds)
+        self.interval_seconds = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._error: BaseException | None = None
+        self._lock = threading.RLock()
+
+    @property
+    def running(self) -> bool:
+        thread = self._thread
+        return bool(thread is not None and thread.is_alive())
+
+    @property
+    def error(self) -> BaseException | None:
+        with self._lock:
+            return self._error
+
+    def _record_error(self, exc: BaseException) -> None:
+        with self._lock:
+            if self._error is None:
+                self._error = exc
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval_seconds):
+            try:
+                self.registry.renew(
+                    self.lease,
+                    ttl_seconds=self.ttl_seconds,
+                )
+            except BaseException as exc:
+                self._record_error(exc)
+                self._stop.set()
+                return
+
+    def start(self) -> "WorkspaceLeaseHeartbeat":
+        if self._thread is not None:
+            raise WorkspaceLeaseError("lease heartbeat has already been started")
+        thread = threading.Thread(
+            target=self._run,
+            name=f"workspace-lease-{self.lease.workspace_id[:12]}",
+            daemon=True,
+        )
+        self._thread = thread
+        thread.start()
+        return self
+
+    def require_healthy(self) -> WorkspaceLease:
+        error = self.error
+        if error is not None:
+            raise WorkspaceLeaseError("workspace lease heartbeat failed") from error
+        return self.registry.require(self.lease)
+
+    def stop(self) -> None:
+        self._stop.set()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=max(1.0, min(self.interval_seconds * 2.0, 5.0)))
+
+    def __enter__(self) -> "WorkspaceLeaseHeartbeat":
+        return self.start()
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.stop()
