@@ -710,6 +710,41 @@ class DurableCompactionProofBuilder:
                 workflow.operator_id,
                 reservation_value.operator_id,
             )
+            and self._compare(
+                reasons,
+                "reservation holder",
+                proof.workflow_id,
+                workflow.workflow_id,
+                reservation_value.holder_id,
+            )
+        )
+        governance_binding = (
+            self._compare(
+                reasons,
+                "readiness digest",
+                workflow.readiness_digest,
+                certificate_value.readiness_digest,
+            )
+            and self._compare(
+                reasons,
+                "retention plan digest",
+                workflow.retention_plan_digest,
+                certificate_value.retention_plan_digest,
+                authorization_value.retention_plan_digest,
+            )
+            and self._compare(
+                reasons,
+                "compaction policy digest",
+                workflow.compaction_policy_digest,
+                certificate_value.compaction_policy_digest,
+                authorization_value.compaction_policy_digest,
+            )
+            and self._compare(
+                reasons,
+                "protected roots digest",
+                certificate_value.protected_roots_digest,
+                authorization_value.protected_roots_digest,
+            )
         )
         certificate_binding = (
             self._compare(
@@ -816,6 +851,7 @@ class DurableCompactionProofBuilder:
                 certificate_value.current_sequence,
                 authorization_value.current_sequence,
                 manifest.current_sequence,
+                archive_verification.current_sequence,
             )
             and self._compare(
                 reasons,
@@ -825,6 +861,7 @@ class DurableCompactionProofBuilder:
                 certificate_value.current_root,
                 authorization_value.current_root,
                 manifest.current_root,
+                archive_verification.current_root,
             )
         )
         floor_binding_valid = (
@@ -923,6 +960,7 @@ class DurableCompactionProofBuilder:
             (
                 chain_binding,
                 workflow_binding,
+                governance_binding,
                 certificate_binding,
                 authorization_binding,
                 archive_binding,
