@@ -45,6 +45,7 @@ class SourcePathInventoryTests(unittest.TestCase):
             "java-accelerators/observability/AcceleratorMain.java",
             "java-accelerators/vector/VectorSearchMain.java",
             "java-accelerators/physics/BroadPhaseMain.java",
+            "java-accelerators/retrieval/FusionMain.java",
         ):
             self.assertEqual(policy.classify_path(path), "first-party")
 
