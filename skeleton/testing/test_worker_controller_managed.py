@@ -8,7 +8,7 @@ import pytest
 from skeleton.shells.runner import ShellCommand
 from skeleton.shells.worker import QueueWorker
 from skeleton.shells.worker_backpressure import BackpressureDecision,BackpressureState
-from skeleton.shells.worker_controller import WorkerController
+from skeleton.shells.worker_controller import WorkerController,WorkerSubmission
 from skeleton.shells.worker_events import WorkerEvents
 from skeleton.shells.worker_identity import WorkerIdentity,WorkerRole
 from skeleton.shells.worker_managed import ManagedQueueWorker
@@ -32,6 +32,38 @@ def ready_runtime():
     runtime.register(worker)
     runtime.heartbeat(worker,sequence=1)
     return runtime,worker
+
+
+@pytest.mark.parametrize("field,value", [
+    ("submission_id",""),
+    ("submission_id","   "),
+    ("principal",""),
+    ("principal","bad\x00principal"),
+    ("work_class",""),
+    ("work_class","bad\x00class"),
+])
+def test_worker_submission_rejects_invalid_identity_fields(field,value):
+    kwargs={
+        "submission_id":"s1",
+        "principal":"p",
+        "work_class":"build",
+        "command":ShellCommand("python"),
+    }
+    kwargs[field]=value
+    with pytest.raises(ValueError):
+        WorkerSubmission(**kwargs)
+
+
+@pytest.mark.parametrize("priority", [True, 1.5, "1"])
+def test_worker_submission_rejects_invalid_priority(priority):
+    with pytest.raises(ValueError):
+        WorkerSubmission("s1","p","build",ShellCommand("python"),priority=priority)
+
+
+@pytest.mark.parametrize("created_at", [-1, True, float("nan"), float("inf")])
+def test_worker_submission_rejects_invalid_timestamp(created_at):
+    with pytest.raises(ValueError):
+        WorkerSubmission("s1","p","build",ShellCommand("python"),created_at=created_at)
 
 
 def test_controller_new_submission_stable_shape():
@@ -72,6 +104,18 @@ def test_controller_submit_can_schedule():
     now[0]=5
     released=controller.release_ready()
     assert [item.item_id for item in released]==["s1"]
+
+
+@pytest.mark.parametrize("delay", [-1, True, float("nan"), float("inf"), "1"])
+def test_controller_rejects_invalid_delay_before_admission(delay):
+    runtime,_=ready_runtime()
+    controller=WorkerController(runtime)
+    submission=controller.new_submission(
+        principal="p",work_class="build",command=ShellCommand("python"),submission_id="s1"
+    )
+    with pytest.raises(ValueError):
+        controller.submit(submission,delay_seconds=delay)
+    assert runtime.queue.counts()["queued"]==0
 
 
 def test_controller_denies_paused_backpressure():
