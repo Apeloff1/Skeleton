@@ -132,6 +132,8 @@ class WorkspaceLeaseHeartbeat:
     ) -> None:
         if isinstance(ttl_seconds, bool) or ttl_seconds <= 0:
             raise ValueError("heartbeat ttl must be positive")
+        if isinstance(interval_seconds, bool):
+            raise ValueError("heartbeat interval must be numeric")
         interval = (
             min(float(ttl_seconds) / 3.0, 30.0)
             if interval_seconds is None
@@ -145,7 +147,7 @@ class WorkspaceLeaseHeartbeat:
         self.interval_seconds = interval
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._error: BaseException | None = None
+        self._error: Exception | None = None
         self._lock = threading.RLock()
 
     @property
@@ -154,11 +156,11 @@ class WorkspaceLeaseHeartbeat:
         return bool(thread is not None and thread.is_alive())
 
     @property
-    def error(self) -> BaseException | None:
+    def error(self) -> Exception | None:
         with self._lock:
             return self._error
 
-    def _record_error(self, exc: BaseException) -> None:
+    def _record_error(self, exc: Exception) -> None:
         with self._lock:
             if self._error is None:
                 self._error = exc
@@ -170,7 +172,7 @@ class WorkspaceLeaseHeartbeat:
                     self.lease,
                     ttl_seconds=self.ttl_seconds,
                 )
-            except BaseException as exc:
+            except Exception as exc:
                 self._record_error(exc)
                 self._stop.set()
                 return
