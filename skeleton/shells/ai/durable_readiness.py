@@ -19,6 +19,11 @@ import hashlib
 import json
 from typing import Iterable
 
+from skeleton.shells.ai.durable_proof_window_operator import (
+    DurableProofWindowFleetReport,
+    DurableProofWindowOperator,
+    DurableProofWindowTarget,
+)
 from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableEvidenceOperationsReport,
@@ -65,6 +70,8 @@ class DurableEvidenceReadinessPolicy:
     require_nonempty_chains: bool = True
     max_chains: int = 32
     max_findings: int = 256
+    require_proof_windows: bool = False
+    allow_proof_window_build: bool = True
 
     def __post_init__(self) -> None:
         for name in (
@@ -74,6 +81,8 @@ class DurableEvidenceReadinessPolicy:
             "allow_sequence_index_repair",
             "allow_verification_refresh",
             "require_nonempty_chains",
+            "require_proof_windows",
+            "allow_proof_window_build",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
@@ -104,6 +113,8 @@ class DurableEvidenceReadinessPolicy:
             "require_nonempty_chains": self.require_nonempty_chains,
             "max_chains": self.max_chains,
             "max_findings": self.max_findings,
+            "require_proof_windows": self.require_proof_windows,
+            "allow_proof_window_build": self.allow_proof_window_build,
         }
 
 
@@ -147,6 +158,7 @@ class DurableEvidenceReadinessReport:
     verification_refresh: DurableVerificationRefreshReport | None
     mutations: tuple[str, ...]
     findings: tuple[DurableEvidenceReadinessFinding, ...]
+    proof_windows: DurableProofWindowFleetReport | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -253,6 +265,11 @@ class DurableEvidenceReadinessReport:
                 item.to_dict()
                 for item in self.findings
             ],
+            "proof_windows": (
+                None
+                if self.proof_windows is None
+                else self.proof_windows.to_dict()
+            ),
         }
         if include_digest:
             data["digest"] = self.digest
@@ -272,6 +289,7 @@ class DurableEvidenceReadinessGuard:
         sequence_indexes: DurableSequenceIndexOperator,
         verification: DurableVerificationOperator,
         policy: DurableEvidenceReadinessPolicy | None = None,
+        proof_windows: DurableProofWindowOperator | None = None,
     ) -> None:
         if not isinstance(
             operations,
@@ -300,6 +318,17 @@ class DurableEvidenceReadinessGuard:
         self.policy = (
             policy or DurableEvidenceReadinessPolicy()
         )
+        if (
+            proof_windows is not None
+            and not isinstance(
+                proof_windows,
+                DurableProofWindowOperator,
+            )
+        ):
+            raise TypeError(
+                "proof_windows must be DurableProofWindowOperator"
+            )
+        self.proof_windows = proof_windows
         if not isinstance(
             self.policy,
             DurableEvidenceReadinessPolicy,
@@ -354,6 +383,25 @@ class DurableEvidenceReadinessGuard:
         )
 
     @staticmethod
+    def _proof_targets(
+        protected_roots: dict[str, tuple[str, ...]] | None,
+    ) -> tuple[DurableProofWindowTarget, ...]:
+        if not protected_roots:
+            return ()
+        targets: list[DurableProofWindowTarget] = []
+        for chain_id in sorted(protected_roots):
+            for root_hash in sorted(
+                set(protected_roots[chain_id])
+            ):
+                targets.append(
+                    DurableProofWindowTarget(
+                        chain_id,
+                        root_hash,
+                    )
+                )
+        return tuple(targets)
+
+    @staticmethod
     def _finding(
         findings: list[DurableEvidenceReadinessFinding],
         severity: DurableEvidenceReadinessSeverity,
@@ -380,6 +428,7 @@ class DurableEvidenceReadinessGuard:
         sequence_report: DurableSequenceIndexFleetReport | None = None,
         verification_report: DurableVerificationOperatorReport | None = None,
         verification_refresh: DurableVerificationRefreshReport | None = None,
+        proof_report: DurableProofWindowFleetReport | None = None,
         mutations: tuple[str, ...] = (),
     ) -> DurableEvidenceReadinessReport:
         findings: list[
@@ -501,6 +550,53 @@ class DurableEvidenceReadinessGuard:
                 ),
             )
 
+        proof_targets = self._proof_targets(
+            protected_roots
+        )
+        if proof_targets:
+            if self.proof_windows is None:
+                if self.policy.require_proof_windows:
+                    self._finding(
+                        findings,
+                        DurableEvidenceReadinessSeverity.ERROR,
+                        "readiness.proof_windows_unavailable",
+                        "protected historical roots require proof-window operator",
+                    )
+            elif proof_report is None:
+                try:
+                    proof_report = self.proof_windows.inspect(
+                        proof_targets
+                    )
+                except Exception as exc:
+                    self._finding(
+                        findings,
+                        DurableEvidenceReadinessSeverity.ERROR,
+                        "readiness.proof_window_error",
+                        "durable proof-window inspection raised "
+                        f"{type(exc).__name__}",
+                    )
+            if (
+                proof_report is not None
+                and not proof_report.ok
+            ):
+                self._finding(
+                    findings,
+                    (
+                        DurableEvidenceReadinessSeverity.ERROR
+                        if self.policy.require_proof_windows
+                        else DurableEvidenceReadinessSeverity.WARNING
+                    ),
+                    "readiness.proof_windows_unhealthy",
+                    (
+                        "durable proof windows are not healthy: "
+                        f"missing={proof_report.missing}, "
+                        f"invalid={proof_report.invalid}, "
+                        f"out_of_window={proof_report.out_of_window}, "
+                        f"unanchored={proof_report.unanchored}, "
+                        f"errors={proof_report.errors}"
+                    ),
+                )
+
         if len(findings) > self.policy.max_findings:
             raise DurableEvidenceReadinessError(
                 "durable readiness finding bound exceeded"
@@ -533,6 +629,7 @@ class DurableEvidenceReadinessGuard:
             verification_refresh,
             mutations,
             tuple(findings),
+            proof_report,
         )
 
     def inspect(
@@ -586,6 +683,31 @@ class DurableEvidenceReadinessGuard:
         verification_report = self.verification.audit(
             entries
         )
+        proof_report = None
+        proof_targets = self._proof_targets(
+            protected_roots
+        )
+        if (
+            proof_targets
+            and self.proof_windows is not None
+        ):
+            proof_report = self.proof_windows.inspect(
+                proof_targets
+            )
+            if not proof_report.ok:
+                if not self.policy.allow_proof_window_build:
+                    if self.policy.require_proof_windows:
+                        raise DurableEvidenceReadinessError(
+                            "proof-window build required but disabled by readiness policy"
+                        )
+                else:
+                    proof_report = self.proof_windows.ensure(
+                        proof_targets
+                    )
+                    if proof_report.repaired:
+                        mutations.append(
+                            "proof_window_build"
+                        )
         verification_refresh = None
         if not verification_report.ok:
             if not self.policy.allow_verification_refresh:
@@ -612,6 +734,7 @@ class DurableEvidenceReadinessGuard:
             sequence_report=sequence_report,
             verification_report=verification_report,
             verification_refresh=verification_refresh,
+            proof_report=proof_report,
             mutations=tuple(mutations),
         )
 
