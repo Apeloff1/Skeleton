@@ -577,9 +577,11 @@ def activate_manual_floor(fixture):
         0,
         -1,
     ):
-        node = fixture.chain.get_by_sequence(
-            sequence
-        )
+        # Once the signed floor boundary itself is removed, reads at or below
+        # that floor are intentionally denied by the hot chain.  Use the
+        # immutable pre-floor capture to simulate physical pruning rather than
+        # violating the very access contract under test.
+        node = fixture.first[sequence - 1]
         node_hash = (
             node.event_hash
             if fixture.kind == "journal"
