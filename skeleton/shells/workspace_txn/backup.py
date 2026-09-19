@@ -49,6 +49,16 @@ class ContentAddressedBackupStore:
         self.blob_root.mkdir(exist_ok=True)
         self.manifest_root.mkdir(exist_ok=True)
 
+    def require_external_to_workspace(self, workspace_root: Path | str) -> None:
+        """Reject backup storage nested inside the workspace being protected."""
+
+        root = Path(workspace_root).expanduser().resolve(strict=True)
+        storage = self.storage_root.resolve(strict=True)
+        if storage == root or root in storage.parents:
+            raise BackupError(
+                "backup storage must be outside the protected workspace"
+            )
+
     def _blob_path(self, digest: str) -> Path:
         if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             raise BackupError("invalid backup digest")
