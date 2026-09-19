@@ -271,62 +271,16 @@ class EnsembleCuriosityResearcher:
 
             legacy_claims = (*source.supports_claims, *source.contradicts_claims)
             bound_ids = {self.claim_identity.canonical_id(binding.claim) for binding in source.claim_bindings}
-            support_labels = {value.casefold(): value for value in source.supports_claims}
             for raw_claim in legacy_claims:
                 raw_identity = self.claim_identity.canonical_id(raw_claim)
                 if raw_identity in bound_ids:
                     continue
 
-                # Compatibility path for legacy source adapters: a verified
-                # locator may bind a supports_claims label only when that label
-                # names one candidate claim exactly after whitespace/case
-                # normalization. Claim-identity similarity alone is not enough.
-                candidate = canonical_by_identity.get(raw_identity)
-                exact_support = (
-                    candidate is not None
-                    and raw_claim.casefold() == candidate.casefold()
-                    and raw_claim.casefold() in support_labels
-                    and source.provenance_verified
-                    and bool(source.locator.strip())
-                )
-                if exact_support:
-                    mapping_rationale = (
-                        "Verified locator legacy adapter exactly names the "
-                        "candidate claim; no semantic or topic-nearby binding."
-                    )
-                    report = self.citation_integrity.validate(CitationBinding(
-                        claim=candidate,
-                        source_id=source.source,
-                        locator=source.locator,
-                        binding_method="analyst_mapping",
-                        evidence_span=raw_claim,
-                        supports=True,
-                        provenance_verified=True,
-                        source_content_sha256=source.content_sha256,
-                        mapping_rationale=mapping_rationale,
-                    ))
-                    citation_reports.append({
-                        "source_id": source.source,
-                        "claim": candidate,
-                        "accepted": report.accepted,
-                        "laundering_risk": report.laundering_risk,
-                        "reasons": list(report.reasons),
-                        "attestation_sha256": report.attestation_sha256,
-                        "legacy_exact_locator_binding": True,
-                    })
-                    if report.accepted:
-                        claim_evidence[candidate].append({
-                            **common,
-                            "supports": True,
-                            "citation_binding": {
-                                "binding_method": "verified_locator_exact_claim",
-                                "evidence_span": raw_claim,
-                                "mapping_rationale": mapping_rationale,
-                            },
-                            "citation_binding_attestation_sha256": report.attestation_sha256,
-                        })
-                    continue
-
+                # Legacy supports/contradicts labels are diagnostics only.
+                # Even an exact claim string plus verified locator is not an
+                # inspectable claim-to-evidence binding: it carries no explicit
+                # evidence span or binding method selected by the source
+                # adapter.  Promotion therefore requires claim_bindings.
                 citation_reports.append({"source_id": source.source, "claim": raw_claim, "accepted": False,
                                          "laundering_risk": "critical",
                                          "reasons": ["legacy_claim_label_without_inspectable_binding"]})
