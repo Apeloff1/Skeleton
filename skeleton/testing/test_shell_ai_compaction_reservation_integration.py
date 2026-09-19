@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 
 import pytest
@@ -114,6 +115,7 @@ class FailReceiptOnceOperator(DurableCompactionOperator):
         chain,
         *,
         reservation_holder_id="",
+        maintenance_epoch=None,
     ):
         stored = self.current(workflow_id)
         if (
@@ -129,6 +131,7 @@ class FailReceiptOnceOperator(DurableCompactionOperator):
             retention,
             chain,
             reservation_holder_id=reservation_holder_id,
+            maintenance_epoch=maintenance_epoch,
         )
 
 
