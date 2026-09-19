@@ -28,6 +28,10 @@ from skeleton.shells.ai.durable_operations import (
     DurableEvidenceOperationsInspector,
     DurableEvidenceOperationsReport,
 )
+from skeleton.shells.ai.durable_sequence_backfill import (
+    DurableSequenceBackfillFleetReport,
+    DurableSequenceBackfillOperator,
+)
 from skeleton.shells.ai.durable_sequence_index import (
     DurableSequenceIndexFleetReport,
     DurableSequenceIndexOperator,
@@ -72,6 +76,8 @@ class DurableEvidenceReadinessPolicy:
     max_findings: int = 256
     require_proof_windows: bool = False
     allow_proof_window_build: bool = True
+    allow_sequence_backfill: bool = True
+    require_backfill_current_head: bool = True
 
     def __post_init__(self) -> None:
         for name in (
@@ -83,6 +89,8 @@ class DurableEvidenceReadinessPolicy:
             "require_nonempty_chains",
             "require_proof_windows",
             "allow_proof_window_build",
+            "allow_sequence_backfill",
+            "require_backfill_current_head",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be bool")
@@ -115,6 +123,10 @@ class DurableEvidenceReadinessPolicy:
             "max_findings": self.max_findings,
             "require_proof_windows": self.require_proof_windows,
             "allow_proof_window_build": self.allow_proof_window_build,
+            "allow_sequence_backfill": self.allow_sequence_backfill,
+            "require_backfill_current_head": (
+                self.require_backfill_current_head
+            ),
         }
 
 
@@ -159,6 +171,7 @@ class DurableEvidenceReadinessReport:
     mutations: tuple[str, ...]
     findings: tuple[DurableEvidenceReadinessFinding, ...]
     proof_windows: DurableProofWindowFleetReport | None = None
+    sequence_backfill: DurableSequenceBackfillFleetReport | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -270,6 +283,11 @@ class DurableEvidenceReadinessReport:
                 if self.proof_windows is None
                 else self.proof_windows.to_dict()
             ),
+            "sequence_backfill": (
+                None
+                if self.sequence_backfill is None
+                else self.sequence_backfill.to_dict()
+            ),
         }
         if include_digest:
             data["digest"] = self.digest
@@ -290,6 +308,7 @@ class DurableEvidenceReadinessGuard:
         verification: DurableVerificationOperator,
         policy: DurableEvidenceReadinessPolicy | None = None,
         proof_windows: DurableProofWindowOperator | None = None,
+        sequence_backfill: DurableSequenceBackfillOperator | None = None,
     ) -> None:
         if not isinstance(
             operations,
@@ -329,6 +348,17 @@ class DurableEvidenceReadinessGuard:
                 "proof_windows must be DurableProofWindowOperator"
             )
         self.proof_windows = proof_windows
+        if (
+            sequence_backfill is not None
+            and not isinstance(
+                sequence_backfill,
+                DurableSequenceBackfillOperator,
+            )
+        ):
+            raise TypeError(
+                "sequence_backfill must be DurableSequenceBackfillOperator"
+            )
+        self.sequence_backfill = sequence_backfill
         if not isinstance(
             self.policy,
             DurableEvidenceReadinessPolicy,
@@ -418,6 +448,39 @@ class DurableEvidenceReadinessGuard:
             )
         )
 
+    def _backfill_covers_current_heads(
+        self,
+        entries: tuple[tuple[str, object], ...],
+        report: DurableSequenceBackfillFleetReport | None,
+    ) -> bool:
+        if report is None or not report.all_complete:
+            return False
+        by_id = {
+            item.chain_id: item
+            for item in report.chains
+        }
+        if set(by_id) != {
+            chain_id
+            for chain_id, _ in entries
+        }:
+            return False
+        for chain_id, chain in entries:
+            item = by_id[chain_id]
+            cursor = item.cursor
+            try:
+                head = chain.head()
+                sequence = int(head.sequence)
+                root = str(head.root_hash)
+            except Exception:
+                return False
+            if (
+                cursor.anchor_sequence != sequence
+                or cursor.anchor_root != root
+                or not cursor.complete
+            ):
+                return False
+        return True
+
     def _evaluate(
         self,
         entries: tuple[tuple[str, object], ...],
@@ -429,6 +492,7 @@ class DurableEvidenceReadinessGuard:
         verification_report: DurableVerificationOperatorReport | None = None,
         verification_refresh: DurableVerificationRefreshReport | None = None,
         proof_report: DurableProofWindowFleetReport | None = None,
+        sequence_backfill_report: DurableSequenceBackfillFleetReport | None = None,
         mutations: tuple[str, ...] = (),
     ) -> DurableEvidenceReadinessReport:
         findings: list[
@@ -500,23 +564,74 @@ class DurableEvidenceReadinessGuard:
                         f"{type(exc).__name__}"
                     ),
                 )
+        backfill_current = self._backfill_covers_current_heads(
+            entries,
+            sequence_backfill_report,
+        )
         if sequence_report is not None and not sequence_report.ok:
-            self._finding(
-                findings,
-                (
-                    DurableEvidenceReadinessSeverity.ERROR
-                    if self.policy.require_sequence_indexes
-                    else DurableEvidenceReadinessSeverity.WARNING
-                ),
-                "readiness.sequence_indexes_unhealthy",
-                (
-                    "durable sequence indexes are not healthy: "
-                    f"missing={sequence_report.missing}, "
-                    f"corrupt={sequence_report.corrupt}, "
-                    f"bounded_out={sequence_report.bounded_out}, "
-                    f"errors={sequence_report.errors}"
-                ),
+            bounded_only = (
+                sequence_report.bounded_out > 0
+                and sequence_report.missing == 0
+                and sequence_report.corrupt == 0
+                and sequence_report.errors == 0
             )
+            accepted_backfill = (
+                bounded_only
+                and backfill_current
+            )
+            if not accepted_backfill:
+                self._finding(
+                    findings,
+                    (
+                        DurableEvidenceReadinessSeverity.ERROR
+                        if self.policy.require_sequence_indexes
+                        else DurableEvidenceReadinessSeverity.WARNING
+                    ),
+                    "readiness.sequence_indexes_unhealthy",
+                    (
+                        "durable sequence indexes are not healthy: "
+                        f"missing={sequence_report.missing}, "
+                        f"corrupt={sequence_report.corrupt}, "
+                        f"bounded_out={sequence_report.bounded_out}, "
+                        f"errors={sequence_report.errors}"
+                    ),
+                )
+            elif not self.policy.require_backfill_current_head:
+                self._finding(
+                    findings,
+                    DurableEvidenceReadinessSeverity.WARNING,
+                    "readiness.sequence_backfill_substituted",
+                    "bounded sequence-index inspection accepted completed backfill proof",
+                )
+
+        if sequence_backfill_report is not None:
+            if sequence_backfill_report.errors:
+                self._finding(
+                    findings,
+                    DurableEvidenceReadinessSeverity.ERROR,
+                    "readiness.sequence_backfill_error",
+                    (
+                        "durable sequence-index backfill reported "
+                        f"{sequence_backfill_report.errors} error(s)"
+                    ),
+                )
+            elif (
+                sequence_backfill_report.paused
+                and not backfill_current
+            ):
+                self._finding(
+                    findings,
+                    (
+                        DurableEvidenceReadinessSeverity.ERROR
+                        if self.policy.require_sequence_indexes
+                        else DurableEvidenceReadinessSeverity.WARNING
+                    ),
+                    "readiness.sequence_backfill_incomplete",
+                    (
+                        "durable sequence-index backfill is incomplete: "
+                        f"paused={sequence_backfill_report.paused}"
+                    ),
+                )
 
         if verification_report is None:
             try:
@@ -630,6 +745,7 @@ class DurableEvidenceReadinessGuard:
             mutations,
             tuple(findings),
             proof_report,
+            sequence_backfill_report,
         )
 
     def inspect(
@@ -659,6 +775,7 @@ class DurableEvidenceReadinessGuard:
         entries = self._entries(chains)
         mutations: list[str] = []
 
+        sequence_backfill_report = None
         sequence_report = self.sequence_indexes.inspect(
             dict(entries)
         )
@@ -678,6 +795,28 @@ class DurableEvidenceReadinessGuard:
             )
             mutations.append(
                 "sequence_index_repair"
+            )
+
+        if (
+            not sequence_report.ok
+            and sequence_report.bounded_out
+            and not sequence_report.missing
+            and not sequence_report.corrupt
+            and not sequence_report.errors
+        ):
+            if not self.policy.allow_sequence_backfill:
+                raise DurableEvidenceReadinessError(
+                    "sequence-index bounded backfill required but disabled by readiness policy"
+                )
+            if self.sequence_backfill is None:
+                raise DurableEvidenceReadinessError(
+                    "sequence-index inspection bounded out and no backfill operator is configured"
+                )
+            sequence_backfill_report = self.sequence_backfill.run(
+                dict(entries)
+            )
+            mutations.append(
+                "sequence_index_backfill"
             )
 
         verification_report = self.verification.audit(
@@ -735,6 +874,7 @@ class DurableEvidenceReadinessGuard:
             verification_report=verification_report,
             verification_refresh=verification_refresh,
             proof_report=proof_report,
+            sequence_backfill_report=sequence_backfill_report,
             mutations=tuple(mutations),
         )
 
