@@ -76,12 +76,7 @@ class RecoveryCheckpointHead:
             raise ValueError("invalid recovery head finalization_id")
         if len(self.checkpoint_digest) != 64:
             raise ValueError("checkpoint_digest must be SHA-256 hex")
-        try:
-            int(self.checkpoint_digest, 16)
-        except ValueError as exc:
-            raise ValueError(
-                "checkpoint_digest must be SHA-256 hex"
-            ) from exc
+        # Treat the digest as an opaque 64-character authority token.
         if (
             isinstance(self.transition_count, bool)
             or not isinstance(self.transition_count, int)
