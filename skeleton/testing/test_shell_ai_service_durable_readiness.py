@@ -1202,10 +1202,7 @@ def test_unsealed_execution_internal_refresh_keeps_next_session_ready(tmp_path):
     result = env.service.execute(
         session,
         review,
-        context=__import__(
-            "skeleton.shells.execution_context",
-            fromlist=["ExecutionContext"],
-        ).ExecutionContext(
+        context=ExecutionContext(
             "ctx",
             principal="alice",
         ),
@@ -1237,8 +1234,6 @@ def test_internal_execution_refresh_tracks_latest_chain_heads(tmp_path):
         )
     )
     review, _ = env.service.review(session)
-    from skeleton.shells.execution_context import ExecutionContext
-
     env.service.execute(
         session,
         review,
@@ -1314,6 +1309,12 @@ def test_internal_refresh_does_not_repair_preexisting_external_drift(tmp_path):
     env.append(2)
     env.service.start()
 
+    session = env.service.new_session(
+        AIIntent(
+            "preexisting-drift",
+            "must not auto-heal external drift",
+        )
+    )
     # Drift exists before the review stage begins, so the pre-stage readiness
     # check must block before the model is called. Internal write maintenance
     # is not a general-purpose external auto-healer.
@@ -1326,12 +1327,6 @@ def test_internal_refresh_does_not_repair_preexisting_external_drift(tmp_path):
         "journal",
         key,
         expected_revision=record.revision,
-    )
-    session = env.service.new_session(
-        AIIntent(
-            "preexisting-drift",
-            "must not auto-heal external drift",
-        )
     )
     with pytest.raises(RuntimeError):
         env.service.review(session)
@@ -1347,8 +1342,6 @@ def test_internal_refresh_supports_multiple_review_execute_cycles(tmp_path):
     )
     env.append(1)
     env.service.start()
-    from skeleton.shells.execution_context import ExecutionContext
-
     for index in range(3):
         session = env.service.new_session(
             AIIntent(
@@ -1372,4 +1365,3 @@ def test_internal_refresh_supports_multiple_review_execute_cycles(tmp_path):
             .durable_readiness["ready"]
             is True
         )
-
