@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-_ACCELERATOR_NAMES = ("observability", "vector", "physics")
+_ACCELERATOR_NAMES = ("observability", "vector", "physics", "retrieval")
 
 
 class JvmAcceleratorRegistryError(RuntimeError):
@@ -86,6 +86,11 @@ def _default_config_provider(name: str) -> ConfigProvider:
             )
             return JvmBroadPhaseConfig.discover()
         return provider
+    if name == "retrieval":
+        def provider() -> Any:
+            from skeleton.retrieval.jvm_fusion_accelerator import JvmFusionConfig
+            return JvmFusionConfig.discover()
+        return provider
     raise JvmAcceleratorRegistryError(f"unknown JVM accelerator: {name}")
 
 
@@ -109,6 +114,13 @@ def _default_factory(name: str) -> AcceleratorFactory:
             )
             return JvmBroadPhaseAccelerator()
         return factory
+    if name == "retrieval":
+        def factory() -> Any:
+            from skeleton.retrieval.jvm_fusion_accelerator import (
+                JvmFusionAccelerator,
+            )
+            return JvmFusionAccelerator()
+        return factory
     raise JvmAcceleratorRegistryError(f"unknown JVM accelerator: {name}")
 
 
@@ -122,7 +134,7 @@ def _resolve_java(binary: str) -> str | None:
 
 
 class JvmAcceleratorRegistry:
-    """Lazy manager for the three optional JVM helpers.
+    """Lazy manager for the optional JVM helpers.
 
     Constructing the registry, calling :meth:`preflight`, or calling
     :meth:`get` do not start Java. get() only constructs the lazy Python
