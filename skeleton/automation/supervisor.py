@@ -33,6 +33,7 @@ from .build_authority import (
 )
 from .free_model import FreeModelClient, ModelError, redact_secrets
 from .bot_manager import bounded_health_summary, load_state
+from .worker_health import classify_worker_prs
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
@@ -299,44 +300,13 @@ def observe(repository: str) -> SupervisorSnapshot:
 
 
 
-def durable_worker_health(snapshot: SupervisorSnapshot) -> dict[str, object]:
-    """Derive bounded cross-run worker evidence from GitHub-native PR state.
 
-    This is intentionally descriptive rather than authoritative. Worker branch
-    namespaces are deterministic and durable on GitHub, unlike runner-local
-    files, so open bot PRs provide useful dedup/backpressure evidence across
-    ephemeral Actions runners.
-    """
-    prefix = "bot/specialist-"
-    active: list[dict[str, object]] = []
-    for pr in snapshot.pull_requests:
-        head = pr.get("headRefName")
-        number = pr.get("number")
-        if not isinstance(head, str) or not head.startswith(prefix):
-            continue
-        if isinstance(number, bool) or not isinstance(number, int):
-            continue
-        worker_and_base = head[len(prefix):]
-        worker, separator, base = worker_and_base.rpartition("-")
-        if not separator or not worker or len(base) != 16:
-            continue
-        if any(ch not in "0123456789abcdef" for ch in base):
-            continue
-        active.append({
-            "worker": worker[:48],
-            "pull_request": number,
-            "base_prefix": base,
-            "is_draft": bool(pr.get("isDraft", False)),
-            "merge_state": str(pr.get("mergeStateStatus", ""))[:32],
-        })
-    active.sort(key=lambda item: (str(item["worker"]), int(item["pull_request"])))
-    return {
-        "version": 1,
-        "non_authoritative": True,
-        "source": "github-open-pull-requests",
-        "active_count": len(active),
-        "active_workers": active[:MAX_ITEMS],
-    }
+def durable_worker_health(snapshot: SupervisorSnapshot) -> dict[str, object]:
+    """Return the canonical bounded worker-health classification for planning."""
+    return classify_worker_prs(
+        snapshot.pull_requests,
+        limit=MAX_ITEMS,
+    )
 
 
 def _context(snapshot: SupervisorSnapshot) -> str:
