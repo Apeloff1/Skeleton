@@ -4439,4 +4439,3 @@ def test_serialized_finalization_exposes_manifest_commit(tmp_path):
         ["journal_digest"]
         == result.finalized.session_journal.digest
     )
-
