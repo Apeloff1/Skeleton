@@ -33,7 +33,7 @@ from .runner_contracts import (
     bounded_text,
     utcnow,
 )
-from .runner_evidence import EvidenceCollector, EvidenceError
+from .runner_evidence import EvidenceCollector
 from .runner_report import assert_report_invariants
 from .runner_scheduler import (
     MutableBudget,
