@@ -424,8 +424,15 @@ class DurablePruningOperation:
             "phase",
             DurablePruningPhase(self.phase),
         )
+        if (
+            isinstance(self.next_delete_index, bool)
+            or not isinstance(self.next_delete_index, int)
+            or self.next_delete_index < -1
+        ):
+            raise ValueError(
+                "next_delete_index must be >= -1"
+            )
         for name in (
-            "next_delete_index",
             "deleted_items",
             "fencing_token",
         ):
@@ -662,17 +669,22 @@ class DurablePruningExecutor:
         previous_floor_sequence: int,
         previous_floor_root: str,
     ) -> str:
+        if (
+            isinstance(previous_floor_sequence, bool)
+            or not isinstance(previous_floor_sequence, int)
+            or previous_floor_sequence < 0
+        ):
+            raise ValueError(
+                "previous_floor_sequence must be non-negative"
+            )
+        _digest(
+            "previous_floor_root",
+            previous_floor_root,
+        )
         payload = {
             "authorization_id": _digest(
                 "authorization_id",
                 authorization_id,
-            ),
-            "previous_floor_sequence": (
-                previous_floor_sequence
-            ),
-            "previous_floor_root": _digest(
-                "previous_floor_root",
-                previous_floor_root,
             ),
             "operation": (
                 "durable-hot-tier-pruning"
