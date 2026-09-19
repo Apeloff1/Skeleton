@@ -1484,4 +1484,3 @@ def test_checkpoint_repair_policy_public_shape():
         "max_chains_per_batch",
         "require_registry_valid",
     )
-
