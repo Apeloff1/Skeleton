@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
+from .model import (
+    UbuntuAction,
+    UbuntuPlan,
+    _clean,
+    _policy_errors,
+    _validate_policy_fields,
+    validate_plan,
+)
 
 @dataclass(frozen=True, slots=True)
 class SecurityApparmorPlan:
@@ -23,17 +30,25 @@ class SecurityApparmorPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-apparmor:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -43,9 +58,11 @@ class SecurityApparmorPlan:
 
 def validate_security_apparmor(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-apparmor action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-apparmor:"+identifier, ("ubuntu","security","apparmor",identifier,desired), "validated security-apparmor")
 
 def plan_security_apparmor(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -73,17 +90,25 @@ class SecurityAuditPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-audit:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -93,9 +118,11 @@ class SecurityAuditPlan:
 
 def validate_security_audit(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-audit action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-audit:"+identifier, ("ubuntu","security","audit",identifier,desired), "validated security-audit")
 
 def plan_security_audit(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -123,17 +150,25 @@ class SecurityPermissionsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-permissions:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -143,9 +178,11 @@ class SecurityPermissionsPlan:
 
 def validate_security_permissions(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-permissions action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-permissions:"+identifier, ("ubuntu","security","permissions",identifier,desired), "validated security-permissions")
 
 def plan_security_permissions(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -173,17 +210,25 @@ class SecurityLimitsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-limits:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -193,9 +238,11 @@ class SecurityLimitsPlan:
 
 def validate_security_limits(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-limits action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-limits:"+identifier, ("ubuntu","security","limits",identifier,desired), "validated security-limits")
 
 def plan_security_limits(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -223,17 +270,25 @@ class SecuritySysctlPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-sysctl:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -243,9 +298,11 @@ class SecuritySysctlPlan:
 
 def validate_security_sysctl(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-sysctl action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-sysctl:"+identifier, ("ubuntu","security","sysctl",identifier,desired), "validated security-sysctl")
 
 def plan_security_sysctl(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -273,17 +330,25 @@ class SecuritySshPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-ssh:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -293,9 +358,11 @@ class SecuritySshPlan:
 
 def validate_security_ssh(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-ssh action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-ssh:"+identifier, ("ubuntu","security","ssh",identifier,desired), "validated security-ssh")
 
 def plan_security_ssh(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -323,17 +390,25 @@ class SecuritySudoPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-sudo:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -343,9 +418,11 @@ class SecuritySudoPlan:
 
 def validate_security_sudo(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-sudo action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-sudo:"+identifier, ("ubuntu","security","sudo",identifier,desired), "validated security-sudo")
 
 def plan_security_sudo(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -373,17 +450,25 @@ class SecuritySecretsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-secrets:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -393,9 +478,11 @@ class SecuritySecretsPlan:
 
 def validate_security_secrets(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-secrets action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-secrets:"+identifier, ("ubuntu","security","secrets",identifier,desired), "validated security-secrets")
 
 def plan_security_secrets(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -423,17 +510,25 @@ class SecurityCertPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-cert:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -443,9 +538,11 @@ class SecurityCertPlan:
 
 def validate_security_cert(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-cert action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-cert:"+identifier, ("ubuntu","security","cert",identifier,desired), "validated security-cert")
 
 def plan_security_cert(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -473,17 +570,25 @@ class SecurityKernelPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
-        if len(self.tags)>32: raise ValueError("too many tags")
+        _validate_policy_fields(
+            identifier=self.identifier,
+            desired=self.desired,
+            version=self.version,
+            owner=self.owner,
+            mode=self.mode,
+            enabled=self.enabled,
+            restart=self.restart,
+            tags=self.tags,
+        )
     @property
     def key(self) -> str:
         return "security-kernel:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        e=[]
-        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
-        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
-        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
-        return tuple(e)
+        return _policy_errors(
+            self.desired,
+            enabled=self.enabled,
+            restart=self.restart,
+        )
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -493,9 +598,11 @@ class SecurityKernelPlan:
 
 def validate_security_kernel(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated security-kernel action."""
-    identifier=_clean(identifier); desired=_clean(desired)
-    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
-    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
+    identifier = _clean(identifier)
+    desired = _clean(desired)
+    errors = _policy_errors(desired, enabled=enabled, restart=False)
+    if errors:
+        raise ValueError("; ".join(errors))
     return UbuntuAction("security-kernel:"+identifier, ("ubuntu","security","kernel",identifier,desired), "validated security-kernel")
 
 def plan_security_kernel(identifiers: Sequence[str]) -> UbuntuPlan:
