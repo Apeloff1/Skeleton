@@ -27,6 +27,8 @@ from skeleton.shells.workspace_txn.lease import (
     WorkspaceLeaseHeartbeat,
     WorkspaceLeaseRegistry,
 )
+from skeleton.shells.workspace_txn.journal import TransactionJournal
+from skeleton.shells.workspace_txn.recovery import TransactionRecoveryInspector
 from skeleton.shells.workspace_txn.scanner import WorkspaceScanner
 from skeleton.shells.workspace_txn.transaction import (
     TransactionConfig,
@@ -344,3 +346,51 @@ def test_zero_mutation_policy_still_fails_closed(tmp_path: Path):
     policy = zero_mutation_policy()
     assert policy.name == "toolchain-zero-mutation"
     assert policy.fail_on_warning
+
+
+def test_recovery_treats_rejected_transaction_as_incomplete():
+    journal = TransactionJournal()
+    transaction_id = "txn-rejected"
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.CREATED.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.EXECUTING.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.REVIEWING.value,
+        {},
+    )
+    journal.append(
+        transaction_id,
+        WorkspaceTransactionState.REJECTED.value,
+        {},
+    )
+
+    candidates = TransactionRecoveryInspector(journal).candidates()
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.transaction_id == transaction_id
+    assert candidate.last_state == WorkspaceTransactionState.REJECTED.value
+    assert candidate.needs_manual_review
+    assert not candidate.safe_to_forget
+
+
+def test_recovery_terminal_states_match_state_machine():
+    terminal = {
+        WorkspaceTransactionState.ACCEPTED.value,
+        WorkspaceTransactionState.ROLLED_BACK.value,
+        WorkspaceTransactionState.ROLLBACK_FAILED.value,
+        WorkspaceTransactionState.ABORTED.value,
+    }
+    for index, state in enumerate(sorted(terminal)):
+        journal = TransactionJournal()
+        transaction_id = f"terminal-{index}"
+        journal.append(transaction_id, state, {})
+        assert TransactionRecoveryInspector(journal).candidates() == ()
