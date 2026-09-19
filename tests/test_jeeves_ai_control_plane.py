@@ -74,6 +74,31 @@ def test_orchestration_requires_parent_and_dependencies_to_exist():
         validate_orchestr((OrchestrRecord("worker", dependencies=("missing",)),))
 
 
+def test_dependency_edges_cannot_escalate_authority():
+    worker_to_secretary = (
+        OrchestrRecord("secretary", authority=Authority.SECRETARY),
+        OrchestrRecord("worker", authority=Authority.WORKER, dependencies=("secretary",)),
+    )
+    with pytest.raises(ValueError, match="dependency authority escalation"):
+        validate_orchestr(worker_to_secretary)
+
+    secretary_to_supervisor = (
+        OrchestrRecord("supervisor", authority=Authority.SUPERVISOR),
+        OrchestrRecord("secretary", authority=Authority.SECRETARY, dependencies=("supervisor",)),
+    )
+    with pytest.raises(ValueError, match="dependency authority escalation"):
+        validate_orchestr(secretary_to_supervisor)
+
+
+def test_dependency_edges_allow_same_or_lower_authority():
+    records = (
+        OrchestrRecord("worker", authority=Authority.WORKER),
+        OrchestrRecord("secretary", authority=Authority.SECRETARY, dependencies=("worker",)),
+        OrchestrRecord("supervisor", authority=Authority.SUPERVISOR, dependencies=("secretary", "worker")),
+    )
+    assert len(validate_orchestr(records)) == 3
+
+
 def test_orchestration_rejects_dependency_cycles():
     with pytest.raises(ValueError, match="cycle"):
         validate_orchestr((OrchestrRecord("a", dependencies=("b",)), OrchestrRecord("b", dependencies=("a",))))
