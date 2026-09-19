@@ -154,7 +154,7 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             second.fingerprint,
         )
 
-    def test_version_two_envelope_round_trip_binds_execution(
+    def test_version_three_envelope_round_trip_binds_execution(
         self,
     ) -> None:
         snap, envelope = self.envelope()
@@ -162,7 +162,7 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             plan,
             fingerprint,
             execution,
-            approved_build_count,
+            build_authorization,
         ) = self.decode(
             envelope.to_base64()
         )
@@ -179,7 +179,7 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             EXECUTION,
         )
         self.assertIsNone(
-            approved_build_count,
+            build_authorization,
         )
 
     def test_envelope_payload_contains_only_expected_fields(
@@ -841,6 +841,7 @@ class SecretaryRoutingTests(unittest.TestCase):
             "root-cause",
             supervisor_fingerprint=FP,
             execution=EXECUTION,
+            build_authorization=None,
         )
 
 
