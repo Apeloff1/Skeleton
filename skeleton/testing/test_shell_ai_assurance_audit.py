@@ -160,7 +160,7 @@ def test_audit_anchor_digest_stable():
         fp("s"),
         fp("l"),
         fp("b"),
-        100.0,
+        observed_at=100.0,
     )
     assert len(anchor.digest) == 64
     assert anchor.digest == anchor.digest
