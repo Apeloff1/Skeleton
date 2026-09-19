@@ -82,7 +82,7 @@ def test_git_unknown_flag_is_rejected():
 
 def test_git_nul_argument_is_rejected():
     contract = standard_catalog().resolve("git")
-    decision = contract.validate(("status", "\\x00bad"))
+    decision = contract.validate(("status", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -101,7 +101,7 @@ def test_gh_unknown_flag_is_rejected():
 
 def test_gh_nul_argument_is_rejected():
     contract = standard_catalog().resolve("gh")
-    decision = contract.validate(("pr", "status", "\\x00bad"))
+    decision = contract.validate(("pr", "status", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -120,7 +120,7 @@ def test_jj_unknown_flag_is_rejected():
 
 def test_jj_nul_argument_is_rejected():
     contract = standard_catalog().resolve("jj")
-    decision = contract.validate(("status", "\\x00bad"))
+    decision = contract.validate(("status", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -139,7 +139,7 @@ def test_hg_unknown_flag_is_rejected():
 
 def test_hg_nul_argument_is_rejected():
     contract = standard_catalog().resolve("hg")
-    decision = contract.validate(("status", "\\x00bad"))
+    decision = contract.validate(("status", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -158,7 +158,7 @@ def test_svn_unknown_flag_is_rejected():
 
 def test_svn_nul_argument_is_rejected():
     contract = standard_catalog().resolve("svn")
-    decision = contract.validate(("status", "\\x00bad"))
+    decision = contract.validate(("status", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -177,7 +177,7 @@ def test_python_unknown_flag_is_rejected():
 
 def test_python_nul_argument_is_rejected():
     contract = standard_catalog().resolve("python")
-    decision = contract.validate(("script.py", "\\x00bad"))
+    decision = contract.validate(("script.py", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -196,7 +196,7 @@ def test_pytest_unknown_flag_is_rejected():
 
 def test_pytest_nul_argument_is_rejected():
     contract = standard_catalog().resolve("pytest")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -215,7 +215,7 @@ def test_ruff_unknown_flag_is_rejected():
 
 def test_ruff_nul_argument_is_rejected():
     contract = standard_catalog().resolve("ruff")
-    decision = contract.validate(("check", "\\x00bad"))
+    decision = contract.validate(("check", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -234,7 +234,7 @@ def test_mypy_unknown_flag_is_rejected():
 
 def test_mypy_nul_argument_is_rejected():
     contract = standard_catalog().resolve("mypy")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -253,7 +253,7 @@ def test_uv_unknown_flag_is_rejected():
 
 def test_uv_nul_argument_is_rejected():
     contract = standard_catalog().resolve("uv")
-    decision = contract.validate(("run", "python", "\\x00bad"))
+    decision = contract.validate(("run", "python", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -272,7 +272,7 @@ def test_pip_unknown_flag_is_rejected():
 
 def test_pip_nul_argument_is_rejected():
     contract = standard_catalog().resolve("pip")
-    decision = contract.validate(("list", "\\x00bad"))
+    decision = contract.validate(("list", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -291,7 +291,7 @@ def test_coverage_unknown_flag_is_rejected():
 
 def test_coverage_nul_argument_is_rejected():
     contract = standard_catalog().resolve("coverage")
-    decision = contract.validate(("report", "\\x00bad"))
+    decision = contract.validate(("report", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -310,7 +310,7 @@ def test_node_unknown_flag_is_rejected():
 
 def test_node_nul_argument_is_rejected():
     contract = standard_catalog().resolve("node")
-    decision = contract.validate(("file.js", "\\x00bad"))
+    decision = contract.validate(("file.js", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -329,7 +329,7 @@ def test_npm_unknown_flag_is_rejected():
 
 def test_npm_nul_argument_is_rejected():
     contract = standard_catalog().resolve("npm")
-    decision = contract.validate(("test", "\\x00bad"))
+    decision = contract.validate(("test", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -348,7 +348,7 @@ def test_npx_unknown_flag_is_rejected():
 
 def test_npx_nul_argument_is_rejected():
     contract = standard_catalog().resolve("npx")
-    decision = contract.validate(("eslint", "\\x00bad"))
+    decision = contract.validate(("eslint", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -367,7 +367,7 @@ def test_pnpm_unknown_flag_is_rejected():
 
 def test_pnpm_nul_argument_is_rejected():
     contract = standard_catalog().resolve("pnpm")
-    decision = contract.validate(("test", "\\x00bad"))
+    decision = contract.validate(("test", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -386,7 +386,7 @@ def test_yarn_unknown_flag_is_rejected():
 
 def test_yarn_nul_argument_is_rejected():
     contract = standard_catalog().resolve("yarn")
-    decision = contract.validate(("test", "\\x00bad"))
+    decision = contract.validate(("test", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -405,7 +405,7 @@ def test_eslint_unknown_flag_is_rejected():
 
 def test_eslint_nul_argument_is_rejected():
     contract = standard_catalog().resolve("eslint")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -424,7 +424,7 @@ def test_prettier_unknown_flag_is_rejected():
 
 def test_prettier_nul_argument_is_rejected():
     contract = standard_catalog().resolve("prettier")
-    decision = contract.validate(("file.js", "\\x00bad"))
+    decision = contract.validate(("file.js", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -443,7 +443,7 @@ def test_vite_unknown_flag_is_rejected():
 
 def test_vite_nul_argument_is_rejected():
     contract = standard_catalog().resolve("vite")
-    decision = contract.validate(("build", "\\x00bad"))
+    decision = contract.validate(("build", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -462,7 +462,7 @@ def test_cargo_unknown_flag_is_rejected():
 
 def test_cargo_nul_argument_is_rejected():
     contract = standard_catalog().resolve("cargo")
-    decision = contract.validate(("check", "\\x00bad"))
+    decision = contract.validate(("check", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -481,7 +481,7 @@ def test_rustc_unknown_flag_is_rejected():
 
 def test_rustc_nul_argument_is_rejected():
     contract = standard_catalog().resolve("rustc")
-    decision = contract.validate(("main.rs", "\\x00bad"))
+    decision = contract.validate(("main.rs", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -500,7 +500,7 @@ def test_go_unknown_flag_is_rejected():
 
 def test_go_nul_argument_is_rejected():
     contract = standard_catalog().resolve("go")
-    decision = contract.validate(("test", "\\x00bad"))
+    decision = contract.validate(("test", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -519,7 +519,7 @@ def test_make_unknown_flag_is_rejected():
 
 def test_make_nul_argument_is_rejected():
     contract = standard_catalog().resolve("make")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -538,7 +538,7 @@ def test_cmake_unknown_flag_is_rejected():
 
 def test_cmake_nul_argument_is_rejected():
     contract = standard_catalog().resolve("cmake")
-    decision = contract.validate(("configure", "\\x00bad"))
+    decision = contract.validate(("configure", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -557,7 +557,7 @@ def test_ninja_unknown_flag_is_rejected():
 
 def test_ninja_nul_argument_is_rejected():
     contract = standard_catalog().resolve("ninja")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -576,7 +576,7 @@ def test_gcc_unknown_flag_is_rejected():
 
 def test_gcc_nul_argument_is_rejected():
     contract = standard_catalog().resolve("gcc")
-    decision = contract.validate(("main.c", "\\x00bad"))
+    decision = contract.validate(("main.c", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -595,7 +595,7 @@ def test_clang_unknown_flag_is_rejected():
 
 def test_clang_nul_argument_is_rejected():
     contract = standard_catalog().resolve("clang")
-    decision = contract.validate(("main.c", "\\x00bad"))
+    decision = contract.validate(("main.c", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -614,7 +614,7 @@ def test_rg_unknown_flag_is_rejected():
 
 def test_rg_nul_argument_is_rejected():
     contract = standard_catalog().resolve("rg")
-    decision = contract.validate(("needle", "\\x00bad"))
+    decision = contract.validate(("needle", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -633,7 +633,7 @@ def test_grep_unknown_flag_is_rejected():
 
 def test_grep_nul_argument_is_rejected():
     contract = standard_catalog().resolve("grep")
-    decision = contract.validate(("needle", "\\x00bad"))
+    decision = contract.validate(("needle", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -652,7 +652,7 @@ def test_find_unknown_flag_is_rejected():
 
 def test_find_nul_argument_is_rejected():
     contract = standard_catalog().resolve("find")
-    decision = contract.validate((".", "\\x00bad"))
+    decision = contract.validate((".", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -671,7 +671,7 @@ def test_ls_unknown_flag_is_rejected():
 
 def test_ls_nul_argument_is_rejected():
     contract = standard_catalog().resolve("ls")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -690,7 +690,7 @@ def test_cat_unknown_flag_is_rejected():
 
 def test_cat_nul_argument_is_rejected():
     contract = standard_catalog().resolve("cat")
-    decision = contract.validate(("file", "\\x00bad"))
+    decision = contract.validate(("file", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -709,7 +709,7 @@ def test_head_unknown_flag_is_rejected():
 
 def test_head_nul_argument_is_rejected():
     contract = standard_catalog().resolve("head")
-    decision = contract.validate(("file", "\\x00bad"))
+    decision = contract.validate(("file", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -728,7 +728,7 @@ def test_tail_unknown_flag_is_rejected():
 
 def test_tail_nul_argument_is_rejected():
     contract = standard_catalog().resolve("tail")
-    decision = contract.validate(("file", "\\x00bad"))
+    decision = contract.validate(("file", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -747,7 +747,7 @@ def test_sort_unknown_flag_is_rejected():
 
 def test_sort_nul_argument_is_rejected():
     contract = standard_catalog().resolve("sort")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -766,7 +766,7 @@ def test_wc_unknown_flag_is_rejected():
 
 def test_wc_nul_argument_is_rejected():
     contract = standard_catalog().resolve("wc")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -785,7 +785,7 @@ def test_diff_unknown_flag_is_rejected():
 
 def test_diff_nul_argument_is_rejected():
     contract = standard_catalog().resolve("diff")
-    decision = contract.validate(("a", "b", "\\x00bad"))
+    decision = contract.validate(("a", "b", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -804,7 +804,7 @@ def test_jq_unknown_flag_is_rejected():
 
 def test_jq_nul_argument_is_rejected():
     contract = standard_catalog().resolve("jq")
-    decision = contract.validate((".", "\\x00bad"))
+    decision = contract.validate((".", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -823,7 +823,7 @@ def test_sqlite3_unknown_flag_is_rejected():
 
 def test_sqlite3_nul_argument_is_rejected():
     contract = standard_catalog().resolve("sqlite3")
-    decision = contract.validate(("db.sqlite", "\\x00bad"))
+    decision = contract.validate(("db.sqlite", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -842,7 +842,7 @@ def test_tar_unknown_flag_is_rejected():
 
 def test_tar_nul_argument_is_rejected():
     contract = standard_catalog().resolve("tar")
-    decision = contract.validate(("archive.tar", "\\x00bad"))
+    decision = contract.validate(("archive.tar", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -861,7 +861,7 @@ def test_zip_unknown_flag_is_rejected():
 
 def test_zip_nul_argument_is_rejected():
     contract = standard_catalog().resolve("zip")
-    decision = contract.validate(("out.zip", "\\x00bad"))
+    decision = contract.validate(("out.zip", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -880,7 +880,7 @@ def test_unzip_unknown_flag_is_rejected():
 
 def test_unzip_nul_argument_is_rejected():
     contract = standard_catalog().resolve("unzip")
-    decision = contract.validate(("archive.zip", "\\x00bad"))
+    decision = contract.validate(("archive.zip", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -899,7 +899,7 @@ def test_curl_unknown_flag_is_rejected():
 
 def test_curl_nul_argument_is_rejected():
     contract = standard_catalog().resolve("curl")
-    decision = contract.validate(("https://example.invalid", "\\x00bad"))
+    decision = contract.validate(("https://example.invalid", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -918,7 +918,7 @@ def test_wget_unknown_flag_is_rejected():
 
 def test_wget_nul_argument_is_rejected():
     contract = standard_catalog().resolve("wget")
-    decision = contract.validate(("https://example.invalid", "\\x00bad"))
+    decision = contract.validate(("https://example.invalid", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -937,7 +937,7 @@ def test_psql_unknown_flag_is_rejected():
 
 def test_psql_nul_argument_is_rejected():
     contract = standard_catalog().resolve("psql")
-    decision = contract.validate(("\\x00bad",))
+    decision = contract.validate(("\x00bad",))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -956,7 +956,7 @@ def test_docker_unknown_flag_is_rejected():
 
 def test_docker_nul_argument_is_rejected():
     contract = standard_catalog().resolve("docker")
-    decision = contract.validate(("version", "\\x00bad"))
+    decision = contract.validate(("version", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -975,7 +975,7 @@ def test_podman_unknown_flag_is_rejected():
 
 def test_podman_nul_argument_is_rejected():
     contract = standard_catalog().resolve("podman")
-    decision = contract.validate(("version", "\\x00bad"))
+    decision = contract.validate(("version", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -994,7 +994,7 @@ def test_kubectl_unknown_flag_is_rejected():
 
 def test_kubectl_nul_argument_is_rejected():
     contract = standard_catalog().resolve("kubectl")
-    decision = contract.validate(("get", "pods", "\\x00bad"))
+    decision = contract.validate(("get", "pods", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -1013,7 +1013,7 @@ def test_helm_unknown_flag_is_rejected():
 
 def test_helm_nul_argument_is_rejected():
     contract = standard_catalog().resolve("helm")
-    decision = contract.validate(("template", "chart", "\\x00bad"))
+    decision = contract.validate(("template", "chart", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
 
@@ -1032,6 +1032,6 @@ def test_terraform_unknown_flag_is_rejected():
 
 def test_terraform_nul_argument_is_rejected():
     contract = standard_catalog().resolve("terraform")
-    decision = contract.validate(("validate", "\\x00bad"))
+    decision = contract.validate(("validate", "\x00bad"))
     assert not decision.allowed
     assert "NUL" in decision.reason
