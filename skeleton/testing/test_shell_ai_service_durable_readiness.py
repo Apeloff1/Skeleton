@@ -1251,11 +1251,11 @@ def test_internal_execution_refresh_tracks_latest_chain_heads(tmp_path):
         for item in verification["chains"]
     }
     assert (
-        by_id["journal"]["current_root"]
+        by_id["journal"]["live_root"]
         == env.journal.root_hash()
     )
     assert (
-        by_id["receipts"]["current_root"]
+        by_id["receipts"]["live_root"]
         == env.receipts.root_hash()
     )
 
