@@ -26,6 +26,14 @@ from typing import Callable, Iterable
 from skeleton.shells.ai.distributed_journal import (
     DistributedAIDecisionJournal,
 )
+from skeleton.shells.ai.durable_destruction import (
+    DurableDestructionConflict,
+    DurableDestructionItem,
+    DurableDestructionItemState,
+    DurableDestructionKind,
+    DurableDestructionLedger,
+    SignedDurableDestructionRecord,
+)
 from skeleton.shells.ai.durable_maintenance import (
     DurableMaintenanceGuard,
     DurableMaintenanceOperation,
@@ -573,6 +581,8 @@ class DurableOrphanGCResult:
     results: tuple[DurableOrphanDeleteResult, ...]
     chain_verified: bool
     completed_at: float
+    destruction_record_id: str = ""
+    destruction_record_digest: str = ""
 
     def __post_init__(self) -> None:
         for name in (
@@ -620,6 +630,25 @@ class DurableOrphanGCResult:
                 self.completed_at,
             ),
         )
+        for name in (
+            "destruction_record_id",
+            "destruction_record_digest",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _digest(
+                    name,
+                    getattr(self, name),
+                    optional=True,
+                ),
+            )
+        if bool(self.destruction_record_id) != bool(
+            self.destruction_record_digest
+        ):
+            raise ValueError(
+                "orphan GC destruction record id/digest must be paired"
+            )
 
     @property
     def deleted(self) -> int:
@@ -688,6 +717,12 @@ class DurableOrphanGCResult:
             ),
             "blocked": self.blocked,
             "ok": self.ok,
+            "destruction_record_id": (
+                self.destruction_record_id
+            ),
+            "destruction_record_digest": (
+                self.destruction_record_digest
+            ),
         }
         if include_digest:
             data["digest"] = self.digest
@@ -718,6 +753,7 @@ class DurableOrphanGCOperator:
         scanner: DurableOrphanScanner,
         *,
         policy: DurableOrphanGCPolicy | None = None,
+        destruction_ledger: DurableDestructionLedger | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         if not isinstance(
@@ -738,10 +774,21 @@ class DurableOrphanGCOperator:
             raise TypeError(
                 "policy must be DurableOrphanGCPolicy"
             )
+        if (
+            destruction_ledger is not None
+            and not isinstance(
+                destruction_ledger,
+                DurableDestructionLedger,
+            )
+        ):
+            raise TypeError(
+                "destruction_ledger must be DurableDestructionLedger"
+            )
         if not callable(clock):
             raise TypeError(
                 "clock must be callable"
             )
+        self.destruction_ledger = destruction_ledger
         self._clock = clock
 
     @staticmethod
@@ -847,6 +894,258 @@ class DurableOrphanGCOperator:
             hashlib.sha256(
                 state_raw
             ).hexdigest(),
+        )
+
+    @staticmethod
+    def _maintenance_fencing_token(
+        maintenance: DurableMaintenanceGuard,
+        chain_id: str,
+    ) -> int:
+        for claim in maintenance.signed.epoch.claims:
+            if claim.resource_id == chain_id:
+                return claim.fencing_token
+        raise DurableOrphanGCManualReview(
+            "maintenance epoch lacks chain fencing claim"
+        )
+
+    @staticmethod
+    def _destruction_items(
+        plan: DurableOrphanGCPlan,
+        result: DurableOrphanGCResult,
+    ) -> tuple[DurableDestructionItem, ...]:
+        if len(plan.targets) != len(result.results):
+            raise DurableOrphanGCManualReview(
+                "orphan GC result count differs from plan"
+            )
+        items: list[DurableDestructionItem] = []
+        for target, outcome in zip(
+            plan.targets,
+            result.results,
+        ):
+            if (
+                outcome.target_digest
+                != target.digest
+                or outcome.backend_key
+                != target.backend_key
+                or outcome.node_hash
+                != target.node_hash
+            ):
+                raise DurableOrphanGCManualReview(
+                    "orphan GC result binding differs from target"
+                )
+            if (
+                outcome.state
+                is DurableOrphanDeleteState.BLOCKED
+            ):
+                raise DurableOrphanGCManualReview(
+                    "blocked orphan deletion cannot be committed as destruction evidence"
+                )
+            state = (
+                DurableDestructionItemState.DELETED
+                if outcome.state
+                is DurableOrphanDeleteState.DELETED
+                else DurableDestructionItemState.ALREADY_ABSENT
+            )
+            items.append(
+                DurableDestructionItem(
+                    plan.node_kind.value,
+                    target.backend_namespace,
+                    target.backend_key,
+                    target.node_hash,
+                    state,
+                    target.expected_revision,
+                    target.sequence,
+                    "",
+                    False,
+                )
+            )
+        return tuple(items)
+
+    @staticmethod
+    def _destruction_verify_digest(
+        *,
+        plan: DurableOrphanGCPlan,
+        result: DurableOrphanGCResult,
+        maintenance: DurableMaintenanceGuard,
+        head_sequence: int,
+        head_root: str,
+        floor_sequence: int,
+        floor_root: str,
+    ) -> str:
+        raw = json.dumps(
+            {
+                "plan_digest": plan.digest,
+                "maintenance_epoch_id": (
+                    maintenance.signed.epoch_id
+                ),
+                "maintenance_epoch_digest": (
+                    maintenance.signed.epoch.digest
+                ),
+                "results": [
+                    item.to_dict()
+                    for item in result.results
+                ],
+                "chain_verified": (
+                    result.chain_verified
+                ),
+                "head_sequence": head_sequence,
+                "head_root": head_root,
+                "floor_sequence": floor_sequence,
+                "floor_root": floor_root,
+                "authority": "orphan-gc-post-delete-verification",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def _record_destruction(
+        self,
+        *,
+        plan: DurableOrphanGCPlan,
+        result: DurableOrphanGCResult,
+        chain: object,
+        maintenance: DurableMaintenanceGuard,
+    ) -> SignedDurableDestructionRecord | None:
+        if (
+            self.destruction_ledger is None
+            or plan.empty
+        ):
+            return None
+        expected_items = self._destruction_items(
+            plan,
+            result,
+        )
+        existing = self.destruction_ledger.find_operation(
+            plan.chain_id,
+            DurableDestructionKind.ORPHAN_GC,
+            plan.plan_id,
+        )
+        if existing is not None:
+            record = existing.record
+            if (
+                record.authority_id
+                != maintenance.signed.epoch_id
+                or record.authority_digest
+                != maintenance.signed.epoch.digest
+                or record.manifest_digest
+                != plan.digest
+                or tuple(
+                    item.backend_key
+                    for item in record.items
+                )
+                != tuple(
+                    item.backend_key
+                    for item in expected_items
+                )
+                or tuple(
+                    item.node_hash
+                    for item in record.items
+                )
+                != tuple(
+                    item.node_hash
+                    for item in expected_items
+                )
+            ):
+                raise DurableOrphanGCManualReview(
+                    "stored destruction evidence differs from orphan GC authority"
+                )
+            return existing
+
+        (
+            after_sequence,
+            after_root,
+            after_floor_sequence,
+            after_floor_root,
+            _,
+        ) = self._head_floor(chain)
+        post_verify_digest = (
+            self._destruction_verify_digest(
+                plan=plan,
+                result=result,
+                maintenance=maintenance,
+                head_sequence=after_sequence,
+                head_root=after_root,
+                floor_sequence=after_floor_sequence,
+                floor_root=after_floor_root,
+            )
+        )
+        fencing_token = (
+            self._maintenance_fencing_token(
+                maintenance,
+                plan.chain_id,
+            )
+        )
+        try:
+            return self.destruction_ledger.append(
+                chain_id=plan.chain_id,
+                operation_kind=DurableDestructionKind.ORPHAN_GC,
+                operation_id=plan.plan_id,
+                authority_id=(
+                    maintenance.signed.epoch_id
+                ),
+                authority_digest=(
+                    maintenance.signed.epoch.digest
+                ),
+                manifest_digest=plan.digest,
+                before_sequence=plan.head_sequence,
+                before_root=plan.head_root,
+                before_floor_sequence=(
+                    plan.floor_sequence
+                ),
+                before_floor_root=(
+                    plan.floor_root
+                ),
+                after_sequence=after_sequence,
+                after_root=after_root,
+                after_floor_sequence=(
+                    after_floor_sequence
+                ),
+                after_floor_root=(
+                    after_floor_root
+                ),
+                items=expected_items,
+                post_verify_digest=(
+                    post_verify_digest
+                ),
+                post_verified=(
+                    result.chain_verified
+                ),
+                fencing_token=fencing_token,
+                completed_at=result.completed_at,
+            )
+        except DurableDestructionConflict as exc:
+            raise DurableOrphanGCManualReview(
+                "destruction evidence conflicted with committed orphan GC record"
+            ) from exc
+
+    def _result_with_destruction(
+        self,
+        *,
+        plan: DurableOrphanGCPlan,
+        result: DurableOrphanGCResult,
+        chain: object,
+        maintenance: DurableMaintenanceGuard,
+    ) -> DurableOrphanGCResult:
+        destruction = self._record_destruction(
+            plan=plan,
+            result=result,
+            chain=chain,
+            maintenance=maintenance,
+        )
+        if destruction is None:
+            return result
+        return DurableOrphanGCResult(
+            result.plan_id,
+            result.plan_digest,
+            result.maintenance_epoch_id,
+            result.chain_id,
+            result.node_kind,
+            result.results,
+            result.chain_verified,
+            result.completed_at,
+            destruction.record_id,
+            destruction.record.digest,
         )
 
     def plan(
@@ -1295,7 +1594,7 @@ class DurableOrphanGCOperator:
             raise DurableOrphanGCManualReview(
                 "committed chain failed final verification after orphan GC"
             )
-        return DurableOrphanGCResult(
+        result = DurableOrphanGCResult(
             plan.plan_id,
             plan.digest,
             maintenance.signed.epoch_id,
@@ -1307,6 +1606,12 @@ class DurableOrphanGCOperator:
                 "GC completion clock",
                 self._clock(),
             ),
+        )
+        return self._result_with_destruction(
+            plan=plan,
+            result=result,
+            chain=chain,
+            maintenance=maintenance,
         )
 
     def verify_result(
@@ -1340,6 +1645,37 @@ class DurableOrphanGCOperator:
             return False
         if not result.ok:
             return False
+        if (
+            self.destruction_ledger is not None
+            and not plan.empty
+        ):
+            if (
+                not result.destruction_record_id
+                or not result.destruction_record_digest
+            ):
+                return False
+            try:
+                destruction = (
+                    self.destruction_ledger.find_operation(
+                        plan.chain_id,
+                        DurableDestructionKind.ORPHAN_GC,
+                        plan.plan_id,
+                    )
+                )
+            except Exception:
+                return False
+            if (
+                destruction is None
+                or destruction.record_id
+                != result.destruction_record_id
+                or destruction.record.digest
+                != result.destruction_record_digest
+                or destruction.record.manifest_digest
+                != plan.digest
+                or destruction.record.authority_id
+                != result.maintenance_epoch_id
+            ):
+                return False
         for target, outcome in zip(
             plan.targets,
             result.results,
