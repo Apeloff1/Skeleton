@@ -579,6 +579,107 @@ class DurablePruningResult:
         }
 
 
+@dataclass(frozen=True)
+class DurablePruningArchiveRecovery:
+    chain_id: str
+    archive_id: str
+    archive_manifest_digest: str
+    cutoff_sequence: int
+    cutoff_root: str
+    archive_revision: int
+    archived_nodes: int
+    recoverable: bool
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        _identity(
+            "chain_id",
+            self.chain_id,
+            maximum=128,
+        )
+        _identity(
+            "archive_id",
+            self.archive_id,
+            maximum=256,
+        )
+        object.__setattr__(
+            self,
+            "archive_manifest_digest",
+            _digest(
+                "archive_manifest_digest",
+                self.archive_manifest_digest,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "cutoff_root",
+            _digest(
+                "cutoff_root",
+                self.cutoff_root,
+            ),
+        )
+        for name in (
+            "cutoff_sequence",
+            "archive_revision",
+            "archived_nodes",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"{name} must be non-negative integer"
+                )
+        if self.cutoff_sequence <= 0:
+            raise ValueError(
+                "cutoff_sequence must be positive"
+            )
+        if not isinstance(
+            self.recoverable,
+            bool,
+        ):
+            raise ValueError(
+                "recoverable must be bool"
+            )
+        if self.recoverable:
+            if self.archive_revision <= 0:
+                raise ValueError(
+                    "recoverable archive requires positive revision"
+                )
+            if (
+                self.archived_nodes
+                < self.cutoff_sequence
+            ):
+                raise ValueError(
+                    "recoverable archive must cover cutoff sequence"
+                )
+            if self.reason:
+                raise ValueError(
+                    "recoverable archive may not carry failure reason"
+                )
+        elif len(self.reason) > 2048:
+            raise ValueError(
+                "archive recovery reason too long"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "archive_id": self.archive_id,
+            "archive_manifest_digest": (
+                self.archive_manifest_digest
+            ),
+            "cutoff_sequence": self.cutoff_sequence,
+            "cutoff_root": self.cutoff_root,
+            "archive_revision": self.archive_revision,
+            "archived_nodes": self.archived_nodes,
+            "recoverable": self.recoverable,
+            "reason": self.reason,
+        }
+
+
 class DurablePruningError(RuntimeError):
     pass
 
@@ -1461,6 +1562,45 @@ class DurablePruningExecutor:
         return self.backend.renew_lease(
             lease,
             ttl_seconds=self.lease_ttl_seconds,
+        )
+
+    def inspect_archive_recoverability(
+        self,
+        manifest: DurablePruningManifest,
+    ) -> DurablePruningArchiveRecovery:
+        if not isinstance(
+            manifest,
+            DurablePruningManifest,
+        ):
+            raise TypeError(
+                "manifest must be DurablePruningManifest"
+            )
+        try:
+            stored = self._require_archive_recoverability(
+                manifest
+            )
+        except DurablePruningManualReview as exc:
+            return DurablePruningArchiveRecovery(
+                manifest.chain_id,
+                manifest.archive_id,
+                manifest.archive_manifest_digest,
+                manifest.cutoff_sequence,
+                manifest.cutoff_root,
+                0,
+                0,
+                False,
+                str(exc)[:2048],
+            )
+        return DurablePruningArchiveRecovery(
+            manifest.chain_id,
+            manifest.archive_id,
+            manifest.archive_manifest_digest,
+            manifest.cutoff_sequence,
+            manifest.cutoff_root,
+            stored.revision,
+            len(stored.node_hashes),
+            True,
+            "",
         )
 
     def _require_archive_recoverability(
