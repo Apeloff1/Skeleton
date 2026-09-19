@@ -123,6 +123,18 @@ def validate_worker_name(value: object) -> str:
         raise SupervisorRuntimeError("invalid worker identity")
     return value
 
+def _mapping_text(
+    source: Mapping[str, object],
+    key: str,
+) -> str:
+    value = source.get(key, "")
+    if not isinstance(value, str):
+        raise SupervisorRuntimeError(
+            f"invalid execution identity field: {key}"
+        )
+    return value.strip()
+
+
 
 @dataclass(frozen=True, slots=True)
 class ExecutionIdentity:
@@ -157,23 +169,26 @@ class ExecutionIdentity:
     @classmethod
     def from_mapping(
         cls,
-        source: Mapping[str, str],
+        source: Mapping[str, object],
         *,
         allow_local_defaults: bool = False,
     ) -> "ExecutionIdentity":
-        repository = source.get("GITHUB_REPOSITORY", "").strip()
+        repository = _mapping_text(source, "GITHUB_REPOSITORY")
         base_sha = (
-            source.get("SUPERVISOR_BASE_SHA", "").strip()
-            or source.get("GITHUB_SHA", "").strip()
+            _mapping_text(source, "SUPERVISOR_BASE_SHA")
+            or _mapping_text(source, "GITHUB_SHA")
         )
-        default_branch = source.get("SUPERVISOR_DEFAULT_BRANCH", "").strip()
+        default_branch = _mapping_text(
+            source,
+            "SUPERVISOR_DEFAULT_BRANCH",
+        )
         run_id = (
-            source.get("SUPERVISOR_RUN_ID", "").strip()
-            or source.get("GITHUB_RUN_ID", "").strip()
+            _mapping_text(source, "SUPERVISOR_RUN_ID")
+            or _mapping_text(source, "GITHUB_RUN_ID")
         )
         run_attempt = (
-            source.get("SUPERVISOR_RUN_ATTEMPT", "").strip()
-            or source.get("GITHUB_RUN_ATTEMPT", "").strip()
+            _mapping_text(source, "SUPERVISOR_RUN_ATTEMPT")
+            or _mapping_text(source, "GITHUB_RUN_ATTEMPT")
         )
         if allow_local_defaults:
             default_branch = default_branch or "main"
@@ -476,13 +491,22 @@ def find_open_pr_for_worker(
     repository: str,
     worker: str,
 ) -> dict[str, Any] | None:
-    """Return the unique same-repository PR owned by a specialist namespace."""
+    """Return the unique canonical same-repository PR for one specialist."""
     prefix = worker_branch_prefix(worker)
-    records = [
-        item
-        for item in _open_pull_requests(repository)
-        if item["headRefName"].startswith(prefix)
-    ]
+    records: list[dict[str, Any]] = []
+    for item in _open_pull_requests(repository):
+        branch = item["headRefName"]
+        if not branch.startswith(prefix):
+            continue
+        suffix = branch[len(prefix):]
+        if (
+            len(suffix) != 16
+            or any(char not in "0123456789abcdef" for char in suffix)
+        ):
+            raise SupervisorRuntimeError(
+                "malformed branch in reserved specialist namespace"
+            )
+        records.append(item)
     if len(records) > 1:
         raise SupervisorRuntimeError(
             "specialist has multiple active autonomous pull requests"
@@ -711,6 +735,7 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
     line may become evidence, and only a closed set of status/identity fields is
     retained. Raw model/provider output is never propagated to the Secretary.
     """
+    validate_worker_name(worker)
     if not isinstance(output, str):
         raise SupervisorRuntimeError("worker result output must be text")
     encoded = output.encode("utf-8")
@@ -734,8 +759,7 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
     admitted: dict[str, Any] = {"status": status, "bot": worker}
     for key in (
         "branch",
-        "parse_worker_result",
-    "proposal_digest",
+        "proposal_digest",
         "base_sha",
         "supervisor_snapshot_fingerprint",
         "execution_fingerprint",
@@ -778,13 +802,40 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         validate_sha(admitted["base_sha"], label="worker evidence base SHA")
         validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
         validate_fingerprint(admitted["execution_fingerprint"])
-    elif status == "existing-pr":
-        if "pull_request" not in admitted:
+        if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
-                "existing-PR evidence is missing pull request identity"
+                "created-PR evidence has invalid changed-line count"
             )
-        if "branch" in admitted:
-            validate_branch(admitted["branch"], label="worker evidence branch")
+    elif status == "existing-pr":
+        required = (
+            "branch",
+            "pull_request",
+            "supervisor_snapshot_fingerprint",
+        )
+        missing = [key for key in required if key not in admitted]
+        if missing:
+            raise SupervisorRuntimeError(
+                "existing-PR evidence is missing custody proof"
+            )
+        branch = validate_branch(
+            admitted["branch"],
+            label="worker evidence branch",
+        )
+        if not branch.startswith(worker_branch_prefix(worker)):
+            raise SupervisorRuntimeError(
+                "existing-PR evidence is outside worker namespace"
+            )
+        if admitted["pull_request"] <= 0:
+            raise SupervisorRuntimeError(
+                "existing-PR evidence has invalid pull request identity"
+            )
+        validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
+    else:
+        unexpected = set(admitted) - {"status", "bot"}
+        if unexpected:
+            raise SupervisorRuntimeError(
+                "no-change evidence contains unsupported custody fields"
+            )
     return admitted
 
 
@@ -809,6 +860,20 @@ def validate_worker_evidence_custody(
         expected_branch = deterministic_worker_branch(custody)
         if evidence.get("branch") != expected_branch:
             raise SupervisorRuntimeError("worker evidence branch mismatch")
+    elif status == "existing-pr":
+        if (
+            evidence.get("supervisor_snapshot_fingerprint")
+            != custody.snapshot_fingerprint
+        ):
+            raise SupervisorRuntimeError("worker evidence snapshot mismatch")
+        branch = evidence.get("branch")
+        if (
+            not isinstance(branch, str)
+            or not branch.startswith(worker_branch_prefix(custody.worker))
+        ):
+            raise SupervisorRuntimeError("worker evidence branch mismatch")
+    elif status != "no-change":
+        raise SupervisorRuntimeError("worker evidence status is not admitted")
 
 
 def sanitized_worker_env(
