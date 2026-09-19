@@ -554,6 +554,45 @@ class DurableProofWindowOperator:
             )
         return DurableProofWindowState.ERROR
 
+    def verify_root(
+        self,
+        chain_id: str,
+        target_root: str,
+    ) -> bool:
+        target = DurableProofWindowTarget(
+            chain_id,
+            target_root,
+        )
+        try:
+            return self.inspect_target(
+                target
+            ).ok
+        except Exception:
+            return False
+
+    def require_root(
+        self,
+        chain_id: str,
+        target_root: str,
+    ) -> DurableProofWindowReport:
+        target = DurableProofWindowTarget(
+            chain_id,
+            target_root,
+        )
+        report = self.inspect_target(
+            target
+        )
+        if not report.ok:
+            detail = (
+                report.findings[0].message
+                if report.findings
+                else "historical proof root is not verified"
+            )
+            raise DurableProofWindowOperatorError(
+                detail
+            )
+        return report
+
     def inspect_target(
         self,
         target: DurableProofWindowTarget,
