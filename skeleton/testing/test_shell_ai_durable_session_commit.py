@@ -395,22 +395,32 @@ def test_builder_happy_path():
     assert len(commit.digest) == 64
 
 
-def test_commit_authority_digest_excludes_store_revisions():
+def test_commit_authority_digest_excludes_only_finalization_revision():
     first = build_commit(
         finalization_revision=1,
-        recovery_revision=2,
-        session_evidence_revision=3,
-        session_journal_revision=4,
     )
     second = build_commit(
         finalization_revision=10,
-        recovery_revision=20,
-        session_evidence_revision=30,
-        session_journal_revision=40,
     )
     assert first.commit_id == second.commit_id
     assert first.digest == second.digest
     assert first.to_dict() != second.to_dict()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("recovery_revision", 30),
+        ("session_evidence_revision", 20),
+        ("session_journal_revision", 50),
+    ],
+)
+def test_commit_authority_digest_signs_immutable_store_revisions(field, value):
+    first = build_commit()
+    kwargs = {field: value}
+    second = build_commit(**kwargs)
+    assert first.commit_id == second.commit_id
+    assert first.digest != second.digest
 
 
 def test_commit_id_is_policy_and_finalization_specific():
@@ -1140,12 +1150,14 @@ def test_head_key_hides_session_identity():
     )
 
 
-def test_commit_to_dict_separates_authority_and_revisions():
+def test_commit_to_dict_separates_operational_finalization_revision():
     commit = build_commit()
     data = commit.to_dict()
     authority = commit.authority_dict
     assert "finalization_revision" not in authority
-    assert "recovery_revision" not in authority
+    assert authority["recovery_revision"] == 3
+    assert authority["session_evidence_revision"] == 2
+    assert authority["session_journal_revision"] == 5
     assert data["finalization_revision"] == 7
     assert data["recovery_revision"] == 3
     assert data["session_evidence_revision"] == 2
