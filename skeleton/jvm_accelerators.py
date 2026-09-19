@@ -209,7 +209,9 @@ class JvmAcceleratorRegistry:
             try:
                 accelerator.ping()
             except Exception as exc:
-                failures[item] = f"{type(exc).__name__}: {exc}"
+                from skeleton.observability.redaction import safe_exception_text
+
+                failures[item] = safe_exception_text(exc)
 
         statuses = self.status(name)
         if failures and strict:
@@ -304,6 +306,7 @@ class JvmAcceleratorRegistry:
                 )
 
         return run
+
     def restart(self, name: str) -> JvmAcceleratorRuntimeStatus:
         self._validate_name(name)
         with self._lock:
