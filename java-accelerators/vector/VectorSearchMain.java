@@ -29,6 +29,8 @@ public final class VectorSearchMain {
     static final byte OP_TOP_K = 2;
     static final byte OP_SHUTDOWN = 3;
     static final byte OP_BATCH_TOP_K = 4;
+    static final byte OP_RANGE = 5;
+    static final byte OP_BATCH_RANGE = 6;
 
     static final byte STATUS_OK = 0;
     static final byte STATUS_BAD_REQUEST = 1;
@@ -37,6 +39,7 @@ public final class VectorSearchMain {
     static final int MAX_DIMENSIONS = 4096;
     static final int MAX_CANDIDATES = 100_000;
     static final int MAX_QUERIES = 512;
+    static final int MAX_RANGE_HITS = 1_000_000;
     static final long MAX_ELEMENTS = 4_000_000L;
     static final int MAX_ERROR_BYTES = 8192;
     static final int MAX_CPU_WORKERS = 32;
@@ -87,6 +90,8 @@ public final class VectorSearchMain {
                         case OP_PING -> handlePing(out, header);
                         case OP_TOP_K -> handleTopK(in, out, header);
                         case OP_BATCH_TOP_K -> handleBatchTopK(in, out, header, workers);
+                        case OP_RANGE -> handleRange(in, out, header);
+                        case OP_BATCH_RANGE -> handleBatchRange(in, out, header, workers);
                         default -> throw new ProtocolException("unsupported operation: " + header.op());
                     }
                 } catch (ProtocolException | IllegalArgumentException bad) {
@@ -261,6 +266,168 @@ public final class VectorSearchMain {
         }
     }
 
+    static void handleRange(
+        DataInputStream in,
+        DataOutputStream out,
+        RequestHeader header
+    ) throws IOException {
+        int dimensions = readBoundedInt(in, "dimensions", 1, MAX_DIMENSIONS);
+        int candidates = readBoundedInt(in, "candidate count", 1, MAX_CANDIDATES);
+        int maxHits = readBoundedInt(in, "max hits", 1, Math.min(candidates, MAX_RANGE_HITS));
+        double threshold = readSimilarityThreshold(in);
+        long elements = (long) dimensions * candidates;
+        if (elements > MAX_ELEMENTS) {
+            throw new ProtocolException("vector element bound exceeded");
+        }
+
+        double queryNorm = readPositiveFinite(in, "query norm");
+        double[] query = new double[dimensions];
+        for (int d = 0; d < dimensions; d++) {
+            query[d] = readFinite(in, "query component");
+        }
+
+        var hits = new ArrayList<Hit>();
+        for (int index = 0; index < candidates; index++) {
+            double candidateNorm = readPositiveFinite(in, "candidate norm");
+            double dot = 0.0;
+            for (int d = 0; d < dimensions; d++) {
+                dot += query[d] * readFinite(in, "candidate component");
+            }
+            double similarity = normalizeSimilarity(dot / (queryNorm * candidateNorm));
+            if (similarity < threshold) continue;
+            if (hits.size() >= maxHits) {
+                throw new ProtocolException("range result bound exceeded");
+            }
+            hits.add(new Hit(index, similarity));
+        }
+
+        hits.sort(
+            Comparator
+                .comparingDouble(Hit::similarity)
+                .reversed()
+                .thenComparingInt(Hit::index)
+        );
+        writeHitList(out, header, hits);
+    }
+
+    static void handleBatchRange(
+        DataInputStream in,
+        DataOutputStream out,
+        RequestHeader header,
+        ExecutorService workers
+    ) throws IOException {
+        int dimensions = readBoundedInt(in, "dimensions", 1, MAX_DIMENSIONS);
+        int queryCount = readBoundedInt(in, "query count", 1, MAX_QUERIES);
+        int candidates = readBoundedInt(in, "candidate count", 1, MAX_CANDIDATES);
+        int maxTotalHits = readBoundedInt(
+            in,
+            "max total hits",
+            1,
+            MAX_RANGE_HITS
+        );
+        double threshold = readSimilarityThreshold(in);
+        long elements = (long) dimensions * ((long) queryCount + candidates);
+        if (elements > MAX_ELEMENTS) {
+            throw new ProtocolException("vector element bound exceeded");
+        }
+
+        double[] queryNorms = new double[queryCount];
+        double[][] queries = new double[queryCount][dimensions];
+        for (int q = 0; q < queryCount; q++) {
+            queryNorms[q] = readPositiveFinite(in, "query norm");
+            for (int d = 0; d < dimensions; d++) {
+                queries[q][d] = readFinite(in, "query component");
+            }
+        }
+
+        double[] candidateNorms = new double[candidates];
+        var vectors = new ArrayList<double[]>(candidates);
+        for (int index = 0; index < candidates; index++) {
+            candidateNorms[index] = readPositiveFinite(in, "candidate norm");
+            double[] vector = new double[dimensions];
+            for (int d = 0; d < dimensions; d++) {
+                vector[d] = readFinite(in, "candidate component");
+            }
+            vectors.add(vector);
+        }
+
+        var tasks = new ArrayList<Callable<List<Hit>>>(queryCount);
+        for (int q = 0; q < queryCount; q++) {
+            final double[] query = queries[q];
+            final double queryNorm = queryNorms[q];
+            tasks.add(() -> rangeForTest(
+                query,
+                queryNorm,
+                vectors,
+                candidateNorms,
+                threshold,
+                maxTotalHits
+            ));
+        }
+
+        var results = new ArrayList<List<Hit>>(queryCount);
+        int total = 0;
+        try {
+            var futures = workers.invokeAll(tasks);
+            for (var future : futures) {
+                List<Hit> hits = future.get();
+                total += hits.size();
+                if (total > maxTotalHits) {
+                    throw new ProtocolException("batch range result bound exceeded");
+                }
+                results.add(hits);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("batch range scoring interrupted", interrupted);
+        } catch (ExecutionException failed) {
+            throw new IOException("batch range scoring failed", failed.getCause());
+        }
+
+        writeHeader(out, header.op(), STATUS_OK, header.requestId());
+        out.writeInt(results.size());
+        for (var hits : results) {
+            out.writeInt(hits.size());
+            for (var hit : hits) {
+                out.writeInt(hit.index());
+                out.writeDouble(hit.similarity());
+            }
+        }
+    }
+
+    static void writeHitList(
+        DataOutputStream out,
+        RequestHeader header,
+        List<Hit> hits
+    ) throws IOException {
+        writeHeader(out, header.op(), STATUS_OK, header.requestId());
+        out.writeInt(hits.size());
+        for (var hit : hits) {
+            out.writeInt(hit.index());
+            out.writeDouble(hit.similarity());
+        }
+    }
+
+    static double readSimilarityThreshold(DataInputStream in) throws IOException {
+        double threshold = readFinite(in, "similarity threshold");
+        if (threshold < -1.0 || threshold > 1.0) {
+            throw new ProtocolException("similarity threshold outside [-1, 1]");
+        }
+        return threshold;
+    }
+
+    static double normalizeSimilarity(double similarity) {
+        if (!Double.isFinite(similarity)) {
+            throw new IllegalArgumentException("non-finite cosine similarity");
+        }
+        if (similarity > 1.0 && similarity < 1.0 + 1e-12) return 1.0;
+        if (similarity < -1.0 && similarity > -1.0 - 1e-12) return -1.0;
+        if (similarity < -1.000000000001 || similarity > 1.000000000001) {
+            throw new IllegalArgumentException("cosine similarity outside supported range");
+        }
+        return similarity;
+    }
+
     static List<Hit> topKFlat(
         double[] queryMatrix,
         int queryOffset,
@@ -416,6 +583,49 @@ public final class VectorSearchMain {
         return ordered;
     }
 
+    static List<Hit> rangeForTest(
+        double[] query,
+        double queryNorm,
+        List<double[]> vectors,
+        double[] norms,
+        double threshold,
+        int maxHits
+    ) {
+        if (query.length == 0) throw new IllegalArgumentException("empty query");
+        if (vectors.size() != norms.length) throw new IllegalArgumentException("norm count");
+        if (!Double.isFinite(threshold) || threshold < -1.0 || threshold > 1.0) {
+            throw new IllegalArgumentException("threshold");
+        }
+        if (maxHits < 1 || maxHits > MAX_RANGE_HITS) {
+            throw new IllegalArgumentException("maxHits");
+        }
+
+        var hits = new ArrayList<Hit>();
+        for (int index = 0; index < vectors.size(); index++) {
+            double[] vector = vectors.get(index);
+            if (vector.length != query.length) {
+                throw new IllegalArgumentException("dimension mismatch");
+            }
+            double dot = 0.0;
+            for (int d = 0; d < query.length; d++) {
+                dot += query[d] * vector[d];
+            }
+            double similarity = normalizeSimilarity(dot / (queryNorm * norms[index]));
+            if (similarity < threshold) continue;
+            if (hits.size() >= maxHits) {
+                throw new IllegalArgumentException("range result bound exceeded");
+            }
+            hits.add(new Hit(index, similarity));
+        }
+        hits.sort(
+            Comparator
+                .comparingDouble(Hit::similarity)
+                .reversed()
+                .thenComparingInt(Hit::index)
+        );
+        return hits;
+    }
+
     static double norm(double[] vector) {
         double sum = 0.0;
         for (double value : vector) sum += value * value;
@@ -456,6 +666,34 @@ public final class VectorSearchMain {
         );
         check(positive.get(0).index() == 0, "batch positive query");
         check(negative.get(0).index() == 2, "batch negative query");
+
+        var ranged = rangeForTest(
+            query,
+            norm(query),
+            vectors,
+            norms,
+            0.70,
+            10
+        );
+        check(ranged.size() == 3, "range hit count");
+        check(ranged.get(0).index() == 0, "range stable first tie");
+        check(ranged.get(1).index() == 4, "range stable second tie");
+        check(ranged.get(2).index() == 3, "range threshold inclusion");
+
+        boolean rangeBoundRaised = false;
+        try {
+            rangeForTest(
+                query,
+                norm(query),
+                vectors,
+                norms,
+                -1.0,
+                2
+            );
+        } catch (IllegalArgumentException expected) {
+            rangeBoundRaised = true;
+        }
+        check(rangeBoundRaised, "range result bound");
 
         System.out.println("VectorSearchMain self-test: OK");
     }
