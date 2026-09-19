@@ -332,6 +332,8 @@ class SessionEvidenceIntegrityVerifier:
         receipt_chain,
         *,
         require_session_journal: bool = True,
+        journal_root_verifier=None,
+        receipt_root_verifier=None,
     ) -> None:
         for name, value in (
             ("journal", journal),
@@ -360,6 +362,14 @@ class SessionEvidenceIntegrityVerifier:
         self.require_session_journal = (
             require_session_journal
         )
+        for name, verifier in (
+            ("journal_root_verifier", journal_root_verifier),
+            ("receipt_root_verifier", receipt_root_verifier),
+        ):
+            if verifier is not None and not callable(verifier):
+                raise TypeError(f"{name} must be callable")
+        self.journal_root_verifier = journal_root_verifier
+        self.receipt_root_verifier = receipt_root_verifier
 
     @staticmethod
     def _manifest_digest(
@@ -609,6 +619,322 @@ class SessionEvidenceIntegrityVerifier:
                 )
         return tuple(results), tuple(issues)
 
+    def _direct_journal_inclusions(
+        self,
+        evidence: SessionJournalEvidence,
+        expected_root: str,
+    ):
+        if self.journal_root_verifier is None:
+            return None
+        get_by_sequence = getattr(
+            self.journal,
+            "get_by_sequence",
+            None,
+        )
+        sequence_for_root = getattr(
+            self.journal,
+            "sequence_for_root",
+            None,
+        )
+        if not (
+            callable(get_by_sequence)
+            and callable(sequence_for_root)
+        ):
+            return None
+        try:
+            if not bool(
+                self.journal_root_verifier(
+                    expected_root
+                )
+            ):
+                return None
+            target_sequence = int(
+                sequence_for_root(
+                    expected_root
+                )
+            )
+        except Exception:
+            return None
+
+        issues: list[str] = []
+        results: list[JournalInclusionResult] = []
+        if (
+            self.require_session_journal
+            and not evidence.events
+        ):
+            issues.append(
+                "session journal contains no events"
+            )
+        for expected in evidence.events:
+            if (
+                expected.global_sequence
+                > target_sequence
+            ):
+                reason = (
+                    "journal event is newer than "
+                    "historical proof root"
+                )
+                issues.append(
+                    f"journal sequence "
+                    f"{expected.global_sequence}: "
+                    f"{reason}"
+                )
+                results.append(
+                    JournalInclusionResult(
+                        expected.global_sequence,
+                        expected.event_hash,
+                        expected.kind,
+                        expected.proposal_id,
+                        False,
+                        False,
+                        reason,
+                    )
+                )
+                continue
+            try:
+                actual = get_by_sequence(
+                    expected.global_sequence,
+                    repair_missing=False,
+                )
+            except Exception:
+                reason = (
+                    "journal event sequence is unavailable"
+                )
+                issues.append(
+                    f"journal sequence "
+                    f"{expected.global_sequence} unavailable"
+                )
+                results.append(
+                    JournalInclusionResult(
+                        expected.global_sequence,
+                        expected.event_hash,
+                        expected.kind,
+                        expected.proposal_id,
+                        False,
+                        False,
+                        reason,
+                    )
+                )
+                continue
+            problems: list[str] = []
+            if (
+                actual.event_hash
+                != expected.event_hash
+            ):
+                problems.append(
+                    "event hash mismatch"
+                )
+            if actual.kind != expected.kind:
+                problems.append(
+                    "event kind mismatch"
+                )
+            if (
+                actual.proposal_id
+                != expected.proposal_id
+            ):
+                problems.append(
+                    "proposal id mismatch"
+                )
+            if (
+                actual.session_id
+                != evidence.session_id
+            ):
+                problems.append(
+                    "session id mismatch"
+                )
+            valid = not problems
+            reason = "; ".join(problems)
+            if not valid:
+                issues.append(
+                    f"journal sequence "
+                    f"{expected.global_sequence}: "
+                    f"{reason}"
+                )
+            results.append(
+                JournalInclusionResult(
+                    expected.global_sequence,
+                    expected.event_hash,
+                    expected.kind,
+                    expected.proposal_id,
+                    True,
+                    valid,
+                    reason,
+                )
+            )
+        return (
+            tuple(results),
+            tuple(issues),
+            expected_root,
+        )
+
+    def _direct_receipt_inclusions(
+        self,
+        evidence: SessionExecutionEvidence,
+        expected_root: str,
+    ):
+        if self.receipt_root_verifier is None:
+            return None
+        find_by_receipt_id = getattr(
+            self.receipt_chain,
+            "find_by_receipt_id",
+            None,
+        )
+        get_by_sequence = getattr(
+            self.receipt_chain,
+            "get_by_sequence",
+            None,
+        )
+        sequence_for_root = getattr(
+            self.receipt_chain,
+            "sequence_for_root",
+            None,
+        )
+        if not (
+            callable(find_by_receipt_id)
+            and callable(get_by_sequence)
+            and callable(sequence_for_root)
+        ):
+            return None
+        try:
+            if not bool(
+                self.receipt_root_verifier(
+                    expected_root
+                )
+            ):
+                return None
+            target_sequence = int(
+                sequence_for_root(
+                    expected_root
+                )
+            )
+        except Exception:
+            return None
+
+        issues: list[str] = []
+        results: list[ReceiptInclusionResult] = []
+        for step in evidence.steps:
+            if step.attempts == 0:
+                continue
+            for index, receipt_id in enumerate(
+                step.receipt_ids
+            ):
+                fingerprint = (
+                    step.receipt_fingerprints[
+                        index
+                    ]
+                )
+                returncode = (
+                    step.returncodes[index]
+                )
+                attempt = index + 1
+                try:
+                    inclusion = (
+                        find_by_receipt_id(
+                            receipt_id,
+                            verify_chain=False,
+                        )
+                    )
+                except Exception:
+                    inclusion = None
+                if inclusion is None:
+                    reason = (
+                        "receipt id is unavailable"
+                    )
+                    issues.append(
+                        f"step {step.step_id} "
+                        f"receipt {receipt_id} unavailable"
+                    )
+                    results.append(
+                        ReceiptInclusionResult(
+                            step.step_id,
+                            step.correlation_id,
+                            attempt,
+                            receipt_id,
+                            fingerprint,
+                            returncode,
+                            None,
+                            False,
+                            False,
+                            reason,
+                        )
+                    )
+                    continue
+                sequence = int(
+                    inclusion.entry.sequence
+                )
+                problems: list[str] = []
+                if sequence > target_sequence:
+                    problems.append(
+                        "receipt is newer than historical proof root"
+                    )
+                try:
+                    canonical = (
+                        get_by_sequence(
+                            sequence,
+                            repair_missing=False,
+                        )
+                    )
+                except Exception:
+                    canonical = None
+                    problems.append(
+                        "receipt sequence locator is unavailable"
+                    )
+                if (
+                    canonical is not None
+                    and canonical.receipt_hash
+                    != inclusion.node.receipt_hash
+                ):
+                    problems.append(
+                        "receipt id index differs from sequence locator"
+                    )
+                actual = inclusion.node.receipt
+                if actual.fingerprint != fingerprint:
+                    problems.append(
+                        "fingerprint mismatch"
+                    )
+                if (
+                    actual.correlation_id
+                    != step.correlation_id
+                ):
+                    problems.append(
+                        "correlation id mismatch"
+                    )
+                if actual.returncode != returncode:
+                    problems.append(
+                        "returncode mismatch"
+                    )
+                if actual.attempt != attempt:
+                    problems.append(
+                        "attempt number mismatch"
+                    )
+                valid = not problems
+                reason = "; ".join(problems)
+                if not valid:
+                    issues.append(
+                        f"step {step.step_id} "
+                        f"receipt {receipt_id}: "
+                        f"{reason}"
+                    )
+                results.append(
+                    ReceiptInclusionResult(
+                        step.step_id,
+                        step.correlation_id,
+                        attempt,
+                        receipt_id,
+                        fingerprint,
+                        returncode,
+                        sequence,
+                        True,
+                        valid,
+                        reason,
+                    )
+                )
+        return (
+            tuple(results),
+            tuple(issues),
+            expected_root,
+        )
+
     @staticmethod
     def _historical_snapshot(
         chain,
@@ -773,45 +1099,79 @@ class SessionEvidenceIntegrityVerifier:
                 "session journal/evidence identity mismatch"
             )
 
-        (
-            journal_snapshot,
-            journal_chain_ok,
-            journal_root,
-            journal_chain_issue,
-        ) = self._historical_snapshot(
-            self.journal,
-            expected_journal_root,
-            label="decision journal",
+        direct_journal = (
+            self._direct_journal_inclusions(
+                session_journal,
+                expected_journal_root,
+            )
+            if expected_journal_root
+            else None
         )
-        (
-            receipt_snapshot,
-            receipt_chain_ok,
-            receipt_root,
-            receipt_chain_issue,
-        ) = self._historical_snapshot(
-            self.receipt_chain,
-            expected_receipt_root,
-            label="receipt",
+        if direct_journal is None:
+            (
+                journal_snapshot,
+                journal_chain_ok,
+                journal_root,
+                journal_chain_issue,
+            ) = self._historical_snapshot(
+                self.journal,
+                expected_journal_root,
+                label="decision journal",
+            )
+            journal_inclusions, journal_issues = (
+                self._journal_inclusions(
+                    session_journal,
+                    journal_snapshot,
+                )
+            )
+        else:
+            (
+                journal_inclusions,
+                journal_issues,
+                journal_root,
+            ) = direct_journal
+            journal_chain_ok = True
+            journal_chain_issue = ""
+
+        direct_receipts = (
+            self._direct_receipt_inclusions(
+                session_evidence,
+                expected_receipt_root,
+            )
+            if expected_receipt_root
+            else None
         )
+        if direct_receipts is None:
+            (
+                receipt_snapshot,
+                receipt_chain_ok,
+                receipt_root,
+                receipt_chain_issue,
+            ) = self._historical_snapshot(
+                self.receipt_chain,
+                expected_receipt_root,
+                label="receipt",
+            )
+            receipt_inclusions, receipt_issues = (
+                self._receipt_inclusions(
+                    session_evidence,
+                    receipt_snapshot,
+                )
+            )
+        else:
+            (
+                receipt_inclusions,
+                receipt_issues,
+                receipt_root,
+            ) = direct_receipts
+            receipt_chain_ok = True
+            receipt_chain_issue = ""
 
         issues: list[str] = []
         if journal_chain_issue:
             issues.append(journal_chain_issue)
         if receipt_chain_issue:
             issues.append(receipt_chain_issue)
-
-        journal_inclusions, journal_issues = (
-            self._journal_inclusions(
-                session_journal,
-                journal_snapshot,
-            )
-        )
-        receipt_inclusions, receipt_issues = (
-            self._receipt_inclusions(
-                session_evidence,
-                receipt_snapshot,
-            )
-        )
         issues.extend(journal_issues)
         issues.extend(receipt_issues)
 
