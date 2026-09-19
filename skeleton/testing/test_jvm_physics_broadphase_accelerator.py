@@ -19,6 +19,7 @@ from skeleton.simulation.physics.jvm_broadphase_accelerator import (
     JvmBroadPhaseConfig,
 )
 from skeleton.simulation.physics.math3d import AABB, Vec3
+from skeleton.simulation.physics.queries import Ray
 from skeleton.simulation.physics.shapes import BoxShape, PlaneShape, SphereShape
 from skeleton.simulation.physics.world import PhysicsSettings, PhysicsWorld
 
@@ -76,6 +77,54 @@ class _FakeBroadPhaseAccelerator:
         return batches
 
 
+    def ray_candidates_many(
+        self,
+        body_bounds: list[AABB],
+        rays: tuple[Ray, ...],
+        *,
+        max_total_candidates: int = 1_000_000,
+    ) -> list[list[int]]:
+        self.calls += 1
+
+        def intersects(ray: Ray, bounds: AABB) -> bool:
+            t_min = 0.0
+            t_max = ray.max_distance
+            for origin, direction, minimum, maximum in zip(
+                ray.origin.to_tuple(),
+                ray.direction.to_tuple(),
+                bounds.minimum.to_tuple(),
+                bounds.maximum.to_tuple(),
+            ):
+                if direction == 0.0:
+                    if origin < minimum or origin > maximum:
+                        return False
+                    continue
+                inverse = 1.0 / direction
+                near = (minimum - origin) * inverse
+                far = (maximum - origin) * inverse
+                if near > far:
+                    near, far = far, near
+                t_min = max(t_min, near)
+                t_max = min(t_max, far)
+                if t_min > t_max + 1.0e-12:
+                    return False
+            return t_max >= -1.0e-12 and t_min <= ray.max_distance + 1.0e-12
+
+        total = 0
+        batches: list[list[int]] = []
+        for ray in rays:
+            hits: list[int] = []
+            for index, bounds in enumerate(body_bounds):
+                if not intersects(ray, bounds):
+                    continue
+                total += 1
+                if total > max_total_candidates:
+                    raise RuntimeError("ray candidate total-hit bound exceeded")
+                hits.append(index)
+            batches.append(hits)
+        return batches
+
+
 class _FailingBroadPhaseAccelerator:
     minimum_bodies = 1
 
@@ -84,6 +133,9 @@ class _FailingBroadPhaseAccelerator:
 
     def query_overlaps_many(self, *args: object, **kwargs: object) -> list[list[int]]:
         raise RuntimeError("simulated JVM AABB query failure")
+
+    def ray_candidates_many(self, *args: object, **kwargs: object) -> list[list[int]]:
+        raise RuntimeError("simulated JVM ray candidate failure")
 
 
 class _MalformedBroadPhaseAccelerator:
@@ -298,6 +350,61 @@ def test_batch_aabb_queries_enforce_total_hit_bound_on_fallback() -> None:
         world.query_aabb_many((query, query), max_total_hits=2)
 
 
+def test_batch_raycast_matches_repeated_python_raycast_with_planes_and_ignore() -> None:
+    fake = _FakeBroadPhaseAccelerator()
+    world = _world(accelerated=True, accelerator=fake)
+    rays = (
+        Ray(Vec3(-3.0, 2.0, 0.0), Vec3(1.0, 0.0, 0.0), 10.0),
+        Ray(Vec3(0.0, 5.0, 0.0), Vec3(0.0, -1.0, 0.0), 10.0),
+        Ray(Vec3(100.0, 100.0, 100.0), Vec3(1.0, 0.0, 0.0), 5.0),
+    )
+
+    expected = tuple(
+        world.raycast(ray, ignore=("ball-1",))
+        for ray in rays
+    )
+    actual = world.raycast_many(
+        rays,
+        ignore=("ball-1",),
+    )
+
+    assert actual == expected
+    stats = world.broad_phase_acceleration_stats()
+    assert stats["spatial_attempts"] == 1
+    assert stats["spatial_successes"] == 1
+
+
+def test_batch_raycast_accelerator_failure_falls_back_without_semantic_change() -> None:
+    world = _world(
+        accelerated=True,
+        accelerator=_FailingBroadPhaseAccelerator(),
+    )
+    rays = (
+        Ray(Vec3(-3.0, 2.0, 0.0), Vec3(1.0, 0.0, 0.0), 10.0),
+        Ray(Vec3(0.0, 5.0, 0.0), Vec3(0.0, -1.0, 0.0), 10.0),
+    )
+
+    expected = tuple(world.raycast(ray) for ray in rays)
+    actual = world.raycast_many(rays)
+
+    assert actual == expected
+    assert world.broad_phase_acceleration_stats()["fallbacks"] == 1
+
+
+def test_batch_raycast_candidate_bound_is_enforced_after_plane_merge() -> None:
+    world = _world(
+        accelerated=True,
+        accelerator=_FakeBroadPhaseAccelerator(),
+    )
+    rays = (
+        Ray(Vec3(-3.0, 2.0, 0.0), Vec3(1.0, 0.0, 0.0), 10.0),
+        Ray(Vec3(0.0, 5.0, 0.0), Vec3(0.0, -1.0, 0.0), 10.0),
+    )
+
+    with pytest.raises(PhysicsValidationError, match="candidate total-hit bound"):
+        world.raycast_many(rays, max_total_candidates=2)
+
+
 def _java_major(java: str) -> int | None:
     completed = subprocess.run(
         [java, "-version"],
@@ -340,6 +447,7 @@ def _real_config() -> JvmBroadPhaseConfig:
         source=source,
         response_timeout_seconds=20,
         minimum_bodies=1,
+        minimum_spatial_tests=1,
     )
 
 
@@ -425,6 +533,47 @@ def test_real_java_world_batch_aabb_queries_match_python() -> None:
     try:
         expected = tuple(baseline.query_aabb(query) for query in queries)
         actual = accelerated.query_aabb_many(queries)
+    finally:
+        accelerator.close()
+
+    assert actual == expected
+
+
+def test_real_java_batch_ray_candidate_roundtrip_is_stable() -> None:
+    bodies = [
+        _aabb((0, 0, 0), (2, 2, 2)),
+        _aabb((1, 1, 1), (3, 3, 3)),
+        _aabb((10, 10, 10), (11, 11, 11)),
+        _aabb((2, 2, 2), (2, 2, 2)),
+    ]
+    rays = (
+        Ray(Vec3(-1.0, 1.0, 1.0), Vec3(1.0, 0.0, 0.0), 20.0),
+        Ray(Vec3(9.5, 10.5, 10.5), Vec3(1.0, 0.0, 0.0), 5.0),
+        Ray(Vec3(0.0, 100.0, 0.0), Vec3(1.0, 0.0, 0.0), 5.0),
+    )
+
+    with JvmBroadPhaseAccelerator(_real_config()) as accelerator:
+        batches = accelerator.ray_candidates_many(
+            bodies,
+            rays,
+            max_total_candidates=100,
+        )
+
+    assert batches == [[0, 1, 3], [2], []]
+
+
+def test_real_java_world_batch_raycast_matches_python_world() -> None:
+    baseline = _world(accelerated=False)
+    accelerator = JvmBroadPhaseAccelerator(_real_config())
+    accelerated = _world(accelerated=True, accelerator=accelerator)
+    rays = (
+        Ray(Vec3(-3.0, 2.0, 0.0), Vec3(1.0, 0.0, 0.0), 10.0),
+        Ray(Vec3(0.0, 5.0, 0.0), Vec3(0.0, -1.0, 0.0), 10.0),
+    )
+
+    try:
+        expected = tuple(baseline.raycast(ray) for ray in rays)
+        actual = accelerated.raycast_many(rays)
     finally:
         accelerator.close()
 
