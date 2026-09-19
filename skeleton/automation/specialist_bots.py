@@ -157,7 +157,8 @@ def admit_build_authorization(
                 "build authorization exceeds byte budget"
             )
         payload = json.loads(
-            raw.decode("utf-8")
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
         )
         authorization = BuildAuthorization.from_payload(
             payload
@@ -219,6 +220,19 @@ def _bounded_text(
     return clean
 
 
+def _unique_json_object(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(
+                f"duplicate JSON field: {key}"
+            )
+        result[key] = value
+    return result
+
+
 def _decode_model_object(raw: str) -> dict[str, Any]:
     """Decode one JSON object without greedy regular-expression extraction."""
     if not isinstance(raw, str):
@@ -233,7 +247,9 @@ def _decode_model_object(raw: str) -> dict[str, Any]:
     if start < 0:
         raise ValueError("specialist returned no JSON object")
 
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(
+        object_pairs_hook=_unique_json_object,
+    )
     try:
         value, end = decoder.raw_decode(text[start:])
     except json.JSONDecodeError as exc:
