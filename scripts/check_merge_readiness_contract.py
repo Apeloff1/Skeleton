@@ -120,8 +120,9 @@ def main() -> int:
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)
     require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
+    normalized_pr_automation = " ".join(pr_automation.split())
     require(
-        "python -m compileall -q skeleton/pr_automation" in pr_automation,
+        "python -m compileall -q skeleton/pr_automation" in normalized_pr_automation,
         "PR automation package compilation gate missing",
         failures,
     )
