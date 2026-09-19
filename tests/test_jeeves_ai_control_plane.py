@@ -1,14 +1,8 @@
 import pytest
 
-from skeleton.jeeves.ai.contracts import (
-    Authority,
-    ContractLedger,
-    ContractRecord,
-    ContractState,
-    validate_contract,
-)
+from skeleton.jeeves.ai.contracts import Authority, ContractLedger, ContractRecord, ContractState, validate_contract
 from skeleton.jeeves.ai.evaluation import EvalLedger, EvalRecord, EvalState, validate_eval
-from skeleton.jeeves.ai.orchestration import OrchestrRecord, OrchestrState, validate_orchestr
+from skeleton.jeeves.ai.orchestration import OrchestrLedger, OrchestrRecord, OrchestrState, validate_orchestr
 
 
 def test_contract_record_is_canonical_and_detached_from_input():
@@ -23,16 +17,27 @@ def test_contract_record_is_canonical_and_detached_from_input():
 
 
 def test_contract_digest_ignores_mapping_insertion_order():
-    left = ContractRecord("policy", payload={"a": 1, "b": 2})
-    right = ContractRecord("policy", payload={"b": 2, "a": 1})
-    assert left.digest == right.digest
+    assert ContractRecord("policy", payload={"a": 1, "b": 2}).digest == ContractRecord("policy", payload={"b": 2, "a": 1}).digest
 
 
-def test_contract_rejects_nonfinite_and_unsupported_payloads():
-    with pytest.raises(ValueError):
-        ContractRecord("bad", payload={"score": float("nan")})
-    with pytest.raises(ValueError):
-        ContractRecord("bad", payload={"opaque": object()})
+def test_all_planes_share_fail_closed_json_contract():
+    constructors = (ContractRecord, EvalRecord, OrchestrRecord)
+    for constructor in constructors:
+        with pytest.raises(ValueError):
+            constructor("bad", payload={"score": float("nan")})
+        with pytest.raises(ValueError):
+            constructor("bad", payload={"opaque": object()})
+        with pytest.raises(ValueError):
+            constructor("bad", payload={"nul": "a\x00b"})
+
+
+def test_all_planes_reject_excessive_nesting():
+    value = "leaf"
+    for _ in range(14):
+        value = {"x": value}
+    for constructor in (ContractRecord, EvalRecord, OrchestrRecord):
+        with pytest.raises(ValueError, match="nesting"):
+            constructor("deep", payload={"root": value})
 
 
 def test_contract_ledger_rejects_duplicate_names():
@@ -51,19 +56,13 @@ def test_supervisor_secretary_worker_hierarchy_is_preserved():
 
 
 def test_worker_cannot_parent_secretary_or_supervisor():
-    records = (
-        OrchestrRecord("worker", authority=Authority.WORKER),
-        OrchestrRecord("secretary", authority=Authority.SECRETARY, parent="worker"),
-    )
+    records = (OrchestrRecord("worker", authority=Authority.WORKER), OrchestrRecord("secretary", authority=Authority.SECRETARY, parent="worker"))
     with pytest.raises(ValueError, match="authority escalation"):
         validate_orchestr(records)
 
 
 def test_secretary_cannot_parent_supervisor():
-    records = (
-        OrchestrRecord("secretary", authority=Authority.SECRETARY),
-        OrchestrRecord("supervisor", authority=Authority.SUPERVISOR, parent="secretary"),
-    )
+    records = (OrchestrRecord("secretary", authority=Authority.SECRETARY), OrchestrRecord("supervisor", authority=Authority.SUPERVISOR, parent="secretary"))
     with pytest.raises(ValueError, match="authority escalation"):
         validate_orchestr(records)
 
@@ -76,27 +75,32 @@ def test_orchestration_requires_parent_and_dependencies_to_exist():
 
 
 def test_orchestration_rejects_dependency_cycles():
-    records = (
-        OrchestrRecord("a", dependencies=("b",)),
-        OrchestrRecord("b", dependencies=("a",)),
-    )
     with pytest.raises(ValueError, match="cycle"):
-        validate_orchestr(records)
+        validate_orchestr((OrchestrRecord("a", dependencies=("b",)), OrchestrRecord("b", dependencies=("a",))))
 
 
-def test_orchestration_rejects_duplicate_names():
+def test_orchestration_rejects_parent_cycles():
+    with pytest.raises(ValueError, match="cycle"):
+        validate_orchestr((OrchestrRecord("a", parent="b"), OrchestrRecord("b", parent="a")))
+
+
+def test_orchestration_ledger_requires_tuple_and_rejects_duplicate_names():
+    with pytest.raises(ValueError, match="tuple"):
+        OrchestrLedger([])  # type: ignore[arg-type]
     record = OrchestrRecord("plan")
     with pytest.raises(ValueError, match="duplicate"):
         validate_orchestr((record, record))
 
 
 def test_orchestration_payload_is_detached():
-    payload = {"tool": "retrieval"}
+    payload = {"tool": "retrieval", "nested": {"mode": "read"}}
     record = OrchestrRecord("plan", payload=payload)
     digest = record.digest
     payload["tool"] = "shell"
+    payload["nested"]["mode"] = "write"
     assert record.digest == digest
     assert record.payload["tool"] == "retrieval"
+    assert record.payload["nested"]["mode"] == "read"
 
 
 def test_eval_requires_score_and_threshold_together():
@@ -127,6 +131,11 @@ def test_evaluation_identity_is_suite_plus_name():
     assert len(validate_eval((a, b))) == 2
     with pytest.raises(ValueError, match="duplicate"):
         validate_eval((a, a))
+
+
+def test_shared_canonicalization_is_order_stable_across_planes():
+    assert EvalRecord("case", payload={"a": 1, "b": 2}).digest == EvalRecord("case", payload={"b": 2, "a": 1}).digest
+    assert OrchestrRecord("task", payload={"a": 1, "b": 2}).digest == OrchestrRecord("task", payload={"b": 2, "a": 1}).digest
 
 
 def test_state_surface_is_explicit():
