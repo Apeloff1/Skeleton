@@ -111,6 +111,9 @@ def _compact_worker(row: Mapping[str, Any]) -> dict[str, Any]:
     worked_on = metadata.get("worked_on")
     if not isinstance(worked_on, list):
         worked_on = []
+    roles = metadata.get("roles")
+    if not isinstance(roles, list):
+        roles = []
     overtime_tasks = row.get("overtime_task_ids")
     if not isinstance(overtime_tasks, list):
         overtime_tasks = []
@@ -129,6 +132,9 @@ def _compact_worker(row: Mapping[str, Any]) -> dict[str, Any]:
             "shift_key": _text(metadata.get("shift_key"), 160),
             "shift_minutes": metadata.get("shift_minutes", 0),
             "worked_on": [_text(value, 160) for value in worked_on[:12]],
+            "roles": [_text(value, 80) for value in roles[:8]],
+            "validation_status": _text(metadata.get("validation_status"), 40),
+            "validation_source": _text(metadata.get("validation_source"), 120),
         },
     }
 
@@ -144,7 +150,11 @@ def _extract_worker_snapshots(issues: Sequence[Any]) -> list[dict[str, Any]]:
             payload = json.loads(str(item.get("body", "{}")))
         except json.JSONDecodeError:
             continue
-        if not isinstance(payload, dict) or payload.get("version") != 1:
+        if (
+            not isinstance(payload, dict)
+            or type(payload.get("version")) is not int
+            or payload.get("version") != 1
+        ):
             continue
         workers = payload.get("workers", [])
         if not isinstance(workers, list):
