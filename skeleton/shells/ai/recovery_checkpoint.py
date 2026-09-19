@@ -23,6 +23,7 @@ class AIRecoveryCheckpoint:
     execution_attempt_authority_digest: str = ""
     session_integrity_digest: str = ""
     session_journal_manifest_digest: str = ""
+    root_protection_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -37,6 +38,7 @@ class AIRecoveryCheckpoint:
             "execution_attempt_authority_digest",
             "session_integrity_digest",
             "session_journal_manifest_digest",
+            "root_protection_digest",
         ):
             value = getattr(self, name)
             if value and len(value) != 64:
@@ -70,6 +72,7 @@ class AIRecoveryCheckpoint:
             "session_journal_manifest_digest": (
                 self.session_journal_manifest_digest
             ),
+            "root_protection_digest": self.root_protection_digest,
         }
 
     @property
@@ -96,6 +99,7 @@ class AIRecoveryCheckpoint:
         execution_attempt_authority_digest: str = "",
         session_integrity_digest: str = "",
         session_journal_manifest_digest: str = "",
+        root_protection_digest: str = "",
     ) -> "AIRecoveryCheckpoint":
         return cls(
             2,
@@ -110,4 +114,5 @@ class AIRecoveryCheckpoint:
             execution_attempt_authority_digest,
             session_integrity_digest,
             session_journal_manifest_digest,
+            root_protection_digest,
         )
