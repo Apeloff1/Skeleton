@@ -20,7 +20,8 @@ from skeleton.shells.ai.signed_artifact import (
 )
 
 
-def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
+def fp(char: str) -> str:
+    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def signer(clock=lambda: 10.0) -> ArtifactSigner:
