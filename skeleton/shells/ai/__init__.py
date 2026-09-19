@@ -1,5 +1,15 @@
 """AI-facing shell control primitives."""
 
+from skeleton.shells.ai.durable_failover_operator import (
+    DurableFailoverOperator,
+    DurableFailoverOperatorError,
+    DurableFailoverOperatorPolicy,
+    DurableFailoverOperatorReport,
+    DurableFailoverOperatorState,
+    DurableFailoverSyncResult,
+    DurableFailoverTicketResult,
+)
+
 from skeleton.shells.ai.durable_replication import (
     DurableChainReplicationReport,
     DurableChainReplicator,
