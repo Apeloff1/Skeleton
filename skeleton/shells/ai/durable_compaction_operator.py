@@ -49,6 +49,10 @@ from skeleton.shells.ai.durable_compaction_reservation import (
     DurableCompactionReservationConflict,
     DurableCompactionReservationStore,
 )
+from skeleton.shells.ai.durable_compaction_workflow_index import (
+    CompactionWorkflowIndexReport,
+    DurableCompactionWorkflowIndex,
+)
 from skeleton.shells.ai.durable_pruning_authorization import (
     DurablePruningAuthorizationError,
     DurablePruningAuthorizationStore,
@@ -813,6 +817,7 @@ class DurableCompactionOperator:
         pruning: DurablePruningExecutor,
         *,
         reservations: DurableCompactionReservationStore | None = None,
+        workflow_index: DurableCompactionWorkflowIndex | None = None,
         namespace: str = (
             "shell-ai-durable-compaction-workflows"
         ),
@@ -877,6 +882,23 @@ class DurableCompactionOperator:
                 "reservations must be DurableCompactionReservationStore"
             )
         if (
+            workflow_index is not None
+            and not isinstance(
+                workflow_index,
+                DurableCompactionWorkflowIndex,
+            )
+        ):
+            raise TypeError(
+                "workflow_index must be DurableCompactionWorkflowIndex"
+            )
+        if (
+            workflow_index is not None
+            and workflow_index.backend is not backend
+        ):
+            raise ValueError(
+                "workflow_index must use operator backend"
+            )
+        if (
             not namespace
             or len(namespace) > 128
         ):
@@ -900,6 +922,17 @@ class DurableCompactionOperator:
         self.pruning = pruning
         self.reservations = reservations
         self.namespace = namespace
+        self.workflow_index = (
+            workflow_index
+            or DurableCompactionWorkflowIndex(
+                backend,
+                namespace=(
+                    DurableCompactionWorkflowIndex
+                    .default_namespace(namespace)
+                ),
+                clock=clock,
+            )
+        )
         self.max_cas_retries = max_cas_retries
         self._clock = clock
 
@@ -1071,6 +1104,14 @@ class DurableCompactionOperator:
         self,
         workflow: DurableCompactionWorkflow,
     ) -> StoredDurableCompactionWorkflow:
+        # Reserve discovery metadata before creating the workflow record.
+        # If the process crashes between these writes, maintenance sees an
+        # indexed-but-missing workflow rather than silently losing evidence
+        # that compaction authority was being established.
+        self.workflow_index.reserve(
+            workflow.chain_id,
+            workflow.workflow_id,
+        )
         key = self._key(
             workflow.workflow_id
         )
@@ -1098,6 +1139,55 @@ class DurableCompactionOperator:
                     "workflow id already binds different compaction authority"
                 )
             return existing
+
+    def indexed_workflows(
+        self,
+        chain_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> tuple[str, ...]:
+        return self.workflow_index.workflow_ids(
+            chain_id,
+            max_items=max_items,
+        )
+
+    def inspect_workflow_index(
+        self,
+        chain_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> CompactionWorkflowIndexReport:
+        return self.workflow_index.inspect(
+            chain_id,
+            max_items=max_items,
+        )
+
+    def require_workflow_index(
+        self,
+        chain_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> CompactionWorkflowIndexReport:
+        return self.workflow_index.require(
+            chain_id,
+            max_items=max_items,
+        )
+
+    def index_existing(
+        self,
+        workflow_id: str,
+    ):
+        stored = self.current(
+            workflow_id
+        )
+        if stored is None:
+            raise DurableCompactionWorkflowError(
+                "workflow is missing"
+            )
+        return self.workflow_index.reserve(
+            stored.workflow.chain_id,
+            stored.workflow.workflow_id,
+        )
 
     def _replace(
         self,
