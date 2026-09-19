@@ -92,6 +92,7 @@ class DurableVerificationMode(str, Enum):
 class DurableVerificationStatus(str, Enum):
     NO_CURSOR = "no_cursor"
     CURRENT = "current"
+    TAIL_PENDING = "tail_pending"
     TAIL_VERIFIED = "tail_verified"
     FULL_VERIFIED = "full_verified"
     FULL_REQUIRED = "full_required"
@@ -941,7 +942,7 @@ class DurableIncrementalVerifier:
         elif tail_items == 0:
             status = DurableVerificationStatus.CURRENT
         else:
-            status = DurableVerificationStatus.TAIL_VERIFIED
+            status = DurableVerificationStatus.TAIL_PENDING
 
         return DurableVerificationReport(
             chain_id,
@@ -1234,6 +1235,11 @@ class DurableIncrementalVerifier:
                 report,
                 latest.item,
                 False,
+            )
+        if report.status is not DurableVerificationStatus.TAIL_PENDING:
+            raise DurableVerificationCursorError(
+                "unexpected verification cursor status: "
+                f"{report.status.value}"
             )
         return self._publish_incremental(
             chain_id,
