@@ -24,6 +24,11 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation_sensitive_paths.py",
     "skeleton/testing/test_pr_automation_workflow.py",
     "skeleton/testing/test_pr_automation_branch_completions.py",
+    "skeleton/testing/test_runner_v2_contracts.py",
+    "skeleton/testing/test_runner_v2_evidence.py",
+    "skeleton/testing/test_runner_v2_runtime.py",
+    "skeleton/testing/test_runner_v2_transaction_report.py",
+    "skeleton/testing/test_runner_v2_engine.py",
 )
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
@@ -120,9 +125,20 @@ def main() -> int:
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)
     require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
+    normalized_pr_automation = " ".join(pr_automation.split())
     require(
-        "python -m compileall -q skeleton/pr_automation" in pr_automation,
+        "python -m compileall -q skeleton/pr_automation" in normalized_pr_automation,
         "PR automation package compilation gate missing",
+        failures,
+    )
+    require(
+        "python scripts/check_automerge_contract.py" in pr_automation,
+        "auto-merge privileged contract checker missing",
+        failures,
+    )
+    require(
+        "python scripts/check_runner_v2_contract.py" in pr_automation,
+        "runner-v2 privileged contract checker missing",
         failures,
     )
     require(
