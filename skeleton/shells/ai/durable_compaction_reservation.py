@@ -578,43 +578,58 @@ class DurableCompactionReservationStore:
         self,
         item: SignedDurableCompactionReservation,
     ) -> None:
+        reservation = item.reservation
+        signature = item.signature
+        if (
+            signature.artifact_type
+            != "durable-compaction-reservation"
+        ):
+            raise DurableCompactionReservationError(
+                "reservation artifact type mismatch"
+            )
+        if (
+            signature.artifact_digest
+            != reservation.digest
+        ):
+            raise DurableCompactionReservationError(
+                "reservation signature digest mismatch"
+            )
+        expected_metadata = {
+            "authority": (
+                "durable-compaction-reservation"
+            ),
+            "reservation_id": (
+                reservation.reservation_id
+            ),
+            "chain_id": reservation.chain_id,
+            "holder_id": reservation.holder_id,
+            "operator_id": (
+                reservation.operator_id
+            ),
+        }
+        if (
+            dict(signature.metadata)
+            != expected_metadata
+        ):
+            raise DurableCompactionReservationError(
+                "reservation signature metadata mismatch"
+            )
         try:
-            payload = self.signer.verify(
-                item.signature
+            self.signer.verify(
+                signature
             )
         except ArtifactSignatureError as exc:
             raise DurableCompactionReservationError(
                 "reservation signature verification failed"
             ) from exc
-        if payload != (
-            item.reservation.unsigned_dict()
-        ):
-            raise DurableCompactionReservationError(
-                "reservation signed payload differs from reservation"
-            )
-        metadata = (
-            item.signature.metadata
-        )
-        if (
-            metadata.get("authority")
-            != "durable-compaction-reservation"
-            or metadata.get("reservation_id")
-            != item.reservation_id
-            or metadata.get("chain_id")
-            != item.chain_id
-            or metadata.get("holder_id")
-            != item.holder_id
-        ):
-            raise DurableCompactionReservationError(
-                "reservation signature metadata mismatch"
-            )
 
     def _signed(
         self,
         reservation: DurableCompactionReservation,
     ) -> SignedDurableCompactionReservation:
         signature = self.signer.sign(
-            reservation.unsigned_dict(),
+            "durable-compaction-reservation",
+            reservation.digest,
             metadata={
                 "authority": (
                     "durable-compaction-reservation"
