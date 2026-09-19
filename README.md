@@ -28,6 +28,12 @@ python -m skeleton test
 6. **interface** — AnomalyDetector, ProvenanceLedger, Reranker, QuadRetriever
 7. **cortex** — JeevesCortex (observes the whole bus)
 
+## Artifact plane
+
+- Track E root-test archive: `tests/legacy_root/`
+- SEVEN_BY series archive: [`docs/archive/seven_by/`](docs/archive/seven_by/)
+- Policy: [`docs/ARTIFACT_PLANE.md`](docs/ARTIFACT_PLANE.md)
+
 ## Subsystems
 
 | Package | Purpose |

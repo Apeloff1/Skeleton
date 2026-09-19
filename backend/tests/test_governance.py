@@ -15,6 +15,8 @@ Covers:
 """
 import os
 import pytest
+
+pytestmark = pytest.mark.live_service
 import requests
 import uuid
 

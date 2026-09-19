@@ -59,6 +59,7 @@ def test_watchdog_reuses_and_keeps_machine_ledger_closed() -> None:
 
     assert '--state all --search "${ISSUE_TITLE} in:title"' in text
     assert '--json number,title' in text
-    assert 'select(.title == \"$ISSUE_TITLE\")' in text
+    assert 'jq -r --arg title "$ISSUE_TITLE"' in text
+    assert "select(.title == $title)" in text
     assert 'repos/${REPO}/issues/${issue}' in text
     assert '-f state=closed' in text

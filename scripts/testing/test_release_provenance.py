@@ -374,3 +374,22 @@ def test_evidence_adapter_gates_missing_tests_and_binds_digests(
     assert release_provenance.gate_release_evidence(gate_args) == 0
     gate_args.source_commit = "ffffffffffffffffffffffffffffffffffffffff"
     assert release_provenance.gate_release_evidence(gate_args) == 1
+
+
+def test_reproducible_release_workflow_gates_bound_release_evidence() -> None:
+    workflow = (
+        REPO_ROOT / ".github" / "workflows" / "reproducible-release.yml"
+    ).read_text(encoding="utf-8")
+
+    assert '"skeleton/release/evidence.py"' in workflow
+    assert '"skeleton/testing/test_release_evidence.py"' in workflow
+    assert "--junitxml=source-a/release-meta/release-tests.xml" in workflow
+    assert "reproducibility-eval.json" in workflow
+    assert "scripts/release_provenance.py evidence" in workflow
+    assert "--test-evidence release-meta/test-evidence.json" in workflow
+    assert "--eval-evidence release-meta/eval-evidence.json" in workflow
+    assert "--output release-meta/release-evidence.json" in workflow
+    assert "--gate" in workflow
+    assert "scripts/release_provenance.py gate" in workflow
+    assert 'find dist -maxdepth 1 -type f' in workflow
+    assert 'source-a/release-meta/' in workflow
