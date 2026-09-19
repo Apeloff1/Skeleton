@@ -129,6 +129,9 @@ python backend/scripts/check_js_process_alias_safety.py
 printf '\n== GitHub Actions workflow security ==\n'
 python backend/scripts/check_workflow_security.py
 
+printf '\n== GitHub Actions workflow secret-output safety ==\n'
+python scripts/check_workflow_secret_output.py
+
 printf '\n== GitHub Actions repository allowlist ==\n'
 python backend/scripts/check_workflow_action_allowlist.py
 
@@ -184,6 +187,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
+  backend/tests/test_workflow_secret_output.py \
   backend/tests/test_workflow_flow_style_security.py \
   backend/tests/test_workflow_event_context_security.py \
   backend/tests/test_workflow_quoted_key_security.py \
