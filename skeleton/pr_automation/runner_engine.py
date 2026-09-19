@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Sequence
 
 from .core import Decision, Evaluation, Mode
 from .index import EventIndex
