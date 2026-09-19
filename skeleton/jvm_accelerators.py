@@ -124,9 +124,10 @@ def _resolve_java(binary: str) -> str | None:
 class JvmAcceleratorRegistry:
     """Lazy manager for the three optional JVM helpers.
 
-    Constructing the registry and calling :meth:`preflight` do not start Java.
-    A helper process starts only after :meth:`get`, :meth:`warm`, or a domain
-    object invokes that accelerator itself.
+    Constructing the registry, calling :meth:`preflight`, or calling
+    :meth:`get` do not start Java. get() only constructs the lazy Python
+    wrapper. A helper process starts when :meth:`warm` pings it or when a
+    domain object invokes an accelerator operation.
     """
 
     def __init__(
@@ -293,37 +294,38 @@ class JvmAcceleratorRegistry:
                     },
                 )
             except Exception as exc:
+                from skeleton.observability.redaction import safe_exception_text
+
                 return ProbeResult(
                     name=f"jvm.{name}",
                     ok=False,
-                    detail=f"{type(exc).__name__}: {exc}",
+                    detail=safe_exception_text(exc),
                     latency_ms=(time.perf_counter() - started) * 1000.0,
                 )
 
         return run
     def restart(self, name: str) -> JvmAcceleratorRuntimeStatus:
-        accelerator = self.get(name)
-        restart = getattr(accelerator, "restart", None)
-        if not callable(restart):
-            raise JvmAcceleratorRegistryError(
-                f"{name} accelerator does not support restart"
-            )
-        restart()
+        self._validate_name(name)
+        with self._lock:
+            accelerator = self.get(name)
+            restart = getattr(accelerator, "restart", None)
+            if not callable(restart):
+                raise JvmAcceleratorRegistryError(
+                    f"{name} accelerator does not support restart"
+                )
+            restart()
         return self.status(name)[name]
 
     def close(self, name: str | None = None) -> None:
         selected = self._select(name)
         with self._lock:
-            accelerators = [
-                (item, self._instances.pop(item, None))
-                for item in selected
-            ]
-        for _item, accelerator in accelerators:
-            if accelerator is None:
-                continue
-            close = getattr(accelerator, "close", None)
-            if callable(close):
-                close()
+            for item in selected:
+                accelerator = self._instances.pop(item, None)
+                if accelerator is None:
+                    continue
+                close = getattr(accelerator, "close", None)
+                if callable(close):
+                    close()
 
     def status(
         self,
