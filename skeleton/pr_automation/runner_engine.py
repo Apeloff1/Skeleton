@@ -42,7 +42,6 @@ from .runner_scheduler import (
     budget_allows_mutation,
     make_budget,
     observe_queue,
-    schedule_items,
 )
 from .runner_targeting import TargetResolver
 from .runner_transaction import MergeTransaction, append_receipt_event
