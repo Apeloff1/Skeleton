@@ -160,11 +160,11 @@ class _ToggleReport:
 
     @property
     def epoch_digest(self):
-        return "t" * 64
+        return "a" * 64
 
     @property
     def policy_digest(self):
-        return "h" * 64
+        return "b" * 64
 
     def to_dict(self):
         return {
@@ -820,8 +820,8 @@ def test_service_status_reports_runtime_trust_and_authority_health(tmp_path):
     assert data["runtime_trust"] == {
         "ok": True,
         "kind": "runtime-trust",
-        "epoch_digest": "t" * 64,
-        "policy_digest": "h" * 64,
+        "epoch_digest": "a" * 64,
+        "policy_digest": "b" * 64,
     }
     assert data["authority_health"] == {
         "ok": True,
