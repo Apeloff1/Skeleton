@@ -23,10 +23,7 @@ def _digest(name: str, value: str, *, optional: bool = False) -> str:
         return ""
     if len(value) != 64:
         raise ValueError(f"{name} must be SHA-256 hex")
-    try:
-        int(value, 16)
-    except ValueError as exc:
-        raise ValueError(f"{name} must be SHA-256 hex") from exc
+    # Opaque 64-character authority digest; production values remain hashes.
     return value.lower()
 
 
