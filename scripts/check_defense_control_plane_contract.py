@@ -40,6 +40,7 @@ REQUIRED_FILES = (
 REQUIRED_TESTS = (
     "skeleton/testing/test_scanner_integrity.py",
     "skeleton/testing/test_defense_plane.py",
+    "skeleton/testing/test_defense_control_plane_contract.py",
     "skeleton/testing/test_incident_containment.py",
     "skeleton/testing/test_automation_control_plane.py",
     "skeleton/testing/test_pr_automation_event_firewall.py",
