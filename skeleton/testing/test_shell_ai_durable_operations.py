@@ -174,6 +174,7 @@ def test_default_operations_policy():
     assert not policy.require_checkpoint_above_warning
     assert not policy.require_recovery_health
     assert not policy.require_checkpoint_indexes
+    assert not policy.require_compaction_maintenance
     assert policy.max_findings == 512
 
 
@@ -201,6 +202,7 @@ def test_operations_policy_digest_is_stable():
         ("require_checkpoint_above_warning", "yes"),
         ("require_recovery_health", 1),
         ("require_checkpoint_indexes", 1),
+        ("require_compaction_maintenance", 1),
     ],
 )
 def test_operations_policy_boolean_validation(field, value):
@@ -209,6 +211,7 @@ def test_operations_policy_boolean_validation(field, value):
         require_checkpoint_above_warning=False,
         require_recovery_health=False,
         require_checkpoint_indexes=False,
+        require_compaction_maintenance=False,
     )
     values[field] = value
     with pytest.raises(ValueError, match="bool"):
@@ -777,6 +780,63 @@ def test_denied_recovery_health_denies_operations():
         item.code
         == "durable_recovery.health_denied"
         for item in report.findings
+    )
+
+
+def test_required_compaction_maintenance_without_guard_is_denied():
+    _, journal, _, _, _, inspector = fixture(
+        operations_policy=DurableOperationsPolicy(
+            require_compaction_maintenance=True,
+        )
+    )
+    report = inspector.inspect(
+        (("journal", journal),)
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "durable_compaction.maintenance_required"
+        for item in report.findings
+    )
+
+
+def test_compaction_workflow_ids_without_guard_are_denied():
+    _, journal, _, _, _, inspector = fixture()
+    report = inspector.inspect(
+        (("journal", journal),),
+        compaction_workflow_ids=(fp("workflow"),),
+    )
+    assert not report.allowed
+    assert any(
+        item.code
+        == "durable_compaction.guard_missing"
+        for item in report.findings
+    )
+
+
+def test_require_forwards_compaction_workflow_ids_without_guard():
+    _, journal, _, _, _, inspector = fixture()
+    with pytest.raises(
+        DurableEvidenceOperationsError,
+        match="compaction workflow ids",
+    ):
+        inspector.require(
+            (("journal", journal),),
+            compaction_workflow_ids=(fp("workflow"),),
+        )
+
+
+def test_operations_policy_digest_changes_with_compaction_requirement():
+    default = DurableOperationsPolicy()
+    strict = DurableOperationsPolicy(
+        require_compaction_maintenance=True,
+    )
+    assert default.digest != strict.digest
+    assert (
+        strict.to_dict()[
+            "require_compaction_maintenance"
+        ]
+        is True
     )
 
 
