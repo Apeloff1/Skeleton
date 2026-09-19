@@ -22,7 +22,7 @@ SPECS = (
     OperationSpec(
         logical_name="go.version",
         executable_key="go",
-        options=(OptionSpec("version"),),
+        subcommand="version",
         effects=frozenset({CommandEffect.READ}),
         risk=CommandRisk.LOW,
         timeout=60.0,
