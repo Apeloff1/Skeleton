@@ -43,6 +43,7 @@ class AIExecutionEvidence:
     completed_at: float = 0.0
     session_integrity_digest: str = ""
     session_journal_manifest_digest: str = ""
+    root_protection_digest: str = ""
 
     def __post_init__(self) -> None:
         if self.schema_version != 1:
@@ -73,6 +74,7 @@ class AIExecutionEvidence:
             "audit_witness_digest",
             "session_integrity_digest",
             "session_journal_manifest_digest",
+            "root_protection_digest",
         )
         for name in optional:
             value = getattr(self, name)
@@ -142,6 +144,7 @@ class AIExecutionEvidence:
             "session_journal_manifest_digest": (
                 self.session_journal_manifest_digest
             ),
+            "root_protection_digest": self.root_protection_digest,
         }
 
     @property
@@ -207,6 +210,7 @@ class AIExecutionEvidenceBuilder:
         execution_attempt_state: str = "",
         session_integrity_digest: str = "",
         session_journal_manifest_digest: str = "",
+        root_protection_digest: str = "",
     ) -> AIExecutionEvidence:
         return AIExecutionEvidence(
             1,
@@ -234,6 +238,7 @@ class AIExecutionEvidenceBuilder:
             self._clock(),
             session_integrity_digest,
             session_journal_manifest_digest,
+            root_protection_digest,
         )
 
 
@@ -354,6 +359,7 @@ class AIExecutionEvidenceStore:
             float(raw["completed_at"]),
             str(raw.get("session_integrity_digest", "")),
             str(raw.get("session_journal_manifest_digest", "")),
+            str(raw.get("root_protection_digest", "")),
         )
 
     @staticmethod
