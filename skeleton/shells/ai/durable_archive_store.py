@@ -268,6 +268,44 @@ class DurableArchiveRootIndex:
 
 
 @dataclass(frozen=True)
+class DurableArchiveSequenceIndex:
+    chain_id: str
+    sequence: int
+    root_hash: str
+
+    def __post_init__(self) -> None:
+        _identity("chain_id", self.chain_id, maximum=128)
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence < 0
+        ):
+            raise ValueError(
+                "archive sequence index must be non-negative"
+            )
+        object.__setattr__(
+            self,
+            "root_hash",
+            _digest("root_hash", self.root_hash),
+        )
+        if self.sequence == 0 and self.root_hash != GENESIS_HASH:
+            raise ValueError(
+                "genesis archive sequence index must use genesis hash"
+            )
+        if self.sequence > 0 and self.root_hash == GENESIS_HASH:
+            raise ValueError(
+                "non-genesis archive sequence may not use genesis hash"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chain_id": self.chain_id,
+            "sequence": self.sequence,
+            "root_hash": self.root_hash,
+        }
+
+
+@dataclass(frozen=True)
 class DurableArchiveRootResolution:
     chain_id: str
     root_hash: str
@@ -760,6 +798,27 @@ class DurableArchiveRepository:
         )
 
     @staticmethod
+    def _sequence_key(
+        chain_id: str,
+        sequence: int,
+    ) -> str:
+        _identity("chain_id", chain_id, maximum=128)
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            raise ValueError(
+                "archive sequence must be non-negative integer"
+            )
+        return (
+            "sequence:"
+            + _hash_key(chain_id)
+            + ":"
+            + f"{sequence:020d}"
+        )
+
+    @staticmethod
     def _head_key(chain_id: str) -> str:
         return "head:" + _hash_key(
             _identity("chain_id", chain_id, maximum=128)
@@ -1047,6 +1106,16 @@ class DurableArchiveRepository:
         )
 
     @staticmethod
+    def _sequence_index(
+        raw: dict[str, object],
+    ) -> DurableArchiveSequenceIndex:
+        return DurableArchiveSequenceIndex(
+            str(raw["chain_id"]),
+            int(raw["sequence"]),
+            str(raw["root_hash"]),
+        )
+
+    @staticmethod
     def _head(raw: dict[str, object]) -> DurableArchiveHead:
         return DurableArchiveHead(
             str(raw["chain_id"]),
@@ -1233,6 +1302,21 @@ class DurableArchiveRepository:
             "archive root replica CAS retry budget exhausted"
         )
 
+    def _put_sequence_index(
+        self,
+        item: DurableArchiveSequenceIndex,
+    ) -> bool:
+        return self._put_immutable(
+            self._sequence_key(
+                item.chain_id,
+                item.sequence,
+            ),
+            item.to_dict(),
+            conflict_message=(
+                "archive sequence already binds different historical root"
+            ),
+        )
+
     def _update_head(
         self,
         candidate: DurableArchiveHead,
@@ -1406,6 +1490,14 @@ class DurableArchiveRepository:
         )
         if self._put_root_index(genesis_index):
             repaired_indexes += 1
+        if self._put_sequence_index(
+            DurableArchiveSequenceIndex(
+                manifest.chain_id,
+                0,
+                GENESIS_HASH,
+            )
+        ):
+            repaired_indexes += 1
         for archived in archived_nodes:
             index = DurableArchiveRootIndex(
                 manifest.chain_id,
@@ -1415,6 +1507,14 @@ class DurableArchiveRepository:
                 manifest.digest,
             )
             if self._put_root_index(index):
+                repaired_indexes += 1
+            if self._put_sequence_index(
+                DurableArchiveSequenceIndex(
+                    manifest.chain_id,
+                    archived.sequence,
+                    archived.node_hash,
+                )
+            ):
                 repaired_indexes += 1
 
         self._update_head(
@@ -1531,6 +1631,148 @@ class DurableArchiveRepository:
         if index.chain_id != chain_id or index.root_hash != root_hash:
             raise DurableArchiveStoreError("archive root index identity mismatch")
         return index
+
+    def sequence_index(
+        self,
+        chain_id: str,
+        sequence: int,
+    ) -> DurableArchiveSequenceIndex | None:
+        _identity("chain_id", chain_id, maximum=128)
+        key = self._sequence_key(
+            chain_id,
+            sequence,
+        )
+        record = self.backend.get(
+            self.namespace,
+            key,
+        )
+        if record is None:
+            return None
+        if not isinstance(record.value, dict):
+            raise DurableArchiveStoreError(
+                "archive sequence index must be mapping"
+            )
+        index = self._sequence_index(
+            dict(record.value)
+        )
+        if (
+            index.chain_id != chain_id
+            or index.sequence != sequence
+        ):
+            raise DurableArchiveStoreError(
+                "archive sequence index identity mismatch"
+            )
+        return index
+
+    def root_for_sequence(
+        self,
+        chain_id: str,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ) -> str:
+        _identity("chain_id", chain_id, maximum=128)
+        if (
+            isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            raise ValueError(
+                "archive sequence must be non-negative integer"
+            )
+        if sequence == 0:
+            return GENESIS_HASH
+        head = self.latest(chain_id)
+        if head is None:
+            raise DurableArchiveStoreError(
+                "archive chain has no committed head"
+            )
+        if sequence > head.sequence:
+            raise IndexError(
+                "archive sequence is beyond archived head"
+            )
+        index = self.sequence_index(
+            chain_id,
+            sequence,
+        )
+        if index is None:
+            if not repair_missing:
+                raise DurableArchiveStoreError(
+                    "archive sequence index is missing"
+                )
+            stored = self.get(
+                head.archive_id
+            )
+            if (
+                stored is None
+                or not self.verify_archive(stored)
+            ):
+                raise DurableArchiveStoreError(
+                    "archive sequence index repair lacks verified head archive"
+                )
+            if sequence > len(stored.node_hashes):
+                raise DurableArchiveStoreError(
+                    "archive head does not contain requested sequence"
+                )
+            root_hash = stored.node_hashes[
+                sequence - 1
+            ]
+            candidate = DurableArchiveSequenceIndex(
+                chain_id,
+                sequence,
+                root_hash,
+            )
+            self._put_sequence_index(candidate)
+            index = self.sequence_index(
+                chain_id,
+                sequence,
+            )
+            if index is None:
+                raise DurableArchiveStoreError(
+                    "archive sequence index repair did not persist"
+                )
+        root_index = self.root_index(
+            chain_id,
+            index.root_hash,
+        )
+        if root_index is None:
+            raise DurableArchiveStoreError(
+                "archive sequence index root is not indexed"
+            )
+        if root_index.sequence != sequence:
+            raise DurableArchiveStoreError(
+                "archive sequence/root index disagreement"
+            )
+        if not self.verify_root(
+            chain_id,
+            index.root_hash,
+        ):
+            raise DurableArchiveStoreError(
+                "archive sequence index resolves unverifiable root"
+            )
+        return index.root_hash
+
+    def get_by_sequence(
+        self,
+        chain_id: str,
+        sequence: int,
+        *,
+        repair_missing: bool = True,
+    ):
+        root_hash = self.root_for_sequence(
+            chain_id,
+            sequence,
+            repair_missing=repair_missing,
+        )
+        node = self.get_node(
+            chain_id,
+            root_hash,
+        )
+        if int(node.sequence) != sequence:
+            raise DurableArchiveStoreError(
+                "archive sequence index resolves wrong node sequence"
+            )
+        return node
 
     def latest(
         self,
@@ -2337,6 +2579,14 @@ class DurableArchiveRepository:
         )
         if self._put_root_index(genesis):
             repaired += 1
+        if self._put_sequence_index(
+            DurableArchiveSequenceIndex(
+                manifest.chain_id,
+                0,
+                GENESIS_HASH,
+            )
+        ):
+            repaired += 1
         for sequence, node_hash in enumerate(stored.node_hashes, start=1):
             index = DurableArchiveRootIndex(
                 manifest.chain_id,
@@ -2346,6 +2596,14 @@ class DurableArchiveRepository:
                 manifest.digest,
             )
             if self._put_root_index(index):
+                repaired += 1
+            if self._put_sequence_index(
+                DurableArchiveSequenceIndex(
+                    manifest.chain_id,
+                    sequence,
+                    node_hash,
+                )
+            ):
                 repaired += 1
         self._update_head(
             DurableArchiveHead(
