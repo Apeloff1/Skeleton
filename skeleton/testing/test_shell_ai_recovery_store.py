@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -22,8 +23,7 @@ from skeleton.shells.ai.session import AISessionPhase, AIShellSession
 from skeleton.shells.ai.types import AIAction, AIIntent, AIPlanProposal
 
 
-def fp(char: str) -> str:
-    return char * 64
+def fp(char: str) -> str:\n    return hashlib.sha256(char.encode()).hexdigest()
 
 
 def session_with_transitions(
