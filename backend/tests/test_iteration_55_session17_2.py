@@ -1,4 +1,7 @@
 """Session 17.2 — Faction sim + worldforge render-split + physics-wire (kick-only)."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

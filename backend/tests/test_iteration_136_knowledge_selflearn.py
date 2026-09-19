@@ -2,6 +2,9 @@
 Iteration 136 — free-API knowledge catalog, /learn, self-improvement, self-learning growth,
 plus regression on activate/map/jeeves-train.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 

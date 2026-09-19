@@ -5,6 +5,9 @@ Run with:
   pytest /app/backend/tests/test_iteration_22_session11.py -v \
     --junitxml=/app/test_reports/pytest/iteration_22_session11.xml
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

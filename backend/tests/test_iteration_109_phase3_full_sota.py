@@ -1,6 +1,9 @@
 """Phase 3 Full SOTA backend regression — verifies all axes ≥9 options,
 axis-tree groupings, 22 tools, per-build Style Pack persistence, and pipeline
 honouring applied pack axes."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

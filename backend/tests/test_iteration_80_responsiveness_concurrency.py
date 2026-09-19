@@ -7,6 +7,9 @@ Strategy:
            guard, then IMMEDIATELY force-complete (to keep RSS under HARD limit).
   Phase C: downstream — files, stats, vault zip, final-build pipeline.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import statistics

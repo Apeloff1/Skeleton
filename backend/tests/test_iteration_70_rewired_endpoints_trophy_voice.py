@@ -7,6 +7,9 @@ Tests:
   • GET /api/tournaments/rewards/ledger     — Trophy Case data source
   • POST /api/jeeves-voice/voice/speak      — HD TTS, tone=triumphant, audio_base64 present
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

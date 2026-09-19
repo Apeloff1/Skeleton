@@ -3,6 +3,9 @@
 Tests the new tier-volume scaling built into ALL 14 gates and the prune endpoint
 on /api/galaxy-studio/text-gamefile.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

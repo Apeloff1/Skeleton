@@ -8,6 +8,9 @@ Validates the era-sensitivity end-to-end at the API:
   • GET  /api/galaxy-studio/vault-gdd/choices/{build_id}
   • POST /api/galaxy-studio/assets/forge        (era param routes to by_type list)
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

@@ -9,6 +9,9 @@ Validates:
   • GET /api/galaxy-studio/gamefile-pipeline/controller/status:
       controller{gates:14, crosswired:true}, traffic metrics, systems[14] each with order+crosswire+feature_count=10
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

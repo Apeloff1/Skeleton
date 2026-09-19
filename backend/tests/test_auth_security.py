@@ -93,9 +93,9 @@ def test_session_exchange_requires_https_when_auth_is_enforced():
     assert resolve_session_api({}).startswith("https://")
     assert (
         resolve_session_api(
-            {"APP_ENV": "development", "EMERGENT_SESSION_API": "http://localhost:8080/session"}
+            {"APP_ENV": "development", "EMERGENT_SESSION_API": "http://localhost/session"}
         )
-        == "http://localhost:8080/session"
+        == "http://localhost/session"
     )
     with pytest.raises(AuthConfigurationError, match="must use HTTPS"):
         resolve_session_api(

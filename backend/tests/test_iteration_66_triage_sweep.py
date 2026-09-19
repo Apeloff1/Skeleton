@@ -4,6 +4,9 @@ Iteration 66 — Galaxy Studio / Tutolage TRIAGE sweep.
 Goal: broad health check of key GET endpoints. NO heavy generation triggers.
 Only reads / lists / overviews. Report status code + small response sample.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

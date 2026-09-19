@@ -14,6 +14,9 @@ Coverage:
 - Regression: compose without style/variants (Auto + toggle off) still composes
   & mounts, returns variants=0, total=primary.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

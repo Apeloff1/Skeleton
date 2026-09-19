@@ -6,6 +6,9 @@ Verifies all endpoints listed in the iteration 99 review request:
 
 Targets the PUBLIC preview backend (EXPO_PUBLIC_BACKEND_URL).
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest

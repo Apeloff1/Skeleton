@@ -5,6 +5,9 @@ Validates:
  * add → list → summary → build → crosswire to 14-gate engine → delete → reorder → update
  * Iteration-118 regression: text-gamefile generators (count==10) + quest_from_text
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

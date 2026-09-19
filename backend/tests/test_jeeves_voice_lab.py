@@ -8,6 +8,9 @@ Endpoints under test:
 - POST /api/jeeves-voice/narrate
 - POST /api/reader/speak (expressive + default)
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

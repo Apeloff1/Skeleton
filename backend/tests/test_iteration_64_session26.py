@@ -10,6 +10,9 @@ Covers:
   - Agent logs GET /api/agent-logs/all|summary|stream
   - Heal apply / apply-all with regen=false (to avoid kicking long GroupChat)
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

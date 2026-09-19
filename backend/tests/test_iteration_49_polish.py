@@ -8,6 +8,10 @@ Validates:
  - GET /api/vault/asset?tag=genesis → assets[] with kind-prefixed name + metadata.source=='asset_genesis'
  - Regressions: /styles (8/8/6); /game/{pid} carries asset_status+tag; /health/registry ok=140
 """
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 import os, time, requests, pytest
 
 BASE = (

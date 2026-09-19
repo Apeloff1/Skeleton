@@ -11,6 +11,9 @@ Coverage:
 - Factions raw HTML contains window.FACTIONS + id __factions
 - Regression: registry ok=116; factions/simulate; apply-physics/async; worldforge/render
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import requests

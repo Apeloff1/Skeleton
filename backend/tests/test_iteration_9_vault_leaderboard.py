@@ -3,6 +3,9 @@ Iteration 9 — Vault Import + Leaderboard + Vote regression.
 Verifies the new EXPANSION features: vault import flow, public leaderboard,
 and that voting still affects leaderboard rankings.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

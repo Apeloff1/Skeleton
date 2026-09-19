@@ -2,6 +2,9 @@
 Session 4 deltas — Leaderboard search/sort, Emoji reactions, Daily spotlight,
 Collection share card.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest

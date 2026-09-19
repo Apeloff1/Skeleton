@@ -6,6 +6,9 @@ Tests the new asset-grounding behaviour:
 - forge/compose still clamps to 300
 - catalog still 550 categories / 30 families
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

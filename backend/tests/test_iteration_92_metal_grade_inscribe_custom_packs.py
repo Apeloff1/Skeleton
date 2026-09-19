@@ -10,6 +10,9 @@ Validates:
 - Custom Style Packs CRUD: POST -> appears in /styles with custom=True -> DELETE removes
 - /forge/compose still returns by_region breakdown
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

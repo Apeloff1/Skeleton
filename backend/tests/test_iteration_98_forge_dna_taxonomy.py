@@ -11,6 +11,9 @@ Covers:
   - POST /api/galaxy-studio/forge/generate  (tier-3 inscribed key)
   - Regression: /catalog, /styles, /search, /random, /compose, /seed
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

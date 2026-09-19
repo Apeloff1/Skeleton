@@ -12,6 +12,9 @@ Runs against the public URL from frontend/.env (EXPO_PUBLIC_BACKEND_URL) — sam
 that the deployed app will hit.
 """
 
+pytestmark = pytest.mark.live_service
+
+
 import os
 import pytest
 import requests

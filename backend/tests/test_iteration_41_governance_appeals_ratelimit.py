@@ -2,6 +2,9 @@
 VII.5 Governance v2 — creator appeal lifecycle + report rate-limit.
 Backend regression for iteration 41. Self-contained (no fixtures from conftest needed).
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 

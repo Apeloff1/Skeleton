@@ -2,6 +2,9 @@
 Session-3 deltas — Collections CRUD, lineage.remix_count, leaderboard.champion_weeks.
 No LLM calls; fast smoke against live preview backend.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

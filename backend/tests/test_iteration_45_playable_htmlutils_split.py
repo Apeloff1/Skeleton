@@ -5,6 +5,9 @@ Exercises: _extract_html → _sanitize → _validate → repair loop → judge �
 Also confirms playable-family routers (repair/derive/cover/edit) are still
 registered and worldforge/governance regression endpoints respond.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

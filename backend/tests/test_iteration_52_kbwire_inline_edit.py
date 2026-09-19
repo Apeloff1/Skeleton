@@ -3,6 +3,9 @@ Iteration 52 — KB inline edit (PUT /api/pipeline/{pid}/kb/{artifact}) +
                 Apply KB to game (POST /api/playable/{pid}/apply-kb/async)
                 + regressions.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

@@ -12,6 +12,9 @@ Covers:
   - Vault bridge: /sources, /from-game (save=true → vault asset tagged WG), /worlds, /worlds/{id}
   - AI lore for cosmic scale (LIVE LLM, ~5-15s, single call)
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import pytest

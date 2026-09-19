@@ -7,6 +7,9 @@ Backend tests for:
   • Governance regression (boardroom submit -> vaulted)
   • Regression: activate, map/systems, knowledge/apis
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

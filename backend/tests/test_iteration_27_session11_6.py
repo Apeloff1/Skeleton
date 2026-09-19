@@ -2,6 +2,9 @@
 Session 11.6 backend tests — anti-farm rate-limit, vote claim-once, ops overview,
 and stripe checkout regression. All hit the public preview URL.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

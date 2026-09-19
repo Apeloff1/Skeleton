@@ -8,6 +8,9 @@ Surface under test:
   • POST /api/worldforge/quest      — JSON-parse retry (branching DAG, consistency.ok)
   • REGRESSION /region /options /biomes
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

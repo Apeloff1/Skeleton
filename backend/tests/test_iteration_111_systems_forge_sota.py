@@ -1,5 +1,8 @@
 """Iteration 111 — Systems Forge SOTA scale-up: 12 systems / 102 knobs / 593 options,
 12 engine models, 10 big-win playbooks, markdown exports & GDD integration."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

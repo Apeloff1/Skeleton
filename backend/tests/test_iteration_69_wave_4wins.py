@@ -5,6 +5,9 @@ Iteration 69 — 4-Wins wave testing:
   Win5: POST /api/imagine/cover   (image-gen is MOCKED in sandbox — expect 200, no crash)
   Win7: POST /api/snowball/{pid}/remaster (uses real pid from marketplace)
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import base64
 import io

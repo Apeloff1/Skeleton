@@ -5,6 +5,9 @@ Covers: registry list/register, use → capability profile growth, permissions,
 versioning + rollback, evolution (improve / flag_for_deprecation),
 combination synergy scoring, status.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import uuid

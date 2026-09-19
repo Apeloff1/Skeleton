@@ -10,6 +10,9 @@ Validates:
 - /search for mech/potion/runic/zzzz
 - REGRESSION: /compose, /seed
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

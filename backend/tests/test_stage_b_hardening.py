@@ -6,6 +6,9 @@ Stage B (Distributed rigor) validation for GameForge / PROOD:
   B4 — Idempotency guard on ship
   REGRESSION — coverage/selftest, prood/readiness, omega/fabric persistence
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

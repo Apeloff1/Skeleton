@@ -8,6 +8,9 @@ Session 12+ — SOTA Worldforge upgrade tests:
   - AI lore: POST /api/worldforge/lore returns {name, region, lore, model, summary}
   - Playable & Agent Memory regressions still green
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import pytest

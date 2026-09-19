@@ -3,6 +3,9 @@ Iteration 135 — CNS Map surface + Jeeves self-training + Git readiness.
 Covers: /api/gameforge/activate, /map/*, /studio/jeeves/*, /studio/git/*,
 questionnaire/steps/forge/deploy build flow.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

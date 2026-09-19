@@ -10,6 +10,9 @@ Tests:
 - War-Room sanity: groupchat router still loaded → /api/health 200
 """
 
+pytestmark = pytest.mark.live_service
+
+
 import os
 import time
 import requests

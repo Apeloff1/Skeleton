@@ -10,6 +10,9 @@ Tests every endpoint listed in the review request:
   • LLM optional (≤1 invocation total)
   • Regression: /health, /jobs/active, /genres ~69
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

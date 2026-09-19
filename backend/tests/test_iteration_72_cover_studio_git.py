@@ -11,6 +11,9 @@ Covers:
 - Regression: real TTS endpoints + rewired DB endpoints still return 200.
 """
 
+pytestmark = pytest.mark.live_service
+
+
 import os
 import time
 import base64

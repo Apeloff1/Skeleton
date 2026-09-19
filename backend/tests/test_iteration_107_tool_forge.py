@@ -1,4 +1,7 @@
 """Iteration 107 — Tool Forge framework + Variations + expanded 5 axes."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import json
 import pytest

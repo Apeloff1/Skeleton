@@ -12,6 +12,9 @@ Covers:
 
 Uses pre-composed game pid 8999ecfb0f9b4ca599f3cf83c1178879 per the request.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

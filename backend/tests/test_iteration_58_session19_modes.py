@@ -8,6 +8,9 @@ Covers:
 - (slow, gated by RUN_LLM=1) full async generate threading: forged_from + derive_mode survive
   on the new playable, and the pipeline Mode stage detail reflects the chosen mode.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

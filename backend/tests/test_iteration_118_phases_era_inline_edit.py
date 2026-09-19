@@ -1,5 +1,9 @@
 """Iteration 118 — era file_count_standard, /snowball/{pid}/phases crosswire,
 era scaling on the 100-phase build, /stages inline edit + build."""
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

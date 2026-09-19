@@ -1,6 +1,9 @@
 """Iteration 83 — Construct/Material Forge backend sanity for the new
 'Populate my world' Done-screen card. Verifies the exact endpoints + payloads
 the frontend POSTs."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

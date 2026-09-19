@@ -7,6 +7,9 @@ Validates:
   - POST /api/pipeline/{pid}/forge/badstage/async  (error path)
   - Regression: leaderboard, apply-assets, genesis/styles, health/registry
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import requests

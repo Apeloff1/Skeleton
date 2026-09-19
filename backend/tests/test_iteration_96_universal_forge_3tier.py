@@ -4,6 +4,9 @@ Validates: catalog headline counts (1,001,432 base / 601,860,632 forges), random
 3-tier resolver, generate at every tier, search relevance + zzqqxx empty-fast,
 styles axes engraving present, and compose/seed/snowball regressions over the
 new _VirtualCatIndex (.get/[]/in)."""
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

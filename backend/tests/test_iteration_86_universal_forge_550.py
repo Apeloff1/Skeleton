@@ -1,6 +1,9 @@
 """Iteration 86 — Universal Forge expansion (550 categories / 30 families),
 aggregate scene clamp (300), themed seed coverage, and regression isolation
 of construct/material kinds from new universal families."""
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

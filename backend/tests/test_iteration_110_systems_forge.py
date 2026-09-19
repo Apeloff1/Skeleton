@@ -1,4 +1,7 @@
 """Iteration 110 — Systems Forge backend smoke + enrich tests."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

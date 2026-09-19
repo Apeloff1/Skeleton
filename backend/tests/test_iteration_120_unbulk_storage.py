@@ -9,6 +9,9 @@ Covers:
   • 14-gate crosswiring on a compressed gamefile (refine, kind=gamefile)
   • Regression: backend healthy, ~155 routers registered, no 500s
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

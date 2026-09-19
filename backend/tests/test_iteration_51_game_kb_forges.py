@@ -11,6 +11,9 @@ Validates:
     /api/playable/{pid}/pipeline returns 9 stages with world/narrative/build carrying 'forge';
     /api/playable/{pid}/apply-assets/async returns job_id; /api/health/registry ok=142
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

@@ -13,6 +13,9 @@ Covers:
 Note: LLM forges (procedural/launch/refine/qa) can take 30-90s each. The test
 sequentially polls a single procedural job up to ~3 min.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

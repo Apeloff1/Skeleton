@@ -4,6 +4,9 @@ Iteration 26 — Session 11.4 backend smoke.
 Confirms backend unchanged after the deluxe-palette remap + React-import removal
 on the frontend. Hits the five endpoints flagged in the review request.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

@@ -7,6 +7,9 @@ Validates:
 - /forge/compose returns by_region with treatments/accents
 - regression: plain compose works
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

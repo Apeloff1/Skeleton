@@ -10,6 +10,9 @@ Covers:
   • Regression: construct snowball/forge still 200 + universal>0; universal
     assets DO NOT leak into /constructs/list or /materials/list.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

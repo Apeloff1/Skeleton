@@ -12,6 +12,9 @@ Validates:
       - GET /api/pipeline/{pid}/kb: top-level 'stale' and 'provenance' present; each artifact entry
         has a 'stale' boolean.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

@@ -6,6 +6,10 @@ Tests:
   * /api/snowball/<id>  -> 200 for a real id from playable/list
   * /api/galaxy-studio/my-builds -> 200, returns {builds, count}
 """
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 import os, requests, pytest
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"

@@ -13,6 +13,9 @@ scientific realism in /api/worldforge endpoints:
   • /quest — branching DAG, realistic factions, real fieldwork objectives
   • Regression — /biomes (16), /presets (>=100), /render still 200
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest

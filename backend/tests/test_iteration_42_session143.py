@@ -5,6 +5,9 @@
 - Appeal-outcome notifications loop
 - Regression on leaderboard / trending / marketplace listings / registered count
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest

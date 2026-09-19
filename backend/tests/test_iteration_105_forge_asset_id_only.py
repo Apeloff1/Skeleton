@@ -3,6 +3,9 @@
 Covers (a) /asset light vs full (geometry strip), (b) part_count/thumb_palette,
 (c) determinism across calls with same id+era+seed, (d) unknown-id graceful
 fallback, and regression checks on /catalog /random /styles."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

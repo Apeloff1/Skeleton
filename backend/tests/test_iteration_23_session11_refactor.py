@@ -1,4 +1,7 @@
 """Iteration 23 — Session 11.1 refactor regression + Live-Ops XP wiring."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

@@ -7,6 +7,9 @@ Covers:
 - Smoke: existing endpoints used by /creator screen — /api/marketplace/mine,
   /api/liveops/pass, /api/marketplace/listings, /api/tournaments.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

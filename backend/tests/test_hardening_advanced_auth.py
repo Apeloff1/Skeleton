@@ -134,7 +134,7 @@ def test_development_wildcard_cors_remains_available(monkeypatch) -> None:
     monkeypatch.setenv("CORS_ORIGINS", "*")
 
     response = hardening._cors_origin_failure(
-        _request(path="/api/health", origin="http://localhost:3000")
+        _request(path="/api/health", origin="http://localhost")
     )
 
     assert response is None

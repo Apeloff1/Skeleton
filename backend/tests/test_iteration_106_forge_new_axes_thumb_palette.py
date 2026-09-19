@@ -3,6 +3,9 @@ Iteration 106 — Forge new axes (illuminescence/decals/symbols/scribbles/sparkl
 thumb_palette on /catalog & /search, LLM quality gate, snowball populate endpoints,
 and DNA/asset determinism with the new axes.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest

@@ -7,6 +7,9 @@ Covers the live CI-pipeline-style streaming console wiring:
 - Sync /package still returns full 7-stage result
 - /play HTML and /game.zip downloads after a build
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

@@ -7,6 +7,9 @@ Covers the new Galaxy Studio endpoints:
 - GET  /api/galaxy-studio/assets/{build_id}
 - GET  /api/galaxy-studio/vault-gdd/{build_id}/gamefiles.zip (downloadable bundle)
 """
+
+pytestmark = pytest.mark.live_service
+
 import io
 import json
 import os

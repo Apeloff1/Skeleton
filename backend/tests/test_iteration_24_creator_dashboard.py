@@ -7,6 +7,9 @@ Covers:
   - Regression smoke: listings, tournaments, liveops/season, playable/list,
     liveops/pass, registered count.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests

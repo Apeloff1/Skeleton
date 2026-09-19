@@ -1,4 +1,7 @@
 """Iteration 108 — Phase 2.5: 135 axes, 15 tools, precise/consecutive pipeline, AAA quality gate."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import json
 import pytest

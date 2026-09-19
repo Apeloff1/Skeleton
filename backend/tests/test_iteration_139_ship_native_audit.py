@@ -2,6 +2,9 @@
 Iteration 139 — Ship It + Native Engine builds (PyInstaller + Godot) + Audit log
 + RBAC/JWT regression + build/runtime/vault regression.
 """
+
+pytestmark = pytest.mark.live_service
+
 import io
 import os
 import zipfile

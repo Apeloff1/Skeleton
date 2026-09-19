@@ -5,6 +5,9 @@ Session 12 — backend tests:
   - NEW Agent Long-Term Memory + reflection
 Uses EXPO_PUBLIC_BACKEND_URL.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import pytest

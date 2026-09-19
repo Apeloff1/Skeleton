@@ -1,5 +1,9 @@
 """Session-5 deltas: reactions → trending velocity / ranking, /most-loved rail,
 reactions_total in leaderboard."""
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 import os
 import requests
 

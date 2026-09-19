@@ -7,6 +7,9 @@ Iteration 124 — Galaxy Studio unified gamefile pipeline:
 
 Backend public URL is used (EXPO_BACKEND_URL). No auth.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

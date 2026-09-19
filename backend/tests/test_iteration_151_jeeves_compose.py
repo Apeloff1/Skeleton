@@ -1,4 +1,7 @@
 """Iteration 151: Jeeves free-tier cascade + multi-format composer + chat + idle_augment."""
+
+pytestmark = pytest.mark.live_service
+
 import base64
 import io
 import os

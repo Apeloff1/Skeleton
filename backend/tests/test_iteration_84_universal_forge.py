@@ -12,6 +12,9 @@ Covers:
   - Regression: constructs/list, materials/list, constructs/presets, constructs/snowball/forge
     still work AND universal-forge assets do not pollute construct/material lists.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os

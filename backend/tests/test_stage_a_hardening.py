@@ -7,6 +7,9 @@ Covers:
   A4 — /api/health/registry ok count + groups classification.
   REGRESSION — coverage/selftest, prood/readiness, lafs/recall, omega roles/sessions.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import sys
 import time
