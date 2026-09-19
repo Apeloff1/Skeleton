@@ -155,6 +155,95 @@ class ExecutionObligationRecoveryReport:
         return data
 
 
+@dataclass(frozen=True)
+class ExecutionObligationRecoverySummary:
+    reports: tuple[ExecutionObligationRecoveryReport, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "reports", tuple(self.reports))
+        ids = tuple(item.obligation_id for item in self.reports)
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate obligation recovery report")
+        if tuple(sorted(ids)) != ids:
+            raise ValueError("obligation recovery reports must be sorted")
+
+    @property
+    def verified_finalized(self) -> int:
+        return sum(
+            item.disposition
+            is ExecutionObligationRecoveryDisposition.VERIFIED_FINALIZED
+            for item in self.reports
+        )
+
+    @property
+    def retired(self) -> int:
+        return sum(
+            item.disposition
+            is ExecutionObligationRecoveryDisposition.RETIRED
+            for item in self.reports
+        )
+
+    @property
+    def unresolved(self) -> int:
+        return len(self.reports) - self.verified_finalized - self.retired
+
+    @property
+    def ambiguous(self) -> int:
+        return sum(
+            item.disposition
+            is ExecutionObligationRecoveryDisposition.AMBIGUOUS_BOUNDARY
+            for item in self.reports
+        )
+
+    @property
+    def allowed(self) -> bool:
+        return self.unresolved == 0
+
+    @property
+    def finalization_ids(self) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                item.derived_finalization_id
+                for item in self.reports
+                if (
+                    item.disposition
+                    is ExecutionObligationRecoveryDisposition.VERIFIED_FINALIZED
+                    and item.derived_finalization_id
+                )
+            )
+        )
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.to_dict(include_digest=False),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def to_dict(
+        self,
+        *,
+        include_digest: bool = True,
+    ) -> dict[str, object]:
+        data: dict[str, object] = {
+            "allowed": self.allowed,
+            "verified_finalized": self.verified_finalized,
+            "retired": self.retired,
+            "unresolved": self.unresolved,
+            "ambiguous": self.ambiguous,
+            "finalization_ids": list(self.finalization_ids),
+            "reports": [
+                item.to_dict()
+                for item in self.reports
+            ],
+        }
+        if include_digest:
+            data["digest"] = self.digest
+        return data
+
+
 class ExecutionObligationRecoveryError(RuntimeError):
     pass
 
@@ -461,9 +550,15 @@ class AIExecutionObligationRecoveryInspector:
             raise ExecutionObligationRecoveryError(
                 "execution obligation scan bound exceeded"
             )
-        return tuple(
+        reports = tuple(
             self.inspect(item.obligation.obligation_id)
             for item in obligations
+        )
+        return tuple(
+            sorted(
+                reports,
+                key=lambda item: item.obligation_id,
+            )
         )
 
     def reconcile_all(
@@ -474,9 +569,66 @@ class AIExecutionObligationRecoveryInspector:
             raise ExecutionObligationRecoveryError(
                 "execution obligation scan bound exceeded"
             )
-        return tuple(
+        reports = tuple(
             self.reconcile(item.obligation.obligation_id)
             for item in obligations
+        )
+        return tuple(
+            sorted(
+                reports,
+                key=lambda item: item.obligation_id,
+            )
+        )
+
+    def recover_safe(
+        self,
+    ) -> ExecutionObligationRecoverySummary:
+        """Resolve only cases that prove no replay or side-effect ambiguity."""
+        initial = self.reconcile_all()
+        for report in initial:
+            if (
+                report.disposition
+                is not ExecutionObligationRecoveryDisposition.SAFE_NOT_STARTED
+            ):
+                continue
+            attempt = report.attempt
+            if (
+                attempt is not None
+                and attempt.state is ExecutionAttemptState.AUTHORIZED
+            ):
+                abandoned = self.attempts.abandon(attempt).attempt
+                self.obligations.sync_attempt(
+                    report.obligation_id,
+                    abandoned,
+                )
+            elif attempt is not None:
+                self.obligations.sync_attempt(
+                    report.obligation_id,
+                    attempt,
+                )
+            fresh = self.inspect(report.obligation_id)
+            if (
+                fresh.disposition
+                is not ExecutionObligationRecoveryDisposition.SAFE_NOT_STARTED
+            ):
+                continue
+            self.obligations.retire(
+                report.obligation_id,
+                proof_digest=fresh.digest,
+                reason=(
+                    "automatic recovery: durable attempt evidence proves "
+                    "the process boundary was never entered"
+                ),
+            )
+        return ExecutionObligationRecoverySummary(
+            self.inspect_all()
+        )
+
+    def summary(
+        self,
+    ) -> ExecutionObligationRecoverySummary:
+        return ExecutionObligationRecoverySummary(
+            self.inspect_all()
         )
 
     def require_no_ambiguous_side_effects(
