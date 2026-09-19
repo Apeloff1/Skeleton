@@ -70,6 +70,15 @@ from skeleton.shells.ai.durable_compaction_certificate import (
     DurableCompactionCertificateVerification,
     SignedDurableCompactionCertificate,
 )
+from skeleton.shells.ai.durable_destruction_health import (
+    DurableDestructionChainHealth,
+    DurableDestructionFleetHealth,
+    DurableDestructionHealthError,
+    DurableDestructionHealthFinding,
+    DurableDestructionHealthGuard,
+    DurableDestructionHealthPolicy,
+    DurableDestructionHealthSeverity,
+)
 from skeleton.shells.ai.durable_destruction import (
     DESTRUCTION_ARTIFACT_TYPE,
     DurableDestructionConflict,
@@ -187,6 +196,13 @@ from skeleton.shells.distributed_receipts import (
 
 
 AI_EXPORTS = {
+    "DurableDestructionChainHealth": DurableDestructionChainHealth,
+    "DurableDestructionFleetHealth": DurableDestructionFleetHealth,
+    "DurableDestructionHealthError": DurableDestructionHealthError,
+    "DurableDestructionHealthFinding": DurableDestructionHealthFinding,
+    "DurableDestructionHealthGuard": DurableDestructionHealthGuard,
+    "DurableDestructionHealthPolicy": DurableDestructionHealthPolicy,
+    "DurableDestructionHealthSeverity": DurableDestructionHealthSeverity,
     "DESTRUCTION_ARTIFACT_TYPE": DESTRUCTION_ARTIFACT_TYPE,
     "DurableDestructionConflict": DurableDestructionConflict,
     "DurableDestructionCorruption": DurableDestructionCorruption,
@@ -2401,3 +2417,36 @@ def test_durable_destruction_index_state_wire_values_are_stable():
         "uncommitted",
     }
 
+def test_durable_destruction_health_constructor_exposes_ledger_and_policy():
+    signature = inspect.signature(DurableDestructionHealthGuard)
+    assert "ledger" in signature.parameters
+    assert "policy" in signature.parameters
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "inspect",
+        "require",
+        "repair_indexes_and_require",
+    ],
+)
+def test_durable_destruction_health_methods_are_stable(method):
+    assert callable(
+        getattr(
+            DurableDestructionHealthGuard,
+            method,
+            None,
+        )
+    )
+
+
+def test_durable_destruction_health_severity_wire_values_are_stable():
+    assert {
+        item.value
+        for item in DurableDestructionHealthSeverity
+    } == {
+        "info",
+        "warning",
+        "error",
+    }
