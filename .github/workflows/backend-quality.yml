@@ -105,6 +105,21 @@ jobs:
       - name: Security scanner surface preflight
         run: python scripts/check_security_scan_surface.py
 
+      - name: Defense control-plane contract
+        working-directory: .
+        run: python scripts/check_defense_control_plane_contract.py
+
+      - name: Security scanner and capability fail-closed contracts
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          PYTHONPATH=. python -m pytest -q --noconftest
+          skeleton/testing/test_scanner_integrity.py
+          skeleton/testing/test_defense_control_plane_contract.py
+          skeleton/testing/test_automation_control_plane.py
+          tests/test_generated_code_sandbox.py
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
