@@ -285,6 +285,45 @@ class EnsembleCuriosityResearcher:
                                          "laundering_risk": "critical",
                                          "reasons": ["legacy_claim_label_without_inspectable_binding"]})
 
+        # Final projection is fail-closed: only inspectable, attested
+        # claim-level citation bindings may survive as promotable evidence.
+        # Legacy supports_claims/contradicts_claims labels are diagnostics and
+        # can never become claim-bound evidence through aggregation aliases.
+        inspectable_claim_evidence: dict[str, list[dict[str, Any]]] = {}
+        for claim, rows in claim_evidence.items():
+            accepted_rows: list[dict[str, Any]] = []
+            for row in rows:
+                binding = row.get("citation_binding")
+                attestation = str(
+                    row.get(
+                        "citation_binding_attestation_sha256"
+                    )
+                    or ""
+                )
+                if not isinstance(binding, dict):
+                    continue
+                binding_method = str(
+                    binding.get("binding_method")
+                    or ""
+                ).strip()
+                evidence_span = str(
+                    binding.get("evidence_span")
+                    or ""
+                ).strip()
+                if (
+                    not binding_method
+                    or not evidence_span
+                    or len(attestation) != 64
+                ):
+                    continue
+                accepted_rows.append(row)
+            inspectable_claim_evidence[claim] = accepted_rows
+        claim_evidence = inspectable_claim_evidence
+        claim_bound_evidence_count = sum(
+            len(rows)
+            for rows in claim_evidence.values()
+        )
+
         summary = summaries[0] if summaries else f"Research panel generated {len(candidate_claims)} candidate claims."
         if sources:
             summary += f" {len(sources)} source record(s) were examined; claim promotion remains verifier-controlled."
@@ -295,7 +334,7 @@ class EnsembleCuriosityResearcher:
             "claim_evidence": claim_evidence, "falsifiable": {claim: True for claim in candidate_claims},
             "panel": [asdict(obs) for obs in valid], "semantic_variants": semantic_variants,
             "source_count": len(sources), "provenance_verified_source_count": sum(source.provenance_verified for source in sources),
-            "claim_bound_evidence_count": sum(len(v) for v in claim_evidence.values()),
+            "claim_bound_evidence_count": claim_bound_evidence_count,
             "citation_integrity": {"accepted": sum(bool(row.get("accepted")) for row in citation_reports),
                                    "rejected": sum(not bool(row.get("accepted")) for row in citation_reports),
                                    "reports": citation_reports[:128]},
