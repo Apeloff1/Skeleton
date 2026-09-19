@@ -2,8 +2,8 @@ name: Jeeves Bidirectional Historical
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - 'skeleton/jeeves/historical_modes.py'
       - 'skeleton/jeeves/bidirectional_modes.py'

@@ -73,7 +73,7 @@ def _bounded_text(value: object, *, field_name: str, limit: int = _MAX_TEXT) -> 
 
 
 def _safe_rule_name(value: object) -> str:
-    text = _bounded_text(value, field_name="rule name", limit=128)
+    text = _bounded_text(value, field_name="rule name", limit=128).casefold()
     if _RULE_RE.fullmatch(text) is None:
         raise ScannerIntegrityError("rule name must be lowercase token text")
     return text
@@ -342,44 +342,38 @@ class ScannerHarness:
             executed.append(rule.name)
             if result is None:
                 continue
-
-            try:
-                if isinstance(result, str):
-                    finding = Finding(
+            if isinstance(result, str):
+                findings.append(
+                    Finding(
                         rule=rule.name,
                         severity=rule.severity,
                         message=result,
                         remediation=rule.remediation,
                     )
-                elif isinstance(result, RuleResult):
-                    finding = Finding(
+                )
+                continue
+            if isinstance(result, RuleResult):
+                findings.append(
+                    Finding(
                         rule=rule.name,
                         severity=result.severity or rule.severity,
                         message=result.message,
                         remediation=result.remediation or rule.remediation,
                         metadata=result.metadata,
                     )
-                else:
-                    finding = Finding(
-                        rule=rule.name,
-                        severity=Severity.CRITICAL,
-                        message="scanner rule returned an unsupported result type",
-                        remediation="Repair the scanner rule contract before merge.",
-                        scanner_failure=True,
-                        metadata=(("result_type", type(result).__name__),),
-                    )
-            except ScannerIntegrityError:
-                # Probe output is untrusted scanner evidence. Invalid, oversized,
-                # or control-bearing diagnostics must make the scan fail closed
-                # without crashing the harness or leaking the raw diagnostic.
-                finding = Finding(
+                )
+                continue
+
+            findings.append(
+                Finding(
                     rule=rule.name,
                     severity=Severity.CRITICAL,
-                    message="scanner rule returned invalid bounded evidence",
+                    message="scanner rule returned an unsupported result type",
                     remediation="Repair the scanner rule contract before merge.",
                     scanner_failure=True,
+                    metadata=(("result_type", type(result).__name__),),
                 )
-            findings.append(finding)
+            )
 
         finished_ns = time.time_ns()
         complete = tuple(executed) == expected
