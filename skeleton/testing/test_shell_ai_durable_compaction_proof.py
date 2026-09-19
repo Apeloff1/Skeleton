@@ -41,6 +41,15 @@ from skeleton.shells.ai.durable_compaction_proof import (
     DurableCompactionProofVerification,
     SignedDurableCompactionProof,
 )
+from skeleton.shells.ai.durable_compaction_proof_store import (
+    DurableCompactionProofHead,
+    DurableCompactionProofLineageEntry,
+    DurableCompactionProofStore,
+    DurableCompactionProofStoreConflict,
+    DurableCompactionProofStoreError,
+    DurableCompactionProofWorkflowIndex,
+    StoredDurableCompactionProof,
+)
 from skeleton.shells.ai.durable_compaction_reservation import (
     DurableCompactionReservationStore,
     SignedDurableCompactionReservation,
@@ -361,17 +370,17 @@ class ProofFixture:
             clock=lambda: self.now[0],
         )
 
-    def complete(self):
+    def complete(self, *, operator_id="operator"):
         planned = self.operator.plan(
             self.retention,
             self.chain,
-            operator_id="operator",
+            operator_id=operator_id,
         )
         holder_id = planned.workflow_id
         reservation = self.reservations.acquire(
             self.chain_id,
             holder_id=holder_id,
-            operator_id="operator",
+            operator_id=operator_id,
         )
         certificate = self.operator.certify(
             planned.workflow_id,
@@ -1472,3 +1481,663 @@ def test_build_rejects_invalid_clock():
             archive_verification=fixture.archive_verification,
             pruning=values["pruning"],
         )
+
+def proof_store(fixture, **kwargs):
+    return DurableCompactionProofStore(
+        fixture.backend,
+        fixture.builder,
+        namespace=f"{fixture.kind}-proof-store",
+        clock=lambda: fixture.now[0],
+        **kwargs,
+    )
+
+
+def put_values(store, fixture, values):
+    return store.put(
+        values["proof"],
+        workflow=values["workflow"],
+        reservation=values["reservation"],
+        certificate=values["certificate"],
+        authorization=values["authorization"],
+        archive=fixture.archive,
+        archive_verification=fixture.archive_verification,
+        pruning=values["pruning"],
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_persists_verified_proof(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    result = put_values(store, fixture, values)
+
+    assert result.fresh_proof
+    assert result.repaired_indexes == 0
+    assert result.stored.proof == values["proof"]
+    assert result.head.generation == 1
+    assert result.lineage_entry.generation == 1
+    assert result.lineage_entry.previous_proof_id == ""
+    assert result.workflow_index.workflow_id == values["workflow"].workflow_id
+    assert store.verify_lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_get_round_trip(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+    loaded = store.get(values["proof"].proof_id)
+    assert loaded == written.stored
+    assert store.require(values["proof"].proof_id) == written.stored
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_workflow_index_round_trip(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+    assert (
+        store.by_workflow(values["workflow"].workflow_id)
+        == written.stored
+    )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_latest_round_trip(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+    assert store.latest(fixture.chain_id) == written.stored
+    revision, head = store.head(fixture.chain_id)
+    assert revision == written.head_revision
+    assert head == written.head
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_lineage_round_trip(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+    lineage = store.lineage(fixture.chain_id)
+    assert lineage == (written.lineage_entry,)
+    assert lineage[0].proof_id == values["proof"].proof_id
+    assert lineage[0].proof_digest == values["proof"].proof.digest
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_identical_retry_is_idempotent(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    first = put_values(store, fixture, values)
+    second = put_values(store, fixture, values)
+    assert not second.fresh_proof
+    assert second.repaired_indexes == 0
+    assert second.stored == first.stored
+    assert second.head == first.head
+    assert second.head_revision == first.head_revision
+    assert store.lineage(fixture.chain_id) == (first.lineage_entry,)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_fresh_reader_observes_existing_proof(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    first = proof_store(fixture)
+    written = put_values(first, fixture, values)
+    fresh = proof_store(fixture)
+    assert fresh.require(values["proof"].proof_id) == written.stored
+    assert fresh.verify_lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_retry_repairs_missing_workflow_index(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    first = put_values(store, fixture, values)
+
+    key = store._workflow_key(values["workflow"].workflow_id)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.delete(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    repaired = put_values(store, fixture, values)
+    assert not repaired.fresh_proof
+    assert repaired.repaired_indexes == 1
+    assert repaired.stored == first.stored
+    assert store.by_workflow(values["workflow"].workflow_id) == first.stored
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_lineage_repairs_missing_latest_index(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+
+    entry_key = store._entry_key(fixture.chain_id, 1)
+    record = fixture.backend.get(store.namespace, entry_key)
+    fixture.backend.delete(
+        store.namespace,
+        entry_key,
+        expected_revision=record.revision,
+    )
+
+    assert fixture.backend.get(store.namespace, entry_key) is None
+    lineage = store.lineage(fixture.chain_id)
+    assert lineage == (written.lineage_entry,)
+    assert fixture.backend.get(store.namespace, entry_key) is not None
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_retry_after_missing_latest_index_is_idempotent(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    written = put_values(store, fixture, values)
+    key = store._entry_key(fixture.chain_id, 1)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.delete(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+
+    retried = put_values(store, fixture, values)
+    assert not retried.fresh_proof
+    assert retried.lineage_entry == written.lineage_entry
+    assert store.verify_lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_missing_proof_record_breaks_lineage(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+
+    key = store._proof_key(values["proof"].proof_id)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.delete(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    assert not store.verify_lineage(fixture.chain_id)
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="missing proof",
+    ):
+        store.lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_missing_head_makes_latest_none(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+    key = store._head_key(fixture.chain_id)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.delete(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+    )
+    assert store.latest(fixture.chain_id) is None
+    assert store.lineage(fixture.chain_id) == ()
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_corrupt_head_type_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    store = proof_store(fixture)
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._head_key(fixture.chain_id),
+        {"bad": True},
+    )
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="head",
+    ):
+        store.head(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_corrupt_workflow_index_type_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._workflow_key(values["workflow"].workflow_id),
+        {"bad": True},
+    )
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="workflow proof index",
+    ):
+        store.by_workflow(values["workflow"].workflow_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_corrupt_lineage_type_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+    key = store._entry_key(fixture.chain_id, 1)
+    record = fixture.backend.get(store.namespace, key)
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value={"bad": True},
+    )
+    assert not store.verify_lineage(fixture.chain_id)
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="lineage entry",
+    ):
+        store.lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_corrupt_previous_link_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+    key = store._entry_key(fixture.chain_id, 1)
+    record = fixture.backend.get(store.namespace, key)
+    bad = replace(
+        record.value,
+        previous_proof_id=fp("unexpected-previous"),
+    )
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=bad,
+    )
+    assert not store.verify_lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_corrupt_head_entry_digest_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+    key = store._head_key(fixture.chain_id)
+    record = fixture.backend.get(store.namespace, key)
+    bad = replace(
+        record.value,
+        entry_digest=fp("wrong-entry"),
+    )
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=bad,
+    )
+    assert not store.verify_lineage(fixture.chain_id)
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_require_missing_is_rejected(kind):
+    fixture = ProofFixture(kind=kind)
+    store = proof_store(fixture)
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="missing",
+    ):
+        store.require(fp("missing-proof"))
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_rejects_unverified_proof(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    tampered = replace(
+        values["proof"].proof,
+        archive_verification_digest=fp("wrong"),
+    )
+    signed = SignedDurableCompactionProof(
+        tampered,
+        fixture.proof_signer.sign(
+            "shell-ai-durable-compaction-proof",
+            tampered.digest,
+        ),
+    )
+    with pytest.raises(
+        DurableCompactionProofError,
+    ):
+        store.put(
+            signed,
+            workflow=values["workflow"],
+            reservation=values["reservation"],
+            certificate=values["certificate"],
+            authorization=values["authorization"],
+            archive=fixture.archive,
+            archive_verification=fixture.archive_verification,
+            pruning=values["pruning"],
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_rejects_non_proof(kind):
+    fixture = ProofFixture(kind=kind)
+    store = proof_store(fixture)
+    with pytest.raises(TypeError, match="SignedDurableCompactionProof"):
+        store.put(
+            object(),
+            workflow=object(),
+            reservation=object(),
+            certificate=object(),
+            authorization=object(),
+            archive=object(),
+            archive_verification=object(),
+            pruning=object(),
+        )
+
+
+@pytest.mark.parametrize("kind", ["journal", "receipts"])
+def test_proof_store_result_serialization(kind):
+    fixture = ProofFixture(kind=kind)
+    values = fixture.complete()
+    store = proof_store(fixture)
+    result = put_values(store, fixture, values)
+    data = result.to_dict()
+    assert data["fresh_proof"] is True
+    assert data["repaired_indexes"] == 0
+    assert data["head"]["generation"] == 1
+    assert data["lineage_entry"]["proof_id"] == values["proof"].proof_id
+
+
+def test_proof_store_supports_two_valid_proofs_on_one_chain_id():
+    first_fixture = ProofFixture(kind="journal")
+    first_values = first_fixture.complete(operator_id="operator-one")
+    store = proof_store(first_fixture)
+    first = put_values(store, first_fixture, first_values)
+
+    # A second independently-verified completed workflow with the same logical
+    # chain id is enough to exercise store serialization. The proof store is an
+    # audit index, not the mutation authority for either source chain.
+    second_fixture = ProofFixture(kind="journal")
+    second_values = second_fixture.complete(operator_id="operator-two")
+    second = store.put(
+        second_values["proof"],
+        workflow=second_values["workflow"],
+        reservation=second_values["reservation"],
+        certificate=second_values["certificate"],
+        authorization=second_values["authorization"],
+        archive=second_fixture.archive,
+        archive_verification=second_fixture.archive_verification,
+        pruning=second_values["pruning"],
+    )
+
+    assert first.head.generation == 1
+    assert second.head.generation == 2
+    lineage = store.lineage("journal")
+    assert len(lineage) == 2
+    assert lineage[0].proof_id == first_values["proof"].proof_id
+    assert lineage[1].proof_id == second_values["proof"].proof_id
+    assert lineage[1].previous_proof_id == lineage[0].proof_id
+    assert store.latest("journal").proof == second_values["proof"]
+
+
+def test_proof_store_capacity_blocks_second_generation():
+    first_fixture = ProofFixture(kind="journal")
+    first_values = first_fixture.complete(operator_id="operator-one")
+    store = proof_store(
+        first_fixture,
+        max_proofs_per_chain=1,
+    )
+    put_values(store, first_fixture, first_values)
+
+    second_fixture = ProofFixture(kind="journal")
+    second_values = second_fixture.complete(operator_id="operator-two")
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="capacity",
+    ):
+        store.put(
+            second_values["proof"],
+            workflow=second_values["workflow"],
+            reservation=second_values["reservation"],
+            certificate=second_values["certificate"],
+            authorization=second_values["authorization"],
+            archive=second_fixture.archive,
+            archive_verification=second_fixture.archive_verification,
+            pruning=second_values["pruning"],
+        )
+
+
+def test_proof_store_same_workflow_cannot_bind_other_proof():
+    fixture = ProofFixture(kind="journal")
+    values = fixture.complete()
+    store = proof_store(fixture)
+    put_values(store, fixture, values)
+
+    key = store._workflow_key(values["workflow"].workflow_id)
+    record = fixture.backend.get(store.namespace, key)
+    conflicting = replace(
+        record.value,
+        proof_id=fp("other-proof"),
+        proof_digest=fp("other-digest"),
+    )
+    fixture.backend.compare_and_swap(
+        store.namespace,
+        key,
+        expected_revision=record.revision,
+        value=conflicting,
+    )
+    with pytest.raises(
+        DurableCompactionProofStoreConflict,
+        match="workflow",
+    ):
+        put_values(store, fixture, values)
+
+
+def test_proof_store_reconstructs_missing_latest_entry_from_head():
+    fixture = ProofFixture(kind="journal")
+    values = fixture.complete()
+    store = proof_store(fixture)
+
+    # Persist proof and workflow index, then emulate a crash after the head CAS
+    # and before the generation index write.
+    stored, _ = store._put_proof(
+        values["proof"],
+        fixture.now[0],
+    )
+    store._put_workflow_index(values["proof"])
+    proof = values["proof"].proof
+    entry = DurableCompactionProofLineageEntry(
+        proof.chain_id,
+        1,
+        proof.proof_id,
+        proof.digest,
+        proof.workflow_id,
+        "",
+        stored.stored_at,
+    )
+    head = DurableCompactionProofHead(
+        proof.chain_id,
+        1,
+        proof.proof_id,
+        entry.digest,
+    )
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._head_key(proof.chain_id),
+        head,
+    )
+    assert (
+        fixture.backend.get(
+            store.namespace,
+            store._entry_key(proof.chain_id, 1),
+        )
+        is None
+    )
+
+    lineage = store.lineage(proof.chain_id)
+    assert lineage == (entry,)
+    assert (
+        fixture.backend.get(
+            store.namespace,
+            store._entry_key(proof.chain_id, 1),
+        )
+        is not None
+    )
+
+
+def test_proof_store_repair_rejects_head_pointing_to_wrong_entry_digest():
+    fixture = ProofFixture(kind="journal")
+    values = fixture.complete()
+    store = proof_store(fixture)
+    stored, _ = store._put_proof(
+        values["proof"],
+        fixture.now[0],
+    )
+    store._put_workflow_index(values["proof"])
+    proof = values["proof"].proof
+    head = DurableCompactionProofHead(
+        proof.chain_id,
+        1,
+        proof.proof_id,
+        fp("wrong-entry"),
+    )
+    fixture.backend.put_if_absent(
+        store.namespace,
+        store._head_key(proof.chain_id),
+        head,
+    )
+    with pytest.raises(
+        DurableCompactionProofStoreError,
+        match="reconstructed",
+    ):
+        store.lineage(proof.chain_id)
+
+
+def test_proof_store_constructor_validation():
+    fixture = ProofFixture()
+    with pytest.raises(TypeError, match="backend"):
+        DurableCompactionProofStore(
+            object(),
+            fixture.builder,
+        )
+    with pytest.raises(TypeError, match="builder"):
+        DurableCompactionProofStore(
+            fixture.backend,
+            object(),
+        )
+    with pytest.raises(ValueError, match="namespace"):
+        DurableCompactionProofStore(
+            fixture.backend,
+            fixture.builder,
+            namespace="",
+        )
+    with pytest.raises(ValueError, match="max_proofs"):
+        DurableCompactionProofStore(
+            fixture.backend,
+            fixture.builder,
+            max_proofs_per_chain=0,
+        )
+    with pytest.raises(ValueError, match="max_cas_retries"):
+        DurableCompactionProofStore(
+            fixture.backend,
+            fixture.builder,
+            max_cas_retries=0,
+        )
+    with pytest.raises(TypeError, match="clock"):
+        DurableCompactionProofStore(
+            fixture.backend,
+            fixture.builder,
+            clock=object(),
+        )
+
+
+def test_proof_store_clock_validation():
+    fixture = ProofFixture()
+    values = fixture.complete()
+    store = DurableCompactionProofStore(
+        fixture.backend,
+        fixture.builder,
+        namespace="invalid-clock-proof-store",
+        clock=lambda: float("nan"),
+    )
+    with pytest.raises(ValueError, match="clock"):
+        put_values(store, fixture, values)
+
+
+def test_proof_store_dataclass_validation():
+    fixture = ProofFixture()
+    values = fixture.complete()
+    proof = values["proof"]
+
+    with pytest.raises(ValueError, match="revision"):
+        StoredDurableCompactionProof(
+            0,
+            proof,
+            1.0,
+        )
+    with pytest.raises(TypeError, match="proof"):
+        StoredDurableCompactionProof(
+            1,
+            object(),
+            1.0,
+        )
+    with pytest.raises(ValueError, match="stored_at"):
+        StoredDurableCompactionProof(
+            1,
+            proof,
+            -1.0,
+        )
+
+    with pytest.raises(ValueError):
+        DurableCompactionProofHead(
+            "journal",
+            0,
+            proof.proof_id,
+            fp("entry"),
+        )
+    with pytest.raises(ValueError):
+        DurableCompactionProofLineageEntry(
+            "journal",
+            0,
+            proof.proof_id,
+            proof.proof.digest,
+            proof.proof.workflow_id,
+            "",
+            1.0,
+        )
+
+
+def test_proof_store_workflow_index_validation():
+    with pytest.raises(ValueError):
+        DurableCompactionProofWorkflowIndex(
+            "bad",
+            "journal",
+            fp("proof"),
+            fp("digest"),
+        )
+    with pytest.raises(ValueError):
+        DurableCompactionProofWorkflowIndex(
+            fp("workflow"),
+            "",
+            fp("proof"),
+            fp("digest"),
+        )
+
