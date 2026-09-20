@@ -19,6 +19,7 @@ queue is congested.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -143,6 +144,7 @@ class TrafficDecision:
     lane: str
     base_sha: str
     observed_at: int
+    decision_fingerprint: str
     active_runs: int
     queued_runs: int
     critical_active: int
@@ -166,6 +168,7 @@ class TrafficDecision:
             "lane": self.lane,
             "base_sha": self.base_sha,
             "observed_at": self.observed_at,
+            "decision_fingerprint": self.decision_fingerprint,
             "active_runs": self.active_runs,
             "queued_runs": self.queued_runs,
             "critical_active": self.critical_active,
@@ -446,9 +449,20 @@ def evaluate(
         relieve = True
         relief_reason = "queue-capacity-exhausted"
 
+    identity_payload = json.dumps(
+        {
+            "repository": snapshot.repository,
+            "base_sha": snapshot.base_sha.lower(),
+            "observed_at": snapshot.observed_at,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    decision_fingerprint = hashlib.sha256(identity_payload).hexdigest()
     common = {
         "base_sha": snapshot.base_sha.lower(),
         "observed_at": snapshot.observed_at,
+        "decision_fingerprint": decision_fingerprint,
         "active_runs": len(active),
         "queued_runs": len(queued),
         "critical_active": len(critical),
@@ -699,6 +713,7 @@ def emit_github_output(
         f"lane={decision.lane}\n"
         f"base_sha={decision.base_sha}\n"
         f"observed_at={decision.observed_at}\n"
+        f"decision_fingerprint={decision.decision_fingerprint}\n"
         f"active_runs={decision.active_runs}\n"
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
@@ -739,6 +754,7 @@ def write_step_summary(decision: TrafficDecision) -> None:
         f"- Lane: `{decision.lane}`",
         f"- Admitted base SHA: `{decision.base_sha}`",
         f"- Observation epoch: `{decision.observed_at}`",
+        f"- Decision fingerprint: `{decision.decision_fingerprint}`",
         (
             "- Active / queued runs: "
             f"`{decision.active_runs}` / "
