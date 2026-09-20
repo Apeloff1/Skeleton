@@ -189,6 +189,8 @@ jobs:
           skeleton/automation
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
+      - name: Validate runner v2 privileged contract
+        run: python scripts/check_runner_v2_contract.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -206,6 +208,11 @@ jobs:
           skeleton/testing/test_automerge_stack.py
           skeleton/testing/test_automerge_engine.py
           skeleton/testing/test_automerge_contract.py
+          skeleton/testing/test_runner_v2_contracts.py
+          skeleton/testing/test_runner_v2_evidence.py
+          skeleton/testing/test_runner_v2_runtime.py
+          skeleton/testing/test_runner_v2_transaction_report.py
+          skeleton/testing/test_runner_v2_engine.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_builder_plane.py
