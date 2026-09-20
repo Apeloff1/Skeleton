@@ -278,3 +278,22 @@ def test_dispatch_passes_decision_bound_sha_to_supervisor() -> None:
     )
     invoke = dispatch.index("gh workflow run supervisor.yml")
     assert comparison < live_check < invoke
+
+
+def test_decision_fingerprint_crosses_dispatch_boundary_as_data() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+    assert (
+        "decision_fingerprint: ${{ steps.traffic.outputs.decision_fingerprint }}"
+        in admission
+    )
+    assert (
+        "TRAFFIC_DECISION_FINGERPRINT: "
+        "${{ needs.admission.outputs.decision_fingerprint }}"
+    ) in dispatch
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert '[[ "$TRAFFIC_DECISION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]' in run_block
+    assert "${{ needs.admission.outputs.decision_fingerprint }}" not in run_block
