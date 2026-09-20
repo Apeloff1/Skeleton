@@ -1,0 +1,412 @@
+schema_version = 1
+
+# Symbolic ownership is intentionally role-based rather than human-specific.
+# A subsystem may own multiple roots. More specific roots win.
+
+[[subsystems]]
+id = "automation-control-plane"
+name = "Automation Control Plane"
+roots = ["skeleton/automation", ".github/workflows"]
+owner = "machine:automation"
+criticality = "critical"
+lifecycle = "active"
+tags = ["automation", "github-actions", "authority"]
+depends_on = ["repository-machine-plane"]
+test_roots = ["tests", "backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "repository-machine-plane"
+name = "Repository Machine Plane"
+roots = [".machine", "skeleton/repo_machine"]
+owner = "machine:repo-intelligence"
+criticality = "critical"
+lifecycle = "active"
+tags = ["machine", "index", "graph", "governance"]
+depends_on = []
+test_roots = ["tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-kernel"
+name = "Skeleton Kernel"
+roots = ["skeleton/kernel", "skeleton/primitives", "skeleton/foundation"]
+owner = "machine:kernel"
+criticality = "critical"
+lifecycle = "active"
+tags = ["kernel", "primitives", "contracts"]
+depends_on = []
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-jeeves"
+name = "Jeeves Intelligence"
+roots = ["skeleton/jeeves", "skeleton/intelligence", "skeleton/cognition", "skeleton/cortex"]
+owner = "machine:jeeves"
+criticality = "high"
+lifecycle = "active"
+tags = ["ai", "reasoning", "jeeves", "cognition"]
+depends_on = ["skeleton-kernel", "skeleton-memory", "skeleton-retrieval"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-memory"
+name = "Memory and Context"
+roots = ["skeleton/memory", "skeleton/context", "skeleton/contexts", "skeleton/vault"]
+owner = "machine:memory"
+criticality = "high"
+lifecycle = "active"
+tags = ["memory", "context", "vault"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-retrieval"
+name = "Retrieval and Knowledge"
+roots = ["skeleton/retrieval", "skeleton/graphs"]
+owner = "machine:retrieval"
+criticality = "high"
+lifecycle = "active"
+tags = ["retrieval", "knowledge", "graph"]
+depends_on = ["skeleton-kernel", "skeleton-memory"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-shells"
+name = "Shell Execution Plane"
+roots = ["skeleton/shells"]
+owner = "machine:shells"
+criticality = "critical"
+lifecycle = "active"
+tags = ["shell", "execution", "tooling"]
+depends_on = ["skeleton-kernel", "skeleton-security", "skeleton-observability"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-agents"
+name = "Agents and Swarm"
+roots = ["skeleton/agents", "skeleton/swarm", "skeleton/mesh", "skeleton/overseer"]
+owner = "machine:agents"
+criticality = "high"
+lifecycle = "active"
+tags = ["agents", "swarm", "mesh"]
+depends_on = ["skeleton-kernel", "skeleton-observability"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-forge"
+name = "Forge and Generation"
+roots = ["skeleton/forge", "skeleton/pipelines", "skeleton/application"]
+owner = "machine:forge"
+criticality = "high"
+lifecycle = "active"
+tags = ["forge", "generation", "pipelines"]
+depends_on = ["skeleton-kernel", "skeleton-agents"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-organism"
+name = "Organism Runtime"
+roots = ["skeleton/organism"]
+owner = "machine:organism"
+criticality = "high"
+lifecycle = "active"
+tags = ["organism", "runtime", "state"]
+depends_on = ["skeleton-kernel", "skeleton-memory", "skeleton-observability"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-simulation"
+name = "Simulation and Game Runtime"
+roots = ["skeleton/simulation", "skeleton/game", "skeleton/galaxy", "skeleton/social"]
+owner = "machine:simulation"
+criticality = "medium"
+lifecycle = "active"
+tags = ["simulation", "game", "world"]
+depends_on = ["skeleton-kernel", "skeleton-agents"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-security"
+name = "Security and Resilience"
+roots = ["skeleton/security", "skeleton/resilience"]
+owner = "machine:security"
+criticality = "critical"
+lifecycle = "active"
+tags = ["security", "resilience", "policy"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["skeleton/testing", "tests", "backend/tests"]
+doc_roots = ["docs/security", "docs"]
+
+[[subsystems]]
+id = "skeleton-observability"
+name = "Observability and Reliability"
+roots = ["skeleton/observability", "skeleton/reliability"]
+owner = "machine:reliability"
+criticality = "high"
+lifecycle = "active"
+tags = ["observability", "metrics", "reliability"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-api"
+name = "Skeleton API and Integrations"
+roots = ["skeleton/api", "skeleton/integrations"]
+owner = "machine:api"
+criticality = "high"
+lifecycle = "active"
+tags = ["api", "integration"]
+depends_on = ["skeleton-kernel", "skeleton-security"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-deployment"
+name = "Skeleton Deployment"
+roots = ["skeleton/deployment"]
+owner = "machine:deployment"
+criticality = "high"
+lifecycle = "active"
+tags = ["deployment", "release"]
+depends_on = ["skeleton-kernel", "skeleton-security", "skeleton-observability"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-developer"
+name = "Developer Tooling"
+roots = ["skeleton/developer", "skeleton/skills"]
+owner = "machine:developer"
+criticality = "medium"
+lifecycle = "active"
+tags = ["developer", "cli", "skills"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "skeleton-acquired"
+name = "Acquired Assets and Mining"
+roots = ["skeleton/acquired"]
+owner = "machine:acquisition"
+criticality = "medium"
+lifecycle = "active"
+tags = ["assets", "mining", "acquired"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["skeleton/testing", "tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-core"
+name = "Backend Core"
+roots = ["backend/core"]
+owner = "machine:backend-core"
+criticality = "critical"
+lifecycle = "active"
+tags = ["backend", "core", "service"]
+depends_on = ["skeleton-kernel"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-gameforge"
+name = "Backend GameForge"
+roots = ["backend/gameforge"]
+owner = "machine:gameforge"
+criticality = "high"
+lifecycle = "active"
+tags = ["backend", "gameforge", "generation"]
+depends_on = ["backend-core"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-routes"
+name = "Backend Routes"
+roots = ["backend/routes"]
+owner = "machine:backend-api"
+criticality = "high"
+lifecycle = "active"
+tags = ["backend", "api", "routes"]
+depends_on = ["backend-core", "backend-services"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-services"
+name = "Backend Services"
+roots = ["backend/services"]
+owner = "machine:backend-services"
+criticality = "high"
+lifecycle = "active"
+tags = ["backend", "services"]
+depends_on = ["backend-core"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-knowledge"
+name = "Backend Knowledge Nexus"
+roots = ["backend/knowledge_nexus"]
+owner = "machine:knowledge"
+criticality = "medium"
+lifecycle = "active"
+tags = ["backend", "knowledge"]
+depends_on = ["backend-core"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "backend-zaibatsu"
+name = "Backend Zaibatsu"
+roots = ["backend/zaibatsu"]
+owner = "machine:governance"
+criticality = "high"
+lifecycle = "active"
+tags = ["backend", "governance"]
+depends_on = ["backend-core"]
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "frontend-app"
+name = "Frontend Application"
+roots = ["frontend/app", "frontend/src", "frontend/components", "frontend/features"]
+owner = "machine:frontend"
+criticality = "high"
+lifecycle = "active"
+tags = ["frontend", "react", "typescript"]
+depends_on = []
+test_roots = ["frontend"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "frontend-platform"
+name = "Frontend Platform"
+roots = ["frontend/services", "frontend/state", "frontend/hooks", "frontend/utils", "frontend/types", "frontend/scripts"]
+owner = "machine:frontend-platform"
+criticality = "medium"
+lifecycle = "active"
+tags = ["frontend", "platform"]
+depends_on = ["frontend-app"]
+test_roots = ["frontend"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "shift-supervisor"
+name = "Shift Supervisor Core"
+roots = ["core/shift_supervisor"]
+owner = "machine:shift-supervisor"
+criticality = "high"
+lifecycle = "active"
+tags = ["core", "supervisor"]
+depends_on = []
+test_roots = ["tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "jvm-accelerators"
+name = "JVM Accelerators"
+roots = ["java-accelerators"]
+owner = "machine:accelerators"
+criticality = "medium"
+lifecycle = "active"
+tags = ["java", "accelerator"]
+depends_on = []
+test_roots = ["tests", "backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "rust-gameforge"
+name = "Rust GameForge Satellite"
+roots = ["satellites/gameforge-rs"]
+owner = "machine:accelerators"
+criticality = "medium"
+lifecycle = "active"
+tags = ["rust", "gameforge", "satellite"]
+depends_on = []
+test_roots = ["satellites/gameforge-rs"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "middleware-satellite"
+name = "GameForge Middleware Satellite"
+roots = ["satellites/gameforge-middleware"]
+owner = "machine:integration"
+criticality = "medium"
+lifecycle = "active"
+tags = ["middleware", "satellite"]
+depends_on = ["backend-core"]
+test_roots = ["satellites/gameforge-middleware"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "canonical-tests"
+name = "Canonical Test Plane"
+roots = ["tests", "skeleton/testing", "backend/tests"]
+owner = "machine:quality"
+criticality = "high"
+lifecycle = "active"
+tags = ["tests", "quality"]
+depends_on = []
+test_roots = ["tests", "skeleton/testing", "backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "canonical-docs"
+name = "Canonical Documentation"
+roots = ["docs"]
+owner = "machine:docs"
+criticality = "medium"
+lifecycle = "active"
+tags = ["docs", "architecture"]
+depends_on = []
+test_roots = ["tests", "backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "bulk-data"
+name = "Bulk Data and Backups"
+roots = ["backend/data", "memory/mongo_backup"]
+owner = "machine:data"
+criticality = "medium"
+lifecycle = "data"
+tags = ["data", "backup"]
+depends_on = []
+test_roots = ["backend/tests"]
+doc_roots = ["docs"]
+
+[[subsystems]]
+id = "branch-snapshot-archive"
+name = "Branch Snapshot Archive"
+roots = ["satellites/branch-snapshots"]
+owner = "machine:archive"
+criticality = "low"
+lifecycle = "archive"
+tags = ["archive", "snapshot"]
+depends_on = []
+test_roots = []
+doc_roots = ["docs/lineage"]
+
+[[subsystems]]
+id = "legacy-archive"
+name = "Legacy Archive"
+roots = ["docs/archive", "tests/legacy_root", "scripts/legacy_root"]
+owner = "machine:archive"
+criticality = "low"
+lifecycle = "archive"
+tags = ["archive", "legacy"]
+depends_on = []
+test_roots = []
+doc_roots = ["docs/archive"]
