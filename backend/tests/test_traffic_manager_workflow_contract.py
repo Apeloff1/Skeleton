@@ -40,6 +40,18 @@ def test_traffic_manager_coalesces_overlapping_runs_without_cancelling_mutation(
     assert "cancel-in-progress: false" in concurrency
 
 
+def test_traffic_control_uses_independent_arm_recovery_lane() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    relief = _job_block(source, "relief", "dispatch")
+    dispatch = _job_block(source, "dispatch")
+    assert "runs-on: ubuntu-24.04-arm" in admission
+    assert "runs-on: ubuntu-24.04-arm" in relief
+    assert "runs-on: ubuntu-24.04-arm" in dispatch
+    assert "runs-on: ubuntu-latest" not in admission
+    assert "runs-on: ubuntu-latest" not in relief
+
+
 def test_admission_job_is_read_only() -> None:
     source = _source(TRAFFIC)
     admission = _job_block(source, "admission", "relief")
