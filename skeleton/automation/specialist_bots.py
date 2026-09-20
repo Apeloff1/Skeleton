@@ -1014,15 +1014,19 @@ def main() -> int:
             custody
         )
         if build_authorization is not None:
-            build_authorization = revalidate_builder_authority(
-                custody,
-                build_authorization,
-                builder_manifest,
+            build_authorization = revalidate_live_build_authorization(
+                build_authorization
             )
         builder_manifest = admit_builder_manifest(
             custody,
             build_authorization,
         )
+        if build_authorization is not None:
+            build_authorization = revalidate_builder_authority(
+                custody,
+                build_authorization,
+                builder_manifest,
+            )
         branch, active_pr = _preflight(
             custody,
             builder_manifest=builder_manifest,
@@ -1149,9 +1153,6 @@ def main() -> int:
                     "status": "no-change",
                     "bot": spec.name,
                     "summary": result["summary"],
-                    "supervisor_snapshot_fingerprint": (
-                        custody.snapshot_fingerprint
-                    ),
                 }
             )
             return 0
