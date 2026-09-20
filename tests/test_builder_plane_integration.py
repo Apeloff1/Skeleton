@@ -703,6 +703,33 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             manifest(),
         )
 
+    def test_no_change_worker_output_is_admitted_without_custody_fields(self) -> None:
+        evidence = parse_worker_result(
+            json.dumps(
+                {
+                    "status": "no-change",
+                    "bot": "feature-builder",
+                    "summary": "authorized task already satisfied",
+                }
+            ),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence,
+            {
+                "status": "no-change",
+                "bot": "feature-builder",
+            },
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+        )
+        validate_builder_worker_evidence(
+            evidence,
+            manifest(),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
