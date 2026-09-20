@@ -1,0 +1,104 @@
+name: Container Digest Refresh Proposal
+
+on:
+  schedule:
+    - cron: "31 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-digest-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  propose:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11.16"
+
+      - name: Inventory immutable container references
+        run: >-
+          python scripts/container_digest_refresh.py inventory
+          --output "$RUNNER_TEMP/container-inventory.json"
+
+      - name: Resolve current registry manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/container_digest_refresh.py queries             --inventory "$RUNNER_TEMP/container-inventory.json"             > "$RUNNER_TEMP/container-queries.txt"
+          : > "$RUNNER_TEMP/container-resolved.tsv"
+          while IFS= read -r image_ref; do
+            if [[ -z "$image_ref" ]]; then
+              continue
+            fi
+            descriptor="$RUNNER_TEMP/descriptor.json"
+            docker buildx imagetools inspect "$image_ref" \
+              --format '{{json .Manifest}}' > "$descriptor"
+            digest="$(jq -er '.digest | strings | select(test("^sha256:[0-9a-f]{64}$"))' "$descriptor")"
+            printf '%s\t%s\n' "$image_ref" "$digest" \
+              >> "$RUNNER_TEMP/container-resolved.tsv"
+          done < "$RUNNER_TEMP/container-queries.txt"
+
+      - name: Build content-addressed refresh plan
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/container_digest_refresh.py resolutions             --input "$RUNNER_TEMP/container-resolved.tsv"             --output "$RUNNER_TEMP/container-resolutions.json"             --resolver docker-buildx-imagetools-manifest-digest
+          python scripts/container_digest_refresh.py plan             --inventory "$RUNNER_TEMP/container-inventory.json"             --resolutions "$RUNNER_TEMP/container-resolutions.json"             --source-commit "$SOURCE_COMMIT"             --output "$RUNNER_TEMP/container-refresh-plan.json"
+
+      - name: Apply proposal in disposable checkout and verify provenance
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/container_digest_refresh.py apply             --plan "$RUNNER_TEMP/container-refresh-plan.json"             --source-commit "$SOURCE_COMMIT"             --evidence "$RUNNER_TEMP/container-refresh-evidence.json"
+          python scripts/container_digest_refresh.py verify             --plan "$RUNNER_TEMP/container-refresh-plan.json"             --evidence "$RUNNER_TEMP/container-refresh-evidence.json"
+          git diff --no-ext-diff --binary --             Dockerfile backend/Dockerfile frontend/Dockerfile docker-compose.yml             .github/workflows             > "$RUNNER_TEMP/container-refresh.patch"
+
+      - name: Summarize proposal
+        env:
+          PLAN_PATH: ${{ runner.temp }}/container-refresh-plan.json
+          EVIDENCE_PATH: ${{ runner.temp }}/container-refresh-evidence.json
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          plan = json.loads(Path(os.environ["PLAN_PATH"]).read_text(encoding="utf-8"))
+          evidence = json.loads(Path(os.environ["EVIDENCE_PATH"]).read_text(encoding="utf-8"))
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text(
+              "## Container digest refresh proposal\n\n"
+              f"- resolver: {plan['resolver']}\n"
+              f"- changed image refs: {len(plan['entries'])}\n"
+              f"- exact pin replacements: {len(evidence['replacements'])}\n"
+              f"- plan digest: {plan['plan_digest']}\n"
+              f"- evidence digest: {evidence['evidence_digest']}\n"
+              "\nThe workflow is read-only to GitHub. Apply the retained patch only after review.\n",
+              encoding="utf-8",
+          )
+
+      - name: Upload refresh proposal and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-digest-refresh-proposal
+          path: |
+            ${{ runner.temp }}/container-inventory.json
+            ${{ runner.temp }}/container-resolutions.json
+            ${{ runner.temp }}/container-refresh-plan.json
+            ${{ runner.temp }}/container-refresh-evidence.json
+            ${{ runner.temp }}/container-refresh.patch
+          if-no-files-found: error
+          retention-days: 30

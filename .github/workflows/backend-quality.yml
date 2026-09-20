@@ -18,6 +18,7 @@ on:
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_quality_gate_parity.py"
       - "scripts/check_repository_python_sast.py"
+      - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
@@ -37,6 +38,7 @@ on:
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_quality_gate_parity.py"
       - "scripts/check_repository_python_sast.py"
+      - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
@@ -118,6 +120,8 @@ jobs:
           skeleton/testing/test_scanner_integrity.py
           skeleton/testing/test_defense_control_plane_contract.py
           skeleton/testing/test_automation_control_plane.py
+          tests/test_container_digest_refresh.py
+          tests/test_container_digest_refresh_workflow.py
           tests/test_generated_code_sandbox.py
 
       - name: Process invocation safety gate
