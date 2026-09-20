@@ -57,6 +57,9 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Shell stabilization boundary:** zero-file-delta refs stay lineage-only; 300-file stabilization waves are held for file-level reconciliation.
 
+- **PR #1865:** physics aggregate validation staged; the 77-file physics wave remains reconciliation input.
+- Large held waves include bounded shell runner (300 files), Jeeves decision rules (137), merge unblockers (132), and live-service boundaries (98–99).
+
 ## Target layout
 
 ```text
