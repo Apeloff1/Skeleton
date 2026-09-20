@@ -42,6 +42,9 @@ Target: **one coherent application** for human maintenance and automated machine
 - **PRs #1809–#1814:** builder-plane deltas, repair receipts, durable checkpoints, agent squads, and four-role studios staged for reconciliation.
 - **Held feature waves:** bounded shell runner (300 files) and build-capable automation v2 (33 files) remain large reconciliation inputs.
 
+- **PRs #1815–#1833:** galaxy lifecycle, Java acceleration/control/observability/retrieval, Jeeves decision/planning/frontier work, machine control, and capability packs staged for reconciliation.
+- **#1828:** Jeeves topology learning is a 129-commit / 20-file wave and remains a large reconciliation input.
+
 ## Target layout
 
 ```text
