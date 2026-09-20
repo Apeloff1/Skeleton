@@ -78,3 +78,54 @@ def verify_digest(attestation: ContractAttestation, expected_digest: str) -> boo
     if len(expected_digest) != 64:
         return False
     return hmac.compare_digest(attestation.digest(), expected_digest.lower())
+
+
+@dataclass(frozen=True, slots=True)
+class AttestationChain:
+    attestations: tuple[ContractAttestation, ...]
+    previous_digests: tuple[str | None, ...]
+
+    def validate(self) -> None:
+        if not self.attestations:
+            raise ValueError("attestation chain is empty")
+        if len(self.attestations) != len(self.previous_digests):
+            raise ValueError("attestation chain length mismatch")
+        if len(self.attestations) > 256:
+            raise ValueError("attestation chain exceeds length budget")
+        seen_commits: set[str] = set()
+        for index, attestation in enumerate(self.attestations):
+            validate_attestation(attestation)
+            commit = attestation.commit_sha.lower()
+            if commit in seen_commits:
+                raise ValueError("duplicate commit in attestation chain")
+            seen_commits.add(commit)
+            previous = self.previous_digests[index]
+            if index == 0:
+                if previous is not None:
+                    raise ValueError("attestation chain root must not have predecessor")
+                continue
+            expected = self.attestations[index - 1].digest()
+            if previous is None or not hmac.compare_digest(previous.lower(), expected):
+                raise ValueError(f"attestation chain discontinuity at index {index}")
+
+    def head_digest(self) -> str:
+        self.validate()
+        return self.attestations[-1].digest()
+
+
+def append_attestation(
+    chain: AttestationChain | None,
+    attestation: ContractAttestation,
+) -> AttestationChain:
+    validate_attestation(attestation)
+    if chain is None:
+        result = AttestationChain((attestation,), (None,))
+        result.validate()
+        return result
+    chain.validate()
+    result = AttestationChain(
+        chain.attestations + (attestation,),
+        chain.previous_digests + (chain.head_digest(),),
+    )
+    result.validate()
+    return result
