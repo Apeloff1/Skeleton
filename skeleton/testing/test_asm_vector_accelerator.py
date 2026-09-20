@@ -116,7 +116,27 @@ def test_batch_dot_scores_rows_and_tail_dimensions(tmp_path: Path) -> None:
     ]
 
     assert actual == pytest.approx(expected, rel=2e-5, abs=2e-5)
-    assert accelerator.status().calls == 1
+
+    long_query = [float(index - 11) / 7.0 for index in range(35)]
+    long_candidates = [
+        [float((index * 3) % 17 - 8) / 5.0 for index in range(35)],
+        [float(23 - index) / 11.0 for index in range(35)],
+    ]
+    long_actual = accelerator.dot_batch_f32(
+        long_query,
+        long_candidates,
+    )
+    long_expected = [
+        sum(a * b for a, b in zip(long_query, candidate))
+        for candidate in long_candidates
+    ]
+
+    assert long_actual == pytest.approx(
+        long_expected,
+        rel=3e-5,
+        abs=3e-5,
+    )
+    assert accelerator.status().calls == 2
 
 
 def test_batch_dot_validates_matrix_shape(tmp_path: Path) -> None:
