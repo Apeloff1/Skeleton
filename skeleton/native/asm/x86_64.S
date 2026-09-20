@@ -4,9 +4,40 @@
 .globl skeleton_asm_abi_version
 .type skeleton_asm_abi_version, @function
 skeleton_asm_abi_version:
-    mov $3, %eax
+    mov $4, %eax
     ret
 .size skeleton_asm_abi_version, .-skeleton_asm_abi_version
+
+.p2align 4
+.globl skeleton_asm_capabilities
+.type skeleton_asm_capabilities, @function
+skeleton_asm_capabilities:
+    push %rbx
+    mov $1, %r9d
+
+    mov $1, %eax
+    xor %ecx, %ecx
+    cpuid
+    mov %ecx, %r8d
+
+    bt $27, %r8d
+    jnc .Lcap_done
+    bt $28, %r8d
+    jnc .Lcap_done
+
+    xor %ecx, %ecx
+    xgetbv
+    and $0x6, %eax
+    cmp $0x6, %eax
+    jne .Lcap_done
+
+    or $2, %r9d
+
+.Lcap_done:
+    mov %r9d, %eax
+    pop %rbx
+    ret
+.size skeleton_asm_capabilities, .-skeleton_asm_capabilities
 
 .p2align 4
 .globl skeleton_asm_dot_f32
@@ -269,5 +300,73 @@ skeleton_asm_dot_matrix_f32:
 .Lmatrix_done:
     ret
 .size skeleton_asm_dot_matrix_f32, .-skeleton_asm_dot_matrix_f32
+
+.p2align 4
+.globl skeleton_asm_dot_matrix_f32_avx
+.type skeleton_asm_dot_matrix_f32_avx, @function
+skeleton_asm_dot_matrix_f32_avx:
+    test %rsi, %rsi
+    je .Lavx_matrix_done
+
+    push %r12
+    mov %rsi, %rax
+
+.Lavx_matrix_query:
+    mov %rdx, %r10
+    mov %rcx, %r11
+    test %r11, %r11
+    je .Lavx_matrix_next_query
+
+.Lavx_matrix_row:
+    vxorps %ymm0, %ymm0, %ymm0
+    mov %rdi, %rsi
+    mov %r8, %r12
+    shr $3, %r12
+    je .Lavx_matrix_reduce
+
+.Lavx_matrix_vec:
+    vmovups (%rsi), %ymm1
+    vmulps (%r10), %ymm1, %ymm1
+    vaddps %ymm1, %ymm0, %ymm0
+    add $32, %rsi
+    add $32, %r10
+    dec %r12
+    jne .Lavx_matrix_vec
+
+.Lavx_matrix_reduce:
+    vextractf128 $1, %ymm0, %xmm1
+    vaddps %xmm1, %xmm0, %xmm0
+    vhaddps %xmm0, %xmm0, %xmm0
+    vhaddps %xmm0, %xmm0, %xmm0
+
+    mov %r8, %r12
+    and $7, %r12
+    je .Lavx_matrix_store
+
+.Lavx_matrix_tail_loop:
+    vmovss (%rsi), %xmm1
+    vmulss (%r10), %xmm1, %xmm1
+    vaddss %xmm1, %xmm0, %xmm0
+    add $4, %rsi
+    add $4, %r10
+    dec %r12
+    jne .Lavx_matrix_tail_loop
+
+.Lavx_matrix_store:
+    vmovss %xmm0, (%r9)
+    add $4, %r9
+    dec %r11
+    jne .Lavx_matrix_row
+
+.Lavx_matrix_next_query:
+    lea (%rdi,%r8,4), %rdi
+    dec %rax
+    jne .Lavx_matrix_query
+
+    pop %r12
+    vzeroupper
+.Lavx_matrix_done:
+    ret
+.size skeleton_asm_dot_matrix_f32_avx, .-skeleton_asm_dot_matrix_f32_avx
 
 .section .note.GNU-stack,"",@progbits
