@@ -171,7 +171,11 @@ def list_branches(repository: str, max_branches: int) -> tuple[tuple[Branch, ...
     return tuple(rows), complete
 
 
-def list_prs(repository: str, base: str, limit: int = 200) -> tuple[PullRequest, ...]:
+def list_prs(
+    repository: str,
+    base: str,
+    limit: int = 200,
+) -> tuple[tuple[PullRequest, ...], bool]:
     if limit < 1 or limit > 500:
         raise BranchMergeError("PR inventory limit out of range")
     value = _json(
@@ -217,7 +221,7 @@ def list_prs(repository: str, base: str, limit: int = 200) -> tuple[PullRequest,
                 url=str(item.get("url", "")).strip(),
             )
         )
-    return tuple(rows)
+    return tuple(rows), len(value) < limit
 
 
 def build_plan(
@@ -279,7 +283,7 @@ def build_plan(
 
     if not complete:
         dispatch = False
-        reason = "branch-inventory-truncated"
+        reason = "repository-inventory-truncated"
     elif not selected:
         dispatch = False
         reason = "no-eligible-branch-backed-prs"
@@ -413,7 +417,8 @@ def run(argv: Sequence[str] | None = None) -> int:
     observe_only = args.observe_only or _env_bool("BRANCH_MERGE_OBSERVE_ONLY")
 
     branches, complete = list_branches(repository, max_branches)
-    prs = list_prs(repository, base)
+    prs, pr_complete = list_prs(repository, base)
+    complete = complete and pr_complete
     plan = build_plan(
         repository,
         base,
