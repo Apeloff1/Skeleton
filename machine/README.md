@@ -49,6 +49,9 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Physics family:** 68–83 files per branch with substantial overlap; do not blindly merge.
 - **#1834–#1842:** assembly queue extended and machine map refreshed.
 
+- **PRs #1843–#1859:** throughput, Ubuntu, orchestration, repo-bot/inventory, Jeeves scientific/compiler/semantic planes, and model-routing waves staged.
+- Zero-file-delta reconciliation branches remain lineage-only; no fake integration is recorded.
+
 ## Target layout
 
 ```text
