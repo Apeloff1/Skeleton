@@ -37,6 +37,9 @@ from .worker_health import classify_worker_prs
 from skeleton.repo_machine.builder import build_repository_model
 from skeleton.repo_machine.health import repository_health
 from skeleton.repo_machine.planner import candidate_payload
+from skeleton.repo_machine.growth import growth_recommendations
+from skeleton.repo_machine.shards import shard_index
+from skeleton.repo_machine.steward import select_steward_plan
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
@@ -338,6 +341,15 @@ def _machine_repository_context() -> dict[str, object]:
             "health": repository_health(model).as_dict(),
             "organization": model.machine_context(max_findings=32),
             "work_candidates": candidate_payload(model, limit=24)["work"],
+            "steward_plan": select_steward_plan(
+                model,
+                max_objectives=3,
+            ).as_dict(),
+            "growth_recommendations": [
+                item.as_dict()
+                for item in growth_recommendations(model, limit=12)
+            ],
+            "context_shards": shard_index(model),
         }
     except (OSError, ValueError, TypeError) as exc:
         return {
