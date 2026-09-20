@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.8",
+  "schema_version": "1.9",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,11 +66,11 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1842,
+      "last": 1859,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1834-1842",
+      "prs": "1843-1859",
       "domains": [
         "galaxy lifecycle",
         "Java accelerators/control/observability/retrieval",
@@ -85,7 +85,13 @@
         "provider resilience",
         "SMB shift manager",
         "tools cockpit",
-        "supervisor downstream/hierarchy/resilience"
+        "supervisor downstream/hierarchy/resilience",
+        "throughput mechanics/pipeline",
+        "Ubuntu delivery",
+        "x-agent orchestration",
+        "repo-bot/inventory gates",
+        "Jeeves scientific/compiler/cortex/lens/semantic planes",
+        "model routing"
       ]
     },
     "large_reconciliation": [
@@ -138,7 +144,8 @@
         "files": "68-83 each",
         "reason": "large overlapping physics wave; reconcile before assembly"
       }
-    ]
+    ],
+    "lineage_note": "Zero-file-delta reconcile branches remain lineage-only and are not represented as integrated content."
   },
   "integrated_domains": [
     "automation runtime dependency repair",
