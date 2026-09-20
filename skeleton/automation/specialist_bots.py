@@ -1414,65 +1414,78 @@ def main() -> int:
             for description in result["tests"]:
                 body += f"- {description}\n"
 
-        subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--repo",
-                execution.repository,
-                "--base",
-                execution.default_branch,
-                "--head",
-                branch,
-                "--title",
-                (
-                    f"bot({spec.name}): "
-                    "specialist maintenance"
-                ),
-                "--body",
-                body[:12_000],
-            ],
-            check=True,
-            env=publish_env,
-            timeout=60,
-        )
+        if followup is None:
+            subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--repo",
+                    execution.repository,
+                    "--base",
+                    execution.default_branch,
+                    "--head",
+                    branch,
+                    "--title",
+                    (
+                        f"bot({spec.name}): "
+                        "specialist maintenance"
+                    ),
+                    "--body",
+                    body[:12_000],
+                ],
+                check=True,
+                env=publish_env,
+                timeout=60,
+            )
 
+        status_payload: dict[str, Any] = {
+            "status": (
+                "pull-request-updated"
+                if followup is not None
+                else "pull-request-created"
+            ),
+            "bot": spec.name,
+            "branch": branch,
+            "changed_lines": changed_lines,
+            "proposal_digest": digest,
+            "base_sha": execution.base_sha,
+            "supervisor_snapshot_fingerprint": (
+                custody.snapshot_fingerprint
+            ),
+            "execution_fingerprint": (
+                execution.fingerprint
+            ),
+            "build_issue_number": (
+                build_authorization.issue_number
+                if build_authorization is not None
+                else None
+            ),
+            "build_task_digest": (
+                build_authorization.task_digest
+                if build_authorization is not None
+                else None
+            ),
+            "builder_manifest_digest": (
+                builder_manifest.manifest_digest
+                if builder_manifest is not None
+                else None
+            ),
+            "builder_proposal_receipt": (
+                builder_receipt.as_dict()
+                if builder_receipt is not None
+                else None
+            ),
+        }
+        if followup is not None:
+            status_payload["pull_request"] = (
+                followup.pr_number
+            )
+            status_payload["repair_parent_sha"] = (
+                followup.head_sha
+            )
         _print_status(
-            {
-                "status": "pull-request-created",
-                "bot": spec.name,
-                "branch": branch,
-                "changed_lines": changed_lines,
-                "proposal_digest": digest,
-                "base_sha": execution.base_sha,
-                "supervisor_snapshot_fingerprint": (
-                    custody.snapshot_fingerprint
-                ),
-                "execution_fingerprint": (
-                    execution.fingerprint
-                ),
-                "build_issue_number": (
-                    build_authorization.issue_number
-                    if build_authorization is not None
-                    else None
-                ),
-                "build_task_digest": (
-                    build_authorization.task_digest
-                    if build_authorization is not None
-                    else None
-                ),
-                "builder_manifest_digest": (
-                    builder_manifest.manifest_digest
-                    if builder_manifest is not None
-                    else None
-                ),
-                "builder_proposal_receipt": (
-                    builder_receipt.as_dict()
-                    if builder_receipt is not None
-                    else None
-                ),
-            }
+            status_payload
         )
         return 0
 
