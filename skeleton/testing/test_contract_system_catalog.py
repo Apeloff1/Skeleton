@@ -94,3 +94,70 @@ def test_dependency_closure_is_topologically_ordered():
 def test_unknown_dependency_closure_fails_closed():
     with pytest.raises(KeyError):
         dependency_closure("does-not-exist")
+
+
+def test_evidence_consumer_must_depend_on_producer():
+    catalog = (
+        ContractSpec("producer", "scripts/check_p_contract.py", ContractTier.SECURITY),
+        ContractSpec(
+            "consumer",
+            "scripts/check_c_contract.py",
+            ContractTier.ROOT,
+            consumes_evidence=(("producer", 1),),
+        ),
+    )
+    with pytest.raises(ValueError, match="non-dependency"):
+        validate_catalog(catalog)
+
+
+def test_evidence_version_mismatch_fails_closed():
+    catalog = (
+        ContractSpec(
+            "producer",
+            "scripts/check_p_contract.py",
+            ContractTier.SECURITY,
+            evidence_version=2,
+        ),
+        ContractSpec(
+            "consumer",
+            "scripts/check_c_contract.py",
+            ContractTier.ROOT,
+            depends_on=("producer",),
+            consumes_evidence=(("producer", 1),),
+        ),
+    )
+    with pytest.raises(ValueError, match="evidence version mismatch"):
+        validate_catalog(catalog)
+
+
+def test_evidence_version_match_is_valid():
+    catalog = (
+        ContractSpec(
+            "producer",
+            "scripts/check_p_contract.py",
+            ContractTier.SECURITY,
+            evidence_version=2,
+        ),
+        ContractSpec(
+            "consumer",
+            "scripts/check_c_contract.py",
+            ContractTier.ROOT,
+            depends_on=("producer",),
+            consumes_evidence=(("producer", 2),),
+        ),
+    )
+    validate_catalog(catalog)
+
+
+def test_boolean_evidence_version_is_rejected():
+    catalog = (
+        ContractSpec(
+            "producer",
+            "scripts/check_p_contract.py",
+            ContractTier.SECURITY,
+            evidence_version=True,
+        ),
+    )
+    # bool is an int subclass; contract versions must remain explicit integers.
+    with pytest.raises(ValueError):
+        validate_catalog(catalog)
