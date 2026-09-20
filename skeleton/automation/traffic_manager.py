@@ -515,15 +515,19 @@ def evaluate(
     )
 
 
-def observe(
-    repository: str,
-    base_sha: str,
-    *,
-    current_run_id: str = "",
-    now: int | None = None,
-) -> TrafficSnapshot:
-    """Capture a bounded repository traffic snapshot."""
-    runs = _gh_json(
+def _observe_runs(repository: str) -> list[dict[str, Any]]:
+    """Return recent history plus a complete bounded view of active statuses.
+
+    A mixed latest-N history can hide old queued/in-progress runs after enough
+    completed runs arrive. Query each active status separately and merge by
+    GitHub run id so admission never mistakes hidden live work for spare
+    capacity.
+    """
+    fields = (
+        "databaseId,name,event,status,conclusion,"
+        "headBranch,headSha,createdAt,updatedAt"
+    )
+    history = _gh_json(
         [
             "run",
             "list",
@@ -532,12 +536,49 @@ def observe(
             "--limit",
             str(MAX_ITEMS),
             "--json",
-            (
-                "databaseId,name,event,status,conclusion,"
-                "headBranch,headSha,createdAt,updatedAt"
-            ),
+            fields,
         ]
     )
+    merged: dict[str, dict[str, Any]] = {}
+    anonymous: list[dict[str, Any]] = []
+
+    def add(run: dict[str, Any]) -> None:
+        run_id = _run_id(run)
+        if run_id:
+            merged[run_id] = run
+        else:
+            anonymous.append(run)
+
+    for run in history:
+        add(run)
+    for status in sorted(ACTIVE_STATUSES):
+        for run in _gh_json(
+            [
+                "run",
+                "list",
+                "--repo",
+                repository,
+                "--status",
+                status,
+                "--limit",
+                str(MAX_ITEMS),
+                "--json",
+                fields,
+            ]
+        ):
+            add(run)
+    return [*merged.values(), *anonymous]
+
+
+def observe(
+    repository: str,
+    base_sha: str,
+    *,
+    current_run_id: str = "",
+    now: int | None = None,
+) -> TrafficSnapshot:
+    """Capture a bounded repository traffic snapshot."""
+    runs = _observe_runs(repository)
     prs = _gh_json(
         [
             "pr",
