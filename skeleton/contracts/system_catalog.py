@@ -21,6 +21,7 @@ class ContractSpec:
     depends_on: tuple[str, ...] = ()
     owns: tuple[str, ...] = ()
     evidence_version: int = 1
+    consumes_evidence: tuple[tuple[str, int], ...] = ()
 
 
 CATALOG = (
@@ -85,6 +86,22 @@ def validate_catalog(catalog: Iterable[ContractSpec] = CATALOG) -> None:
             raise ValueError(f"{item.contract_id} has unknown dependencies: {sorted(missing)}")
         if item.evidence_version < 1:
             raise ValueError(f"invalid evidence version: {item.contract_id}")
+        consumed_names: set[str] = set()
+        for producer, version in item.consumes_evidence:
+            if producer in consumed_names:
+                raise ValueError(f"duplicate evidence dependency: {item.contract_id}:{producer}")
+            consumed_names.add(producer)
+            if producer not in item.depends_on:
+                raise ValueError(
+                    f"{item.contract_id} consumes evidence from non-dependency: {producer}"
+                )
+            if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+                raise ValueError(f"invalid consumed evidence version: {item.contract_id}:{producer}")
+            if producer in index and index[producer].evidence_version != version:
+                raise ValueError(
+                    f"evidence version mismatch: {producer} produces "
+                    f"{index[producer].evidence_version}, {item.contract_id} requires {version}"
+                )
         if len(item.owns) != len(set(item.owns)):
             raise ValueError(f"duplicate ownership prefix: {item.contract_id}")
     topological_order(items)
