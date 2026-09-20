@@ -218,6 +218,11 @@ jobs:
           tests/test_repo_machine_growth.py
           tests/test_repo_machine_catalog.py
           tests/test_repo_machine_sota.py
+          tests/test_repo_machine_operations.py
+          tests/test_repo_machine_coordination.py
+          tests/test_repo_machine_scheduler.py
+          tests/test_repo_machine_protocol.py
+          tests/test_repo_machine_architecture.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:
@@ -226,6 +231,7 @@ jobs:
         run: >-
           python -m pytest -q --noconftest --import-mode=importlib
           backend/tests/test_supervisor_workflow_contract.py
+          backend/tests/test_repo_machine_supervisor_contract.py
 
   readiness:
     name: Merge Readiness
