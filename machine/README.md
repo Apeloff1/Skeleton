@@ -88,6 +88,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Latest staging wave:** machine gates, safe-1669, merge-unblockers, live-service boundaries, Jeeves decision drain, and shell-live gates are staged as integration PRs; large overlapping waves remain held for reconciliation.
 
+- **Semantic/domain wave:** Jeeves semantics, repository bots, security evidence, Java observability/retrieval, and role studios revalidated against assembly; existing integration PRs reused.
+
 ## Target layout
 
 ```text
