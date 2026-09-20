@@ -32,7 +32,7 @@ def test_preflight_is_side_effect_free(tmp_path: Path) -> None:
 
     assert before == after
     assert status.library.endswith(
-        f"libskeleton_asm_v2_{status.architecture}.so"
+        f"libskeleton_asm_v3_{status.architecture}.so"
     )
     if sys.platform.startswith("linux") and status.architecture in {
         "x86_64",
@@ -72,7 +72,7 @@ class _FakeFunction:
 
 
 class _StaleAbiLibrary:
-    def __init__(self, version: int = 2) -> None:
+    def __init__(self, version: int = 3) -> None:
         self.skeleton_asm_abi_version = _FakeFunction(version)
         self.skeleton_asm_dot_f32 = _FakeFunction()
         self.skeleton_asm_l2_sq_f32 = _FakeFunction()
@@ -106,10 +106,10 @@ def test_loader_rejects_wrong_abi_version(
     monkeypatch.setattr(
         asm_module.ctypes,
         "CDLL",
-        lambda _path: _StaleAbiLibrary(version=1),
+        lambda _path: _StaleAbiLibrary(version=2),
     )
 
-    with pytest.raises(AsmAcceleratorAbiError, match="expected 2, got 1"):
+    with pytest.raises(AsmAcceleratorAbiError, match="expected 3, got 2"):
         AsmVectorAccelerator(library)
 
 
@@ -145,7 +145,7 @@ def test_build_load_and_numeric_contract(tmp_path: Path) -> None:
         )
 
     runtime = accelerator.status()
-    assert runtime.abi_version == 2
+    assert runtime.abi_version == 3
     assert runtime.calls == len(cases) * 2
     assert runtime.failures == 0
 
@@ -212,6 +212,34 @@ def test_batch_dot_validates_matrix_shape(tmp_path: Path) -> None:
     assert accelerator.status().calls == 0
 
 
+def test_multi_query_matrix_scores_in_one_native_call(tmp_path: Path) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    queries = [
+        1.0, 0.0, 2.0,
+        0.0, 1.0, -1.0,
+    ]
+    matrix = [
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0,
+    ]
+    actual = accelerator.dot_queries_matrix_f32(
+        queries,
+        matrix,
+        query_count=2,
+        rows=2,
+        dimensions=3,
+    )
+
+    assert actual == pytest.approx([7.0, 16.0, -1.0, -1.0])
+    assert accelerator.status().calls == 1
+
+
 def test_length_mismatch_is_rejected_before_native_call(tmp_path: Path) -> None:
     status = _supported_preflight(tmp_path)
     if not status.build_ready:
@@ -232,6 +260,7 @@ def test_assembly_sources_export_the_same_abi() -> None:
         "skeleton_asm_dot_f32",
         "skeleton_asm_l2_sq_f32",
         "skeleton_asm_dot_batch_f32",
+        "skeleton_asm_dot_matrix_f32",
     }
     for filename in ("x86_64.S", "aarch64.S"):
         source = (root / filename).read_text(encoding="utf-8")
