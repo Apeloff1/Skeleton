@@ -14,11 +14,14 @@ from skeleton.automation.builder_plane import (
     BuilderBudget,
     BuilderManifest,
     BuilderPlaneError,
+    BuilderProposalReceipt,
     BuilderStage,
     builder_worker_branch,
     compile_builder_manifest,
+    compile_builder_proposal_receipt,
     manifest_prompt_fragment,
     validate_builder_custody,
+    validate_builder_proposal_receipt,
 )
 from skeleton.automation.supervisor_runtime import ExecutionIdentity
 
@@ -588,6 +591,152 @@ class BuilderCustodyTests(unittest.TestCase):
                 object(),
                 snapshot_fingerprint=SNAPSHOT,
                 execution=execution(),
+            )
+
+
+class BuilderProposalReceiptTests(unittest.TestCase):
+    def manifest(self) -> BuilderManifest:
+        return compile_builder_manifest(
+            authorization(),
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+
+    def receipt(self) -> BuilderProposalReceipt:
+        value = self.manifest()
+        return compile_builder_proposal_receipt(
+            value,
+            proposal_digest="c" * 64,
+            branch=builder_worker_branch(value),
+            files=(
+                {
+                    "path": "skeleton/feature.py",
+                    "content": "VALUE = 1\n",
+                },
+                {
+                    "path": "tests/test_feature.py",
+                    "content": "def test_feature():\n    assert True\n",
+                },
+            ),
+            tests=("focused feature regression",),
+            changed_lines=7,
+        )
+
+    def test_receipt_is_deterministic_and_canonical(self) -> None:
+        first = self.receipt()
+        second = self.receipt()
+        self.assertEqual(first, second)
+        self.assertEqual(first.receipt_digest, second.receipt_digest)
+        self.assertEqual(
+            first.paths,
+            (
+                "skeleton/feature.py",
+                "tests/test_feature.py",
+            ),
+        )
+
+    def test_receipt_round_trip_preserves_digest(self) -> None:
+        first = self.receipt()
+        second = BuilderProposalReceipt.from_payload(
+            first.as_dict()
+        )
+        self.assertEqual(second, first)
+        self.assertEqual(
+            second.receipt_digest,
+            first.receipt_digest,
+        )
+
+    def test_receipt_digest_tamper_is_rejected(self) -> None:
+        payload = self.receipt().as_dict()
+        payload["receipt_digest"] = "0" * 64
+        with self.assertRaises(BuilderPlaneError):
+            BuilderProposalReceipt.from_payload(payload)
+
+    def test_receipt_path_tamper_is_rejected(self) -> None:
+        payload = self.receipt().as_dict()
+        payload["paths"] = ["../escape.py"]
+        with self.assertRaises(BuilderPlaneError):
+            BuilderProposalReceipt.from_payload(payload)
+
+    def test_receipt_requires_canonical_path_order(self) -> None:
+        payload = self.receipt().as_dict()
+        payload["paths"] = list(reversed(payload["paths"]))
+        payload["receipt_digest"] = BuilderProposalReceipt(
+            version=payload["version"],
+            repository=payload["repository"],
+            issue_number=payload["issue_number"],
+            manifest_digest=payload["manifest_digest"],
+            task_digest=payload["task_digest"],
+            snapshot_fingerprint=payload["snapshot_fingerprint"],
+            execution_fingerprint=payload["execution_fingerprint"],
+            base_sha=payload["base_sha"],
+            branch=payload["branch"],
+            proposal_digest=payload["proposal_digest"],
+            paths=tuple(sorted(payload["paths"])),
+            changed_lines=payload["changed_lines"],
+            total_bytes=payload["total_bytes"],
+            test_count=payload["test_count"],
+            tests_digest=payload["tests_digest"],
+        ).receipt_digest
+        with self.assertRaises(BuilderPlaneError):
+            BuilderProposalReceipt.from_payload(payload)
+
+    def test_compile_rejects_wrong_task_branch(self) -> None:
+        value = self.manifest()
+        with self.assertRaises(BuilderPlaneError):
+            compile_builder_proposal_receipt(
+                value,
+                proposal_digest="c" * 64,
+                branch=(
+                    "bot/specialist-feature-builder-"
+                    + ("f" * 16)
+                ),
+                files=(
+                    {
+                        "path": "skeleton/feature.py",
+                        "content": "VALUE = 1\n",
+                    },
+                ),
+                tests=("focused regression",),
+                changed_lines=1,
+            )
+
+    def test_compile_rejects_manifest_file_budget_overflow(self) -> None:
+        value = self.manifest()
+        files = tuple(
+            {
+                "path": f"skeleton/generated_{index}.py",
+                "content": "VALUE = 1\n",
+            }
+            for index in range(value.budget.max_files + 1)
+        )
+        with self.assertRaises(BuilderPlaneError):
+            compile_builder_proposal_receipt(
+                value,
+                proposal_digest="c" * 64,
+                branch=builder_worker_branch(value),
+                files=files,
+                tests=(),
+                changed_lines=1,
+            )
+
+    def test_validate_receipt_binds_manifest(self) -> None:
+        value = self.manifest()
+        receipt = self.receipt()
+        validate_builder_proposal_receipt(
+            receipt,
+            value,
+        )
+
+        different = compile_builder_manifest(
+            authorization(body="Implement another tested API task."),
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_proposal_receipt(
+                receipt,
+                different,
             )
 
 
