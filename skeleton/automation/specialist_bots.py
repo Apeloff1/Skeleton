@@ -1078,6 +1078,11 @@ def main() -> int:
             f"\nProposal digest: "
             f"`{digest}`"
         )
+        if builder_manifest is not None:
+            body += (
+                f"\nBuilder manifest: "
+                f"`{builder_manifest.manifest_digest}`"
+            )
         if build_authorization is not None:
             body += (
                 f"\nAuthorized build issue: "
@@ -1144,6 +1149,11 @@ def main() -> int:
                 "build_task_digest": (
                     build_authorization.task_digest
                     if build_authorization is not None
+                    else None
+                ),
+                "builder_manifest_digest": (
+                    builder_manifest.manifest_digest
+                    if builder_manifest is not None
                     else None
                 ),
             }
