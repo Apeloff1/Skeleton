@@ -1,6 +1,6 @@
 import pytest
 
-from skeleton.contracts.attestation import (AttestationChain, ContractAttestation, append_attestation, checkpoint, validate_attestation, verify_checkpoint, verify_digest, verify_extension)
+from skeleton.contracts.attestation import (AttestationChain, AttestationQuorum, ContractAttestation, append_attestation, checkpoint, quorum_digest, quorum_satisfied, validate_attestation, validate_quorum, verify_checkpoint, verify_digest, verify_extension)
 
 
 def valid_attestation():
@@ -165,3 +165,43 @@ def test_extension_rejects_checkpoint_beyond_candidate_length():
 def test_extension_accepts_exact_checkpoint_without_growth():
     chain = append_attestation(None, attestation_for("a"))
     assert verify_extension(checkpoint(chain), chain)
+
+
+def test_quorum_requires_exact_threshold_of_distinct_witnesses():
+    cp = checkpoint(append_attestation(None, attestation_for("a")))
+    quorum = AttestationQuorum(cp, ("ci", "security", "readiness"), 2)
+    digest = quorum_digest(quorum)
+    assert quorum_satisfied(quorum, {"ci": digest, "security": digest})
+    assert not quorum_satisfied(quorum, {"ci": digest})
+
+
+def test_quorum_rejects_digest_for_different_policy():
+    cp = checkpoint(append_attestation(None, attestation_for("a")))
+    strict = AttestationQuorum(cp, ("ci", "security", "readiness"), 3)
+    loose = AttestationQuorum(cp, ("ci", "security", "readiness"), 2)
+    loose_digest = quorum_digest(loose)
+    assert not quorum_satisfied(strict, {
+        "ci": loose_digest,
+        "security": loose_digest,
+        "readiness": loose_digest,
+    })
+
+
+def test_quorum_rejects_duplicate_witnesses():
+    cp = checkpoint(append_attestation(None, attestation_for("a")))
+    with pytest.raises(ValueError, match="duplicate"):
+        validate_quorum(AttestationQuorum(cp, ("ci", "ci"), 1))
+
+
+@pytest.mark.parametrize("threshold", [0, 3, True])
+def test_quorum_rejects_invalid_threshold(threshold):
+    cp = checkpoint(append_attestation(None, attestation_for("a")))
+    with pytest.raises(ValueError, match="threshold"):
+        validate_quorum(AttestationQuorum(cp, ("ci", "security"), threshold))
+
+
+def test_quorum_identity_is_order_independent_for_witness_set():
+    cp = checkpoint(append_attestation(None, attestation_for("a")))
+    left = AttestationQuorum(cp, ("ci", "security"), 2)
+    right = AttestationQuorum(cp, ("security", "ci"), 2)
+    assert quorum_digest(left) == quorum_digest(right)
