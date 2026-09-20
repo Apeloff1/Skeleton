@@ -27,7 +27,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     outputs:
       admit: ${{ steps.traffic.outputs.admit }}
@@ -82,7 +82,7 @@ jobs:
       actions: write
       contents: read
       pull-requests: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
@@ -220,7 +220,7 @@ jobs:
     permissions:
       actions: write
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
