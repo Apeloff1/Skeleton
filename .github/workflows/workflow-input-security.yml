@@ -29,6 +29,7 @@ on:
       - 'backend/tests/test_traffic_manager_workflow_contract.py'
       - 'skeleton/automation/supervisor.py'
       - 'skeleton/automation/traffic_manager.py'
+      - 'skeleton/automation/branch_merge_manager.py'
       - 'skeleton/automation/build_authority.py'
       - 'skeleton/automation/supervisor_runtime.py'
       - 'skeleton/automation/secretary.py'
