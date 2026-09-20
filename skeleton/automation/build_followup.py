@@ -49,6 +49,12 @@ FAILURE_CONCLUSIONS = frozenset(
         "stale",
     }
 )
+REPAIRABLE_CONCLUSIONS = frozenset(
+    {
+        "failure",
+        "timed_out",
+    }
+)
 BENIGN_CONCLUSIONS = frozenset(
     {
         "success",
@@ -234,7 +240,10 @@ class BuildFollowup:
     def repairable(self) -> bool:
         return (
             self.state == "failed"
-            and bool(self.failed_checks)
+            and any(
+                item.conclusion in REPAIRABLE_CONCLUSIONS
+                for item in self.failed_checks
+            )
         )
 
     @property
