@@ -185,6 +185,26 @@ class AIExecutionFinalization:
 
     def _validate_phase_evidence(self) -> None:
         order = _PHASE_ORDER[self.phase]
+
+        # Report the evidence specific to the requested phase before inherited
+        # prerequisites. This keeps failures actionable: a witnessed/signed
+        # transition must say which witness/signature evidence is absent rather
+        # than being masked by an earlier anchor prerequisite.
+        if self.phase is FinalizationPhase.WITNESSED:
+            if not self.audit_witness_digest:
+                raise ValueError(
+                    "witnessed phase requires audit witness evidence"
+                )
+        if self.phase is FinalizationPhase.SIGNED:
+            if not self.execution_evidence_digest:
+                raise ValueError(
+                    "signed phase requires execution evidence digest"
+                )
+            if not self.execution_evidence_chain_node_hash:
+                raise ValueError(
+                    "signed phase requires execution evidence chain node"
+                )
+
         if order >= _PHASE_ORDER[FinalizationPhase.SESSION_EVIDENCE]:
             if not self.session_evidence_digest:
                 raise ValueError(
@@ -203,20 +223,6 @@ class AIExecutionFinalization:
             ):
                 raise ValueError(
                     "anchored phase requires audit anchor, chain node, and root"
-                )
-        if self.phase is FinalizationPhase.WITNESSED:
-            if not self.audit_witness_digest:
-                raise ValueError(
-                    "witnessed phase requires audit witness evidence"
-                )
-        if self.phase is FinalizationPhase.SIGNED:
-            if not self.execution_evidence_digest:
-                raise ValueError(
-                    "signed phase requires execution evidence digest"
-                )
-            if not self.execution_evidence_chain_node_hash:
-                raise ValueError(
-                    "signed phase requires execution evidence chain node"
                 )
         if self.phase is FinalizationPhase.COMPLETE:
             if not self.audit_anchor_digest:

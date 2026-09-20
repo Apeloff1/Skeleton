@@ -1042,6 +1042,10 @@ class DurableIncrementalVerifier:
                 "chain does not implement incremental verification protocol"
             )
         current_sequence, current_root = self._head(chain)
+        # Validate the verifier clock on every inspection, including bootstrap
+        # before the first cursor exists. A poisoned clock must never be hidden
+        # by the NO_CURSOR fast path.
+        now = self._now()
         latest = self.store.latest(chain_id)
         if latest is None:
             return DurableVerificationReport(
@@ -1081,14 +1085,16 @@ class DurableIncrementalVerifier:
                 "chain root forked at verification cursor sequence"
             )
 
-        now = self._now()
         full_age = max(
             0.0,
             now - cursor.last_full_verified_at,
         )
-        items_since_full = (
-            current_sequence
-            - cursor.full_verified_sequence
+        # A regressed chain is INVALID, but report construction itself must
+        # remain total. Clamp presentation metrics while preserving the explicit
+        # regression reason above.
+        items_since_full = max(
+            0,
+            current_sequence - cursor.full_verified_sequence,
         )
         tail_items = max(
             0,

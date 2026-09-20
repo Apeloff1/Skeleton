@@ -559,7 +559,8 @@ def test_real_java_batch_ray_candidate_roundtrip_is_stable() -> None:
             max_total_candidates=100,
         )
 
-    assert batches == [[0, 1, 3], [2], []]
+    # Degenerate point AABB body 3 at (2,2,2) is off the y=1,z=1 ray slab.
+    assert batches == [[0, 1], [2], []]
 
 
 def test_real_java_world_batch_raycast_matches_python_world() -> None:

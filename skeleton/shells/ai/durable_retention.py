@@ -684,7 +684,8 @@ class DurableRetentionPlanner:
                 )
 
         reasons.append(
-            "retention planning never authorizes deletion; destructive pruning requires separate signed authority"
+            "local deletion remains unsafe; retention planning never authorizes "
+            "deletion and destructive pruning requires separate signed authority"
         )
 
         return DurableRetentionPlan(

@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TEST_ROOT = ROOT / "backend" / "tests"
 MANIFEST = TEST_ROOT / "live_service_tests.json"
 LIVE_MARKER = "pytestmark = pytest.mark.live_service"
+LIVE_MARKER_RE = re.compile(r"(?m)^pytestmark\s*=\s*pytest\.mark\.live_service\b")
 
 # These signatures intentionally target the repository's known external-service
 # test style rather than generic URL strings used by SSRF/parser unit fixtures.
@@ -96,12 +97,12 @@ def audit(
             findings.append(f"{name}: manifest entry points to a missing test")
             continue
         text = _read_text(path)
-        if LIVE_MARKER not in text:
+        if LIVE_MARKER_RE.search(text) is None:
             findings.append(f"{name}: missing module-level live_service pytest marker")
 
     for name, path in sorted(inventory.items()):
         text = _read_text(path)
-        marked = LIVE_MARKER in text
+        marked = LIVE_MARKER_RE.search(text) is not None
         detected = _detected_live_signature(text)
         registered = name in manifest
         if detected and not registered:
