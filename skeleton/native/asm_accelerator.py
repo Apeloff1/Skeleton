@@ -28,7 +28,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Sequence
 
-_ASM_ABI_VERSION = 2
+_ASM_ABI_VERSION = 3
 _SUPPORTED_ARCHES = frozenset({"x86_64", "aarch64"})
 _ARCH_ALIASES = {
     "amd64": "x86_64",
@@ -224,6 +224,22 @@ class AsmVectorAccelerator:
         ]
         batch.restype = None
 
+        try:
+            matrix_batch = loaded.skeleton_asm_dot_matrix_f32
+        except AttributeError as exc:
+            raise AsmAcceleratorAbiError(
+                "Assembly ABI v3 missing symbol: skeleton_asm_dot_matrix_f32"
+            ) from exc
+        matrix_batch.argtypes = [
+            float_pointer,
+            ctypes.c_size_t,
+            float_pointer,
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            float_pointer,
+        ]
+        matrix_batch.restype = None
+
         self._library = loaded
         self._library_path = target.resolve()
         self._architecture = arch
@@ -409,6 +425,63 @@ class AsmVectorAccelerator:
                 matrix_buffer,
                 rows,
                 dims,
+                output_buffer,
+            )
+        except Exception:
+            with self._lock:
+                self._calls += 1
+                self._failures += 1
+            raise
+
+        with self._lock:
+            self._calls += 1
+        return output.tolist()
+
+    def dot_queries_matrix_f32(
+        self,
+        queries: Sequence[float],
+        matrix: Sequence[float],
+        *,
+        query_count: int,
+        rows: int,
+        dimensions: int,
+    ) -> list[float]:
+        for name, value in (
+            ("query_count", query_count),
+            ("rows", rows),
+            ("dimensions", dimensions),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+
+        expected_queries = query_count * dimensions
+        expected_matrix = rows * dimensions
+        output_count = query_count * rows
+        if expected_queries > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("query matrix element count exceeds accelerator bound")
+        if expected_matrix > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("candidate matrix element count exceeds accelerator bound")
+        if output_count > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("output matrix element count exceeds accelerator bound")
+        if len(queries) != expected_queries:
+            raise ValueError("query matrix shape mismatch")
+        if len(matrix) != expected_matrix:
+            raise ValueError("matrix shape mismatch")
+        if query_count == 0 or rows == 0:
+            return []
+
+        query_array, query_buffer = self._float_buffer(queries)
+        matrix_array, matrix_buffer = self._float_buffer(matrix)
+        output = array.array("f", [0.0]) * output_count
+        output_buffer = self._float_buffer(output)[1]
+        function = self._library.skeleton_asm_dot_matrix_f32
+        try:
+            function(
+                query_buffer,
+                query_count,
+                matrix_buffer,
+                rows,
+                dimensions,
                 output_buffer,
             )
         except Exception:
