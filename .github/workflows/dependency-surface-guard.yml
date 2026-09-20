@@ -7,6 +7,8 @@ on:
       - "pyproject.toml"
       - ".github/dependabot.yml"
       - "satellites/branch-snapshots/**"
+      - "scripts/check_archived_dependency_surface.py"
+      - "tests/test_archived_dependency_surface.py"
       - ".github/workflows/dependency-surface-guard.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -14,6 +16,8 @@ on:
       - "pyproject.toml"
       - ".github/dependabot.yml"
       - "satellites/branch-snapshots/**"
+      - "scripts/check_archived_dependency_surface.py"
+      - "tests/test_archived_dependency_surface.py"
       - ".github/workflows/dependency-surface-guard.yml"
   workflow_dispatch:
 
@@ -34,23 +38,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Reject installable Python manifests in archived snapshots
-        shell: bash
-        run: |
-          set -euo pipefail
-          if find satellites/branch-snapshots -type f -name requirements.txt -print -quit | grep -q .; then
-            echo "Archived branch snapshots must not expose installable requirements.txt manifests." >&2
-            find satellites/branch-snapshots -type f -name requirements.txt -print >&2
-            echo "Preserve historical dependency text as requirements.snapshot and promote code before execution." >&2
-            exit 1
-          fi
+      - name: Verify archived dependency quarantine and provenance map
+        run: python scripts/check_archived_dependency_surface.py
 
-      - name: Verify archived dependency evidence remains non-installable
+      - name: Verify quarantined bytes retain recorded Git blob identities
         shell: bash
         run: |
           set -euo pipefail
-          count=$(find satellites/branch-snapshots -type f -name requirements.snapshot -print | wc -l)
-          test "$count" -ge 3 || {
-            echo "Expected archived dependency evidence is missing; found $count snapshot manifests." >&2
-            exit 1
-          }
+          jq -r '.entries[] | [.archive_path, .blob_sha] | @tsv' \
+            satellites/branch-snapshots/DEPENDENCY_ARCHIVE_MAP.json |
+          while IFS=$'\t' read -r path expected; do
+            observed="$(git hash-object -- "$path")"
+            if [[ "$observed" != "$expected" ]]; then
+              echo "Archived dependency evidence changed bytes: $path" >&2
+              echo "Expected blob: $expected" >&2
+              echo "Observed blob: $observed" >&2
+              exit 1
+            fi
+          done

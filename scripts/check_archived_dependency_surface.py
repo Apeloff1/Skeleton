@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""Reject dependency-manager manifests from archival branch snapshots.
+
+The snapshots under satellites/branch-snapshots are provenance evidence only.
+Keeping files under dependency-manager canonical names causes repository-level
+security tooling to treat stale historical graphs as live dependency surfaces.
+This gate fails closed whenever a newly imported snapshot exposes an installable
+manifest or the provenance map drifts from the quarantined files.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+ARCHIVE_ROOT = Path("satellites/branch-snapshots")
+ARCHIVE_MAP = ARCHIVE_ROOT / "DEPENDENCY_ARCHIVE_MAP.json"
+
+EXACT_MANIFEST_NAMES = {
+    "package.json",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "bun.lock",
+    "bun.lockb",
+    "pyproject.toml",
+    "poetry.lock",
+    "pdm.lock",
+    "uv.lock",
+    "pipfile",
+    "pipfile.lock",
+    "setup.py",
+    "setup.cfg",
+    "gemfile",
+    "gemfile.lock",
+    "go.mod",
+    "go.sum",
+    "cargo.toml",
+    "cargo.lock",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "composer.json",
+    "composer.lock",
+    "environment.yml",
+    "environment.yaml",
+    "conda-lock.yml",
+    "conda-lock.yaml",
+    "gradle.lockfile",
+    "go.work",
+    "go.work.sum",
+    "mix.exs",
+    "mix.lock",
+    "package.resolved",
+    "podfile",
+    "podfile.lock",
+    "packages.lock.json",
+    "directory.packages.props",
+    "packages.config",
+    "paket.dependencies",
+    "paket.lock",
+    "deno.json",
+    "deno.jsonc",
+    "deno.lock",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "package.swift",
+    "build.sbt",
+    "deps.edn",
+    "project.clj",
+    "module.bazel",
+    "workspace",
+    "workspace.bazel",
+    "libs.versions.toml",
+    "settings.gradle",
+    "settings.gradle.kts",
+}
+DOTNET_PROJECT_RE = re.compile(
+    r"^[^/]+\.(?:csproj|fsproj|vbproj)$",
+    re.IGNORECASE,
+)
+REQUIREMENTS_RE = re.compile(
+    r"^requirements(?:[-_.][^/]*)?\.(?:txt|in)$",
+    re.IGNORECASE,
+)
+CONSTRAINTS_RE = re.compile(
+    r"^constraints(?:[-_.][^/]*)?\.(?:txt|in)$",
+    re.IGNORECASE,
+)
+ARCHIVE_PREFIX = "satellites/branch-snapshots/"
+
+
+def is_installable_manifest_name(name: str) -> bool:
+    """Return whether *name* is recognized by common dependency tooling."""
+    lowered = name.lower()
+    return (
+        lowered in EXACT_MANIFEST_NAMES
+        or DOTNET_PROJECT_RE.fullmatch(name) is not None
+        or REQUIREMENTS_RE.fullmatch(name) is not None
+        or CONSTRAINTS_RE.fullmatch(name) is not None
+    )
+
+
+def find_installable_manifests(root: Path = ARCHIVE_ROOT) -> list[Path]:
+    """Find canonical dependency surfaces below the archival snapshot tree."""
+    if root.is_symlink():
+        raise RuntimeError(f"archival snapshot root must not be a symlink: {root}")
+    if not root.is_dir():
+        raise FileNotFoundError(f"archival snapshot root is missing: {root}")
+
+    findings: list[Path] = []
+    for path in root.rglob("*"):
+        if (path.is_file() or path.is_symlink()) and is_installable_manifest_name(path.name):
+            findings.append(path)
+    return sorted(findings, key=lambda item: item.as_posix())
+
+
+def _canonical_repo_path(raw: Any) -> PurePosixPath | None:
+    if not isinstance(raw, str) or not raw or "\x00" in raw or "\\" in raw:
+        return None
+    path = PurePosixPath(raw)
+    normalized = path.as_posix()
+    if (
+        path.is_absolute()
+        or normalized != raw
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        return None
+    return path
+
+
+def _safe_archive_file(
+    repo_root: Path,
+    relative: PurePosixPath,
+) -> tuple[Path | None, str | None]:
+    """Resolve one mapped archive without traversing symlink components."""
+    try:
+        root = repo_root.resolve(strict=True)
+    except OSError:
+        return None, "repository root is unavailable"
+
+    current = repo_root
+    for part in relative.parts:
+        current = current / part
+        try:
+            current.lstat()
+        except FileNotFoundError:
+            return None, "archive_path is missing"
+        except OSError:
+            return None, "archive_path metadata is unavailable"
+        if current.is_symlink():
+            return None, "archive_path must not traverse symlinks"
+
+    try:
+        resolved = current.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError):
+        return None, "archive_path escapes repository root"
+    if not current.is_file():
+        return None, "archive_path is missing"
+    return current, None
+
+
+def _looks_like_git_blob_sha(raw: Any) -> bool:
+    return (
+        isinstance(raw, str)
+        and len(raw) == 40
+        and all(character in "0123456789abcdef" for character in raw)
+    )
+
+
+def _git_blob_sha(payload: bytes) -> str:
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload, usedforsecurity=False).hexdigest()
+
+
+def validate_archive_map(
+    map_path: Path = ARCHIVE_MAP,
+    *,
+    repo_root: Path = Path("."),
+) -> list[str]:
+    """Validate provenance-map structure and its working-tree evidence."""
+    errors: list[str] = []
+    if map_path.is_symlink():
+        return ["archive map must not be a symlink"]
+    try:
+        payload = json.loads(map_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise
+
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        return ["archive map must be an object with schema_version=1"]
+
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return ["archive map entries must be a non-empty list"]
+
+    seen_sources: set[str] = set()
+    seen_archives: set[str] = set()
+
+    for index, entry in enumerate(entries):
+        label = f"entries[{index}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{label}: entry must be an object")
+            continue
+
+        source = _canonical_repo_path(entry.get("source_path"))
+        archive = _canonical_repo_path(entry.get("archive_path"))
+        if source is None:
+            errors.append(f"{label}: source_path is not canonical")
+        if archive is None:
+            errors.append(f"{label}: archive_path is not canonical")
+        if source is None or archive is None:
+            continue
+
+        source_text = source.as_posix()
+        archive_text = archive.as_posix()
+        if not source_text.startswith(ARCHIVE_PREFIX):
+            errors.append(f"{label}: source_path escapes archive root")
+        if not archive_text.startswith(ARCHIVE_PREFIX):
+            errors.append(f"{label}: archive_path escapes archive root")
+        if not is_installable_manifest_name(source.name):
+            errors.append(f"{label}: source_path is not a recognized dependency manifest")
+        if is_installable_manifest_name(archive.name):
+            errors.append(f"{label}: archive_path still has an installable manifest name")
+        if ".snapshot" not in archive.name:
+            errors.append(f"{label}: archive_path must carry an explicit .snapshot marker")
+
+        if source_text in seen_sources:
+            errors.append(f"{label}: duplicate source_path")
+        if archive_text in seen_archives:
+            errors.append(f"{label}: duplicate archive_path")
+        seen_sources.add(source_text)
+        seen_archives.add(archive_text)
+
+        source_fs = repo_root / source_text
+        if source_fs.exists() or source_fs.is_symlink():
+            errors.append(f"{label}: source_path still exists in the working tree")
+        archive_fs, archive_error = _safe_archive_file(repo_root, archive)
+        if archive_error is not None or archive_fs is None:
+            errors.append(f"{label}: {archive_error}")
+            continue
+
+        expected_size = entry.get("size")
+        expected_blob = entry.get("blob_sha")
+        if not isinstance(expected_size, int) or isinstance(expected_size, bool) or expected_size < 0:
+            errors.append(f"{label}: size must be a non-negative integer")
+        if not _looks_like_git_blob_sha(expected_blob):
+            errors.append(
+                f"{label}: blob_sha must be a lowercase 40-character hexadecimal Git blob id"
+            )
+
+        try:
+            payload = archive_fs.read_bytes()
+        except OSError as exc:
+            errors.append(
+                f"{label}: cannot read archive_path ({type(exc).__name__})"
+            )
+        else:
+            observed_size = len(payload)
+            if isinstance(expected_size, int) and not isinstance(expected_size, bool):
+                if observed_size != expected_size:
+                    errors.append(
+                        f"{label}: archive size mismatch "
+                        f"(expected {expected_size}, observed {observed_size})"
+                    )
+            if _looks_like_git_blob_sha(expected_blob):
+                observed_blob = _git_blob_sha(payload)
+                if observed_blob != expected_blob:
+                    errors.append(
+                        f"{label}: archive Git blob identity mismatch"
+                    )
+
+    vendor_files: set[str] = set()
+    archive_root_fs = repo_root / ARCHIVE_ROOT
+    if archive_root_fs.is_dir():
+        for path in archive_root_fs.rglob("*"):
+            relative_text = path.relative_to(repo_root).as_posix()
+            if "vendor/dependency-manifests" not in relative_text:
+                continue
+            if path.is_symlink():
+                errors.append(
+                    "quarantined dependency evidence must not be a symlink: "
+                    f"{relative_text}"
+                )
+                continue
+            if not path.is_file():
+                continue
+            vendor_files.add(relative_text)
+
+    unmapped = sorted(vendor_files - seen_archives)
+    missing_from_tree = sorted(seen_archives - vendor_files)
+    for path in unmapped:
+        errors.append(f"unmapped quarantined dependency evidence: {path}")
+    for path in missing_from_tree:
+        errors.append(f"mapped archive evidence missing from quarantine tree: {path}")
+
+    return errors
+
+
+def main() -> int:
+    try:
+        findings = find_installable_manifests()
+        map_errors = validate_archive_map()
+    except (OSError, RuntimeError, json.JSONDecodeError) as exc:
+        print(
+            f"archived-dependency-surface: cannot inspect archive safely: "
+            f"{type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return 2
+
+    if findings:
+        print(
+            "archived-dependency-surface: installable dependency manifests are "
+            "forbidden below satellites/branch-snapshots:",
+            file=sys.stderr,
+        )
+        for path in findings[:100]:
+            print(f"  - {path.as_posix()}", file=sys.stderr)
+        if len(findings) > 100:
+            print(f"  - ... and {len(findings) - 100} more", file=sys.stderr)
+
+    if map_errors:
+        print("archived-dependency-surface: provenance-map drift detected:", file=sys.stderr)
+        for error in map_errors[:100]:
+            print(f"  - {error}", file=sys.stderr)
+        if len(map_errors) > 100:
+            print(f"  - ... and {len(map_errors) - 100} more", file=sys.stderr)
+
+    if findings or map_errors:
+        print(
+            "Historical dependency evidence must remain under non-installable "
+            "*.snapshot names with a consistent provenance map.",
+            file=sys.stderr,
+        )
+        return 1
+
+    payload = json.loads(ARCHIVE_MAP.read_text(encoding="utf-8"))
+    print(
+        "archived-dependency-surface: OK "
+        f"({len(payload['entries'])} quarantined manifest(s), no live archive surfaces)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
