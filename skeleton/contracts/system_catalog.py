@@ -489,3 +489,60 @@ def high_risk_changes(
         "maturity-regressed",
     }
     return tuple(change for change in changes if change.classification in risky)
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewRequirement:
+    contract_id: str
+    reasons: tuple[str, ...]
+    required_gates: tuple[str, ...]
+    human_review: bool
+
+
+def review_requirements(
+    changes: Iterable[ContractChange],
+) -> tuple[ReviewRequirement, ...]:
+    """Map semantic drift to deterministic escalation requirements."""
+    gate_map = {
+        "added": ("contract-system", "merge-readiness"),
+        "removed": ("contract-system", "merge-readiness"),
+        "privilege-expanded": ("contract-system", "workflow-input-security", "merge-readiness"),
+        "ownership-expanded": ("contract-system", "repository-hygiene", "merge-readiness"),
+        "evidence-version-changed": ("contract-system", "merge-readiness"),
+        "maturity-regressed": ("contract-system", "merge-readiness"),
+    }
+    human_classes = {
+        "removed",
+        "privilege-expanded",
+        "ownership-expanded",
+        "evidence-version-changed",
+        "maturity-regressed",
+    }
+    requirements: list[ReviewRequirement] = []
+    for change in sorted(changes, key=lambda item: item.contract_id):
+        gates = gate_map.get(change.classification, ("contract-system",))
+        requirements.append(
+            ReviewRequirement(
+                contract_id=change.contract_id,
+                reasons=(change.classification,),
+                required_gates=tuple(sorted(set(gates))),
+                human_review=change.classification in human_classes,
+            )
+        )
+    return tuple(requirements)
+
+
+def aggregate_review_policy(
+    requirements: Iterable[ReviewRequirement],
+) -> dict[str, object]:
+    items = tuple(requirements)
+    return {
+        "contracts": [item.contract_id for item in items],
+        "required_gates": sorted(
+            {gate for item in items for gate in item.required_gates}
+        ),
+        "human_review": any(item.human_review for item in items),
+        "reasons": sorted(
+            {reason for item in items for reason in item.reasons}
+        ),
+    }
