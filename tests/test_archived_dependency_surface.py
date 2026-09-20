@@ -176,6 +176,55 @@ def test_archive_map_rejects_symlinked_evidence(tmp_path: Path) -> None:
     assert any("archive_path must not be a symlink" in error for error in errors)
 
 
+def test_archive_map_rejects_symlinked_parent_directory(
+    tmp_path: Path,
+) -> None:
+    map_path = _write_map(tmp_path)
+    payload = json.loads(map_path.read_text(encoding="utf-8"))
+    archive_path = tmp_path / payload["entries"][0]["archive_path"]
+    archive_parent = archive_path.parent
+    outside = tmp_path / "outside-evidence"
+    outside.mkdir()
+    outside_file = outside / archive_path.name
+    outside_file.write_bytes(b"data")
+
+    archive_path.unlink()
+    archive_parent.rmdir()
+    try:
+        archive_parent.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        return
+
+    errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
+    assert any("must not traverse symlinks" in error for error in errors)
+
+
+def test_archive_map_rejects_symlinked_map_file(tmp_path: Path) -> None:
+    map_path = _write_map(tmp_path)
+    real_map = tmp_path / "real-map.json"
+    map_path.replace(real_map)
+    try:
+        map_path.symlink_to(real_map)
+    except OSError:
+        return
+    assert MODULE.validate_archive_map(map_path, repo_root=tmp_path) == [
+        "archive map must not be a symlink"
+    ]
+
+
+def test_archive_map_detects_broken_source_symlink(tmp_path: Path) -> None:
+    map_path = _write_map(tmp_path)
+    payload = json.loads(map_path.read_text(encoding="utf-8"))
+    source = tmp_path / payload["entries"][0]["source_path"]
+    source.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        source.symlink_to(tmp_path / "missing-source")
+    except OSError:
+        return
+    errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
+    assert any("source_path still exists" in error for error in errors)
+
+
 def test_archive_map_rejects_unmapped_vendor_evidence(tmp_path: Path) -> None:
     map_path = _write_map(tmp_path)
     extra = (
