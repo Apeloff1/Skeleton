@@ -325,4 +325,3 @@ def test_main_handles_archive_root_runtime_failure_cleanly(
     monkeypatch.setattr(MODULE, "find_installable_manifests", explode)
     assert MODULE.main() == 2
     assert "cannot inspect archive safely" in capsys.readouterr().err
-
