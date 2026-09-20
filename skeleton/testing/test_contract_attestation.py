@@ -1,6 +1,6 @@
 import pytest
 
-from skeleton.contracts.attestation import (AttestationChain, ContractAttestation, append_attestation, validate_attestation, verify_digest)
+from skeleton.contracts.attestation import (AttestationChain, ContractAttestation, append_attestation, checkpoint, validate_attestation, verify_checkpoint, verify_digest, verify_extension)
 
 
 def valid_attestation():
@@ -129,3 +129,39 @@ def test_attestation_chain_rejects_shape_mismatch():
     chain = AttestationChain((first,), ())
     with pytest.raises(ValueError, match="length mismatch"):
         chain.validate()
+
+
+def test_checkpoint_binds_head_length_repository_and_commit():
+    chain = append_attestation(None, attestation_for("a"))
+    cp = checkpoint(chain)
+    assert cp.length == 1
+    assert cp.repository == "Apeloff1/Skeleton"
+    assert cp.head_commit_sha == "a" * 40
+    assert verify_checkpoint(chain, cp)
+
+
+def test_checkpoint_rejects_truncated_or_extended_chain():
+    first = append_attestation(None, attestation_for("a"))
+    cp = checkpoint(first)
+    second = append_attestation(first, attestation_for("b"))
+    assert not verify_checkpoint(second, cp)
+    assert verify_extension(cp, second)
+
+
+def test_extension_rejects_rewritten_trusted_prefix():
+    original = append_attestation(None, attestation_for("a"))
+    cp = checkpoint(original)
+    rewritten = append_attestation(None, attestation_for("c"))
+    rewritten = append_attestation(rewritten, attestation_for("b"))
+    assert not verify_extension(cp, rewritten)
+
+
+def test_extension_rejects_checkpoint_beyond_candidate_length():
+    chain = append_attestation(None, attestation_for("a"))
+    cp = checkpoint(append_attestation(chain, attestation_for("b")))
+    assert not verify_extension(cp, chain)
+
+
+def test_extension_accepts_exact_checkpoint_without_growth():
+    chain = append_attestation(None, attestation_for("a"))
+    assert verify_extension(checkpoint(chain), chain)
