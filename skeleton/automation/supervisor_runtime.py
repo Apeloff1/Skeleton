@@ -785,6 +785,7 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         "supervisor_snapshot_fingerprint",
         "execution_fingerprint",
         "build_task_digest",
+        "builder_manifest_digest",
     ):
         item = value.get(key)
         if item is not None:
@@ -823,6 +824,8 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         validate_sha(admitted["base_sha"], label="worker evidence base SHA")
         validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
         validate_fingerprint(admitted["execution_fingerprint"])
+        if "builder_manifest_digest" in admitted:
+            validate_fingerprint(admitted["builder_manifest_digest"])
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
                 "created-PR evidence has invalid changed-line count"
