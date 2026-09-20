@@ -12,11 +12,11 @@ on:
         type: boolean
 
 # Deny authority by default. Admission is read-only; the dispatch job receives
-# only actions:write so it can queue the already-reviewed Supervisor workflow.
+# only actions:write so it can queue one reviewed downstream automation lane.
 permissions: {}
 
 concurrency:
-  group: automation-traffic-manager-${{ github.repository }}
+  group: automation-traffic-manager-\${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -30,20 +30,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      admit: ${{ steps.traffic.outputs.admit }}
-      reason: ${{ steps.traffic.outputs.reason }}
-      lane: ${{ steps.traffic.outputs.lane }}
-      active_runs: ${{ steps.traffic.outputs.active_runs }}
-      queued_runs: ${{ steps.traffic.outputs.queued_runs }}
-      critical_active: ${{ steps.traffic.outputs.critical_active }}
-      decision_json: ${{ steps.traffic.outputs.decision_json }}
+      admit: \${{ steps.traffic.outputs.admit }}
+      reason: \${{ steps.traffic.outputs.reason }}
+      lane: \${{ steps.traffic.outputs.lane }}
+      active_runs: \${{ steps.traffic.outputs.active_runs }}
+      queued_runs: \${{ steps.traffic.outputs.queued_runs }}
+      critical_active: \${{ steps.traffic.outputs.critical_active }}
+      decision_json: \${{ steps.traffic.outputs.decision_json }}
     env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GH_TOKEN: ${{ github.token }}
-      PYTHONPATH: ${{ github.workspace }}
-      TRAFFIC_EVENT_REF: ${{ github.ref }}
-      TRAFFIC_EXPECTED_REF: refs/heads/${{ github.event.repository.default_branch }}
-      TRAFFIC_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force && 'true' || 'false' }}
+      GITHUB_TOKEN: \${{ github.token }}
+      GH_TOKEN: \${{ github.token }}
+      PYTHONPATH: \${{ github.workspace }}
+      TRAFFIC_EVENT_REF: \${{ github.ref }}
+      TRAFFIC_EXPECTED_REF: refs/heads/\${{ github.event.repository.default_branch }}
+      TRAFFIC_FORCE: \${{ github.event_name == 'workflow_dispatch' && inputs.force && 'true' || 'false' }}
     steps:
       - name: Require default-branch traffic control
         shell: bash
@@ -55,7 +55,7 @@ jobs:
       - name: Checkout immutable traffic policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: \${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Python
@@ -70,20 +70,29 @@ jobs:
           --emit-github-output "$GITHUB_OUTPUT"
 
   dispatch:
-    name: Queue admitted repository supervisor
+    name: Queue admitted automation lane
     needs: admission
-    if: ${{ needs.admission.outputs.admit == 'true' }}
+    if: \${{ needs.admission.outputs.admit == 'true' }}
     permissions:
       actions: write
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      GH_TOKEN: ${{ github.token }}
-      GITHUB_TOKEN: ${{ github.token }}
-      TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      GH_TOKEN: \${{ github.token }}
+      GITHUB_TOKEN: \${{ github.token }}
+      TRAFFIC_DEFAULT_BRANCH: \${{ github.event.repository.default_branch }}
+      TRAFFIC_LANE: \${{ needs.admission.outputs.lane }}
     steps:
-      - name: Dispatch reviewed supervisor workflow
+      - name: Dispatch branch merge manager for integration lane
+        if: \${{ needs.admission.outputs.lane == 'integration' }}
+        run: >-
+          gh workflow run branch-merge-manager.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref "$TRAFFIC_DEFAULT_BRANCH"
+
+      - name: Dispatch reviewed supervisor for non-integration lane
+        if: \${{ needs.admission.outputs.lane != 'integration' }}
         run: >-
           gh workflow run supervisor.yml
           --repo "$GITHUB_REPOSITORY"
