@@ -41,6 +41,16 @@ def test_preflight_is_side_effect_free(tmp_path: Path) -> None:
         assert status.source_available is True
 
 
+def test_explicit_cache_dir_wins_over_library_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SKELETON_ASM_LIBRARY", str(tmp_path / "override.so"))
+    explicit = tmp_path / "explicit"
+    status = AsmVectorAccelerator.preflight(cache_dir=explicit)
+    assert Path(status.library).parent == explicit
+
+
 def test_missing_library_does_not_build_implicitly(tmp_path: Path) -> None:
     missing = tmp_path / "missing.so"
     with pytest.raises(AsmAcceleratorUnavailable, match="library not found"):
