@@ -839,7 +839,10 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
     if builder_receipt is not None:
         if (
             worker != "feature-builder"
-            or status != "pull-request-created"
+            or status not in {
+                "pull-request-created",
+                "pull-request-updated",
+            }
         ):
             raise SupervisorRuntimeError(
                 "Builder proposal receipt escaped its admitted worker status"
@@ -878,12 +881,11 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         if "builder_manifest_digest" in admitted:
             validate_fingerprint(admitted["builder_manifest_digest"])
         if (
-            status == "pull-request-created"
-            and worker == "feature-builder"
+            worker == "feature-builder"
             and "builder_proposal_receipt" not in admitted
         ):
             raise SupervisorRuntimeError(
-                "feature-builder created-PR evidence is missing proposal receipt"
+                "feature-builder mutation evidence is missing proposal receipt"
             )
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
@@ -916,7 +918,10 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
                 parent,
                 label="worker repair parent SHA",
             )
-            if admitted_branch is not None and branch != admitted_branch:
+            if (
+                admitted_branch is not None
+                and branch != admitted_branch
+            ):
                 raise SupervisorRuntimeError(
                     "worker repair evidence branch mismatch"
                 )
