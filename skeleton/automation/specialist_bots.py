@@ -32,6 +32,11 @@ from .advanced_bots import (
     allowed,
 )
 from .free_model import FreeModelClient, ModelError, redact_secrets
+from .write_layer import (
+    WriteBudget,
+    WriteLayerError,
+    generate_feature_proposal,
+)
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
@@ -54,6 +59,7 @@ from .supervisor_runtime import (
 MAX_FILE = 80_000
 MAX_TOTAL_PROPOSED_BYTES = 240_000
 MAX_CHANGED_LINES = 1_200
+MAX_FEATURE_CHANGED_LINES = 6_000
 MAX_CONTEXT_BYTES = 90_000
 MAX_CONTEXT_FILE_BYTES = 3_500
 MAX_SUMMARY_BYTES = 4_000
@@ -512,6 +518,8 @@ def validate_generated_files(
 
 def validate_mutation_budget(
     files: list[dict[str, str]],
+    *,
+    max_lines: int = MAX_CHANGED_LINES,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
     changed = 0
@@ -526,7 +534,7 @@ def validate_mutation_budget(
             for line in delta
             if line.startswith(("+ ", "- "))
         )
-        if changed > MAX_CHANGED_LINES:
+        if changed > max_lines:
             raise RuntimeError(
                 "specialist mutation line budget exceeded"
             )
@@ -748,22 +756,34 @@ def main() -> int:
         )
 
         client = FreeModelClient()
-        result = extract_plan(
-            client.chat(
-                (
-                    "You are a conservative specialist maintenance agent. "
-                    "Return JSON only."
+        if spec.name == "feature-builder":
+            if build_authorization is None:
+                raise WorkerAdmissionError(
+                    "feature-builder missing autonomous write authority"
+                )
+            result = generate_feature_proposal(
+                client,
+                build_authorization,
+                plan,
+                budget=WriteBudget(max_files=spec.max_files),
+            )
+        else:
+            result = extract_plan(
+                client.chat(
+                    (
+                        "You are a conservative specialist maintenance agent. "
+                        "Return JSON only."
+                    ),
+                    _render_prompt(
+                        spec,
+                        execution.repository,
+                        plan,
+                        build_authorization=build_authorization,
+                    ),
+                    max_tokens=MODEL_MAX_TOKENS,
                 ),
-                _render_prompt(
-                    spec,
-                    execution.repository,
-                    plan,
-                    build_authorization=build_authorization,
-                ),
-                max_tokens=MODEL_MAX_TOKENS,
-            ),
-            spec.max_files,
-        )
+                spec.max_files,
+            )
 
         result["files"] = filter_noop_files(
             result["files"]
@@ -791,8 +811,14 @@ def main() -> int:
             )
 
         validate_generated_files(result["files"])
+        changed_limit = (
+            MAX_FEATURE_CHANGED_LINES
+            if spec.name == "feature-builder"
+            else MAX_CHANGED_LINES
+        )
         changed_lines = validate_mutation_budget(
-            result["files"]
+            result["files"],
+            max_lines=changed_limit,
         )
         digest = proposal_digest(
             worker=spec.name,
@@ -929,7 +955,7 @@ def main() -> int:
         )
         body += (
             f"\n\nChanged-line admission budget: "
-            f"{changed_lines}/{MAX_CHANGED_LINES}."
+            f"{changed_lines}/{changed_limit}."
         )
         body += (
             "\nDispatched by the repository Secretary; "
@@ -1025,6 +1051,7 @@ def main() -> int:
 
     except (
         ModelError,
+        WriteLayerError,
         ValueError,
         RuntimeError,
         SupervisorRuntimeError,
