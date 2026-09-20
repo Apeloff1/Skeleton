@@ -157,13 +157,10 @@ class AsmVectorSearchAccelerator:
         if not 1 <= top_k <= prepared.count:
             raise ValueError("top_k outside candidate range")
 
-        output: list[list[AsmVectorHit]] = []
-        for query, query_norm in queries:
-            self._validate_query(query, query_norm, prepared)
-            output.append(
-                self._score_prepared(query, query_norm, prepared)[:top_k]
-            )
-        return output
+        return [
+            hits[:top_k]
+            for hits in self._score_many_prepared(queries, prepared)
+        ]
 
     def range_search(
         self,
@@ -239,16 +236,53 @@ class AsmVectorSearchAccelerator:
 
         total = 0
         output: list[list[AsmVectorHit]] = []
-        for query, query_norm in queries:
-            self._validate_query(query, query_norm, prepared)
+        for scored in self._score_many_prepared(queries, prepared):
             hits = [
                 hit
-                for hit in self._score_prepared(query, query_norm, prepared)
+                for hit in scored
                 if hit.similarity + _SIMILARITY_EPSILON >= threshold
             ]
             total += len(hits)
             if total > max_total_hits:
                 raise ValueError("batch range result bound exceeded")
+            output.append(hits)
+        return output
+
+    def _score_many_prepared(
+        self,
+        queries: Sequence[tuple[Sequence[float], float]],
+        prepared: PreparedAsmCandidates,
+    ) -> list[list[AsmVectorHit]]:
+        query_matrix = array.array("f")
+        query_norms: list[float] = []
+        for query, query_norm in queries:
+            self._validate_query(query, query_norm, prepared)
+            query_matrix.extend(self._float32_query(query))
+            query_norms.append(float(query_norm))
+
+        dots = self._kernel.dot_queries_matrix_f32(
+            query_matrix,
+            prepared.matrix,
+            query_count=len(queries),
+            rows=prepared.count,
+            dimensions=prepared.dimensions,
+        )
+        expected = len(queries) * prepared.count
+        if len(dots) != expected:
+            raise RuntimeError("Assembly kernel returned wrong score matrix size")
+
+        output: list[list[AsmVectorHit]] = []
+        for query_index, query_norm in enumerate(query_norms):
+            start = query_index * prepared.count
+            query_dots = dots[start : start + prepared.count]
+            hits: list[AsmVectorHit] = []
+            for index, dot in enumerate(query_dots):
+                similarity = float(dot) / (
+                    query_norm * prepared.norms[index]
+                )
+                similarity = self._bounded_similarity(similarity)
+                hits.append(AsmVectorHit(index=index, similarity=similarity))
+            hits.sort(key=lambda hit: (-hit.similarity, hit.index))
             output.append(hits)
         return output
 
