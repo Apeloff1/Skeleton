@@ -42,7 +42,7 @@ def test_traffic_manager_coalesces_overlapping_runs_without_cancelling_mutation(
 
 def test_admission_job_is_read_only() -> None:
     source = _source(TRAFFIC)
-    admission = _job_block(source, "admission", "supervisor")
+    admission = _job_block(source, "admission", "dispatch")
     permissions = admission.split("    permissions:\n", 1)[1].split(
         "    runs-on:", 1
     )[0]
@@ -64,7 +64,7 @@ def test_manager_invokes_fixed_admission_module() -> None:
 def test_manual_force_crosses_shell_boundary_only_through_env() -> None:
     source = _source(TRAFFIC)
     assert "TRAFFIC_FORCE:" in source
-    admission = _job_block(source, "admission", "supervisor")
+    admission = _job_block(source, "admission", "dispatch")
     run_block = admission.split(
         "- name: Evaluate bounded automation pressure", 1
     )[1]
@@ -72,13 +72,19 @@ def test_manual_force_crosses_shell_boundary_only_through_env() -> None:
     assert "${{ github.event" not in run_block
 
 
-def test_traffic_manager_calls_reusable_supervisor_only_after_admission() -> None:
+def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
     source = _source(TRAFFIC)
-    supervisor = _job_block(source, "supervisor")
-    assert "needs: admission" in supervisor
-    assert "needs.admission.outputs.admit == 'true'" in supervisor
-    assert "uses: ./.github/workflows/supervisor.yml" in supervisor
-    assert "secrets: inherit" in supervisor
+    before_jobs = source.split("jobs:\n", 1)[0]
+    assert "permissions: {}" in before_jobs
+
+    dispatch = _job_block(source, "dispatch")
+    assert "needs: admission" in dispatch
+    assert "needs.admission.outputs.admit == 'true'" in dispatch
+    assert "actions: write" in dispatch
+    assert "contents: read" in dispatch
+    assert "pull-requests: write" not in dispatch
+    assert "gh workflow run supervisor.yml" in dispatch
+    assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in dispatch
 
 
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
