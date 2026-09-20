@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,6 +17,10 @@ import type { ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
 import { exportTranscript, MAX_ATTACHMENT_BYTES, saveArtifact, validateAttachment } from './chatFiles';
+import { consumeHandoff } from './workbench/handoff';
+import CaptureEditor from './workbench/CaptureEditor';
+import { captureInput } from './workbench/capture';
+import type { CaptureInput } from './workbench/capture';
 
 const C = { bg: '#0b1220', card: '#111a2e', edge: '#28364e', text: '#e2e8f0', muted: '#94a3b8', purple: '#a78bfa', green: '#86efac', red: '#fca5a5' };
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -50,6 +54,7 @@ function ArtifactCard({ artifact, notify }: { artifact: Artifact; notify: (messa
 }
 
 function MessageCard({ message, controller, busy }: { message: Message; controller: WorkspaceController; busy: boolean }) {
+  const [capture, setCapture] = useState<CaptureInput | null>(null);
   const user = message.role === 'user';
   const failed = message.status === 'failed' || message.status === 'cancelled';
   return <View style={[s.messageRow, user && s.userRow]}>
@@ -69,8 +74,10 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
           void Clipboard.setStringAsync(message.text).then(() => controller.notify('Message copied.')).catch(() => controller.notify('Clipboard is unavailable. Select the message text to copy it.'));
         }} />
         {failed && <Button icon="refresh-outline" label="Retry" disabled={busy} onPress={() => { void controller.retry(message.id); }} />}
+        {message.status === 'complete' && !!message.text.trim() && <Button icon="book-outline" label="Save note" onPress={() => setCapture(captureInput(controller.active, message, ''))} />}
       </View>
       {failed && <Text accessibilityRole="alert" style={s.error}>{message.error || 'Reply was not delivered.'}</Text>}
+      {capture && <CaptureEditor input={capture} close={() => setCapture(null)} />}
     </View>
   </View>;
 }
@@ -149,6 +156,9 @@ export default function ChatWorkspace() {
   }, [controller]);
 
   useEffect(() => { setAttachment(undefined); pickerGeneration.current++; setPicking(false); }, [conversation.id]);
+  useFocusEffect(React.useCallback(() => {
+    if (snapshot.ready) void consumeHandoff(AsyncStorage, controller);
+  }, [controller, snapshot.ready]));
   useEffect(() => {
     const timer = setTimeout(() => {
       if (conversation.messages.length) scroll.current?.scrollToEnd({ animated: true });
@@ -213,6 +223,7 @@ export default function ChatWorkspace() {
       <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button" style={s.back} testID="back-btn"><Ionicons name="chevron-back" size={24} color={C.text} /></TouchableOpacity>
       <View style={s.brand}><Text style={s.brandTitle}>Jeeves</Text><Text style={s.small}>{storageLabel}</Text></View>
       <Button icon="chatbubbles-outline" label={width > 600 ? 'Conversations' : 'Chats'} onPress={() => setLibrary(true)} disabled={!snapshot.ready} />
+      <Button icon="folder-outline" label="Workbench" onPress={() => router.push('/jeeves-workbench')} />
       {width > 650 && <Button icon="add-outline" label="New chat" onPress={() => controller.create()} disabled={!snapshot.ready} />}
     </View>
     {!snapshot.ready ? <View style={s.loading}>

@@ -4,6 +4,7 @@ import {
   encodeWorkspace, migrateLegacy, newId, updateConversation,
 } from './workspace';
 import type { Artifact, Attachment, ChatBody, Conversation, Message, Workspace } from './workspace';
+import type { ChatHandoff } from './workbench/types';
 
 export interface WorkspaceStorage {
   getItem(key: string): Promise<string | null>;
@@ -153,6 +154,44 @@ export class WorkspaceController {
     } catch (error) {
       this.notify(error instanceof Error ? error.message : 'Could not create a conversation.');
     }
+  }
+
+  /** Import into a separate conversation, with a persisted receipt for safe retries. */
+  acceptHandoff(handoff: ChatHandoff): boolean {
+    if (!this.snapshot.ready) return false;
+    const existing = this.snapshot.workspace.conversations.find(item => item.handoffId === handoff.id);
+    if (existing) {
+      this.select(existing.id);
+      return true;
+    }
+    try {
+      const workspace = addConversation(this.snapshot.workspace);
+      this.cancel();
+      const conversation = {
+        ...workspace.conversations[0],
+        handoffId: handoff.id,
+        title: handoff.projectTitle.slice(0, 100) || 'Project discussion',
+        draft: handoff.draft.slice(0, MAX_TEXT),
+        context: handoff.context.slice(0, MAX_CONTEXT),
+      };
+      this.change({ ...workspace, conversations: [conversation, ...this.snapshot.workspace.conversations] });
+      this.notify('Project draft opened. Review its context in Details, then send when ready.');
+      return true;
+    } catch (error) {
+      this.notify(error instanceof Error ? error.message : 'Could not open the project draft.');
+      return false;
+    }
+  }
+
+  whenSaved(): Promise<boolean> {
+    if (this.snapshot.saveState !== 'saving') return Promise.resolve(this.snapshot.saveState === 'saved');
+    return new Promise(resolve => {
+      const unsubscribe = this.subscribe(() => {
+        if (this.snapshot.saveState === 'saving') return;
+        unsubscribe();
+        resolve(this.snapshot.saveState === 'saved');
+      });
+    });
   }
 
   select(id: string): void {

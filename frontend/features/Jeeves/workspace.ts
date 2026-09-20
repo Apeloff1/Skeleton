@@ -33,6 +33,7 @@ export type Message = {
 
 export type Conversation = {
   id: string;
+  handoffId?: string;
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -124,6 +125,7 @@ function restoreConversation(value: unknown, now: number): Conversation | null {
   const sessionFresh = now >= sessionUpdatedAt && now - sessionUpdatedAt <= SESSION_TTL;
   return {
     id: text(item.id, 100), title: text(item.title, 100).trim() || 'Untitled conversation',
+    handoffId: typeof item.handoffId === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(item.handoffId) ? item.handoffId : undefined,
     createdAt: timestamp(item.createdAt, now), updatedAt: timestamp(item.updatedAt, now),
     pinned: item.pinned === true, archived: item.archived === true,
     draft: text(item.draft), context: text(item.context, MAX_CONTEXT), allForms: item.allForms === true,
@@ -153,6 +155,7 @@ export function encodeWorkspace(workspace: Workspace): string {
     version: 1, activeId: workspace.activeId,
     conversations: workspace.conversations.slice(0, MAX_CONVERSATIONS).map(c => ({
       id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
+      handoffId: c.handoffId,
       pinned: c.pinned, archived: c.archived, draft: c.draft.slice(0, MAX_TEXT),
       context: c.context.slice(0, MAX_CONTEXT), allForms: c.allForms,
       sessionId: c.sessionId, sessionUpdatedAt: c.sessionUpdatedAt,

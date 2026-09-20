@@ -6,6 +6,9 @@
     "features/Jeeves/ChatWorkspace.tsx",
     "features/Jeeves/chatFiles.ts",
     "features/Jeeves/MessageContent.tsx",
+    "features/Jeeves/workbench/**/*.ts",
+    "features/Jeeves/workbench/**/*.tsx",
+    "app/jeeves-workbench.tsx",
     "app/jeeves-chat.tsx",
     "expo-env.d.ts"
   ]
