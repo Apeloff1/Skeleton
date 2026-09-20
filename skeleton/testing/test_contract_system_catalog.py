@@ -4,6 +4,7 @@ from skeleton.contracts.system_catalog import (
     CATALOG,
     ContractSpec,
     ContractTier,
+    active_contracts,
     audit_catalog,
     dependency_closure,
     impacted_contracts,
@@ -229,3 +230,55 @@ def test_control_plane_orphan_surface_detection():
 
 def test_contract_system_checker_is_intentionally_self_owned():
     assert unowned_paths(["scripts/check_contract_system.py"]) == ()
+
+
+def test_contract_maturity_must_be_positive_integer():
+    with pytest.raises(ValueError, match="maturity"):
+        validate_catalog((
+            ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=0),
+        ))
+    with pytest.raises(ValueError, match="maturity"):
+        validate_catalog((
+            ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=True),
+        ))
+
+
+def test_superseded_contract_is_removed_from_active_set():
+    catalog = (
+        ContractSpec("legacy", "scripts/check_legacy_contract.py", ContractTier.ROOT),
+        ContractSpec(
+            "current",
+            "scripts/check_current_contract.py",
+            ContractTier.ROOT,
+            supersedes=("legacy",),
+            maturity=2,
+        ),
+    )
+    validate_catalog(catalog)
+    assert tuple(item.contract_id for item in active_contracts(catalog)) == ("current",)
+
+
+def test_unknown_supersession_fails_closed():
+    catalog = (
+        ContractSpec(
+            "current",
+            "scripts/check_current_contract.py",
+            ContractTier.ROOT,
+            supersedes=("missing",),
+        ),
+    )
+    with pytest.raises(ValueError, match="supersedes unknown"):
+        validate_catalog(catalog)
+
+
+def test_self_supersession_fails_closed():
+    catalog = (
+        ContractSpec(
+            "current",
+            "scripts/check_current_contract.py",
+            ContractTier.ROOT,
+            supersedes=("current",),
+        ),
+    )
+    with pytest.raises(ValueError, match="self supersession"):
+        validate_catalog(catalog)
