@@ -809,23 +809,54 @@ def main() -> int:
                 build_authorization
             )
         branch, active_pr = _preflight(custody)
+        followup: BuildFollowup | None = None
+        publish_env: dict[str, str] | None = None
 
         if active_pr is not None:
-            _print_status(
-                {
-                    "status": "existing-pr",
-                    "bot": spec.name,
-                    "branch": active_pr.get(
-                        "headRefName",
-                        branch,
-                    ),
-                    "pull_request": active_pr.get("number"),
-                    "supervisor_snapshot_fingerprint": (
-                        custody.snapshot_fingerprint
-                    ),
-                }
-            )
-            return 0
+            if (
+                spec.name == "feature-builder"
+                and build_authorization is not None
+            ):
+                followup = inspect_build_followup(
+                    execution.repository,
+                    active_pr,
+                    build_authorization,
+                )
+                branch = followup.branch
+                if not followup.repairable:
+                    _print_status(
+                        {
+                            "status": "existing-pr",
+                            "bot": spec.name,
+                            "branch": branch,
+                            "pull_request": followup.pr_number,
+                            "supervisor_snapshot_fingerprint": (
+                                custody.snapshot_fingerprint
+                            ),
+                        }
+                    )
+                    return 0
+                publish_env = _publication_env()
+                _checkout_followup_head(
+                    followup,
+                    env=publish_env,
+                )
+            else:
+                _print_status(
+                    {
+                        "status": "existing-pr",
+                        "bot": spec.name,
+                        "branch": active_pr.get(
+                            "headRefName",
+                            branch,
+                        ),
+                        "pull_request": active_pr.get("number"),
+                        "supervisor_snapshot_fingerprint": (
+                            custody.snapshot_fingerprint
+                        ),
+                    }
+                )
+                return 0
 
         plan = _bounded_text(
             args.plan,
@@ -840,13 +871,21 @@ def main() -> int:
                 raise WorkerAdmissionError(
                     "feature-builder missing admitted build authority"
                 )
-            from .build_plane import run_feature_build
+            if followup is not None:
+                result = run_feature_followup_repair(
+                    plan=plan,
+                    build_authorization=build_authorization,
+                    followup=followup,
+                    client=client,
+                )
+            else:
+                from .build_plane import run_feature_build
 
-            result = run_feature_build(
-                plan=plan,
-                build_authorization=build_authorization,
-                client=client,
-            )
+                result = run_feature_build(
+                    plan=plan,
+                    build_authorization=build_authorization,
+                    client=client,
+                )
         else:
             result = extract_plan(
                 client.chat(
@@ -922,7 +961,7 @@ def main() -> int:
             for item in result["files"]
         }
 
-        publish_env = _publication_env()
+        publish_env = publish_env or _publication_env()
         hooks = Path(
             os.environ.get(
                 "RUNNER_TEMP",
@@ -937,16 +976,24 @@ def main() -> int:
             exist_ok=True,
         )
 
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "switch",
-                "--create",
-                branch,
-                execution.base_sha,
-            ),
-            env=publish_env,
-        )
+        if followup is None:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "switch",
+                    "--create",
+                    branch,
+                    execution.base_sha,
+                ),
+                env=publish_env,
+            )
+        else:
+            require_exact_head(
+                followup.head_sha
+            )
+            _require_followup_head_unchanged(
+                followup
+            )
 
         for item in result["files"]:
             safe_write_text(
