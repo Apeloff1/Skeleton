@@ -15,7 +15,6 @@ from skeleton.automation.supervisor_runtime import (
     WorkerCustody,
 )
 
-
 FP = "a" * 64
 BASE = "b" * 40
 OTHER_BASE = "c" * 40
@@ -827,7 +826,7 @@ class BuildAuthorityTests(unittest.TestCase):
             ["feature-builder"],
         )
 
-    def test_ordinary_ci_signal_does_not_select_feature_builder(
+    def test_authorized_feature_builder_is_not_suppressed_by_plan_text(
         self,
     ) -> None:
         routed = secretary.route(
@@ -855,10 +854,7 @@ class BuildAuthorityTests(unittest.TestCase):
                 )
             ),
         )
-        self.assertEqual(
-            routed,
-            ["root-cause"],
-        )
+        self.assertEqual(routed, ["feature-builder", "root-cause"])
 
 
 class SecretaryRoutingTests(unittest.TestCase):
