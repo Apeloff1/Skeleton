@@ -12,11 +12,11 @@ def test_live_reaper_is_bounded_to_obsolete_pr_runs() -> None:
     workflow = _workflow()
 
     assert "LIVE_RUN_STALE_MINUTES: '10'" in workflow
-    assert "- cron: '23 * * * *'" in workflow
+    assert "- cron: '23 */6 * * *'" in workflow
     assert "LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'" in workflow
     assert "FORCE_CANCEL_ATTEMPTS: '2'" in workflow
     assert "FORCE_CANCEL_REJECT_BACKOFF_SECONDS: '1'" in workflow
-    assert "FORCE_CANCEL_POLL_SECONDS: '2'" in workflow
+    assert "FORCE_CANCEL_POLL_SECONDS: '1'" in workflow
     assert "MAX_LIVE_CANCELS: '100'" in workflow
     assert "pull-requests: read" in workflow
     assert "pull-requests: write" not in workflow
