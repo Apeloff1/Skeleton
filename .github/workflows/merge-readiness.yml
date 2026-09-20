@@ -187,8 +187,11 @@ jobs:
           python -m compileall -q
           skeleton/pr_automation
           skeleton/automation
+          skeleton/repo_machine
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
+      - name: Validate machine repository organization contract
+        run: python scripts/check_repo_machine.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -210,6 +213,10 @@ jobs:
           tests/test_build_authority.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
+          tests/test_repo_machine.py
+          tests/test_repo_machine_advanced.py
+          tests/test_repo_machine_growth.py
+          tests/test_repo_machine_catalog.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:
