@@ -5,10 +5,9 @@ from dataclasses import dataclass
 
 from .supervisor_runtime import SupervisorRuntimeError, validate_worker_name
 
-
 _RISKS = frozenset({"low", "medium", "high"})
 _MAX_TRIGGER_BYTES = 256
-_MAX_FILES = 12
+_MAX_FILES = 48
 
 
 @dataclass(frozen=True)
