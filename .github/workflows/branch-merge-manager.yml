@@ -1,0 +1,83 @@
+name: Branch Merge Manager
+
+on:
+  workflow_dispatch:
+    inputs:
+      observe_only:
+        description: "Inventory branch-backed PRs without dispatching the merger"
+        required: false
+        default: false
+        type: boolean
+      max_merges:
+        description: "Maximum merges delegated to the canonical auto-merge control plane"
+        required: false
+        default: "3"
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: branch-merge-manager-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile branch-backed merge work
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      BRANCH_MERGE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      BRANCH_MERGE_EVENT_REF: ${{ github.ref }}
+      BRANCH_MERGE_EXPECTED_REF: refs/heads/${{ github.event.repository.default_branch }}
+      BRANCH_MERGE_OBSERVE_ONLY: ${{ inputs.observe_only && 'true' || 'false' }}
+      BRANCH_MERGE_MAX_MERGES: ${{ inputs.max_merges }}
+      BRANCH_MERGE_MAX_BRANCHES: "300"
+      BRANCH_MERGE_MAX_CANDIDATES: "40"
+      BRANCH_MERGE_REPORT_PATH: ".branch-merge/report.json"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Require trusted default-branch dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BRANCH_MERGE_EXPECTED_REF"
+          test "$BRANCH_MERGE_EVENT_REF" = "$BRANCH_MERGE_EXPECTED_REF"
+
+      - name: Checkout immutable branch merge policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Compile branch merge manager
+        run: python -m compileall -q skeleton/automation/branch_merge_manager.py
+
+      - name: Reconcile branch-backed PRs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m skeleton.automation.branch_merge_manager \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$BRANCH_MERGE_DEFAULT_BRANCH" \
+            --report-json "$BRANCH_MERGE_REPORT_PATH"
+
+      - name: Upload branch merge evidence
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: branch-merge-evidence-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 14
+          path: .branch-merge/report.json
