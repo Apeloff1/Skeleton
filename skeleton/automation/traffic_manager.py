@@ -33,6 +33,7 @@ from .free_model import redact_secrets
 
 MAX_ITEMS = 100
 MAX_OUTPUT_BYTES = 16_000
+MAX_REPOSITORY_LENGTH = 200
 
 ACTIVE_STATUSES = frozenset(
     {"queued", "in_progress", "waiting", "requested", "pending"}
@@ -102,8 +103,27 @@ class TrafficSnapshot:
     issues: tuple[dict[str, Any], ...]
 
     def __post_init__(self) -> None:
-        if not self.repository or self.repository.count("/") != 1:
-            raise TrafficManagerError("repository must be owner/name")
+        if (
+            not self.repository
+            or len(self.repository) > MAX_REPOSITORY_LENGTH
+            or self.repository.count("/") != 1
+    ):
+            raise TrafficManagerError("repository must be bounded owner/name")
+        owner, name = self.repository.split("/", 1)
+        allowed = frozenset(
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789-_."
+        )
+        if (
+            not owner
+            or not name
+            or owner.startswith("-")
+            or name.startswith(".")
+            or any(ch not in allowed for ch in owner)
+            or any(ch not in allowed for ch in name)
+        ):
+            raise TrafficManagerError("repository contains unsafe characters")
         if len(self.base_sha) != 40 or any(
             ch not in "0123456789abcdefABCDEF" for ch in self.base_sha
         ):
@@ -162,6 +182,16 @@ class TrafficDecision:
 
 def _gh_json(args: list[str]) -> list[dict[str, Any]]:
     """Run one bounded GitHub CLI read and validate its top-level shape."""
+    if not args or len(args) > 20:
+        raise TrafficManagerError("invalid GitHub CLI argument vector")
+    if any(
+        not isinstance(arg, str)
+        or not arg
+        or "\x00" in arg
+        or len(arg) > 1_000
+        for arg in args
+    ):
+        raise TrafficManagerError("unsafe GitHub CLI argument")
     try:
         raw = subprocess.check_output(
             ["gh", *args],
