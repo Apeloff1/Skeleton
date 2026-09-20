@@ -216,6 +216,8 @@ jobs:
           tests/test_traffic_manager.py
           tests/test_repo_machine.py
           tests/test_repo_machine_advanced.py
+          tests/test_repo_machine_growth.py
+          tests/test_repo_machine_catalog.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:
