@@ -56,10 +56,6 @@ class ManagedQueueWorker:
         self.principal_resolver=principal_resolver or _default_principal
 
     def run_once(self)->ManagedWorkResult:
-        # We cannot reserve quota before QueueWorker claims without duplicating
-        # its ownership logic. Instead inspect the next queued principal through
-        # a resolver based on the worker identity, then use a reservation for the
-        # execution attempt. Queue limits remain the authoritative ownership gate.
         principal=self.principal_resolver(self.worker)
         reservation:QuotaReservation|None=None
         if self.quotas is not None:
@@ -93,6 +89,18 @@ class ManagedQueueWorker:
         if reservation is not None:
             self.quotas.complete(reservation,ok=ok)
         self.metrics.completed(self.worker.owner,ok=ok,duration_ms=0,output_bytes=0)
+        if result.disposition.value=="executor_error":
+            self.events.emit(
+                "worker.execution.error",worker_id=self.worker.owner,
+                data={"principal":principal,"error_type":result.error_type},
+            )
+            self.journal.append(
+                worker_id=self.worker.owner,generation=1,kind="worker.execution.error",
+                detail={"principal":principal,"error_type":result.error_type},
+            )
+            error_name=result.error_type or "RuntimeError"
+            error_type=RuntimeError if error_name!="RuntimeError" else RuntimeError
+            raise error_type(f"worker executor failed: {error_name}")
         self.events.emit(
             "worker.execution.completed",worker_id=self.worker.owner,
             data={"principal":principal,"ok":ok,"item_id":result.item_id},
