@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.9",
+  "schema_version": "3.0",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -208,10 +208,14 @@
     "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
     "assembly_status": "queue_audited_through_1865",
     "queue_recheck": {
-      "prs": "1848-1865",
-      "status": "revalidated",
-      "new_files": "none"
-    }
+      "prs": "1860-1865",
+      "status": "file-level reconciled",
+      "result": "network replication and x-harness content already present byte-for-byte on assembly; retained PRs are lineage/source references"
+    },
+    "lineage_noop_examples": [
+      "reconcile/network-replication-current-main-v2",
+      "reconcile/x-harness-current-main-v2"
+    ]
   },
   "integrated_domains": [
     "automation runtime dependency repair",
