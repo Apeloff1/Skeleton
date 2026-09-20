@@ -2,7 +2,8 @@
 
 This adapter exposes the same narrow search surface used by VectorStore's JVM
 accelerator, but keeps scoring in-process through Skeleton's hand-written
-Assembly microkernels.
+Assembly microkernels. Candidate matrices can be prepared once and reused
+across repeated queries.
 """
 from __future__ import annotations
 
@@ -22,12 +23,21 @@ _MAX_CANDIDATES = 100_000
 _MAX_QUERIES = 512
 _MAX_ELEMENTS = 4_000_000
 _MAX_RANGE_HITS = 1_000_000
+_SIMILARITY_EPSILON = 1e-4
 
 
 @dataclass(frozen=True, slots=True)
 class AsmVectorHit:
     index: int
     similarity: float
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedAsmCandidates:
+    dimensions: int
+    count: int
+    matrix: array.array
+    norms: tuple[float, ...]
 
 
 class AsmVectorSearchAccelerator:
@@ -55,6 +65,44 @@ class AsmVectorSearchAccelerator:
     def kernel(self) -> AsmVectorAccelerator:
         return self._kernel
 
+    def prepare_candidates(
+        self,
+        candidates: Sequence[tuple[Sequence[float], float]],
+    ) -> PreparedAsmCandidates:
+        candidate_count = len(candidates)
+        if not 1 <= candidate_count <= _MAX_CANDIDATES:
+            raise ValueError("candidate count outside supported range")
+
+        dimensions = len(candidates[0][0])
+        if not 1 <= dimensions <= _MAX_DIMENSIONS:
+            raise ValueError("candidate dimensions outside supported range")
+        if dimensions * candidate_count > _MAX_ELEMENTS:
+            raise ValueError("vector element count exceeds accelerator bound")
+
+        matrix = array.array("f")
+        norms: list[float] = []
+        for vector, norm in candidates:
+            if len(vector) != dimensions:
+                raise ValueError("candidate dimension mismatch")
+            norm_value = float(norm)
+            if not math.isfinite(norm_value) or norm_value <= 0:
+                raise ValueError("candidate norm must be finite and positive")
+            try:
+                row = array.array("f", (float(value) for value in vector))
+            except (OverflowError, TypeError, ValueError) as exc:
+                raise ValueError("candidate vector is not representable as float32") from exc
+            if not all(math.isfinite(value) for value in row):
+                raise ValueError("candidate vector must contain finite values")
+            matrix.extend(row)
+            norms.append(norm_value)
+
+        return PreparedAsmCandidates(
+            dimensions=dimensions,
+            count=candidate_count,
+            matrix=matrix,
+            norms=tuple(norms),
+        )
+
     def top_k(
         self,
         query: Sequence[float],
@@ -62,25 +110,25 @@ class AsmVectorSearchAccelerator:
         candidates: Sequence[tuple[Sequence[float], float]],
         top_k: int,
     ) -> list[AsmVectorHit]:
-        dimensions, matrix, norms = self._prepare_candidates(query, candidates)
-        self._validate_query_norm(query_norm)
-        if not 1 <= top_k <= len(candidates):
+        return self.top_k_prepared(
+            query,
+            query_norm,
+            self.prepare_candidates(candidates),
+            top_k,
+        )
+
+    def top_k_prepared(
+        self,
+        query: Sequence[float],
+        query_norm: float,
+        prepared: PreparedAsmCandidates,
+        top_k: int,
+    ) -> list[AsmVectorHit]:
+        self._validate_query(query, query_norm, prepared)
+        if not 1 <= top_k <= prepared.count:
             raise ValueError("top_k outside candidate range")
 
-        dots = self._kernel.dot_matrix_f32(
-            query,
-            matrix,
-            rows=len(candidates),
-            dimensions=dimensions,
-        )
-        hits = [
-            AsmVectorHit(
-                index=index,
-                similarity=dot / (float(query_norm) * norms[index]),
-            )
-            for index, dot in enumerate(dots)
-        ]
-        hits.sort(key=lambda hit: (-hit.similarity, hit.index))
+        hits = self._score_prepared(query, query_norm, prepared)
         return hits[:top_k]
 
     def top_k_many(
@@ -89,36 +137,32 @@ class AsmVectorSearchAccelerator:
         candidates: Sequence[tuple[Sequence[float], float]],
         top_k: int,
     ) -> list[list[AsmVectorHit]]:
+        return self.top_k_many_prepared(
+            queries,
+            self.prepare_candidates(candidates),
+            top_k,
+        )
+
+    def top_k_many_prepared(
+        self,
+        queries: Sequence[tuple[Sequence[float], float]],
+        prepared: PreparedAsmCandidates,
+        top_k: int,
+    ) -> list[list[AsmVectorHit]]:
         query_count = len(queries)
         if not 1 <= query_count <= _MAX_QUERIES:
             raise ValueError("query count outside supported range")
-        first_query = queries[0][0]
-        dimensions, matrix, norms = self._prepare_candidates(first_query, candidates)
-        if dimensions * (query_count + len(candidates)) > _MAX_ELEMENTS:
+        if prepared.dimensions * (query_count + prepared.count) > _MAX_ELEMENTS:
             raise ValueError("vector element count exceeds accelerator bound")
-        if not 1 <= top_k <= len(candidates):
+        if not 1 <= top_k <= prepared.count:
             raise ValueError("top_k outside candidate range")
 
         output: list[list[AsmVectorHit]] = []
         for query, query_norm in queries:
-            if len(query) != dimensions:
-                raise ValueError("query dimension mismatch")
-            self._validate_query_norm(query_norm)
-            dots = self._kernel.dot_matrix_f32(
-                query,
-                matrix,
-                rows=len(candidates),
-                dimensions=dimensions,
+            self._validate_query(query, query_norm, prepared)
+            output.append(
+                self._score_prepared(query, query_norm, prepared)[:top_k]
             )
-            hits = [
-                AsmVectorHit(
-                    index=index,
-                    similarity=dot / (float(query_norm) * norms[index]),
-                )
-                for index, dot in enumerate(dots)
-            ]
-            hits.sort(key=lambda hit: (-hit.similarity, hit.index))
-            output.append(hits[:top_k])
         return output
 
     def range_search(
@@ -130,26 +174,33 @@ class AsmVectorSearchAccelerator:
         *,
         max_hits: int = _MAX_RANGE_HITS,
     ) -> list[AsmVectorHit]:
+        return self.range_search_prepared(
+            query,
+            query_norm,
+            self.prepare_candidates(candidates),
+            similarity_threshold,
+            max_hits=max_hits,
+        )
+
+    def range_search_prepared(
+        self,
+        query: Sequence[float],
+        query_norm: float,
+        prepared: PreparedAsmCandidates,
+        similarity_threshold: float,
+        *,
+        max_hits: int = _MAX_RANGE_HITS,
+    ) -> list[AsmVectorHit]:
         threshold = self._validate_threshold(similarity_threshold)
-        dimensions, matrix, norms = self._prepare_candidates(query, candidates)
-        self._validate_query_norm(query_norm)
-        if not 1 <= max_hits <= min(len(candidates), _MAX_RANGE_HITS):
+        self._validate_query(query, query_norm, prepared)
+        if not 1 <= max_hits <= min(prepared.count, _MAX_RANGE_HITS):
             raise ValueError("max_hits outside candidate range")
 
-        denominator = float(query_norm)
-        dots = self._kernel.dot_matrix_f32(
-            query,
-            matrix,
-            rows=len(candidates),
-            dimensions=dimensions,
-        )
-        hits: list[AsmVectorHit] = []
-        for index, dot in enumerate(dots):
-            similarity = dot / (denominator * norms[index])
-            if similarity + 1e-7 < threshold:
-                continue
-            hits.append(AsmVectorHit(index=index, similarity=similarity))
-        hits.sort(key=lambda hit: (-hit.similarity, hit.index))
+        hits = [
+            hit
+            for hit in self._score_prepared(query, query_norm, prepared)
+            if hit.similarity + _SIMILARITY_EPSILON >= threshold
+        ]
         if len(hits) > max_hits:
             raise ValueError("range result bound exceeded")
         return hits
@@ -162,44 +213,90 @@ class AsmVectorSearchAccelerator:
         *,
         max_total_hits: int = _MAX_RANGE_HITS,
     ) -> list[list[AsmVectorHit]]:
+        return self.range_search_many_prepared(
+            queries,
+            self.prepare_candidates(candidates),
+            similarity_threshold,
+            max_total_hits=max_total_hits,
+        )
+
+    def range_search_many_prepared(
+        self,
+        queries: Sequence[tuple[Sequence[float], float]],
+        prepared: PreparedAsmCandidates,
+        similarity_threshold: float,
+        *,
+        max_total_hits: int = _MAX_RANGE_HITS,
+    ) -> list[list[AsmVectorHit]]:
         query_count = len(queries)
         if not 1 <= query_count <= _MAX_QUERIES:
             raise ValueError("query count outside supported range")
         if not 1 <= max_total_hits <= _MAX_RANGE_HITS:
             raise ValueError("max_total_hits outside supported range")
-        threshold = self._validate_threshold(similarity_threshold)
-        dimensions, matrix, norms = self._prepare_candidates(
-            queries[0][0],
-            candidates,
-        )
-        if dimensions * (query_count + len(candidates)) > _MAX_ELEMENTS:
+        if prepared.dimensions * (query_count + prepared.count) > _MAX_ELEMENTS:
             raise ValueError("vector element count exceeds accelerator bound")
+        threshold = self._validate_threshold(similarity_threshold)
 
         total = 0
         output: list[list[AsmVectorHit]] = []
         for query, query_norm in queries:
-            if len(query) != dimensions:
-                raise ValueError("query dimension mismatch")
-            self._validate_query_norm(query_norm)
-            denominator = float(query_norm)
-            dots = self._kernel.dot_matrix_f32(
-                query,
-                matrix,
-                rows=len(candidates),
-                dimensions=dimensions,
-            )
-            hits: list[AsmVectorHit] = []
-            for index, dot in enumerate(dots):
-                similarity = dot / (denominator * norms[index])
-                if similarity + 1e-7 < threshold:
-                    continue
-                hits.append(AsmVectorHit(index=index, similarity=similarity))
-            hits.sort(key=lambda hit: (-hit.similarity, hit.index))
+            self._validate_query(query, query_norm, prepared)
+            hits = [
+                hit
+                for hit in self._score_prepared(query, query_norm, prepared)
+                if hit.similarity + _SIMILARITY_EPSILON >= threshold
+            ]
             total += len(hits)
             if total > max_total_hits:
                 raise ValueError("batch range result bound exceeded")
             output.append(hits)
         return output
+
+    def _score_prepared(
+        self,
+        query: Sequence[float],
+        query_norm: float,
+        prepared: PreparedAsmCandidates,
+    ) -> list[AsmVectorHit]:
+        query_values = self._float32_query(query)
+        dots = self._kernel.dot_matrix_f32(
+            query_values,
+            prepared.matrix,
+            rows=prepared.count,
+            dimensions=prepared.dimensions,
+        )
+        if len(dots) != prepared.count:
+            raise RuntimeError("Assembly kernel returned wrong row count")
+
+        denominator = float(query_norm)
+        hits: list[AsmVectorHit] = []
+        for index, dot in enumerate(dots):
+            similarity = float(dot) / (denominator * prepared.norms[index])
+            similarity = self._bounded_similarity(similarity)
+            hits.append(AsmVectorHit(index=index, similarity=similarity))
+        hits.sort(key=lambda hit: (-hit.similarity, hit.index))
+        return hits
+
+    @staticmethod
+    def _float32_query(query: Sequence[float]) -> array.array:
+        try:
+            values = array.array("f", (float(value) for value in query))
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("query vector is not representable as float32") from exc
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("query vector must contain finite values")
+        return values
+
+    @classmethod
+    def _validate_query(
+        cls,
+        query: Sequence[float],
+        query_norm: float,
+        prepared: PreparedAsmCandidates,
+    ) -> None:
+        if len(query) != prepared.dimensions:
+            raise ValueError("query dimension mismatch")
+        cls._validate_query_norm(query_norm)
 
     @staticmethod
     def _validate_query_norm(query_norm: float) -> None:
@@ -215,30 +312,15 @@ class AsmVectorSearchAccelerator:
         return value
 
     @staticmethod
-    def _prepare_candidates(
-        query: Sequence[float],
-        candidates: Sequence[tuple[Sequence[float], float]],
-    ) -> tuple[int, array.array, list[float]]:
-        dimensions = len(query)
-        candidate_count = len(candidates)
-        if not 1 <= dimensions <= _MAX_DIMENSIONS:
-            raise ValueError("query dimensions outside supported range")
-        if not 1 <= candidate_count <= _MAX_CANDIDATES:
-            raise ValueError("candidate count outside supported range")
-        if dimensions * candidate_count > _MAX_ELEMENTS:
-            raise ValueError("vector element count exceeds accelerator bound")
-
-        matrix = array.array("f")
-        norms: list[float] = []
-        for vector, norm in candidates:
-            if len(vector) != dimensions:
-                raise ValueError("candidate dimension mismatch")
-            norm_value = float(norm)
-            if not math.isfinite(norm_value) or norm_value <= 0:
-                raise ValueError("candidate norm must be finite and positive")
-            matrix.extend(float(value) for value in vector)
-            norms.append(norm_value)
-        return dimensions, matrix, norms
+    def _bounded_similarity(similarity: float) -> float:
+        if not math.isfinite(similarity):
+            raise RuntimeError("Assembly kernel produced non-finite similarity")
+        if (
+            similarity < -1.0 - _SIMILARITY_EPSILON
+            or similarity > 1.0 + _SIMILARITY_EPSILON
+        ):
+            raise RuntimeError("Assembly cosine similarity outside supported range")
+        return min(1.0, max(-1.0, similarity))
 
 
 _default_search_accelerator: AsmVectorSearchAccelerator | None = None
@@ -256,5 +338,6 @@ def get_default_asm_vector_accelerator() -> AsmVectorSearchAccelerator:
 __all__ = [
     "AsmVectorHit",
     "AsmVectorSearchAccelerator",
+    "PreparedAsmCandidates",
     "get_default_asm_vector_accelerator",
 ]
