@@ -781,6 +781,28 @@ def validate_builder_custody(
     return manifest
 
 
+def validate_builder_worker_evidence(
+    evidence: Mapping[str, Any],
+    manifest: BuilderManifest,
+) -> None:
+    """Bind a newly published feature proposal to its exact Builder manifest."""
+    if not isinstance(evidence, Mapping):
+        raise BuilderPlaneError("builder worker evidence must be a mapping")
+    if not isinstance(manifest, BuilderManifest):
+        raise BuilderPlaneError("invalid builder manifest type")
+    if evidence.get("status") != "pull-request-created":
+        return
+    if evidence.get("bot") != "feature-builder":
+        raise BuilderPlaneError(
+            "builder mutation evidence came from a non-builder worker"
+        )
+    supplied = evidence.get("builder_manifest_digest")
+    if supplied != manifest.manifest_digest:
+        raise BuilderPlaneError(
+            "builder worker evidence manifest digest mismatch"
+        )
+
+
 def manifest_prompt_fragment(manifest: BuilderManifest) -> str:
     """Render bounded inert manifest data for the feature-builder model prompt."""
     payload = {
@@ -820,4 +842,5 @@ __all__ = [
     "compile_builder_manifest",
     "manifest_prompt_fragment",
     "validate_builder_custody",
+    "validate_builder_worker_evidence",
 ]
