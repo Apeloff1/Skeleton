@@ -5,6 +5,9 @@ from skeleton.contracts.system_catalog import (
     ContractSpec,
     ContractTier,
     active_contracts,
+    authority_paths,
+    contract_fingerprint,
+    contract_fingerprints,
     audit_catalog,
     dependency_closure,
     impacted_contracts,
@@ -282,3 +285,71 @@ def test_self_supersession_fails_closed():
     )
     with pytest.raises(ValueError, match="self supersession"):
         validate_catalog(catalog)
+
+
+def test_contract_fingerprint_is_stable_and_sensitive():
+    base = ContractSpec(
+        "a",
+        "scripts/check_a_contract.py",
+        ContractTier.ROOT,
+        privileges=("contents:read",),
+    )
+    same = ContractSpec(
+        "a",
+        "scripts/check_a_contract.py",
+        ContractTier.ROOT,
+        privileges=("contents:read",),
+    )
+    changed = ContractSpec(
+        "a",
+        "scripts/check_a_contract.py",
+        ContractTier.ROOT,
+        privileges=("contents:write",),
+    )
+    assert contract_fingerprint(base) == contract_fingerprint(same)
+    assert contract_fingerprint(base) != contract_fingerprint(changed)
+    assert len(contract_fingerprint(base)) == 64
+
+
+def test_contract_fingerprint_normalizes_unordered_declarations():
+    left = ContractSpec(
+        "a",
+        "scripts/check_a_contract.py",
+        ContractTier.ROOT,
+        owns=("z/", "a/"),
+        privileges=("z:read", "a:read"),
+    )
+    right = ContractSpec(
+        "a",
+        "scripts/check_a_contract.py",
+        ContractTier.ROOT,
+        owns=("a/", "z/"),
+        privileges=("a:read", "z:read"),
+    )
+    assert contract_fingerprint(left) == contract_fingerprint(right)
+
+
+def test_catalog_fingerprints_cover_every_contract():
+    fingerprints = contract_fingerprints()
+    assert set(fingerprints) == {item.contract_id for item in CATALOG}
+    assert all(len(value) == 64 for value in fingerprints.values())
+
+
+def test_authority_paths_reach_root_and_target():
+    paths = authority_paths("merge-readiness")
+    assert paths
+    for path in paths:
+        assert path[-1] == "merge-readiness"
+        assert path[0] in {"automerge", "toolchain"}
+    assert ("automerge", "runner-v2", "merge-readiness") in paths
+    assert (
+        "automerge",
+        "runner-v2",
+        "defense-control-plane",
+        "merge-readiness",
+    ) in paths
+
+
+def test_unknown_authority_target_fails_closed():
+    with pytest.raises(KeyError):
+        authority_paths("missing")
