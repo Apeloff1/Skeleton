@@ -16,7 +16,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from skeleton.contracts.system_catalog import CATALOG, audit_catalog, topological_order, validate_catalog
+from skeleton.contracts.system_catalog import (
+    CATALOG,
+    audit_catalog,
+    authority_paths,
+    contract_fingerprints,
+    topological_order,
+    validate_authority_paths,
+    validate_catalog,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_CHECKER_BYTES = 300_000
@@ -89,6 +97,7 @@ def _run_checker(relative: str) -> ContractEvidence:
 def _validate_manifest() -> None:
     validate_catalog(CATALOG)
     audit = audit_catalog(CATALOG)
+    validate_authority_paths(CATALOG)
     if not audit.clean:
         raise RuntimeError(
             "cross-contract consistency failure: "
@@ -157,6 +166,11 @@ def main() -> int:
                 producer: version
                 for producer, version in spec.consumes_evidence
             }
+            for spec in sorted(CATALOG, key=lambda item: item.contract_id)
+        },
+        "contract_fingerprints": contract_fingerprints(CATALOG),
+        "authority_paths": {
+            spec.contract_id: [list(path) for path in authority_paths(spec.contract_id, CATALOG)]
             for spec in sorted(CATALOG, key=lambda item: item.contract_id)
         },
         "lifecycle": {
