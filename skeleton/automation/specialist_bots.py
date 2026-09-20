@@ -240,6 +240,45 @@ def admit_builder_manifest(
     return manifest
 
 
+
+def revalidate_builder_authority(
+    custody: WorkerCustody,
+    authorization: BuildAuthorization | None,
+    manifest: BuilderManifest | None,
+) -> BuildAuthorization | None:
+    """Rebind live issue authority to the exact admitted Builder manifest."""
+    if authorization is None:
+        if manifest is not None:
+            raise WorkerAdmissionError(
+                "Builder Plane manifest exists without build authority"
+            )
+        return None
+    if custody.worker != "feature-builder":
+        raise WorkerAdmissionError(
+            "build authority reached a non-builder worker"
+        )
+    if manifest is None:
+        raise WorkerAdmissionError(
+            "feature-builder live revalidation missing Builder manifest"
+        )
+
+    try:
+        current = revalidate_live_build_authorization(
+            authorization
+        )
+        validate_builder_custody(
+            manifest,
+            authorization=current,
+            snapshot_fingerprint=custody.snapshot_fingerprint,
+            execution=custody.execution,
+        )
+    except (BuildAuthorityError, BuilderPlaneError) as exc:
+        raise WorkerAdmissionError(
+            "live build authority no longer matches Builder custody"
+        ) from exc
+    return current
+
+
 def validate_builder_proposal_budget(
     result: Mapping[str, Any],
     manifest: BuilderManifest,
@@ -1050,8 +1089,10 @@ def main() -> int:
         # Model generation may take long enough for repository authority or main
         # to change. Revalidate both immediately before creating the commit.
         if build_authorization is not None:
-            build_authorization = revalidate_live_build_authorization(
-                build_authorization
+            build_authorization = revalidate_builder_authority(
+                custody,
+                build_authorization,
+                builder_manifest,
             )
         require_remote_base_unchanged(execution)
 
@@ -1080,8 +1121,10 @@ def main() -> int:
 
         # Close the final authority/base window before the remote mutation.
         if build_authorization is not None:
-            build_authorization = revalidate_live_build_authorization(
-                build_authorization
+            build_authorization = revalidate_builder_authority(
+                custody,
+                build_authorization,
+                builder_manifest,
             )
         require_remote_base_unchanged(execution)
         _run_git(
