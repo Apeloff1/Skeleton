@@ -99,6 +99,8 @@ jobs:
           kept_security=0
           kept_unlinked=0
           kept_recent=0
+          recovery_cache_hits=0
+          recovery_cache_misses=0
 
           pr_contains_sha() {
             local pr_number="$1" target_sha="$2" page page_json count
@@ -121,9 +123,27 @@ jobs:
 
           recover_pr_numbers() {
             local head_branch="$1" target_sha="$2" output="$3"
-            local owner page page_json count pr_number membership
+            local owner page page_json count pr_number membership commit_pr_json
             owner="${REPO%%/*}"
             : > "$output"
+
+            # Fast path: GitHub can map a commit directly to associated PRs.
+            # Keep the historical branch/commit walk as a fail-closed fallback
+            # because closed/unmerged PR ancestry is not guaranteed to appear.
+            commit_pr_json="$RUNNER_TEMP/commit-prs-${target_sha}.json"
+            if gh api --method GET               "/repos/${REPO}/commits/${target_sha}/pulls?per_page=100"               > "$commit_pr_json" 2>/dev/null &&
+              jq -e 'type == "array"' "$commit_pr_json" >/dev/null; then
+              jq -r                 --arg repo "$REPO"                 --arg branch "$head_branch"                 '.[] | select(
+                  (.number | type == "number") and
+                  .number > 0 and
+                  .head.repo.full_name == $repo and
+                  .head.ref == $branch
+                ) | .number' "$commit_pr_json" >> "$output"
+              if [[ -s "$output" ]]; then
+                sort -n -u -o "$output" "$output"
+                return 0
+              fi
+            fi
 
             for page in $(seq 1 10); do
               page_json="$RUNNER_TEMP/pr-history-${page}.json"
@@ -213,10 +233,17 @@ jobs:
 
             mapfile -t pr_numbers < <(jq -r '.pull_requests[]?.number | select(type == "number" and . > 0)' "$run_json" | sort -n -u)
             if (( ${#pr_numbers[@]} == 0 )); then
-              recovered_prs="$RUNNER_TEMP/run-${id}-recovered-prs.txt"
-              if ! recover_pr_numbers "$head_branch" "$head_sha" "$recovered_prs"; then
-                preserved_errors=$((preserved_errors + 1))
-                continue
+              recovery_key=$(printf '%s:%s' "$head_branch" "$head_sha" | sha256sum | cut -d ' ' -f 1)
+              recovered_prs="$RUNNER_TEMP/recovered-prs-${recovery_key}.txt"
+              if [[ -e "$recovered_prs" ]]; then
+                recovery_cache_hits=$((recovery_cache_hits + 1))
+              else
+                recovery_cache_misses=$((recovery_cache_misses + 1))
+                if ! recover_pr_numbers "$head_branch" "$head_sha" "$recovered_prs"; then
+                  rm -f "$recovered_prs"
+                  preserved_errors=$((preserved_errors + 1))
+                  continue
+                fi
               fi
               mapfile -t pr_numbers < "$recovered_prs"
             fi
@@ -416,6 +443,8 @@ jobs:
             echo "- Security/provenance/artifact/dependency runs preserved from force escalation: $kept_security"
             echo "- Unlinked/non-PR live runs preserved: $kept_unlinked"
             echo "- Recent live runs preserved: $kept_recent"
+            echo "- PR-recovery cache hits: $recovery_cache_hits"
+            echo "- PR-recovery cache misses: $recovery_cache_misses"
             echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
             echo "- Force-cancel threshold: ${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes"
             echo "- Force-cancel attempts per proven target: ${FORCE_CANCEL_ATTEMPTS}"
