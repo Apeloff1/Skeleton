@@ -9,6 +9,7 @@ manifest or the provenance map drifts from the quarantined files.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import string
@@ -87,8 +88,13 @@ def _looks_like_git_blob_sha(raw: Any) -> bool:
     return (
         isinstance(raw, str)
         and len(raw) == 40
-        and all(character in string.hexdigits for character in raw)
+        and all(character in "0123456789abcdef" for character in raw)
     )
+
+
+def _git_blob_sha(payload: bytes) -> str:
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
 
 
 def validate_archive_map(
@@ -157,22 +163,34 @@ def validate_archive_map(
             continue
 
         expected_size = entry.get("size")
-        if not isinstance(expected_size, int) or expected_size < 0:
+        expected_blob = entry.get("blob_sha")
+        if not isinstance(expected_size, int) or isinstance(expected_size, bool) or expected_size < 0:
             errors.append(f"{label}: size must be a non-negative integer")
+        if not _looks_like_git_blob_sha(expected_blob):
+            errors.append(
+                f"{label}: blob_sha must be a lowercase 40-character hexadecimal Git blob id"
+            )
+
+        try:
+            payload = archive_fs.read_bytes()
+        except OSError as exc:
+            errors.append(
+                f"{label}: cannot read archive_path ({type(exc).__name__})"
+            )
         else:
-            try:
-                observed_size = archive_fs.stat().st_size
-            except OSError as exc:
-                errors.append(f"{label}: cannot stat archive_path ({type(exc).__name__})")
-            else:
+            observed_size = len(payload)
+            if isinstance(expected_size, int) and not isinstance(expected_size, bool):
                 if observed_size != expected_size:
                     errors.append(
                         f"{label}: archive size mismatch "
                         f"(expected {expected_size}, observed {observed_size})"
                     )
-
-        if not _looks_like_git_blob_sha(entry.get("blob_sha")):
-            errors.append(f"{label}: blob_sha must be a 40-character hexadecimal Git blob id")
+            if _looks_like_git_blob_sha(expected_blob):
+                observed_blob = _git_blob_sha(payload)
+                if observed_blob != expected_blob:
+                    errors.append(
+                        f"{label}: archive Git blob identity mismatch"
+                    )
 
     vendor_files: set[str] = set()
     archive_root_fs = repo_root / ARCHIVE_ROOT
