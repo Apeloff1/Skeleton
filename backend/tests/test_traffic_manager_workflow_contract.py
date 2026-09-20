@@ -159,6 +159,39 @@ def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
     assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in dispatch
 
 
+def test_dispatch_is_bound_to_exact_admitted_default_branch_head() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+
+    assert "admitted_base_sha: ${{ steps.identity.outputs.base_sha }}" in admission
+    assert "name: Capture immutable admission identity" in admission
+    assert '[[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]' in admission
+    assert 'echo "base_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"' in admission
+
+    assert (
+        "TRAFFIC_ADMITTED_BASE_SHA: "
+        "${{ needs.admission.outputs.admitted_base_sha }}"
+    ) in dispatch
+    assert "Require admission still matches default-branch head" in dispatch
+    assert "/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" in dispatch
+    assert '[[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]' in dispatch
+
+
+def test_stale_dispatch_guard_does_not_interpolate_expressions_into_shell() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    guard = dispatch.split(
+        "- name: Require admission still matches default-branch head", 1
+    )[1].split(
+        "- name: Dispatch reviewed supervisor workflow", 1
+    )[0]
+    assert "${{ " not in guard
+    assert "$TRAFFIC_ADMITTED_BASE_SHA" in guard
+    assert "$TRAFFIC_DEFAULT_BRANCH" in guard
+
+
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
     source = _source(SUPERVISOR)
     trigger = source.split("concurrency:", 1)[0]
