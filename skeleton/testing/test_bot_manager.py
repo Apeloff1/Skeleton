@@ -28,7 +28,7 @@ def test_advanced_bot_definition_fails_closed():
         {"trigger": "bad\ntrigger"},
         {"risk": "critical"},
         {"max_files": True},
-        {"max_files": 13},
+        {"max_files": 49},
         {"requires_tests": 1},
     )
     base = {
@@ -128,6 +128,23 @@ def test_existing_pr_dedup_is_successful_worker_outcome():
         now=300,
     )
     assert state["root-cause"]["failures"] == 0
+
+
+def test_updated_build_pr_is_successful_worker_outcome():
+    state = {}
+    record_worker_outcome(
+        state,
+        {
+            "bot": "feature-builder",
+            "returncode": 0,
+            "evidence": {
+                "bot": "feature-builder",
+                "status": "pull-request-updated",
+            },
+        },
+        now=350,
+    )
+    assert state["feature-builder"]["failures"] == 0
 
 
 def test_zero_exit_without_evidence_counts_as_failure():
