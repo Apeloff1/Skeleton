@@ -55,6 +55,8 @@ Target: **one coherent application** for human maintenance and automated machine
 - **PRs #1860–#1864:** network replication, physics simulation, repository bots, security evidence, and harness reconciliation staged.
 - Large merge waves (**115/150 files**) remain held for controlled reconciliation rather than blind assembly.
 
+- **Shell stabilization boundary:** zero-file-delta refs stay lineage-only; 300-file stabilization waves are held for file-level reconciliation.
+
 ## Target layout
 
 ```text
