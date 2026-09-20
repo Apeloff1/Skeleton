@@ -73,13 +73,27 @@ class VectorStore:
         *,
         use_jvm_acceleration: bool = False,
         accelerator: Any = None,
+        use_asm_acceleration: bool = False,
+        asm_accelerator: Any = None,
     ):
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
         self._use_jvm_acceleration = bool(use_jvm_acceleration)
         self._accelerator = accelerator
+        self._use_asm_acceleration = bool(use_asm_acceleration)
+        self._asm_accelerator = asm_accelerator
         self._acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+            "batch_attempts": 0,
+            "batch_successes": 0,
+            "range_attempts": 0,
+            "range_successes": 0,
+        }
+        self._asm_acceleration = {
             "attempts": 0,
             "successes": 0,
             "fallbacks": 0,
@@ -140,6 +154,31 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration and top_k > 0:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    hits = asm_accelerator.top_k(
+                        qv,
+                        qnorm,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    self._asm_acceleration["successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
         for entry in candidates:
@@ -218,6 +257,39 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration and top_k > 0:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["batch_attempts"] += 1
+                    batches = asm_accelerator.top_k_many(
+                        embedded,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        min(top_k, len(candidates)),
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError(
+                            "Assembly accelerator returned wrong batch query count"
+                        )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["batch_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         output: List[List[ScoredChunk]] = []
         for query_vector, query_norm in embedded:
@@ -306,6 +378,34 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["range_attempts"] += 1
+                    hits = asm_accelerator.range_search(
+                        qv,
+                        qnorm,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        cosine_threshold,
+                        max_hits=bounded_results,
+                    )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["range_successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
         for entry in candidates:
@@ -403,6 +503,40 @@ class VectorStore:
             except Exception:
                 self._acceleration["fallbacks"] += 1
 
+        if self._use_asm_acceleration:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["range_attempts"] += 1
+                    batches = asm_accelerator.range_search_many(
+                        embedded,
+                        [(entry.vector, entry.norm) for entry in candidates],
+                        cosine_threshold,
+                        max_total_hits=max_total_results,
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError(
+                            "Assembly accelerator returned wrong range batch count"
+                        )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["range_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
+
         output: List[List[ScoredChunk]] = []
         total = 0
         for query_vector, query_norm in embedded:
@@ -436,10 +570,15 @@ class VectorStore:
         return all(metadata.get(k) == v for k, v in filt.items())
 
     def acceleration_stats(self) -> Dict[str, int | bool]:
-        """Return optional JVM fast-path counters without changing store stats."""
+        """Return optional fast-path counters without changing store stats."""
         return {
             "enabled": self._use_jvm_acceleration,
             **self._acceleration,
+            "asm_enabled": self._use_asm_acceleration,
+            **{
+                f"asm_{name}": value
+                for name, value in self._asm_acceleration.items()
+            },
         }
 
     def _resolve_accelerator(self) -> Any:
@@ -448,6 +587,15 @@ class VectorStore:
 
             self._accelerator = get_default_vector_accelerator()
         return self._accelerator
+
+    def _resolve_asm_accelerator(self) -> Any:
+        if self._asm_accelerator is None:
+            from skeleton.memory.asm_vector_accelerator import (
+                get_default_asm_vector_accelerator,
+            )
+
+            self._asm_accelerator = get_default_asm_vector_accelerator()
+        return self._asm_accelerator
 
     def stats(self) -> Dict[str, Any]:
         return {
