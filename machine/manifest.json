@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.9",
+  "schema_version": "2.0",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,11 +66,11 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1859,
+      "last": 1864,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1843-1859",
+      "prs": "1860-1864",
       "domains": [
         "galaxy lifecycle",
         "Java accelerators/control/observability/retrieval",
@@ -91,7 +91,12 @@
         "x-agent orchestration",
         "repo-bot/inventory gates",
         "Jeeves scientific/compiler/cortex/lens/semantic planes",
-        "model routing"
+        "model routing",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "x-harness"
       ]
     },
     "large_reconciliation": [
@@ -143,6 +148,16 @@
         "source": "physics feature family",
         "files": "68-83 each",
         "reason": "large overlapping physics wave; reconcile before assembly"
+      },
+      {
+        "source": "merge/repo-machine-gates-20260920",
+        "files": 115,
+        "reason": "large reconciliation input"
+      },
+      {
+        "source": "merge/1669-safe-20260920",
+        "files": 150,
+        "reason": "large reconciliation input"
       }
     ],
     "lineage_note": "Zero-file-delta reconcile branches remain lineage-only and are not represented as integrated content."
