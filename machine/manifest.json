@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.5",
+  "schema_version": "2.6",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -97,7 +97,11 @@
         "repository bots",
         "security scan evidence",
         "x-harness",
-        "physics aggregate validation"
+        "physics aggregate validation",
+        "workflow security/scope fixes",
+        "repository contract/archive/import safety",
+        "secret-scan contracts/evidence",
+        "repair intake hardening"
       ]
     },
     "large_reconciliation": [
@@ -204,8 +208,8 @@
     "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
     "assembly_status": "queue_audited_through_1865",
     "queue_recheck": {
-      "prs": "1791-1802",
-      "status": "already staged",
+      "prs": "1779-1790,1803-1808",
+      "status": "revalidated",
       "new_files": "none"
     }
   },
