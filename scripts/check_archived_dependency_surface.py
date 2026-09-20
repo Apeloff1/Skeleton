@@ -83,6 +83,38 @@ def _canonical_repo_path(raw: Any) -> PurePosixPath | None:
     return path
 
 
+def _safe_archive_file(
+    repo_root: Path,
+    relative: PurePosixPath,
+) -> tuple[Path | None, str | None]:
+    """Resolve one mapped archive without traversing symlink components."""
+    try:
+        root = repo_root.resolve(strict=True)
+    except OSError:
+        return None, "repository root is unavailable"
+
+    current = repo_root
+    for part in relative.parts:
+        current = current / part
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return None, "archive_path is missing"
+        except OSError:
+            return None, "archive_path metadata is unavailable"
+        if current.is_symlink():
+            return None, "archive_path must not traverse symlinks"
+
+    try:
+        resolved = current.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError):
+        return None, "archive_path escapes repository root"
+    if not current.is_file():
+        return None, "archive_path is missing"
+    return current, None
+
+
 def _looks_like_git_blob_sha(raw: Any) -> bool:
     return (
         isinstance(raw, str)
@@ -102,8 +134,13 @@ def validate_archive_map(
     repo_root: Path = Path("."),
 ) -> list[str]:
     """Validate provenance-map structure and its working-tree evidence."""
-    payload = json.loads(map_path.read_text(encoding="utf-8"))
     errors: list[str] = []
+    if map_path.is_symlink():
+        return ["archive map must not be a symlink"]
+    try:
+        payload = json.loads(map_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise
 
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         return ["archive map must be an object with schema_version=1"]
@@ -151,14 +188,11 @@ def validate_archive_map(
         seen_archives.add(archive_text)
 
         source_fs = repo_root / source_text
-        archive_fs = repo_root / archive_text
-        if source_fs.exists():
+        if source_fs.exists() or source_fs.is_symlink():
             errors.append(f"{label}: source_path still exists in the working tree")
-        if archive_fs.is_symlink():
-            errors.append(f"{label}: archive_path must not be a symlink")
-            continue
-        if not archive_fs.is_file():
-            errors.append(f"{label}: archive_path is missing")
+        archive_fs, archive_error = _safe_archive_file(repo_root, archive)
+        if archive_error is not None or archive_fs is None:
+            errors.append(f"{label}: {archive_error}")
             continue
 
         expected_size = entry.get("size")
