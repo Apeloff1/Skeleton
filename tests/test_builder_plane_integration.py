@@ -12,6 +12,7 @@ from skeleton.automation.builder_plane import (
     BuilderBudget,
     BuilderManifest,
     BuilderPlaneError,
+    builder_worker_branch,
     compile_builder_manifest,
     validate_builder_custody,
     validate_builder_worker_evidence,
@@ -178,6 +179,74 @@ class SecretaryBuilderPlaneIntegrationTests(unittest.TestCase):
                 build_authorization=auth,
                 builder_manifest=wrong,
             )
+
+
+class FeatureBuilderPreflightTests(unittest.TestCase):
+    def test_matching_task_branch_converges_on_existing_pr(self) -> None:
+        value = manifest()
+        expected_branch = builder_worker_branch(value)
+        active = {
+            "number": 91,
+            "headRefName": expected_branch,
+            "baseRefName": "main",
+        }
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=active,
+            ),
+        ):
+            branch, selected = specialist_bots._preflight(
+                feature_custody(),
+                builder_manifest=value,
+            )
+        self.assertEqual(branch, expected_branch)
+        self.assertEqual(selected, active)
+
+    def test_different_task_pr_on_same_base_fails_closed(self) -> None:
+        value = manifest()
+        active = {
+            "number": 92,
+            "headRefName": (
+                "bot/specialist-feature-builder-" + ("f" * 16)
+            ),
+            "baseRefName": "main",
+        }
+        self.assertNotEqual(
+            active["headRefName"],
+            builder_worker_branch(value),
+        )
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=active,
+            ),
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots._preflight(
+                    feature_custody(),
+                    builder_manifest=value,
+                )
 
 
 class WorkerManifestAdmissionTests(unittest.TestCase):
@@ -444,19 +513,66 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
         *,
         digest: str | None = None,
         bot: str = "feature-builder",
+        branch: str | None = None,
+        task_digest: str | None = None,
+        issue_number: int | None = None,
     ) -> dict[str, object]:
         value = manifest()
         return {
             "status": "pull-request-created",
             "bot": bot,
-            "branch": "bot/specialist-feature-builder-" + BASE[:16],
+            "branch": (
+                builder_worker_branch(value)
+                if branch is None
+                else branch
+            ),
             "changed_lines": 12,
             "proposal_digest": "c" * 64,
             "base_sha": BASE,
             "supervisor_snapshot_fingerprint": SNAPSHOT,
             "execution_fingerprint": execution().fingerprint,
+            "build_issue_number": (
+                value.issue_number
+                if issue_number is None
+                else issue_number
+            ),
+            "build_task_digest": (
+                value.task_digest
+                if task_digest is None
+                else task_digest
+            ),
             "builder_manifest_digest": (
                 value.manifest_digest if digest is None else digest
+            ),
+        }
+
+    def existing_evidence(
+        self,
+        *,
+        branch: str | None = None,
+        task_digest: str | None = None,
+        issue_number: int | None = None,
+    ) -> dict[str, object]:
+        value = manifest()
+        return {
+            "status": "existing-pr",
+            "bot": "feature-builder",
+            "branch": (
+                builder_worker_branch(value)
+                if branch is None
+                else branch
+            ),
+            "pull_request": 93,
+            "supervisor_snapshot_fingerprint": SNAPSHOT,
+            "build_issue_number": (
+                value.issue_number
+                if issue_number is None
+                else issue_number
+            ),
+            "build_task_digest": (
+                value.task_digest
+                if task_digest is None
+                else task_digest
             ),
         }
 
@@ -476,6 +592,44 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             self.created_evidence(),
             manifest(),
         )
+
+    def test_created_evidence_rejects_wrong_task_branch(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(
+                    branch=(
+                        "bot/specialist-feature-builder-" + ("f" * 16)
+                    )
+                ),
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_wrong_task_digest(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(task_digest="0" * 64),
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_wrong_issue_number(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(issue_number=999),
+                manifest(),
+            )
+
+    def test_existing_pr_evidence_is_task_bound(self) -> None:
+        validate_builder_worker_evidence(
+            self.existing_evidence(),
+            manifest(),
+        )
+
+    def test_existing_pr_rejects_cross_task_reuse(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.existing_evidence(task_digest="0" * 64),
+                manifest(),
+            )
 
     def test_manifest_evidence_digest_mismatch_is_rejected(self) -> None:
         with self.assertRaises(BuilderPlaneError):
