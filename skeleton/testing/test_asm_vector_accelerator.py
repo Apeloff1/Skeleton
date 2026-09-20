@@ -32,7 +32,7 @@ def test_preflight_is_side_effect_free(tmp_path: Path) -> None:
 
     assert before == after
     assert status.library.endswith(
-        f"libskeleton_asm_v3_{status.architecture}.so"
+        f"libskeleton_asm_v4_{status.architecture}.so"
     )
     if sys.platform.startswith("linux") and status.architecture in {
         "x86_64",
@@ -72,8 +72,9 @@ class _FakeFunction:
 
 
 class _StaleAbiLibrary:
-    def __init__(self, version: int = 3) -> None:
+    def __init__(self, version: int = 4) -> None:
         self.skeleton_asm_abi_version = _FakeFunction(version)
+        self.skeleton_asm_capabilities = _FakeFunction(1)
         self.skeleton_asm_dot_f32 = _FakeFunction()
         self.skeleton_asm_l2_sq_f32 = _FakeFunction()
 
@@ -106,10 +107,10 @@ def test_loader_rejects_wrong_abi_version(
     monkeypatch.setattr(
         asm_module.ctypes,
         "CDLL",
-        lambda _path: _StaleAbiLibrary(version=2),
+        lambda _path: _StaleAbiLibrary(version=3),
     )
 
-    with pytest.raises(AsmAcceleratorAbiError, match="expected 3, got 2"):
+    with pytest.raises(AsmAcceleratorAbiError, match="expected 4, got 3"):
         AsmVectorAccelerator(library)
 
 
@@ -145,9 +146,15 @@ def test_build_load_and_numeric_contract(tmp_path: Path) -> None:
         )
 
     runtime = accelerator.status()
-    assert runtime.abi_version == 3
+    assert runtime.abi_version == 4
     assert runtime.calls == len(cases) * 2
     assert runtime.failures == 0
+    if runtime.architecture == "x86_64":
+        assert "sse2" in runtime.capabilities
+        assert runtime.matrix_backend in {"sse2", "avx"}
+    else:
+        assert runtime.capabilities == ("neon",)
+        assert runtime.matrix_backend == "neon"
 
 
 def test_batch_dot_scores_rows_and_tail_dimensions(tmp_path: Path) -> None:
@@ -257,6 +264,7 @@ def test_assembly_sources_export_the_same_abi() -> None:
     root = Path("skeleton/native/asm")
     expected = {
         "skeleton_asm_abi_version",
+        "skeleton_asm_capabilities",
         "skeleton_asm_dot_f32",
         "skeleton_asm_l2_sq_f32",
         "skeleton_asm_dot_batch_f32",
@@ -266,3 +274,10 @@ def test_assembly_sources_export_the_same_abi() -> None:
         source = (root / filename).read_text(encoding="utf-8")
         assert expected <= {symbol for symbol in expected if symbol in source}
         assert ".note.GNU-stack" in source
+
+
+def test_x86_source_contains_runtime_guarded_avx_matrix_kernel() -> None:
+    source = Path("skeleton/native/asm/x86_64.S").read_text(encoding="utf-8")
+    assert "skeleton_asm_dot_matrix_f32_avx" in source
+    assert "xgetbv" in source
+    assert "vzeroupper" in source
