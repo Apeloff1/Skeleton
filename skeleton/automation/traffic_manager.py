@@ -141,6 +141,8 @@ class TrafficDecision:
     admit: bool
     reason: str
     lane: str
+    base_sha: str
+    observed_at: int
     active_runs: int
     queued_runs: int
     critical_active: int
@@ -162,6 +164,8 @@ class TrafficDecision:
             "admit": self.admit,
             "reason": self.reason,
             "lane": self.lane,
+            "base_sha": self.base_sha,
+            "observed_at": self.observed_at,
             "active_runs": self.active_runs,
             "queued_runs": self.queued_runs,
             "critical_active": self.critical_active,
@@ -443,6 +447,8 @@ def evaluate(
         relief_reason = "queue-capacity-exhausted"
 
     common = {
+        "base_sha": snapshot.base_sha.lower(),
+        "observed_at": snapshot.observed_at,
         "active_runs": len(active),
         "queued_runs": len(queued),
         "critical_active": len(critical),
@@ -691,6 +697,8 @@ def emit_github_output(
         f"admit={'true' if decision.admit else 'false'}\n"
         f"reason={decision.reason}\n"
         f"lane={decision.lane}\n"
+        f"base_sha={decision.base_sha}\n"
+        f"observed_at={decision.observed_at}\n"
         f"active_runs={decision.active_runs}\n"
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
@@ -729,6 +737,8 @@ def write_step_summary(decision: TrafficDecision) -> None:
         ),
         f"- Reason: `{decision.reason}`",
         f"- Lane: `{decision.lane}`",
+        f"- Admitted base SHA: `{decision.base_sha}`",
+        f"- Observation epoch: `{decision.observed_at}`",
         (
             "- Active / queued runs: "
             f"`{decision.active_runs}` / "
