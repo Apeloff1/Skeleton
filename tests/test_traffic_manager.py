@@ -423,7 +423,7 @@ class BranchMergePlanningTests(unittest.TestCase):
             observed_at=NOW,
         )
         self.assertFalse(plan.dispatch)
-        self.assertEqual(plan.reason, "branch-inventory-truncated")
+        self.assertEqual(plan.reason, "repository-inventory-truncated")
 
     def test_ambiguous_duplicate_head_is_held(self) -> None:
         plan = build_plan(
