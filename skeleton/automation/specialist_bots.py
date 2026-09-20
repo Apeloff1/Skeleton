@@ -926,9 +926,6 @@ def main() -> int:
                     "status": "no-change",
                     "bot": spec.name,
                     "summary": result["summary"],
-                    "supervisor_snapshot_fingerprint": (
-                        custody.snapshot_fingerprint
-                    ),
                 }
             )
             return 0
