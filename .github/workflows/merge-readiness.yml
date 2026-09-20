@@ -217,6 +217,15 @@ jobs:
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
+          tests/test_build_contracts.py
+          tests/test_build_edits.py
+          tests/test_build_followup.py
+          tests/test_build_graph.py
+          tests/test_build_plane.py
+          tests/test_build_repair.py
+          tests/test_build_review.py
+          tests/test_build_session.py
+          tests/test_build_validation.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
