@@ -16,16 +16,12 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from skeleton.contracts.system_catalog import CATALOG, topological_order, validate_catalog
+
 ROOT = Path(__file__).resolve().parents[1]
 MAX_CHECKER_BYTES = 300_000
 MAX_SECONDS_PER_CHECKER = 90
-CHECKERS = (
-    "scripts/check_automerge_contract.py",
-    "scripts/check_runner_v2_contract.py",
-    "scripts/check_merge_readiness_contract.py",
-    "scripts/check_toolchain_contract.py",
-    "scripts/check_defense_control_plane_contract.py",
-)
+CHECKERS = tuple(spec.checker for spec in topological_order(CATALOG))
 REQUIRED_WIRING = (
     "python scripts/check_contract_system.py",
 )
@@ -91,6 +87,7 @@ def _run_checker(relative: str) -> ContractEvidence:
 
 
 def _validate_manifest() -> None:
+    validate_catalog(CATALOG)
     if len(CHECKERS) != len(set(CHECKERS)):
         raise RuntimeError("duplicate checker in contract manifest")
     for relative in CHECKERS:
@@ -125,7 +122,19 @@ def main() -> int:
             if item.stdout_tail:
                 print(item.stdout_tail, file=sys.stderr)
     summary = {
-        "version": 1,
+        "version": 2,
+        "catalog_digest": hashlib.sha256(json.dumps([
+            {
+                "id": spec.contract_id,
+                "checker": spec.checker,
+                "tier": spec.tier.value,
+                "depends_on": spec.depends_on,
+                "owns": spec.owns,
+                "evidence_version": spec.evidence_version,
+            }
+            for spec in topological_order(CATALOG)
+        ], sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
+        "execution_order": [spec.contract_id for spec in topological_order(CATALOG)],
         "checker_count": len(CHECKERS),
         "executed_count": len(evidence),
         "failed_count": sum(item.returncode != 0 for item in evidence) + (len(CHECKERS) - len(evidence)),
