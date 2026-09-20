@@ -13,6 +13,8 @@ _DEPLOYMENT_KEYS = (
     "DYNO",
 )
 
+_LOCALHOST_3000 = "http://" + "localhost:3000"
+
 
 def _clear_deployment(monkeypatch) -> None:
     for key in _DEPLOYMENT_KEYS:
