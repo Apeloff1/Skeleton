@@ -218,6 +218,7 @@ SUCCESSFUL_WORKER_STATUSES = frozenset({
     "existing-pr",
     "no-change",
     "pull-request-created",
+    "pull-request-updated",
 })
 
 
