@@ -14,6 +14,14 @@ on:
       - 'tests/test_repo_machine_growth.py'
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
+      - '.machine/**'
+      - 'skeleton/repo_machine/**'
+      - 'scripts/check_repo_machine.py'
+      - 'tests/test_repo_machine.py'
+      - 'tests/test_repo_machine_advanced.py'
+      - 'tests/test_repo_machine_growth.py'
+      - 'tests/test_repo_machine_catalog.py'
+      - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
@@ -34,7 +42,9 @@ on:
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
       - 'backend/tests/test_supervisor_workflow_contract.py'
+      - 'backend/tests/test_traffic_manager_workflow_contract.py'
       - 'skeleton/automation/supervisor.py'
+      - 'skeleton/automation/traffic_manager.py'
       - 'skeleton/automation/build_authority.py'
       - 'skeleton/automation/supervisor_runtime.py'
       - 'skeleton/automation/secretary.py'
@@ -45,6 +55,7 @@ on:
       - 'tests/test_autonomous_supervisor.py'
       - 'tests/test_build_authority.py'
       - 'tests/test_supervisor_runtime.py'
+      - 'tests/test_traffic_manager.py'
       - 'tests/test_worker_health.py'
       - 'skeleton/testing/test_bot_manager.py'
       - 'core/activation_security.py'
@@ -55,14 +66,6 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
-      - '.machine/**'
-      - 'skeleton/repo_machine/**'
-      - 'scripts/check_repo_machine.py'
-      - 'tests/test_repo_machine.py'
-      - 'tests/test_repo_machine_advanced.py'
-      - 'tests/test_repo_machine_growth.py'
-      - 'tests/test_repo_machine_catalog.py'
-      - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
@@ -142,6 +145,7 @@ jobs:
           tests/test_workflow_run_branch_completions_contract.py
           tests/test_bot_activation_security.py
           tests/test_supervisor_workflow_contract.py
+          tests/test_traffic_manager_workflow_contract.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
       - name: Enforce reviewed action repository allowlist
