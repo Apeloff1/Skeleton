@@ -1453,8 +1453,10 @@ def main() -> int:
             for description in result["tests"]:
                 body += f"- {description}\n"
 
+        pull_request_url: str | None = None
+        pull_request_number: int | None = None
         if followup is None:
-            subprocess.run(
+            created = subprocess.run(
                 [
                     "gh",
                     "pr",
@@ -1472,10 +1474,28 @@ def main() -> int:
                     ),
                     "--body",
                     body[:12_000],
+                    "--json",
+                    "number,url",
                 ],
                 check=True,
                 env=publish_env,
                 timeout=60,
+                capture_output=True,
+                text=True,
+            )
+            created_payload = json.loads(created.stdout)
+            pull_request_number = int(created_payload["number"])
+            pull_request_url = _bounded_text(
+                created_payload["url"],
+                label="pull request URL",
+                byte_limit=512,
+                allow_empty=False,
+            )
+        else:
+            pull_request_number = followup.pr_number
+            pull_request_url = (
+                f"https://github.com/{execution.repository}/pull/"
+                f"{followup.pr_number}"
             )
 
         status_payload: dict[str, Any] = {
@@ -1515,10 +1535,11 @@ def main() -> int:
             status_payload["builder_proposal_receipt"] = (
                 builder_receipt.as_dict()
             )
+        if pull_request_number is not None:
+            status_payload["pull_request"] = pull_request_number
+        if pull_request_url is not None:
+            status_payload["pull_request_url"] = pull_request_url
         if followup is not None:
-            status_payload["pull_request"] = (
-                followup.pr_number
-            )
             status_payload["repair_parent_sha"] = (
                 followup.head_sha
             )

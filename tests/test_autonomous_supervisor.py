@@ -1663,5 +1663,22 @@ class WorkerProposalTests(unittest.TestCase):
                 )
 
 
+class AutonomousPublicationEvidenceTests(unittest.TestCase):
+    def test_worker_publication_requests_and_surfaces_pull_request_url(self) -> None:
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "skeleton"
+            / "automation"
+            / "specialist_bots.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"pull_request_url"', source)
+        self.assertIn('"--json"', source)
+        self.assertIn('"number,url"', source)
+        self.assertIn('"gh",
+                    "pr",
+                    "create"', source)
+
+
 if __name__ == "__main__":
     unittest.main()
