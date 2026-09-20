@@ -611,7 +611,7 @@ jobs:
           REPO: ${{ github.repository }}
           HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml
           HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'
-          HOUSEKEEPING_REDISPATCH_COOLDOWN_MINUTES: '360'
+          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'
         shell: bash
         run: |
           set -euo pipefail
@@ -693,21 +693,18 @@ jobs:
             exit 0
           fi
 
-          [[ "$HOUSEKEEPING_REDISPATCH_COOLDOWN_MINUTES" =~ ^[1-9][0-9]*$ ]] || {
-            echo '::error::Invalid housekeeping redispatch cooldown.'
-            exit 1
-          }
-          recent_completed=$(gh api             "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=1"             --jq '.workflow_runs[0].updated_at // empty')
-          if [[ -n "$recent_completed" ]]; then
-            recent_epoch=$(date -u -d "$recent_completed" +%s)
-            now_epoch=$(date -u +%s)
-            cooldown_seconds=$((HOUSEKEEPING_REDISPATCH_COOLDOWN_MINUTES * 60))
-            if (( now_epoch - recent_epoch < cooldown_seconds )); then
+          recent_success=$(gh api \
+            "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""')
+          if [[ -n "$recent_success" ]]; then
+            recent_epoch=$(date -u -d "$recent_success" +%s)
+            cooldown_cutoff=$(date -u -d "${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES} minutes ago" +%s)
+            if (( recent_epoch >= cooldown_cutoff )); then
               {
                 echo '## Housekeeping wake'
                 echo '- Dispatch: no'
-                echo "- Reason: recent completed Housekeeping run is inside the ${HOUSEKEEPING_REDISPATCH_COOLDOWN_MINUTES}-minute cooldown"
-                echo "- Last completion: ${recent_completed}"
+                echo "- Reason: successful Housekeeping run is inside ${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES}-minute cooldown"
+                echo "- Last successful completion: ${recent_success}"
                 echo "- Old queued candidate observed: ${stale_candidate}"
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
@@ -720,6 +717,5 @@ jobs:
             echo '- Dispatch: yes'
             echo "- Old queued candidate observed: ${stale_candidate}"
             echo "- Stale threshold: ${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes"
-            echo "- Redispatch cooldown: ${HOUSEKEEPING_REDISPATCH_COOLDOWN_MINUTES} minutes"
             echo '- Safety: dispatch only; Housekeeping independently re-proves PR/run identity before any cancellation.'
           } >> "$GITHUB_STEP_SUMMARY"
