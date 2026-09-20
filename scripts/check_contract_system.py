@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -16,18 +17,38 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
-from skeleton.contracts.system_catalog import (
-    CATALOG,
-    audit_catalog,
-    authority_paths,
-    contract_fingerprints,
-    topological_order,
-    validate_authority_paths,
-    validate_catalog,
-)
+
+def _load_catalog_module():
+    """Load the static catalog without importing the application package.
+
+    Contract validation runs in a deliberately dependency-free quarantine job.
+    Importing ``skeleton.contracts`` first executes ``skeleton.__init__`` and
+    incorrectly makes this static gate depend on runtime packages such as
+    pydantic. Loading the leaf module preserves the quarantine boundary.
+    """
+    module_name = "_skeleton_contract_system_catalog"
+    path = ROOT / "skeleton/contracts/system_catalog.py"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("unable to load contract system catalog")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(module_name, None)
+    return module
+
+
+_catalog = _load_catalog_module()
+CATALOG = _catalog.CATALOG
+audit_catalog = _catalog.audit_catalog
+authority_paths = _catalog.authority_paths
+contract_fingerprints = _catalog.contract_fingerprints
+topological_order = _catalog.topological_order
+validate_authority_paths = _catalog.validate_authority_paths
+validate_catalog = _catalog.validate_catalog
 
 MAX_CHECKER_BYTES = 300_000
 MAX_SECONDS_PER_CHECKER = 90
