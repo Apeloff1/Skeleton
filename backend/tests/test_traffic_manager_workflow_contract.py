@@ -82,11 +82,32 @@ def test_traffic_manager_dispatches_relief_only_on_pressure() -> None:
     assert "needs.admission.outputs.relieve == 'true'" in relief
     assert "actions: write" in relief
     assert "contents: read" in relief
-    assert "pull-requests: write" not in relief
+    assert "pull-requests: write" in relief
     assert "gh workflow run queue-drain.yml" in relief
     assert "actions/workflows/queue-drain.yml/runs" in relief
     assert "requested waiting pending queued in_progress" in relief
     assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in relief
+
+
+def test_relief_quenches_only_bounded_same_repo_main_prs() -> None:
+    source = _source(TRAFFIC)
+    relief = _job_block(source, "relief", "dispatch")
+    assert "Quench non-exempt ready PR fanout" in relief
+    assert "TRAFFIC_MAX_DRAFTS: '20'" in relief
+    assert '.base.ref == "main"' in relief
+    assert ".head.repo.full_name == $repo" in relief
+    assert 'gh pr ready "$pr_number" --undo' in relief
+    assert "head -n \"$TRAFFIC_MAX_DRAFTS\"" in relief
+
+
+def test_relief_preserves_explicit_priority_labels() -> None:
+    source = _source(TRAFFIC)
+    relief = _job_block(source, "relief", "dispatch")
+    assert '"traffic:keep-ready"' in relief
+    assert '"ci:priority"' in relief
+    assert '"queue:exempt"' in relief
+    assert "Re-read and only" not in relief
+    assert "A concurrent actor may have drafted it first" in relief
 
 
 def test_traffic_manager_exposes_relief_observability() -> None:
