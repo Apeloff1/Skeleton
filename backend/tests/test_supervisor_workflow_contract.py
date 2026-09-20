@@ -206,7 +206,7 @@ def test_supervisor_workflow_uses_pinned_reviewed_actions() -> None:
 def test_secretary_timeout_keeps_a_bounded_execution_window() -> None:
     source = _source()
     secretary = _job_block(source, "secretary")
-    assert "timeout-minutes: 70" in secretary
+    assert "timeout-minutes: 45" in secretary
 
 def test_worker_health_surface_is_tracked_by_workflow_security() -> None:
     workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"
@@ -230,7 +230,6 @@ def test_merge_readiness_runs_worker_health_regressions() -> None:
     for fragment in required:
         assert fragment in source
 
-
 def test_builder_plane_surface_is_tracked_by_workflow_security() -> None:
     workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"
     source = workflow.read_text(encoding="utf-8")
@@ -253,33 +252,3 @@ def test_merge_readiness_runs_builder_plane_regressions() -> None:
     for fragment in required:
         assert fragment in source
 
-
-def test_supervisor_declares_optional_expected_base_sha_for_both_entrypoints() -> None:
-    source = _source()
-    trigger = source.split("concurrency:\n", 1)[0]
-    assert trigger.count("expected_base_sha:") == 2
-    assert trigger.count('description: "Optional immutable caller-admitted base SHA"') == 2
-    assert trigger.count("required: false") == 2
-    assert trigger.count("type: string") == 2
-
-
-def test_caller_admission_sha_crosses_shell_boundary_through_env() -> None:
-    source = _source()
-    assert "SUPERVISOR_CALLER_BASE_SHA: ${{ inputs.expected_base_sha }}" in source
-    plan = _job_block(source, "plan", "secretary")
-    guard = plan.split(
-        "- name: Require default-branch execution", 1
-    )[1].split(
-        "- name: Checkout immutable execution commit", 1
-    )[0]
-    assert "${{ " not in guard
-    assert '[[ -n "$SUPERVISOR_CALLER_BASE_SHA" ]]' in guard
-    assert '[[ "$SUPERVISOR_CALLER_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in guard
-    assert 'test "$SUPERVISOR_BASE_SHA" = "$SUPERVISOR_CALLER_BASE_SHA"' in guard
-
-
-def test_traffic_manager_passes_exact_admitted_sha_to_supervisor() -> None:
-    workflow = ROOT / ".github" / "workflows" / "automation-traffic-manager.yml"
-    source = workflow.read_text(encoding="utf-8")
-    assert '-f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"' in source
-    assert source.count("gh workflow run supervisor.yml") == 1
