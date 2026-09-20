@@ -130,6 +130,9 @@ def validate_catalog(catalog: Iterable[ContractSpec] = CATALOG) -> None:
             ):
                 raise ValueError(f"invalid privilege: {item.contract_id}:{privilege!r}")
     topological_order(items)
+    cycles = supersession_cycles(items)
+    if cycles:
+        raise ValueError(f"contract supersession cycle: {cycles!r}")
 
 
 def topological_order(catalog: Iterable[ContractSpec] = CATALOG) -> tuple[ContractSpec, ...]:
