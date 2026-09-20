@@ -129,3 +129,61 @@ def append_attestation(
     )
     result.validate()
     return result
+
+
+@dataclass(frozen=True, slots=True)
+class AttestationCheckpoint:
+    head_digest: str
+    length: int
+    repository: str
+    head_commit_sha: str
+
+
+def checkpoint(chain: AttestationChain) -> AttestationCheckpoint:
+    chain.validate()
+    head = chain.attestations[-1]
+    return AttestationCheckpoint(
+        head_digest=chain.head_digest(),
+        length=len(chain.attestations),
+        repository=head.repository,
+        head_commit_sha=head.commit_sha.lower(),
+    )
+
+
+def verify_checkpoint(
+    chain: AttestationChain,
+    expected: AttestationCheckpoint,
+) -> bool:
+    try:
+        actual = checkpoint(chain)
+    except ValueError:
+        return False
+    return (
+        actual.length == expected.length
+        and actual.repository == expected.repository
+        and actual.head_commit_sha == expected.head_commit_sha.lower()
+        and hmac.compare_digest(actual.head_digest, expected.head_digest.lower())
+    )
+
+
+def verify_extension(
+    trusted: AttestationCheckpoint,
+    candidate: AttestationChain,
+) -> bool:
+    """Prove candidate preserves a trusted checkpoint as an exact prefix."""
+    try:
+        candidate.validate()
+    except ValueError:
+        return False
+    if trusted.length < 1 or trusted.length > len(candidate.attestations):
+        return False
+    prefix = AttestationChain(
+        candidate.attestations[: trusted.length],
+        candidate.previous_digests[: trusted.length],
+    )
+    if not verify_checkpoint(prefix, trusted):
+        return False
+    return (
+        candidate.attestations[-1].repository == trusted.repository
+        and len(candidate.attestations) >= trusted.length
+    )
