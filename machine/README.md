@@ -82,6 +82,8 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Deep reconciliation:** physics stack and Jeeves semantic/compiler waves were inspected at file level; divergent core modules remain held rather than overwritten.
 - **Physics aggregate:** 77-file wave remains held due overlap with the consolidated simulation stack.
 
+- **Physics family audit:** 11 candidate branches rechecked; core CCD/convex/collision/world modules diverge across branches, so the family remains held for semantic consolidation.
+
 ## Target layout
 
 ```text
