@@ -135,3 +135,78 @@ def impacted_contracts(paths: Iterable[str], catalog: Iterable[ContractSpec] = C
                 impacted.add(dependent)
                 queue.append(dependent)
     return tuple(item.contract_id for item in topological_order(items) if item.contract_id in impacted)
+
+
+@dataclass(frozen=True, slots=True)
+class ContractAudit:
+    execution_order: tuple[str, ...]
+    ownership_conflicts: tuple[tuple[str, str, str], ...]
+    orphan_dependencies: tuple[str, ...]
+
+    @property
+    def clean(self) -> bool:
+        return not self.ownership_conflicts and not self.orphan_dependencies
+
+
+def ownership_conflicts(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[tuple[str, str, str], ...]:
+    """Return ambiguous exact ownership declarations across contracts.
+
+    Prefix overlap is intentionally legal: root contracts may cover a broad
+    plane while a privileged child owns a narrower surface. Exact duplicate
+    prefixes are rejected because they make the authoritative owner ambiguous.
+    """
+    owners: dict[str, str] = {}
+    conflicts: list[tuple[str, str, str]] = []
+    for item in catalog:
+        for prefix in item.owns:
+            previous = owners.get(prefix)
+            if previous is not None and previous != item.contract_id:
+                conflicts.append((prefix, previous, item.contract_id))
+            else:
+                owners[prefix] = item.contract_id
+    return tuple(sorted(conflicts))
+
+
+def dependency_closure(
+    contract_id: str,
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[str, ...]:
+    items = tuple(catalog)
+    index = by_id(items)
+    if contract_id not in index:
+        raise KeyError(contract_id)
+    found: set[str] = set()
+
+    def collect(name: str) -> None:
+        for dependency in index[name].depends_on:
+            if dependency not in found:
+                found.add(dependency)
+                collect(dependency)
+
+    collect(contract_id)
+    order = topological_order(items)
+    return tuple(item.contract_id for item in order if item.contract_id in found)
+
+
+def audit_catalog(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> ContractAudit:
+    items = tuple(catalog)
+    validate_catalog(items)
+    order = topological_order(items)
+    index = by_id(items)
+    orphan_dependencies = tuple(
+        sorted(
+            dependency
+            for item in items
+            for dependency in item.depends_on
+            if dependency not in index
+        )
+    )
+    return ContractAudit(
+        execution_order=tuple(item.contract_id for item in order),
+        ownership_conflicts=ownership_conflicts(items),
+        orphan_dependencies=orphan_dependencies,
+    )
