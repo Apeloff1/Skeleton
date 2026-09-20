@@ -65,6 +65,8 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Assembly audit:** rechecked staged queues and lineage branches; no new non-noop PR required in this pass.
 - Large overlapping physics and shell waves remain held for reconciliation.
 
+- **Fix-wave audit:** #1791–#1802 rechecked; all remain staged source material with meaningful file deltas, and existing integration PRs were reused rather than duplicated.
+
 ## Target layout
 
 ```text
