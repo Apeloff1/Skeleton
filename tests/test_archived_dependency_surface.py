@@ -1,6 +1,7 @@
 """Regression coverage for archived dependency-surface quarantine."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -12,6 +13,10 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def git_blob_sha(payload: bytes) -> str:
+    return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
 
 
 def test_detects_common_installable_manifests(tmp_path: Path) -> None:
@@ -96,7 +101,7 @@ def _write_map(tmp_path: Path, *, archive_name: str = "package.snapshot.json", s
                     "satellites/branch-snapshots/sample/vendor/"
                     f"dependency-manifests/{archive_name}"
                 ),
-                "blob_sha": "a" * 40,
+                "blob_sha": git_blob_sha(b"data"),
                 "size": size,
             }
         ],
@@ -114,6 +119,17 @@ def test_archive_map_rejects_installable_archive_name(tmp_path: Path) -> None:
     map_path = _write_map(tmp_path, archive_name="package.json")
     errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
     assert any("archive_path still has an installable manifest name" in error for error in errors)
+
+
+def test_archive_map_rejects_blob_identity_drift(tmp_path: Path) -> None:
+    map_path = _write_map(tmp_path)
+    payload = json.loads(map_path.read_text(encoding="utf-8"))
+    archive_path = tmp_path / payload["entries"][0]["archive_path"]
+    archive_path.write_bytes(b"evil")
+    payload["entries"][0]["size"] = 4
+    map_path.write_text(json.dumps(payload), encoding="utf-8")
+    errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
+    assert any("Git blob identity mismatch" in error for error in errors)
 
 
 def test_archive_map_rejects_size_drift(tmp_path: Path) -> None:
