@@ -76,6 +76,22 @@ def test_snapshot_evidence_names_are_not_dependency_surfaces(tmp_path: Path) -> 
     assert MODULE.find_installable_manifests(archive) == []
 
 
+def test_symlinked_archive_root_fails_closed(tmp_path: Path) -> None:
+    target = tmp_path / "real-snapshots"
+    target.mkdir()
+    link = tmp_path / "snapshots"
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        return
+    try:
+        MODULE.find_installable_manifests(link)
+    except RuntimeError as exc:
+        assert "must not be a symlink" in str(exc)
+    else:
+        raise AssertionError("symlinked archive root must fail closed")
+
+
 def test_missing_archive_root_fails_closed(tmp_path: Path) -> None:
     missing = tmp_path / "missing"
     try:
