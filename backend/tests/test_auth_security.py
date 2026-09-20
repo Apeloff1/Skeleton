@@ -4,8 +4,6 @@ from pathlib import Path
 import pytest
 
 from core.auth_security import (
-
-pytestmark = pytest.mark.live_service
     AuthConfigurationError,
     auth_enforced,
     resolve_jwt_secret,
