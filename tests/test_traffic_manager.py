@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from skeleton.automation.traffic_manager import (
     TrafficPolicy,
     TrafficSnapshot,
+    _observe_runs,
     evaluate,
 )
 
@@ -49,6 +51,61 @@ def snapshot(
         pull_requests=prs,
         issues=issues,
     )
+
+
+class TrafficManagerObservationTests(unittest.TestCase):
+    def test_active_runs_are_merged_even_when_missing_from_recent_history(self) -> None:
+        completed = run(
+            name="Completed",
+            status="completed",
+            database_id=10,
+        )
+        hidden_active = run(
+            name="Merge Readiness",
+            status="in_progress",
+            conclusion="",
+            database_id=99,
+        )
+
+        def fake_gh(args: list[str]) -> list[dict[str, object]]:
+            if "--status" not in args:
+                return [completed]
+            status = args[args.index("--status") + 1]
+            return [hidden_active] if status == "in_progress" else []
+
+        with patch(
+            "skeleton.automation.traffic_manager._gh_json",
+            side_effect=fake_gh,
+        ):
+            observed = _observe_runs("Apeloff1/Skeleton")
+
+        self.assertEqual(
+            {item["databaseId"] for item in observed},
+            {10, 99},
+        )
+
+    def test_active_status_query_deduplicates_recent_history(self) -> None:
+        active = run(
+            name="CI/CD",
+            status="queued",
+            conclusion="",
+            database_id=42,
+        )
+
+        def fake_gh(args: list[str]) -> list[dict[str, object]]:
+            if "--status" not in args:
+                return [active]
+            status = args[args.index("--status") + 1]
+            return [dict(active)] if status == "queued" else []
+
+        with patch(
+            "skeleton.automation.traffic_manager._gh_json",
+            side_effect=fake_gh,
+        ):
+            observed = _observe_runs("Apeloff1/Skeleton")
+
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0]["databaseId"], 42)
 
 
 class TrafficManagerAdmissionTests(unittest.TestCase):
