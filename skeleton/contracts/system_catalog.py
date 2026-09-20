@@ -417,3 +417,75 @@ def validate_authority_paths(
         for path in paths:
             if path[-1] != item.contract_id:
                 raise ValueError(f"authority path terminus mismatch: {path!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class ContractChange:
+    contract_id: str
+    before: str | None
+    after: str | None
+    classification: str
+
+
+def diff_contract_catalogs(
+    before: Iterable[ContractSpec],
+    after: Iterable[ContractSpec],
+) -> tuple[ContractChange, ...]:
+    """Produce deterministic semantic changes between two contract catalogs."""
+    old_items = tuple(before)
+    new_items = tuple(after)
+    validate_catalog(old_items)
+    validate_catalog(new_items)
+    old = by_id(old_items)
+    new = by_id(new_items)
+    changes: list[ContractChange] = []
+    for contract_id in sorted(set(old) | set(new)):
+        old_spec = old.get(contract_id)
+        new_spec = new.get(contract_id)
+        if old_spec is None and new_spec is not None:
+            changes.append(
+                ContractChange(contract_id, None, contract_fingerprint(new_spec), "added")
+            )
+            continue
+        if old_spec is not None and new_spec is None:
+            changes.append(
+                ContractChange(contract_id, contract_fingerprint(old_spec), None, "removed")
+            )
+            continue
+        assert old_spec is not None and new_spec is not None
+        before_digest = contract_fingerprint(old_spec)
+        after_digest = contract_fingerprint(new_spec)
+        if before_digest == after_digest:
+            continue
+        old_priv = set(old_spec.privileges)
+        new_priv = set(new_spec.privileges)
+        old_owns = set(old_spec.owns)
+        new_owns = set(new_spec.owns)
+        if new_priv - old_priv:
+            classification = "privilege-expanded"
+        elif new_owns - old_owns:
+            classification = "ownership-expanded"
+        elif new_spec.evidence_version != old_spec.evidence_version:
+            classification = "evidence-version-changed"
+        elif new_spec.maturity < old_spec.maturity:
+            classification = "maturity-regressed"
+        else:
+            classification = "modified"
+        changes.append(
+            ContractChange(contract_id, before_digest, after_digest, classification)
+        )
+    return tuple(changes)
+
+
+def high_risk_changes(
+    changes: Iterable[ContractChange],
+) -> tuple[ContractChange, ...]:
+    risky = {
+        "added",
+        "removed",
+        "privilege-expanded",
+        "ownership-expanded",
+        "evidence-version-changed",
+        "maturity-regressed",
+    }
+    return tuple(change for change in changes if change.classification in risky)
