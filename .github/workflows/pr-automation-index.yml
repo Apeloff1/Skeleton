@@ -86,7 +86,8 @@ jobs:
       PR_RUNNER_MIN_RATE_REMAINING: "50"
       PR_RUNNER_RETRY_ATTEMPTS: "3"
       PR_RUNNER_RETRY_CEILING_SECONDS: "30"
-      # main is currently not branch-protected; exact live base-head binding remains mandatory.\n      # Set the repository variable to true when branch protection/rulesets are enforced.\n      PR_RUNNER_REQUIRE_PROTECTED_BASE: ${{ vars.PR_RUNNER_REQUIRE_PROTECTED_BASE || 'false' }}
+      # main is currently not branch-protected; exact live base-head binding remains mandatory.
+      # Set the repository variable to true when branch protection/rulesets are enforced.\n      PR_RUNNER_REQUIRE_PROTECTED_BASE: ${{ vars.PR_RUNNER_REQUIRE_PROTECTED_BASE || 'false' }}
       PR_RUNNER_REQUIRE_EXACT_BASE_HEAD: "true"
       PR_RUNNER_QUEUE_PRESSURE_HOLD: "true"
       PR_RUNNER_PUBLISH_GATE_STATUS: "true"
