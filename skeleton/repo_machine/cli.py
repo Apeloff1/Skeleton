@@ -11,7 +11,6 @@ from .builder import RepositoryModelBuilder
 from .context import context_for_intent
 from .debt import debt_register
 from .docs_map import documentation_coverage
-from .evolution import evaluate_evolution
 from .governance import validate_governance
 from .growth import growth_recommendations
 from .health import repository_health
