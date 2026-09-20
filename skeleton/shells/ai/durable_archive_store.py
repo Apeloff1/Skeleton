@@ -1440,6 +1440,8 @@ class DurableArchiveRepository:
         if not isinstance(chain, CheckpointableEvidenceChain):
             raise TypeError("chain must satisfy CheckpointableEvidenceChain")
 
+        self._verify_manifest_signature(item)
+        self._verify_checkpoint_authority(checkpoint)
         try:
             verification = self._builder.require(
                 item,
@@ -1455,9 +1457,6 @@ class DurableArchiveRepository:
             raise DurableArchiveStoreError(
                 "archive failed live-chain verification"
             )
-        self._verify_manifest_signature(item)
-        self._verify_checkpoint_authority(checkpoint)
-
         manifest = item.manifest
         if manifest.node_count > self.max_nodes_per_archive:
             raise DurableArchiveStoreError("archive node bound exceeded")
@@ -1558,14 +1557,13 @@ class DurableArchiveRepository:
         )
         if self._put_root_index(genesis_index):
             repaired_indexes += 1
-        if self._put_sequence_index(
+        self._put_sequence_index(
             DurableArchiveSequenceIndex(
                 manifest.chain_id,
                 0,
                 GENESIS_HASH,
             )
-        ):
-            repaired_indexes += 1
+        )
         for archived in archived_nodes:
             index = DurableArchiveRootIndex(
                 manifest.chain_id,
@@ -1576,14 +1574,13 @@ class DurableArchiveRepository:
             )
             if self._put_root_index(index):
                 repaired_indexes += 1
-            if self._put_sequence_index(
+            self._put_sequence_index(
                 DurableArchiveSequenceIndex(
                     manifest.chain_id,
                     archived.sequence,
                     archived.node_hash,
                 )
-            ):
-                repaired_indexes += 1
+            )
 
         self._update_head(
             DurableArchiveHead(
@@ -2346,7 +2343,8 @@ class DurableArchiveRepository:
             except Exception as exc:
                 failures.append(
                     f"{replica.archive_id}:"
-                    f"{type(exc).__name__}"
+                    f"{type(exc).__name__}:"
+                    f"{exc}"
                 )
         raise DurableArchiveStoreError(
             "all archive replicas failed historical resolution: "
@@ -2968,14 +2966,13 @@ class DurableArchiveRepository:
         )
         if self._put_root_index(genesis):
             repaired += 1
-        if self._put_sequence_index(
+        self._put_sequence_index(
             DurableArchiveSequenceIndex(
                 manifest.chain_id,
                 0,
                 GENESIS_HASH,
             )
-        ):
-            repaired += 1
+        )
         for sequence, node_hash in enumerate(stored.node_hashes, start=1):
             index = DurableArchiveRootIndex(
                 manifest.chain_id,
@@ -2986,14 +2983,13 @@ class DurableArchiveRepository:
             )
             if self._put_root_index(index):
                 repaired += 1
-            if self._put_sequence_index(
+            self._put_sequence_index(
                 DurableArchiveSequenceIndex(
                     manifest.chain_id,
                     sequence,
                     node_hash,
                 )
-            ):
-                repaired += 1
+            )
         self._update_head(
             DurableArchiveHead(
                 manifest.chain_id,
