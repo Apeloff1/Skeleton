@@ -409,6 +409,27 @@ def _supervisor_provenance(
     return fingerprint
 
 
+def dispatchable_specialists(
+    state: dict[str, dict],
+    *,
+    build_authorization: BuildAuthorization | None = None,
+) -> list[str]:
+    """Return due specialists while keeping approved build work continuously live.
+
+    Ordinary specialists retain the generic cooldown. An explicitly authorized
+    feature build may bypass only that cooldown; disabled/circuit-open state
+    remains authoritative through authorized_builder_available().
+    """
+    due = select_specialists_due(state)
+    if (
+        build_authorization is not None
+        and "feature-builder" not in due
+        and authorized_builder_available(state)
+    ):
+        due.append("feature-builder")
+    return due
+
+
 def route(
     plan: str,
     due: list[str],
@@ -740,13 +761,10 @@ def main() -> int:
             ) from exc
 
     state = load_state()
-    due = select_specialists_due(state)
-    if (
-        build_authorization is not None
-        and "feature-builder" not in due
-        and authorized_builder_available(state)
-    ):
-        due.append("feature-builder")
+    due = dispatchable_specialists(
+        state,
+        build_authorization=build_authorization,
+    )
     assignments = route(
         plan,
         due,
