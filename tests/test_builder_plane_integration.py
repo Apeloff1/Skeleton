@@ -19,8 +19,10 @@ from skeleton.automation.builder_plane import (
 )
 from skeleton.automation.supervisor_runtime import (
     ExecutionIdentity,
+    SupervisorRuntimeError,
     WorkerCustody,
     parse_worker_result,
+    validate_worker_evidence_custody,
 )
 
 
@@ -592,6 +594,53 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             self.created_evidence(),
             manifest(),
         )
+
+    def test_shared_custody_accepts_explicit_task_bound_branch(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.created_evidence()),
+            worker="feature-builder",
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+
+    def test_shared_custody_rejects_wrong_explicit_branch(self) -> None:
+        evidence = parse_worker_result(
+            json.dumps(self.created_evidence()),
+            worker="feature-builder",
+        )
+        with self.assertRaises(SupervisorRuntimeError):
+            validate_worker_evidence_custody(
+                evidence,
+                feature_custody(),
+                expected_branch=(
+                    "bot/specialist-feature-builder-" + ("f" * 16)
+                ),
+            )
+
+    def test_existing_pr_parser_retains_task_identity(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.existing_evidence()),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence["build_issue_number"],
+            value.issue_number,
+        )
+        self.assertEqual(
+            evidence["build_task_digest"],
+            value.task_digest,
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+        validate_builder_worker_evidence(evidence, value)
 
     def test_created_evidence_rejects_wrong_task_branch(self) -> None:
         with self.assertRaises(BuilderPlaneError):
