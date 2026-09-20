@@ -818,7 +818,7 @@ def run_feature_build(
                     "diagnostics": len(validation.diagnostics),
                 },
             )
-    
+
             review = model_review(
                 client=calls,
                 objective=architecture.objective,
