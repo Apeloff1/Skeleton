@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2",
+  "schema_version": "2.3",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -193,9 +193,15 @@
         "source": "fix/live-service-test-boundaries-20260920",
         "files": "98-99",
         "reason": "parallel live-service boundary variants"
+      },
+      {
+        "source": "physics feature family",
+        "files": "68-83 per branch",
+        "commits": "202-291 per branch",
+        "reason": "high-overlap multi-branch physics stack"
       }
     ],
-    "lineage_note": "Zero-file-delta stabilization branches are lineage-only; large shell waves require file-level reconciliation."
+    "lineage_note": "Zero-file-delta fix branches remain lineage-only. The remaining physics feature family is intentionally held as overlapping reconciliation input; no blind merges."
   },
   "integrated_domains": [
     "automation runtime dependency repair",
