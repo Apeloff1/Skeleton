@@ -14,7 +14,7 @@ on:
       - ".github/workflows/arm64.yml"
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - "Dockerfile"
       - "backend/**"
@@ -39,9 +39,14 @@ env:
 
 jobs:
   arm64:
-    # Close events are cancellation tombstones only; do not consume scarce ARM
-    # capacity after the PR-number concurrency group evicts obsolete work.
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    # Draft/close transitions are cancellation tombstones only. They still
+    # enter the PR-number concurrency group so obsolete ARM work is evicted,
+    # but they never consume the scarce recovery runner after cancellation.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (!github.event.pull_request.draft &&
+       github.event.action != 'converted_to_draft' &&
+       github.event.action != 'closed')
     name: Ubuntu ARM64 compatibility
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
