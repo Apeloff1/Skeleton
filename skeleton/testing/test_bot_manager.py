@@ -29,7 +29,7 @@ def test_advanced_bot_definition_fails_closed():
         {"trigger": "bad\ntrigger"},
         {"risk": "critical"},
         {"max_files": True},
-        {"max_files": 13},
+        {"max_files": 49},
         {"requires_tests": 1},
     )
     base = {
