@@ -171,10 +171,15 @@ class ContractAudit:
     execution_order: tuple[str, ...]
     ownership_conflicts: tuple[tuple[str, str, str], ...]
     orphan_dependencies: tuple[str, ...]
+    privilege_escalations: tuple[tuple[str, str, str], ...]
 
     @property
     def clean(self) -> bool:
-        return not self.ownership_conflicts and not self.orphan_dependencies
+        return (
+            not self.ownership_conflicts
+            and not self.orphan_dependencies
+            and not self.privilege_escalations
+        )
 
 
 def ownership_conflicts(
@@ -238,6 +243,7 @@ def audit_catalog(
         execution_order=tuple(item.contract_id for item in order),
         ownership_conflicts=ownership_conflicts(items),
         orphan_dependencies=orphan_dependencies,
+        privilege_escalations=privilege_escalations(items),
     )
 
 
