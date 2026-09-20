@@ -1040,7 +1040,16 @@ def main() -> int:
                 build_authorization
             )
         require_remote_base_unchanged(execution)
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
 
+        commit_subject = (
+            "repair autonomous build"
+            if followup is not None
+            else "specialist maintenance"
+        )
         _run_git(
             _hookless_git_args(
                 hooks,
@@ -1049,13 +1058,20 @@ def main() -> int:
                 "-m",
                 (
                     f"bot({spec.name}): "
-                    "specialist maintenance"
+                    f"{commit_subject}"
                 ),
             ),
             env=publish_env,
             timeout=60,
         )
-        _verify_single_parent(execution.base_sha)
+        expected_parent = (
+            followup.head_sha
+            if followup is not None
+            else execution.base_sha
+        )
+        _verify_single_parent(
+            expected_parent
+        )
 
         subprocess.run(
             ["gh", "auth", "setup-git"],
@@ -1070,17 +1086,32 @@ def main() -> int:
                 build_authorization
             )
         require_remote_base_unchanged(execution)
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "push",
-                "--set-upstream",
-                "origin",
-                branch,
-            ),
-            env=publish_env,
-            timeout=120,
-        )
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "origin",
+                    f"HEAD:refs/heads/{branch}",
+                ),
+                env=publish_env,
+                timeout=120,
+            )
+        else:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "--set-upstream",
+                    "origin",
+                    branch,
+                ),
+                env=publish_env,
+                timeout=120,
+            )
 
         body = result["summary"] or (
             "Specialist maintenance proposal."
@@ -1129,55 +1160,68 @@ def main() -> int:
             for description in result["tests"]:
                 body += f"- {description}\n"
 
-        subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--repo",
-                execution.repository,
-                "--base",
-                execution.default_branch,
-                "--head",
-                branch,
-                "--title",
-                (
-                    f"bot({spec.name}): "
-                    "specialist maintenance"
-                ),
-                "--body",
-                body[:12_000],
-            ],
-            check=True,
-            env=publish_env,
-            timeout=60,
-        )
+        if followup is None:
+            subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--repo",
+                    execution.repository,
+                    "--base",
+                    execution.default_branch,
+                    "--head",
+                    branch,
+                    "--title",
+                    (
+                        f"bot({spec.name}): "
+                        "specialist maintenance"
+                    ),
+                    "--body",
+                    body[:12_000],
+                ],
+                check=True,
+                env=publish_env,
+                timeout=60,
+            )
 
+        status_payload: dict[str, Any] = {
+            "status": (
+                "pull-request-updated"
+                if followup is not None
+                else "pull-request-created"
+            ),
+            "bot": spec.name,
+            "branch": branch,
+            "changed_lines": changed_lines,
+            "proposal_digest": digest,
+            "base_sha": execution.base_sha,
+            "supervisor_snapshot_fingerprint": (
+                custody.snapshot_fingerprint
+            ),
+            "execution_fingerprint": (
+                execution.fingerprint
+            ),
+            "build_issue_number": (
+                build_authorization.issue_number
+                if build_authorization is not None
+                else None
+            ),
+            "build_task_digest": (
+                build_authorization.task_digest
+                if build_authorization is not None
+                else None
+            ),
+        }
+        if followup is not None:
+            status_payload["pull_request"] = (
+                followup.pr_number
+            )
+            status_payload["repair_parent_sha"] = (
+                followup.head_sha
+            )
         _print_status(
-            {
-                "status": "pull-request-created",
-                "bot": spec.name,
-                "branch": branch,
-                "changed_lines": changed_lines,
-                "proposal_digest": digest,
-                "base_sha": execution.base_sha,
-                "supervisor_snapshot_fingerprint": (
-                    custody.snapshot_fingerprint
-                ),
-                "execution_fingerprint": (
-                    execution.fingerprint
-                ),
-                "build_issue_number": (
-                    build_authorization.issue_number
-                    if build_authorization is not None
-                    else None
-                ),
-                "build_task_digest": (
-                    build_authorization.task_digest
-                    if build_authorization is not None
-                    else None
-                ),
-            }
+            status_payload
         )
         return 0
 
