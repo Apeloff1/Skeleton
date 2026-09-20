@@ -42,6 +42,7 @@ jobs:
       # Provider-stuck runs can reject force-cancel indefinitely. Keep a
       # bounded retry for transient races without monopolizing the ARM lane.
       FORCE_CANCEL_ATTEMPTS: '2'
+      FORCE_CANCEL_REJECT_BACKOFF_SECONDS: '1'
       FORCE_CANCEL_POLL_SECONDS: '1'
       MAX_LIVE_CANCELS: '100'
     steps:
@@ -386,12 +387,16 @@ jobs:
                 fi
                 echo "force-cancel accepted: run=${id} attempt=${force_attempt} branch=${head_branch} sha=${head_sha}"
               else
-                echo "force-cancel rejected: run=${id} attempt=${force_attempt}; retrying after fresh identity checks"
+                echo "force-cancel rejected: run=${id} attempt=${force_attempt}; skipping completion polls"
+                if (( force_attempt < FORCE_CANCEL_ATTEMPTS )); then
+                  sleep "$FORCE_CANCEL_REJECT_BACKOFF_SECONDS"
+                fi
+                continue
               fi
 
-              # An accepted provider request can be asynchronous. Poll before
-              # deciding the run is still stuck, then retry only if it remains
-              # exactly queued with the same immutable identity.
+              # Only an accepted provider request can produce an asynchronous
+              # cancellation transition. Rejected requests skip these polls so
+              # provider-stuck tombstones cannot monopolize the recovery lane.
               for force_poll in 1 2 3; do
                 sleep "$FORCE_CANCEL_POLL_SECONDS"
                 force_poll_json="$RUNNER_TEMP/force-poll-${id}-${force_attempt}-${force_poll}.json"
@@ -450,7 +455,8 @@ jobs:
             echo "- Stale threshold: ${LIVE_RUN_STALE_MINUTES} minutes"
             echo "- Force-cancel threshold: ${LIVE_FORCE_CANCEL_STALE_MINUTES} minutes"
             echo "- Force-cancel attempts per proven target: ${FORCE_CANCEL_ATTEMPTS}"
-            echo "- Force-cancel poll interval: ${FORCE_CANCEL_POLL_SECONDS}s"
+            echo "- Force-cancel reject backoff: ${FORCE_CANCEL_REJECT_BACKOFF_SECONDS}s"
+            echo "- Force-cancel poll interval after accepted request: ${FORCE_CANCEL_POLL_SECONDS}s"
             echo "- Cancellation cap: ${MAX_LIVE_CANCELS}"
             echo '- Ordinary cancellation requires every linked same-repository PR to be closed or moved to a different head SHA, including security-class PR runs.'
             echo '- Security/provenance/artifact/dependency PR runs are never force-cancelled after an ordinary cancellation failure.'
