@@ -3,7 +3,8 @@ name: Actions Housekeeping CLI
 on:
   workflow_dispatch:
   schedule:
-    - cron: '23 4 * * 0'
+    # Hourly ARM-lane fallback for provider-stuck obsolete Actions runs.
+    - cron: '23 * * * *'
   push:
     branches: [main]
     paths:
