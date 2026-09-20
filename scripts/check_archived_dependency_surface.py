@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import string
 import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -94,7 +93,7 @@ def _looks_like_git_blob_sha(raw: Any) -> bool:
 
 def _git_blob_sha(payload: bytes) -> str:
     header = f"blob {len(payload)}\0".encode("ascii")
-    return hashlib.sha1(header + payload).hexdigest()
+    return hashlib.sha1(header + payload, usedforsecurity=False).hexdigest()
 
 
 def validate_archive_map(
