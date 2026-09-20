@@ -90,6 +90,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Semantic/domain wave:** Jeeves semantics, repository bots, security evidence, Java observability/retrieval, and role studios revalidated against assembly; existing integration PRs reused.
 
+- **Frontier/Java/machine wave:** revalidated galaxy, Java accelerator/control/observability, Jeeves decision/planning/frontier chains, and machine control-plane sources; existing integration PRs reused.
+
 ## Target layout
 
 ```text
