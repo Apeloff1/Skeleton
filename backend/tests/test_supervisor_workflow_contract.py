@@ -230,3 +230,25 @@ def test_merge_readiness_runs_worker_health_regressions() -> None:
     for fragment in required:
         assert fragment in source
 
+
+def test_builder_plane_surface_is_tracked_by_workflow_security() -> None:
+    workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"
+    source = workflow.read_text(encoding="utf-8")
+    required = (
+        "skeleton/automation/builder_plane.py",
+        "tests/test_builder_plane.py",
+        "tests/test_builder_plane_integration.py",
+    )
+    for fragment in required:
+        assert source.count(fragment) == 2
+
+
+def test_merge_readiness_runs_builder_plane_regressions() -> None:
+    workflow = ROOT / ".github" / "workflows" / "merge-readiness.yml"
+    source = workflow.read_text(encoding="utf-8")
+    required = (
+        "tests/test_builder_plane.py",
+        "tests/test_builder_plane_integration.py",
+    )
+    for fragment in required:
+        assert fragment in source
