@@ -130,6 +130,7 @@ on:
       - 'tests/test_build_session.py'
       - 'tests/test_build_validation.py'
       - 'tests/test_supervisor_runtime.py'
+      - 'tests/test_traffic_manager.py'
       - 'tests/test_worker_health.py'
       - 'skeleton/testing/test_bot_manager.py'
       - 'core/activation_security.py'
