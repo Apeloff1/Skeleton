@@ -42,7 +42,13 @@ from .builder_plane import (
     validate_builder_custody,
     validate_builder_worker_evidence,
 )
-from .execution_failsafe import retry_allowed, summarize_results
+from .execution_failsafe import (
+    attach_retry_history,
+    retry_allowed,
+    retry_delay_seconds,
+    retry_token,
+    summarize_results,
+)
 from .free_model import redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -567,6 +573,12 @@ def _dispatch_one(
             )
 
             env = sanitized_worker_env(os.environ)
+            attempt_token = retry_token(
+                worker=name,
+                attempt=attempt,
+                execution_fingerprint=execution.fingerprint,
+                snapshot_fingerprint=supervisor_fingerprint,
+            )
             env.update(
                 {
                     "SECRETARY_PLAN": plan,
@@ -584,6 +596,8 @@ def _dispatch_one(
                     "SUPERVISOR_EXECUTION_FINGERPRINT": (
                         execution.fingerprint
                     ),
+                    "SECRETARY_ATTEMPT": str(attempt),
+                    "SECRETARY_RETRY_TOKEN": attempt_token,
                     "PYTHONPATH": str(worktree),
                     "GITHUB_WORKSPACE": str(worktree),
                     "PYTHONDONTWRITEBYTECODE": "1",
@@ -690,6 +704,7 @@ def _dispatch_one(
                 "isolated": True,
                 "evidence": evidence,
                 "attempt": attempt,
+                "retry_token": attempt_token,
                 "failure_kind": (
                     None
                     if process.returncode == 0
@@ -702,6 +717,12 @@ def _dispatch_one(
                 "returncode": 1,
                 "isolated": True,
                 "attempt": attempt,
+                "retry_token": retry_token(
+                    worker=name,
+                    attempt=attempt,
+                    execution_fingerprint=execution.fingerprint,
+                    snapshot_fingerprint=supervisor_fingerprint,
+                ),
                 # A timeout may happen after a worker pushed a branch or PR.
                 # Never retry an ambiguous post-start outcome automatically.
                 "failure_kind": "worker-timeout",
@@ -712,6 +733,12 @@ def _dispatch_one(
                 "returncode": 1,
                 "isolated": True,
                 "attempt": attempt,
+                "retry_token": retry_token(
+                    worker=name,
+                    attempt=attempt,
+                    execution_fingerprint=execution.fingerprint,
+                    snapshot_fingerprint=supervisor_fingerprint,
+                ),
                 "failure_kind": "invalid-evidence",
             }
         except (OSError, subprocess.CalledProcessError):
@@ -720,6 +747,12 @@ def _dispatch_one(
                 "returncode": 1,
                 "isolated": True,
                 "attempt": attempt,
+                "retry_token": retry_token(
+                    worker=name,
+                    attempt=attempt,
+                    execution_fingerprint=execution.fingerprint,
+                    snapshot_fingerprint=supervisor_fingerprint,
+                ),
                 # These errors occur while creating or launching the isolated
                 # worker, before admitted worker evidence can exist.
                 "failure_kind": "setup-failure",
@@ -805,14 +838,34 @@ def dispatch(
             name,
             **kwargs,
         )
+        attempts = [result]
         if retry_allowed(result):
+            second_token = retry_token(
+                worker=name,
+                attempt=2,
+                execution_fingerprint=execution.fingerprint,
+                snapshot_fingerprint=supervisor_fingerprint,
+            )
+            time.sleep(retry_delay_seconds(2, second_token))
+            # Re-admit immutable repository custody immediately before the
+            # retry. A base advance converts recovery into a safe terminal run.
+            require_exact_head(execution.base_sha)
+            require_remote_base_unchanged(execution)
             result = _dispatch_one(
                 plan,
                 name,
                 attempt=2,
                 **kwargs,
             )
-        results.append(result)
+            attempts.append(result)
+        results.append(
+            attach_retry_history(
+                result,
+                attempts,
+                execution_fingerprint=execution.fingerprint,
+                snapshot_fingerprint=supervisor_fingerprint,
+            )
+        )
     return results
 
 
