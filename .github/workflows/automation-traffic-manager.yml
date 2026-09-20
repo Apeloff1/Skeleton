@@ -215,7 +215,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   dispatch:
-    name: Queue admitted repository supervisor
+    name: Queue admitted automation lane
     needs: admission
     if: ${{ needs.admission.outputs.admit == 'true' }}
     permissions:
@@ -227,8 +227,17 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      TRAFFIC_LANE: ${{ needs.admission.outputs.lane }}
     steps:
-      - name: Dispatch reviewed supervisor workflow
+      - name: Dispatch branch merge manager for integration lane
+        if: ${{ needs.admission.outputs.lane == 'integration' }}
+        run: >-
+          gh workflow run branch-merge-manager.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref "$TRAFFIC_DEFAULT_BRANCH"
+
+      - name: Dispatch reviewed supervisor for non-integration lane
+        if: ${{ needs.admission.outputs.lane != 'integration' }}
         run: >-
           gh workflow run supervisor.yml
           --repo "$GITHUB_REPOSITORY"
