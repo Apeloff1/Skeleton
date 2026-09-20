@@ -73,6 +73,7 @@ class TrafficPolicy:
     failure_window_seconds: int = 6 * 60 * 60
     stale_queued_seconds: int = 15 * 60
     max_stale_queued_runs: int = 2
+    provider_tombstone_seconds: int = 24 * 60 * 60
 
     def __post_init__(self) -> None:
         values = (
@@ -84,6 +85,7 @@ class TrafficPolicy:
             self.failure_window_seconds,
             self.stale_queued_seconds,
             self.max_stale_queued_runs,
+            self.provider_tombstone_seconds,
         )
         if any(isinstance(value, bool) or value <= 0 for value in values):
             raise TrafficManagerError("traffic policy values must be positive")
@@ -128,6 +130,7 @@ class TrafficDecision:
     authorized_issues: int
     seconds_since_success: int | None
     stale_queued_runs: int
+    provider_tombstones: int
     oldest_queued_age_seconds: int | None
     inventory_saturated: bool
     relieve: bool
@@ -148,6 +151,7 @@ class TrafficDecision:
             "authorized_issues": self.authorized_issues,
             "seconds_since_success": self.seconds_since_success,
             "stale_queued_runs": self.stale_queued_runs,
+            "provider_tombstones": self.provider_tombstones,
             "oldest_queued_age_seconds": self.oldest_queued_age_seconds,
             "inventory_saturated": self.inventory_saturated,
             "relieve": self.relieve,
@@ -342,7 +346,22 @@ def evaluate(
 ) -> TrafficDecision:
     """Return one fail-closed deterministic admission decision."""
     policy = policy or TrafficPolicy()
-    active = _active_runs(snapshot)
+    observed_active = _active_runs(snapshot)
+    provider_tombstones = tuple(
+        run
+        for run in observed_active
+        if _run_status(run) == "queued"
+        and (
+            (age := _queued_age_seconds(snapshot, run)) is not None
+            and age >= policy.provider_tombstone_seconds
+        )
+    )
+    tombstone_ids = {id(run) for run in provider_tombstones}
+    active = tuple(
+        run
+        for run in observed_active
+        if id(run) not in tombstone_ids
+    )
     queued = tuple(
         run
         for run in active
@@ -403,6 +422,7 @@ def evaluate(
         "authorized_issues": authorized,
         "seconds_since_success": success_age,
         "stale_queued_runs": len(stale_queued),
+        "provider_tombstones": len(provider_tombstones),
         "oldest_queued_age_seconds": oldest_queue_age,
         "inventory_saturated": inventory_saturated,
         "relieve": relieve,
@@ -607,6 +627,7 @@ def emit_github_output(
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
         f"stale_queued_runs={decision.stale_queued_runs}\n"
+        f"provider_tombstones={decision.provider_tombstones}\n"
         f"oldest_queued_age_seconds={oldest_queued_age}\n"
         f"inventory_saturated={inventory_saturated}\n"
         f"relieve={relieve}\n"
@@ -652,6 +673,10 @@ def write_step_summary(decision: TrafficDecision) -> None:
         (
             "- Stale queued runs: "
             f"`{decision.stale_queued_runs}`"
+        ),
+        (
+            "- Provider tombstones (24h+ queued): "
+            f"`{decision.provider_tombstones}`"
         ),
         (
             "- Oldest queued age (seconds): "
