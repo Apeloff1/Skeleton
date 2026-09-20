@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.5",
+  "schema_version": "1.6",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,20 +66,27 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1808,
+      "last": 1814,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1791-1808",
+      "prs": "1809-1814",
       "domains": [
-        "security headers",
-        "shell AI readiness/trust",
-        "skills/files atomic writes",
-        "planning harness",
-        "supervisor controls",
-        "tooling regressions",
-        "workflow/security controls",
-        "vulnerability bounds"
+        "builder plane current-main delta",
+        "builder repair receipts",
+        "durable run checkpoints",
+        "agent squads",
+        "four-role studios"
+      ],
+      "held": [
+        {
+          "source": "feat/bounded-shell-runner-20260918",
+          "files": 300
+        },
+        {
+          "source": "feat/build-capable-automation-v2-20260920",
+          "files": 33
+        }
       ]
     },
     "large_reconciliation": [
