@@ -2290,12 +2290,6 @@ class DurableArchiveRepository:
                     raise DurableArchiveStoreError(
                         "root replica manifest digest mismatch"
                     )
-                if not self.verify_archive(
-                    stored
-                ):
-                    raise DurableArchiveStoreError(
-                        "archive replica failed verification"
-                    )
                 if (
                     index.sequence
                     > len(stored.node_hashes)
@@ -2303,12 +2297,21 @@ class DurableArchiveRepository:
                     raise DurableArchiveStoreError(
                         "root index sequence exceeds archive replica"
                     )
+                # Reconstruct the requested prefix before collapsing verification
+                # to a boolean so missing/corrupt archived-node diagnostics remain
+                # actionable to callers.
                 nodes = self._stored_nodes(
                     stored,
                     through_sequence=(
                         index.sequence
                     ),
                 )
+                if not self.verify_archive(
+                    stored
+                ):
+                    raise DurableArchiveStoreError(
+                        "archive replica failed verification"
+                    )
                 terminal = (
                     GENESIS_HASH
                     if not nodes
