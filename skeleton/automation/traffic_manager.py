@@ -71,6 +71,8 @@ class TrafficPolicy:
     cooldown_seconds: int = 30 * 60
     maintenance_interval_seconds: int = 2 * 60 * 60
     failure_window_seconds: int = 6 * 60 * 60
+    stale_queued_seconds: int = 15 * 60
+    max_stale_queued_runs: int = 2
 
     def __post_init__(self) -> None:
         values = (
@@ -80,6 +82,8 @@ class TrafficPolicy:
             self.cooldown_seconds,
             self.maintenance_interval_seconds,
             self.failure_window_seconds,
+            self.stale_queued_seconds,
+            self.max_stale_queued_runs,
         )
         if any(isinstance(value, bool) or value <= 0 for value in values):
             raise TrafficManagerError("traffic policy values must be positive")
@@ -123,6 +127,11 @@ class TrafficDecision:
     blocked_pull_requests: int
     authorized_issues: int
     seconds_since_success: int | None
+    stale_queued_runs: int
+    oldest_queued_age_seconds: int | None
+    inventory_saturated: bool
+    relieve: bool
+    relief_reason: str
     forced: bool = False
 
     def as_dict(self) -> dict[str, object]:
@@ -138,6 +147,11 @@ class TrafficDecision:
             "blocked_pull_requests": self.blocked_pull_requests,
             "authorized_issues": self.authorized_issues,
             "seconds_since_success": self.seconds_since_success,
+            "stale_queued_runs": self.stale_queued_runs,
+            "oldest_queued_age_seconds": self.oldest_queued_age_seconds,
+            "inventory_saturated": self.inventory_saturated,
+            "relieve": self.relieve,
+            "relief_reason": self.relief_reason,
             "forced": self.forced,
         }
 
@@ -237,6 +251,17 @@ def _active_runs(
     )
 
 
+def _queued_age_seconds(
+    snapshot: TrafficSnapshot,
+    run: dict[str, Any],
+) -> int | None:
+    created = _timestamp(run.get("createdAt"))
+    if created is None:
+        return None
+    age = snapshot.observed_at - created
+    return age if age >= 0 else None
+
+
 def _recent_success_age(snapshot: TrafficSnapshot) -> int | None:
     ages: list[int] = []
     for run in _visible_runs(snapshot):
@@ -333,10 +358,37 @@ def evaluate(
         for run in active
         if _is_marker_workflow(run, MANAGED_WORKFLOW_MARKERS)
     )
+    queue_ages = tuple(
+        age
+        for run in queued
+        if (age := _queued_age_seconds(snapshot, run)) is not None
+    )
+    stale_queued = tuple(
+        run
+        for run in queued
+        if (
+            (age := _queued_age_seconds(snapshot, run)) is not None
+            and age >= policy.stale_queued_seconds
+        )
+    )
+    oldest_queue_age = max(queue_ages) if queue_ages else None
+    inventory_saturated = len(snapshot.workflow_runs) >= MAX_ITEMS
     failures = _recent_failures(snapshot, policy)
     blocked = _blocked_pull_requests(snapshot)
     authorized = _authorized_issues(snapshot)
     success_age = _recent_success_age(snapshot)
+
+    relieve = False
+    relief_reason = "none"
+    if inventory_saturated:
+        relieve = True
+        relief_reason = "run-inventory-saturated"
+    elif len(stale_queued) >= policy.max_stale_queued_runs:
+        relieve = True
+        relief_reason = "stale-queue-pressure"
+    elif len(queued) >= policy.max_queued_runs:
+        relieve = True
+        relief_reason = "queue-capacity-exhausted"
 
     common = {
         "active_runs": len(active),
@@ -347,9 +399,28 @@ def evaluate(
         "blocked_pull_requests": blocked,
         "authorized_issues": authorized,
         "seconds_since_success": success_age,
+        "stale_queued_runs": len(stale_queued),
+        "oldest_queued_age_seconds": oldest_queue_age,
+        "inventory_saturated": inventory_saturated,
+        "relieve": relieve,
+        "relief_reason": relief_reason,
         "forced": bool(force),
     }
 
+    if inventory_saturated:
+        return TrafficDecision(
+            False,
+            "run-inventory-saturated",
+            "hold",
+            **common,
+        )
+    if len(stale_queued) >= policy.max_stale_queued_runs:
+        return TrafficDecision(
+            False,
+            "stale-queue-pressure",
+            "hold",
+            **common,
+        )
     if len(queued) >= policy.max_queued_runs:
         return TrafficDecision(
             False,
@@ -523,6 +594,11 @@ def emit_github_output(
         f"active_runs={decision.active_runs}\n"
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
+        f"stale_queued_runs={decision.stale_queued_runs}\n"
+        f"oldest_queued_age_seconds={decision.oldest_queued_age_seconds if decision.oldest_queued_age_seconds is not None else ''}\n"
+        f"inventory_saturated={'true' if decision.inventory_saturated else 'false'}\n"
+        f"relieve={'true' if decision.relieve else 'false'}\n"
+        f"relief_reason={decision.relief_reason}\n"
         f"decision_json={payload}\n"
     )
     with path.open(
@@ -560,6 +636,22 @@ def write_step_summary(decision: TrafficDecision) -> None:
         (
             "- Critical active runs: "
             f"`{decision.critical_active}`"
+        ),
+        (
+            "- Stale queued runs: "
+            f"`{decision.stale_queued_runs}`"
+        ),
+        (
+            "- Oldest queued age (seconds): "
+            f"`{decision.oldest_queued_age_seconds}`"
+        ),
+        (
+            "- Run inventory saturated: "
+            f"`{decision.inventory_saturated}`"
+        ),
+        (
+            "- Relief required: "
+            f"`{decision.relieve}` ({decision.relief_reason})"
         ),
         (
             "- Managed automation active: "
