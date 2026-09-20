@@ -377,10 +377,6 @@
       "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
       "target": "127.0.0.1:8000"
     },
-    "test_live_service_test_boundaries.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "127.0.0.1:8123"
-    },
     "test_stage_a_hardening.py": {
       "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
       "target": "remote-preview"
