@@ -193,7 +193,7 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             snapshot(
                 runs=(
                     run(
-                        name="Automation Traffic Manager",
+                        name="Repository Supervisor",
                         conclusion="success",
                         updated_at="2027-01-15T07:50:00Z",
                     ),
@@ -218,7 +218,7 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             snapshot(
                 runs=(
                     run(
-                        name="Automation Traffic Manager",
+                        name="Repository Supervisor",
                         conclusion="success",
                         updated_at="2027-01-15T07:50:00Z",
                     ),
@@ -275,7 +275,7 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
 
     def test_draft_blocked_pr_does_not_create_demand(self) -> None:
         recent = run(
-            name="Automation Traffic Manager",
+            name="Repository Supervisor",
             conclusion="success",
             updated_at="2027-01-15T07:20:00Z",
         )
@@ -311,7 +311,7 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
 
     def test_old_failure_outside_window_is_not_demand(self) -> None:
         recent_success = run(
-            name="Automation Traffic Manager",
+            name="Repository Supervisor",
             conclusion="success",
             updated_at="2027-01-15T07:00:00Z",
         )
