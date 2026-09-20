@@ -1158,16 +1158,15 @@ def main() -> int:
             )
 
         validate_generated_files(result["files"])
-        changed_lines = validate_mutation_budget(
-            result["files"]
+        changed_line_limit = (
+            builder_manifest.budget.max_changed_lines
+            if builder_manifest is not None
+            else MAX_CHANGED_LINES
         )
-        if (
-            builder_manifest is not None
-            and changed_lines > builder_manifest.budget.max_changed_lines
-        ):
-            raise WorkerAdmissionError(
-                "feature-builder proposal exceeds Builder Plane changed-line budget"
-            )
+        changed_lines = validate_mutation_budget(
+            result["files"],
+            max_changed_lines=changed_line_limit,
+        )
         digest = proposal_digest(
             worker=spec.name,
             snapshot_fingerprint=custody.snapshot_fingerprint,
@@ -1190,17 +1189,22 @@ def main() -> int:
                 ) from exc
 
         repo_root = Path.cwd().resolve()
+        active_safe_prefixes = (
+            BUILD_SAFE_PREFIXES
+            if spec.name == "feature-builder"
+            else SAFE_PREFIXES
+        )
         targets = {
             item["path"]: resolve_mutation_target(
                 item["path"],
                 repo_root=repo_root,
-                allowed_prefixes=SAFE_PREFIXES,
+                allowed_prefixes=active_safe_prefixes,
                 blocked_prefixes=BLOCKED_PREFIXES,
             )
             for item in result["files"]
         }
 
-        publish_env = _publication_env()
+        publish_env = publish_env or _publication_env()
         hooks = Path(
             os.environ.get(
                 "RUNNER_TEMP",
@@ -1215,16 +1219,24 @@ def main() -> int:
             exist_ok=True,
         )
 
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "switch",
-                "--create",
-                branch,
-                execution.base_sha,
-            ),
-            env=publish_env,
-        )
+        if followup is None:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "switch",
+                    "--create",
+                    branch,
+                    execution.base_sha,
+                ),
+                env=publish_env,
+            )
+        else:
+            require_exact_head(
+                followup.head_sha
+            )
+            _require_followup_head_unchanged(
+                followup
+            )
 
         for item in result["files"]:
             safe_write_text(
@@ -1273,7 +1285,16 @@ def main() -> int:
                 builder_manifest,
             )
         require_remote_base_unchanged(execution)
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
 
+        commit_subject = (
+            "repair autonomous build"
+            if followup is not None
+            else "specialist maintenance"
+        )
         _run_git(
             _hookless_git_args(
                 hooks,
@@ -1282,13 +1303,17 @@ def main() -> int:
                 "-m",
                 (
                     f"bot({spec.name}): "
-                    "specialist maintenance"
+                    f"{commit_subject}"
                 ),
             ),
             env=publish_env,
             timeout=60,
         )
-        _verify_single_parent(execution.base_sha)
+        _verify_single_parent(
+            followup.head_sha
+            if followup is not None
+            else execution.base_sha
+        )
 
         subprocess.run(
             ["gh", "auth", "setup-git"],
@@ -1305,24 +1330,39 @@ def main() -> int:
                 builder_manifest,
             )
         require_remote_base_unchanged(execution)
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "push",
-                "--set-upstream",
-                "origin",
-                branch,
-            ),
-            env=publish_env,
-            timeout=120,
-        )
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "origin",
+                    f"HEAD:refs/heads/{branch}",
+                ),
+                env=publish_env,
+                timeout=120,
+            )
+        else:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "--set-upstream",
+                    "origin",
+                    branch,
+                ),
+                env=publish_env,
+                timeout=120,
+            )
 
         body = result["summary"] or (
             "Specialist maintenance proposal."
         )
         body += (
             f"\n\nChanged-line admission budget: "
-            f"{changed_lines}/{MAX_CHANGED_LINES}."
+            f"{changed_lines}/{changed_line_limit}."
         )
         body += (
             "\nDispatched by the repository Secretary; "
