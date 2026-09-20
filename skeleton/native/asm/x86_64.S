@@ -4,7 +4,7 @@
 .globl skeleton_asm_abi_version
 .type skeleton_asm_abi_version, @function
 skeleton_asm_abi_version:
-    mov $1, %eax
+    mov $2, %eax
     ret
 .size skeleton_asm_abi_version, .-skeleton_asm_abi_version
 
@@ -101,5 +101,63 @@ skeleton_asm_l2_sq_f32:
 .Ll2_done:
     ret
 .size skeleton_asm_l2_sq_f32, .-skeleton_asm_l2_sq_f32
+
+.p2align 4
+.globl skeleton_asm_dot_batch_f32
+.type skeleton_asm_dot_batch_f32, @function
+skeleton_asm_dot_batch_f32:
+    test %rdx, %rdx
+    je .Lbatch_done
+
+    mov %rdx, %rax
+    mov %rdi, %r9
+
+.Lbatch_row:
+    xorps %xmm0, %xmm0
+    mov %r9, %rdi
+    mov %rcx, %rdx
+    shr $2, %rdx
+    je .Lbatch_tail
+
+.Lbatch_vec:
+    movups (%rdi), %xmm1
+    movups (%rsi), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm0
+    add $16, %rdi
+    add $16, %rsi
+    dec %rdx
+    jne .Lbatch_vec
+
+    movaps %xmm0, %xmm1
+    movhlps %xmm0, %xmm1
+    addps %xmm1, %xmm0
+    movaps %xmm0, %xmm1
+    shufps $0x55, %xmm1, %xmm1
+    addss %xmm1, %xmm0
+
+.Lbatch_tail:
+    mov %rcx, %rdx
+    and $3, %rdx
+    je .Lbatch_store
+
+.Lbatch_tail_loop:
+    movss (%rdi), %xmm1
+    mulss (%rsi), %xmm1
+    addss %xmm1, %xmm0
+    add $4, %rdi
+    add $4, %rsi
+    dec %rdx
+    jne .Lbatch_tail_loop
+
+.Lbatch_store:
+    movss %xmm0, (%r8)
+    add $4, %r8
+    dec %rax
+    jne .Lbatch_row
+
+.Lbatch_done:
+    ret
+.size skeleton_asm_dot_batch_f32, .-skeleton_asm_dot_batch_f32
 
 .section .note.GNU-stack,"",@progbits
