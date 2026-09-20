@@ -160,7 +160,7 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             3600,
         )
 
-    def test_saturated_run_inventory_requests_fail_closed_relief(self) -> None:
+    def test_completed_history_at_observation_limit_does_not_block(self) -> None:
         completed = tuple(
             run(
                 name=f"Completed {i}",
@@ -170,6 +170,24 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
         )
         decision = evaluate(
             snapshot(runs=completed),
+            policy=self.policy,
+            force=True,
+        )
+        self.assertTrue(decision.admit)
+        self.assertFalse(decision.inventory_saturated)
+
+    def test_fully_active_observation_window_requests_fail_closed_relief(self) -> None:
+        active = tuple(
+            run(
+                name=f"Active {i}",
+                status="in_progress",
+                conclusion="",
+                database_id=2000 + i,
+            )
+            for i in range(100)
+        )
+        decision = evaluate(
+            snapshot(runs=active),
             policy=self.policy,
             force=True,
         )
@@ -184,6 +202,11 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             decision.relief_reason,
             "run-inventory-saturated",
         )
+
+    def test_default_policy_keeps_stewardship_near_continuous(self) -> None:
+        policy = TrafficPolicy()
+        self.assertEqual(policy.cooldown_seconds, 5 * 60)
+        self.assertEqual(policy.maintenance_interval_seconds, 10 * 60)
 
     def test_critical_lane_contention_blocks(self) -> None:
         runs = (
