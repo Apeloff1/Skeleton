@@ -1223,7 +1223,11 @@ def validate_builder_worker_evidence(
                 "builder no-change evidence came from a non-builder worker"
             )
         return
-    if status not in {"pull-request-created", "existing-pr"}:
+    if status not in {
+        "pull-request-created",
+        "pull-request-updated",
+        "existing-pr",
+    }:
         raise BuilderPlaneError("builder worker evidence status is not admitted")
     if evidence.get("bot") != "feature-builder":
         raise BuilderPlaneError(
