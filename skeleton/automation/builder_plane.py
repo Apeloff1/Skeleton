@@ -810,13 +810,16 @@ def _derive_acceptance(signals: Iterable[str]) -> tuple[str, ...]:
 
 
 def _default_budget(signals: Iterable[str]) -> BuilderBudget:
-    signal_set = set(signals)
-    max_files = 8
-    if "integration" in signal_set or "api-contract" in signal_set:
-        max_files = 10
-    if "documentation" in signal_set and len(signal_set) > 1:
-        max_files = min(MAX_BUDGET_FILES, max_files + 1)
-    return BuilderBudget(max_files=max_files)
+    # Exact authority and path policy provide the safety boundary; capability
+    # should not silently shrink based on keyword classification. The full
+    # bounded build budget is available to every explicitly approved task.
+    tuple(signals)
+    return BuilderBudget(
+        max_files=MAX_BUDGET_FILES,
+        max_changed_lines=MAX_BUDGET_CHANGED_LINES,
+        max_total_bytes=MAX_BUDGET_TOTAL_BYTES,
+        max_test_descriptions=MAX_BUDGET_TEST_DESCRIPTIONS,
+    )
 
 
 def _stages(signals: tuple[str, ...]) -> tuple[BuilderStage, ...]:
@@ -1223,7 +1226,11 @@ def validate_builder_worker_evidence(
                 "builder no-change evidence came from a non-builder worker"
             )
         return
-    if status not in {"pull-request-created", "existing-pr"}:
+    if status not in {
+        "pull-request-created",
+        "pull-request-updated",
+        "existing-pr",
+    }:
         raise BuilderPlaneError("builder worker evidence status is not admitted")
     if evidence.get("bot") != "feature-builder":
         raise BuilderPlaneError(
@@ -1245,16 +1252,19 @@ def validate_builder_worker_evidence(
     if status == "existing-pr":
         return
 
-    created_expected = {
+    mutation_expected = {
         "builder_manifest_digest": manifest.manifest_digest,
         "base_sha": manifest.base_sha,
         "execution_fingerprint": manifest.execution_fingerprint,
     }
-    for field, expected_value in created_expected.items():
+    for field, expected_value in mutation_expected.items():
         if evidence.get(field) != expected_value:
             raise BuilderPlaneError(
                 f"builder worker evidence {field} mismatch"
             )
+
+    if status == "pull-request-updated":
+        return
 
     try:
         receipt = BuilderProposalReceipt.from_payload(
