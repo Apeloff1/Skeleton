@@ -69,6 +69,9 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Fix queue recheck:** workflow security/scope, repository safety, secret-scan, and repair-intake waves remain staged with meaningful deltas; existing PRs reused.
 
+- **Capability-wave audit:** #1834–#1847 revalidated; all remain meaningful staged source material.
+- Physics feature family revalidated and remains held for consolidated assembly.
+
 ## Target layout
 
 ```text
