@@ -28,6 +28,7 @@ from .build_authority import (
     revalidate_live_build_authorization,
 )
 from .bot_manager import (
+    authorized_builder_available,
     load_state,
     record_worker_outcome,
     save_state,
@@ -740,6 +741,12 @@ def main() -> int:
 
     state = load_state()
     due = select_specialists_due(state)
+    if (
+        build_authorization is not None
+        and "feature-builder" not in due
+        and authorized_builder_available(state)
+    ):
+        due.append("feature-builder")
     assignments = route(
         plan,
         due,
