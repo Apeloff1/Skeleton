@@ -20,10 +20,25 @@ import subprocess
 from pathlib import Path
 from typing import Any, Mapping
 
+from .advanced_bots import (
+    ADVANCED_BOTS,
+    BLOCKED_PREFIXES,
+    BUILD_SAFE_PREFIXES,
+    SAFE_PREFIXES,
+    AdvancedBot,
+    allowed,
+)
 from .build_authority import (
-    BuildAuthorization,
     BuildAuthorityError,
+    BuildAuthorization,
     revalidate_live_build_authorization,
+)
+from .build_followup import (
+    BuildFollowup,
+    inspect_build_followup,
+)
+from .build_repair import (
+    run_feature_followup_repair,
 )
 from .builder_plane import (
     BuilderManifest,
@@ -33,23 +48,7 @@ from .builder_plane import (
     manifest_prompt_fragment,
     validate_builder_custody,
 )
-from .build_followup import (
-    BuildFollowup,
-    BuildFollowupError,
-    inspect_build_followup,
-)
-from .build_repair import (
-    BuildRepairError,
-    run_feature_followup_repair,
-)
-from .advanced_bots import (
-    ADVANCED_BOTS,
-    BLOCKED_PREFIXES,
-    BUILD_SAFE_PREFIXES,
-    SAFE_PREFIXES,
-    AdvancedBot,
-    allowed,
-)
+from .execution_failsafe import retry_token
 from .free_model import FreeModelClient, ModelError, redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -132,6 +131,21 @@ def admit_worker(name: str) -> WorkerCustody:
                 "",
             ).strip()
         )
+        raw_attempt = os.environ.get("SECRETARY_ATTEMPT", "").strip()
+        if raw_attempt not in {"1", "2"}:
+            raise WorkerAdmissionError("worker retry attempt is invalid")
+        expected_retry_token = retry_token(
+            worker=name,
+            attempt=int(raw_attempt),
+            execution_fingerprint=execution.fingerprint,
+            snapshot_fingerprint=snapshot,
+        )
+        supplied_retry_token = os.environ.get(
+            "SECRETARY_RETRY_TOKEN",
+            "",
+        ).strip()
+        if supplied_retry_token != expected_retry_token:
+            raise WorkerAdmissionError("worker retry custody mismatch")
         return WorkerCustody(
             worker=name,
             snapshot_fingerprint=snapshot,
