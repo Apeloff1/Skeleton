@@ -36,6 +36,10 @@ from .build_followup import (
     BuildFollowup,
     BuildFollowupError,
 )
+from .builder_plane import (
+    BuilderManifest,
+    builder_worker_branch,
+)
 from .build_index import (
     BuildIndexError,
     RepositoryIndex,
@@ -143,14 +147,27 @@ def _manifest_fingerprint(
 def _architecture(
     authorization: BuildAuthorization,
     followup: BuildFollowup,
+    builder_manifest: BuilderManifest | None = None,
 ) -> ArchitecturePlan:
     checks = tuple(
         item.name
         for item in followup.failed_checks
     )
-    acceptance = tuple(
+    failure_acceptance = tuple(
         f"Resolve failing check: {name}"
         for name in checks
+    )
+    acceptance = tuple(
+        dict.fromkeys(
+            (
+                *(
+                    builder_manifest.acceptance
+                    if builder_manifest is not None
+                    else ()
+                ),
+                *failure_acceptance,
+            )
+        )
     )
     if not acceptance:
         acceptance = (
@@ -485,6 +502,7 @@ def run_feature_followup_repair(
     client: FreeModelClient | None = None,
     budget: BuildBudget | None = None,
     index: RepositoryIndex | None = None,
+    builder_manifest: BuilderManifest | None = None,
 ) -> dict[str, object]:
     """Repair an exact failed feature-builder PR without expanding its scope."""
     if not isinstance(
@@ -505,6 +523,20 @@ def run_feature_followup_repair(
         raise BuildRepairError(
             "build followup task digest mismatch"
         )
+    if builder_manifest is not None:
+        if (
+            builder_manifest.repository
+            != build_authorization.repository
+            or builder_manifest.issue_number
+            != build_authorization.issue_number
+            or builder_manifest.task_digest
+            != build_authorization.task_digest
+            or followup.branch
+            != builder_worker_branch(builder_manifest)
+        ):
+            raise BuildRepairError(
+                "build followup differs from canonical Builder manifest"
+            )
     if not followup.repairable:
         return {
             "summary": (
@@ -529,6 +561,7 @@ def run_feature_followup_repair(
     architecture = _architecture(
         build_authorization,
         followup,
+        builder_manifest,
     )
     before = _read_current_files(
         index,
