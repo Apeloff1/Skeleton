@@ -8,6 +8,7 @@ import re
 from typing import Iterable, Mapping
 
 _TOKEN = re.compile(r"^[a-z0-9][a-z0-9_.:/-]{0,191}$")
+_ZONE_TOKEN = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _ALLOWED_CRITICALITY = {"low", "medium", "high", "critical"}
 _ALLOWED_SEVERITY = {"info", "low", "medium", "high", "critical"}
@@ -53,7 +54,12 @@ class ZoneRule:
     criticality: str = "medium"
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "name", _token("zone name", self.name))
+        zone_name = _token("zone name", self.name)
+        if _ZONE_TOKEN.fullmatch(zone_name) is None:
+            raise ValueError(
+                "zone name must be a filename-safe canonical token"
+            )
+        object.__setattr__(self, "name", zone_name)
         object.__setattr__(self, "owner", _token("zone owner", self.owner))
         criticality = _text("criticality", self.criticality, 16).casefold()
         if criticality not in _ALLOWED_CRITICALITY:
