@@ -1,7 +1,8 @@
 """Bounded specialist workers dispatched by the repository Secretary.
 
-Workers receive model output as untrusted proposal data.  They may create one
-ordinary pull request, but only after proving immutable Supervisor custody,
+Workers receive model output as untrusted proposal data. They may create one
+ordinary pull request or fast-forward a previously admitted builder PR, but only
+after proving immutable Supervisor custody,
 checking that the default branch did not advance, validating every destination,
 and staging exactly the admitted regular files.
 
@@ -24,6 +25,15 @@ from .build_authority import (
     BuildAuthorityError,
     revalidate_live_build_authorization,
 )
+from .build_followup import (
+    BuildFollowup,
+    BuildFollowupError,
+    inspect_build_followup,
+)
+from .build_repair import (
+    BuildRepairError,
+    run_feature_followup_repair,
+)
 from .advanced_bots import (
     ADVANCED_BOTS,
     BLOCKED_PREFIXES,
@@ -42,6 +52,7 @@ from .supervisor_runtime import (
     find_open_pr_for_worker,
     proposal_digest,
     remote_branch_exists,
+    remote_branch_head,
     require_clean_worktree,
     require_exact_head,
     require_remote_base_unchanged,
@@ -617,6 +628,64 @@ def _verify_single_parent(base_sha: str) -> None:
         )
 
 
+def _require_followup_head_unchanged(
+    followup: BuildFollowup,
+) -> None:
+    current = remote_branch_head(
+        followup.branch
+    )
+    if current != followup.head_sha:
+        raise WorkerAdmissionError(
+            "active build PR head changed during repair"
+        )
+
+
+def _checkout_followup_head(
+    followup: BuildFollowup,
+    *,
+    env: dict[str, str],
+) -> None:
+    """Fetch and detach at the exact admitted PR head without branch mutation."""
+    _require_followup_head_unchanged(
+        followup
+    )
+    subprocess.run(
+        ["gh", "auth", "setup-git"],
+        check=True,
+        env=env,
+        timeout=30,
+    )
+    _run_git(
+        [
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"refs/heads/{followup.branch}",
+        ],
+        env=env,
+        timeout=120,
+    )
+    fetched = _git_text(
+        ["rev-parse", "FETCH_HEAD"]
+    ).strip()
+    if fetched != followup.head_sha:
+        raise WorkerAdmissionError(
+            "fetched build PR head differs from admitted head"
+        )
+    _run_git(
+        [
+            "switch",
+            "--detach",
+            followup.head_sha,
+        ],
+        env=env,
+    )
+    require_clean_worktree()
+    _require_followup_head_unchanged(
+        followup
+    )
+
+
 def _render_prompt(
     spec: AdvancedBot,
     repo: str,
@@ -700,7 +769,7 @@ def _preflight(
             raise WorkerAdmissionError(
                 "active worker pull request targets an unexpected base branch"
             )
-        return branch, active
+        return active["headRefName"], active
 
     exact = find_open_pr_for_head(
         execution.repository,
