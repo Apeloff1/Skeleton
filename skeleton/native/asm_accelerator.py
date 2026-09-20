@@ -74,7 +74,11 @@ class AsmAcceleratorPreflight:
 
     @property
     def load_ready(self) -> bool:
-        return self.build_ready and self.library_available
+        return (
+            self.platform_supported
+            and self.architecture_supported
+            and self.library_available
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,9 +117,10 @@ def _default_library_path(
     architecture: str | None = None,
     cache_dir: Path | None = None,
 ) -> Path:
-    override = os.getenv("SKELETON_ASM_LIBRARY")
-    if override:
-        return Path(override).expanduser()
+    if cache_dir is None:
+        override = os.getenv("SKELETON_ASM_LIBRARY")
+        if override:
+            return Path(override).expanduser()
     arch = architecture or normalize_architecture()
     base = cache_dir or _default_cache_dir()
     return base / f"libskeleton_asm_v{_ASM_ABI_VERSION}_{arch}.so"
