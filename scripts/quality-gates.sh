@@ -144,6 +144,11 @@ python backend/scripts/check_workflow_concurrency.py
 printf '\n== GitHub Actions workflow_run branch completions ==\n'
 python backend/scripts/check_workflow_run_branch_completions.py
 
+printf '\n== Archived dependency-surface quarantine ==\n'
+python scripts/check_archived_dependency_surface.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  tests/test_archived_dependency_surface.py
+
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
