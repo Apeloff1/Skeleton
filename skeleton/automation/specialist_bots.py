@@ -860,6 +860,73 @@ def _checkout_followup_head(
     )
 
 
+def _builder_receipt_files(
+    result: Mapping[str, Any],
+    followup: BuildFollowup | None,
+) -> tuple[dict[str, str], ...]:
+    """Return the full PR candidate surface for manifest receipt coverage.
+
+    Initial builds attest exactly the proposal files. CI repairs attest every
+    existing PR path, using repaired content where supplied and immutable HEAD
+    content for unchanged paths. This preserves concrete regression-file
+    coverage across repair-only production deltas.
+    """
+    raw_files = result.get("files")
+    if not isinstance(raw_files, list):
+        raise WorkerAdmissionError(
+            "Builder receipt proposal files must be a list"
+        )
+    repaired: dict[str, str] = {}
+    for item in raw_files:
+        if not isinstance(item, Mapping):
+            raise WorkerAdmissionError(
+                "Builder receipt proposal file has invalid shape"
+            )
+        path = item.get("path")
+        content = item.get("content")
+        if not isinstance(path, str) or not isinstance(content, str):
+            raise WorkerAdmissionError(
+                "Builder receipt proposal file must be text"
+            )
+        if path in repaired:
+            raise WorkerAdmissionError(
+                "Builder receipt proposal contains duplicate path"
+            )
+        repaired[path] = content
+
+    if followup is None:
+        return tuple(
+            {
+                "path": path,
+                "content": repaired[path],
+            }
+            for path in sorted(repaired)
+        )
+
+    admitted = set(followup.changed_paths)
+    if not set(repaired).issubset(admitted):
+        raise WorkerAdmissionError(
+            "Builder repair receipt attempted path expansion"
+        )
+
+    receipt_files: list[dict[str, str]] = []
+    for path in followup.changed_paths:
+        content = repaired.get(path)
+        if content is None:
+            content = _head_text(path)
+        if content is None:
+            raise WorkerAdmissionError(
+                "Builder repair receipt cannot read existing PR path"
+            )
+        receipt_files.append(
+            {
+                "path": path,
+                "content": content,
+            }
+        )
+    return tuple(receipt_files)
+
+
 def _render_prompt(
     spec: AdvancedBot,
     repo: str,
@@ -1189,13 +1256,16 @@ def main() -> int:
                 "feature-builder proposal exceeds Builder Plane changed-line budget"
             )
         builder_receipt = None
-        if builder_manifest is not None and followup is None:
+        if builder_manifest is not None:
             try:
                 builder_receipt = compile_builder_proposal_receipt(
                     builder_manifest,
                     proposal_digest=digest,
                     branch=branch,
-                    files=result["files"],
+                    files=_builder_receipt_files(
+                        result,
+                        followup,
+                    ),
                     tests=result["tests"],
                     changed_lines=changed_lines,
                 )
