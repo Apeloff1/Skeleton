@@ -4,7 +4,7 @@
 .global skeleton_asm_abi_version
 .type skeleton_asm_abi_version, %function
 skeleton_asm_abi_version:
-    mov w0, #2
+    mov w0, #3
     ret
 .size skeleton_asm_abi_version, .-skeleton_asm_abi_version
 
@@ -157,5 +157,59 @@ skeleton_asm_dot_batch_f32:
 .Lbatch_done:
     ret
 .size skeleton_asm_dot_batch_f32, .-skeleton_asm_dot_batch_f32
+
+.align 2
+.global skeleton_asm_dot_matrix_f32
+.type skeleton_asm_dot_matrix_f32, %function
+skeleton_asm_dot_matrix_f32:
+    cbz x1, .Lmatrix_done
+
+    mov x6, x1
+
+.Lmatrix_query:
+    mov x7, x2
+    mov x8, x3
+    cbz x8, .Lmatrix_next_query
+
+.Lmatrix_row:
+    eor v0.16b, v0.16b, v0.16b
+    mov x9, x0
+    lsr x10, x4, #2
+    cbz x10, .Lmatrix_tail
+
+.Lmatrix_vec:
+    ld1 {v1.4s}, [x9], #16
+    ld1 {v2.4s}, [x7], #16
+    fmla v0.4s, v1.4s, v2.4s
+    subs x10, x10, #1
+    b.ne .Lmatrix_vec
+
+    faddp v0.4s, v0.4s, v0.4s
+    faddp s0, v0.2s
+
+.Lmatrix_tail:
+    and x10, x4, #3
+    cbz x10, .Lmatrix_store
+
+.Lmatrix_tail_loop:
+    ldr s1, [x9], #4
+    ldr s2, [x7], #4
+    fmadd s0, s1, s2, s0
+    subs x10, x10, #1
+    b.ne .Lmatrix_tail_loop
+
+.Lmatrix_store:
+    str s0, [x5], #4
+    subs x8, x8, #1
+    b.ne .Lmatrix_row
+
+.Lmatrix_next_query:
+    add x0, x0, x4, lsl #2
+    subs x6, x6, #1
+    b.ne .Lmatrix_query
+
+.Lmatrix_done:
+    ret
+.size skeleton_asm_dot_matrix_f32, .-skeleton_asm_dot_matrix_f32
 
 .section .note.GNU-stack,"",@progbits
