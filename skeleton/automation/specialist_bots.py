@@ -279,6 +279,46 @@ def revalidate_builder_authority(
     return current
 
 
+
+def builder_requires_regression_intent(
+    spec: AdvancedBot,
+    manifest: BuilderManifest,
+) -> bool:
+    """Decide whether a Builder proposal must declare regression intent."""
+    if spec.name != "feature-builder":
+        raise WorkerAdmissionError(
+            "Builder regression policy reached a non-builder specialist"
+        )
+    if not spec.requires_tests:
+        return False
+    # A purely documentation-scoped authorization can be satisfied without
+    # manufacturing meaningless executable tests. Mixed documentation + code
+    # signals retain the normal feature-builder regression requirement.
+    return set(manifest.signals) != {"documentation"}
+
+
+def validate_builder_regression_policy(
+    result: Mapping[str, Any],
+    spec: AdvancedBot,
+    manifest: BuilderManifest,
+) -> None:
+    """Enforce the registry's requires_tests contract as bounded intent data."""
+    if not builder_requires_regression_intent(spec, manifest):
+        return
+    tests = result.get("tests")
+    if not isinstance(tests, list) or not tests:
+        raise WorkerAdmissionError(
+            "feature-builder proposal is missing required regression intent"
+        )
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in tests
+    ):
+        raise WorkerAdmissionError(
+            "feature-builder regression intent contains empty entries"
+        )
+
+
 def validate_builder_proposal_budget(
     result: Mapping[str, Any],
     manifest: BuilderManifest,
@@ -954,6 +994,11 @@ def main() -> int:
         if builder_manifest is not None:
             validate_builder_proposal_budget(
                 result,
+                builder_manifest,
+            )
+            validate_builder_regression_policy(
+                result,
+                spec,
                 builder_manifest,
             )
 
