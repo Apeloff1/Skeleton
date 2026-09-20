@@ -45,6 +45,10 @@ Target: **one coherent application** for human maintenance and automated machine
 - **PRs #1815–#1833:** galaxy lifecycle, Java acceleration/control/observability/retrieval, Jeeves decision/planning/frontier work, machine control, and capability packs staged for reconciliation.
 - **#1828:** Jeeves topology learning is a 129-commit / 20-file wave and remains a large reconciliation input.
 
+- **PRs #1834–#1842:** pack J, PR runner, provider resilience, SMB, cockpit, and supervisor capability waves staged; large physics family held for reconciliation.
+- **Physics family:** 68–83 files per branch with substantial overlap; do not blindly merge.
+- **#1834–#1842:** assembly queue extended and machine map refreshed.
+
 ## Target layout
 
 ```text
