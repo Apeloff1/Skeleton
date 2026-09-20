@@ -297,3 +297,28 @@ def test_decision_fingerprint_crosses_dispatch_boundary_as_data() -> None:
     )[1]
     assert '[[ "$TRAFFIC_DECISION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]' in run_block
     assert "${{ needs.admission.outputs.decision_fingerprint }}" not in run_block
+
+
+def test_dispatch_independently_recomputes_decision_fingerprint() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert "decision_identity_fingerprint" in run_block
+    assert 'os.environ["GITHUB_REPOSITORY"]' in run_block
+    assert 'os.environ["TRAFFIC_DECISION_BASE_SHA"]' in run_block
+    assert 'os.environ["TRAFFIC_DECISION_OBSERVED_AT"]' in run_block
+    assert (
+        'test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT"'
+        in run_block
+    )
+    recompute = run_block.index("expected_fingerprint=$(python")
+    compare = run_block.index(
+        'test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT"'
+    )
+    live = run_block.index(
+        '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]'
+    )
+    invoke = run_block.index("gh workflow run supervisor.yml")
+    assert recompute < compare < live < invoke
