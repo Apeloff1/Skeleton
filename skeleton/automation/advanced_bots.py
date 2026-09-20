@@ -52,7 +52,7 @@ ADVANCED_BOTS = (
         "feature-builder",
         "maintainer-approved feature or implementation work",
         "medium",
-        10,
+        12,
     ),
     AdvancedBot("architecture-reviewer", "large PR or subsystem drift", "low", 4),
     AdvancedBot("security-auditor", "security/code-scanning signal", "high", 5),
