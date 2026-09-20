@@ -184,9 +184,15 @@ class AsmVectorAccelerator:
                 f"failed to load Assembly accelerator: {type(exc).__name__}"
             ) from exc
 
-        loaded.skeleton_asm_abi_version.argtypes = []
-        loaded.skeleton_asm_abi_version.restype = ctypes.c_uint32
-        abi_version = int(loaded.skeleton_asm_abi_version())
+        try:
+            abi_function = loaded.skeleton_asm_abi_version
+        except AttributeError as exc:
+            raise AsmAcceleratorAbiError(
+                "Assembly library does not export skeleton_asm_abi_version"
+            ) from exc
+        abi_function.argtypes = []
+        abi_function.restype = ctypes.c_uint32
+        abi_version = int(abi_function())
         if abi_version != _ASM_ABI_VERSION:
             raise AsmAcceleratorAbiError(
                 f"Assembly ABI mismatch: expected {_ASM_ABI_VERSION}, got {abi_version}"
@@ -194,11 +200,21 @@ class AsmVectorAccelerator:
 
         float_pointer = ctypes.POINTER(ctypes.c_float)
         for name in ("skeleton_asm_dot_f32", "skeleton_asm_l2_sq_f32"):
-            function = getattr(loaded, name)
+            try:
+                function = getattr(loaded, name)
+            except AttributeError as exc:
+                raise AsmAcceleratorAbiError(
+                    f"Assembly ABI v{_ASM_ABI_VERSION} missing symbol: {name}"
+                ) from exc
             function.argtypes = [float_pointer, float_pointer, ctypes.c_size_t]
             function.restype = ctypes.c_float
 
-        batch = loaded.skeleton_asm_dot_batch_f32
+        try:
+            batch = loaded.skeleton_asm_dot_batch_f32
+        except AttributeError as exc:
+            raise AsmAcceleratorAbiError(
+                "Assembly ABI v2 missing symbol: skeleton_asm_dot_batch_f32"
+            ) from exc
         batch.argtypes = [
             float_pointer,
             float_pointer,
