@@ -10,6 +10,7 @@ from skeleton.memory.asm_vector_accelerator import (
 )
 from skeleton.memory.core import Chunk
 from skeleton.memory.vector import VectorStore
+from skeleton.native.asm_accelerator import AsmVectorAccelerator
 
 
 class _FakeKernel:
@@ -256,6 +257,48 @@ def test_asm_search_adapter_range_enforces_total_bound() -> None:
             candidates,
             -1.0,
             max_total_hits=5,
+        )
+
+
+def test_real_asm_vector_store_matches_python(tmp_path) -> None:
+    preflight = AsmVectorAccelerator.preflight(cache_dir=tmp_path)
+    if not preflight.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    kernel = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    accelerator = AsmVectorSearchAccelerator(
+        kernel=kernel,
+        minimum_candidates=1,
+    )
+    baseline = _build_store(use_asm=False)
+    accelerated = _build_store(
+        use_asm=True,
+        asm_accelerator=accelerator,
+    )
+
+    expected = baseline.query_many(
+        ["query", "orthogonal", "diagonal"],
+        top_k=4,
+    )
+    actual = accelerated.query_many(
+        ["query", "orthogonal", "diagonal"],
+        top_k=4,
+    )
+
+    assert [
+        [row.chunk.chunk_id for row in batch]
+        for batch in actual
+    ] == [
+        [row.chunk.chunk_id for row in batch]
+        for batch in expected
+    ]
+    for actual_batch, expected_batch in zip(actual, expected):
+        assert [row.score for row in actual_batch] == pytest.approx(
+            [row.score for row in expected_batch],
+            rel=2e-5,
+            abs=2e-5,
         )
 
 
