@@ -62,6 +62,9 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Physics family boundary:** 11 remaining physics branches are held as overlapping reconciliation inputs (68–83 files each); zero-file-delta fix branches remain lineage-only.
 
+- **Assembly audit:** rechecked staged queues and lineage branches; no new non-noop PR required in this pass.
+- Large overlapping physics and shell waves remain held for reconciliation.
+
 ## Target layout
 
 ```text
