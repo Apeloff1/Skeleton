@@ -1021,6 +1021,56 @@ def builder_worker_branch(manifest: BuilderManifest) -> str:
 
 
 
+
+def builder_requires_regression_files(
+    manifest: BuilderManifest,
+) -> bool:
+    """Return whether a build must mutate a recognized regression surface."""
+    if not isinstance(manifest, BuilderManifest):
+        raise BuilderPlaneError("invalid builder manifest type")
+    return set(manifest.signals) != {"documentation"}
+
+
+def is_builder_regression_path(path: object) -> bool:
+    """Recognize bounded repository test surfaces without executing content."""
+    candidate = _builder_path(path)
+    parts = candidate.split("/")
+    name = parts[-1].casefold()
+    lowered = candidate.casefold()
+    return (
+        lowered.startswith("tests/")
+        or lowered.startswith("skeleton/testing/")
+        or "/tests/" in lowered
+        or "/testing/" in lowered
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+        or ".test." in name
+        or ".spec." in name
+    )
+
+
+def validate_builder_regression_paths(
+    paths: Iterable[str],
+    manifest: BuilderManifest,
+) -> None:
+    """Require real regression-file coverage for non-documentation builds."""
+    if not builder_requires_regression_files(manifest):
+        return
+    try:
+        candidates = tuple(paths)
+    except TypeError as exc:
+        raise BuilderPlaneError(
+            "builder regression paths must be iterable"
+        ) from exc
+    if not candidates or not any(
+        is_builder_regression_path(path)
+        for path in candidates
+    ):
+        raise BuilderPlaneError(
+            "feature build is missing a recognized regression file"
+        )
+
+
 def compile_builder_proposal_receipt(
     manifest: BuilderManifest,
     *,
@@ -1088,6 +1138,10 @@ def compile_builder_proposal_receipt(
         raise BuilderPlaneError(
             "builder proposal exceeds manifest byte budget"
         )
+    validate_builder_regression_paths(
+        canonical_paths,
+        manifest,
+    )
 
     changed = _positive_int(
         changed_lines,
@@ -1179,6 +1233,10 @@ def validate_builder_proposal_receipt(
         raise BuilderPlaneError(
             "builder proposal receipt exceeds test budget"
         )
+    validate_builder_regression_paths(
+        receipt.paths,
+        manifest,
+    )
 
     if evidence is None:
         return
@@ -1309,11 +1367,14 @@ __all__ = [
     "MAX_BUDGET_TOTAL_BYTES",
     "MAX_MANIFEST_BYTES",
     "MAX_PROPOSAL_RECEIPT_BYTES",
+    "builder_requires_regression_files",
     "builder_worker_branch",
     "compile_builder_manifest",
     "compile_builder_proposal_receipt",
+    "is_builder_regression_path",
     "manifest_prompt_fragment",
     "validate_builder_custody",
     "validate_builder_proposal_receipt",
+    "validate_builder_regression_paths",
     "validate_builder_worker_evidence",
 ]
