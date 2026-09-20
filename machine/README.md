@@ -29,11 +29,12 @@ The active assembly branch is `integration/app-consolidation`. It is the workspa
 - Update this README when the assembly workflow or machine contract changes.
 - Preserve branches containing unique commits until their useful changes have been integrated or explicitly retired.
 
-## Branch integration
+## Integration ledger
 
-The branch sweep has already normalized stale branch tips that contained no commits absent from `main`. Diverged branches remain available as source material.
-
-Current integration work includes PR #1701 from `fix/bot-manager-runtime-deps`; GitHub currently reports that integration PR as not mergeable, so it remains queued for conflict resolution rather than being forced.
+- **PR #1701 — merged:** `fix/bot-manager-runtime-deps`; runtime dependency repair integrated into the assembly branch.
+- **PR #1702 — queued:** `feat/automerge-control-plane-20260919`; 19 files / 9,605 additions staged into the assembly branch at file level because the source branch diverged from the assembly tip.
+- Integrated domain: automerge control plane, including workflow automation, policy/evidence/ledger/model/stack modules, CLI/GitHub adapter, contract checks, and tests.
+- Stale branch normalization remains at **40** validated tips; unique-commit branches remain preserved for review.
 
 ## Target layout
 
@@ -47,8 +48,10 @@ Skeleton/
 │   ├── retrieval/        # retrieval/ranking/fusion
 │   ├── vault/            # access/security primitives
 │   ├── observability/    # telemetry
+│   ├── pr_automation/    # repository automation and merge control
 │   └── testing/          # validation infrastructure
 ├── docs/                 # architecture and human documentation
+├── scripts/              # machine checks and maintenance scripts
 └── .github/              # CI/repository automation
 ```
 
