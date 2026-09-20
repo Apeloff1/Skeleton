@@ -59,13 +59,6 @@ class DurableMerkleHealthPolicy:
             raise ValueError(
                 "max_finalizations must be positive"
             )
-        # Tolerances above the inspection bound are valid and simply act as
-        # effectively-unbounded ceilings. A required minimum, however, must be
-        # satisfiable within the bounded inspection set.
-        if self.minimum_verified > self.max_finalizations:
-            raise ValueError(
-                "minimum_verified exceeds max_finalizations"
-            )
         for name in (
             "maximum_missing",
             "maximum_incomplete",
