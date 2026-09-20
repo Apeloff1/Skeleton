@@ -6,20 +6,29 @@ import json
 from pathlib import Path
 import sys
 
-from .budgets import derive_zone_budgets
+from .architecture_layers import derive_architecture_layers
 from .builder import RepositoryModelBuilder
 from .context import context_for_intent
+from .debt import debt_register
+from .docs_map import documentation_coverage
+from .evolution import evaluate_evolution
 from .governance import validate_governance
 from .growth import growth_recommendations
 from .health import repository_health
 from .hotspots import structural_hotspots
 from .manifest import save_manifest
+from .naming import analyze_naming
+from .package_graph import discover_package_units
 from .planner import candidate_payload
+from .refactor import plan_refactors
 from .reorganize import propose_reorganization
 from .retrieval import RepositoryRetrievalIndex
+from .selfcheck import run_selfcheck
+from .session import build_machine_session
 from .shards import shard_index
 from .steward import select_steward_plan
 from .workspace import generate_workspace
+from .budgets import derive_zone_budgets
 
 
 def main() -> int:
@@ -31,10 +40,18 @@ def main() -> int:
     parser.add_argument("--health", action="store_true")
     parser.add_argument("--growth", action="store_true")
     parser.add_argument("--steward", action="store_true")
+    parser.add_argument("--session", action="store_true")
     parser.add_argument("--shards", action="store_true")
     parser.add_argument("--hotspots", action="store_true")
     parser.add_argument("--governance", action="store_true")
     parser.add_argument("--reorganize", action="store_true")
+    parser.add_argument("--refactors", action="store_true")
+    parser.add_argument("--debt", action="store_true")
+    parser.add_argument("--docs", action="store_true")
+    parser.add_argument("--packages", action="store_true")
+    parser.add_argument("--naming", action="store_true")
+    parser.add_argument("--layers", action="store_true")
+    parser.add_argument("--selfcheck", action="store_true")
     parser.add_argument("--budgets", action="store_true")
     parser.add_argument("--search", default="")
     parser.add_argument("--workspace", default="")
@@ -52,11 +69,7 @@ def main() -> int:
     model = builder.build()
 
     if args.workspace:
-        files = generate_workspace(
-            model,
-            builder.config,
-            args.workspace,
-        )
+        files = generate_workspace(model, builder.config, args.workspace)
         payload: object = {
             "repository_fingerprint": model.fingerprint,
             "workspace": args.workspace,
@@ -71,6 +84,12 @@ def main() -> int:
                 for item in RepositoryRetrievalIndex(model).search(args.search)
             ],
         }
+    elif args.session:
+        payload = build_machine_session(
+            model,
+            builder.config,
+            now=1,
+        ).as_dict()
     elif args.hotspots:
         payload = {
             "repository_fingerprint": model.fingerprint,
@@ -95,13 +114,51 @@ def main() -> int:
                 for item in propose_reorganization(model, builder.config)
             ],
         }
+    elif args.refactors:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "plans": [item.as_dict() for item in plan_refactors(model)],
+        }
+    elif args.debt:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "debt": [item.as_dict() for item in debt_register(model)],
+        }
+    elif args.docs:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "coverage": [
+                item.as_dict()
+                for item in documentation_coverage(model)
+            ],
+        }
+    elif args.packages:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "packages": [
+                item.as_dict()
+                for item in discover_package_units(model)
+            ],
+        }
+    elif args.naming:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "findings": [item.as_dict() for item in analyze_naming(model)],
+        }
+    elif args.layers:
+        payload = derive_architecture_layers(model).as_dict()
+    elif args.selfcheck:
+        payload = {
+            "repository_fingerprint": model.fingerprint,
+            "findings": [
+                item.as_dict()
+                for item in run_selfcheck(model, builder.config)
+            ],
+        }
     elif args.budgets:
         payload = {
             "repository_fingerprint": model.fingerprint,
-            "zones": [
-                item.as_dict()
-                for item in derive_zone_budgets(model)
-            ],
+            "zones": [item.as_dict() for item in derive_zone_budgets(model)],
         }
     elif args.health:
         payload = repository_health(model).as_dict()
@@ -127,10 +184,11 @@ def main() -> int:
         payload = model.as_dict()
 
     if args.output and not any((
-        args.summary, args.work, args.health, args.growth,
-        args.steward, args.shards, args.hotspots, args.governance,
-        args.reorganize, args.budgets, bool(args.search),
-        bool(args.workspace), bool(args.intent),
+        args.summary, args.work, args.health, args.growth, args.steward,
+        args.session, args.shards, args.hotspots, args.governance,
+        args.reorganize, args.refactors, args.debt, args.docs, args.packages,
+        args.naming, args.layers, args.selfcheck, args.budgets,
+        bool(args.search), bool(args.workspace), bool(args.intent),
     )):
         save_manifest(model, args.output)
         return 0
