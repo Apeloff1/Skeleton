@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.8",
+  "schema_version": "2.9",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -208,7 +208,7 @@
     "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
     "assembly_status": "queue_audited_through_1865",
     "queue_recheck": {
-      "prs": "1815-1842",
+      "prs": "1848-1865",
       "status": "revalidated",
       "new_files": "none"
     }
