@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.0",
+  "schema_version": "3.1",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -215,7 +215,12 @@
     "lineage_noop_examples": [
       "reconcile/network-replication-current-main-v2",
       "reconcile/x-harness-current-main-v2"
-    ]
+    ],
+    "reconciliation_note": {
+      "physics_stack": "15-file wave rechecked; 3 files already identical, 5 core modules diverge and are held for semantic/file-level reconciliation",
+      "physics_aggregate": "77-file wave remains held; overlaps simulation stack and is not blindly merged",
+      "jeeves_semantics": "compiler/semantic_plane differences detected; no overwrite performed"
+    }
   },
   "integrated_domains": [
     "automation runtime dependency repair",
