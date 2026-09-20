@@ -108,7 +108,7 @@ class TrafficSnapshot:
             not self.repository
             or len(self.repository) > MAX_REPOSITORY_LENGTH
             or self.repository.count("/") != 1
-    ):
+        ):
             raise TrafficManagerError("repository must be bounded owner/name")
         owner, name = self.repository.split("/", 1)
         allowed = frozenset(
