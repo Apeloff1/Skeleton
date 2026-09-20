@@ -27,6 +27,7 @@ from .build_authority import (
 from .builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
+    builder_worker_branch,
     manifest_prompt_fragment,
     validate_builder_custody,
 )
@@ -772,21 +773,43 @@ def _print_status(payload: dict[str, Any]) -> None:
 
 def _preflight(
     custody: WorkerCustody,
+    *,
+    builder_manifest: BuilderManifest | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     execution = custody.execution
     require_exact_head(execution.base_sha)
     require_clean_worktree()
     require_remote_base_unchanged(execution)
 
+    if builder_manifest is not None:
+        if custody.worker != "feature-builder":
+            raise WorkerAdmissionError(
+                "Builder Plane manifest reached a non-builder preflight"
+            )
+        try:
+            branch = builder_worker_branch(builder_manifest)
+        except BuilderPlaneError as exc:
+            raise WorkerAdmissionError(
+                "unable to derive task-bound feature-builder branch"
+            ) from exc
+    else:
+        branch = deterministic_worker_branch(custody)
+
     active = find_open_pr_for_worker(
         execution.repository,
         custody.worker,
     )
-    branch = deterministic_worker_branch(custody)
     if active is not None:
         if active.get("baseRefName") != execution.default_branch:
             raise WorkerAdmissionError(
                 "active worker pull request targets an unexpected base branch"
+            )
+        if (
+            builder_manifest is not None
+            and active.get("headRefName") != branch
+        ):
+            raise WorkerAdmissionError(
+                "active feature-builder pull request belongs to a different build task"
             )
         return branch, active
 
@@ -831,23 +854,32 @@ def main() -> int:
             custody,
             build_authorization,
         )
-        branch, active_pr = _preflight(custody)
+        branch, active_pr = _preflight(
+            custody,
+            builder_manifest=builder_manifest,
+        )
 
         if active_pr is not None:
-            _print_status(
-                {
-                    "status": "existing-pr",
-                    "bot": spec.name,
-                    "branch": active_pr.get(
-                        "headRefName",
-                        branch,
-                    ),
-                    "pull_request": active_pr.get("number"),
-                    "supervisor_snapshot_fingerprint": (
-                        custody.snapshot_fingerprint
-                    ),
-                }
-            )
+            existing_evidence: dict[str, Any] = {
+                "status": "existing-pr",
+                "bot": spec.name,
+                "branch": active_pr.get(
+                    "headRefName",
+                    branch,
+                ),
+                "pull_request": active_pr.get("number"),
+                "supervisor_snapshot_fingerprint": (
+                    custody.snapshot_fingerprint
+                ),
+            }
+            if build_authorization is not None:
+                existing_evidence["build_issue_number"] = (
+                    build_authorization.issue_number
+                )
+                existing_evidence["build_task_digest"] = (
+                    build_authorization.task_digest
+                )
+            _print_status(existing_evidence)
             return 0
 
         plan = _bounded_text(
