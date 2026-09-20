@@ -46,6 +46,7 @@ jobs:
       admitted_base_sha: ${{ steps.identity.outputs.base_sha }}
       decision_base_sha: ${{ steps.traffic.outputs.base_sha }}
       decision_observed_at: ${{ steps.traffic.outputs.observed_at }}
+      decision_fingerprint: ${{ steps.traffic.outputs.decision_fingerprint }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
       GH_TOKEN: ${{ github.token }}
@@ -264,6 +265,7 @@ jobs:
       TRAFFIC_ADMITTED_BASE_SHA: ${{ needs.admission.outputs.admitted_base_sha }}
       TRAFFIC_DECISION_BASE_SHA: ${{ needs.admission.outputs.decision_base_sha }}
       TRAFFIC_DECISION_OBSERVED_AT: ${{ needs.admission.outputs.decision_observed_at }}
+      TRAFFIC_DECISION_FINGERPRINT: ${{ needs.admission.outputs.decision_fingerprint }}
     steps:
       - name: Revalidate admission and dispatch reviewed supervisor workflow
         shell: bash
@@ -279,6 +281,10 @@ jobs:
           }
           [[ "$TRAFFIC_DECISION_OBSERVED_AT" =~ ^[1-9][0-9]{0,11}$ ]] || {
             echo "::error::Traffic decision observation epoch is malformed."
+            exit 1
+          }
+          [[ "$TRAFFIC_DECISION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || {
+            echo "::error::Traffic decision fingerprint is malformed."
             exit 1
           }
           [[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]] || {
