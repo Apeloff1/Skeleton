@@ -72,6 +72,9 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Capability-wave audit:** #1834–#1847 revalidated; all remain meaningful staged source material.
 - Physics feature family revalidated and remains held for consolidated assembly.
 
+- **Capability ledger:** Jeeves/Java/frontier/supervisor waves #1815–#1842 revalidated; existing staging PRs reused.
+- **Held:** Jeeves topology learning remains a large 129-commit reconciliation input.
+
 ## Target layout
 
 ```text
