@@ -314,6 +314,33 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             "managed-automation-already-active",
         )
 
+    def test_active_branch_merger_blocks_duplicate_integration_dispatch(self) -> None:
+        decision = evaluate(
+            snapshot(
+                runs=(
+                    run(
+                        name="Branch Merge Manager",
+                        status="in_progress",
+                        conclusion="",
+                        database_id=41,
+                    ),
+                ),
+                prs=(
+                    {
+                        "number": 42,
+                        "isDraft": False,
+                        "mergeStateStatus": "BLOCKED",
+                    },
+                ),
+            ),
+            policy=self.policy,
+        )
+        self.assertFalse(decision.admit)
+        self.assertEqual(
+            decision.reason,
+            "managed-automation-already-active",
+        )
+
     def test_current_traffic_manager_run_is_excluded(self) -> None:
         decision = evaluate(
             snapshot(
