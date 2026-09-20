@@ -208,6 +208,61 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
         self.assertEqual(policy.cooldown_seconds, 5 * 60)
         self.assertEqual(policy.maintenance_interval_seconds, 10 * 60)
 
+    def test_provider_tombstones_do_not_permanently_block_capacity(self) -> None:
+        tombstones = tuple(
+            run(
+                name="CI/CD" if i % 2 == 0 else "Frontier Contracts",
+                status="queued",
+                conclusion="",
+                database_id=3000 + i,
+                updated_at="2027-01-13T07:00:00Z",
+            )
+            for i in range(8)
+        )
+        decision = evaluate(
+            snapshot(runs=tombstones),
+            policy=self.policy,
+            force=True,
+        )
+        self.assertTrue(decision.admit)
+        self.assertEqual(decision.provider_tombstones, 8)
+        self.assertEqual(decision.queued_runs, 0)
+        self.assertEqual(decision.active_runs, 0)
+        self.assertEqual(decision.critical_active, 0)
+        self.assertFalse(decision.relieve)
+        self.assertEqual(decision.relief_reason, "none")
+
+    def test_recent_queue_still_blocks_when_old_tombstones_exist(self) -> None:
+        old = tuple(
+            run(
+                name="CI/CD",
+                status="queued",
+                conclusion="",
+                database_id=3100 + i,
+                updated_at="2027-01-13T07:00:00Z",
+            )
+            for i in range(6)
+        )
+        recent = tuple(
+            run(
+                name=f"Recent queued {i}",
+                status="queued",
+                conclusion="",
+                database_id=3200 + i,
+                updated_at="2027-01-15T07:55:00Z",
+            )
+            for i in range(3)
+        )
+        decision = evaluate(
+            snapshot(runs=old + recent),
+            policy=self.policy,
+            force=True,
+        )
+        self.assertFalse(decision.admit)
+        self.assertEqual(decision.provider_tombstones, 6)
+        self.assertEqual(decision.queued_runs, 3)
+        self.assertEqual(decision.reason, "queue-capacity-exhausted")
+
     def test_critical_lane_contention_blocks(self) -> None:
         runs = (
             run(
