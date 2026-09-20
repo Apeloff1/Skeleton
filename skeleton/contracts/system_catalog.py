@@ -22,6 +22,7 @@ class ContractSpec:
     owns: tuple[str, ...] = ()
     evidence_version: int = 1
     consumes_evidence: tuple[tuple[str, int], ...] = ()
+    privileges: tuple[str, ...] = ()
 
 
 CATALOG = (
@@ -108,6 +109,13 @@ def validate_catalog(catalog: Iterable[ContractSpec] = CATALOG) -> None:
                 )
         if len(item.owns) != len(set(item.owns)):
             raise ValueError(f"duplicate ownership prefix: {item.contract_id}")
+        if len(item.privileges) != len(set(item.privileges)):
+            raise ValueError(f"duplicate privilege: {item.contract_id}")
+        for privilege in item.privileges:
+            if not privilege or privilege.lower() != privilege or any(
+                char not in "abcdefghijklmnopqrstuvwxyz0123456789:-_" for char in privilege
+            ):
+                raise ValueError(f"invalid privilege: {item.contract_id}:{privilege!r}")
     topological_order(items)
 
 
@@ -231,3 +239,47 @@ def audit_catalog(
         ownership_conflicts=ownership_conflicts(items),
         orphan_dependencies=orphan_dependencies,
     )
+
+
+def privilege_escalations(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[tuple[str, str, str], ...]:
+    """Detect child contracts claiming privileges absent from every dependency.
+
+    Root and standalone contracts establish trust boundaries. A dependent
+    contract may retain or narrow inherited privileges but may not silently
+    introduce a new privilege without making that authority explicit at a root.
+    """
+    items = tuple(catalog)
+    index = by_id(items)
+    findings: list[tuple[str, str, str]] = []
+    for item in items:
+        if not item.depends_on:
+            continue
+        inherited = {
+            privilege
+            for dependency in dependency_closure(item.contract_id, items)
+            for privilege in index[dependency].privileges
+        }
+        for privilege in item.privileges:
+            if privilege not in inherited:
+                findings.append((item.contract_id, privilege, "not-inherited"))
+    return tuple(sorted(findings))
+
+
+def unowned_paths(
+    paths: Iterable[str],
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[str, ...]:
+    """Return changed control-plane paths with no declared contract owner."""
+    items = tuple(catalog)
+    candidates = tuple(
+        path for path in paths
+        if path.startswith(("scripts/check_", ".github/workflows/", "skeleton/contracts/"))
+    )
+    return tuple(sorted(
+        path
+        for path in candidates
+        if not any(path.startswith(prefix) for item in items for prefix in item.owns)
+        and path != "scripts/check_contract_system.py"
+    ))
