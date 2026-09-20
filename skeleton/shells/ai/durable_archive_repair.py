@@ -598,6 +598,9 @@ class DurableArchiveIndexRepairCoordinator:
         self,
         archive_id: str,
     ) -> ArchiveIndexRepairPlan:
+        # Validate temporal authority before any archive lookup so an invalid
+        # coordinator clock cannot be masked by a missing/corrupt archive.
+        created_at = self._now()
         try:
             health = (
                 self.archives
@@ -669,7 +672,7 @@ class DurableArchiveIndexRepairCoordinator:
             health.corrupt_root_indexes,
             health.head_repair_required,
             self.policy.max_repairs_per_archive,
-            self._now(),
+            created_at,
             tuple(reasons),
         )
 
