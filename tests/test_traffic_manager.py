@@ -53,6 +53,81 @@ def snapshot(
     )
 
 
+class TrafficManagerBoundaryTests(unittest.TestCase):
+    def test_snapshot_rejects_shell_metacharacters_in_repository(self) -> None:
+        with self.assertRaisesRegex(Exception, "unsafe characters"):
+            TrafficSnapshot(
+                repository="Apeloff1/Skeleton;echo-pwned",
+                base_sha=BASE,
+                observed_at=NOW,
+                current_run_id="",
+                workflow_runs=(),
+                pull_requests=(),
+                issues=(),
+            )
+
+    def test_snapshot_rejects_path_like_repository(self) -> None:
+        for repository in (
+            "../Skeleton",
+            "Apeloff1/../Skeleton",
+            "Apeloff1/.hidden",
+            "-owner/Skeleton",
+        ):
+            with self.subTest(repository=repository):
+                with self.assertRaises(Exception):
+                    TrafficSnapshot(
+                        repository=repository,
+                        base_sha=BASE,
+                        observed_at=NOW,
+                        current_run_id="",
+                        workflow_runs=(),
+                        pull_requests=(),
+                        issues=(),
+                    )
+
+    def test_snapshot_accepts_normal_github_repository_characters(self) -> None:
+        value = TrafficSnapshot(
+            repository="Apeloff-1/Skeleton.repo_2",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        self.assertEqual(value.repository, "Apeloff-1/Skeleton.repo_2")
+
+    def test_gh_json_rejects_empty_argument_vector_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json([])
+        execute.assert_not_called()
+
+    def test_gh_json_rejects_nul_argument_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json(["api", "bad\x00argument"])
+        execute.assert_not_called()
+
+    def test_gh_json_rejects_oversized_argument_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json(["api", "x" * 1_001])
+        execute.assert_not_called()
+
+
 class TrafficManagerObservationTests(unittest.TestCase):
     def test_active_runs_are_merged_even_when_missing_from_recent_history(self) -> None:
         completed = run(
