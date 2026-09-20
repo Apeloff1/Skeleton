@@ -54,6 +54,7 @@ MAX_BUDGET_CHANGED_LINES = 9_000
 MAX_BUDGET_TOTAL_BYTES = 1_200_000
 MAX_BUDGET_TEST_DESCRIPTIONS = 40
 MAX_PROPOSAL_RECEIPT_BYTES = 12_000
+MAX_REPAIR_RECEIPT_BYTES = 16_000
 MAX_RECEIPT_PATH_BYTES = 320
 
 _STAGE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,47}$")
@@ -783,6 +784,237 @@ class BuilderProposalReceipt:
         return receipt
 
 
+@dataclass(frozen=True, slots=True)
+class BuilderRepairReceipt:
+    """Canonical attestation for one bounded CI-driven Builder repair."""
+
+    version: int
+    repository: str
+    issue_number: int
+    pull_request: int
+    manifest_digest: str
+    task_digest: str
+    snapshot_fingerprint: str
+    execution_fingerprint: str
+    base_sha: str
+    branch: str
+    parent_sha: str
+    proposal_digest: str
+    paths: tuple[str, ...]
+    changed_lines: int
+    total_bytes: int
+    test_count: int
+    tests_digest: str
+    followup_fingerprint: str
+    repair_evidence_fingerprint: str
+
+    def __post_init__(self) -> None:
+        if self.version != 1:
+            raise BuilderPlaneError(
+                "unsupported builder repair receipt version"
+            )
+        _repository(self.repository)
+        _positive_int(
+            self.issue_number,
+            label="builder repair issue number",
+            maximum=2_147_483_647,
+        )
+        _positive_int(
+            self.pull_request,
+            label="builder repair pull request",
+            maximum=2_147_483_647,
+        )
+        for value, label in (
+            (self.manifest_digest, "builder repair manifest digest"),
+            (self.task_digest, "builder repair task digest"),
+            (
+                self.snapshot_fingerprint,
+                "builder repair snapshot fingerprint",
+            ),
+            (
+                self.execution_fingerprint,
+                "builder repair execution fingerprint",
+            ),
+            (self.proposal_digest, "builder repair proposal digest"),
+            (self.tests_digest, "builder repair tests digest"),
+            (
+                self.followup_fingerprint,
+                "builder repair followup fingerprint",
+            ),
+            (
+                self.repair_evidence_fingerprint,
+                "builder repair evidence fingerprint",
+            ),
+        ):
+            _fingerprint(value, label=label)
+        _sha(self.base_sha)
+        _sha(self.parent_sha)
+        if self.parent_sha == self.base_sha:
+            raise BuilderPlaneError(
+                "builder repair parent must be the existing PR head"
+            )
+        try:
+            validate_branch(
+                self.branch,
+                label="builder repair branch",
+            )
+        except SupervisorRuntimeError as exc:
+            raise BuilderPlaneError(
+                "invalid builder repair branch"
+            ) from exc
+
+        raw_paths = _strict_sequence(
+            self.paths,
+            label="builder repair paths",
+            maximum=MAX_BUDGET_FILES,
+        )
+        if not raw_paths:
+            raise BuilderPlaneError(
+                "builder repair receipt requires changed paths"
+            )
+        normalized_paths = tuple(
+            sorted(_builder_path(item) for item in raw_paths)
+        )
+        if len(normalized_paths) != len(set(normalized_paths)):
+            raise BuilderPlaneError(
+                "duplicate builder repair path"
+            )
+        if self.paths != normalized_paths:
+            raise BuilderPlaneError(
+                "builder repair paths are not canonical"
+            )
+
+        _positive_int(
+            self.changed_lines,
+            label="builder repair changed lines",
+            maximum=MAX_BUDGET_CHANGED_LINES,
+        )
+        _positive_int(
+            self.total_bytes,
+            label="builder repair total bytes",
+            maximum=MAX_BUDGET_TOTAL_BYTES,
+        )
+        _positive_int(
+            self.test_count,
+            label="builder repair test count",
+            maximum=MAX_BUDGET_TEST_DESCRIPTIONS,
+            minimum=0,
+        )
+
+    def unsigned_payload(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "repository": self.repository,
+            "issue_number": self.issue_number,
+            "pull_request": self.pull_request,
+            "manifest_digest": self.manifest_digest,
+            "task_digest": self.task_digest,
+            "snapshot_fingerprint": self.snapshot_fingerprint,
+            "execution_fingerprint": self.execution_fingerprint,
+            "base_sha": self.base_sha,
+            "branch": self.branch,
+            "parent_sha": self.parent_sha,
+            "proposal_digest": self.proposal_digest,
+            "paths": list(self.paths),
+            "changed_lines": self.changed_lines,
+            "total_bytes": self.total_bytes,
+            "test_count": self.test_count,
+            "tests_digest": self.tests_digest,
+            "followup_fingerprint": self.followup_fingerprint,
+            "repair_evidence_fingerprint": (
+                self.repair_evidence_fingerprint
+            ),
+        }
+
+    @property
+    def receipt_digest(self) -> str:
+        return _canonical_digest(self.unsigned_payload())
+
+    def as_dict(self) -> dict[str, object]:
+        payload = {
+            **self.unsigned_payload(),
+            "receipt_digest": self.receipt_digest,
+        }
+        if len(canonical_json(payload)) > MAX_REPAIR_RECEIPT_BYTES:
+            raise BuilderPlaneError(
+                "builder repair receipt exceeds byte budget"
+            )
+        return payload
+
+    @classmethod
+    def from_payload(
+        cls,
+        value: object,
+    ) -> "BuilderRepairReceipt":
+        if not isinstance(value, dict):
+            raise BuilderPlaneError(
+                "builder repair receipt must be an object"
+            )
+        expected = {
+            "version",
+            "repository",
+            "issue_number",
+            "pull_request",
+            "manifest_digest",
+            "task_digest",
+            "snapshot_fingerprint",
+            "execution_fingerprint",
+            "base_sha",
+            "branch",
+            "parent_sha",
+            "proposal_digest",
+            "paths",
+            "changed_lines",
+            "total_bytes",
+            "test_count",
+            "tests_digest",
+            "followup_fingerprint",
+            "repair_evidence_fingerprint",
+            "receipt_digest",
+        }
+        if set(value) != expected:
+            raise BuilderPlaneError(
+                "builder repair receipt shape mismatch"
+            )
+        raw_paths = value["paths"]
+        receipt = cls(
+            version=value["version"],
+            repository=value["repository"],
+            issue_number=value["issue_number"],
+            pull_request=value["pull_request"],
+            manifest_digest=value["manifest_digest"],
+            task_digest=value["task_digest"],
+            snapshot_fingerprint=value["snapshot_fingerprint"],
+            execution_fingerprint=value["execution_fingerprint"],
+            base_sha=value["base_sha"],
+            branch=value["branch"],
+            parent_sha=value["parent_sha"],
+            proposal_digest=value["proposal_digest"],
+            paths=(
+                tuple(raw_paths)
+                if isinstance(raw_paths, list)
+                else raw_paths
+            ),
+            changed_lines=value["changed_lines"],
+            total_bytes=value["total_bytes"],
+            test_count=value["test_count"],
+            tests_digest=value["tests_digest"],
+            followup_fingerprint=value["followup_fingerprint"],
+            repair_evidence_fingerprint=(
+                value["repair_evidence_fingerprint"]
+            ),
+        )
+        if value.get("receipt_digest") != receipt.receipt_digest:
+            raise BuilderPlaneError(
+                "builder repair receipt digest mismatch"
+            )
+        if len(canonical_json(value)) > MAX_REPAIR_RECEIPT_BYTES:
+            raise BuilderPlaneError(
+                "builder repair receipt exceeds byte budget"
+            )
+        return receipt
+
+
 def _derive_signals(authorization: BuildAuthorization) -> tuple[str, ...]:
     haystack = " ".join(
         (
@@ -1266,6 +1498,291 @@ def validate_builder_proposal_receipt(
             )
 
 
+_REPAIR_EVIDENCE_FIELDS = frozenset(
+    {
+        "followup_fingerprint",
+        "architecture_fingerprint",
+        "before_fingerprint",
+        "after_fingerprint",
+        "validation_fingerprint",
+        "review_verdict",
+        "review_rounds",
+        "model_calls",
+        "changed_paths",
+        "fingerprint",
+    }
+)
+
+
+def _admit_repair_evidence(
+    value: object,
+) -> tuple[str, tuple[str, ...]]:
+    if not isinstance(value, Mapping):
+        raise BuilderPlaneError(
+            "builder repair evidence must be a mapping"
+        )
+    if set(value) != _REPAIR_EVIDENCE_FIELDS:
+        raise BuilderPlaneError(
+            "builder repair evidence shape mismatch"
+        )
+    unsigned = {
+        key: value[key]
+        for key in _REPAIR_EVIDENCE_FIELDS
+        if key != "fingerprint"
+    }
+    fingerprint = _fingerprint(
+        value.get("fingerprint"),
+        label="builder repair evidence fingerprint",
+    )
+    if _canonical_digest(unsigned) != fingerprint:
+        raise BuilderPlaneError(
+            "builder repair evidence fingerprint mismatch"
+        )
+    for key in (
+        "followup_fingerprint",
+        "architecture_fingerprint",
+        "before_fingerprint",
+        "after_fingerprint",
+        "validation_fingerprint",
+    ):
+        _fingerprint(
+            value.get(key),
+            label=f"builder repair {key}",
+        )
+    if value.get("review_verdict") != "accept":
+        raise BuilderPlaneError(
+            "builder repair evidence lacks accepted review"
+        )
+    _positive_int(
+        value.get("review_rounds"),
+        label="builder repair review rounds",
+        maximum=8,
+    )
+    _positive_int(
+        value.get("model_calls"),
+        label="builder repair model calls",
+        maximum=32,
+    )
+    raw_paths = _strict_sequence(
+        value.get("changed_paths"),
+        label="builder repair evidence paths",
+        maximum=MAX_BUDGET_FILES,
+    )
+    paths = tuple(
+        sorted(_builder_path(item) for item in raw_paths)
+    )
+    if not paths or len(paths) != len(set(paths)):
+        raise BuilderPlaneError(
+            "builder repair evidence paths are invalid"
+        )
+    return fingerprint, paths
+
+
+def compile_builder_repair_receipt(
+    manifest: BuilderManifest,
+    *,
+    pull_request: int,
+    parent_sha: str,
+    proposal_digest: str,
+    branch: str,
+    files: Iterable[Mapping[str, Any]],
+    tests: Iterable[str],
+    changed_lines: int,
+    repair_evidence: Mapping[str, Any],
+) -> BuilderRepairReceipt:
+    """Seal one repair attempt to exact Builder and prior-PR custody."""
+    if not isinstance(manifest, BuilderManifest):
+        raise BuilderPlaneError("invalid builder manifest type")
+    expected_branch = builder_worker_branch(manifest)
+    if branch != expected_branch:
+        raise BuilderPlaneError(
+            "builder repair receipt branch mismatch"
+        )
+    pr_number = _positive_int(
+        pull_request,
+        label="builder repair pull request",
+        maximum=2_147_483_647,
+    )
+    parent = _sha(parent_sha)
+    proposal = _fingerprint(
+        proposal_digest,
+        label="builder repair proposal digest",
+    )
+
+    try:
+        file_items = tuple(files)
+    except TypeError as exc:
+        raise BuilderPlaneError(
+            "builder repair files must be iterable"
+        ) from exc
+    if (
+        not file_items
+        or len(file_items) > manifest.budget.max_files
+    ):
+        raise BuilderPlaneError(
+            "builder repair exceeds manifest file budget"
+        )
+    paths: list[str] = []
+    total_bytes = 0
+    for item in file_items:
+        if not isinstance(item, Mapping):
+            raise BuilderPlaneError(
+                "builder repair file must be a mapping"
+            )
+        if set(item) != {"path", "content"}:
+            raise BuilderPlaneError(
+                "builder repair file shape mismatch"
+            )
+        path = _builder_path(item.get("path"))
+        content = item.get("content")
+        if not isinstance(content, str):
+            raise BuilderPlaneError(
+                "builder repair content must be text"
+            )
+        paths.append(path)
+        total_bytes += len(path.encode("utf-8"))
+        total_bytes += len(content.encode("utf-8"))
+    canonical_paths = tuple(sorted(paths))
+    if len(canonical_paths) != len(set(canonical_paths)):
+        raise BuilderPlaneError(
+            "duplicate builder repair path"
+        )
+    if total_bytes > manifest.budget.max_total_bytes:
+        raise BuilderPlaneError(
+            "builder repair exceeds manifest byte budget"
+        )
+
+    changed = _positive_int(
+        changed_lines,
+        label="builder repair changed lines",
+        maximum=manifest.budget.max_changed_lines,
+    )
+    try:
+        raw_tests = tuple(tests)
+    except TypeError as exc:
+        raise BuilderPlaneError(
+            "builder repair tests must be iterable"
+        ) from exc
+    if len(raw_tests) > manifest.budget.max_test_descriptions:
+        raise BuilderPlaneError(
+            "builder repair exceeds manifest test budget"
+        )
+    normalized_tests = tuple(
+        _bounded_text(
+            item,
+            label="builder repair test description",
+            byte_limit=MAX_ACCEPTANCE_TEXT_BYTES,
+        )
+        for item in raw_tests
+    )
+
+    evidence_fingerprint, evidence_paths = _admit_repair_evidence(
+        repair_evidence
+    )
+    if evidence_paths != canonical_paths:
+        raise BuilderPlaneError(
+            "builder repair evidence path set mismatch"
+        )
+    followup_fingerprint = _fingerprint(
+        repair_evidence.get("followup_fingerprint"),
+        label="builder repair followup fingerprint",
+    )
+
+    return BuilderRepairReceipt(
+        version=1,
+        repository=manifest.repository,
+        issue_number=manifest.issue_number,
+        pull_request=pr_number,
+        manifest_digest=manifest.manifest_digest,
+        task_digest=manifest.task_digest,
+        snapshot_fingerprint=manifest.snapshot_fingerprint,
+        execution_fingerprint=manifest.execution_fingerprint,
+        base_sha=manifest.base_sha,
+        branch=expected_branch,
+        parent_sha=parent,
+        proposal_digest=proposal,
+        paths=canonical_paths,
+        changed_lines=changed,
+        total_bytes=total_bytes,
+        test_count=len(normalized_tests),
+        tests_digest=_canonical_digest(list(normalized_tests)),
+        followup_fingerprint=followup_fingerprint,
+        repair_evidence_fingerprint=evidence_fingerprint,
+    )
+
+
+def validate_builder_repair_receipt(
+    receipt: BuilderRepairReceipt,
+    manifest: BuilderManifest,
+    *,
+    evidence: Mapping[str, Any] | None = None,
+) -> None:
+    """Verify repair receipt custody at the Secretary boundary."""
+    if not isinstance(receipt, BuilderRepairReceipt):
+        raise BuilderPlaneError(
+            "invalid builder repair receipt type"
+        )
+    if not isinstance(manifest, BuilderManifest):
+        raise BuilderPlaneError("invalid builder manifest type")
+    expected = {
+        "repository": manifest.repository,
+        "issue_number": manifest.issue_number,
+        "manifest_digest": manifest.manifest_digest,
+        "task_digest": manifest.task_digest,
+        "snapshot_fingerprint": manifest.snapshot_fingerprint,
+        "execution_fingerprint": manifest.execution_fingerprint,
+        "base_sha": manifest.base_sha,
+        "branch": builder_worker_branch(manifest),
+    }
+    for field, expected_value in expected.items():
+        if getattr(receipt, field) != expected_value:
+            raise BuilderPlaneError(
+                f"builder repair receipt {field} mismatch"
+            )
+    if len(receipt.paths) > manifest.budget.max_files:
+        raise BuilderPlaneError(
+            "builder repair receipt exceeds file budget"
+        )
+    if receipt.changed_lines > manifest.budget.max_changed_lines:
+        raise BuilderPlaneError(
+            "builder repair receipt exceeds changed-line budget"
+        )
+    if receipt.total_bytes > manifest.budget.max_total_bytes:
+        raise BuilderPlaneError(
+            "builder repair receipt exceeds byte budget"
+        )
+    if receipt.test_count > manifest.budget.max_test_descriptions:
+        raise BuilderPlaneError(
+            "builder repair receipt exceeds test budget"
+        )
+    if evidence is None:
+        return
+    if not isinstance(evidence, Mapping):
+        raise BuilderPlaneError(
+            "builder repair evidence must be a mapping"
+        )
+    evidence_expected = {
+        "branch": receipt.branch,
+        "proposal_digest": receipt.proposal_digest,
+        "changed_lines": receipt.changed_lines,
+        "base_sha": receipt.base_sha,
+        "supervisor_snapshot_fingerprint": (
+            receipt.snapshot_fingerprint
+        ),
+        "execution_fingerprint": receipt.execution_fingerprint,
+        "build_issue_number": receipt.issue_number,
+        "build_task_digest": receipt.task_digest,
+        "builder_manifest_digest": receipt.manifest_digest,
+        "pull_request": receipt.pull_request,
+        "repair_parent_sha": receipt.parent_sha,
+    }
+    for field, expected_value in evidence_expected.items():
+        if evidence.get(field) != expected_value:
+            raise BuilderPlaneError(
+                f"builder repair evidence {field} mismatch"
+            )
+
+
 def validate_builder_worker_evidence(
     evidence: Mapping[str, Any],
     manifest: BuilderManifest,
@@ -1321,6 +1838,19 @@ def validate_builder_worker_evidence(
             )
 
     if status == "pull-request-updated":
+        try:
+            receipt = BuilderRepairReceipt.from_payload(
+                evidence.get("builder_repair_receipt")
+            )
+            validate_builder_repair_receipt(
+                receipt,
+                manifest,
+                evidence=evidence,
+            )
+        except BuilderPlaneError as exc:
+            raise BuilderPlaneError(
+                "builder worker repair receipt is invalid"
+            ) from exc
         return
 
     try:
@@ -1369,6 +1899,7 @@ __all__ = [
     "BuilderManifest",
     "BuilderPlaneError",
     "BuilderProposalReceipt",
+    "BuilderRepairReceipt",
     "BuilderStage",
     "MAX_BUDGET_CHANGED_LINES",
     "MAX_BUDGET_FILES",
@@ -1376,14 +1907,17 @@ __all__ = [
     "MAX_BUDGET_TOTAL_BYTES",
     "MAX_MANIFEST_BYTES",
     "MAX_PROPOSAL_RECEIPT_BYTES",
+    "MAX_REPAIR_RECEIPT_BYTES",
     "builder_requires_regression_files",
     "builder_worker_branch",
     "compile_builder_manifest",
     "compile_builder_proposal_receipt",
+    "compile_builder_repair_receipt",
     "is_builder_regression_path",
     "manifest_prompt_fragment",
     "validate_builder_custody",
     "validate_builder_proposal_receipt",
+    "validate_builder_repair_receipt",
     "validate_builder_regression_paths",
     "validate_builder_worker_evidence",
 ]

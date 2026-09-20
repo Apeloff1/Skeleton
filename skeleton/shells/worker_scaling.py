@@ -16,13 +16,17 @@ class ScalingAction(str,Enum):
 class ScalingPolicy:
     target_queue_per_worker:float=10.0
     scale_out_queue_per_worker:float=25.0
-    scale_in_queue_per_worker:float=2.0
+    scale_in_queue_per_worker:float|None=None
     min_workers:int=1
     max_workers:int=256
     max_step:int=8
 
     def __post_init__(self)->None:
-        if not 0<=self.scale_in_queue_per_worker<self.target_queue_per_worker<self.scale_out_queue_per_worker:
+        scale_in=self.scale_in_queue_per_worker
+        if scale_in is None:
+            scale_in=min(2.0,self.target_queue_per_worker/2)
+            object.__setattr__(self,"scale_in_queue_per_worker",scale_in)
+        if not 0<=scale_in<self.target_queue_per_worker<self.scale_out_queue_per_worker:
             raise ValueError("invalid scaling thresholds")
         if self.min_workers<=0 or self.max_workers<self.min_workers:
             raise ValueError("invalid worker scale bounds")

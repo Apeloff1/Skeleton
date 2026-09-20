@@ -422,7 +422,7 @@ def test_execution_fence_ttl_must_cover_plan_budget():
 def test_execution_fence_ttl_may_equal_plan_budget():
     target = manager()
     fence = acquire(target, ttl_seconds=8.0)
-    assert fence.lease.expires_at - fence.lease.acquired_at == 8.0
+    assert fence.lease.expires_at - fence.lease.acquired_at == pytest.approx(8.0)
 
 
 def test_execution_fence_ttl_cannot_exceed_policy_maximum():

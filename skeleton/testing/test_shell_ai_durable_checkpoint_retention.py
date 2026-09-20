@@ -927,7 +927,7 @@ def test_retention_warning_reason_without_archive():
         policy=DurableRetentionPolicy(
             minimum_live_tail=10,
             minimum_archive_batch=1,
-            target_utilization=0.9,
+            target_utilization=0.5,
             warning_utilization=0.7,
             critical_utilization=0.95,
         ),

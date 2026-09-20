@@ -153,6 +153,8 @@ def _safe_archive_file(
         except OSError:
             return None, "archive_path metadata is unavailable"
         if current.is_symlink():
+            if part == relative.parts[-1]:
+                return None, "archive_path must not be a symlink"
             return None, "archive_path must not traverse symlinks"
 
     try:

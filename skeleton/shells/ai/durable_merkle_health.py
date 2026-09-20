@@ -34,12 +34,18 @@ class DurableMerkleHealthPolicy:
     max_finalizations: int = 512
     require_nonempty: bool = False
     require_bundles: bool = False
-    maximum_missing: int = 512
+    maximum_missing: int | None = None
     maximum_incomplete: int = 0
     minimum_verified: int = 0
     reject_manual_review: bool = True
 
     def __post_init__(self) -> None:
+        if self.maximum_missing is None:
+            object.__setattr__(
+                self,
+                "maximum_missing",
+                min(512, self.max_finalizations),
+            )
         for name in (
             "max_finalizations",
             "maximum_missing",

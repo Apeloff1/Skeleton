@@ -205,6 +205,12 @@ def test_store_nonempty_journal_archive():
         == checkpoint.checkpoint.digest
     )
     assert report.repaired_indexes == 4
+    # Sequence indexes are derived accelerators: they must be present for
+    # historical lookup without inflating the logical repaired-root count.
+    assert repository.sequence_for_root(
+        "journal",
+        report.root_hash,
+    ) == 3
     assert repository.verify_root(
         "journal",
         report.root_hash,

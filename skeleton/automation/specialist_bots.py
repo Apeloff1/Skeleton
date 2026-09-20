@@ -30,6 +30,7 @@ from .builder_plane import (
     BuilderPlaneError,
     builder_worker_branch,
     compile_builder_proposal_receipt,
+    compile_builder_repair_receipt,
     manifest_prompt_fragment,
     validate_builder_custody,
 )
@@ -467,11 +468,15 @@ def extract_plan(
     raw: str,
     max_files: int,
     *,
-    max_file_bytes: int = MAX_FILE,
-    max_total_bytes: int = MAX_TOTAL_PROPOSED_BYTES,
+    max_file_bytes: int | None = None,
+    max_total_bytes: int | None = None,
     safe_prefixes: tuple[str, ...] = SAFE_PREFIXES,
 ) -> dict[str, Any]:
     """Validate the complete model proposal as bounded inert data."""
+    if max_file_bytes is None:
+        max_file_bytes = MAX_FILE
+    if max_total_bytes is None:
+        max_total_bytes = MAX_TOTAL_PROPOSED_BYTES
     data = _decode_model_object(raw)
     summary = _bounded_text(
         data.get("summary", ""),
@@ -714,9 +719,11 @@ def validate_generated_files(
 def validate_mutation_budget(
     files: list[dict[str, str]],
     *,
-    max_changed_lines: int = MAX_CHANGED_LINES,
+    max_changed_lines: int | None = None,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
+    if max_changed_lines is None:
+        max_changed_lines = MAX_CHANGED_LINES
     changed = 0
     for item in files:
         old = _head_text(item["path"]) or ""
@@ -1189,6 +1196,7 @@ def main() -> int:
                 "feature-builder proposal exceeds Builder Plane changed-line budget"
             )
         builder_receipt = None
+        builder_repair_receipt = None
         if builder_manifest is not None and followup is None:
             try:
                 builder_receipt = compile_builder_proposal_receipt(
@@ -1202,6 +1210,28 @@ def main() -> int:
             except BuilderPlaneError as exc:
                 raise WorkerAdmissionError(
                     "feature-builder proposal receipt rejected"
+                ) from exc
+        elif builder_manifest is not None and followup is not None:
+            repair_evidence = result.get("repair_evidence")
+            if not isinstance(repair_evidence, Mapping):
+                raise WorkerAdmissionError(
+                    "feature-builder repair is missing structured evidence"
+                )
+            try:
+                builder_repair_receipt = compile_builder_repair_receipt(
+                    builder_manifest,
+                    pull_request=followup.pr_number,
+                    parent_sha=followup.head_sha,
+                    proposal_digest=digest,
+                    branch=branch,
+                    files=result["files"],
+                    tests=result["tests"],
+                    changed_lines=changed_lines,
+                    repair_evidence=repair_evidence,
+                )
+            except BuilderPlaneError as exc:
+                raise WorkerAdmissionError(
+                    "feature-builder repair receipt rejected"
                 ) from exc
 
         repo_root = Path.cwd().resolve()
@@ -1422,6 +1452,11 @@ def main() -> int:
                     f"\nBuilder proposal receipt: "
                     f"`{builder_receipt.receipt_digest}`"
                 )
+            if builder_repair_receipt is not None:
+                body += (
+                    f"\nBuilder repair receipt: "
+                    f"`{builder_repair_receipt.receipt_digest}`"
+                )
             body += (
                 f"\n\nCloses #{build_authorization.issue_number}"
             )
@@ -1494,6 +1529,10 @@ def main() -> int:
         if builder_receipt is not None:
             status_payload["builder_proposal_receipt"] = (
                 builder_receipt.as_dict()
+            )
+        if builder_repair_receipt is not None:
+            status_payload["builder_repair_receipt"] = (
+                builder_repair_receipt.as_dict()
             )
         if followup is not None:
             status_payload["pull_request"] = (

@@ -636,6 +636,8 @@ class DurableRetentionPlanner:
         pressure = (
             utilization
             >= self.policy.target_utilization
+            and current_sequence
+            > self.policy.minimum_live_tail
         )
         if pressure and selected is None:
             reasons.append(
@@ -684,7 +686,7 @@ class DurableRetentionPlanner:
                 )
 
         reasons.append(
-            "retention planning never authorizes deletion; destructive pruning requires separate signed authority"
+            "retention planning never authorizes deletion; local deletion remains unsafe until a separate signed authority and archive-backed recovery path exist"
         )
 
         return DurableRetentionPlan(

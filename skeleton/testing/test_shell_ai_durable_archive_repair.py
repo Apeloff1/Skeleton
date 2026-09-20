@@ -1159,9 +1159,16 @@ def test_batch_report_sorted_unique_validation():
             archive_id="other",
         ),
     )
+    reverse_sorted = tuple(
+        sorted(
+            (one, other),
+            key=lambda item: item.archive_id,
+            reverse=True,
+        )
+    )
     with pytest.raises(ValueError, match="sorted"):
         ArchiveIndexRepairBatchReport(
-            (one, other),
+            reverse_sorted,
             coordinator.policy.digest,
         )
     with pytest.raises(ValueError, match="duplicate"):

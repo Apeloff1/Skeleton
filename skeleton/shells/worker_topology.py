@@ -57,7 +57,7 @@ class WorkerTopology:
                 rejected[registration.identity.worker_id]="worker lacks topology label"
                 continue
             projected=domains.get(domain,0)+1
-            if projected-minimum>constraint.max_skew+1:
+            if projected-minimum>constraint.max_skew:
                 rejected[registration.identity.worker_id]="placement would exceed topology skew"
                 continue
             allowed.append(registration)
