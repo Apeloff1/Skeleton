@@ -93,7 +93,8 @@ def _validate_manifest() -> None:
         raise RuntimeError(
             "cross-contract consistency failure: "
             f"ownership={audit.ownership_conflicts!r} "
-            f"orphans={audit.orphan_dependencies!r}"
+            f"orphans={audit.orphan_dependencies!r} "
+            f"privilege_escalations={audit.privilege_escalations!r}"
         )
     if len(CHECKERS) != len(set(CHECKERS)):
         raise RuntimeError("duplicate checker in contract manifest")
@@ -139,6 +140,7 @@ def main() -> int:
                 "owns": spec.owns,
                 "evidence_version": spec.evidence_version,
                 "consumes_evidence": spec.consumes_evidence,
+                "privileges": spec.privileges,
             }
             for spec in topological_order(CATALOG)
         ], sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
@@ -153,6 +155,10 @@ def main() -> int:
                 producer: version
                 for producer, version in spec.consumes_evidence
             }
+            for spec in sorted(CATALOG, key=lambda item: item.contract_id)
+        },
+        "privileges": {
+            spec.contract_id: list(spec.privileges)
             for spec in sorted(CATALOG, key=lambda item: item.contract_id)
         },
         "ownership": {
