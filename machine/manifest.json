@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4",
+  "schema_version": "2.5",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -201,8 +201,13 @@
         "reason": "high-overlap multi-branch physics stack"
       }
     ],
-    "lineage_note": "Repeated verification confirms zero-file-delta branches are lineage-only; staged PRs remain source material pending reconciliation, while large overlapping physics/shell waves stay held.",
-    "assembly_status": "queue_audited_through_1865"
+    "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
+    "assembly_status": "queue_audited_through_1865",
+    "queue_recheck": {
+      "prs": "1791-1802",
+      "status": "already staged",
+      "new_files": "none"
+    }
   },
   "integrated_domains": [
     "automation runtime dependency repair",
