@@ -465,6 +465,8 @@ def route(
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
+            if not matches:
+                continue
             score = 100 + matches
         else:
             score = sum(
