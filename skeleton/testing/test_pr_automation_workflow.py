@@ -84,7 +84,14 @@ def test_workflow_defaults_are_fail_closed_and_bounded():
 def test_workflow_elevates_only_the_evaluate_job_for_status_and_merge_control():
     text = _workflow()
     assert "permissions:\n  contents: read\n" in text
-    assert "    permissions:\n      contents: write\n      pull-requests: write\n      statuses: write\n" in text
+    assert (
+        "    permissions:\n"
+        "      actions: read\n"
+        "      checks: read\n"
+        "      contents: write\n"
+        "      pull-requests: write\n"
+        "      statuses: write\n"
+    ) in text
     assert "actions: write" not in text
     assert "administration: write" not in text
     assert "secrets: write" not in text

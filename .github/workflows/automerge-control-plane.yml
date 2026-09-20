@@ -22,6 +22,10 @@ on:
       - "Merge Readiness"
     types:
       - completed
+    # workflow_run branch filters are evaluated against the completing head.
+    # Match both single-segment and slash-containing branches so the control
+    # plane observes every Merge Readiness completion before its in-job trust
+    # guard decides whether reconciliation is authorized.
     branches:
       - "*"
       - "**"

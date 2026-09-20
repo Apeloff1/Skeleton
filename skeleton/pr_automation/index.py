@@ -238,7 +238,7 @@ class EventIndex:
                 (idempotency_key,),
             ).fetchone()
             if row:
-                if row["status"] == "succeeded":
+                if row["status"] in {"succeeded", "uncertain"}:
                     conn.rollback()
                     return False
                 if row["status"] == "inflight":
@@ -279,7 +279,17 @@ class EventIndex:
         finally:
             conn.close()
 
-    def finish_action(self, idempotency_key: str, *, success: bool, error: str | None = None) -> None:
+    def finish_action(
+        self,
+        idempotency_key: str,
+        *,
+        success: bool,
+        error: str | None = None,
+        uncertain: bool = False,
+    ) -> None:
+        if success and uncertain:
+            raise ValueError("successful action cannot have uncertain outcome")
+        status = "succeeded" if success else ("uncertain" if uncertain else "failed")
         with self._connect() as conn:
             conn.execute(
                 """
@@ -288,7 +298,7 @@ class EventIndex:
                 WHERE idempotency_key = ?
                 """,
                 (
-                    "succeeded" if success else "failed",
+                    status,
                     None if success else (error or "unknown error")[:2000],
                     _utcnow(),
                     idempotency_key,
