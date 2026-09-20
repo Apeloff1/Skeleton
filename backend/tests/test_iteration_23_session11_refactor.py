@@ -3,6 +3,8 @@ import os
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE = os.environ.get('EXPO_BACKEND_URL', 'https://gemini-game-craft.preview.emergentagent.com').rstrip('/')
 PID = "7b640a5ebf0c4bc0807b8640d757df76"
 

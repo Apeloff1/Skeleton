@@ -15,6 +15,8 @@ import uuid
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "admin@gameforge.io"
 ADMIN_PASSWORD = "GameForge#Admin2026"
