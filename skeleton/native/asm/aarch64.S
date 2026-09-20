@@ -91,21 +91,54 @@ skeleton_asm_dot_batch_f32:
 
 .Lbatch_row:
     eor v0.16b, v0.16b, v0.16b
+    eor v4.16b, v4.16b, v4.16b
+    eor v5.16b, v5.16b, v5.16b
+    eor v6.16b, v6.16b, v6.16b
     mov x0, x6
-    lsr x7, x3, #2
-    cbz x7, .Lbatch_tail
 
-.Lbatch_vec:
+    lsr x7, x3, #4
+    cbz x7, .Lbatch_vec4_setup
+
+.Lbatch_vec16:
+    ld1 {v1.4s}, [x0], #16
+    ld1 {v2.4s}, [x1], #16
+    fmla v0.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x0], #16
+    ld1 {v2.4s}, [x1], #16
+    fmla v4.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x0], #16
+    ld1 {v2.4s}, [x1], #16
+    fmla v5.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x0], #16
+    ld1 {v2.4s}, [x1], #16
+    fmla v6.4s, v1.4s, v2.4s
+
+    subs x7, x7, #1
+    b.ne .Lbatch_vec16
+
+    fadd v0.4s, v0.4s, v4.4s
+    fadd v5.4s, v5.4s, v6.4s
+    fadd v0.4s, v0.4s, v5.4s
+
+.Lbatch_vec4_setup:
+    lsr x7, x3, #2
+    and x7, x7, #3
+    cbz x7, .Lbatch_reduce
+
+.Lbatch_vec4:
     ld1 {v1.4s}, [x0], #16
     ld1 {v2.4s}, [x1], #16
     fmla v0.4s, v1.4s, v2.4s
     subs x7, x7, #1
-    b.ne .Lbatch_vec
+    b.ne .Lbatch_vec4
 
+.Lbatch_reduce:
     faddp v0.4s, v0.4s, v0.4s
     faddp s0, v0.2s
 
-.Lbatch_tail:
     and x7, x3, #3
     cbz x7, .Lbatch_store
 
