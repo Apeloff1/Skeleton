@@ -68,8 +68,8 @@ class TrafficPolicy:
     max_active_runs: int = 8
     max_queued_runs: int = 6
     max_critical_active: int = 3
-    cooldown_seconds: int = 30 * 60
-    maintenance_interval_seconds: int = 2 * 60 * 60
+    cooldown_seconds: int = 5 * 60
+    maintenance_interval_seconds: int = 10 * 60
     failure_window_seconds: int = 6 * 60 * 60
     stale_queued_seconds: int = 15 * 60
     max_stale_queued_runs: int = 2
@@ -372,7 +372,10 @@ def evaluate(
         )
     )
     oldest_queue_age = max(queue_ages) if queue_ages else None
-    inventory_saturated = len(snapshot.workflow_runs) >= MAX_ITEMS
+    # Reaching the observation history limit is normal on an active repository.
+    # Only fail closed when the bounded window itself is entirely occupied by
+    # active work; completed history must never permanently suppress stewardship.
+    inventory_saturated = len(active) >= MAX_ITEMS
     failures = _recent_failures(snapshot, policy)
     blocked = _blocked_pull_requests(snapshot)
     authorized = _authorized_issues(snapshot)
