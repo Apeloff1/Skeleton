@@ -616,3 +616,56 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrafficDecisionEvidenceTests(unittest.TestCase):
+    def test_decision_binds_snapshot_identity(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        self.assertEqual(decision.base_sha, BASE)
+        self.assertEqual(decision.observed_at, NOW)
+        payload = decision.as_dict()
+        self.assertEqual(payload["base_sha"], BASE)
+        self.assertEqual(payload["observed_at"], NOW)
+
+    def test_decision_normalizes_uppercase_snapshot_sha(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha="A" * 40,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        self.assertEqual(decision.base_sha, "a" * 40)
+
+    def test_github_output_contains_decision_identity(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            from skeleton.automation.traffic_manager import emit_github_output
+            emit_github_output(decision, str(output))
+            rendered = output.read_text(encoding="utf-8")
+        self.assertIn(f"base_sha={BASE}\n", rendered)
+        self.assertIn(f"observed_at={NOW}\n", rendered)
+        self.assertIn('"base_sha":"' + BASE + '"', rendered)
+        self.assertIn(f'"observed_at":{NOW}', rendered)
