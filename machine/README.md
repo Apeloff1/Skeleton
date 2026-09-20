@@ -84,6 +84,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Physics family audit:** 11 candidate branches rechecked; core CCD/convex/collision/world modules diverge across branches, so the family remains held for semantic consolidation.
 
+- **Large-wave audit:** PR runner hygiene #1867 staged; bounded-shell and shell-AI 300-file waves remain held for reconciliation.
+
 ## Target layout
 
 ```text
