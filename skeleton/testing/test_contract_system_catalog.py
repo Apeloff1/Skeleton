@@ -4,7 +4,10 @@ from skeleton.contracts.system_catalog import (
     CATALOG,
     ContractSpec,
     ContractTier,
+    audit_catalog,
+    dependency_closure,
     impacted_contracts,
+    ownership_conflicts,
     topological_order,
     validate_catalog,
 )
@@ -61,3 +64,33 @@ def test_toolchain_change_reaches_root_readiness():
 
 def test_unowned_path_has_no_false_contract_impact():
     assert impacted_contracts(["docs/unrelated-note.md"]) == ()
+
+
+def test_catalog_audit_is_clean():
+    audit = audit_catalog()
+    assert audit.clean
+    assert audit.ownership_conflicts == ()
+    assert audit.orphan_dependencies == ()
+
+
+def test_exact_duplicate_ownership_is_reported():
+    catalog = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, owns=("shared/",)),
+        ContractSpec("b", "scripts/check_b_contract.py", ContractTier.SECURITY, owns=("shared/",)),
+    )
+    assert ownership_conflicts(catalog) == (("shared/", "a", "b"),)
+
+
+def test_dependency_closure_is_topologically_ordered():
+    closure = dependency_closure("merge-readiness")
+    assert "runner-v2" in closure
+    assert "automerge" in closure
+    assert "toolchain" in closure
+    assert "defense-control-plane" in closure
+    assert closure.index("automerge") < closure.index("runner-v2")
+    assert closure.index("runner-v2") < closure.index("defense-control-plane")
+
+
+def test_unknown_dependency_closure_fails_closed():
+    with pytest.raises(KeyError):
+        dependency_closure("does-not-exist")
