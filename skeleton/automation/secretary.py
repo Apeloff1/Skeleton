@@ -22,9 +22,16 @@ from pathlib import Path
 from typing import Any
 
 from .advanced_bots import ADVANCED_BOTS
+from .bot_manager import (
+    authorized_builder_available,
+    load_state,
+    record_worker_outcome,
+    save_state,
+    select_specialists_due,
+)
 from .build_authority import (
-    BuildAuthorization,
     BuildAuthorityError,
+    BuildAuthorization,
     revalidate_live_build_authorization,
 )
 from .builder_plane import (
@@ -34,13 +41,6 @@ from .builder_plane import (
     compile_builder_manifest,
     validate_builder_custody,
     validate_builder_worker_evidence,
-)
-from .bot_manager import (
-    authorized_builder_available,
-    load_state,
-    record_worker_outcome,
-    save_state,
-    select_specialists_due,
 )
 from .free_model import redact_secrets
 from .supervisor_runtime import (
@@ -457,17 +457,10 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Exact repository state grants authority, but plan intent still
-            # gates selection. This prevents unrelated CI/repair signals from
-            # consuming an approved feature authorization.
-            matches = sum(
-                1
-                for word in KEYWORDS.get(spec.name, ())
-                if word in text
-            )
-            if not matches:
-                continue
-            score = 100 + matches
+            # Maintainer-approved issue state is the authority and intent.
+            # Model prose is untrusted advisory data, so it must not be able to
+            # suppress an already-authorized build by omitting a keyword.
+            score = 1_000
         else:
             score = sum(
                 1
