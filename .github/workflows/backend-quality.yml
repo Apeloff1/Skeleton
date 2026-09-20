@@ -229,3 +229,7 @@ jobs:
           tests/test_request_identity_logging_security.py
           tests/test_security_middleware_properties.py
           tests/test_webhook_cron_security.py
+          tests/test_traffic_manager.py
+          backend/tests/test_traffic_manager_workflow_contract.py
+          tests/test_actions_housekeeping_live_reaper.py
+          tests/test_queue_drain_housekeeping_cooldown.py
