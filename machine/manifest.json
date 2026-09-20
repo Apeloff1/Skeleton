@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.6",
+  "schema_version": "1.7",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,27 +66,20 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1814,
+      "last": 1833,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1809-1814",
+      "prs": "1815-1833",
       "domains": [
-        "builder plane current-main delta",
-        "builder repair receipts",
-        "durable run checkpoints",
-        "agent squads",
-        "four-role studios"
-      ],
-      "held": [
-        {
-          "source": "feat/bounded-shell-runner-20260918",
-          "files": 300
-        },
-        {
-          "source": "feat/build-capable-automation-v2-20260920",
-          "files": 33
-        }
+        "galaxy lifecycle",
+        "Java accelerators/control/observability/retrieval",
+        "Jeeves AI decision/planning/evidence",
+        "Jeeves frontier chains",
+        "topology learning",
+        "machine repository control",
+        "merge blocker recovery",
+        "MW/pack capability waves"
       ]
     },
     "large_reconciliation": [
@@ -119,6 +112,12 @@
         "source": "fix/physics-aggregate-validation",
         "status": "held",
         "files": 77
+      },
+      {
+        "source": "feat/jeeves-topology-learning",
+        "pr": 1828,
+        "files": 20,
+        "commits": 129
       }
     ],
     "no_op_lineage": "Branches with zero file delta versus assembly are retained as lineage and not represented as integrated content."
