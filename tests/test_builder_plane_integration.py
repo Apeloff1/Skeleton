@@ -12,9 +12,12 @@ from skeleton.automation.builder_plane import (
     BuilderBudget,
     BuilderManifest,
     BuilderPlaneError,
+    BuilderProposalReceipt,
     builder_worker_branch,
     compile_builder_manifest,
+    compile_builder_proposal_receipt,
     validate_builder_custody,
+    validate_builder_proposal_receipt,
     validate_builder_worker_evidence,
 )
 from skeleton.automation.supervisor_runtime import (
@@ -71,6 +74,25 @@ def manifest(
         authorization(),
         snapshot_fingerprint=snapshot,
         execution=run or execution(),
+    )
+
+
+def proposal_receipt(
+    value: BuilderManifest | None = None,
+) -> BuilderProposalReceipt:
+    current = value or manifest()
+    return compile_builder_proposal_receipt(
+        current,
+        proposal_digest="c" * 64,
+        branch=builder_worker_branch(current),
+        files=(
+            {
+                "path": "skeleton/feature.py",
+                "content": "VALUE = 1\n",
+            },
+        ),
+        tests=("focused regression",),
+        changed_lines=12,
     )
 
 
@@ -546,6 +568,9 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             "builder_manifest_digest": (
                 value.manifest_digest if digest is None else digest
             ),
+            "builder_proposal_receipt": (
+                proposal_receipt(value).as_dict()
+            ),
         }
 
     def existing_evidence(
@@ -588,6 +613,74 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             evidence["builder_manifest_digest"],
             manifest().manifest_digest,
         )
+        parsed_receipt = BuilderProposalReceipt.from_payload(
+            evidence["builder_proposal_receipt"]
+        )
+        self.assertEqual(
+            parsed_receipt.receipt_digest,
+            proposal_receipt().receipt_digest,
+        )
+
+
+    def test_created_evidence_receipt_is_manifest_bound(self) -> None:
+        evidence = self.created_evidence()
+        receipt = BuilderProposalReceipt.from_payload(
+            evidence["builder_proposal_receipt"]
+        )
+        validate_builder_proposal_receipt(
+            receipt,
+            manifest(),
+            evidence=evidence,
+        )
+
+    def test_created_evidence_rejects_receipt_digest_tamper(self) -> None:
+        evidence = self.created_evidence()
+        evidence["builder_proposal_receipt"]["receipt_digest"] = (
+            "0" * 64
+        )
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                evidence,
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_receipt_path_tamper(self) -> None:
+        evidence = self.created_evidence()
+        evidence["builder_proposal_receipt"]["paths"] = [
+            "../escape.py"
+        ]
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                evidence,
+                manifest(),
+            )
+
+    def test_runtime_parser_requires_feature_receipt(self) -> None:
+        evidence = self.created_evidence()
+        evidence.pop("builder_proposal_receipt")
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="feature-builder",
+            )
+
+    def test_runtime_parser_rejects_receipt_on_non_builder(self) -> None:
+        evidence = {
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            "changed_lines": 1,
+            "proposal_digest": "c" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": SNAPSHOT,
+            "execution_fingerprint": execution().fingerprint,
+            "builder_proposal_receipt": proposal_receipt().as_dict(),
+        }
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="root-cause",
+            )
 
     def test_exact_manifest_bound_evidence_is_accepted(self) -> None:
         validate_builder_worker_evidence(
