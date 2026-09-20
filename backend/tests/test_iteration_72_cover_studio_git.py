@@ -17,6 +17,8 @@ import base64
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 
 LONG = 120  # image gen can take up to ~30s; give plenty of headroom

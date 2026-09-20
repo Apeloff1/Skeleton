@@ -8,6 +8,8 @@ import os
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     # Fallback to internal for local pytest runs

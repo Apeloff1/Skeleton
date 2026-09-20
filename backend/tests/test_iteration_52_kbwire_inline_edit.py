@@ -8,6 +8,8 @@ import time
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', '').rstrip('/') or \
            'https://gemini-game-craft.preview.emergentagent.com'
 PID = "d02790d6d8174ff59bf7005221cd7609"

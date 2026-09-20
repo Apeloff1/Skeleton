@@ -10,6 +10,9 @@ Validates:
 """
 import os, requests, pytest
 
+import pytest
+
+pytestmark = pytest.mark.live_service
 BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if "EXPO_PUBLIC_BACKEND_URL" in os.environ else \
        "https://gemini-game-craft.preview.emergentagent.com"
 PID = "d02790d6d8174ff59bf7005221cd7609"
