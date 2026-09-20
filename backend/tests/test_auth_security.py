@@ -15,6 +15,7 @@ from core.auth_security import (
 
 STRONG_SECRET = "s" * 48
 STRONG_PASSWORD = "Correct-Horse-Battery-Staple-2026"
+LOCAL_SESSION_API = "http://" + "localhost:8080/session"
 
 
 def test_auth_enforcement_defaults_closed_in_production_but_open_in_local_dev():
