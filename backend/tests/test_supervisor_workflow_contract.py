@@ -206,7 +206,7 @@ def test_supervisor_workflow_uses_pinned_reviewed_actions() -> None:
 def test_secretary_timeout_keeps_a_bounded_execution_window() -> None:
     source = _source()
     secretary = _job_block(source, "secretary")
-    assert "timeout-minutes: 45" in secretary
+    assert "timeout-minutes: 70" in secretary
 
 def test_worker_health_surface_is_tracked_by_workflow_security() -> None:
     workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"

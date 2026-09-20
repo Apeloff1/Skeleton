@@ -27,6 +27,7 @@ from .build_authority import (
 from .advanced_bots import (
     ADVANCED_BOTS,
     BLOCKED_PREFIXES,
+    BUILD_SAFE_PREFIXES,
     SAFE_PREFIXES,
     AdvancedBot,
     allowed,
@@ -54,6 +55,7 @@ from .supervisor_runtime import (
 MAX_FILE = 80_000
 MAX_TOTAL_PROPOSED_BYTES = 240_000
 MAX_CHANGED_LINES = 1_200
+MAX_BUILD_CHANGED_LINES = 9_000
 MAX_CONTEXT_BYTES = 90_000
 MAX_CONTEXT_FILE_BYTES = 3_500
 MAX_SUMMARY_BYTES = 4_000
@@ -184,7 +186,11 @@ def admit_build_authorization(
     return authorization
 
 
-def safe_path(path: object) -> bool:
+def safe_path(
+    path: object,
+    *,
+    safe_prefixes: tuple[str, ...] = SAFE_PREFIXES,
+) -> bool:
     """Fast lexical admission; filesystem checks happen before every write."""
     if not isinstance(path, str) or not path:
         return False
@@ -200,7 +206,7 @@ def safe_path(path: object) -> bool:
         return False
     if any(path.startswith(prefix) for prefix in BLOCKED_PREFIXES):
         return False
-    return any(path.startswith(prefix) for prefix in SAFE_PREFIXES)
+    return any(path.startswith(prefix) for prefix in safe_prefixes)
 
 
 def _bounded_text(
@@ -272,7 +278,14 @@ def _decode_model_object(raw: str) -> dict[str, Any]:
     return value
 
 
-def extract_plan(raw: str, max_files: int) -> dict[str, Any]:
+def extract_plan(
+    raw: str,
+    max_files: int,
+    *,
+    max_file_bytes: int = MAX_FILE,
+    max_total_bytes: int = MAX_TOTAL_PROPOSED_BYTES,
+    safe_prefixes: tuple[str, ...] = SAFE_PREFIXES,
+) -> dict[str, Any]:
     """Validate the complete model proposal as bounded inert data."""
     data = _decode_model_object(raw)
     summary = _bounded_text(
@@ -319,12 +332,15 @@ def extract_plan(raw: str, max_files: int) -> dict[str, Any]:
             )
         path = item.get("path")
         content = item.get("content")
-        if not safe_path(path) or not isinstance(content, str):
+        if (
+            not safe_path(path, safe_prefixes=safe_prefixes)
+            or not isinstance(content, str)
+        ):
             raise ValueError(
                 f"unsafe specialist file: {path!r}"
             )
         size = len(content.encode("utf-8"))
-        if size > MAX_FILE:
+        if size > max_file_bytes:
             raise ValueError(
                 f"specialist file exceeds byte budget: {path!r}"
             )
@@ -333,7 +349,7 @@ def extract_plan(raw: str, max_files: int) -> dict[str, Any]:
                 f"duplicate specialist file: {path!r}"
             )
         total_bytes += size
-        if total_bytes > MAX_TOTAL_PROPOSED_BYTES:
+        if total_bytes > max_total_bytes:
             raise ValueError(
                 "specialist exceeded total byte budget"
             )
@@ -512,6 +528,8 @@ def validate_generated_files(
 
 def validate_mutation_budget(
     files: list[dict[str, str]],
+    *,
+    max_changed_lines: int = MAX_CHANGED_LINES,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
     changed = 0
@@ -526,7 +544,7 @@ def validate_mutation_budget(
             for line in delta
             if line.startswith(("+ ", "- "))
         )
-        if changed > MAX_CHANGED_LINES:
+        if changed > max_changed_lines:
             raise RuntimeError(
                 "specialist mutation line budget exceeded"
             )
@@ -748,22 +766,35 @@ def main() -> int:
         )
 
         client = FreeModelClient()
-        result = extract_plan(
-            client.chat(
-                (
-                    "You are a conservative specialist maintenance agent. "
-                    "Return JSON only."
+        if spec.name == "feature-builder":
+            if build_authorization is None:
+                raise WorkerAdmissionError(
+                    "feature-builder missing admitted build authority"
+                )
+            from .build_plane import run_feature_build
+
+            result = run_feature_build(
+                plan=plan,
+                build_authorization=build_authorization,
+                client=client,
+            )
+        else:
+            result = extract_plan(
+                client.chat(
+                    (
+                        "You are a conservative specialist maintenance agent. "
+                        "Return JSON only."
+                    ),
+                    _render_prompt(
+                        spec,
+                        execution.repository,
+                        plan,
+                        build_authorization=build_authorization,
+                    ),
+                    max_tokens=MODEL_MAX_TOKENS,
                 ),
-                _render_prompt(
-                    spec,
-                    execution.repository,
-                    plan,
-                    build_authorization=build_authorization,
-                ),
-                max_tokens=MODEL_MAX_TOKENS,
-            ),
-            spec.max_files,
-        )
+                spec.max_files,
+            )
 
         result["files"] = filter_noop_files(
             result["files"]
@@ -791,8 +822,14 @@ def main() -> int:
             )
 
         validate_generated_files(result["files"])
+        changed_line_limit = (
+            MAX_BUILD_CHANGED_LINES
+            if spec.name == "feature-builder"
+            else MAX_CHANGED_LINES
+        )
         changed_lines = validate_mutation_budget(
-            result["files"]
+            result["files"],
+            max_changed_lines=changed_line_limit,
         )
         digest = proposal_digest(
             worker=spec.name,
@@ -801,11 +838,16 @@ def main() -> int:
         )
 
         repo_root = Path.cwd().resolve()
+        active_safe_prefixes = (
+            BUILD_SAFE_PREFIXES
+            if spec.name == "feature-builder"
+            else SAFE_PREFIXES
+        )
         targets = {
             item["path"]: resolve_mutation_target(
                 item["path"],
                 repo_root=repo_root,
-                allowed_prefixes=SAFE_PREFIXES,
+                allowed_prefixes=active_safe_prefixes,
                 blocked_prefixes=BLOCKED_PREFIXES,
             )
             for item in result["files"]
@@ -929,7 +971,7 @@ def main() -> int:
         )
         body += (
             f"\n\nChanged-line admission budget: "
-            f"{changed_lines}/{MAX_CHANGED_LINES}."
+            f"{changed_lines}/{changed_line_limit}."
         )
         body += (
             "\nDispatched by the repository Secretary; "
