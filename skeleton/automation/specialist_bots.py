@@ -28,6 +28,7 @@ from .builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
     builder_worker_branch,
+    compile_builder_proposal_receipt,
     manifest_prompt_fragment,
     validate_builder_custody,
 )
@@ -955,6 +956,21 @@ def main() -> int:
             snapshot_fingerprint=custody.snapshot_fingerprint,
             files=result["files"],
         )
+        builder_receipt = None
+        if builder_manifest is not None:
+            try:
+                builder_receipt = compile_builder_proposal_receipt(
+                    builder_manifest,
+                    proposal_digest=digest,
+                    branch=branch,
+                    files=result["files"],
+                    tests=result["tests"],
+                    changed_lines=changed_lines,
+                )
+            except BuilderPlaneError as exc:
+                raise WorkerAdmissionError(
+                    "feature-builder proposal receipt rejected"
+                ) from exc
 
         repo_root = Path.cwd().resolve()
         targets = {
@@ -1112,6 +1128,11 @@ def main() -> int:
                 f"\nBuilder manifest: "
                 f"`{builder_manifest.manifest_digest}`"
             )
+        if builder_receipt is not None:
+            body += (
+                f"\nBuilder proposal receipt: "
+                f"`{builder_receipt.receipt_digest}`"
+            )
         if build_authorization is not None:
             body += (
                 f"\nAuthorized build issue: "
@@ -1183,6 +1204,11 @@ def main() -> int:
                 "builder_manifest_digest": (
                     builder_manifest.manifest_digest
                     if builder_manifest is not None
+                    else None
+                ),
+                "builder_proposal_receipt": (
+                    builder_receipt.as_dict()
+                    if builder_receipt is not None
                     else None
                 ),
             }
