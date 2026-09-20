@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TRAFFIC = ROOT / ".github" / "workflows" / "automation-traffic-manager.yml"
+BRANCH_MERGER = ROOT / ".github" / "workflows" / "branch-merge-manager.yml"
 SUPERVISOR = ROOT / ".github" / "workflows" / "supervisor.yml"
 SECRETARY = ROOT / ".github" / "workflows" / "secretary.yml"
 
@@ -22,13 +23,15 @@ def _job_block(source: str, job: str, next_job: str | None = None) -> str:
     return source[start:end]
 
 
-def test_traffic_manager_is_only_routine_schedule_for_supervisor_chain() -> None:
+def test_traffic_manager_is_only_routine_schedule_for_automation_chain() -> None:
     traffic = _source(TRAFFIC)
+    branch_merger = _source(BRANCH_MERGER)
     supervisor = _source(SUPERVISOR)
     secretary = _source(SECRETARY)
 
     assert 'cron: "*/10 * * * *"' in traffic
     assert "  schedule:" in traffic.split("permissions:", 1)[0]
+    assert "  schedule:" not in branch_merger.split("permissions:", 1)[0]
     assert "  schedule:" not in supervisor.split("concurrency:", 1)[0]
     assert "  schedule:" not in secretary.split("concurrency:", 1)[0]
 
@@ -134,7 +137,7 @@ def test_traffic_manager_exposes_relief_observability() -> None:
     assert "relief_reason:" in admission
 
 
-def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
+def test_traffic_manager_routes_integration_to_branch_merger() -> None:
     source = _source(TRAFFIC)
     dispatch = _job_block(source, "dispatch")
     assert "needs: admission" in dispatch
@@ -142,8 +145,77 @@ def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
     assert "actions: write" in dispatch
     assert "contents: read" in dispatch
     assert "pull-requests: write" not in dispatch
+    assert "contents: write" not in dispatch
+    assert "TRAFFIC_LANE:" in dispatch
+    assert "needs.admission.outputs.lane == 'integration'" in dispatch
+    assert "needs.admission.outputs.lane != 'integration'" in dispatch
+    assert "gh workflow run branch-merge-manager.yml" in dispatch
     assert "gh workflow run supervisor.yml" in dispatch
-    assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in dispatch
+    assert dispatch.count('--ref "$TRAFFIC_DEFAULT_BRANCH"') == 2
+
+
+
+def test_branch_merger_has_narrow_delegation_authority() -> None:
+    source = _source(BRANCH_MERGER)
+    trigger = source.split("permissions:", 1)[0]
+    assert source.startswith("name: Branch Merge Manager\n")
+    assert "  workflow_dispatch:" in trigger
+    assert "  schedule:" not in trigger
+    assert "pull_request_target:" not in source
+    assert "pull_request:" not in trigger
+    assert "permissions: {}" in source.split("jobs:\n", 1)[0]
+
+    reconcile = _job_block(source, "reconcile")
+    permissions = reconcile.split("    permissions:\n", 1)[1].split(
+        "    env:", 1
+    )[0]
+    assert "actions: write" in permissions
+    assert "contents: read" in permissions
+    assert "pull-requests: read" in permissions
+    assert "contents: write" not in permissions
+    assert "pull-requests: write" not in permissions
+    assert "checks: write" not in permissions
+    assert "statuses: write" not in permissions
+    assert (
+        'test "$BRANCH_MERGE_EVENT_REF" = "$BRANCH_MERGE_EXPECTED_REF"'
+        in reconcile
+    )
+    assert "persist-credentials: false" in reconcile
+    assert "python -m skeleton.automation.branch_merge_manager" in reconcile
+    assert "gh pr merge" not in reconcile
+    assert "git merge" not in reconcile
+    assert "git push" not in reconcile
+
+
+def test_branch_merger_inputs_cross_shell_boundary_through_env() -> None:
+    source = _source(BRANCH_MERGER)
+    reconcile = _job_block(source, "reconcile")
+    run_block = reconcile.split("- name: Reconcile branch-backed PRs", 1)[1]
+    assert "BRANCH_MERGE_OBSERVE_ONLY:" in reconcile
+    assert "BRANCH_MERGE_MAX_MERGES:" in reconcile
+    assert "${{ inputs.observe_only" not in run_block
+    assert "${{ inputs.max_merges" not in run_block
+    assert "${{ github.event" not in run_block
+
+
+def test_branch_merger_retains_evidence_and_uses_pinned_actions() -> None:
+    source = _source(BRANCH_MERGER)
+    assert (
+        "actions/checkout@"
+        "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    ) in source
+    assert (
+        "actions/setup-python@"
+        "5fda3b95a4ea91299a34e894583c3862153e4b97"
+    ) in source
+    assert (
+        "actions/upload-artifact@"
+        "65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08"
+    ) in source
+    assert "if-no-files-found: error" in source
+    assert ".branch-merge/report.json" in source
+    assert "@main" not in source
+    assert "@master" not in source
 
 
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
