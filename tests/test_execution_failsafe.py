@@ -7,8 +7,11 @@ import pytest
 from skeleton.automation import secretary
 from skeleton.automation.execution_failsafe import (
     FailureKind,
+    attach_retry_history,
     classify_result,
     retry_allowed,
+    retry_delay_seconds,
+    retry_token,
     summarize_results,
 )
 from skeleton.automation.supervisor_runtime import ExecutionIdentity
@@ -150,6 +153,9 @@ def test_dispatch_retries_one_pre_execution_setup_failure(monkeypatch) -> None:
         return result(returncode=0, status="no-change", attempt=2)
 
     monkeypatch.setattr(secretary, "_dispatch_one", fake_dispatch)
+    monkeypatch.setattr(secretary.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(secretary, "require_exact_head", lambda _sha: None)
+    monkeypatch.setattr(secretary, "require_remote_base_unchanged", lambda _execution: None)
     results = secretary.dispatch(
         "repair CI",
         ["root-cause"],
@@ -158,6 +164,8 @@ def test_dispatch_retries_one_pre_execution_setup_failure(monkeypatch) -> None:
     )
     assert attempts == [1, 2]
     assert results[0]["evidence"]["status"] == "no-change"
+    assert [item["attempt"] for item in results[0]["attempt_history"]] == [1, 2]
+    assert len(results[0]["retry_chain_digest"]) == 64
 
 
 @pytest.mark.parametrize(
@@ -212,3 +220,64 @@ def test_step_summary_rejects_symlink(tmp_path, monkeypatch) -> None:
             failsafe_summary=None,
         )
     assert target.read_text(encoding="utf-8") == "untouched\n"
+
+
+def test_retry_token_is_deterministic_and_custody_bound() -> None:
+    first = retry_token(
+        worker="feature-builder",
+        attempt=1,
+        execution_fingerprint="a" * 64,
+        snapshot_fingerprint="b" * 64,
+    )
+    same = retry_token(
+        worker="feature-builder",
+        attempt=1,
+        execution_fingerprint="a" * 64,
+        snapshot_fingerprint="b" * 64,
+    )
+    next_attempt = retry_token(
+        worker="feature-builder",
+        attempt=2,
+        execution_fingerprint="a" * 64,
+        snapshot_fingerprint="b" * 64,
+    )
+    assert first == same
+    assert first != next_attempt
+    assert len(first) == 64
+
+
+def test_retry_backoff_is_deterministic_and_bounded() -> None:
+    token = retry_token(
+        worker="root-cause",
+        attempt=2,
+        execution_fingerprint="a" * 64,
+        snapshot_fingerprint="b" * 64,
+    )
+    delay = retry_delay_seconds(2, token)
+    assert delay == retry_delay_seconds(2, token)
+    assert 1 <= delay <= 8
+
+
+def test_retry_history_rejects_noncontiguous_attempts() -> None:
+    first = result(failure_kind="setup-failure", attempt=1)
+    third = result(returncode=0, status="no-change", attempt=2)
+    third["attempt"] = 1
+    with pytest.raises(ValueError, match="contiguous"):
+        attach_retry_history(
+            third,
+            [first, third],
+            execution_fingerprint="a" * 64,
+            snapshot_fingerprint="b" * 64,
+        )
+
+
+def test_retry_history_rejects_transition_after_terminal_failure() -> None:
+    first = result(failure_kind="worker-timeout", attempt=1)
+    second = result(returncode=0, status="no-change", attempt=2)
+    with pytest.raises(ValueError, match="unauthorized transition"):
+        attach_retry_history(
+            second,
+            [first, second],
+            execution_fingerprint="a" * 64,
+            snapshot_fingerprint="b" * 64,
+        )
