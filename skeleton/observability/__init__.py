@@ -6,6 +6,13 @@ from skeleton.observability.anomaly import (
     AnomalyReport,
     SeasonalDecomposer,
 )
+from skeleton.observability.correlation import (
+    background_job,
+    correlation_scope,
+    get_correlation_id,
+    reset_correlation_id,
+    set_correlation_id,
+)
 from skeleton.observability.event_bridge import EventMetricsBridge, ObservedEvent
 from skeleton.observability.health import HealthRegistry, ProbeResult, probe
 from skeleton.observability.jvm_accelerator import (
@@ -58,6 +65,11 @@ __all__ = [
     "InMemoryExporter",
     "EventMetricsBridge",
     "ObservedEvent",
+    "get_correlation_id",
+    "set_correlation_id",
+    "reset_correlation_id",
+    "correlation_scope",
+    "background_job",
     "ObservableOrchestrator",
     "JvmObservabilityAccelerator",
     "JvmAcceleratorConfig",

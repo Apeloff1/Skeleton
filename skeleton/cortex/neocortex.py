@@ -989,7 +989,13 @@ class ControlSurface:
 
     def inject_event(self, topic: str, payload: Dict[str, Any]) -> None:
         if self._bus:
-            self._bus.publish(DomainEvent(topic=topic, payload=payload))
+            # Inherit active observability correlation when callers omit it.
+            from skeleton.observability.correlation import get_correlation_id
+
+            cid = get_correlation_id()
+            self._bus.publish(
+                DomainEvent(topic=topic, payload=payload, correlation_id=cid)
+            )
         self._interventions.append({"action": "inject", "topic": topic, "time": _obs_time.time()})
 
     def stats(self) -> Dict[str, Any]:

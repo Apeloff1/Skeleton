@@ -11,8 +11,13 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from contextvars import ContextVar
 from typing import Iterable, Mapping
+
+from skeleton.observability.correlation import (
+    get_correlation_id,
+    reset_correlation_id,
+    set_correlation_id,
+)
 
 from skeleton.frontier.model_runtime import CancellationToken, ProviderCancelledError
 from skeleton.frontier.orchestration import (
@@ -33,12 +38,6 @@ from skeleton.kernel.events import EventBus
 from skeleton.observability.event_bridge import EventMetricsBridge
 from skeleton.observability.logging import StructuredLogger
 from skeleton.observability.tracing import Tracer
-
-
-_CURRENT_CORRELATION_ID: ContextVar[str] = ContextVar(
-    "skeleton_orchestration_correlation_id",
-    default="",
-)
 
 
 def _normalized_correlation_id(value: str | None, *, fallback: str) -> str:
@@ -100,7 +99,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         self.tracer = tracer or Tracer("skeleton.orchestration")
 
     def _emit(self, topic: str, payload: dict[str, object]) -> None:
-        correlation_id = _CURRENT_CORRELATION_ID.get()
+        correlation_id = get_correlation_id()
         self.event_bus.emit(
             topic,
             payload,
@@ -129,7 +128,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
             correlation_id,
             fallback=effective_run_id,
         )
-        token = _CURRENT_CORRELATION_ID.set(effective_correlation_id)
+        token = set_correlation_id(effective_correlation_id)
         started = time.perf_counter()
         try:
             with self.tracer(
@@ -186,7 +185,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
                     )
                     return record
         finally:
-            _CURRENT_CORRELATION_ID.reset(token)
+            reset_correlation_id(token)
 
     async def _execute_tool(
         self,
@@ -200,7 +199,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         started = time.perf_counter()
         with self.tracer(
             "orchestration.tool",
-            trace_id=_CURRENT_CORRELATION_ID.get(),
+            trace_id=get_correlation_id(),
             run_id=record.run_id,
             call_id=call.call_id,
             tool_name=call.name,
