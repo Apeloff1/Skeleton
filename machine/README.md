@@ -79,6 +79,9 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **File-level reconciliation:** network replication and X-harness waves are already byte-for-byte present on the assembly branch; their open PRs remain lineage/source references rather than duplicate content.
 
+- **Deep reconciliation:** physics stack and Jeeves semantic/compiler waves were inspected at file level; divergent core modules remain held rather than overwritten.
+- **Physics aggregate:** 77-file wave remains held due overlap with the consolidated simulation stack.
+
 ## Target layout
 
 ```text
