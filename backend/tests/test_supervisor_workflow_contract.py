@@ -29,12 +29,12 @@ def test_supervisor_workflow_has_no_workflow_wide_authority() -> None:
     assert "read-all" not in source
 
 
-def test_supervisor_workflow_is_unattended_and_manual_only() -> None:
+def test_supervisor_workflow_is_reusable_and_manual_only() -> None:
     source = _source()
     trigger = source.split("concurrency:\n", 1)[0]
-    assert "  schedule:" in trigger
-    assert 'cron: "7 * * * *"' in trigger
+    assert "  workflow_call:" in trigger
     assert "  workflow_dispatch:" in trigger
+    assert "  schedule:" not in trigger
     assert "pull_request:" not in trigger
     assert "push:" not in trigger
     assert "workflow_run:" not in trigger
