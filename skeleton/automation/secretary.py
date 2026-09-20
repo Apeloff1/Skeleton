@@ -30,6 +30,7 @@ from .build_authority import (
 from .builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
+    builder_worker_branch,
     compile_builder_manifest,
     validate_builder_custody,
     validate_builder_worker_evidence,
@@ -633,6 +634,20 @@ def _dispatch_one(
                     process.stdout,
                     worker=name,
                 )
+                expected_branch: str | None = None
+                if name == "feature-builder":
+                    if builder_manifest is None:
+                        raise SupervisorRuntimeError(
+                            "feature-builder evidence missing Builder Plane custody"
+                        )
+                    try:
+                        expected_branch = builder_worker_branch(
+                            builder_manifest
+                        )
+                    except BuilderPlaneError as exc:
+                        raise SupervisorRuntimeError(
+                            "feature-builder branch custody is invalid"
+                        ) from exc
                 validate_worker_evidence_custody(
                     evidence,
                     WorkerCustody(
@@ -640,12 +655,9 @@ def _dispatch_one(
                         snapshot_fingerprint=supervisor_fingerprint,
                         execution=execution,
                     ),
+                    expected_branch=expected_branch,
                 )
                 if name == "feature-builder":
-                    if builder_manifest is None:
-                        raise SupervisorRuntimeError(
-                            "feature-builder evidence missing Builder Plane custody"
-                        )
                     try:
                         validate_builder_worker_evidence(
                             evidence,
