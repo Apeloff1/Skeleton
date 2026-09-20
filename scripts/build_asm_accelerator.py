@@ -35,7 +35,7 @@ def main() -> int:
         "architecture": preflight.architecture,
         "compiler": preflight.compiler,
         "library": str(library),
-        "abi_version": 3,
+        "abi_version": 4,
         "self_test": "not-requested",
     }
 
@@ -93,6 +93,9 @@ def main() -> int:
             raise SystemExit(
                 f"multi-query self-test failed: {multi} != {expected_multi}"
             )
+        runtime = accelerator.status()
+        payload["capabilities"] = list(runtime.capabilities)
+        payload["matrix_backend"] = runtime.matrix_backend
         payload["self_test"] = "passed"
 
     if args.json_output:
