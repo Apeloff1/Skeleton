@@ -5,6 +5,7 @@ from skeleton.contracts.system_catalog import (
     ContractSpec,
     ContractTier,
     active_contracts,
+    aggregate_review_policy,
     authority_paths,
     contract_fingerprint,
     contract_fingerprints,
@@ -14,6 +15,7 @@ from skeleton.contracts.system_catalog import (
     dependency_closure,
     impacted_contracts,
     ownership_conflicts,
+    review_requirements,
     privilege_escalations,
     unowned_paths,
     topological_order,
@@ -418,3 +420,55 @@ def test_non_authority_change_is_modified_not_high_risk():
     changes = diff_contract_catalogs(before, after)
     assert changes[0].classification == "modified"
     assert high_risk_changes(changes) == ()
+
+
+def test_privilege_expansion_requires_security_and_human_review():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read",)),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read", "contents:write")),
+    )
+    requirements = review_requirements(diff_contract_catalogs(before, after))
+    assert requirements[0].human_review is True
+    assert "workflow-input-security" in requirements[0].required_gates
+    assert "merge-readiness" in requirements[0].required_gates
+
+
+def test_ordinary_modification_requires_contract_gate_without_human_escalation():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=1),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=2),
+    )
+    requirements = review_requirements(diff_contract_catalogs(before, after))
+    assert requirements[0].required_gates == ("contract-system",)
+    assert requirements[0].human_review is False
+
+
+def test_aggregate_review_policy_deduplicates_gates_and_reasons():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read",)),
+        ContractSpec("b", "scripts/check_b_contract.py", ContractTier.ROOT, owns=("b/",)),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read", "contents:write")),
+        ContractSpec("b", "scripts/check_b_contract.py", ContractTier.ROOT, owns=("b/", "c/")),
+    )
+    policy = aggregate_review_policy(
+        review_requirements(diff_contract_catalogs(before, after))
+    )
+    assert policy["human_review"] is True
+    assert policy["contracts"] == ["a", "b"]
+    assert policy["required_gates"] == sorted(set(policy["required_gates"]))
+    assert set(policy["reasons"]) == {"ownership-expanded", "privilege-expanded"}
+
+
+def test_empty_review_policy_is_safe_and_deterministic():
+    assert aggregate_review_policy(()) == {
+        "contracts": [],
+        "required_gates": [],
+        "human_review": False,
+        "reasons": [],
+    }
