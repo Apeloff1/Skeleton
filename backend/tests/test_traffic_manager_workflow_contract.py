@@ -189,7 +189,7 @@ def test_stale_dispatch_guard_does_not_interpolate_expressions_into_shell() -> N
     )[0]
     assert "${{ " not in guard
     assert "$TRAFFIC_ADMITTED_BASE_SHA" in guard
-    assert "$TRAFFIC_DEFAULT_BRANCH" in guard
+    assert "${TRAFFIC_DEFAULT_BRANCH}" in guard
 
 
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
