@@ -8,6 +8,15 @@ import shutil
 from .budgets import derive_zone_budgets
 from .catalog import build_catalog
 from .contracts import contract_map
+from .architecture_layers import derive_architecture_layers
+from .context_budget import allocate_context
+from .coordinator import build_coordinator_snapshot
+from .debt import debt_register
+from .docs_map import documentation_coverage
+from .naming import analyze_naming
+from .package_graph import discover_package_units
+from .refactor import plan_refactors
+from .selfcheck import run_selfcheck
 from .growth import growth_recommendations
 from .health import repository_health
 from .hotspots import structural_hotspots
@@ -69,6 +78,53 @@ def generate_workspace(
             ]
         },
         "steward-plan.json": select_steward_plan(model).as_dict(),
+        "coordinator.json": build_coordinator_snapshot(
+            model,
+            config,
+        ).as_dict(),
+        "architecture-layers.json": derive_architecture_layers(model).as_dict(),
+        "context-budgets.json": {
+            "allocations": [
+                item.as_dict()
+                for item in allocate_context(model)
+            ]
+        },
+        "debt.json": {
+            "items": [
+                item.as_dict()
+                for item in debt_register(model)
+            ]
+        },
+        "documentation.json": {
+            "coverage": [
+                item.as_dict()
+                for item in documentation_coverage(model)
+            ]
+        },
+        "packages.json": {
+            "packages": [
+                item.as_dict()
+                for item in discover_package_units(model)
+            ]
+        },
+        "naming.json": {
+            "findings": [
+                item.as_dict()
+                for item in analyze_naming(model)
+            ]
+        },
+        "refactors.json": {
+            "plans": [
+                item.as_dict()
+                for item in plan_refactors(model)
+            ]
+        },
+        "selfcheck.json": {
+            "findings": [
+                item.as_dict()
+                for item in run_selfcheck(model, config)
+            ]
+        },
     }
     for filename, payload in artifacts.items():
         _write_json(root / filename, payload)
