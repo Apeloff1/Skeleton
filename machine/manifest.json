@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.3",
+  "schema_version": "3.4",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -245,6 +245,46 @@
       "branches": 11,
       "status": "held",
       "result": "core CCD/convex/collision/world modules diverge across candidate branches; no blind merge"
+    },
+    "latest_staging": {
+      "prs": [
+        1868,
+        1869,
+        1870,
+        1871,
+        1872
+      ],
+      "held_large_waves": [
+        [
+          "merge/repo-machine-gates-20260920",
+          115
+        ],
+        [
+          "merge/1669-safe-20260920",
+          150
+        ],
+        [
+          "fix/merge-unblockers-20260920",
+          132
+        ],
+        [
+          "fix/live-service-test-boundaries-20260920",
+          98
+        ],
+        [
+          "fix/live-service-test-manifest-boundary",
+          99
+        ],
+        [
+          "fix/jeeves-decision-rules-20260919-drain",
+          137
+        ],
+        [
+          "fix/main-gates-shell-live-20260920",
+          67
+        ]
+      ],
+      "note": "staged only; overlapping large waves require reconciliation"
     }
   },
   "integrated_domains": [
