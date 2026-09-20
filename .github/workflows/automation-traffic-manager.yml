@@ -43,6 +43,7 @@ jobs:
       relieve: ${{ steps.traffic.outputs.relieve }}
       relief_reason: ${{ steps.traffic.outputs.relief_reason }}
       decision_json: ${{ steps.traffic.outputs.decision_json }}
+      admitted_base_sha: ${{ steps.identity.outputs.base_sha }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
       GH_TOKEN: ${{ github.token }}
@@ -57,6 +58,17 @@ jobs:
           set -euo pipefail
           test -n "$TRAFFIC_EXPECTED_REF"
           test "$TRAFFIC_EVENT_REF" = "$TRAFFIC_EXPECTED_REF"
+
+      - name: Capture immutable admission identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Traffic manager did not receive a full commit SHA."
+            exit 1
+          }
+          echo "base_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Checkout immutable traffic policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -247,7 +259,19 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      TRAFFIC_ADMITTED_BASE_SHA: ${{ needs.admission.outputs.admitted_base_sha }}
     steps:
+      - name: Require admission still matches default-branch head
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          live_sha=$(gh api "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" --jq '.object.sha')
+          if [[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]; then
+            echo "Admission became stale (${TRAFFIC_ADMITTED_BASE_SHA} != ${live_sha}); coalescing this dispatch."
+            exit 0
+          fi
+
       - name: Dispatch reviewed supervisor workflow
         run: >-
           gh workflow run supervisor.yml
