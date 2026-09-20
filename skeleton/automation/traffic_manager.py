@@ -587,6 +587,15 @@ def emit_github_output(
             "traffic decision output exceeds byte budget"
         )
 
+    oldest_queued_age = (
+        ""
+        if decision.oldest_queued_age_seconds is None
+        else str(decision.oldest_queued_age_seconds)
+    )
+    inventory_saturated = (
+        "true" if decision.inventory_saturated else "false"
+    )
+    relieve = "true" if decision.relieve else "false"
     lines = (
         f"admit={'true' if decision.admit else 'false'}\n"
         f"reason={decision.reason}\n"
@@ -595,9 +604,9 @@ def emit_github_output(
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
         f"stale_queued_runs={decision.stale_queued_runs}\n"
-        f"oldest_queued_age_seconds={decision.oldest_queued_age_seconds if decision.oldest_queued_age_seconds is not None else ''}\n"
-        f"inventory_saturated={'true' if decision.inventory_saturated else 'false'}\n"
-        f"relieve={'true' if decision.relieve else 'false'}\n"
+        f"oldest_queued_age_seconds={oldest_queued_age}\n"
+        f"inventory_saturated={inventory_saturated}\n"
+        f"relieve={relieve}\n"
         f"relief_reason={decision.relief_reason}\n"
         f"decision_json={payload}\n"
     )
