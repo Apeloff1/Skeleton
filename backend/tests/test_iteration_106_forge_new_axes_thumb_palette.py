@@ -8,6 +8,8 @@ import re
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 TIMEOUT = 60
 
