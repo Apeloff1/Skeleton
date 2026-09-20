@@ -98,6 +98,82 @@ def test_loader_rejects_stale_abi_before_native_calls(
         AsmVectorAccelerator(library)
 
 
+class _CompleteFakeLibrary(_StaleAbiLibrary):
+    def __init__(
+        self,
+        *,
+        capabilities: int,
+        include_avx: bool = True,
+    ) -> None:
+        super().__init__(version=4)
+        self.skeleton_asm_capabilities = _FakeFunction(capabilities)
+        self.skeleton_asm_dot_batch_f32 = _FakeFunction()
+        self.skeleton_asm_dot_matrix_f32 = _FakeFunction()
+        if include_avx:
+            self.skeleton_asm_dot_matrix_f32_avx = _FakeFunction()
+
+
+def test_loader_selects_sse2_when_avx_is_not_advertised(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "sse.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(asm_module.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _CompleteFakeLibrary(capabilities=1),
+    )
+
+    accelerator = AsmVectorAccelerator(library)
+
+    assert accelerator.status().capabilities == ("sse2",)
+    assert accelerator.status().matrix_backend == "sse2"
+
+
+def test_loader_selects_avx_only_when_runtime_advertises_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "avx.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(asm_module.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _CompleteFakeLibrary(capabilities=3),
+    )
+
+    accelerator = AsmVectorAccelerator(library)
+
+    assert accelerator.status().capabilities == ("sse2", "avx")
+    assert accelerator.status().matrix_backend == "avx"
+
+
+def test_loader_rejects_claimed_avx_without_avx_symbol(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "broken-avx.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(asm_module.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _CompleteFakeLibrary(
+            capabilities=3,
+            include_avx=False,
+        ),
+    )
+
+    with pytest.raises(
+        AsmAcceleratorAbiError,
+        match="reported AVX",
+    ):
+        AsmVectorAccelerator(library)
+
+
 def test_loader_rejects_wrong_abi_version(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
