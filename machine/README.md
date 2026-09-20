@@ -77,6 +77,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Reconcile-wave audit:** #1848–#1865 revalidated; existing integration PRs reused with no duplicate staging.
 
+- **File-level reconciliation:** network replication and X-harness waves are already byte-for-byte present on the assembly branch; their open PRs remain lineage/source references rather than duplicate content.
+
 ## Target layout
 
 ```text
