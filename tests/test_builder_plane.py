@@ -15,6 +15,7 @@ from skeleton.automation.builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
     BuilderStage,
+    builder_worker_branch,
     compile_builder_manifest,
     manifest_prompt_fragment,
     validate_builder_custody,
@@ -436,6 +437,73 @@ class BuilderStageTests(unittest.TestCase):
                 signals=("general-feature",),
                 acceptance=("Accept.",),
             )
+
+
+class BuilderBranchIdentityTests(unittest.TestCase):
+    def test_branch_is_stable_across_execution_and_snapshot_refresh(self) -> None:
+        auth = authorization()
+        first = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(run_id="123"),
+        )
+        second = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint="c" * 64,
+            execution=execution(run_id="999"),
+        )
+        self.assertEqual(
+            builder_worker_branch(first),
+            builder_worker_branch(second),
+        )
+
+    def test_branch_changes_when_authorized_task_changes(self) -> None:
+        first = compile_builder_manifest(
+            authorization(body="Implement capability A with tests."),
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        second = compile_builder_manifest(
+            authorization(body="Implement capability B with tests."),
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        self.assertNotEqual(
+            builder_worker_branch(first),
+            builder_worker_branch(second),
+        )
+
+    def test_branch_changes_when_base_commit_changes(self) -> None:
+        auth = authorization()
+        first = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(base_sha="a" * 40),
+        )
+        second = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(base_sha="c" * 40),
+        )
+        self.assertNotEqual(
+            builder_worker_branch(first),
+            builder_worker_branch(second),
+        )
+
+    def test_branch_stays_inside_reserved_feature_builder_namespace(self) -> None:
+        manifest = compile_builder_manifest(
+            authorization(),
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        branch = builder_worker_branch(manifest)
+        prefix = "bot/specialist-feature-builder-"
+        self.assertTrue(branch.startswith(prefix))
+        suffix = branch[len(prefix):]
+        self.assertEqual(len(suffix), 16)
+        self.assertTrue(
+            all(char in "0123456789abcdef" for char in suffix)
+        )
 
 
 class BuilderCustodyTests(unittest.TestCase):
