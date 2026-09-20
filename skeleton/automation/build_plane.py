@@ -67,8 +67,8 @@ from .free_model import FreeModelClient, ModelError, redact_secrets
 
 
 ARCHITECT_TOKENS = 6_000
-IMPLEMENT_TOKENS = 12_000
-REPAIR_TOKENS = 10_000
+IMPLEMENT_TOKENS = 8_000
+REPAIR_TOKENS = 8_000
 MAX_ARCHITECT_CONTEXT_FILES = 18
 MAX_IMPLEMENTATION_CONTEXT_FILES = 32
 
@@ -113,6 +113,10 @@ def budget_from_manifest(
     return BuildBudget(
         max_files=manifest.budget.max_files,
         max_total_bytes=manifest.budget.max_total_bytes,
+        max_file_bytes=min(
+            500_000,
+            manifest.budget.max_total_bytes,
+        ),
         max_changed_lines=manifest.budget.max_changed_lines,
         max_test_intents=manifest.budget.max_test_descriptions,
     )
