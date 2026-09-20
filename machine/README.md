@@ -39,6 +39,9 @@ Target: **one coherent application** for human maintenance and automated machine
 - **PRs #1791–#1808:** security headers, shell AI readiness/trust, supervisor controls, tooling regressions, workflow/security controls, and vulnerability bounds staged for reconciliation.
 - Zero-file-delta supervisor/tooling lineage remains unrepresented as integrated content.
 
+- **PRs #1809–#1814:** builder-plane deltas, repair receipts, durable checkpoints, agent squads, and four-role studios staged for reconciliation.
+- **Held feature waves:** bounded shell runner (300 files) and build-capable automation v2 (33 files) remain large reconciliation inputs.
+
 ## Target layout
 
 ```text
