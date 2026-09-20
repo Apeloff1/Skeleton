@@ -8,7 +8,7 @@ from .supervisor_runtime import SupervisorRuntimeError, validate_worker_name
 
 _RISKS = frozenset({"low", "medium", "high"})
 _MAX_TRIGGER_BYTES = 256
-_MAX_FILES = 12
+_MAX_FILES = 48
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ ADVANCED_BOTS = (
         "feature-builder",
         "maintainer-approved feature or implementation work",
         "medium",
-        10,
+        36,
     ),
     AdvancedBot("architecture-reviewer", "large PR or subsystem drift", "low", 4),
     AdvancedBot("security-auditor", "security/code-scanning signal", "high", 5),
@@ -78,6 +78,13 @@ BLOCKED_PREFIXES = (
     "skeleton/pr_automation/",
     "skeleton/security/",
     "skeleton/build/",
+    "core/activation_security.py",
+    "core/shift_supervisor/",
+    "backend/security/",
+    "backend/scripts/",
+    "backend/tests/test_bot_activation_security.py",
+    "backend/tests/test_supervisor_workflow_contract.py",
+    "backend/tests/test_traffic_manager_workflow_contract.py",
     # Nor may they weaken the canonical merge/unit runners or their own custody
     # regression suite. These exact file paths are represented as prefixes so
     # the shared path checks remain single-sourced and fail closed.
@@ -87,6 +94,14 @@ BLOCKED_PREFIXES = (
     "tests/test_cross_subsystem_integration.py",
 )
 SAFE_PREFIXES = ("skeleton/", "tests/", "docs/")
+BUILD_SAFE_PREFIXES = (
+    "skeleton/",
+    "tests/",
+    "docs/",
+    "backend/",
+    "frontend/",
+    "core/",
+)
 
 
 def allowed(bot: AdvancedBot, changed_files: list[str]) -> bool:
@@ -96,6 +111,11 @@ def allowed(bot: AdvancedBot, changed_files: list[str]) -> bool:
     if len(changed_files) > bot.max_files:
         return False
     seen: set[str] = set()
+    safe_prefixes = (
+        BUILD_SAFE_PREFIXES
+        if bot.name == "feature-builder"
+        else SAFE_PREFIXES
+    )
     for path in changed_files:
         if (
             not isinstance(path, str)
@@ -112,6 +132,6 @@ def allowed(bot: AdvancedBot, changed_files: list[str]) -> bool:
         seen.add(path)
         if path.startswith(BLOCKED_PREFIXES):
             return False
-        if not path.startswith(SAFE_PREFIXES):
+        if not path.startswith(safe_prefixes):
             return False
     return True

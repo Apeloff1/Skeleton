@@ -8,6 +8,7 @@ from skeleton.automation.bot_manager import (
     COOLDOWN_SECONDS,
     DEFAULT_BOTS,
     BotHealth,
+    authorized_builder_available,
     bounded_health_summary,
     record_result,
     record_worker_outcome,
@@ -236,3 +237,24 @@ def test_health_summary_normalizes_malformed_state():
     assert root["failures"] == 0
     assert root["circuit_open"] is False
     assert root["seconds_since_last_run"] is None
+
+
+def test_authorized_builder_bypasses_cooldown_but_not_disable_or_circuit():
+    state = {
+        "feature-builder": asdict(
+            BotHealth(
+                name="feature-builder",
+                enabled=True,
+                last_run=COOLDOWN_SECONDS + 100,
+                circuit_open=False,
+            )
+        )
+    }
+    assert authorized_builder_available(state) is True
+
+    state["feature-builder"]["enabled"] = False
+    assert authorized_builder_available(state) is False
+
+    state["feature-builder"]["enabled"] = True
+    state["feature-builder"]["circuit_open"] = True
+    assert authorized_builder_available(state) is False

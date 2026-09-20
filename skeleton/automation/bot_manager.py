@@ -172,6 +172,21 @@ def select_due(
     )[:MAX_CONCURRENT]
 
 
+def authorized_builder_available(
+    state: dict[str, dict],
+) -> bool:
+    """Allow approved build work to bypass cooldown, never circuit/disable state."""
+    normalized = normalize_state(state)
+    item = normalized.get(
+        "feature-builder",
+        asdict(BotHealth("feature-builder")),
+    )
+    return bool(
+        item["enabled"]
+        and not item["circuit_open"]
+    )
+
+
 def select_specialists_due(
     state: dict[str, dict],
     now: float | None = None,
@@ -218,6 +233,7 @@ SUCCESSFUL_WORKER_STATUSES = frozenset({
     "existing-pr",
     "no-change",
     "pull-request-created",
+    "pull-request-updated",
 })
 
 

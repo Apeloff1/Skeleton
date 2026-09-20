@@ -36,6 +36,7 @@ from .builder_plane import (
     validate_builder_worker_evidence,
 )
 from .bot_manager import (
+    authorized_builder_available,
     load_state,
     record_worker_outcome,
     save_state,
@@ -59,7 +60,7 @@ MAX_PLAN = 18_000
 MAX_ASSIGNMENTS = 3
 MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 MAX_ENCODED_ENVELOPE = 32_000
-MAX_WORKER_SECONDS = 12 * 60
+MAX_WORKER_SECONDS = 20 * 60
 MAX_DISPATCH_SECONDS = MAX_ASSIGNMENTS * MAX_WORKER_SECONDS
 
 KEYWORDS = {
@@ -417,6 +418,27 @@ def _supervisor_provenance(
     return fingerprint
 
 
+def dispatchable_specialists(
+    state: dict[str, dict],
+    *,
+    build_authorization: BuildAuthorization | None = None,
+) -> list[str]:
+    """Return due specialists while keeping approved build work continuously live.
+
+    Ordinary specialists retain the generic cooldown. An explicitly authorized
+    feature build may bypass only that cooldown; disabled/circuit-open state
+    remains authoritative through authorized_builder_available().
+    """
+    due = select_specialists_due(state)
+    if (
+        build_authorization is not None
+        and "feature-builder" not in due
+        and authorized_builder_available(state)
+    ):
+        due.append("feature-builder")
+    return due
+
+
 def route(
     plan: str,
     due: list[str],
@@ -435,17 +457,14 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Repository state grants build authority; plan text only selects
-            # whether the authorized builder is relevant to this dispatch.
-            # Ordinary CI/root-cause work must not wake a feature builder merely
-            # because some unrelated approved build task exists.
+            # Exact repository state, not model prose, grants and schedules
+            # approved build work. Plan keyword matches may increase priority
+            # but can never suppress a maintainer-approved queued build.
             matches = sum(
                 1
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
-            if not matches:
-                continue
             score = 100 + matches
         else:
             score = sum(
@@ -846,7 +865,10 @@ def main() -> int:
             ) from exc
 
     state = load_state()
-    due = select_specialists_due(state)
+    due = dispatchable_specialists(
+        state,
+        build_authorization=build_authorization,
+    )
     assignments = route(
         plan,
         due,
