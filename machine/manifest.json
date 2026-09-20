@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "project": "Tutolage Skeleton",
+  "version": "16.0.0",
+  "purpose": "machine-readable map for automated agents and tooling",
+  "runtime": {"language": "python", "version": "3.11", "web": "fastapi", "server": "uvicorn"},
+  "entrypoints": {
+    "tests": "python -m pytest skeleton/testing -v",
+    "fallback_tests": "python -m unittest discover skeleton/testing -v",
+    "install": "pip install -r requirements.txt",
+    "dev_install": "pip install -r requirements-dev.txt"
+  },
+  "top_level": {
+    "skeleton": "application source and domain packages",
+    "skeleton/agents": "agent orchestration and swarm runtime",
+    "skeleton/kernel": "core domain primitives",
+    "skeleton/config": "configuration and snapshots",
+    "skeleton/retrieval": "retrieval, fusion and ranking",
+    "skeleton/vault": "access control and key management",
+    "skeleton/observability": "telemetry and sampling",
+    "skeleton/testing": "test infrastructure",
+    "docs": "human and architectural documentation",
+    ".github": "CI and repository automation"
+  },
+  "machine_rules": [
+    "Prefer package-local imports over root-level coupling.",
+    "Keep heavy subsystems out of skeleton/__init__.py.",
+    "Use machine/manifest.json as the stable discovery index.",
+    "Treat integration/app-consolidation as the assembly workspace."
+  ]
+}
