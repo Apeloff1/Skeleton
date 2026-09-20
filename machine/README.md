@@ -86,6 +86,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Large-wave audit:** PR runner hygiene #1867 staged; bounded-shell and shell-AI 300-file waves remain held for reconciliation.
 
+- **Latest staging wave:** machine gates, safe-1669, merge-unblockers, live-service boundaries, Jeeves decision drain, and shell-live gates are staged as integration PRs; large overlapping waves remain held for reconciliation.
+
 ## Target layout
 
 ```text
