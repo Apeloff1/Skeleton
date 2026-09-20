@@ -17,6 +17,12 @@ oversized_javascript_lines = 1800
 oversized_generic_lines = 2400
 
 [[zone]]
+name = "repo-machine"
+prefixes = [".machine/", "skeleton/repo_machine/", "scripts/check_repo_machine.py"]
+owner = "machine-architecture"
+criticality = "critical"
+
+[[zone]]
 name = "automation"
 prefixes = ["skeleton/automation/", ".github/workflows/", "backend/scripts/check_workflow_"]
 owner = "automation-control-plane"
