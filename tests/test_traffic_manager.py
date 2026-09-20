@@ -68,10 +68,10 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if "--status" not in args:
+            if args[0] == "run":
                 return [completed]
-            status = args[args.index("--status") + 1]
-            return [hidden_active] if status == "in_progress" else []
+            endpoint = args[1]
+            return [hidden_active] if "status=in_progress" in endpoint else []
 
         with patch(
             "skeleton.automation.traffic_manager._gh_json",
@@ -93,10 +93,10 @@ class TrafficManagerObservationTests(unittest.TestCase):
         )
 
         def fake_gh(args: list[str]) -> list[dict[str, object]]:
-            if "--status" not in args:
+            if args[0] == "run":
                 return [active]
-            status = args[args.index("--status") + 1]
-            return [dict(active)] if status == "queued" else []
+            endpoint = args[1]
+            return [dict(active)] if "status=queued" in endpoint else []
 
         with patch(
             "skeleton.automation.traffic_manager._gh_json",
