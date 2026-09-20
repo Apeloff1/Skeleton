@@ -33,6 +33,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("automation capability containment regression", "test_automation_control_plane.py"),
     ("generated-code sandbox regression", "test_generated_code_sandbox.py"),
     ("live scraper network regression", "test_live_scraper_network_security.py"),
+    ("container digest refresh regression", "test_container_digest_refresh.py"),
+    ("container digest refresh workflow contract", "test_container_digest_refresh_workflow.py"),
     ("high-confidence SAST", "check_sast_security.py"),
     ("high-confidence SAST regression", "test_sast_security_gate.py"),
     ("repository Python SAST", "check_repository_python_sast.py"),
