@@ -302,6 +302,68 @@ def test_real_asm_vector_store_matches_python(tmp_path) -> None:
         )
 
 
+def test_vector_store_reuses_prepared_asm_matrix_until_mutation() -> None:
+    kernel = _FakeKernel()
+    accelerator = AsmVectorSearchAccelerator(
+        kernel=kernel,
+        minimum_candidates=1,
+    )
+    store = _build_store(
+        use_asm=True,
+        asm_accelerator=accelerator,
+    )
+
+    first = store.query("query", top_k=3)
+    second = store.query("orthogonal", top_k=3)
+
+    assert len(first) == 3
+    assert len(second) == 3
+    stats = store.acceleration_stats()
+    assert stats["asm_prepared_builds"] == 1
+    assert stats["asm_prepared_hits"] == 1
+    assert stats["asm_prepared_invalidations"] == 0
+
+    store.add(
+        Chunk(
+            text="alpha",
+            chunk_id="alpha",
+            metadata={"group": "keep"},
+        )
+    )
+    third = store.query("query", top_k=3)
+
+    assert len(third) == 3
+    stats = store.acceleration_stats()
+    assert stats["asm_prepared_builds"] == 2
+    assert stats["asm_prepared_hits"] == 1
+    assert stats["asm_prepared_invalidations"] == 1
+    assert kernel.calls == 3
+
+
+def test_vector_store_filtered_asm_queries_do_not_reuse_full_store_matrix() -> None:
+    kernel = _FakeKernel()
+    accelerator = AsmVectorSearchAccelerator(
+        kernel=kernel,
+        minimum_candidates=1,
+    )
+    store = _build_store(
+        use_asm=True,
+        asm_accelerator=accelerator,
+    )
+
+    store.query("query", top_k=3)
+    filtered = store.query(
+        "query",
+        top_k=3,
+        metadata_filter={"group": "keep"},
+    )
+
+    assert all(row.chunk.metadata["group"] == "keep" for row in filtered)
+    stats = store.acceleration_stats()
+    assert stats["asm_prepared_builds"] == 2
+    assert stats["asm_prepared_hits"] == 0
+
+
 def test_vector_store_asm_fast_path_matches_python() -> None:
     baseline = _build_store(use_asm=False)
     fake = _FakeAsmSearch()
