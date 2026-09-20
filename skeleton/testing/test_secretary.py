@@ -1,5 +1,5 @@
 from skeleton.automation.advanced_bots import ADVANCED_BOTS
-from skeleton.automation.secretary import route
+from skeleton.automation.secretary import dispatchable_specialists, route
 
 
 def test_secretary_knows_every_registered_specialist():
@@ -59,3 +59,54 @@ def test_route_does_not_invent_builder_when_not_in_due_set():
         build_authorization=object(),
     )
     assert "feature-builder" not in selected
+
+
+def test_dispatchable_specialists_keeps_authorized_builder_hot_during_cooldown():
+    state = {
+        "feature-builder": {
+            "name": "feature-builder",
+            "enabled": True,
+            "failures": 0,
+            "last_run": 10**12,
+            "circuit_open": False,
+        }
+    }
+    due = dispatchable_specialists(
+        state,
+        build_authorization=object(),
+    )
+    assert "feature-builder" in due
+
+
+def test_dispatchable_specialists_preserves_builder_circuit_breaker():
+    state = {
+        "feature-builder": {
+            "name": "feature-builder",
+            "enabled": True,
+            "failures": 3,
+            "last_run": 0.0,
+            "circuit_open": True,
+        }
+    }
+    due = dispatchable_specialists(
+        state,
+        build_authorization=object(),
+    )
+    assert "feature-builder" not in due
+
+
+def test_dispatchable_specialists_does_not_bypass_cooldown_without_authority():
+    state = {
+        "feature-builder": {
+            "name": "feature-builder",
+            "enabled": True,
+            "failures": 0,
+            "last_run": 10**12,
+            "circuit_open": False,
+        }
+    }
+    due = dispatchable_specialists(
+        state,
+        build_authorization=None,
+    )
+    assert "feature-builder" not in due
