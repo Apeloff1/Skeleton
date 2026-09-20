@@ -37,6 +37,7 @@ jobs:
       queued_runs: ${{ steps.traffic.outputs.queued_runs }}
       critical_active: ${{ steps.traffic.outputs.critical_active }}
       stale_queued_runs: ${{ steps.traffic.outputs.stale_queued_runs }}
+      provider_tombstones: ${{ steps.traffic.outputs.provider_tombstones }}
       oldest_queued_age_seconds: ${{ steps.traffic.outputs.oldest_queued_age_seconds }}
       inventory_saturated: ${{ steps.traffic.outputs.inventory_saturated }}
       relieve: ${{ steps.traffic.outputs.relieve }}
