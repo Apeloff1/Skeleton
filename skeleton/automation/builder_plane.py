@@ -49,10 +49,10 @@ MAX_SIGNAL_ITEMS = 12
 MAX_SIGNAL_BYTES = 80
 MAX_ACCEPTANCE_ITEMS = 12
 MAX_ACCEPTANCE_TEXT_BYTES = 600
-MAX_BUDGET_FILES = 16
-MAX_BUDGET_CHANGED_LINES = 1_200
-MAX_BUDGET_TOTAL_BYTES = 240_000
-MAX_BUDGET_TEST_DESCRIPTIONS = 12
+MAX_BUDGET_FILES = 36
+MAX_BUDGET_CHANGED_LINES = 9_000
+MAX_BUDGET_TOTAL_BYTES = 1_200_000
+MAX_BUDGET_TEST_DESCRIPTIONS = 40
 MAX_PROPOSAL_RECEIPT_BYTES = 12_000
 MAX_RECEIPT_PATH_BYTES = 320
 
@@ -212,7 +212,7 @@ def _strict_sequence(
 class BuilderBudget:
     """Hard proposal budget inherited by the authorized feature builder."""
 
-    max_files: int = 8
+    max_files: int = 24
     max_changed_lines: int = MAX_BUDGET_CHANGED_LINES
     max_total_bytes: int = MAX_BUDGET_TOTAL_BYTES
     max_test_descriptions: int = MAX_BUDGET_TEST_DESCRIPTIONS
@@ -811,11 +811,11 @@ def _derive_acceptance(signals: Iterable[str]) -> tuple[str, ...]:
 
 def _default_budget(signals: Iterable[str]) -> BuilderBudget:
     signal_set = set(signals)
-    max_files = 8
+    max_files = 24
     if "integration" in signal_set or "api-contract" in signal_set:
-        max_files = 10
+        max_files = 36
     if "documentation" in signal_set and len(signal_set) > 1:
-        max_files = min(MAX_BUDGET_FILES, max_files + 1)
+        max_files = min(MAX_BUDGET_FILES, max_files + 4)
     return BuilderBudget(max_files=max_files)
 
 
