@@ -23,6 +23,8 @@ class ContractSpec:
     evidence_version: int = 1
     consumes_evidence: tuple[tuple[str, int], ...] = ()
     privileges: tuple[str, ...] = ()
+    maturity: int = 1
+    supersedes: tuple[str, ...] = ()
 
 
 CATALOG = (
@@ -109,6 +111,17 @@ def validate_catalog(catalog: Iterable[ContractSpec] = CATALOG) -> None:
                 )
         if len(item.owns) != len(set(item.owns)):
             raise ValueError(f"duplicate ownership prefix: {item.contract_id}")
+        if not isinstance(item.maturity, int) or isinstance(item.maturity, bool) or item.maturity < 1:
+            raise ValueError(f"invalid contract maturity: {item.contract_id}")
+        if len(item.supersedes) != len(set(item.supersedes)):
+            raise ValueError(f"duplicate supersession: {item.contract_id}")
+        if item.contract_id in item.supersedes:
+            raise ValueError(f"self supersession: {item.contract_id}")
+        unknown_superseded = set(item.supersedes) - set(index)
+        if unknown_superseded:
+            raise ValueError(
+                f"{item.contract_id} supersedes unknown contracts: {sorted(unknown_superseded)}"
+            )
         if len(item.privileges) != len(set(item.privileges)):
             raise ValueError(f"duplicate privilege: {item.contract_id}")
         for privilege in item.privileges:
@@ -289,3 +302,42 @@ def unowned_paths(
         if not any(path.startswith(prefix) for item in items for prefix in item.owns)
         and path != "scripts/check_contract_system.py"
     ))
+
+
+def supersession_cycles(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[tuple[str, ...], ...]:
+    items = tuple(catalog)
+    index = by_id(items)
+    state: dict[str, int] = {}
+    stack: list[str] = []
+    cycles: set[tuple[str, ...]] = set()
+
+    def visit(name: str) -> None:
+        mark = state.get(name, 0)
+        if mark == 2:
+            return
+        if mark == 1:
+            if name in stack:
+                start = stack.index(name)
+                cycle = tuple(stack[start:] + [name])
+                cycles.add(cycle)
+            return
+        state[name] = 1
+        stack.append(name)
+        for old in sorted(index[name].supersedes):
+            visit(old)
+        stack.pop()
+        state[name] = 2
+
+    for name in sorted(index):
+        visit(name)
+    return tuple(sorted(cycles))
+
+
+def active_contracts(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[ContractSpec, ...]:
+    items = tuple(catalog)
+    superseded = {old for item in items for old in item.supersedes}
+    return tuple(item for item in topological_order(items) if item.contract_id not in superseded)
