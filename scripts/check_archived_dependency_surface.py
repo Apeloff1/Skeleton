@@ -60,7 +60,29 @@ EXACT_MANIFEST_NAMES = {
     "podfile.lock",
     "packages.lock.json",
     "directory.packages.props",
+    "packages.config",
+    "paket.dependencies",
+    "paket.lock",
+    "deno.json",
+    "deno.jsonc",
+    "deno.lock",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "package.swift",
+    "build.sbt",
+    "deps.edn",
+    "project.clj",
+    "module.bazel",
+    "workspace",
+    "workspace.bazel",
+    "libs.versions.toml",
+    "settings.gradle",
+    "settings.gradle.kts",
 }
+DOTNET_PROJECT_RE = re.compile(
+    r"^[^/]+\.(?:csproj|fsproj|vbproj)$",
+    re.IGNORECASE,
+)
 REQUIREMENTS_RE = re.compile(
     r"^requirements(?:[-_.][^/]*)?\.(?:txt|in)$",
     re.IGNORECASE,
@@ -77,6 +99,7 @@ def is_installable_manifest_name(name: str) -> bool:
     lowered = name.lower()
     return (
         lowered in EXACT_MANIFEST_NAMES
+        or DOTNET_PROJECT_RE.fullmatch(name) is not None
         or REQUIREMENTS_RE.fullmatch(name) is not None
         or CONSTRAINTS_RE.fullmatch(name) is not None
     )
@@ -256,9 +279,18 @@ def validate_archive_map(
     archive_root_fs = repo_root / ARCHIVE_ROOT
     if archive_root_fs.is_dir():
         for path in archive_root_fs.rglob("*"):
-            if not path.is_file() or "vendor/dependency-manifests" not in path.as_posix():
+            relative_text = path.relative_to(repo_root).as_posix()
+            if "vendor/dependency-manifests" not in relative_text:
                 continue
-            vendor_files.add(path.relative_to(repo_root).as_posix())
+            if path.is_symlink():
+                errors.append(
+                    "quarantined dependency evidence must not be a symlink: "
+                    f"{relative_text}"
+                )
+                continue
+            if not path.is_file():
+                continue
+            vendor_files.add(relative_text)
 
     unmapped = sorted(vendor_files - seen_archives)
     missing_from_tree = sorted(seen_archives - vendor_files)
@@ -274,7 +306,7 @@ def main() -> int:
     try:
         findings = find_installable_manifests()
         map_errors = validate_archive_map()
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, RuntimeError, json.JSONDecodeError) as exc:
         print(
             f"archived-dependency-surface: cannot inspect archive safely: "
             f"{type(exc).__name__}",
