@@ -208,6 +208,8 @@ jobs:
           skeleton/testing/test_automerge_contract.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
+          tests/test_builder_plane.py
+          tests/test_builder_plane_integration.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
