@@ -189,6 +189,8 @@ jobs:
           skeleton/automation
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
+      - name: Validate runner v2 privileged contract
+        run: python scripts/check_runner_v2_contract.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -206,12 +208,27 @@ jobs:
           skeleton/testing/test_automerge_stack.py
           skeleton/testing/test_automerge_engine.py
           skeleton/testing/test_automerge_contract.py
+          skeleton/testing/test_runner_v2_contracts.py
+          skeleton/testing/test_runner_v2_evidence.py
+          skeleton/testing/test_runner_v2_runtime.py
+          skeleton/testing/test_runner_v2_transaction_report.py
+          skeleton/testing/test_runner_v2_engine.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
+          tests/test_builder_plane.py
+          tests/test_builder_plane_integration.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
+          tests/test_traffic_manager.py
           skeleton/testing/test_bot_manager.py
+      - name: Run supervisor workflow contract in isolated import namespace
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest --import-mode=importlib
           backend/tests/test_supervisor_workflow_contract.py
+          backend/tests/test_traffic_manager_workflow_contract.py
 
   readiness:
     name: Merge Readiness
