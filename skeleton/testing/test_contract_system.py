@@ -1,17 +1,30 @@
-from pathlib import Path
 import importlib.util
+import sys
+from pathlib import Path
+
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 PATH = ROOT / "scripts/check_contract_system.py"
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("check_contract_system", PATH)
+    module_name = "check_contract_system_under_test"
+    spec = importlib.util.spec_from_file_location(module_name, PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(module_name, None)
     return module
+
+
+def test_contract_checker_path_is_repository_rooted():
+    assert (ROOT / ".git").exists()
+    assert PATH == ROOT / "scripts" / "check_contract_system.py"
+    assert PATH.is_file()
 
 
 def test_contract_manifest_is_unique_bounded_and_canonical():
@@ -50,6 +63,34 @@ def test_checker_admission_rejects_forbidden_execution_marker(tmp_path, monkeypa
     monkeypatch.setattr(module, "ROOT", tmp_path)
     with pytest.raises(RuntimeError):
         module._admit_checker("scripts/check_fake_contract.py")
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "exec('pass')\n",
+        "import os\nos.system('true')\n",
+        "import subprocess\nsubprocess.run(['true'], shell=True)\n",
+    ),
+)
+def test_checker_admission_rejects_executable_call_shapes(tmp_path, monkeypatch, source):
+    module = load_module()
+    checker = tmp_path / "scripts/check_fake_contract.py"
+    checker.parent.mkdir()
+    checker.write_text(source, encoding="utf-8")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError):
+        module._admit_checker("scripts/check_fake_contract.py")
+
+
+def test_checker_admission_allows_policy_marker_strings(tmp_path, monkeypatch):
+    module = load_module()
+    checker = tmp_path / "scripts/check_fake_contract.py"
+    checker.parent.mkdir()
+    checker.write_text("FORBIDDEN = ('eval(', 'exec(', 'shell=True')\n", encoding="utf-8")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    admitted, _ = module._admit_checker("scripts/check_fake_contract.py")
+    assert admitted == checker
 
 
 def test_contract_evidence_is_deterministic_shape():
