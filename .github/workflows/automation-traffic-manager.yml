@@ -121,31 +121,41 @@ jobs:
           set -euo pipefail
           inventory="$RUNNER_TEMP/traffic-ready-prs.json"
           candidates="$RUNNER_TEMP/traffic-ready-prs.txt"
+          [[ "$TRAFFIC_MAX_DRAFTS" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::TRAFFIC_MAX_DRAFTS must be a positive integer."
+            exit 1
+          }
+          (( TRAFFIC_MAX_DRAFTS <= 100 )) || {
+            echo "::error::TRAFFIC_MAX_DRAFTS exceeds the bounded inventory."
+            exit 1
+          }
           gh api "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" > "$inventory"
-          jq -r --arg repo "$GITHUB_REPOSITORY" '
-            .[]
-            | select(.state == "open")
-            | select(.draft == false)
-            | select(.base.ref == "main")
-            | select(.head.repo.full_name == $repo)
-            | select(
-                (
-                  [
-                    .labels[]?
-                    | .name?
-                    | select(type == "string")
-                    | ascii_downcase
-                  ]
-                  | any(
-                      . == "traffic:keep-ready"
-                      or . == "ci:priority"
-                      or . == "queue:exempt"
-                    )
+          jq -r             --arg repo "$GITHUB_REPOSITORY"             --argjson max_drafts "$TRAFFIC_MAX_DRAFTS" '
+            [
+              .[]
+              | select(.state == "open")
+              | select(.draft == false)
+              | select(.base.ref == "main")
+              | select(.head.repo.full_name == $repo)
+              | select(
+                  (
+                    [
+                      .labels[]?
+                      | .name?
+                      | select(type == "string")
+                      | ascii_downcase
+                    ]
+                    | any(
+                        . == "traffic:keep-ready"
+                        or . == "ci:priority"
+                        or . == "queue:exempt"
+                      )
+                  )
+                  | not
                 )
-                | not
-              )
-            | .number
-          ' "$inventory" | head -n "$TRAFFIC_MAX_DRAFTS" > "$candidates"
+              | .number
+            ][: $max_drafts][]
+          ' "$inventory" > "$candidates"
 
           drafted=0
           while IFS= read -r pr_number; do
