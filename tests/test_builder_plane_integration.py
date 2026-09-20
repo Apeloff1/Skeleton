@@ -14,10 +14,12 @@ from skeleton.automation.builder_plane import (
     BuilderPlaneError,
     compile_builder_manifest,
     validate_builder_custody,
+    validate_builder_worker_evidence,
 )
 from skeleton.automation.supervisor_runtime import (
     ExecutionIdentity,
     WorkerCustody,
+    parse_worker_result,
 )
 
 
@@ -432,6 +434,70 @@ class WorkerBuilderBudgetTests(unittest.TestCase):
         specialist_bots.validate_builder_proposal_budget(
             result,
             value,
+        )
+
+
+
+class BuilderWorkerEvidenceTests(unittest.TestCase):
+    def created_evidence(
+        self,
+        *,
+        digest: str | None = None,
+        bot: str = "feature-builder",
+    ) -> dict[str, object]:
+        value = manifest()
+        return {
+            "status": "pull-request-created",
+            "bot": bot,
+            "branch": "bot/specialist-feature-builder-" + BASE[:16],
+            "changed_lines": 12,
+            "proposal_digest": "c" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": SNAPSHOT,
+            "execution_fingerprint": execution().fingerprint,
+            "builder_manifest_digest": (
+                value.manifest_digest if digest is None else digest
+            ),
+        }
+
+    def test_runtime_parser_retains_manifest_digest(self) -> None:
+        payload = json.dumps(self.created_evidence())
+        evidence = parse_worker_result(
+            payload,
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence["builder_manifest_digest"],
+            manifest().manifest_digest,
+        )
+
+    def test_exact_manifest_bound_evidence_is_accepted(self) -> None:
+        validate_builder_worker_evidence(
+            self.created_evidence(),
+            manifest(),
+        )
+
+    def test_manifest_evidence_digest_mismatch_is_rejected(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(digest="0" * 64),
+                manifest(),
+            )
+
+    def test_non_builder_mutation_evidence_is_rejected(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(bot="root-cause"),
+                manifest(),
+            )
+
+    def test_non_mutating_result_does_not_require_manifest_digest(self) -> None:
+        validate_builder_worker_evidence(
+            {
+                "status": "no-change",
+                "bot": "feature-builder",
+            },
+            manifest(),
         )
 
 
