@@ -187,3 +187,62 @@ def verify_extension(
         candidate.attestations[-1].repository == trusted.repository
         and len(candidate.attestations) >= trusted.length
     )
+
+
+@dataclass(frozen=True, slots=True)
+class AttestationQuorum:
+    checkpoint: AttestationCheckpoint
+    witnesses: tuple[str, ...]
+    threshold: int
+
+
+def validate_quorum(quorum: AttestationQuorum) -> None:
+    if not isinstance(quorum.threshold, int) or isinstance(quorum.threshold, bool):
+        raise ValueError("invalid quorum threshold")
+    if quorum.threshold < 1 or quorum.threshold > len(quorum.witnesses):
+        raise ValueError("quorum threshold outside witness set")
+    if len(quorum.witnesses) > 64:
+        raise ValueError("quorum witness budget exceeded")
+    if len(set(quorum.witnesses)) != len(quorum.witnesses):
+        raise ValueError("duplicate quorum witness")
+    for witness in quorum.witnesses:
+        if (
+            not witness
+            or len(witness) > 80
+            or witness.lower() != witness
+            or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789._:-" for char in witness)
+        ):
+            raise ValueError(f"invalid quorum witness: {witness!r}")
+
+
+def quorum_digest(quorum: AttestationQuorum) -> str:
+    validate_quorum(quorum)
+    payload = {
+        "checkpoint": {
+            "head_digest": quorum.checkpoint.head_digest.lower(),
+            "length": quorum.checkpoint.length,
+            "repository": quorum.checkpoint.repository,
+            "head_commit_sha": quorum.checkpoint.head_commit_sha.lower(),
+        },
+        "witnesses": sorted(quorum.witnesses),
+        "threshold": quorum.threshold,
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def quorum_satisfied(
+    quorum: AttestationQuorum,
+    approvals: Mapping[str, str],
+) -> bool:
+    """Require threshold distinct witnesses to attest the exact quorum digest."""
+    validate_quorum(quorum)
+    expected = quorum_digest(quorum)
+    accepted = 0
+    for witness in quorum.witnesses:
+        supplied = approvals.get(witness)
+        if supplied is None or len(supplied) != 64:
+            continue
+        if hmac.compare_digest(supplied.lower(), expected):
+            accepted += 1
+    return accepted >= quorum.threshold
