@@ -66,7 +66,15 @@ class DurableMerkleHealthPolicy:
             raise ValueError(
                 "minimum_verified exceeds max_finalizations"
             )
-        for name in (\n            "maximum_missing",\n            "maximum_incomplete",\n            "minimum_verified",\n        ):\n            if getattr(self, name) > self.max_finalizations:\n                raise ValueError(\n                    f"{name} exceeds max_finalizations"\n                )
+        for name in (
+            "maximum_missing",
+            "maximum_incomplete",
+            "minimum_verified",
+        ):
+            if getattr(self, name) > self.max_finalizations:
+                raise ValueError(
+                    f"{name} exceeds max_finalizations"
+                )
         for name in (
             "require_nonempty",
             "require_bundles",
