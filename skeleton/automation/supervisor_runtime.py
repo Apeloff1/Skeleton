@@ -854,6 +854,25 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
             )
         admitted["builder_proposal_receipt"] = builder_receipt
 
+    repair_receipt = value.get("builder_repair_receipt")
+    if repair_receipt is not None:
+        if (
+            worker != "feature-builder"
+            or status != "pull-request-updated"
+        ):
+            raise SupervisorRuntimeError(
+                "Builder repair receipt escaped its admitted worker status"
+            )
+        if not isinstance(repair_receipt, dict):
+            raise SupervisorRuntimeError(
+                "Builder repair receipt must be an object"
+            )
+        if len(canonical_json(repair_receipt)) > 16_000:
+            raise SupervisorRuntimeError(
+                "Builder repair receipt exceeds evidence budget"
+            )
+        admitted["builder_repair_receipt"] = repair_receipt
+
     # Evidence that claims a mutation must carry the immutable custody proofs
     # needed to correlate the remote proposal with this exact execution.
     if status in {"pull-request-created", "pull-request-updated"}:
@@ -884,6 +903,14 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         ):
             raise SupervisorRuntimeError(
                 "feature-builder created-PR evidence is missing proposal receipt"
+            )
+        if (
+            status == "pull-request-updated"
+            and worker == "feature-builder"
+            and "builder_repair_receipt" not in admitted
+        ):
+            raise SupervisorRuntimeError(
+                "feature-builder updated-PR evidence is missing repair receipt"
             )
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
