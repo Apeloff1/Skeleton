@@ -32,6 +32,9 @@ def fp(char: str) -> str:
     return char * 64
 
 
+_UNSET = object()
+
+
 def finalization(
     *,
     finalization_id="finalization",
@@ -46,13 +49,28 @@ def finalization(
     audit_anchor_digest=None,
     audit_chain_node_hash=None,
     audit_root=None,
-    audit_witness_digest=None,
+    audit_witness_digest=_UNSET,
     audit_witness_sequence=1,
-    execution_evidence_digest=None,
-    execution_evidence_chain_node_hash=None,
+    execution_evidence_digest=_UNSET,
+    execution_evidence_chain_node_hash=_UNSET,
     runtime_trust_digest=None,
     release_evidence_digest=None,
 ) -> AIExecutionFinalization:
+    witness_digest = (
+        fp("w")
+        if audit_witness_digest is _UNSET
+        else audit_witness_digest
+    )
+    signed_digest = (
+        fp("e")
+        if execution_evidence_digest is _UNSET
+        else execution_evidence_digest
+    )
+    signed_chain_node = (
+        fp("x")
+        if execution_evidence_chain_node_hash is _UNSET
+        else execution_evidence_chain_node_hash
+    )
     return AIExecutionFinalization(
         schema_version=1,
         finalization_id=finalization_id,
@@ -70,8 +88,8 @@ def finalization(
             release_evidence_digest or fp("r")
         ),
         require_recovery_checkpoint=True,
-        require_witness=True,
-        require_signed_evidence=True,
+        require_witness=bool(witness_digest),
+        require_signed_evidence=bool(signed_digest),
         session_evidence_digest=(
             session_evidence_digest or fp("s")
         ),
@@ -85,17 +103,10 @@ def finalization(
             audit_chain_node_hash or fp("n")
         ),
         audit_root=audit_root or fp("o"),
-        audit_witness_digest=(
-            audit_witness_digest or fp("w")
-        ),
+        audit_witness_digest=witness_digest,
         audit_witness_sequence=audit_witness_sequence,
-        execution_evidence_digest=(
-            execution_evidence_digest or fp("e")
-        ),
-        execution_evidence_chain_node_hash=(
-            execution_evidence_chain_node_hash
-            or fp("x")
-        ),
+        execution_evidence_digest=signed_digest,
+        execution_evidence_chain_node_hash=signed_chain_node,
         error_count=error_count,
         last_error_type=last_error_type,
         last_error_at=last_error_at,
@@ -121,19 +132,19 @@ def build_commit(
     recovery_checkpoint_digest=None,
     session_evidence_digest=None,
     session_journal_digest=None,
-    session_journal_manifest_digest=None,
+    session_journal_manifest_digest=_UNSET,
     session_integrity_digest=None,
     journal_root=None,
     receipt_root=None,
     audit_anchor_digest=None,
     audit_chain_node_hash=None,
     audit_root=None,
-    audit_witness_digest=None,
+    audit_witness_digest=_UNSET,
     audit_witness_sequence=1,
-    execution_evidence_digest=None,
-    execution_evidence_chain_node_hash=None,
+    execution_evidence_digest=_UNSET,
+    execution_evidence_chain_node_hash=_UNSET,
 ):
-    item = item or finalization()
+    item = finalization() if item is None else item
     commit_builder = (
         commit_builder or builder()
     )
@@ -144,12 +155,12 @@ def build_commit(
         ),
         recovery_checkpoint_digest=(
             recovery_checkpoint_digest
-            or item.recovery_checkpoint_digest
+            or getattr(item, "recovery_checkpoint_digest", fp("c"))
         ),
         recovery_revision=recovery_revision,
         session_evidence_digest=(
             session_evidence_digest
-            or item.session_evidence_digest
+            or getattr(item, "session_evidence_digest", fp("s"))
         ),
         session_evidence_revision=(
             session_evidence_revision
@@ -158,8 +169,9 @@ def build_commit(
             session_journal_digest or fp("j")
         ),
         session_journal_manifest_digest=(
-            session_journal_manifest_digest
-            or fp("m")
+            fp("m")
+            if session_journal_manifest_digest is _UNSET
+            else session_journal_manifest_digest
         ),
         session_journal_revision=(
             session_journal_revision
@@ -175,29 +187,32 @@ def build_commit(
         ),
         audit_anchor_digest=(
             audit_anchor_digest
-            or item.audit_anchor_digest
+            or getattr(item, "audit_anchor_digest", fp("d"))
         ),
         audit_chain_node_hash=(
             audit_chain_node_hash
-            or item.audit_chain_node_hash
+            or getattr(item, "audit_chain_node_hash", fp("n"))
         ),
         audit_root=(
-            audit_root or item.audit_root
+            audit_root or getattr(item, "audit_root", fp("o"))
         ),
         audit_witness_digest=(
-            audit_witness_digest
-            or item.audit_witness_digest
+            getattr(item, "audit_witness_digest", fp("w"))
+            if audit_witness_digest is _UNSET
+            else audit_witness_digest
         ),
         audit_witness_sequence=(
             audit_witness_sequence
         ),
         execution_evidence_digest=(
-            execution_evidence_digest
-            or item.execution_evidence_digest
+            getattr(item, "execution_evidence_digest", fp("e"))
+            if execution_evidence_digest is _UNSET
+            else execution_evidence_digest
         ),
         execution_evidence_chain_node_hash=(
-            execution_evidence_chain_node_hash
-            or item.execution_evidence_chain_node_hash
+            getattr(item, "execution_evidence_chain_node_hash", fp("x"))
+            if execution_evidence_chain_node_hash is _UNSET
+            else execution_evidence_chain_node_hash
         ),
     )
 
@@ -944,8 +959,14 @@ def test_commit_payload_tamper_is_corruption():
         commit,
         session_integrity_digest=fp("u"),
     )
-    tampered = SignedDurableSessionCommit(
-        tampered_commit,
+    # Simulate bytes/state corrupted after a previously valid object was
+    # persisted. Constructor validation is intentionally bypassed here because
+    # this test targets store-time corruption detection, not wrapper creation.
+    tampered = object.__new__(SignedDurableSessionCommit)
+    object.__setattr__(tampered, "commit", tampered_commit)
+    object.__setattr__(
+        tampered,
+        "signature",
         publication.stored.signed.signature,
     )
     backend.compare_and_swap(
