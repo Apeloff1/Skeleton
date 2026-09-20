@@ -291,6 +291,11 @@ jobs:
             echo "::error::Admission identity differs from traffic decision custody."
             exit 1
           }
+          expected_fingerprint=$(python -c 'import os; from skeleton.automation.traffic_manager import decision_identity_fingerprint; print(decision_identity_fingerprint(os.environ["GITHUB_REPOSITORY"], os.environ["TRAFFIC_DECISION_BASE_SHA"], int(os.environ["TRAFFIC_DECISION_OBSERVED_AT"])))')
+          test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT" || {
+            echo "::error::Traffic decision fingerprint failed independent verification."
+            exit 1
+          }
           [[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || {
             echo "::error::Default branch contains unexpected characters."
             exit 1
