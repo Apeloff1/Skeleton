@@ -31,6 +31,12 @@ def test_detects_common_installable_manifests(tmp_path: Path) -> None:
         archive / "b" / "requirements-dev.txt",
         archive / "c" / "Cargo.lock",
         archive / "d" / "build.gradle.kts",
+        archive / "e" / "requirements-build.in",
+        archive / "f" / "constraints.txt",
+        archive / "g" / "environment.yml",
+        archive / "h" / "packages.lock.json",
+        archive / "i" / "go.work",
+        archive / "j" / "Podfile.lock",
     ]
     for path in bad:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,6 +50,12 @@ def test_detects_common_installable_manifests(tmp_path: Path) -> None:
         "b/requirements-dev.txt",
         "c/Cargo.lock",
         "d/build.gradle.kts",
+        "e/requirements-build.in",
+        "f/constraints.txt",
+        "g/environment.yml",
+        "h/packages.lock.json",
+        "i/go.work",
+        "j/Podfile.lock",
     ]
 
 
@@ -78,6 +90,12 @@ def test_requirements_name_matching_is_bounded() -> None:
     assert MODULE.is_installable_manifest_name("requirements.txt")
     assert MODULE.is_installable_manifest_name("requirements-dev.txt")
     assert MODULE.is_installable_manifest_name("requirements.frontier.txt")
+    assert MODULE.is_installable_manifest_name("requirements-build.in")
+    assert MODULE.is_installable_manifest_name("constraints.txt")
+    assert MODULE.is_installable_manifest_name("constraints-dev.in")
+    assert MODULE.is_installable_manifest_name("environment.yml")
+    assert MODULE.is_installable_manifest_name("packages.lock.json")
+    assert MODULE.is_installable_manifest_name("Podfile.lock")
     assert not MODULE.is_installable_manifest_name("requirements.snapshot")
     assert not MODULE.is_installable_manifest_name("requirements-notes.md")
 
