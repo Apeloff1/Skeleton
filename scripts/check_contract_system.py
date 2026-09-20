@@ -141,6 +141,8 @@ def main() -> int:
                 "evidence_version": spec.evidence_version,
                 "consumes_evidence": spec.consumes_evidence,
                 "privileges": spec.privileges,
+                "maturity": spec.maturity,
+                "supersedes": spec.supersedes,
             }
             for spec in topological_order(CATALOG)
         ], sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
@@ -154,6 +156,13 @@ def main() -> int:
             spec.contract_id: {
                 producer: version
                 for producer, version in spec.consumes_evidence
+            }
+            for spec in sorted(CATALOG, key=lambda item: item.contract_id)
+        },
+        "lifecycle": {
+            spec.contract_id: {
+                "maturity": spec.maturity,
+                "supersedes": list(spec.supersedes),
             }
             for spec in sorted(CATALOG, key=lambda item: item.contract_id)
         },
