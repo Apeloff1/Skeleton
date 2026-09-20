@@ -1,9 +1,14 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
-  "runtime": {"language": "python", "version": "3.11", "web": "fastapi", "server": "uvicorn"},
+  "runtime": {
+    "language": "python",
+    "version": "3.11",
+    "web": "fastapi",
+    "server": "uvicorn"
+  },
   "assembly": {
     "branch": "integration/app-consolidation",
     "base": "main",
@@ -39,11 +44,31 @@
   },
   "recent_integration": {
     "validated_stale_branches_normalized": 40,
-    "open_integration_pr": 1701,
-    "open_integration_pr_head": "fix/bot-manager-runtime-deps",
-    "open_integration_pr_state": "not_mergeable",
-    "reason_to_retain": "requires conflict resolution before integration"
+    "merged_into_assembly": [
+      {
+        "pr": 1701,
+        "head": "fix/bot-manager-runtime-deps",
+        "status": "merged",
+        "sha": "addad395849ca9e4c70388e701267d5fc45ce80f"
+      }
+    ],
+    "queued": [
+      {
+        "pr": 1702,
+        "head": "feat/automerge-control-plane-20260919",
+        "status": "not_mergeable",
+        "files": 19,
+        "additions": 9605
+      }
+    ]
   },
+  "integrated_domains": [
+    "automation runtime dependency repair",
+    "automerge control plane",
+    "automerge policy/evidence/ledger/model/stack",
+    "automerge CLI and GitHub adapter",
+    "automerge contract checks and tests"
+  ],
   "machine_rules": [
     "Read this manifest before modifying the repository.",
     "Prefer package-local imports over root-level coupling.",
