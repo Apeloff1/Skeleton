@@ -121,6 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           inventory="$RUNNER_TEMP/traffic-ready-prs.json"
+          active_heads="$RUNNER_TEMP/traffic-in-progress-heads.json"
           candidates="$RUNNER_TEMP/traffic-ready-prs.txt"
           [[ "$TRAFFIC_MAX_DRAFTS" =~ ^[1-9][0-9]*$ ]] || {
             echo "::error::TRAFFIC_MAX_DRAFTS must be a positive integer."
@@ -131,13 +132,31 @@ jobs:
             exit 1
           }
           gh api "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" > "$inventory"
-          jq -r             --arg repo "$GITHUB_REPOSITORY"             --argjson max_drafts "$TRAFFIC_MAX_DRAFTS" '
+
+          # Never draft a PR whose current head is already consuming runner
+          # capacity. Cancelling in-progress validation wastes the exact
+          # capacity this relief path is meant to recover.
+          gh api --paginate --slurp \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?status=in_progress&per_page=100" \
+            | jq -e '
+                [
+                  .[]
+                  | .workflow_runs[]?
+                  | .head_sha
+                  | select(type == "string" and test("^[0-9a-fA-F]{40}$"))
+                ]
+                | unique
+              ' > "$active_heads"
+
+          jq -r             --arg repo "$GITHUB_REPOSITORY"             --argjson max_drafts "$TRAFFIC_MAX_DRAFTS"             --slurpfile active_heads "$active_heads" '
             [
               .[]
               | select(.state == "open")
               | select(.draft == false)
               | select(.base.ref == "main")
               | select(.head.repo.full_name == $repo)
+              | .head.sha as $head_sha
+              | select(($active_heads[0] | index($head_sha)) == null)
               | select(
                   (
                     [
@@ -211,6 +230,7 @@ jobs:
             echo "- Ready PRs converted to draft: ${drafted}"
             echo "- Per-pass cap: ${TRAFFIC_MAX_DRAFTS}"
             echo '- Exempt labels: traffic:keep-ready, ci:priority, queue:exempt'
+            echo '- In-progress current-head validations are preserved'
             echo '- Scope: same-repository open PRs targeting main only'
           } >> "$GITHUB_STEP_SUMMARY"
 
