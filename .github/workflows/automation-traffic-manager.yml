@@ -36,6 +36,11 @@ jobs:
       active_runs: ${{ steps.traffic.outputs.active_runs }}
       queued_runs: ${{ steps.traffic.outputs.queued_runs }}
       critical_active: ${{ steps.traffic.outputs.critical_active }}
+      stale_queued_runs: ${{ steps.traffic.outputs.stale_queued_runs }}
+      oldest_queued_age_seconds: ${{ steps.traffic.outputs.oldest_queued_age_seconds }}
+      inventory_saturated: ${{ steps.traffic.outputs.inventory_saturated }}
+      relieve: ${{ steps.traffic.outputs.relieve }}
+      relief_reason: ${{ steps.traffic.outputs.relief_reason }}
       decision_json: ${{ steps.traffic.outputs.decision_json }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
@@ -68,6 +73,44 @@ jobs:
         run: >-
           python -m skeleton.automation.traffic_manager
           --emit-github-output "$GITHUB_OUTPUT"
+
+  relief:
+    name: Queue bounded Actions relief
+    needs: admission
+    if: ${{ needs.admission.outputs.relieve == 'true' }}
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Dispatch queue drain when no recovery run is live
+        shell: bash
+        run: |
+          set -euo pipefail
+          live=0
+          for status_name in requested waiting pending queued in_progress; do
+            count=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/queue-drain.yml/runs?status=${status_name}&per_page=1" --jq '.total_count')
+            [[ "$count" =~ ^[0-9]+$ ]] || {
+              echo "::error::Invalid queue-drain run count for ${status_name}."
+              exit 1
+            }
+            if (( count > 0 )); then
+              live=1
+              break
+            fi
+          done
+          if (( live > 0 )); then
+            echo "Queue drain already live; coalescing recovery request."
+            exit 0
+          fi
+          gh workflow run queue-drain.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TRAFFIC_DEFAULT_BRANCH"
 
   dispatch:
     name: Queue admitted repository supervisor
