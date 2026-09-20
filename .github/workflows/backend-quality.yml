@@ -118,6 +118,9 @@ jobs:
           skeleton/testing/test_scanner_integrity.py
           skeleton/testing/test_defense_control_plane_contract.py
           skeleton/testing/test_automation_control_plane.py
+          skeleton/testing/test_security_rooted_fs.py
+          skeleton/testing/test_security_archive_sandbox.py
+          skeleton/testing/test_security_outbound_http.py
           tests/test_generated_code_sandbox.py
 
       - name: Process invocation safety gate
