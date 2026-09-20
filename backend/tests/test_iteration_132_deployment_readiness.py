@@ -16,6 +16,8 @@ import os
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 # Prefer the public preview URL, fall back to localhost only for local dev.
 BASE_URL = (
     os.environ.get("EXPO_BACKEND_URL")

@@ -6,6 +6,8 @@ import os
 import requests
 import pytest
 
+
+pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", os.environ.get("EXPO_PUBLIC_BACKEND_URL", "")).rstrip("/")
 if not BASE_URL:
     # fallback to local for direct call where ingress unavailable

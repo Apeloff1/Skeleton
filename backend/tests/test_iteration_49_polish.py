@@ -10,6 +10,9 @@ Validates:
 """
 import os, time, requests, pytest
 
+import pytest
+
+pytestmark = pytest.mark.live_service
 BASE = (
     os.environ.get("EXPO_PUBLIC_BACKEND_URL")
     or "https://gemini-game-craft.preview.emergentagent.com"
