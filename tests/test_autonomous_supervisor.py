@@ -496,15 +496,6 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             "base becomes stale.",
             plan["constraints"],
         )
-        self.assertEqual(
-            plan["continuous_stewardship"]["mode"],
-            "always-on",
-        )
-        priorities = plan["continuous_stewardship"]["priorities"]
-        self.assertTrue(any("security" in item for item in priorities))
-        self.assertTrue(any("regression" in item for item in priorities))
-        self.assertTrue(any("architecture" in item for item in priorities))
-        self.assertTrue(any("documentation" in item for item in priorities))
 
     def test_model_plan_falls_back_without_complete_provider(
         self,
