@@ -36,6 +36,10 @@ from .bot_manager import bounded_health_summary, load_state
 from .worker_health import classify_worker_prs
 from skeleton.repo_machine.builder import build_repository_model
 from skeleton.repo_machine.growth import growth_recommendations
+from skeleton.repo_machine.budgets import derive_zone_budgets
+from skeleton.repo_machine.governance import validate_governance
+from skeleton.repo_machine.hotspots import structural_hotspots
+from skeleton.repo_machine.reorganize import propose_reorganization
 from skeleton.repo_machine.health import repository_health
 from skeleton.repo_machine.planner import candidate_payload
 from skeleton.repo_machine.shards import shard_index
@@ -339,6 +343,29 @@ def _machine_repository_context() -> dict[str, object]:
                 for item in growth_recommendations(model, limit=12)
             ],
             "context_shards": shard_index(model),
+            "hotspots": [
+                item.as_dict()
+                for item in structural_hotspots(model, limit=24)
+            ],
+            "governance": [
+                item.as_dict()
+                for item in validate_governance(
+                    model,
+                    RepositoryModelBuilder(Path.cwd()).config,
+                )[:24]
+            ],
+            "reorganization": [
+                item.as_dict()
+                for item in propose_reorganization(
+                    model,
+                    RepositoryModelBuilder(Path.cwd()).config,
+                    limit=16,
+                )
+            ],
+            "zone_budgets": [
+                item.as_dict()
+                for item in derive_zone_budgets(model)
+            ],
         }
     except (OSError, ValueError, TypeError) as exc:
         return {
