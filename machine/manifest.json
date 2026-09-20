@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.6",
+  "schema_version": "2.7",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -150,11 +150,6 @@
         "reason": "large reconciliation input"
       },
       {
-        "source": "physics feature family",
-        "files": "68-83 each",
-        "reason": "large overlapping physics wave; reconcile before assembly"
-      },
-      {
         "source": "merge/repo-machine-gates-20260920",
         "files": 115,
         "reason": "large reconciliation input"
@@ -201,14 +196,13 @@
       {
         "source": "physics feature family",
         "files": "68-83 per branch",
-        "commits": "202-291 per branch",
-        "reason": "high-overlap multi-branch physics stack"
+        "reason": "revalidated; high overlap, held for consolidated physics assembly"
       }
     ],
     "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
     "assembly_status": "queue_audited_through_1865",
     "queue_recheck": {
-      "prs": "1779-1790,1803-1808",
+      "prs": "1834-1847",
       "status": "revalidated",
       "new_files": "none"
     }
