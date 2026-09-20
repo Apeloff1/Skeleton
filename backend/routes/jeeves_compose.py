@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from gameforge.jeeves.free_tier import free_tier
 from gameforge.jeeves import artifacts as ART
+from gameforge.jeeves.chat_contract import ChatReq, conversation_prompt, retrieval_query
 
 router = APIRouter(prefix="/api/jeeves", tags=["jeeves"])
 
@@ -56,7 +57,8 @@ def _derive_dataset(recalled: List[Dict]) -> Dict:
             "title": "Canon Relevance"}
 
 
-async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool) -> Dict:
+async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool,
+                         conversation_context: str = "") -> Dict:
     """Free-tier cascade: local extractive → free → paid LLM."""
     tier = free_tier.decide(needs_reasoning)
     ctx = "\n".join(f"[{i+1}] {(r.get('payload') or {}).get('extract') or (r.get('payload') or {}).get('content') or ''}"[:300]
@@ -67,7 +69,9 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             p = recalled[0].get("payload") or {}
             head = (p.get("extract") or p.get("content") or p.get("description") or "").strip()
         text = (f"{head[:700]}" if head
-                else f"Jeeves composed a response for '{query}' from {len(recalled)} canon sheet(s).")
+                else "I couldn't find relevant material in the available knowledge base. "
+                     "This response is using local extraction rather than generative reasoning. "
+                     "Try a more specific question or add relevant project details.")
         return {"text": text, "tier": tier, "model": f"{tier}-extractive"}
     # paid escalation
     import os
@@ -79,12 +83,13 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
                            system_message="You are Jeeves, the GameForge master orchestrator. "
                            "Answer grounded in the canon; cite [n]. Be precise.").with_model(
                            "anthropic", "claude-sonnet-4-6")
-            reply = await chat.send_message(UserMessage(text=f"CANON:\n{ctx}\n\nQ: {query}"))
+            reply = await chat.send_message(UserMessage(text=f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"))
             return {"text": reply, "tier": "paid", "model": "anthropic:claude-sonnet-4-6"}
         except Exception:  # noqa: BLE001
             pass
-    return {"text": f"(paid tier unavailable) Jeeves summary for '{query}'.",
-            "tier": "paid", "model": "fallback"}
+    return {"text": "The generative provider is unavailable. I couldn't produce an answer to this request. "
+                    "Please try again after checking the provider configuration.",
+            "tier": "local", "model": "unavailable-fallback"}
 
 
 def _build_artifacts(forms: List[str], title: str, text: str, ds: Dict,
@@ -152,14 +157,6 @@ async def compose(req: ComposeReq):
 
 
 # ── SOTA chat ──────────────────────────────────────────────────
-class ChatReq(BaseModel):
-    session_id: Optional[str] = None
-    message: str = Field(..., min_length=1)
-    image_base64: Optional[str] = None
-    pdf_base64: Optional[str] = None
-    force_all_forms: bool = False
-
-
 def _chat_col():
     from core.databases import core_db
     return core_db["jeeves_chat"]
@@ -171,7 +168,7 @@ async def chat(req: ChatReq):
     in a single parse. Detects requested forms from the message."""
     sid = req.session_id or uuid.uuid4().hex[:16]
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
-    recalled = _canon_context(req.message)
+    recalled = _canon_context(retrieval_query(req))
 
     # fold attachments into multimodal memory (free/local)
     modalities = ["text"]
@@ -185,7 +182,11 @@ async def chat(req: ChatReq):
         pass
 
     needs_reasoning = len(req.message.split()) > 4 or bool(req.image_base64)
-    gen = await _generate_text(req.message, recalled, needs_reasoning)
+    if req.context or req.history:
+        gen = await _generate_text(req.message, recalled, needs_reasoning,
+                                   conversation_prompt(req.message, req.context, req.history))
+    else:
+        gen = await _generate_text(req.message, recalled, needs_reasoning)
     ds = _derive_dataset(recalled)
     artifact_forms = [f for f in forms if f != "text"]
     art = _build_artifacts(artifact_forms, req.message[:60], gen["text"], ds, recalled) if artifact_forms else []
@@ -193,23 +194,29 @@ async def chat(req: ChatReq):
     turn = {"session_id": sid, "role_user": req.message, "role_jeeves": gen["text"],
             "forms": forms, "artifact_count": len(art), "tier": gen["tier"],
             "modalities": modalities, "ts": time.time()}
+    persisted = True
     try:
         await _chat_col().insert_one(dict(turn))
     except Exception:  # noqa: BLE001
-        pass
+        persisted = False
 
     return {"ok": True, "session_id": sid, "reply": gen["text"], "forms": forms,
             "tier": gen["tier"], "model": gen["model"], "modalities": modalities,
-            "artifacts": art, "artifact_count": len(art), "grounded_in": len(recalled)}
+            "artifacts": art, "artifact_count": len(art), "grounded_in": len(recalled),
+            "persisted": persisted, "history_messages_used": len(req.history)}
 
 
 @router.get("/chat/{session_id}")
-async def chat_history(session_id: str, limit: int = 50):
+async def chat_history(session_id: str, limit: Annotated[int, Query(ge=1, le=100)] = 50):
+    available = True
     try:
-        rows = await _chat_col().find({"session_id": session_id}, {"_id": 0}).sort("ts", 1).to_list(int(limit))
+        rows = await _chat_col().find({"session_id": session_id}, {"_id": 0}).sort("ts", -1).to_list(int(limit))
+        rows.reverse()
     except Exception:  # noqa: BLE001
         rows = []
-    return {"ok": True, "session_id": session_id, "turns": rows, "count": len(rows)}
+        available = False
+    return {"ok": available, "session_id": session_id, "turns": rows, "count": len(rows),
+            "available": available}
 
 
 @router.get("/free-tier")

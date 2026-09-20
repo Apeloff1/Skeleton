@@ -12,6 +12,8 @@
     "lint": "expo lint",
     "lint:ci": "expo lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "typecheck:jeeves": "tsc --noEmit --project tsconfig.jeeves.json",
+    "test:jeeves": "node scripts/test-jeeves-workspace.cjs",
     "export:web": "expo export --platform web",
     "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js"
   },

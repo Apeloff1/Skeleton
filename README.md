@@ -2,6 +2,10 @@
 
 AI game engine and agent orchestration framework.
 
+Jeeves chat now includes saved conversations, project context, search, retry,
+and transcript export. See the [Jeeves workspace baseline](docs/JEEVES_WORKSPACE_BASELINE.md)
+for its architecture, limits, migration behavior and focused test commands.
+
 ## Quick Start
 
 ```bash

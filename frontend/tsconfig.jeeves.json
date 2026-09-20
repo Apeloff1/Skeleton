@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "features/Jeeves/workspace.ts",
+    "features/Jeeves/WorkspaceController.ts",
+    "features/Jeeves/ChatWorkspace.tsx",
+    "features/Jeeves/chatFiles.ts",
+    "features/Jeeves/MessageContent.tsx",
+    "app/jeeves-chat.tsx",
+    "expo-env.d.ts"
+  ]
+}
