@@ -522,6 +522,119 @@ class WorkerBuilderPromptTests(unittest.TestCase):
         self.assertNotIn("permission", payload)
 
 
+class WorkerBuilderRegressionPolicyTests(unittest.TestCase):
+    def test_feature_builder_registry_requires_tests(self) -> None:
+        self.assertTrue(
+            specialist_bots.spec_for("feature-builder").requires_tests
+        )
+
+    def test_non_documentation_build_requires_regression_intent(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "implementation",
+                    "files": [
+                        {
+                            "path": "skeleton/feature.py",
+                            "content": "VALUE = 1\n",
+                        }
+                    ],
+                    "tests": [],
+                },
+                specialist_bots.spec_for("feature-builder"),
+                manifest(),
+            )
+
+    def test_non_documentation_build_accepts_bounded_regression_intent(
+        self,
+    ) -> None:
+        specialist_bots.validate_builder_regression_policy(
+            {
+                "summary": "implementation",
+                "files": [
+                    {
+                        "path": "skeleton/feature.py",
+                        "content": "VALUE = 1\n",
+                    }
+                ],
+                "tests": ["exercise the authorized feature behavior"],
+            },
+            specialist_bots.spec_for("feature-builder"),
+            manifest(),
+        )
+
+    def test_empty_regression_intent_entry_is_rejected(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "implementation",
+                    "files": [
+                        {
+                            "path": "skeleton/feature.py",
+                            "content": "VALUE = 1\n",
+                        }
+                    ],
+                    "tests": ["   "],
+                },
+                specialist_bots.spec_for("feature-builder"),
+                manifest(),
+            )
+
+    def test_pure_documentation_build_does_not_invent_tests(self) -> None:
+        auth = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 88,
+                "title": "Update documentation guide",
+                "body": "Refresh documentation guide wording only.",
+                "labels": ("automation-approved",),
+                "updatedAt": "2026-09-20T03:10:00Z",
+                "automation_authorized": True,
+            },
+        )
+        docs_manifest = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        self.assertEqual(
+            docs_manifest.signals,
+            ("documentation",),
+        )
+        specialist_bots.validate_builder_regression_policy(
+            {
+                "summary": "docs only",
+                "files": [
+                    {
+                        "path": "docs/guide.md",
+                        "content": "Updated guide.\n",
+                    }
+                ],
+                "tests": [],
+            },
+            specialist_bots.spec_for("feature-builder"),
+            docs_manifest,
+        )
+
+    def test_regression_policy_rejects_non_builder_specialist(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "irrelevant",
+                    "files": [],
+                    "tests": [],
+                },
+                specialist_bots.spec_for("root-cause"),
+                manifest(),
+            )
+
+
 class WorkerBuilderBudgetTests(unittest.TestCase):
     def test_file_budget_is_enforced_before_write(self) -> None:
         value = replace(
