@@ -19,9 +19,13 @@ Both architectures export:
 - `skeleton_asm_abi_version() -> uint32`
 - `skeleton_asm_dot_f32(left, right, length) -> float`
 - `skeleton_asm_l2_sq_f32(left, right, length) -> float`
+- `skeleton_asm_dot_batch_f32(query, row_major_matrix, rows, dimensions, out) -> void`
 
 The x86-64 and AArch64 kernels process four float32 lanes per loop and finish
-remaining elements with scalar instructions. They do not require AVX, AVX2,
+remaining elements with scalar instructions. The batch kernel keeps the query
+resident across row scoring and emits one float32 dot product per matrix row,
+so dense retrieval can cross the Python/native boundary once per query instead
+of once per candidate. They do not require AVX, AVX2,
 SVE, or CPU-specific dispatch.
 
 ## Build
@@ -45,7 +49,7 @@ accelerator = AsmVectorAccelerator(path)
 build cache and `SKELETON_ASM_LIBRARY` may point at a prebuilt shared library.
 
 Compilation uses an argv list with `shell=False`, position-independent code,
-and a non-executable stack linker flag. Runtime loading verifies ABI version 1
+and a non-executable stack linker flag. Runtime loading verifies ABI version 2
 before any kernel is exposed.
 
 ## Numeric contract
