@@ -4,37 +4,42 @@ This directory is the stable machine-facing index for Skeleton.
 
 ## Assembly model
 
-The target is **one coherent application**, organized for both human maintenance and automated machine/agent operation.
+The target is **one coherent application**, organized for human maintenance and automated machine/agent operation.
 
-The active assembly branch is `integration/app-consolidation`. It is the workspace where distinct capabilities are combined before promotion to `main`.
+The active assembly branch is `integration/app-consolidation`. Distinct capabilities are combined here before promotion to `main`.
 
 ## Discovery order
 
 1. Read `machine/manifest.json`.
-2. Inspect runtime dependencies in `requirements.txt` and `requirements-dev.txt`.
-3. Treat `skeleton/kernel` as foundational primitives.
-4. Treat `skeleton/config`, `retrieval`, `vault`, and `observability` as domain services.
-5. Treat `skeleton/agents` as the orchestration/runtime layer.
-6. Treat `skeleton/testing` as the validation layer.
-7. Inspect `.github` for CI and automation contracts.
-8. Group new functionality by domain package, never by branch name.
+2. Inspect `requirements.txt` and `requirements-dev.txt`.
+3. Treat `skeleton/kernel` as foundational.
+4. Inspect `config`, `retrieval`, `vault`, and `observability` as domain services.
+5. Treat `skeleton/agents` and `skeleton/automation` as orchestration/runtime layers.
+6. Treat `skeleton/pr_automation` as repository automation and merge-control infrastructure.
+7. Treat `skeleton/testing` as validation.
+8. Inspect `.github` for CI/automation contracts.
+9. Group functionality by domain package, never by branch name.
 
 ## Machine rules
 
-- Make small, deterministic, domain-scoped changes.
+- Make deterministic, domain-scoped changes.
 - Prefer existing interfaces over parallel implementations.
-- Keep imports dependency-light and avoid unnecessary root-level coupling.
+- Keep imports dependency-light.
 - Run targeted tests after each integration unit.
-- Update the manifest when architecture or entrypoints change.
-- Update this README when the assembly workflow or machine contract changes.
-- Preserve branches containing unique commits until their useful changes have been integrated or explicitly retired.
+- Update manifest and README when structure or workflow changes.
+- Preserve unique-commit branches until their useful changes are integrated or explicitly retired.
+- Treat non-mergeable PRs as source material requiring reconciliation, not as merge commands.
 
 ## Integration ledger
 
-- **PR #1701 — merged:** `fix/bot-manager-runtime-deps`; runtime dependency repair integrated into the assembly branch.
-- **PR #1702 — queued:** `feat/automerge-control-plane-20260919`; 19 files / 9,605 additions staged into the assembly branch at file level because the source branch diverged from the assembly tip.
-- Integrated domain: automerge control plane, including workflow automation, policy/evidence/ledger/model/stack modules, CLI/GitHub adapter, contract checks, and tests.
-- Stale branch normalization remains at **40** validated tips; unique-commit branches remain preserved for review.
+- **PR #1701 — merged:** bot-manager runtime dependency repair.
+- **PR #1702 — queued:** automerge control plane; 19 files / 9,605 additions.
+- **File-level integrated:** backlog reasoning adapter and builder plane control.
+- **PRs #1703–#1778:** staged integration queue covering build-capable automation, supervisor control, workflow/queue controls, security hardening, Jeeves domains, physics, PR automation, and merge-readiness contracts. These remain source/staging material; non-mergeable items are not blindly merged.
+- **PR #1763:** canonical owner queue drain variant.
+- **PR #1764:** 132-file merge-unblocker reconciliation wave.
+- **Large held waves:** live-service test boundaries (98/99 files), merge-unblockers (132), Jeeves decision rules (137), Jeeves frontier core (57), main-gates shell-live (67), physics aggregate validation (77).
+- Stale branch normalization remains at **40** validated tips.
 
 ## Target layout
 
@@ -45,6 +50,7 @@ Skeleton/
 │   ├── kernel/           # foundational primitives
 │   ├── config/           # configuration
 │   ├── agents/           # orchestration and agent runtime
+│   ├── automation/       # builder/supervisor/reasoning automation
 │   ├── retrieval/        # retrieval/ranking/fusion
 │   ├── vault/            # access/security primitives
 │   ├── observability/    # telemetry
@@ -55,4 +61,4 @@ Skeleton/
 └── .github/              # CI/repository automation
 ```
 
-The map is intentionally updated as integration proceeds so automated workers can rediscover the current structure without relying on conversational context.
+The map is updated during assembly so automated workers can rediscover the current structure without relying on conversational context.
