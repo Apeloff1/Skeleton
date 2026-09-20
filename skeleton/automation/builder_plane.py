@@ -161,6 +161,19 @@ def _sha(value: object) -> str:
         raise BuilderPlaneError("invalid builder base SHA") from exc
 
 
+def _unique_json_object(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise BuilderPlaneError(
+                f"duplicate builder manifest field: {key}"
+            )
+        result[key] = value
+    return result
+
+
 def _strict_sequence(
     value: object,
     *,
@@ -543,7 +556,10 @@ class BuilderManifest:
             raw = base64.b64decode(encoded, validate=True)
             if len(raw) > MAX_MANIFEST_BYTES:
                 raise BuilderPlaneError("builder manifest exceeds byte budget")
-            value = json.loads(raw.decode("utf-8"))
+            value = json.loads(
+                raw.decode("utf-8"),
+                object_pairs_hook=_unique_json_object,
+            )
         except (
             ValueError,
             UnicodeDecodeError,
