@@ -43,6 +43,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Validate repository contract system
+        run: python scripts/check_contract_system.py
       - name: Validate merge-readiness workflow contract
         run: python scripts/check_merge_readiness_contract.py
       - name: Validate flaky-test quarantine registry
@@ -207,6 +209,9 @@ jobs:
           skeleton/testing/test_runner_v2_runtime.py
           skeleton/testing/test_runner_v2_transaction_report.py
           skeleton/testing/test_runner_v2_engine.py
+          skeleton/testing/test_contract_system.py
+          skeleton/testing/test_contract_system_catalog.py
+          skeleton/testing/test_contract_attestation.py
           skeleton/testing/test_automerge_model.py
           skeleton/testing/test_automerge_evidence.py
           skeleton/testing/test_automerge_policy.py
@@ -217,7 +222,6 @@ jobs:
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
-          tests/test_builder_repair_receipt.py
           tests/test_build_contracts.py
           tests/test_build_edits.py
           tests/test_build_followup.py
@@ -230,6 +234,7 @@ jobs:
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
+          tests/test_execution_failsafe.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:
