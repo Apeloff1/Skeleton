@@ -32,6 +32,7 @@ from .builder_plane import (
     BuilderPlaneError,
     compile_builder_manifest,
     validate_builder_custody,
+    validate_builder_worker_evidence,
 )
 from .bot_manager import (
     load_state,
@@ -640,6 +641,20 @@ def _dispatch_one(
                         execution=execution,
                     ),
                 )
+                if name == "feature-builder":
+                    if builder_manifest is None:
+                        raise SupervisorRuntimeError(
+                            "feature-builder evidence missing Builder Plane custody"
+                        )
+                    try:
+                        validate_builder_worker_evidence(
+                            evidence,
+                            builder_manifest,
+                        )
+                    except BuilderPlaneError as exc:
+                        raise SupervisorRuntimeError(
+                            "feature-builder evidence failed Builder Plane custody"
+                        ) from exc
             return {
                 "bot": name,
                 "returncode": process.returncode,
