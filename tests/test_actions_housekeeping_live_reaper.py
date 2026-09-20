@@ -11,10 +11,12 @@ def _workflow() -> str:
 def test_live_reaper_is_bounded_to_obsolete_pr_runs() -> None:
     workflow = _workflow()
 
-    assert "LIVE_RUN_STALE_MINUTES: '30'" in workflow
+    assert "LIVE_RUN_STALE_MINUTES: '10'" in workflow
+    assert "- cron: '23 */6 * * *'" in workflow
     assert "LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'" in workflow
-    assert "FORCE_CANCEL_ATTEMPTS: '4'" in workflow
-    assert "FORCE_CANCEL_POLL_SECONDS: '2'" in workflow
+    assert "FORCE_CANCEL_ATTEMPTS: '2'" in workflow
+    assert "FORCE_CANCEL_REJECT_BACKOFF_SECONDS: '1'" in workflow
+    assert "FORCE_CANCEL_POLL_SECONDS: '1'" in workflow
     assert "MAX_LIVE_CANCELS: '100'" in workflow
     assert "pull-requests: read" in workflow
     assert "pull-requests: write" not in workflow
@@ -32,6 +34,9 @@ def test_live_reaper_is_bounded_to_obsolete_pr_runs() -> None:
     assert '--method POST "/repos/${REPO}/actions/runs/${id}/force-cancel"' in workflow
     assert "recover_pr_numbers()" in workflow
     assert "pr_contains_sha()" in workflow
+    assert "recovery_cache_hits=0" in workflow
+    assert "recovery_cache_misses=0" in workflow
+    assert "/commits/${target_sha}/pulls?per_page=100" in workflow
     assert "/pulls/${pr_number}/commits?per_page=100&page=${page}" in workflow
     assert '-f "head=${owner}:${head_branch}"' in workflow
     assert "for page in $(seq 1 10)" in workflow
@@ -120,8 +125,14 @@ def test_live_reaper_retries_force_cancel_with_fresh_identity_and_polling() -> N
     assert 'for force_attempt in $(seq 1 "$FORCE_CANCEL_ATTEMPTS"); do' in live_reaper
     assert 'force-pr-${id}-${force_attempt}-${pr_number}.json' in live_reaper
     assert 'force-run-${id}-${force_attempt}.json' in live_reaper
-    assert 'for force_poll in 1 2 3; do' in live_reaper
-    assert 'sleep "$FORCE_CANCEL_POLL_SECONDS"' in live_reaper
+    assert 'force-cancel rejected: run=${id} attempt=${force_attempt}; skipping completion polls' in live_reaper
+    assert 'sleep "$FORCE_CANCEL_REJECT_BACKOFF_SECONDS"' in live_reaper
+    rejected = live_reaper.index(
+        'force-cancel rejected: run=${id} attempt=${force_attempt}; skipping completion polls'
+    )
+    polling = live_reaper.index('for force_poll in 1 2 3; do')
+    assert 'continue' in live_reaper[rejected:polling]
+    assert 'sleep "$FORCE_CANCEL_POLL_SECONDS"' in live_reaper[polling:]
     assert 'force-cancel accepted: run=${id} attempt=${force_attempt}' in live_reaper
     assert 'force-cancel stuck: run=${id} remained queued after ${FORCE_CANCEL_ATTEMPTS}' in live_reaper
     assert 'force_stuck=$((force_stuck + 1))' in live_reaper
