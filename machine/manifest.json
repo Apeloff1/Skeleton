@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.4",
+  "schema_version": "1.5",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,18 +66,20 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1790,
+      "last": 1808,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1779-1790",
+      "prs": "1791-1808",
       "domains": [
-        "repair intake",
-        "repo attention",
-        "repo bots permissions",
-        "repo contract drain",
-        "archive/dynamic import safety",
-        "secret scan contracts"
+        "security headers",
+        "shell AI readiness/trust",
+        "skills/files atomic writes",
+        "planning harness",
+        "supervisor controls",
+        "tooling regressions",
+        "workflow/security controls",
+        "vulnerability bounds"
       ]
     },
     "large_reconciliation": [
