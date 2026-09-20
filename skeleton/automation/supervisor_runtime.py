@@ -803,6 +803,25 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
                 )
             admitted[key] = item
 
+    builder_receipt = value.get("builder_proposal_receipt")
+    if builder_receipt is not None:
+        if (
+            worker != "feature-builder"
+            or status != "pull-request-created"
+        ):
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt escaped its admitted worker status"
+            )
+        if not isinstance(builder_receipt, dict):
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt must be an object"
+            )
+        if len(canonical_json(builder_receipt)) > 12_000:
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt exceeds evidence budget"
+            )
+        admitted["builder_proposal_receipt"] = builder_receipt
+
     # Evidence that claims a mutation must carry the immutable custody proofs
     # needed to correlate the remote proposal with this exact execution.
     if status == "pull-request-created":
@@ -826,6 +845,13 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         validate_fingerprint(admitted["execution_fingerprint"])
         if "builder_manifest_digest" in admitted:
             validate_fingerprint(admitted["builder_manifest_digest"])
+        if (
+            worker == "feature-builder"
+            and "builder_proposal_receipt" not in admitted
+        ):
+            raise SupervisorRuntimeError(
+                "feature-builder created-PR evidence is missing proposal receipt"
+            )
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
                 "created-PR evidence has invalid changed-line count"
