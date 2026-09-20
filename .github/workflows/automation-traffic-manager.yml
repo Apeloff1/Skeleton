@@ -261,19 +261,28 @@ jobs:
       TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       TRAFFIC_ADMITTED_BASE_SHA: ${{ needs.admission.outputs.admitted_base_sha }}
     steps:
-      - name: Require admission still matches default-branch head
+      - name: Revalidate admission and dispatch reviewed supervisor workflow
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
-          live_sha=$(gh api "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" --jq '.object.sha')
+          [[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Admission did not provide a full commit SHA."
+            exit 1
+          }
+          [[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+            echo "::error::Default branch contains unexpected characters."
+            exit 1
+          }
+
+          live_sha=$(gh api             "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}"             --jq '.object.sha')
+          [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid default-branch head."
+            exit 1
+          }
+
           if [[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]; then
             echo "Admission became stale (${TRAFFIC_ADMITTED_BASE_SHA} != ${live_sha}); coalescing this dispatch."
             exit 0
           fi
 
-      - name: Dispatch reviewed supervisor workflow
-        run: >-
-          gh workflow run supervisor.yml
-          --repo "$GITHUB_REPOSITORY"
-          --ref "$TRAFFIC_DEFAULT_BRANCH"
+          gh workflow run supervisor.yml             --repo "$GITHUB_REPOSITORY"             --ref "$TRAFFIC_DEFAULT_BRANCH"
