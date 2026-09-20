@@ -120,7 +120,9 @@ class TrafficSnapshot:
             not owner
             or not name
             or owner.startswith("-")
+            or owner in {".", ".."}
             or name.startswith(".")
+            or name in {".", ".."}
             or any(ch not in allowed for ch in owner)
             or any(ch not in allowed for ch in name)
         ):
