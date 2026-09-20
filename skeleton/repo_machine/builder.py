@@ -7,6 +7,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 from typing import Iterable
 
 from .config import MachineConfig, load_machine_config
@@ -208,19 +209,50 @@ class RepositoryModelBuilder:
     def _record(self, path: Path) -> FileRecord:
         rel = _posix(path, self.root)
         zone, owner, _criticality = self._zone(rel)
-        stat = path.stat()
-        if stat.st_size > self.config.max_file_bytes:
-            content = ""
-            digest_value = hashlib.sha256(b"<oversize>").hexdigest()
-            lines = 0
-        else:
-            raw = path.read_bytes()
-            digest_value = hashlib.sha256(raw).hexdigest()
-            try:
-                content = raw.decode("utf-8")
-            except UnicodeDecodeError:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("repository inventory only accepts regular files")
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise ValueError("repository file cannot be resolved") from exc
+        if not resolved.is_relative_to(self.root):
+            raise ValueError("repository file escapes repository root")
+
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(path, flags)
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode):
+                raise ValueError("repository inventory only accepts regular files")
+            if before.st_size > self.config.max_file_bytes:
                 content = ""
-            lines = len(content.splitlines()) if content else 0
+                digest_value = hashlib.sha256(
+                    f"<oversize:{before.st_size}>".encode("ascii")
+                ).hexdigest()
+                lines = 0
+            else:
+                with os.fdopen(fd, "rb", closefd=False) as handle:
+                    raw = handle.read(self.config.max_file_bytes + 1)
+                after = os.fstat(fd)
+                if (
+                    before.st_size != after.st_size
+                    or before.st_mtime_ns != after.st_mtime_ns
+                ):
+                    raise OSError("repository file changed during scan")
+                if len(raw) > self.config.max_file_bytes:
+                    raise OSError("repository file exceeded scan bound during read")
+                digest_value = hashlib.sha256(raw).hexdigest()
+                try:
+                    content = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    content = ""
+                lines = len(content.splitlines()) if content else 0
+            file_size = before.st_size
+        finally:
+            os.close(fd)
         language = _language(rel)
         symbols = 0
         imports: tuple[str, ...] = ()
@@ -234,7 +266,7 @@ class RepositoryModelBuilder:
             owner=owner,
             kind=_kind(rel),
             language=language,
-            size=stat.st_size,
+            size=file_size,
             lines=lines,
             sha256=digest_value,
             symbols=symbols,
