@@ -468,11 +468,15 @@ def extract_plan(
     raw: str,
     max_files: int,
     *,
-    max_file_bytes: int = MAX_FILE,
-    max_total_bytes: int = MAX_TOTAL_PROPOSED_BYTES,
+    max_file_bytes: int | None = None,
+    max_total_bytes: int | None = None,
     safe_prefixes: tuple[str, ...] = SAFE_PREFIXES,
 ) -> dict[str, Any]:
     """Validate the complete model proposal as bounded inert data."""
+    if max_file_bytes is None:
+        max_file_bytes = MAX_FILE
+    if max_total_bytes is None:
+        max_total_bytes = MAX_TOTAL_PROPOSED_BYTES
     data = _decode_model_object(raw)
     summary = _bounded_text(
         data.get("summary", ""),
@@ -715,9 +719,11 @@ def validate_generated_files(
 def validate_mutation_budget(
     files: list[dict[str, str]],
     *,
-    max_changed_lines: int = MAX_CHANGED_LINES,
+    max_changed_lines: int | None = None,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
+    if max_changed_lines is None:
+        max_changed_lines = MAX_CHANGED_LINES
     changed = 0
     for item in files:
         old = _head_text(item["path"]) or ""
