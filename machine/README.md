@@ -92,6 +92,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Frontier/Java/machine wave:** revalidated galaxy, Java accelerator/control/observability, Jeeves decision/planning/frontier chains, and machine control-plane sources; existing integration PRs reused.
 
+- **Orchestration/ops wave:** PR runner, provider/SMB resilience, cockpit, supervisor hierarchy/resilience, x-agent, and bot-ledger sources revalidated; existing integration PRs reused.
+
 ## Target layout
 
 ```text
