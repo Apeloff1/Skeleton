@@ -273,6 +273,94 @@ class FeatureBuilderPreflightTests(unittest.TestCase):
                 )
 
 
+class WorkerLiveAuthorityRebindTests(unittest.TestCase):
+    def test_exact_live_authority_rebind_is_accepted(self) -> None:
+        auth = authorization()
+        value = manifest()
+        with patch(
+            "skeleton.automation.specialist_bots."
+            "revalidate_live_build_authorization",
+            return_value=auth,
+        ) as live:
+            current = specialist_bots.revalidate_builder_authority(
+                feature_custody(),
+                auth,
+                value,
+            )
+        self.assertEqual(current, auth)
+        live.assert_called_once_with(auth)
+
+    def test_changed_live_authority_fails_closed(self) -> None:
+        auth = authorization()
+        changed = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 77,
+                "title": "Build typed integration capability",
+                "body": "Implement a changed task with regression tests.",
+                "labels": (
+                    "automation-approved",
+                    "enhancement",
+                    "integration",
+                ),
+                "updatedAt": "2026-09-20T03:01:00Z",
+                "automation_authorized": True,
+            },
+        )
+        with patch(
+            "skeleton.automation.specialist_bots."
+            "revalidate_live_build_authorization",
+            return_value=changed,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.revalidate_builder_authority(
+                    feature_custody(),
+                    auth,
+                    manifest(),
+                )
+
+    def test_manifestless_feature_revalidation_is_rejected(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.revalidate_builder_authority(
+                feature_custody(),
+                authorization(),
+                None,
+            )
+
+    def test_non_builder_cannot_receive_build_authority(self) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.revalidate_builder_authority(
+                custody,
+                authorization(),
+                manifest(),
+            )
+
+    def test_non_builder_without_authority_remains_inert(self) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        self.assertIsNone(
+            specialist_bots.revalidate_builder_authority(
+                custody,
+                None,
+                None,
+            )
+        )
+
+
 class WorkerManifestAdmissionTests(unittest.TestCase):
     def admitted_env(
         self,
