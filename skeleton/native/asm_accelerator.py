@@ -8,9 +8,10 @@ Supported runtime ABI:
 - Linux x86-64 using the System V AMD64 ABI.
 - Linux AArch64 using AAPCS64.
 
-The microkernel currently exposes float32 dot product and squared L2 distance.
-It is intended for dense retrieval and other numeric hot paths where a caller
-can amortize Python-to-native conversion overhead.
+The microkernel exposes float32 dot product, squared L2 distance, row-batch
+dot product, and multi-query matrix scoring. It is intended for dense retrieval
+and other numeric hot paths where a caller can amortize Python-to-native
+conversion overhead.
 """
 from __future__ import annotations
 
@@ -213,7 +214,8 @@ class AsmVectorAccelerator:
             batch = loaded.skeleton_asm_dot_batch_f32
         except AttributeError as exc:
             raise AsmAcceleratorAbiError(
-                "Assembly ABI v2 missing symbol: skeleton_asm_dot_batch_f32"
+                f"Assembly ABI v{_ASM_ABI_VERSION} missing symbol: "
+                "skeleton_asm_dot_batch_f32"
             ) from exc
         batch.argtypes = [
             float_pointer,
@@ -228,7 +230,8 @@ class AsmVectorAccelerator:
             matrix_batch = loaded.skeleton_asm_dot_matrix_f32
         except AttributeError as exc:
             raise AsmAcceleratorAbiError(
-                "Assembly ABI v3 missing symbol: skeleton_asm_dot_matrix_f32"
+                f"Assembly ABI v{_ASM_ABI_VERSION} missing symbol: "
+                "skeleton_asm_dot_matrix_f32"
             ) from exc
         matrix_batch.argtypes = [
             float_pointer,
