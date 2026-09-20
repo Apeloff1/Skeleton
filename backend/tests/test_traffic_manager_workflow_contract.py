@@ -97,7 +97,9 @@ def test_relief_quenches_only_bounded_same_repo_main_prs() -> None:
     assert '.base.ref == "main"' in relief
     assert ".head.repo.full_name == $repo" in relief
     assert 'gh pr ready "$pr_number" --undo' in relief
-    assert "head -n \"$TRAFFIC_MAX_DRAFTS\"" in relief
+    assert '--argjson max_drafts "$TRAFFIC_MAX_DRAFTS"' in relief
+    assert "][: $max_drafts][]" in relief
+    assert "TRAFFIC_MAX_DRAFTS <= 100" in relief
 
 
 def test_relief_preserves_explicit_priority_labels() -> None:
@@ -106,7 +108,6 @@ def test_relief_preserves_explicit_priority_labels() -> None:
     assert '"traffic:keep-ready"' in relief
     assert '"ci:priority"' in relief
     assert '"queue:exempt"' in relief
-    assert "Re-read and only" not in relief
     assert "A concurrent actor may have drafted it first" in relief
 
 
