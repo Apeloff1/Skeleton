@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3",
+  "schema_version": "2.4",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -201,7 +201,8 @@
         "reason": "high-overlap multi-branch physics stack"
       }
     ],
-    "lineage_note": "Zero-file-delta fix branches remain lineage-only. The remaining physics feature family is intentionally held as overlapping reconciliation input; no blind merges."
+    "lineage_note": "Repeated verification confirms zero-file-delta branches are lineage-only; staged PRs remain source material pending reconciliation, while large overlapping physics/shell waves stay held.",
+    "assembly_status": "queue_audited_through_1865"
   },
   "integrated_domains": [
     "automation runtime dependency repair",
