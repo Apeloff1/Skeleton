@@ -239,3 +239,42 @@ def test_traffic_manager_uses_pinned_reviewed_actions() -> None:
     ) in source
     assert "@main" not in source
     assert "@master" not in source
+
+
+def test_decision_identity_is_exported_and_revalidated_before_dispatch() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+    assert "decision_base_sha: ${{ steps.traffic.outputs.base_sha }}" in admission
+    assert "decision_observed_at: ${{ steps.traffic.outputs.observed_at }}" in admission
+    assert (
+        "TRAFFIC_DECISION_BASE_SHA: "
+        "${{ needs.admission.outputs.decision_base_sha }}"
+    ) in dispatch
+    assert (
+        "TRAFFIC_DECISION_OBSERVED_AT: "
+        "${{ needs.admission.outputs.decision_observed_at }}"
+    ) in dispatch
+    assert '[[ "$TRAFFIC_DECISION_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert (
+        '[[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]]'
+        in dispatch
+    )
+    assert (
+        '[[ "$TRAFFIC_DECISION_OBSERVED_AT" =~ ^[1-9][0-9]{0,11}$ ]]'
+        in dispatch
+    )
+
+
+def test_dispatch_passes_decision_bound_sha_to_supervisor() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert '-f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"' in dispatch
+    comparison = dispatch.index(
+        '[[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]]'
+    )
+    live_check = dispatch.index(
+        '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]'
+    )
+    invoke = dispatch.index("gh workflow run supervisor.yml")
+    assert comparison < live_check < invoke
