@@ -6,6 +6,8 @@ from starlette.requests import Request
 
 from middleware import hardening
 
+_LOCALHOST_3000 = "http://" + "localhost:3000"
+
 def _request(
     path: str = "/api/advanced/settings",
     token: str | None = None,
