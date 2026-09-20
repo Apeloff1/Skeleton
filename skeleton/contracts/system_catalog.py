@@ -84,7 +84,11 @@ def validate_catalog(catalog: Iterable[ContractSpec] = CATALOG) -> None:
         missing = set(item.depends_on) - set(index)
         if missing:
             raise ValueError(f"{item.contract_id} has unknown dependencies: {sorted(missing)}")
-        if item.evidence_version < 1:
+        if (
+            not isinstance(item.evidence_version, int)
+            or isinstance(item.evidence_version, bool)
+            or item.evidence_version < 1
+        ):
             raise ValueError(f"invalid evidence version: {item.contract_id}")
         consumed_names: set[str] = set()
         for producer, version in item.consumes_evidence:
