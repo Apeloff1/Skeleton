@@ -234,6 +234,7 @@ jobs:
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
+          tests/test_execution_failsafe.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:
