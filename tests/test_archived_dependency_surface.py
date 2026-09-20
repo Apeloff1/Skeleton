@@ -59,6 +59,32 @@ def test_detects_common_installable_manifests(tmp_path: Path) -> None:
     ]
 
 
+def test_additional_dependency_ecosystems_are_recognized() -> None:
+    for name in (
+        "service.csproj",
+        "library.fsproj",
+        "tool.vbproj",
+        "packages.config",
+        "paket.dependencies",
+        "paket.lock",
+        "deno.json",
+        "deno.jsonc",
+        "deno.lock",
+        "pubspec.yaml",
+        "pubspec.lock",
+        "Package.swift",
+        "build.sbt",
+        "deps.edn",
+        "project.clj",
+        "MODULE.bazel",
+        "WORKSPACE",
+        "WORKSPACE.bazel",
+        "libs.versions.toml",
+        "settings.gradle",
+        "settings.gradle.kts",
+    ):
+        assert MODULE.is_installable_manifest_name(name), name
+
 def test_snapshot_evidence_names_are_not_dependency_surfaces(tmp_path: Path) -> None:
     archive = tmp_path / "snapshots"
     safe = [
@@ -259,6 +285,21 @@ def test_archive_map_detects_broken_source_symlink(tmp_path: Path) -> None:
     assert any("source_path still exists" in error for error in errors)
 
 
+def test_archive_map_rejects_broken_symlinked_vendor_evidence(tmp_path: Path) -> None:
+    map_path = _write_map(tmp_path)
+    payload = json.loads(map_path.read_text(encoding="utf-8"))
+    archive_path = tmp_path / payload["entries"][0]["archive_path"]
+    extra = archive_path.parent / "extra.snapshot.lock"
+    try:
+        extra.symlink_to(tmp_path / "missing-evidence")
+    except OSError:
+        return
+    errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
+    assert any(
+        "quarantined dependency evidence must not be a symlink" in error
+        for error in errors
+    )
+
 def test_archive_map_rejects_unmapped_vendor_evidence(tmp_path: Path) -> None:
     map_path = _write_map(tmp_path)
     extra = (
@@ -273,3 +314,15 @@ def test_archive_map_rejects_unmapped_vendor_evidence(tmp_path: Path) -> None:
     extra.write_text("extra", encoding="utf-8")
     errors = MODULE.validate_archive_map(map_path, repo_root=tmp_path)
     assert any("unmapped quarantined dependency evidence" in error for error in errors)
+
+def test_main_handles_archive_root_runtime_failure_cleanly(
+    monkeypatch,
+    capsys,
+) -> None:
+    def explode():
+        raise RuntimeError("unsafe archive root")
+
+    monkeypatch.setattr(MODULE, "find_installable_manifests", explode)
+    assert MODULE.main() == 2
+    assert "cannot inspect archive safely" in capsys.readouterr().err
+
