@@ -8,6 +8,8 @@ from skeleton.contracts.system_catalog import (
     dependency_closure,
     impacted_contracts,
     ownership_conflicts,
+    privilege_escalations,
+    unowned_paths,
     topological_order,
     validate_catalog,
 )
@@ -161,3 +163,69 @@ def test_boolean_evidence_version_is_rejected():
     # bool is an int subclass; contract versions must remain explicit integers.
     with pytest.raises(ValueError):
         validate_catalog(catalog)
+
+
+def test_privilege_escalation_requires_upstream_authority():
+    catalog = (
+        ContractSpec(
+            "root",
+            "scripts/check_root_contract.py",
+            ContractTier.ROOT,
+            privileges=("contents:read",),
+        ),
+        ContractSpec(
+            "child",
+            "scripts/check_child_contract.py",
+            ContractTier.PRIVILEGED,
+            depends_on=("root",),
+            privileges=("contents:write",),
+        ),
+    )
+    assert privilege_escalations(catalog) == (
+        ("child", "contents:write", "not-inherited"),
+    )
+
+
+def test_inherited_privilege_is_accepted():
+    catalog = (
+        ContractSpec(
+            "root",
+            "scripts/check_root_contract.py",
+            ContractTier.ROOT,
+            privileges=("contents:read",),
+        ),
+        ContractSpec(
+            "child",
+            "scripts/check_child_contract.py",
+            ContractTier.PRIVILEGED,
+            depends_on=("root",),
+            privileges=("contents:read",),
+        ),
+    )
+    assert privilege_escalations(catalog) == ()
+
+
+def test_invalid_privilege_name_fails_closed():
+    catalog = (
+        ContractSpec(
+            "root",
+            "scripts/check_root_contract.py",
+            ContractTier.ROOT,
+            privileges=("Contents Write",),
+        ),
+    )
+    with pytest.raises(ValueError, match="invalid privilege"):
+        validate_catalog(catalog)
+
+
+def test_control_plane_orphan_surface_detection():
+    assert unowned_paths(
+        [
+            ".github/workflows/new-privileged-plane.yml",
+            "docs/readme.md",
+        ]
+    ) == (".github/workflows/new-privileged-plane.yml",)
+
+
+def test_contract_system_checker_is_intentionally_self_owned():
+    assert unowned_paths(["scripts/check_contract_system.py"]) == ()
