@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           jq -r '.entries[] | [.archive_path, .blob_sha] | @tsv' \
             satellites/branch-snapshots/DEPENDENCY_ARCHIVE_MAP.json |
-          while IFS=\t' read -r path expected; do
+          while IFS=$'\t' read -r path expected; do
             observed="$(git hash-object -- "$path")"
             if [[ "$observed" != "$expected" ]]; then
               echo "Archived dependency evidence changed bytes: $path" >&2
