@@ -60,6 +60,8 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             cooldown_seconds=1800,
             maintenance_interval_seconds=7200,
             failure_window_seconds=21600,
+            stale_queued_seconds=900,
+            max_stale_queued_runs=2,
         )
 
     def test_failure_demand_admits_repair_lane(self) -> None:
@@ -120,6 +122,68 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             decision.reason,
             "queue-capacity-exhausted",
         )
+        self.assertTrue(decision.relieve)
+        self.assertEqual(
+            decision.relief_reason,
+            "queue-capacity-exhausted",
+        )
+
+    def test_stale_queue_pressure_requests_relief_before_capacity_limit(self) -> None:
+        queued = tuple(
+            run(
+                name=f"Queued stale {i}",
+                status="queued",
+                conclusion="",
+                database_id=20 + i,
+                updated_at="2027-01-15T07:00:00Z",
+            )
+            for i in range(2)
+        )
+        decision = evaluate(
+            snapshot(runs=queued),
+            policy=self.policy,
+            force=True,
+        )
+        self.assertFalse(decision.admit)
+        self.assertEqual(
+            decision.reason,
+            "stale-queue-pressure",
+        )
+        self.assertTrue(decision.relieve)
+        self.assertEqual(
+            decision.relief_reason,
+            "stale-queue-pressure",
+        )
+        self.assertEqual(decision.stale_queued_runs, 2)
+        self.assertEqual(
+            decision.oldest_queued_age_seconds,
+            3600,
+        )
+
+    def test_saturated_run_inventory_requests_fail_closed_relief(self) -> None:
+        completed = tuple(
+            run(
+                name=f"Completed {i}",
+                database_id=1000 + i,
+            )
+            for i in range(100)
+        )
+        decision = evaluate(
+            snapshot(runs=completed),
+            policy=self.policy,
+            force=True,
+        )
+        self.assertFalse(decision.admit)
+        self.assertEqual(
+            decision.reason,
+            "run-inventory-saturated",
+        )
+        self.assertTrue(decision.inventory_saturated)
+        self.assertTrue(decision.relieve)
+        self.assertEqual(
+            decision.relief_reason,
+            "run-inventory-saturated",
+        )
 
     def test_critical_lane_contention_blocks(self) -> None:
         runs = (
@@ -145,6 +209,8 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             decision.reason,
             "critical-lane-contention",
         )
+        self.assertFalse(decision.relieve)
+        self.assertEqual(decision.relief_reason, "none")
 
     def test_existing_managed_automation_blocks_duplicate(self) -> None:
         decision = evaluate(
