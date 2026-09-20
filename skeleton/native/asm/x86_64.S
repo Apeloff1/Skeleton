@@ -114,12 +114,52 @@ skeleton_asm_dot_batch_f32:
 
 .Lbatch_row:
     xorps %xmm0, %xmm0
+    xorps %xmm3, %xmm3
+    xorps %xmm4, %xmm4
+    xorps %xmm5, %xmm5
     mov %r9, %rdi
+
+    mov %rcx, %rdx
+    shr $4, %rdx
+    je .Lbatch_vec4_setup
+
+.Lbatch_vec16:
+    movups 0(%rdi), %xmm1
+    movups 0(%rsi), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm0
+
+    movups 16(%rdi), %xmm1
+    movups 16(%rsi), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm3
+
+    movups 32(%rdi), %xmm1
+    movups 32(%rsi), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm4
+
+    movups 48(%rdi), %xmm1
+    movups 48(%rsi), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm5
+
+    add $64, %rdi
+    add $64, %rsi
+    dec %rdx
+    jne .Lbatch_vec16
+
+    addps %xmm3, %xmm0
+    addps %xmm4, %xmm0
+    addps %xmm5, %xmm0
+
+.Lbatch_vec4_setup:
     mov %rcx, %rdx
     shr $2, %rdx
-    je .Lbatch_tail
+    and $3, %rdx
+    je .Lbatch_reduce
 
-.Lbatch_vec:
+.Lbatch_vec4:
     movups (%rdi), %xmm1
     movups (%rsi), %xmm2
     mulps %xmm2, %xmm1
@@ -127,8 +167,9 @@ skeleton_asm_dot_batch_f32:
     add $16, %rdi
     add $16, %rsi
     dec %rdx
-    jne .Lbatch_vec
+    jne .Lbatch_vec4
 
+.Lbatch_reduce:
     movaps %xmm0, %xmm1
     movhlps %xmm0, %xmm1
     addps %xmm1, %xmm0
@@ -136,7 +177,6 @@ skeleton_asm_dot_batch_f32:
     shufps $0x55, %xmm1, %xmm1
     addss %xmm1, %xmm0
 
-.Lbatch_tail:
     mov %rcx, %rdx
     and $3, %rdx
     je .Lbatch_store
