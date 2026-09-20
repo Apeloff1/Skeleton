@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.6",
+  "schema_version": "3.7",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -312,6 +312,21 @@
       ],
       "status": "staged",
       "note": "existing integration PRs reused; no duplicate PRs"
+    },
+    "orchestration_ops_wave": {
+      "revalidated": [
+        "pack J sibling ports",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor",
+        "supervisor downstream/hierarchy/resilience",
+        "x-agent orchestration",
+        "closed bot ledger",
+        "hardened repo bots"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused"
     }
   },
   "integrated_domains": [
