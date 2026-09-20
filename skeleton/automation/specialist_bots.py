@@ -1453,8 +1453,9 @@ def main() -> int:
             for description in result["tests"]:
                 body += f"- {description}\n"
 
+        publication_url: str | None = None
         if followup is None:
-            subprocess.run(
+            created_pr = subprocess.run(
                 [
                     "gh",
                     "pr",
@@ -1476,6 +1477,25 @@ def main() -> int:
                 check=True,
                 env=publish_env,
                 timeout=60,
+                capture_output=True,
+                text=True,
+            )
+            publication_lines = created_pr.stdout.strip().splitlines()
+            publication_url = (
+                publication_lines[-1]
+                if publication_lines
+                else ""
+            )
+            if not publication_url.startswith(
+                f"https://github.com/{execution.repository}/pull/"
+            ):
+                raise WorkerAdmissionError(
+                    "pull-request publication returned an invalid URL"
+                )
+        else:
+            publication_url = (
+                f"https://github.com/{execution.repository}/pull/"
+                f"{followup.pr_number}"
             )
 
         status_payload: dict[str, Any] = {
@@ -1515,6 +1535,7 @@ def main() -> int:
             status_payload["builder_proposal_receipt"] = (
                 builder_receipt.as_dict()
             )
+        status_payload["pull_request_url"] = publication_url
         if followup is not None:
             status_payload["pull_request"] = (
                 followup.pr_number
