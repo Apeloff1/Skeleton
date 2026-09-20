@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/**'
       - '.machine/**'
+      - 'AGENTS.md'
       - 'skeleton/repo_machine/**'
       - 'scripts/check_repo_machine.py'
       - 'tests/test_repo_machine.py'
@@ -14,6 +15,8 @@ on:
       - 'tests/test_repo_machine_growth.py'
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
+      - 'tests/test_repo_machine_*.py'
+      - 'backend/tests/test_repo_machine_supervisor_contract.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
@@ -56,6 +59,7 @@ on:
     paths:
       - '.github/workflows/**'
       - '.machine/**'
+      - 'AGENTS.md'
       - 'skeleton/repo_machine/**'
       - 'scripts/check_repo_machine.py'
       - 'tests/test_repo_machine.py'
@@ -63,6 +67,8 @@ on:
       - 'tests/test_repo_machine_growth.py'
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
+      - 'tests/test_repo_machine_*.py'
+      - 'backend/tests/test_repo_machine_supervisor_contract.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
@@ -142,6 +148,7 @@ jobs:
           tests/test_workflow_run_branch_completions_contract.py
           tests/test_bot_activation_security.py
           tests/test_supervisor_workflow_contract.py
+          tests/test_repo_machine_supervisor_contract.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
       - name: Enforce reviewed action repository allowlist
