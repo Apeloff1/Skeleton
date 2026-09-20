@@ -210,6 +210,7 @@ jobs:
           skeleton/testing/test_runner_v2_transaction_report.py
           skeleton/testing/test_runner_v2_engine.py
           skeleton/testing/test_contract_system.py
+          skeleton/testing/test_contract_system_catalog.py
           skeleton/testing/test_automerge_model.py
           skeleton/testing/test_automerge_evidence.py
           skeleton/testing/test_automerge_policy.py
