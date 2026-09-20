@@ -114,6 +114,19 @@ def test_relief_quenches_only_bounded_same_repo_main_prs() -> None:
     assert "TRAFFIC_MAX_DRAFTS <= 100" in relief
 
 
+def test_relief_preserves_in_progress_current_head_validation() -> None:
+    source = _source(TRAFFIC)
+    relief = _job_block(source, "relief", "dispatch")
+
+    assert "actions/runs?status=in_progress&per_page=100" in relief
+    assert "gh api --paginate --slurp" in relief
+    assert 'select(type == "string" and test("^[0-9a-fA-F]{40}$"))' in relief
+    assert '--slurpfile active_heads "$active_heads"' in relief
+    assert '.head.sha as $head_sha' in relief
+    assert 'index($head_sha)) == null' in relief
+    assert "In-progress current-head validations are preserved" in relief
+
+
 def test_relief_preserves_explicit_priority_labels() -> None:
     source = _source(TRAFFIC)
     relief = _job_block(source, "relief", "dispatch")
