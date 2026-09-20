@@ -16,8 +16,10 @@ from skeleton.automation.builder_plane import (
     builder_worker_branch,
     compile_builder_manifest,
     compile_builder_proposal_receipt,
+    is_builder_regression_path,
     validate_builder_custody,
     validate_builder_proposal_receipt,
+    validate_builder_regression_paths,
     validate_builder_worker_evidence,
 )
 from skeleton.automation.supervisor_runtime import (
@@ -89,6 +91,13 @@ def proposal_receipt(
             {
                 "path": "skeleton/feature.py",
                 "content": "VALUE = 1\n",
+            },
+            {
+                "path": "tests/test_feature.py",
+                "content": (
+                    "def test_feature():\n"
+                    "    assert True\n"
+                ),
             },
         ),
         tests=("focused regression",),
@@ -633,6 +642,100 @@ class WorkerBuilderRegressionPolicyTests(unittest.TestCase):
                 specialist_bots.spec_for("root-cause"),
                 manifest(),
             )
+
+
+class WorkerBuilderRegressionFileTests(unittest.TestCase):
+    def test_recognizes_canonical_test_surfaces(self) -> None:
+        recognized = (
+            "tests/test_feature.py",
+            "skeleton/testing/test_feature.py",
+            "skeleton/component/tests/test_api.py",
+            "skeleton/component/testing/check_spec.py",
+            "skeleton/component/test_feature.py",
+            "skeleton/component/feature_test.py",
+            "skeleton/component/feature.test.ts",
+            "skeleton/component/feature.spec.tsx",
+        )
+        for path in recognized:
+            with self.subTest(path=path):
+                self.assertTrue(
+                    is_builder_regression_path(path)
+                )
+
+    def test_source_file_is_not_misclassified_as_regression(self) -> None:
+        self.assertFalse(
+            is_builder_regression_path(
+                "skeleton/component/feature.py"
+            )
+        )
+
+    def test_non_documentation_receipt_requires_test_file(self) -> None:
+        value = manifest()
+        with self.assertRaises(BuilderPlaneError):
+            compile_builder_proposal_receipt(
+                value,
+                proposal_digest="c" * 64,
+                branch=builder_worker_branch(value),
+                files=(
+                    {
+                        "path": "skeleton/feature.py",
+                        "content": "VALUE = 1\n",
+                    },
+                ),
+                tests=("claimed regression intent",),
+                changed_lines=1,
+            )
+
+    def test_manifest_validator_rejects_source_only_paths(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_regression_paths(
+                ("skeleton/feature.py",),
+                manifest(),
+            )
+
+    def test_manifest_validator_accepts_real_test_path(self) -> None:
+        validate_builder_regression_paths(
+            (
+                "skeleton/feature.py",
+                "tests/test_feature.py",
+            ),
+            manifest(),
+        )
+
+    def test_documentation_manifest_allows_no_test_path(self) -> None:
+        auth = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 89,
+                "title": "Documentation guide refresh",
+                "body": "Refresh documentation guide text only.",
+                "labels": ("automation-approved",),
+                "updatedAt": "2026-09-20T03:11:00Z",
+                "automation_authorized": True,
+            },
+        )
+        docs_manifest = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        receipt = compile_builder_proposal_receipt(
+            docs_manifest,
+            proposal_digest="d" * 64,
+            branch=builder_worker_branch(docs_manifest),
+            files=(
+                {
+                    "path": "docs/guide.md",
+                    "content": "Updated docs.\n",
+                },
+            ),
+            tests=(),
+            changed_lines=1,
+        )
+        self.assertEqual(
+            receipt.paths,
+            ("docs/guide.md",),
+        )
 
 
 class WorkerBuilderBudgetTests(unittest.TestCase):
