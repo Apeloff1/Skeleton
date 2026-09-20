@@ -4,10 +4,6 @@ from pathlib import Path
 
 from core.exec_guard import configure_cors_environment, normalize_cors_origins
 
-
-import pytest
-
-pytestmark = pytest.mark.live_service
 _DEPLOYMENT_KEYS = (
     "EMERGENT_DEPLOY",
     "ENVIRONMENT",
@@ -104,9 +100,9 @@ def test_production_wildcard_fails_closed_even_with_dev_opt_in() -> None:
 
 def test_explicit_origins_are_normalized_and_deduplicated() -> None:
     assert normalize_cors_origins(
-        " https://example.com/,https://example.com, http://localhost:3000/ ",
+        f" https://example.com/,https://example.com, {_LOCALHOST_3000}/ ",
         production=True,
-    ) == ("https://example.com", "http://localhost:3000")
+    ) == ("https://example.com", _LOCALHOST_3000)
 
 
 def test_invalid_or_partially_invalid_origins_fail_closed() -> None:
