@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1",
+  "schema_version": "2.2",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -66,11 +66,11 @@
     ],
     "queued_pr_range": {
       "first": 1702,
-      "last": 1864,
+      "last": 1865,
       "status": "staged_or_queued_non_mergeable"
     },
     "newly_staged": {
-      "prs": "1860-1864",
+      "prs": "1865",
       "domains": [
         "galaxy lifecycle",
         "Java accelerators/control/observability/retrieval",
@@ -96,7 +96,8 @@
         "physics simulation stack",
         "repository bots",
         "security scan evidence",
-        "x-harness"
+        "x-harness",
+        "physics aggregate validation"
       ]
     },
     "large_reconciliation": [
@@ -170,6 +171,28 @@
         "files": 300,
         "commits": 355,
         "reason": "large overlapping shell stabilization wave"
+      },
+      {
+        "source": "feat/bounded-shell-runner-20260918",
+        "files": 300,
+        "reason": "large shell/runtime reconciliation"
+      },
+      {
+        "source": "fix/jeeves-decision-rules-20260919-drain",
+        "files": 137,
+        "commits": 63,
+        "reason": "large Jeeves reconciliation"
+      },
+      {
+        "source": "fix/merge-unblockers-20260920",
+        "files": 132,
+        "commits": 33,
+        "reason": "large merge-unblocker reconciliation"
+      },
+      {
+        "source": "fix/live-service-test-boundaries-20260920",
+        "files": "98-99",
+        "reason": "parallel live-service boundary variants"
       }
     ],
     "lineage_note": "Zero-file-delta stabilization branches are lineage-only; large shell waves require file-level reconciliation."
