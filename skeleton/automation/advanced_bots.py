@@ -20,6 +20,8 @@ class AdvancedBot:
     requires_tests: bool = True
 
     def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or self.name.lower() != self.name:
+            raise ValueError("invalid specialist name")
         try:
             validate_worker_name(self.name)
         except SupervisorRuntimeError as exc:
