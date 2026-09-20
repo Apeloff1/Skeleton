@@ -46,15 +46,40 @@ EXACT_MANIFEST_NAMES = {
     "build.gradle.kts",
     "composer.json",
     "composer.lock",
+    "environment.yml",
+    "environment.yaml",
+    "conda-lock.yml",
+    "conda-lock.yaml",
+    "gradle.lockfile",
+    "go.work",
+    "go.work.sum",
+    "mix.exs",
+    "mix.lock",
+    "package.resolved",
+    "podfile",
+    "podfile.lock",
+    "packages.lock.json",
+    "directory.packages.props",
 }
-REQUIREMENTS_RE = re.compile(r"^requirements(?:[-_.][^/]*)?\.txt$", re.IGNORECASE)
+REQUIREMENTS_RE = re.compile(
+    r"^requirements(?:[-_.][^/]*)?\.(?:txt|in)$",
+    re.IGNORECASE,
+)
+CONSTRAINTS_RE = re.compile(
+    r"^constraints(?:[-_.][^/]*)?\.(?:txt|in)$",
+    re.IGNORECASE,
+)
 ARCHIVE_PREFIX = "satellites/branch-snapshots/"
 
 
 def is_installable_manifest_name(name: str) -> bool:
     """Return whether *name* is recognized by common dependency tooling."""
     lowered = name.lower()
-    return lowered in EXACT_MANIFEST_NAMES or REQUIREMENTS_RE.fullmatch(name) is not None
+    return (
+        lowered in EXACT_MANIFEST_NAMES
+        or REQUIREMENTS_RE.fullmatch(name) is not None
+        or CONSTRAINTS_RE.fullmatch(name) is not None
+    )
 
 
 def find_installable_manifests(root: Path = ARCHIVE_ROOT) -> list[Path]:
