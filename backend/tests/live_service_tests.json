@@ -1,14 +1,6 @@
 {
   "version": 1,
   "tests": {
-    "test_auth_security.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "localhost:8080"
-    },
-    "test_cors_policy.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "localhost:3000"
-    },
     "test_galaxy_build_pipeline_regression.py": {
       "reason": "Exercises a separately running Galaxy Studio backend over HTTP.",
       "target": "localhost:8001"
@@ -20,10 +12,6 @@
     "test_governance.py": {
       "reason": "Exercises a mutable deployed preview environment and its persisted governance state.",
       "target": "remote-preview"
-    },
-    "test_hardening_advanced_auth.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "localhost:3000"
     },
     "test_iteration_105_forge_asset_id_only.py": {
       "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
