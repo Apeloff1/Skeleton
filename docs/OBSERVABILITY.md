@@ -6,6 +6,13 @@ Issue #121 consolidates observability around the existing `skeleton.observabilit
 
 `DomainEvent.correlation_id` is the subsystem-neutral correlation field. `EventBus.emit(..., correlation_id=...)` preserves it on emitted events. API request IDs, orchestration run IDs, agent task IDs, and tool call IDs should be related through this field or included as explicit structured payload fields when crossing subsystem boundaries.
 
+`skeleton.observability.correlation` owns the shared ContextVar used by
+`ObservableOrchestrator`. When that context is active, bare
+`EventBus.publish` / `emit` calls that omit `correlation_id` inherit it
+through a kernel fallback (no second telemetry plane). Use
+`correlation_scope(...)` or `background_job(...)` for side-bus and
+background-job hops. Explicit `correlation_id` on an event always wins.
+
 Correlation identifiers are operational metadata, not a place to store credentials or user payloads.
 
 ## Redaction

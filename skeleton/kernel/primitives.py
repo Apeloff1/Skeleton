@@ -76,6 +76,33 @@ class DomainEvent:
         )
 
 
+_correlation_fallback: Optional[Callable[[], str]] = None
+
+
+def register_correlation_fallback(provider: Optional[Callable[[], str]]) -> None:
+    """Optionally supply active correlation when an event omits it.
+
+    Observability installs a ContextVar-backed provider. Passing ``None``
+    clears the provider (tests). Failures in the provider are ignored.
+    """
+
+    global _correlation_fallback
+    _correlation_fallback = provider
+
+
+def _resolve_correlation_fallback() -> str:
+    provider = _correlation_fallback
+    if provider is None:
+        return ""
+    try:
+        value = provider()
+    except Exception:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return ""
+
+
 class EventBus:
     """Lightweight pub/sub event bus with bounded diagnostic replay."""
 
@@ -104,6 +131,17 @@ class EventBus:
     def publish(self, event: DomainEvent) -> DomainEvent:
         """Publish an event and retain it in the bounded replay window."""
 
+        if not event.correlation_id:
+            fallback = _resolve_correlation_fallback()
+            if fallback:
+                event = DomainEvent(
+                    topic=event.topic,
+                    payload=dict(event.payload),
+                    correlation_id=fallback,
+                    timestamp=event.timestamp,
+                    event_id=event.event_id,
+                    causation_id=event.causation_id,
+                )
         self._replay.append(event)
         for topic, handlers in self._subscribers.items():
             if self._matches(topic, event.topic):
@@ -131,6 +169,8 @@ class EventBus:
                 if isinstance(candidate, str) and candidate:
                     resolved = candidate
                     break
+        if not resolved:
+            resolved = _resolve_correlation_fallback()
         return self.publish(
             DomainEvent(
                 topic=topic,
