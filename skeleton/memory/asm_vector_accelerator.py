@@ -22,6 +22,7 @@ _MAX_DIMENSIONS = 4096
 _MAX_CANDIDATES = 100_000
 _MAX_QUERIES = 512
 _MAX_ELEMENTS = 4_000_000
+_MAX_SCORE_ELEMENTS = 4_000_000
 _MAX_RANGE_HITS = 1_000_000
 _SIMILARITY_EPSILON = 1e-4
 
@@ -154,6 +155,8 @@ class AsmVectorSearchAccelerator:
             raise ValueError("query count outside supported range")
         if prepared.dimensions * (query_count + prepared.count) > _MAX_ELEMENTS:
             raise ValueError("vector element count exceeds accelerator bound")
+        if query_count * prepared.count > _MAX_SCORE_ELEMENTS:
+            raise ValueError("score matrix exceeds accelerator bound")
         if not 1 <= top_k <= prepared.count:
             raise ValueError("top_k outside candidate range")
 
@@ -232,6 +235,8 @@ class AsmVectorSearchAccelerator:
             raise ValueError("max_total_hits outside supported range")
         if prepared.dimensions * (query_count + prepared.count) > _MAX_ELEMENTS:
             raise ValueError("vector element count exceeds accelerator bound")
+        if query_count * prepared.count > _MAX_SCORE_ELEMENTS:
+            raise ValueError("score matrix exceeds accelerator bound")
         threshold = self._validate_threshold(similarity_threshold)
 
         total = 0
