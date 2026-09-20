@@ -8,8 +8,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 GOV = f"{BASE_URL}/api/governance"
 PLAY = f"{BASE_URL}/api/playable"

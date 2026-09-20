@@ -4,9 +4,6 @@ import importlib.util
 from pathlib import Path
 
 
-import pytest
-
-pytestmark = pytest.mark.live_service
 def _load_collection_boundary():
     path = Path(__file__).resolve().parents[1] / "tests" / "conftest.py"
     spec = importlib.util.spec_from_file_location("backend_tests_conftest_contract", path)

@@ -25,8 +25,6 @@ import io
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = "http://localhost:8001"
 TIMEOUT = 60
 

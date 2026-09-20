@@ -12,8 +12,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL")
 if not BASE_URL:
     # Read directly from frontend .env

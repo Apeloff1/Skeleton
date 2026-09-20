@@ -7,8 +7,6 @@ import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 FORGE = f"{BASE_URL}/api/galaxy-studio/forge"
 

@@ -8,9 +8,6 @@ Tests:
 """
 import os, requests, pytest
 
-import pytest
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"
 
 

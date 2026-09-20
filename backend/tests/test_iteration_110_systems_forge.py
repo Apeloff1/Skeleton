@@ -3,8 +3,6 @@ import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL") or os.environ.get("EXPO_PUBLIC_BACKEND_URL") or "https://player-retention.preview.emergentagent.com"
 BASE_URL = BASE_URL.rstrip("/")
 API = f"{BASE_URL}/api/galaxy-studio/systems"

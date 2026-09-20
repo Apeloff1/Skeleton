@@ -22,8 +22,6 @@ import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or \
            os.environ.get("EXPO_BACKEND_URL", "").rstrip("/")
 
