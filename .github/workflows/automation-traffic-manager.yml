@@ -43,6 +43,10 @@ jobs:
       relieve: ${{ steps.traffic.outputs.relieve }}
       relief_reason: ${{ steps.traffic.outputs.relief_reason }}
       decision_json: ${{ steps.traffic.outputs.decision_json }}
+      admitted_base_sha: ${{ steps.identity.outputs.base_sha }}
+      decision_base_sha: ${{ steps.traffic.outputs.base_sha }}
+      decision_observed_at: ${{ steps.traffic.outputs.observed_at }}
+      decision_fingerprint: ${{ steps.traffic.outputs.decision_fingerprint }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
       GH_TOKEN: ${{ github.token }}
@@ -57,6 +61,17 @@ jobs:
           set -euo pipefail
           test -n "$TRAFFIC_EXPECTED_REF"
           test "$TRAFFIC_EVENT_REF" = "$TRAFFIC_EXPECTED_REF"
+
+      - name: Capture immutable admission identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Traffic manager did not receive a full commit SHA."
+            exit 1
+          }
+          echo "base_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Checkout immutable traffic policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -247,9 +262,59 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      TRAFFIC_ADMITTED_BASE_SHA: ${{ needs.admission.outputs.admitted_base_sha }}
+      TRAFFIC_DECISION_BASE_SHA: ${{ needs.admission.outputs.decision_base_sha }}
+      TRAFFIC_DECISION_OBSERVED_AT: ${{ needs.admission.outputs.decision_observed_at }}
+      TRAFFIC_DECISION_FINGERPRINT: ${{ needs.admission.outputs.decision_fingerprint }}
     steps:
-      - name: Dispatch reviewed supervisor workflow
-        run: >-
-          gh workflow run supervisor.yml
-          --repo "$GITHUB_REPOSITORY"
-          --ref "$TRAFFIC_DEFAULT_BRANCH"
+      - name: Revalidate admission and dispatch reviewed supervisor workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Admission did not provide a full commit SHA."
+            exit 1
+          }
+          [[ "$TRAFFIC_DECISION_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Traffic decision did not bind a full base SHA."
+            exit 1
+          }
+          [[ "$TRAFFIC_DECISION_OBSERVED_AT" =~ ^[1-9][0-9]{0,11}$ ]] || {
+            echo "::error::Traffic decision observation epoch is malformed."
+            exit 1
+          }
+          [[ "$TRAFFIC_DECISION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || {
+            echo "::error::Traffic decision fingerprint is malformed."
+            exit 1
+          }
+          [[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]] || {
+            echo "::error::Admission identity differs from traffic decision custody."
+            exit 1
+          }
+          expected_fingerprint=$(python -c 'import os; from skeleton.automation.traffic_manager import decision_identity_fingerprint; print(decision_identity_fingerprint(os.environ["GITHUB_REPOSITORY"], os.environ["TRAFFIC_DECISION_BASE_SHA"], int(os.environ["TRAFFIC_DECISION_OBSERVED_AT"])))')
+          test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT" || {
+            echo "::error::Traffic decision fingerprint failed independent verification."
+            exit 1
+          }
+          [[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+            echo "::error::Default branch contains unexpected characters."
+            exit 1
+          }
+
+          live_sha=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" \
+            --jq '.object.sha')
+          [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid default-branch head."
+            exit 1
+          }
+
+          if [[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]; then
+            echo "Admission became stale (${TRAFFIC_ADMITTED_BASE_SHA} != ${live_sha}); coalescing this dispatch."
+            exit 0
+          fi
+
+          gh workflow run supervisor.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TRAFFIC_DEFAULT_BRANCH" \
+            -f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"
