@@ -8,6 +8,10 @@ and never grants build authority.
 Routine authority remains one-way::
 
     Traffic Manager (observe/admit)
+        -> Branch Merge Manager (integration inventory/delegation)
+        -> Auto-Merge Control Plane (exact-head merge authority)
+
+    Traffic Manager (observe/admit)
         -> Supervisor (read/plan)
         -> Secretary (admit/dispatch)
         -> Worker (mutate)
@@ -52,6 +56,7 @@ CRITICAL_WORKFLOW_MARKERS = (
 
 MANAGED_WORKFLOW_MARKERS = (
     "automation traffic manager",
+    "branch merge manager",
     "repository supervisor",
     "repository secretary",
 )
