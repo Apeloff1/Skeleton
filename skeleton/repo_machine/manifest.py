@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import tempfile
 import os
+import stat
 from typing import Mapping
 
 from .model import RepositoryModel, canonical_json
@@ -76,10 +77,44 @@ def save_manifest(model: RepositoryModel, path: str | Path, *, include_files: bo
 
 def load_manifest(path: str | Path) -> Mapping[str, object]:
     source = Path(path)
-    raw = source.read_bytes()
-    if len(raw) > MAX_MANIFEST_BYTES:
+    try:
+        metadata = source.lstat()
+    except OSError as exc:
+        raise ValueError("machine manifest is unavailable") from exc
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise ValueError("machine manifest must be a regular non-symlink file")
+    if metadata.st_size <= 0 or metadata.st_size > MAX_MANIFEST_BYTES:
         raise ValueError("machine manifest exceeds byte budget")
-    payload = json.loads(raw.decode("utf-8"))
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(source, flags)
+    except OSError as exc:
+        raise ValueError("machine manifest cannot be opened safely") from exc
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("machine manifest must be a regular file")
+        if before.st_size <= 0 or before.st_size > MAX_MANIFEST_BYTES:
+            raise ValueError("machine manifest exceeds byte budget")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(MAX_MANIFEST_BYTES + 1)
+        after = os.fstat(fd)
+        if (
+            before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+        ):
+            raise ValueError("machine manifest changed during read")
+        if len(raw) > MAX_MANIFEST_BYTES:
+            raise ValueError("machine manifest exceeds byte budget")
+    finally:
+        os.close(fd)
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("machine manifest is invalid JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("machine manifest must be an object")
     if payload.get("format") != "skeleton-repository-machine-manifest" or payload.get("version") != 1:
