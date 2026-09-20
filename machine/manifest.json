@@ -1,81 +1,31 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
-  "runtime": {
-    "language": "python",
-    "version": "3.11",
-    "web": "fastapi",
-    "server": "uvicorn"
-  },
-  "assembly": {
-    "branch": "integration/app-consolidation",
-    "base": "main",
-    "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
-    "current_status": "assembly_started"
-  },
-  "entrypoints": {
-    "tests": "python -m pytest skeleton/testing -v",
-    "fallback_tests": "python -m unittest discover skeleton/testing -v",
-    "install": "pip install -r requirements.txt",
-    "dev_install": "pip install -r requirements-dev.txt"
-  },
-  "top_level": {
-    "skeleton": "application source and domain packages",
-    "skeleton/agents": "agent orchestration and swarm runtime",
-    "skeleton/kernel": "core domain primitives",
-    "skeleton/config": "configuration and snapshots",
-    "skeleton/retrieval": "retrieval, fusion and ranking",
-    "skeleton/vault": "access control and key management",
-    "skeleton/observability": "telemetry and sampling",
-    "skeleton/testing": "test infrastructure",
-    "docs": "human and architectural documentation",
-    ".github": "CI and repository automation",
-    "machine": "machine-facing architecture and integration metadata"
-  },
-  "branch_families": {
-    "feat": "application capabilities; inspect unique commits and files before integration",
-    "fix": "repairs and hardening; integrate when they add distinct behavior",
-    "reconcile": "integration/reconciliation work; preserve unique commits and resolve overlap",
-    "stabilize": "stabilization work; stale tips already contained in main were normalized",
-    "merge": "merge-oriented work; currently contains unique commits and is not auto-merged",
-    "tmp": "temporary work; stale tips already contained in main were normalized"
-  },
+  "runtime": {"language":"python","version":"3.11","web":"fastapi","server":"uvicorn"},
+  "assembly": {"branch":"integration/app-consolidation","base":"main","policy":"integrate distinct application capabilities by domain; do not blindly merge branch history","current_status":"assembly_started"},
+  "entrypoints": {"tests":"python -m pytest skeleton/testing -v","fallback_tests":"python -m unittest discover skeleton/testing -v","install":"pip install -r requirements.txt","dev_install":"pip install -r requirements-dev.txt"},
+  "top_level": {"skeleton":"application source and domain packages","skeleton/agents":"agent orchestration and swarm runtime","skeleton/kernel":"core domain primitives","skeleton/config":"configuration and snapshots","skeleton/retrieval":"retrieval, fusion and ranking","skeleton/vault":"access control and key management","skeleton/observability":"telemetry and sampling","skeleton/testing":"test infrastructure","docs":"human and architectural documentation",".github":"CI and repository automation","machine":"machine-facing architecture and integration metadata"},
+  "branch_families": {"feat":"application capabilities; inspect unique commits and files before integration","fix":"repairs and hardening; integrate when they add distinct behavior","reconcile":"integration/reconciliation work; preserve unique commits and resolve overlap","stabilize":"stabilization work; stale tips already contained in main were normalized","merge":"merge-oriented work; unique commits are preserved for review","tmp":"temporary work; stale tips already contained in main were normalized"},
   "recent_integration": {
     "validated_stale_branches_normalized": 40,
-    "merged_into_assembly": [
-      {
-        "pr": 1701,
-        "head": "fix/bot-manager-runtime-deps",
-        "status": "merged",
-        "sha": "addad395849ca9e4c70388e701267d5fc45ce80f"
-      }
+    "merged_into_assembly":[{"pr":1701,"head":"fix/bot-manager-runtime-deps","status":"merged","sha":"addad395849ca9e4c70388e701267d5fc45ce80f"}],
+    "integrated_without_branch_merge":[
+      {"domain":"backlog reasoning adapter","source":"feat/backlog-reasoning-adapter-current-main-v2","status":"integrated_file_level"},
+      {"domain":"builder plane control","source":"feat/builder-plane-control-plane","status":"integrated_file_level"}
     ],
-    "queued": [
-      {
-        "pr": 1702,
-        "head": "feat/automerge-control-plane-20260919",
-        "status": "not_mergeable",
-        "files": 19,
-        "additions": 9605
-      }
-    ]
+    "queued_pr_range":{"first":1702,"last":1778,"status":"staged_or_queued_non_mergeable"},
+    "large_reconciliation":[
+      {"source":"fix/merge-unblockers-20260920","pr":1764,"files":132},
+      {"source":"fix/live-service-test-boundaries-20260920","pr":1754,"files":98},
+      {"source":"fix/main-gates-shell-live-20260920","status":"held","files":67},
+      {"source":"fix/jeeves-decision-rules-20260919-drain","status":"held","files":137},
+      {"source":"fix/jeeves-frontier-core-clean-20260919","status":"held","files":57},
+      {"source":"fix/physics-aggregate-validation","status":"held","files":77}
+    ],
+    "no_op_lineage":"Branches with zero file delta versus assembly are retained as lineage and not represented as integrated content."
   },
-  "integrated_domains": [
-    "automation runtime dependency repair",
-    "automerge control plane",
-    "automerge policy/evidence/ledger/model/stack",
-    "automerge CLI and GitHub adapter",
-    "automerge contract checks and tests"
-  ],
-  "machine_rules": [
-    "Read this manifest before modifying the repository.",
-    "Prefer package-local imports over root-level coupling.",
-    "Keep heavy subsystems out of skeleton/__init__.py.",
-    "Use integration/app-consolidation as the assembly workspace.",
-    "Integrate behavior and files, not branch names.",
-    "Record every structural integration decision here and in machine/README.md.",
-    "Do not discard branches with unique commits without reviewing their file-level changes."
-  ]
+  "integrated_domains":["automation runtime dependency repair","backlog reasoning adapter","builder plane control","automerge control plane","automerge policy/evidence/ledger/model/stack","automerge CLI and GitHub adapter","automerge contract checks and tests"],
+  "machine_rules":["Read this manifest before modifying the repository.","Prefer package-local imports over root-level coupling.","Keep heavy subsystems out of skeleton/__init__.py.","Use integration/app-consolidation as the assembly workspace.","Integrate behavior and files, not branch names.","Record structural integration decisions here and in machine/README.md.","Do not discard branches with unique commits without reviewing their file-level changes.","Do not blindly merge non-mergeable integration PRs; reconcile overlapping files first."]
 }
