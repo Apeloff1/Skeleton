@@ -1,7 +1,6 @@
 name: Drain superseded Actions queue
 
 on:
-  workflow_call:
   workflow_dispatch:
   workflow_run:
     workflows: ["Merge Readiness"]
