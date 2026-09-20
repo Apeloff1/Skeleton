@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from skeleton.contracts.system_catalog import CATALOG, topological_order, validate_catalog
+from skeleton.contracts.system_catalog import CATALOG, audit_catalog, topological_order, validate_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_CHECKER_BYTES = 300_000
@@ -88,6 +88,13 @@ def _run_checker(relative: str) -> ContractEvidence:
 
 def _validate_manifest() -> None:
     validate_catalog(CATALOG)
+    audit = audit_catalog(CATALOG)
+    if not audit.clean:
+        raise RuntimeError(
+            "cross-contract consistency failure: "
+            f"ownership={audit.ownership_conflicts!r} "
+            f"orphans={audit.orphan_dependencies!r}"
+        )
     if len(CHECKERS) != len(set(CHECKERS)):
         raise RuntimeError("duplicate checker in contract manifest")
     for relative in CHECKERS:
@@ -135,6 +142,15 @@ def main() -> int:
             for spec in topological_order(CATALOG)
         ], sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
         "execution_order": [spec.contract_id for spec in topological_order(CATALOG)],
+        "dependency_edges": sorted(
+            [dependency, spec.contract_id]
+            for spec in CATALOG
+            for dependency in spec.depends_on
+        ),
+        "ownership": {
+            spec.contract_id: list(spec.owns)
+            for spec in sorted(CATALOG, key=lambda item: item.contract_id)
+        },
         "checker_count": len(CHECKERS),
         "executed_count": len(evidence),
         "failed_count": sum(item.returncode != 0 for item in evidence) + (len(CHECKERS) - len(evidence)),
