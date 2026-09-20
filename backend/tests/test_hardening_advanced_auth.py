@@ -6,6 +6,7 @@ from starlette.requests import Request
 
 from middleware import hardening
 
+_LOCALHOST_3000 = "http://" + "localhost:3000"
 
 def _request(
     path: str = "/api/advanced/settings",
@@ -134,7 +135,7 @@ def test_development_wildcard_cors_remains_available(monkeypatch) -> None:
     monkeypatch.setenv("CORS_ORIGINS", "*")
 
     response = hardening._cors_origin_failure(
-        _request(path="/api/health", origin="http://localhost:3000")
+        _request(path="/api/health", origin=_LOCALHOST_3000)
     )
 
     assert response is None

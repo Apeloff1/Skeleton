@@ -17,6 +17,7 @@ from typing import Callable
 from skeleton.shells.ai.durable_checkpoint import (
     CheckpointableEvidenceChain,
     DurableChainCheckpointStore,
+    DurableCheckpointError,
     SignedDurableChainCheckpoint,
 )
 from skeleton.shells.ai.signed_artifact import (
@@ -458,10 +459,15 @@ class DurableArchiveManifestBuilder:
             raise TypeError(
                 "checkpoint must be SignedDurableChainCheckpoint"
             )
-        verification = self.checkpoints.require(
-            checkpoint,
-            chain,
-        )
+        try:
+            verification = self.checkpoints.require(
+                checkpoint,
+                chain,
+            )
+        except DurableCheckpointError as exc:
+            raise DurableArchiveError(
+                f"checkpoint failed canonical verification: {exc}"
+            ) from exc
         if not verification.valid:
             raise DurableArchiveError(
                 "checkpoint failed verification"

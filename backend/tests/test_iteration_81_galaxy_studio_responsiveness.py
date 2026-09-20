@@ -19,6 +19,8 @@ import zipfile
 import pytest
 import requests
 
+
+pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 # fall back: prefer local socket for tight time-boxing
 BASE_LOCAL = "http://localhost:8001"
