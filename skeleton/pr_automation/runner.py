@@ -944,6 +944,11 @@ def _publish_run_error(client: GitHubClient, repository: str, number: int, messa
 
 
 def main(argv: list[str] | None = None) -> int:
+    if _bool_env("PR_AUTOMATION_RUNNER_V2", False):
+        from .runner_v2_cli import run_v2
+
+        return run_v2(argv)
+
     parser = argparse.ArgumentParser(description="Evaluate and safely automate pull requests.")
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--pr", type=int)
