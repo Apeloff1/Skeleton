@@ -84,6 +84,8 @@ def is_installable_manifest_name(name: str) -> bool:
 
 def find_installable_manifests(root: Path = ARCHIVE_ROOT) -> list[Path]:
     """Find canonical dependency surfaces below the archival snapshot tree."""
+    if root.is_symlink():
+        raise RuntimeError(f"archival snapshot root must not be a symlink: {root}")
     if not root.is_dir():
         raise FileNotFoundError(f"archival snapshot root is missing: {root}")
 
@@ -122,7 +124,7 @@ def _safe_archive_file(
     for part in relative.parts:
         current = current / part
         try:
-            info = current.lstat()
+            current.lstat()
         except FileNotFoundError:
             return None, "archive_path is missing"
         except OSError:
