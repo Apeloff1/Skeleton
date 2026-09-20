@@ -8,6 +8,8 @@ from skeleton.contracts.system_catalog import (
     authority_paths,
     contract_fingerprint,
     contract_fingerprints,
+    diff_contract_catalogs,
+    high_risk_changes,
     audit_catalog,
     dependency_closure,
     impacted_contracts,
@@ -353,3 +355,66 @@ def test_authority_paths_reach_root_and_target():
 def test_unknown_authority_target_fails_closed():
     with pytest.raises(KeyError):
         authority_paths("missing")
+
+
+def test_semantic_drift_detects_privilege_expansion():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read",)),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, privileges=("contents:read", "contents:write")),
+    )
+    changes = diff_contract_catalogs(before, after)
+    assert len(changes) == 1
+    assert changes[0].classification == "privilege-expanded"
+    assert high_risk_changes(changes) == changes
+
+
+def test_semantic_drift_detects_ownership_expansion():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, owns=("a/",)),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, owns=("a/", "b/")),
+    )
+    assert diff_contract_catalogs(before, after)[0].classification == "ownership-expanded"
+
+
+def test_semantic_drift_detects_evidence_version_change():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, evidence_version=1),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, evidence_version=2),
+    )
+    assert diff_contract_catalogs(before, after)[0].classification == "evidence-version-changed"
+
+
+def test_semantic_drift_detects_maturity_regression():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=3),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=2),
+    )
+    assert diff_contract_catalogs(before, after)[0].classification == "maturity-regressed"
+
+
+def test_semantic_drift_detects_add_remove_and_ignores_equal():
+    stable = ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT)
+    added = ContractSpec("b", "scripts/check_b_contract.py", ContractTier.SECURITY)
+    assert diff_contract_catalogs((stable,), (stable,)) == ()
+    assert diff_contract_catalogs((stable,), (stable, added))[0].classification == "added"
+    assert diff_contract_catalogs((stable, added), (stable,))[0].classification == "removed"
+
+
+def test_non_authority_change_is_modified_not_high_risk():
+    before = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=1),
+    )
+    after = (
+        ContractSpec("a", "scripts/check_a_contract.py", ContractTier.ROOT, maturity=2),
+    )
+    changes = diff_contract_catalogs(before, after)
+    assert changes[0].classification == "modified"
+    assert high_risk_changes(changes) == ()
