@@ -2269,7 +2269,7 @@ class DurableArchiveRepository:
         )
         if index is None:
             raise DurableArchiveStoreError(
-                "historical root is not archived"
+                "historical root is unavailable: not archived"
             )
         failures: list[str] = []
         for position, replica in enumerate(
