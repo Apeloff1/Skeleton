@@ -173,23 +173,43 @@ def test_dispatch_is_bound_to_exact_admitted_default_branch_head() -> None:
         "TRAFFIC_ADMITTED_BASE_SHA: "
         "${{ needs.admission.outputs.admitted_base_sha }}"
     ) in dispatch
-    assert "Require admission still matches default-branch head" in dispatch
+    assert "Revalidate admission and dispatch reviewed supervisor workflow" in dispatch
     assert "/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" in dispatch
     assert '[[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in dispatch
     assert '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]' in dispatch
+    assert "gh workflow run supervisor.yml" in dispatch
+
+
+def test_stale_admission_cannot_fall_through_to_separate_dispatch_step() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert dispatch.count("gh workflow run supervisor.yml") == 1
+    assert dispatch.count("name: Revalidate admission and dispatch reviewed supervisor workflow") == 1
+    assert "name: Dispatch reviewed supervisor workflow" not in dispatch
+    guard_position = dispatch.index('[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]')
+    exit_position = dispatch.index("exit 0", guard_position)
+    dispatch_position = dispatch.index("gh workflow run supervisor.yml", exit_position)
+    assert guard_position < exit_position < dispatch_position
 
 
 def test_stale_dispatch_guard_does_not_interpolate_expressions_into_shell() -> None:
     source = _source(TRAFFIC)
     dispatch = _job_block(source, "dispatch")
-    guard = dispatch.split(
-        "- name: Require admission still matches default-branch head", 1
-    )[1].split(
-        "- name: Dispatch reviewed supervisor workflow", 1
-    )[0]
-    assert "${{ " not in guard
-    assert "$TRAFFIC_ADMITTED_BASE_SHA" in guard
-    assert "${TRAFFIC_DEFAULT_BRANCH}" in guard
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert "${{ " not in run_block
+    assert "$TRAFFIC_ADMITTED_BASE_SHA" in run_block
+    assert "${TRAFFIC_DEFAULT_BRANCH}" in run_block
+    assert "$GITHUB_REPOSITORY" in run_block
+
+
+def test_dispatch_validates_provider_head_before_comparison() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert '[[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert "GitHub returned an invalid default-branch head" in dispatch
+    assert '[[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]' in dispatch
 
 
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
