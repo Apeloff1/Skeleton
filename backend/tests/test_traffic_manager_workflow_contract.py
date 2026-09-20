@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+TRAFFIC = ROOT / ".github" / "workflows" / "automation-traffic-manager.yml"
+SUPERVISOR = ROOT / ".github" / "workflows" / "supervisor.yml"
+SECRETARY = ROOT / ".github" / "workflows" / "secretary.yml"
+
+
+def _source(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _job_block(source: str, job: str, next_job: str | None = None) -> str:
+    marker = f"  {job}:\n"
+    start = source.index(marker)
+    if next_job is None:
+        return source[start:]
+    end = source.index(f"  {next_job}:\n", start + len(marker))
+    return source[start:end]
+
+
+def test_traffic_manager_is_only_routine_schedule_for_supervisor_chain() -> None:
+    traffic = _source(TRAFFIC)
+    supervisor = _source(SUPERVISOR)
+    secretary = _source(SECRETARY)
+
+    assert 'cron: "*/15 * * * *"' in traffic
+    assert "  schedule:" in traffic.split("permissions:", 1)[0]
+    assert "  schedule:" not in supervisor.split("concurrency:", 1)[0]
+    assert "  schedule:" not in secretary.split("concurrency:", 1)[0]
+
+
+def test_traffic_manager_coalesces_overlapping_runs_without_cancelling_mutation() -> None:
+    source = _source(TRAFFIC)
+    concurrency = source.split("concurrency:\n", 1)[1].split("\n\njobs:", 1)[0]
+    assert "group: automation-traffic-manager-${{ github.repository }}" in concurrency
+    assert "cancel-in-progress: false" in concurrency
+
+
+def test_admission_job_is_read_only() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "supervisor")
+    permissions = admission.split("    permissions:\n", 1)[1].split(
+        "    runs-on:", 1
+    )[0]
+    assert "actions: read" in permissions
+    assert "contents: read" in permissions
+    assert "issues: read" in permissions
+    assert "pull-requests: read" in permissions
+    assert "write" not in permissions
+
+
+def test_manager_invokes_fixed_admission_module() -> None:
+    source = _source(TRAFFIC)
+    assert "python -m skeleton.automation.traffic_manager" in source
+    assert "eval " not in source
+    assert "bash -c" not in source
+    assert "sh -c" not in source
+
+
+def test_manual_force_crosses_shell_boundary_only_through_env() -> None:
+    source = _source(TRAFFIC)
+    assert "TRAFFIC_FORCE:" in source
+    admission = _job_block(source, "admission", "supervisor")
+    run_block = admission.split(
+        "- name: Evaluate bounded automation pressure", 1
+    )[1]
+    assert "${{ inputs.force" not in run_block
+    assert "${{ github.event" not in run_block
+
+
+def test_traffic_manager_calls_reusable_supervisor_only_after_admission() -> None:
+    source = _source(TRAFFIC)
+    supervisor = _job_block(source, "supervisor")
+    assert "needs: admission" in supervisor
+    assert "needs.admission.outputs.admit == 'true'" in supervisor
+    assert "uses: ./.github/workflows/supervisor.yml" in supervisor
+    assert "secrets: inherit" in supervisor
+
+
+def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
+    source = _source(SUPERVISOR)
+    trigger = source.split("concurrency:", 1)[0]
+    assert "  workflow_call:" in trigger
+    assert "  workflow_dispatch:" in trigger
+    assert "  schedule:" not in trigger
+
+
+def test_secretary_has_no_routine_schedule() -> None:
+    source = _source(SECRETARY)
+    trigger = source.split("concurrency:", 1)[0]
+    assert "  workflow_dispatch:" in trigger
+    assert "  schedule:" not in trigger
+
+
+def test_traffic_manager_uses_pinned_reviewed_actions() -> None:
+    source = _source(TRAFFIC)
+    assert (
+        "actions/checkout@"
+        "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    ) in source
+    assert (
+        "actions/setup-python@"
+        "5fda3b95a4ea91299a34e894583c3862153e4b97"
+    ) in source
+    assert "@main" not in source
+    assert "@master" not in source
