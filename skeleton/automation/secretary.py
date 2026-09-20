@@ -42,6 +42,7 @@ from .builder_plane import (
     validate_builder_custody,
     validate_builder_worker_evidence,
 )
+from .execution_failsafe import retry_allowed, summarize_results
 from .free_model import redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -62,6 +63,7 @@ MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 MAX_ENCODED_ENVELOPE = 32_000
 MAX_WORKER_SECONDS = 20 * 60
 MAX_DISPATCH_SECONDS = MAX_ASSIGNMENTS * MAX_WORKER_SECONDS
+MAX_STEP_SUMMARY_BYTES = 1_000_000
 
 KEYWORDS = {
     "root-cause": (
@@ -530,6 +532,7 @@ def _dispatch_one(
     execution: ExecutionIdentity,
     build_authorization: BuildAuthorization | None = None,
     builder_manifest: BuilderManifest | None = None,
+    attempt: int = 1,
 ) -> dict[str, Any]:
     """Run one worker in a detached worktree rooted at the admitted base."""
     repo_root = Path.cwd().resolve()
@@ -686,17 +689,40 @@ def _dispatch_one(
                 "returncode": process.returncode,
                 "isolated": True,
                 "evidence": evidence,
+                "attempt": attempt,
+                "failure_kind": (
+                    None
+                    if process.returncode == 0
+                    else "worker-failure"
+                ),
             }
-        except (
-            OSError,
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            SupervisorRuntimeError,
-        ):
+        except subprocess.TimeoutExpired:
             return {
                 "bot": name,
                 "returncode": 1,
                 "isolated": True,
+                "attempt": attempt,
+                # A timeout may happen after a worker pushed a branch or PR.
+                # Never retry an ambiguous post-start outcome automatically.
+                "failure_kind": "worker-timeout",
+            }
+        except SupervisorRuntimeError:
+            return {
+                "bot": name,
+                "returncode": 1,
+                "isolated": True,
+                "attempt": attempt,
+                "failure_kind": "invalid-evidence",
+            }
+        except (OSError, subprocess.CalledProcessError):
+            return {
+                "bot": name,
+                "returncode": 1,
+                "isolated": True,
+                "attempt": attempt,
+                # These errors occur while creating or launching the isolated
+                # worker, before admitted worker evidence can exist.
+                "failure_kind": "setup-failure",
             }
         finally:
             _remove_worktree(
@@ -774,14 +800,69 @@ def dispatch(
         }
         if name == "feature-builder":
             kwargs["builder_manifest"] = builder_manifest
-        results.append(
-            _dispatch_one(
+        result = _dispatch_one(
+            plan,
+            name,
+            **kwargs,
+        )
+        if retry_allowed(result):
+            result = _dispatch_one(
                 plan,
                 name,
+                attempt=2,
                 **kwargs,
             )
-        )
+        results.append(result)
     return results
+
+
+def _append_step_summary(
+    *,
+    execution: ExecutionIdentity,
+    assignments: list[str],
+    failsafe_summary: dict[str, object] | None,
+) -> None:
+    """Append bounded operator evidence to the GitHub run summary."""
+    raw_path = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
+    if not raw_path:
+        return
+    path = Path(raw_path)
+    if not path.is_absolute() or path.is_symlink():
+        raise SecretaryAdmissionError("unsafe GitHub step summary path")
+    if path.exists() and path.stat().st_size > MAX_STEP_SUMMARY_BYTES:
+        raise SecretaryAdmissionError("GitHub step summary exceeds byte budget")
+    lines = [
+        "## Repository Secretary failsafe report",
+        f"- Repository: `{execution.repository}`",
+        f"- Base SHA: `{execution.base_sha}`",
+        f"- Execution fingerprint: `{execution.fingerprint}`",
+        f"- Assignments: `{', '.join(assignments) if assignments else 'none'}`",
+    ]
+    if failsafe_summary is None:
+        lines.append("- Outcome: `no-dispatch`")
+    else:
+        lines.extend(
+            [
+                f"- Terminal failures: `{failsafe_summary['terminal_failures']}`",
+                f"- Retryable outcomes: `{failsafe_summary['retryable_count']}`",
+                f"- Summary digest: `{failsafe_summary['summary_digest']}`",
+            ]
+        )
+        for outcome in failsafe_summary.get("outcomes", []):
+            if not isinstance(outcome, dict):
+                continue
+            lines.append(
+                "- Worker "
+                f"`{outcome.get('worker')}`: `{outcome.get('kind')}` "
+                f"(attempt `{outcome.get('attempt')}`, "
+                f"digest `{outcome.get('failure_digest')}`)"
+            )
+    rendered = "\n".join(lines) + "\n"
+    if len(rendered.encode("utf-8")) > 16_000:
+        raise SecretaryAdmissionError("failsafe step summary exceeds byte budget")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(rendered)
 
 
 def main() -> int:
@@ -914,6 +995,11 @@ def main() -> int:
 
     if not assignments:
         save_state(state)
+        _append_step_summary(
+            execution=execution,
+            assignments=assignments,
+            failsafe_summary=None,
+        )
         return 0
 
     results = dispatch(
@@ -931,12 +1017,21 @@ def main() -> int:
         )
     save_state(state)
 
+    failsafe_summary = summarize_results(results)
     print(
         json.dumps(
-            {"results": results},
+            {
+                "results": results,
+                "failsafe_summary": failsafe_summary,
+            },
             indent=2,
             sort_keys=True,
         )
+    )
+    _append_step_summary(
+        execution=execution,
+        assignments=assignments,
+        failsafe_summary=failsafe_summary,
     )
     return (
         0
