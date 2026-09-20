@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Repository-wide fail-closed contract manifest.
 
 This gate composes the repository's privileged static contract checkers into one
@@ -16,6 +15,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from skeleton.contracts.system_catalog import (
     CATALOG,
     audit_catalog,
@@ -26,14 +29,13 @@ from skeleton.contracts.system_catalog import (
     validate_catalog,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
 MAX_CHECKER_BYTES = 300_000
 MAX_SECONDS_PER_CHECKER = 90
 CHECKERS = tuple(spec.checker for spec in topological_order(CATALOG))
 REQUIRED_WIRING = (
     "python scripts/check_contract_system.py",
 )
-FORBIDDEN_MARKERS = ("eval(", "exec(", "shell=True", "os.system(")
+FORBIDDEN_CALLS = frozenset({"eval", "exec", "os.system"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,31 @@ class ContractEvidence:
         }
 
 
+def _call_name(node: ast.expr) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        return f"{node.value.id}.{node.attr}"
+    return ""
+
+
+def _forbidden_execution_marker(tree: ast.AST) -> str | None:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _call_name(node.func)
+        if call_name in FORBIDDEN_CALLS:
+            return call_name
+        for keyword in node.keywords:
+            if (
+                keyword.arg == "shell"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is True
+            ):
+                return f"{call_name or '<dynamic>'}(shell=True)"
+    return None
+
+
 def _admit_checker(relative: str) -> tuple[Path, bytes]:
     path = ROOT / relative
     if path.is_symlink() or not path.is_file():
@@ -63,12 +90,12 @@ def _admit_checker(relative: str) -> tuple[Path, bytes]:
         raise RuntimeError(f"contract checker has invalid bounded content: {relative}")
     try:
         source = raw.decode("utf-8")
-        ast.parse(source, filename=relative)
+        tree = ast.parse(source, filename=relative)
     except (UnicodeDecodeError, SyntaxError) as exc:
         raise RuntimeError(f"contract checker is not valid UTF-8 Python: {relative}") from exc
-    for marker in FORBIDDEN_MARKERS:
-        if marker in source:
-            raise RuntimeError(f"contract checker contains forbidden execution marker {marker!r}: {relative}")
+    marker = _forbidden_execution_marker(tree)
+    if marker is not None:
+        raise RuntimeError(f"contract checker contains forbidden execution call {marker!r}: {relative}")
     return path, raw
 
 
