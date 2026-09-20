@@ -344,3 +344,76 @@ def active_contracts(
     items = tuple(catalog)
     superseded = {old for item in items for old in item.supersedes}
     return tuple(item for item in topological_order(items) if item.contract_id not in superseded)
+
+
+def contract_fingerprint(
+    spec: ContractSpec,
+) -> str:
+    """Stable identity for one contract's declarative authority."""
+    import hashlib
+    import json
+
+    payload = {
+        "contract_id": spec.contract_id,
+        "checker": spec.checker,
+        "tier": spec.tier.value,
+        "depends_on": sorted(spec.depends_on),
+        "owns": sorted(spec.owns),
+        "evidence_version": spec.evidence_version,
+        "consumes_evidence": sorted([list(item) for item in spec.consumes_evidence]),
+        "privileges": sorted(spec.privileges),
+        "maturity": spec.maturity,
+        "supersedes": sorted(spec.supersedes),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def contract_fingerprints(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> dict[str, str]:
+    items = tuple(catalog)
+    validate_catalog(items)
+    return {
+        item.contract_id: contract_fingerprint(item)
+        for item in sorted(items, key=lambda value: value.contract_id)
+    }
+
+
+def authority_paths(
+    contract_id: str,
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> tuple[tuple[str, ...], ...]:
+    """Enumerate bounded dependency paths from roots to a contract."""
+    items = tuple(catalog)
+    index = by_id(items)
+    if contract_id not in index:
+        raise KeyError(contract_id)
+    paths: list[tuple[str, ...]] = []
+
+    def walk(name: str, suffix: tuple[str, ...]) -> None:
+        spec = index[name]
+        current = (name,) + suffix
+        if not spec.depends_on:
+            paths.append(current)
+            return
+        for dependency in sorted(spec.depends_on):
+            walk(dependency, current)
+
+    walk(contract_id, ())
+    return tuple(sorted(paths))
+
+
+def validate_authority_paths(
+    catalog: Iterable[ContractSpec] = CATALOG,
+) -> None:
+    """Require every dependent contract to have a finite root authority path."""
+    items = tuple(catalog)
+    validate_catalog(items)
+    for item in items:
+        paths = authority_paths(item.contract_id, items)
+        if not paths:
+            raise ValueError(f"contract has no authority path: {item.contract_id}")
+        for path in paths:
+            if path[-1] != item.contract_id:
+                raise ValueError(f"authority path terminus mismatch: {path!r}")
