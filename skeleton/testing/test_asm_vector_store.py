@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import array
 import math
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from skeleton.memory.asm_vector_accelerator import (
     AsmVectorHit,
     AsmVectorSearchAccelerator,
+    PreparedAsmCandidates,
 )
 from skeleton.memory.core import Chunk
 from skeleton.memory.vector import VectorStore
@@ -281,6 +283,27 @@ def test_asm_search_adapter_range_enforces_total_bound() -> None:
             -1.0,
             max_total_hits=5,
         )
+
+
+def test_asm_search_adapter_rejects_oversized_score_matrix() -> None:
+    kernel = _FakeKernel()
+    accelerator = AsmVectorSearchAccelerator(
+        kernel=kernel,
+        minimum_candidates=1,
+    )
+    candidate_count = 8_000
+    prepared = PreparedAsmCandidates(
+        dimensions=1,
+        count=candidate_count,
+        matrix=array.array("f", [1.0]) * candidate_count,
+        norms=(1.0,) * candidate_count,
+    )
+    queries = [([1.0], 1.0)] * 512
+
+    with pytest.raises(ValueError, match="score matrix exceeds accelerator bound"):
+        accelerator.top_k_many_prepared(queries, prepared, 1)
+
+    assert kernel.calls == 0
 
 
 def test_real_asm_vector_store_matches_python(tmp_path) -> None:
