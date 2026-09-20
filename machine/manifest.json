@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.2",
+  "schema_version": "3.3",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -203,6 +203,26 @@
         "files": 20,
         "commits": 129,
         "reason": "large capability wave; staged/held for file-level reconciliation"
+      },
+      {
+        "source": "feat/pr-runner-hygiene-pack-e-20260920",
+        "files": 111,
+        "reason": "staged as PR #1867; large hygiene wave held for reconciliation"
+      },
+      {
+        "source": "feat/bounded-shell-runner-20260918",
+        "files": 300,
+        "reason": "300-file shell wave held"
+      },
+      {
+        "source": "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "files": 300,
+        "reason": "300-file shell wave held"
+      },
+      {
+        "source": "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "files": 300,
+        "reason": "300-file shell wave held"
       }
     ],
     "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
