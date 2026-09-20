@@ -32,6 +32,7 @@ from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
     canonical_json,
+    validate_branch,
     validate_fingerprint,
     validate_repository,
     validate_sha,
@@ -781,26 +782,80 @@ def validate_builder_custody(
     return manifest
 
 
+def builder_worker_branch(manifest: BuilderManifest) -> str:
+    """Derive a feature-builder branch from immutable base and build task.
+
+    Generic specialists converge on worker + base SHA. Feature work has one
+    additional identity dimension: the maintainer-approved task. Including the
+    task digest prevents two approved issues on the same base commit from
+    aliasing one autonomous feature PR.
+    """
+    if not isinstance(manifest, BuilderManifest):
+        raise BuilderPlaneError("invalid builder manifest type")
+    suffix = _canonical_digest(
+        {
+            "base_sha": manifest.base_sha,
+            "task_digest": manifest.task_digest,
+        }
+    )[:16]
+    try:
+        return validate_branch(
+            f"bot/specialist-feature-builder-{suffix}",
+            label="builder worker branch",
+        )
+    except SupervisorRuntimeError as exc:
+        raise BuilderPlaneError("invalid builder worker branch") from exc
+
+
 def validate_builder_worker_evidence(
     evidence: Mapping[str, Any],
     manifest: BuilderManifest,
 ) -> None:
-    """Bind a newly published feature proposal to its exact Builder manifest."""
+    """Bind feature-builder evidence to exact task, branch, and custody."""
     if not isinstance(evidence, Mapping):
         raise BuilderPlaneError("builder worker evidence must be a mapping")
     if not isinstance(manifest, BuilderManifest):
         raise BuilderPlaneError("invalid builder manifest type")
-    if evidence.get("status") != "pull-request-created":
+
+    status = evidence.get("status")
+    if status == "no-change":
+        if evidence.get("bot") != "feature-builder":
+            raise BuilderPlaneError(
+                "builder no-change evidence came from a non-builder worker"
+            )
         return
+    if status not in {"pull-request-created", "existing-pr"}:
+        raise BuilderPlaneError("builder worker evidence status is not admitted")
     if evidence.get("bot") != "feature-builder":
         raise BuilderPlaneError(
             "builder mutation evidence came from a non-builder worker"
         )
-    supplied = evidence.get("builder_manifest_digest")
-    if supplied != manifest.manifest_digest:
-        raise BuilderPlaneError(
-            "builder worker evidence manifest digest mismatch"
-        )
+
+    expected = {
+        "branch": builder_worker_branch(manifest),
+        "build_issue_number": manifest.issue_number,
+        "build_task_digest": manifest.task_digest,
+        "supervisor_snapshot_fingerprint": manifest.snapshot_fingerprint,
+    }
+    for field, expected_value in expected.items():
+        if evidence.get(field) != expected_value:
+            raise BuilderPlaneError(
+                f"builder worker evidence {field} mismatch"
+            )
+
+    if status == "existing-pr":
+        return
+
+    created_expected = {
+        "builder_manifest_digest": manifest.manifest_digest,
+        "base_sha": manifest.base_sha,
+        "execution_fingerprint": manifest.execution_fingerprint,
+    }
+    for field, expected_value in created_expected.items():
+        if evidence.get(field) != expected_value:
+            raise BuilderPlaneError(
+                f"builder worker evidence {field} mismatch"
+            )
 
 
 def manifest_prompt_fragment(manifest: BuilderManifest) -> str:
@@ -839,6 +894,7 @@ __all__ = [
     "MAX_BUDGET_TEST_DESCRIPTIONS",
     "MAX_BUDGET_TOTAL_BYTES",
     "MAX_MANIFEST_BYTES",
+    "builder_worker_branch",
     "compile_builder_manifest",
     "manifest_prompt_fragment",
     "validate_builder_custody",
