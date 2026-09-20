@@ -704,6 +704,10 @@ def run_feature_followup_repair(
                 for item in changed
             ],
             "tests": tests,
+            "repair_evidence": {
+                **evidence.as_dict(),
+                "fingerprint": evidence.fingerprint,
+            },
         }
 
     except (
