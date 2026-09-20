@@ -40,3 +40,16 @@ def test_arm64_trigger_keeps_test_modules_executed_by_legacy_runner() -> None:
     assert "skeleton.testing.test_simulation_physics_" in runner
     assert '- "skeleton/**"' in workflow
     assert '- "!skeleton/testing/**"' not in workflow
+
+
+def test_arm64_draft_transitions_cancel_without_consuming_runner() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "types: [opened, synchronize, reopened, ready_for_review, "
+        "converted_to_draft, closed]"
+    ) in text
+    assert "github.event.pull_request.draft" in text
+    assert "github.event.action != 'converted_to_draft'" in text
+    assert "github.event.action != 'closed'" in text
+    assert "cancel-in-progress: true" in text
