@@ -241,7 +241,7 @@ def _recent_success_age(snapshot: TrafficSnapshot) -> int | None:
     ages: list[int] = []
     for run in _visible_runs(snapshot):
         if not _is_marker_workflow(
-            run, ("automation traffic manager",)
+            run, ("repository supervisor",)
         ):
             continue
         if str(run.get("conclusion", "")).casefold() != "success":
