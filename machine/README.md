@@ -75,6 +75,8 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Capability ledger:** Jeeves/Java/frontier/supervisor waves #1815–#1842 revalidated; existing staging PRs reused.
 - **Held:** Jeeves topology learning remains a large 129-commit reconciliation input.
 
+- **Reconcile-wave audit:** #1848–#1865 revalidated; existing integration PRs reused with no duplicate staging.
+
 ## Target layout
 
 ```text
