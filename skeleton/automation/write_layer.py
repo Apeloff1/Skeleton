@@ -28,7 +28,7 @@ class WriteLayerError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class WriteBudget:
     max_tasks: int = 4
-    max_passes: int = 5
+    max_passes: int = 6
     max_files: int = 12
     max_file_bytes: int = 120_000
     max_total_bytes: int = 600_000
