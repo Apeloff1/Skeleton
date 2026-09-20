@@ -138,6 +138,7 @@ def main() -> int:
                 "depends_on": spec.depends_on,
                 "owns": spec.owns,
                 "evidence_version": spec.evidence_version,
+                "consumes_evidence": spec.consumes_evidence,
             }
             for spec in topological_order(CATALOG)
         ], sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
@@ -147,6 +148,13 @@ def main() -> int:
             for spec in CATALOG
             for dependency in spec.depends_on
         ),
+        "evidence_compatibility": {
+            spec.contract_id: {
+                producer: version
+                for producer, version in spec.consumes_evidence
+            }
+            for spec in sorted(CATALOG, key=lambda item: item.contract_id)
+        },
         "ownership": {
             spec.contract_id: list(spec.owns)
             for spec in sorted(CATALOG, key=lambda item: item.contract_id)
