@@ -5,10 +5,9 @@ from dataclasses import dataclass
 
 from .supervisor_runtime import SupervisorRuntimeError, validate_worker_name
 
-
 _RISKS = frozenset({"low", "medium", "high"})
 _MAX_TRIGGER_BYTES = 256
-_MAX_FILES = 12
+_MAX_FILES = 48
 
 
 @dataclass(frozen=True)
@@ -20,6 +19,8 @@ class AdvancedBot:
     requires_tests: bool = True
 
     def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or self.name.lower() != self.name:
+            raise ValueError("invalid specialist name")
         try:
             validate_worker_name(self.name)
         except SupervisorRuntimeError as exc:
@@ -52,7 +53,7 @@ ADVANCED_BOTS = (
         "feature-builder",
         "maintainer-approved feature or implementation work",
         "medium",
-        12,
+        36,
     ),
     AdvancedBot("architecture-reviewer", "large PR or subsystem drift", "low", 4),
     AdvancedBot("security-auditor", "security/code-scanning signal", "high", 5),
