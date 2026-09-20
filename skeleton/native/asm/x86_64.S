@@ -4,7 +4,7 @@
 .globl skeleton_asm_abi_version
 .type skeleton_asm_abi_version, @function
 skeleton_asm_abi_version:
-    mov $2, %eax
+    mov $3, %eax
     ret
 .size skeleton_asm_abi_version, .-skeleton_asm_abi_version
 
@@ -199,5 +199,75 @@ skeleton_asm_dot_batch_f32:
 .Lbatch_done:
     ret
 .size skeleton_asm_dot_batch_f32, .-skeleton_asm_dot_batch_f32
+
+.p2align 4
+.globl skeleton_asm_dot_matrix_f32
+.type skeleton_asm_dot_matrix_f32, @function
+skeleton_asm_dot_matrix_f32:
+    test %rsi, %rsi
+    je .Lmatrix_done
+
+    push %r12
+    mov %rsi, %rax
+
+.Lmatrix_query:
+    mov %rdx, %r10
+    mov %rcx, %r11
+    test %r11, %r11
+    je .Lmatrix_next_query
+
+.Lmatrix_row:
+    xorps %xmm0, %xmm0
+    mov %rdi, %rsi
+    mov %r8, %r12
+    shr $2, %r12
+    je .Lmatrix_tail
+
+.Lmatrix_vec:
+    movups (%rsi), %xmm1
+    movups (%r10), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm0
+    add $16, %rsi
+    add $16, %r10
+    dec %r12
+    jne .Lmatrix_vec
+
+    movaps %xmm0, %xmm1
+    movhlps %xmm0, %xmm1
+    addps %xmm1, %xmm0
+    movaps %xmm0, %xmm1
+    shufps $0x55, %xmm1, %xmm1
+    addss %xmm1, %xmm0
+
+.Lmatrix_tail:
+    mov %r8, %r12
+    and $3, %r12
+    je .Lmatrix_store
+
+.Lmatrix_tail_loop:
+    movss (%rsi), %xmm1
+    mulss (%r10), %xmm1
+    addss %xmm1, %xmm0
+    add $4, %rsi
+    add $4, %r10
+    dec %r12
+    jne .Lmatrix_tail_loop
+
+.Lmatrix_store:
+    movss %xmm0, (%r9)
+    add $4, %r9
+    dec %r11
+    jne .Lmatrix_row
+
+.Lmatrix_next_query:
+    lea (%rdi,%r8,4), %rdi
+    dec %rax
+    jne .Lmatrix_query
+
+    pop %r12
+.Lmatrix_done:
+    ret
+.size skeleton_asm_dot_matrix_f32, .-skeleton_asm_dot_matrix_f32
 
 .section .note.GNU-stack,"",@progbits
