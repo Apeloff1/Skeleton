@@ -611,6 +611,7 @@ jobs:
           REPO: ${{ github.repository }}
           HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml
           HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'
+          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'
         shell: bash
         run: |
           set -euo pipefail
@@ -690,6 +691,24 @@ jobs:
               echo "- Old queued candidate observed: ${stale_candidate}"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+
+          recent_success=$(gh api \
+            "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""')
+          if [[ -n "$recent_success" ]]; then
+            recent_epoch=$(date -u -d "$recent_success" +%s)
+            cooldown_cutoff=$(date -u -d "${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES} minutes ago" +%s)
+            if (( recent_epoch >= cooldown_cutoff )); then
+              {
+                echo '## Housekeeping wake'
+                echo '- Dispatch: no'
+                echo "- Reason: successful Housekeeping run is inside ${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES}-minute cooldown"
+                echo "- Last successful completion: ${recent_success}"
+                echo "- Old queued candidate observed: ${stale_candidate}"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
           fi
 
           gh workflow run "$HOUSEKEEPING_WORKFLOW" --repo "$REPO" --ref main
