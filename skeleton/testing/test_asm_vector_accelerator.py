@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from skeleton.native import asm_accelerator as asm_module
 from skeleton.native.asm_accelerator import (
+    AsmAcceleratorAbiError,
     AsmAcceleratorUnavailable,
     AsmVectorAccelerator,
     normalize_architecture,
@@ -56,6 +58,59 @@ def test_missing_library_does_not_build_implicitly(tmp_path: Path) -> None:
     with pytest.raises(AsmAcceleratorUnavailable, match="library not found"):
         AsmVectorAccelerator(missing)
     assert not missing.exists()
+
+
+
+class _FakeFunction:
+    def __init__(self, value: int = 0) -> None:
+        self.argtypes = None
+        self.restype = None
+        self._value = value
+
+    def __call__(self, *args: object) -> int:
+        return self._value
+
+
+class _StaleAbiLibrary:
+    def __init__(self, version: int = 2) -> None:
+        self.skeleton_asm_abi_version = _FakeFunction(version)
+        self.skeleton_asm_dot_f32 = _FakeFunction()
+        self.skeleton_asm_l2_sq_f32 = _FakeFunction()
+
+
+def test_loader_rejects_stale_abi_before_native_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "stale.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _StaleAbiLibrary(),
+    )
+
+    with pytest.raises(
+        AsmAcceleratorAbiError,
+        match="skeleton_asm_dot_batch_f32",
+    ):
+        AsmVectorAccelerator(library)
+
+
+def test_loader_rejects_wrong_abi_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "old.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _StaleAbiLibrary(version=1),
+    )
+
+    with pytest.raises(AsmAcceleratorAbiError, match="expected 2, got 1"):
+        AsmVectorAccelerator(library)
 
 
 def test_build_load_and_numeric_contract(tmp_path: Path) -> None:
