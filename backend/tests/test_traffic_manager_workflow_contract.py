@@ -127,6 +127,7 @@ def test_traffic_manager_exposes_relief_observability() -> None:
     source = _source(TRAFFIC)
     admission = _job_block(source, "admission", "relief")
     assert "stale_queued_runs:" in admission
+    assert "provider_tombstones:" in admission
     assert "oldest_queued_age_seconds:" in admission
     assert "inventory_saturated:" in admission
     assert "relieve:" in admission
