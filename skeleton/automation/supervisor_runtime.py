@@ -855,11 +855,25 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
             )
         validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
     else:
-        unexpected = set(admitted) - {"status", "bot"}
+        allowed_no_change = {
+            "status",
+            "bot",
+            "supervisor_snapshot_fingerprint",
+            "execution_fingerprint",
+            "builder_manifest_digest",
+        }
+        unexpected = set(admitted) - allowed_no_change
         if unexpected:
             raise SupervisorRuntimeError(
                 "no-change evidence contains unsupported custody fields"
             )
+        for key in (
+            "supervisor_snapshot_fingerprint",
+            "execution_fingerprint",
+            "builder_manifest_digest",
+        ):
+            if key in admitted:
+                validate_fingerprint(admitted[key])
     return admitted
 
 
@@ -896,7 +910,20 @@ def validate_worker_evidence_custody(
             or not branch.startswith(worker_branch_prefix(custody.worker))
         ):
             raise SupervisorRuntimeError("worker evidence branch mismatch")
-    elif status != "no-change":
+    elif status == "no-change":
+        snapshot = evidence.get("supervisor_snapshot_fingerprint")
+        if (
+            snapshot is not None
+            and snapshot != custody.snapshot_fingerprint
+        ):
+            raise SupervisorRuntimeError("worker evidence snapshot mismatch")
+        execution = evidence.get("execution_fingerprint")
+        if (
+            execution is not None
+            and execution != custody.execution.fingerprint
+        ):
+            raise SupervisorRuntimeError("worker evidence execution mismatch")
+    else:
         raise SupervisorRuntimeError("worker evidence status is not admitted")
 
 
