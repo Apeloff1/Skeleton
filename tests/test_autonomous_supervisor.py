@@ -10,11 +10,11 @@ from unittest.mock import patch
 
 from skeleton.automation import secretary, specialist_bots, supervisor
 from skeleton.automation.build_authority import BuildAuthorization
+from skeleton.automation.execution_failsafe import retry_token
 from skeleton.automation.supervisor_runtime import (
     ExecutionIdentity,
     WorkerCustody,
 )
-
 
 FP = "a" * 64
 BASE = "b" * 40
@@ -34,7 +34,7 @@ def execution_env(
     worker: str = "root-cause",
     snapshot: str = FP,
 ) -> dict[str, str]:
-    return {
+    env = {
         "GITHUB_REPOSITORY": REPO,
         "GITHUB_SHA": BASE,
         "GITHUB_RUN_ID": "12345",
@@ -47,7 +47,19 @@ def execution_env(
         "SUPERVISOR_SNAPSHOT_FINGERPRINT": snapshot,
         "SECRETARY_DELEGATION": "1",
         "SECRETARY_WORKER": worker,
+        "SECRETARY_ATTEMPT": "1",
     }
+    env["SECRETARY_RETRY_TOKEN"] = (
+        retry_token(
+            worker=worker,
+            attempt=1,
+            execution_fingerprint=EXECUTION.fingerprint,
+            snapshot_fingerprint=snapshot,
+        )
+        if len(snapshot) == 64
+        else "f" * 64
+    )
+    return env
 
 
 def tamper_envelope(
@@ -827,7 +839,7 @@ class BuildAuthorityTests(unittest.TestCase):
             ["feature-builder"],
         )
 
-    def test_ordinary_ci_signal_does_not_select_feature_builder(
+    def test_authorized_feature_builder_is_not_suppressed_by_plan_text(
         self,
     ) -> None:
         routed = secretary.route(
@@ -855,10 +867,7 @@ class BuildAuthorityTests(unittest.TestCase):
                 )
             ),
         )
-        self.assertEqual(
-            routed,
-            ["root-cause"],
-        )
+        self.assertEqual(routed, ["feature-builder", "root-cause"])
 
 
 class SecretaryRoutingTests(unittest.TestCase):
@@ -990,16 +999,11 @@ class SecretaryRoutingTests(unittest.TestCase):
                 EXECUTION,
             )
 
-        self.assertEqual(
-            result,
-            [
-                {
-                    "bot": "root-cause",
-                    "returncode": 0,
-                    "isolated": True,
-                }
-            ],
-        )
+        self.assertEqual(result[0]["bot"], "root-cause")
+        self.assertEqual(result[0]["returncode"], 0)
+        self.assertTrue(result[0]["isolated"])
+        self.assertEqual(len(result[0]["attempt_history"]), 1)
+        self.assertEqual(len(result[0]["retry_chain_digest"]), 64)
         worker.assert_called_once_with(
             "CI failure",
             "root-cause",
@@ -1090,6 +1094,20 @@ class WorkerAdmissionTests(unittest.TestCase):
             custody.execution,
             EXECUTION,
         )
+
+    def test_retry_token_replay_under_different_attempt_is_rejected(self) -> None:
+        env = execution_env()
+        env["SECRETARY_ATTEMPT"] = "2"
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(specialist_bots.WorkerAdmissionError):
+                specialist_bots.admit_worker("root-cause")
+
+    def test_retry_token_tamper_is_rejected(self) -> None:
+        env = execution_env()
+        env["SECRETARY_RETRY_TOKEN"] = "f" * 64
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(specialist_bots.WorkerAdmissionError):
+                specialist_bots.admit_worker("root-cause")
 
     def test_feature_builder_rejects_duplicate_authorization_keys(
         self,

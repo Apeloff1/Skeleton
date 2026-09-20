@@ -19,6 +19,7 @@ queue is congested.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -33,6 +34,7 @@ from .free_model import redact_secrets
 
 MAX_ITEMS = 100
 MAX_OUTPUT_BYTES = 16_000
+MAX_REPOSITORY_LENGTH = 200
 
 ACTIVE_STATUSES = frozenset(
     {"queued", "in_progress", "waiting", "requested", "pending"}
@@ -102,8 +104,29 @@ class TrafficSnapshot:
     issues: tuple[dict[str, Any], ...]
 
     def __post_init__(self) -> None:
-        if not self.repository or self.repository.count("/") != 1:
-            raise TrafficManagerError("repository must be owner/name")
+        if (
+            not self.repository
+            or len(self.repository) > MAX_REPOSITORY_LENGTH
+            or self.repository.count("/") != 1
+        ):
+            raise TrafficManagerError("repository must be bounded owner/name")
+        owner, name = self.repository.split("/", 1)
+        allowed = frozenset(
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789-_."
+        )
+        if (
+            not owner
+            or not name
+            or owner.startswith("-")
+            or owner in {".", ".."}
+            or name.startswith(".")
+            or name in {".", ".."}
+            or any(ch not in allowed for ch in owner)
+            or any(ch not in allowed for ch in name)
+        ):
+            raise TrafficManagerError("repository contains unsafe characters")
         if len(self.base_sha) != 40 or any(
             ch not in "0123456789abcdefABCDEF" for ch in self.base_sha
         ):
@@ -121,6 +144,9 @@ class TrafficDecision:
     admit: bool
     reason: str
     lane: str
+    base_sha: str
+    observed_at: int
+    decision_fingerprint: str
     active_runs: int
     queued_runs: int
     critical_active: int
@@ -142,6 +168,9 @@ class TrafficDecision:
             "admit": self.admit,
             "reason": self.reason,
             "lane": self.lane,
+            "base_sha": self.base_sha,
+            "observed_at": self.observed_at,
+            "decision_fingerprint": self.decision_fingerprint,
             "active_runs": self.active_runs,
             "queued_runs": self.queued_runs,
             "critical_active": self.critical_active,
@@ -162,6 +191,16 @@ class TrafficDecision:
 
 def _gh_json(args: list[str]) -> list[dict[str, Any]]:
     """Run one bounded GitHub CLI read and validate its top-level shape."""
+    if not args or len(args) > 20:
+        raise TrafficManagerError("invalid GitHub CLI argument vector")
+    if any(
+        not isinstance(arg, str)
+        or not arg
+        or "\x00" in arg
+        or len(arg) > 1_000
+        for arg in args
+    ):
+        raise TrafficManagerError("unsafe GitHub CLI argument")
     try:
         raw = subprocess.check_output(
             ["gh", *args],
@@ -412,7 +451,15 @@ def evaluate(
         relieve = True
         relief_reason = "queue-capacity-exhausted"
 
+    decision_fingerprint = decision_identity_fingerprint(
+        snapshot.repository,
+        snapshot.base_sha,
+        snapshot.observed_at,
+    )
     common = {
+        "base_sha": snapshot.base_sha.lower(),
+        "observed_at": snapshot.observed_at,
+        "decision_fingerprint": decision_fingerprint,
         "active_runs": len(active),
         "queued_runs": len(queued),
         "critical_active": len(critical),
@@ -618,6 +665,33 @@ def observe(
     )
 
 
+def decision_identity_fingerprint(
+    repository: str,
+    base_sha: str,
+    observed_at: int,
+) -> str:
+    """Return the canonical digest used to bind admission evidence."""
+    snapshot = TrafficSnapshot(
+        repository=repository,
+        base_sha=base_sha,
+        observed_at=observed_at,
+        current_run_id="",
+        workflow_runs=(),
+        pull_requests=(),
+        issues=(),
+    )
+    payload = json.dumps(
+        {
+            "repository": snapshot.repository,
+            "base_sha": snapshot.base_sha.lower(),
+            "observed_at": snapshot.observed_at,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _bool_env(name: str) -> bool:
     value = os.environ.get(name, "").strip().casefold()
     if value in {"", "0", "false", "no", "off"}:
@@ -661,6 +735,9 @@ def emit_github_output(
         f"admit={'true' if decision.admit else 'false'}\n"
         f"reason={decision.reason}\n"
         f"lane={decision.lane}\n"
+        f"base_sha={decision.base_sha}\n"
+        f"observed_at={decision.observed_at}\n"
+        f"decision_fingerprint={decision.decision_fingerprint}\n"
         f"active_runs={decision.active_runs}\n"
         f"queued_runs={decision.queued_runs}\n"
         f"critical_active={decision.critical_active}\n"
@@ -699,6 +776,9 @@ def write_step_summary(decision: TrafficDecision) -> None:
         ),
         f"- Reason: `{decision.reason}`",
         f"- Lane: `{decision.lane}`",
+        f"- Admitted base SHA: `{decision.base_sha}`",
+        f"- Observation epoch: `{decision.observed_at}`",
+        f"- Decision fingerprint: `{decision.decision_fingerprint}`",
         (
             "- Active / queued runs: "
             f"`{decision.active_runs}` / "

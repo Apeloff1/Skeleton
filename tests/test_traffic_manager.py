@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from skeleton.automation.traffic_manager import (
@@ -51,6 +53,81 @@ def snapshot(
         pull_requests=prs,
         issues=issues,
     )
+
+
+class TrafficManagerBoundaryTests(unittest.TestCase):
+    def test_snapshot_rejects_shell_metacharacters_in_repository(self) -> None:
+        with self.assertRaisesRegex(Exception, "unsafe characters"):
+            TrafficSnapshot(
+                repository="Apeloff1/Skeleton;echo-pwned",
+                base_sha=BASE,
+                observed_at=NOW,
+                current_run_id="",
+                workflow_runs=(),
+                pull_requests=(),
+                issues=(),
+            )
+
+    def test_snapshot_rejects_path_like_repository(self) -> None:
+        for repository in (
+            "../Skeleton",
+            "Apeloff1/../Skeleton",
+            "Apeloff1/.hidden",
+            "-owner/Skeleton",
+        ):
+            with self.subTest(repository=repository):
+                with self.assertRaises(Exception):
+                    TrafficSnapshot(
+                        repository=repository,
+                        base_sha=BASE,
+                        observed_at=NOW,
+                        current_run_id="",
+                        workflow_runs=(),
+                        pull_requests=(),
+                        issues=(),
+                    )
+
+    def test_snapshot_accepts_normal_github_repository_characters(self) -> None:
+        value = TrafficSnapshot(
+            repository="Apeloff-1/Skeleton.repo_2",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        self.assertEqual(value.repository, "Apeloff-1/Skeleton.repo_2")
+
+    def test_gh_json_rejects_empty_argument_vector_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json([])
+        execute.assert_not_called()
+
+    def test_gh_json_rejects_nul_argument_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json(["api", "bad\x00argument"])
+        execute.assert_not_called()
+
+    def test_gh_json_rejects_oversized_argument_before_subprocess(self) -> None:
+        from skeleton.automation.traffic_manager import _gh_json
+
+        with patch(
+            "skeleton.automation.traffic_manager.subprocess.check_output"
+        ) as execute:
+            with self.assertRaises(Exception):
+                _gh_json(["api", "x" * 1_001])
+        execute.assert_not_called()
 
 
 class TrafficManagerObservationTests(unittest.TestCase):
@@ -541,3 +618,108 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrafficDecisionEvidenceTests(unittest.TestCase):
+    def test_decision_binds_snapshot_identity(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        self.assertEqual(decision.base_sha, BASE)
+        self.assertEqual(decision.observed_at, NOW)
+        payload = decision.as_dict()
+        self.assertEqual(payload["base_sha"], BASE)
+        self.assertEqual(payload["observed_at"], NOW)
+
+    def test_decision_normalizes_uppercase_snapshot_sha(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha="A" * 40,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        self.assertEqual(decision.base_sha, "a" * 40)
+
+    def test_github_output_contains_decision_identity(self) -> None:
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=BASE,
+            observed_at=NOW,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        decision = evaluate(snapshot, force=True)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            from skeleton.automation.traffic_manager import emit_github_output
+            emit_github_output(decision, str(output))
+            rendered = output.read_text(encoding="utf-8")
+        self.assertIn(f"base_sha={BASE}\n", rendered)
+        self.assertIn(f"observed_at={NOW}\n", rendered)
+        self.assertIn('"base_sha":"' + BASE + '"', rendered)
+        self.assertIn(f'"observed_at":{NOW}', rendered)
+
+
+class TrafficDecisionFingerprintTests(unittest.TestCase):
+    def _decision(self, *, sha: str = BASE, observed_at: int = NOW):
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=sha,
+            observed_at=observed_at,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        return evaluate(snapshot, force=True)
+
+    def test_fingerprint_is_stable_for_same_identity(self) -> None:
+        first = self._decision()
+        second = self._decision()
+        self.assertEqual(first.decision_fingerprint, second.decision_fingerprint)
+        self.assertRegex(first.decision_fingerprint, r"^[0-9a-f]{64}$")
+
+    def test_fingerprint_changes_when_base_sha_changes(self) -> None:
+        first = self._decision(sha="a" * 40)
+        second = self._decision(sha="b" * 40)
+        self.assertNotEqual(
+            first.decision_fingerprint,
+            second.decision_fingerprint,
+        )
+
+    def test_fingerprint_changes_when_observation_epoch_changes(self) -> None:
+        first = self._decision(observed_at=NOW)
+        second = self._decision(observed_at=NOW + 1)
+        self.assertNotEqual(
+            first.decision_fingerprint,
+            second.decision_fingerprint,
+        )
+
+    def test_fingerprint_is_exported_in_json_and_github_output(self) -> None:
+        decision = self._decision()
+        self.assertEqual(
+            decision.as_dict()["decision_fingerprint"],
+            decision.decision_fingerprint,
+        )
+        from skeleton.automation.traffic_manager import emit_github_output
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            emit_github_output(decision, str(output))
+            rendered = output.read_text(encoding="utf-8")
+        self.assertIn(
+            f"decision_fingerprint={decision.decision_fingerprint}\n",
+            rendered,
+        )

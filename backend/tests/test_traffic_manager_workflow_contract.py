@@ -159,6 +159,59 @@ def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
     assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in dispatch
 
 
+def test_dispatch_is_bound_to_exact_admitted_default_branch_head() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+
+    assert "admitted_base_sha: ${{ steps.identity.outputs.base_sha }}" in admission
+    assert "name: Capture immutable admission identity" in admission
+    assert '[[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]' in admission
+    assert 'echo "base_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"' in admission
+
+    assert (
+        "TRAFFIC_ADMITTED_BASE_SHA: "
+        "${{ needs.admission.outputs.admitted_base_sha }}"
+    ) in dispatch
+    assert "Revalidate admission and dispatch reviewed supervisor workflow" in dispatch
+    assert "/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" in dispatch
+    assert '[[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]' in dispatch
+    assert "gh workflow run supervisor.yml" in dispatch
+
+
+def test_stale_admission_cannot_fall_through_to_separate_dispatch_step() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert dispatch.count("gh workflow run supervisor.yml") == 1
+    assert dispatch.count("name: Revalidate admission and dispatch reviewed supervisor workflow") == 1
+    assert "name: Dispatch reviewed supervisor workflow" not in dispatch
+    guard_position = dispatch.index('[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]')
+    exit_position = dispatch.index("exit 0", guard_position)
+    dispatch_position = dispatch.index("gh workflow run supervisor.yml", exit_position)
+    assert guard_position < exit_position < dispatch_position
+
+
+def test_stale_dispatch_guard_does_not_interpolate_expressions_into_shell() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert "${{ " not in run_block
+    assert "$TRAFFIC_ADMITTED_BASE_SHA" in run_block
+    assert "${TRAFFIC_DEFAULT_BRANCH}" in run_block
+    assert "$GITHUB_REPOSITORY" in run_block
+
+
+def test_dispatch_validates_provider_head_before_comparison() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert '[[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert "GitHub returned an invalid default-branch head" in dispatch
+    assert '[[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]' in dispatch
+
+
 def test_supervisor_exposes_reusable_entrypoint_and_no_schedule() -> None:
     source = _source(SUPERVISOR)
     trigger = source.split("concurrency:", 1)[0]
@@ -186,3 +239,86 @@ def test_traffic_manager_uses_pinned_reviewed_actions() -> None:
     ) in source
     assert "@main" not in source
     assert "@master" not in source
+
+
+def test_decision_identity_is_exported_and_revalidated_before_dispatch() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+    assert "decision_base_sha: ${{ steps.traffic.outputs.base_sha }}" in admission
+    assert "decision_observed_at: ${{ steps.traffic.outputs.observed_at }}" in admission
+    assert (
+        "TRAFFIC_DECISION_BASE_SHA: "
+        "${{ needs.admission.outputs.decision_base_sha }}"
+    ) in dispatch
+    assert (
+        "TRAFFIC_DECISION_OBSERVED_AT: "
+        "${{ needs.admission.outputs.decision_observed_at }}"
+    ) in dispatch
+    assert '[[ "$TRAFFIC_DECISION_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]' in dispatch
+    assert (
+        '[[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]]'
+        in dispatch
+    )
+    assert (
+        '[[ "$TRAFFIC_DECISION_OBSERVED_AT" =~ ^[1-9][0-9]{0,11}$ ]]'
+        in dispatch
+    )
+
+
+def test_dispatch_passes_decision_bound_sha_to_supervisor() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    assert '-f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"' in dispatch
+    comparison = dispatch.index(
+        '[[ "$TRAFFIC_ADMITTED_BASE_SHA" = "$TRAFFIC_DECISION_BASE_SHA" ]]'
+    )
+    live_check = dispatch.index(
+        '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]'
+    )
+    invoke = dispatch.index("gh workflow run supervisor.yml")
+    assert comparison < live_check < invoke
+
+
+def test_decision_fingerprint_crosses_dispatch_boundary_as_data() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    dispatch = _job_block(source, "dispatch")
+    assert (
+        "decision_fingerprint: ${{ steps.traffic.outputs.decision_fingerprint }}"
+        in admission
+    )
+    assert (
+        "TRAFFIC_DECISION_FINGERPRINT: "
+        "${{ needs.admission.outputs.decision_fingerprint }}"
+    ) in dispatch
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert '[[ "$TRAFFIC_DECISION_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]' in run_block
+    assert "${{ needs.admission.outputs.decision_fingerprint }}" not in run_block
+
+
+def test_dispatch_independently_recomputes_decision_fingerprint() -> None:
+    source = _source(TRAFFIC)
+    dispatch = _job_block(source, "dispatch")
+    run_block = dispatch.split(
+        "- name: Revalidate admission and dispatch reviewed supervisor workflow", 1
+    )[1]
+    assert "decision_identity_fingerprint" in run_block
+    assert 'os.environ["GITHUB_REPOSITORY"]' in run_block
+    assert 'os.environ["TRAFFIC_DECISION_BASE_SHA"]' in run_block
+    assert 'os.environ["TRAFFIC_DECISION_OBSERVED_AT"]' in run_block
+    assert (
+        'test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT"'
+        in run_block
+    )
+    recompute = run_block.index("expected_fingerprint=$(python")
+    compare = run_block.index(
+        'test "$expected_fingerprint" = "$TRAFFIC_DECISION_FINGERPRINT"'
+    )
+    live = run_block.index(
+        '[[ "$live_sha" != "$TRAFFIC_ADMITTED_BASE_SHA" ]]'
+    )
+    invoke = run_block.index("gh workflow run supervisor.yml")
+    assert recompute < compare < live < invoke
