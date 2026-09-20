@@ -67,6 +67,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Fix-wave audit:** #1791–#1802 rechecked; all remain staged source material with meaningful file deltas, and existing integration PRs were reused rather than duplicated.
 
+- **Fix queue recheck:** workflow security/scope, repository safety, secret-scan, and repair-intake waves remain staged with meaningful deltas; existing PRs reused.
+
 ## Target layout
 
 ```text
