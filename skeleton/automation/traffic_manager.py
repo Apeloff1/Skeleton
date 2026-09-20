@@ -554,16 +554,13 @@ def _observe_runs(repository: str) -> list[dict[str, Any]]:
     for status in sorted(ACTIVE_STATUSES):
         for run in _gh_json(
             [
-                "run",
-                "list",
-                "--repo",
-                repository,
-                "--status",
-                status,
-                "--limit",
-                str(MAX_ITEMS),
-                "--json",
-                fields,
+                "api",
+                (
+                    f"/repos/{repository}/actions/runs"
+                    f"?status={status}&per_page={MAX_ITEMS}"
+                ),
+                "--jq",
+                ".workflow_runs",
             ]
         ):
             add(run)
