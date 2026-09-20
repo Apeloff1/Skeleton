@@ -134,6 +134,74 @@ class RepoMachineTests(unittest.TestCase):
             self.assertIn("organization_findings", context)
             self.assertLess(len(encoded), 100000)
 
+    def test_inventory_refuses_symlinked_files(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            (root / "alpha").mkdir()
+            outside = root.parent / f"{root.name}-outside.py"
+            outside.write_text("SECRET = 1\n", encoding="utf-8")
+            link = root / "alpha" / "leak.py"
+            try:
+                link.symlink_to(outside)
+            except OSError:
+                outside.unlink(missing_ok=True)
+                self.skipTest("symlinks unavailable")
+            try:
+                model = RepositoryModelBuilder(root).build()
+            finally:
+                outside.unlink(missing_ok=True)
+
+            self.assertNotIn("alpha/leak.py", {item.path for item in model.files})
+            self.assertTrue(any(
+                finding.code == "scan.unreadable"
+                and finding.path == "alpha/leak.py"
+                for finding in model.findings
+            ))
+
+    def test_config_rejects_symlink_input(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            config_path = root / ".machine" / "repository.toml"
+            outside = root.parent / f"{root.name}-config.toml"
+            outside.write_text(CONFIG, encoding="utf-8")
+            config_path.unlink()
+            try:
+                config_path.symlink_to(outside)
+            except OSError:
+                outside.unlink(missing_ok=True)
+                self.skipTest("symlinks unavailable")
+            try:
+                with self.assertRaisesRegex(ValueError, "non-symlink"):
+                    load_machine_config(root)
+            finally:
+                outside.unlink(missing_ok=True)
+
+    def test_config_rejects_parent_symlink_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as external:
+            root = Path(temp)
+            external_machine = Path(external) / ".machine"
+            external_machine.mkdir()
+            (external_machine / "repository.toml").write_text(CONFIG, encoding="utf-8")
+            try:
+                (root / ".machine").symlink_to(external_machine, target_is_directory=True)
+            except OSError:
+                self.skipTest("symlinks unavailable")
+            with self.assertRaisesRegex(ValueError, "escapes repository root"):
+                load_machine_config(root)
+
+    def test_config_rejects_path_like_zone_name(self) -> None:
+        with self.fixture() as temp:
+            root = Path(temp)
+            config_path = root / ".machine" / "repository.toml"
+            config = config_path.read_text(encoding="utf-8").replace(
+                'name = "alpha"',
+                'name = "alpha/../../escape"',
+                1,
+            )
+            config_path.write_text(config, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "filename-safe"):
+                load_machine_config(root)
+
     def test_config_rejects_duplicate_zone_names(self) -> None:
         with self.fixture() as temp:
             root = Path(temp)
