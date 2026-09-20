@@ -804,6 +804,57 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             ),
         }
 
+    def updated_evidence(
+        self,
+        *,
+        repair_parent_sha: str = "d" * 40,
+    ) -> dict[str, object]:
+        value = self.created_evidence()
+        value["status"] = "pull-request-updated"
+        value["pull_request"] = 93
+        value["repair_parent_sha"] = repair_parent_sha
+        return value
+
+    def test_updated_pr_evidence_is_receipt_and_manifest_bound(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.updated_evidence()),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence["repair_parent_sha"],
+            "d" * 40,
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+        validate_builder_worker_evidence(
+            evidence,
+            value,
+        )
+
+    def test_updated_pr_evidence_requires_repair_parent(self) -> None:
+        evidence = self.updated_evidence()
+        evidence.pop("repair_parent_sha")
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="feature-builder",
+            )
+
+    def test_updated_pr_evidence_rejects_invalid_repair_parent(self) -> None:
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(
+                    self.updated_evidence(
+                        repair_parent_sha="not-a-sha"
+                    )
+                ),
+                worker="feature-builder",
+            )
+
     def test_runtime_parser_retains_manifest_digest(self) -> None:
         payload = json.dumps(self.created_evidence())
         evidence = parse_worker_result(
