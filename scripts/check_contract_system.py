@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Repository-wide fail-closed contract manifest.
+
+This gate composes the repository's privileged static contract checkers into one
+bounded, deterministic entry point. It does not replace subsystem tests: it
+ensures contract gates cannot silently disappear, stop compiling, or stop being
+wired into Merge Readiness.
+"""
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+MAX_CHECKER_BYTES = 300_000
+MAX_SECONDS_PER_CHECKER = 90
+CHECKERS = (
+    "scripts/check_automerge_contract.py",
+    "scripts/check_runner_v2_contract.py",
+    "scripts/check_merge_readiness_contract.py",
+    "scripts/check_toolchain_contract.py",
+    "scripts/check_defense_control_plane_contract.py",
+)
+REQUIRED_WIRING = (
+    "python scripts/check_contract_system.py",
+)
+FORBIDDEN_MARKERS = ("eval(", "exec(", "shell=True", "os.system(")
+
+
+@dataclass(frozen=True, slots=True)
+class ContractEvidence:
+    path: str
+    sha256: str
+    bytes: int
+    returncode: int
+    stdout_tail: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "path": self.path,
+            "sha256": self.sha256,
+            "bytes": self.bytes,
+            "returncode": self.returncode,
+            "stdout_tail": self.stdout_tail,
+        }
+
+
+def _admit_checker(relative: str) -> tuple[Path, bytes]:
+    path = ROOT / relative
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError(f"contract checker missing or symlinked: {relative}")
+    raw = path.read_bytes()
+    if not raw or len(raw) > MAX_CHECKER_BYTES or b"\x00" in raw:
+        raise RuntimeError(f"contract checker has invalid bounded content: {relative}")
+    try:
+        source = raw.decode("utf-8")
+        ast.parse(source, filename=relative)
+    except (UnicodeDecodeError, SyntaxError) as exc:
+        raise RuntimeError(f"contract checker is not valid UTF-8 Python: {relative}") from exc
+    for marker in FORBIDDEN_MARKERS:
+        if marker in source:
+            raise RuntimeError(f"contract checker contains forbidden execution marker {marker!r}: {relative}")
+    return path, raw
+
+
+def _run_checker(relative: str) -> ContractEvidence:
+    path, raw = _admit_checker(relative)
+    proc = subprocess.run(
+        [sys.executable, str(path)],
+        cwd=ROOT,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=MAX_SECONDS_PER_CHECKER,
+        check=False,
+    )
+    tail = proc.stdout[-4000:]
+    return ContractEvidence(
+        path=relative,
+        sha256=hashlib.sha256(raw).hexdigest(),
+        bytes=len(raw),
+        returncode=proc.returncode,
+        stdout_tail=tail,
+    )
+
+
+def _validate_manifest() -> None:
+    if len(CHECKERS) != len(set(CHECKERS)):
+        raise RuntimeError("duplicate checker in contract manifest")
+    for relative in CHECKERS:
+        if not relative.startswith("scripts/check_") or not relative.endswith("_contract.py"):
+            raise RuntimeError(f"non-canonical contract checker path: {relative}")
+
+
+def _validate_wiring() -> None:
+    workflow = (ROOT / ".github/workflows/merge-readiness.yml").read_text(encoding="utf-8")
+    for marker in REQUIRED_WIRING:
+        if marker not in workflow:
+            raise RuntimeError(f"merge-readiness missing contract-system wiring: {marker}")
+
+
+def main() -> int:
+    _validate_manifest()
+    _validate_wiring()
+    evidence: list[ContractEvidence] = []
+    failed = False
+    for checker in CHECKERS:
+        try:
+            item = _run_checker(checker)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"contract-system: FAIL {checker}: {exc}", file=sys.stderr)
+            failed = True
+            continue
+        evidence.append(item)
+        status = "PASS" if item.returncode == 0 else "FAIL"
+        print(f"contract-system: {status} {item.path} sha256={item.sha256} bytes={item.bytes}")
+        if item.returncode:
+            failed = True
+            if item.stdout_tail:
+                print(item.stdout_tail, file=sys.stderr)
+    summary = {
+        "version": 1,
+        "checker_count": len(CHECKERS),
+        "executed_count": len(evidence),
+        "failed_count": sum(item.returncode != 0 for item in evidence) + (len(CHECKERS) - len(evidence)),
+        "evidence": [item.as_dict() for item in evidence],
+    }
+    print("contract-system-evidence=" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
