@@ -943,10 +943,6 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
                 parent,
                 label="worker repair parent SHA",
             )
-            if admitted_branch is not None and branch != admitted_branch:
-                raise SupervisorRuntimeError(
-                    "worker repair evidence branch mismatch"
-                )
     elif status == "existing-pr":
         required = (
             "branch",
