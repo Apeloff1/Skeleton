@@ -2,10 +2,6 @@
 
 AI game engine and agent orchestration framework.
 
-Jeeves chat now includes saved conversations, project context, search, retry,
-and transcript export. See the [Jeeves workspace baseline](docs/JEEVES_WORKSPACE_BASELINE.md)
-for its architecture, limits, migration behavior and focused test commands.
-
 ## Quick Start
 
 ```bash
@@ -37,6 +33,18 @@ python -m skeleton test
 - Track E root-test archive: `tests/legacy_root/`
 - SEVEN_BY series archive: [`docs/archive/seven_by/`](docs/archive/seven_by/)
 - Policy: [`docs/ARTIFACT_PLANE.md`](docs/ARTIFACT_PLANE.md)
+
+## Builder plane
+
+Autonomous feature work uses a deterministic Builder Plane between Secretary
+admission and the bounded feature worker. Maintainer-approved issue authority
+is compiled into a digest-sealed build manifest with exact snapshot/execution
+custody, an ordered build DAG, proposal budgets, acceptance criteria, and
+publication evidence. The plane is data-only: it does not add token
+permissions, executable model output, or merge authority.
+
+See [`docs/BUILDER_PLANE.md`](docs/BUILDER_PLANE.md) for the complete
+authority, lifecycle, failure, and CI contract.
 
 ## Subsystems
 
