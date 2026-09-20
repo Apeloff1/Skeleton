@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -158,9 +158,21 @@
         "source": "merge/1669-safe-20260920",
         "files": 150,
         "reason": "large reconciliation input"
+      },
+      {
+        "source": "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "files": 300,
+        "commits": 446,
+        "reason": "large overlapping shell stabilization wave"
+      },
+      {
+        "source": "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "files": 300,
+        "commits": 355,
+        "reason": "large overlapping shell stabilization wave"
       }
     ],
-    "lineage_note": "Zero-file-delta reconcile branches remain lineage-only and are not represented as integrated content."
+    "lineage_note": "Zero-file-delta stabilization branches are lineage-only; large shell waves require file-level reconciliation."
   },
   "integrated_domains": [
     "automation runtime dependency repair",
