@@ -42,7 +42,7 @@ def test_traffic_manager_coalesces_overlapping_runs_without_cancelling_mutation(
 
 def test_admission_job_is_read_only() -> None:
     source = _source(TRAFFIC)
-    admission = _job_block(source, "admission", "dispatch")
+    admission = _job_block(source, "admission", "relief")
     permissions = admission.split("    permissions:\n", 1)[1].split(
         "    runs-on:", 1
     )[0]
@@ -64,7 +64,7 @@ def test_manager_invokes_fixed_admission_module() -> None:
 def test_manual_force_crosses_shell_boundary_only_through_env() -> None:
     source = _source(TRAFFIC)
     assert "TRAFFIC_FORCE:" in source
-    admission = _job_block(source, "admission", "dispatch")
+    admission = _job_block(source, "admission", "relief")
     run_block = admission.split(
         "- name: Evaluate bounded automation pressure", 1
     )[1]
@@ -72,11 +72,35 @@ def test_manual_force_crosses_shell_boundary_only_through_env() -> None:
     assert "${{ github.event" not in run_block
 
 
-def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
+def test_traffic_manager_dispatches_relief_only_on_pressure() -> None:
     source = _source(TRAFFIC)
     before_jobs = source.split("jobs:\n", 1)[0]
     assert "permissions: {}" in before_jobs
 
+    relief = _job_block(source, "relief", "dispatch")
+    assert "needs: admission" in relief
+    assert "needs.admission.outputs.relieve == 'true'" in relief
+    assert "actions: write" in relief
+    assert "contents: read" in relief
+    assert "pull-requests: write" not in relief
+    assert "gh workflow run queue-drain.yml" in relief
+    assert "actions/workflows/queue-drain.yml/runs" in relief
+    assert "requested waiting pending queued in_progress" in relief
+    assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in relief
+
+
+def test_traffic_manager_exposes_relief_observability() -> None:
+    source = _source(TRAFFIC)
+    admission = _job_block(source, "admission", "relief")
+    assert "stale_queued_runs:" in admission
+    assert "oldest_queued_age_seconds:" in admission
+    assert "inventory_saturated:" in admission
+    assert "relieve:" in admission
+    assert "relief_reason:" in admission
+
+
+def test_traffic_manager_dispatches_supervisor_only_after_admission() -> None:
+    source = _source(TRAFFIC)
     dispatch = _job_block(source, "dispatch")
     assert "needs: admission" in dispatch
     assert "needs.admission.outputs.admit == 'true'" in dispatch
