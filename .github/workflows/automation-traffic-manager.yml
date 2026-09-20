@@ -1,0 +1,255 @@
+name: Automation Traffic Manager
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Bypass soft cooldown/no-demand suppression (hard capacity still applies)"
+        required: false
+        default: false
+        type: boolean
+
+# Deny authority by default. Admission is read-only; the dispatch job receives
+# only actions:write so it can queue the already-reviewed Supervisor workflow.
+permissions: {}
+
+concurrency:
+  group: automation-traffic-manager-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  admission:
+    name: Measure pressure and admit one automation lane
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    outputs:
+      admit: ${{ steps.traffic.outputs.admit }}
+      reason: ${{ steps.traffic.outputs.reason }}
+      lane: ${{ steps.traffic.outputs.lane }}
+      active_runs: ${{ steps.traffic.outputs.active_runs }}
+      queued_runs: ${{ steps.traffic.outputs.queued_runs }}
+      critical_active: ${{ steps.traffic.outputs.critical_active }}
+      stale_queued_runs: ${{ steps.traffic.outputs.stale_queued_runs }}
+      provider_tombstones: ${{ steps.traffic.outputs.provider_tombstones }}
+      oldest_queued_age_seconds: ${{ steps.traffic.outputs.oldest_queued_age_seconds }}
+      inventory_saturated: ${{ steps.traffic.outputs.inventory_saturated }}
+      relieve: ${{ steps.traffic.outputs.relieve }}
+      relief_reason: ${{ steps.traffic.outputs.relief_reason }}
+      decision_json: ${{ steps.traffic.outputs.decision_json }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
+      PYTHONPATH: ${{ github.workspace }}
+      TRAFFIC_EVENT_REF: ${{ github.ref }}
+      TRAFFIC_EXPECTED_REF: refs/heads/${{ github.event.repository.default_branch }}
+      TRAFFIC_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force && 'true' || 'false' }}
+    steps:
+      - name: Require default-branch traffic control
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TRAFFIC_EXPECTED_REF"
+          test "$TRAFFIC_EVENT_REF" = "$TRAFFIC_EXPECTED_REF"
+
+      - name: Checkout immutable traffic policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Evaluate bounded automation pressure
+        id: traffic
+        run: >-
+          python -m skeleton.automation.traffic_manager
+          --emit-github-output "$GITHUB_OUTPUT"
+
+  relief:
+    name: Queue bounded Actions relief
+    needs: admission
+    if: ${{ needs.admission.outputs.relieve == 'true' }}
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Dispatch queue drain when no recovery run is live
+        shell: bash
+        run: |
+          set -euo pipefail
+          live=0
+          for status_name in requested waiting pending queued in_progress; do
+            count=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/queue-drain.yml/runs?status=${status_name}&per_page=1" --jq '.total_count')
+            [[ "$count" =~ ^[0-9]+$ ]] || {
+              echo "::error::Invalid queue-drain run count for ${status_name}."
+              exit 1
+            }
+            if (( count > 0 )); then
+              live=1
+              break
+            fi
+          done
+          if (( live > 0 )); then
+            echo "Queue drain already live; coalescing recovery request."
+            exit 0
+          fi
+          gh workflow run queue-drain.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TRAFFIC_DEFAULT_BRANCH"
+
+      - name: Quench non-exempt ready PR fanout
+        env:
+          TRAFFIC_MAX_DRAFTS: '20'
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory="$RUNNER_TEMP/traffic-ready-prs.json"
+          active_heads="$RUNNER_TEMP/traffic-in-progress-heads.json"
+          candidates="$RUNNER_TEMP/traffic-ready-prs.txt"
+          [[ "$TRAFFIC_MAX_DRAFTS" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::TRAFFIC_MAX_DRAFTS must be a positive integer."
+            exit 1
+          }
+          (( TRAFFIC_MAX_DRAFTS <= 100 )) || {
+            echo "::error::TRAFFIC_MAX_DRAFTS exceeds the bounded inventory."
+            exit 1
+          }
+          gh api "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" > "$inventory"
+
+          # Never draft a PR whose current head is already consuming runner
+          # capacity. Cancelling in-progress validation wastes the exact
+          # capacity this relief path is meant to recover.
+          gh api --paginate --slurp \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?status=in_progress&per_page=100" \
+            | jq -e '
+                [
+                  .[]
+                  | .workflow_runs[]?
+                  | .head_sha
+                  | select(type == "string" and test("^[0-9a-fA-F]{40}$"))
+                ]
+                | unique
+              ' > "$active_heads"
+
+          jq -r             --arg repo "$GITHUB_REPOSITORY"             --argjson max_drafts "$TRAFFIC_MAX_DRAFTS"             --slurpfile active_heads "$active_heads" '
+            [
+              .[]
+              | select(.state == "open")
+              | select(.draft == false)
+              | select(.base.ref == "main")
+              | select(.head.repo.full_name == $repo)
+              | .head.sha as $head_sha
+              | select(($active_heads[0] | index($head_sha)) == null)
+              | select(
+                  (
+                    [
+                      .labels[]?
+                      | .name?
+                      | select(type == "string")
+                      | ascii_downcase
+                    ]
+                    | any(
+                        . == "traffic:keep-ready"
+                        or . == "ci:priority"
+                        or . == "queue:exempt"
+                      )
+                  )
+                  | not
+                )
+              | .number
+            ][: $max_drafts][]
+          ' "$inventory" > "$candidates"
+
+          drafted=0
+          while IFS= read -r pr_number; do
+            [[ "$pr_number" =~ ^[0-9]+$ ]] || {
+              echo "::error::Invalid PR number in traffic quench inventory."
+              exit 1
+            }
+            current="$RUNNER_TEMP/traffic-pr-${pr_number}.json"
+            gh api "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" > "$current"
+            if ! jq -e --arg repo "$GITHUB_REPOSITORY" '
+              .state == "open"
+              and .draft == false
+              and .base.ref == "main"
+              and .head.repo.full_name == $repo
+              and (
+                (
+                  [
+                    .labels[]?
+                    | .name?
+                    | select(type == "string")
+                    | ascii_downcase
+                  ]
+                  | any(
+                      . == "traffic:keep-ready"
+                      or . == "ci:priority"
+                      or . == "queue:exempt"
+                    )
+                )
+                | not
+              )
+            ' "$current" >/dev/null; then
+              continue
+            fi
+
+            if gh pr ready "$pr_number" --undo --repo "$GITHUB_REPOSITORY"; then
+              drafted=$((drafted + 1))
+              continue
+            fi
+
+            # A concurrent actor may have drafted it first. Re-read and only
+            # accept that exact benign race; every other mutation failure fails.
+            gh api "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" > "$current"
+            if jq -e '.state == "open" and .draft == true' "$current" >/dev/null; then
+              continue
+            fi
+            echo "::error::Failed to quench ready PR #${pr_number}."
+            exit 1
+          done < "$candidates"
+
+          {
+            echo '## PR traffic quench'
+            echo "- Ready PRs converted to draft: ${drafted}"
+            echo "- Per-pass cap: ${TRAFFIC_MAX_DRAFTS}"
+            echo '- Exempt labels: traffic:keep-ready, ci:priority, queue:exempt'
+            echo '- In-progress current-head validations are preserved'
+            echo '- Scope: same-repository open PRs targeting main only'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dispatch:
+    name: Queue admitted repository supervisor
+    needs: admission
+    if: ${{ needs.admission.outputs.admit == 'true' }}
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      TRAFFIC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Dispatch reviewed supervisor workflow
+        run: >-
+          gh workflow run supervisor.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref "$TRAFFIC_DEFAULT_BRANCH"

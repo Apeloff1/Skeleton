@@ -1,8 +1,7 @@
 name: Repository Supervisor
 
 on:
-  schedule:
-    - cron: "7 * * * *"
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
@@ -84,7 +83,7 @@ jobs:
       issues: read
       pull-requests: write
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 70
     env:
       GITHUB_TOKEN: ${{ github.token }}
       GH_TOKEN: ${{ github.token }}

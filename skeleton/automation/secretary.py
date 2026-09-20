@@ -27,7 +27,16 @@ from .build_authority import (
     BuildAuthorityError,
     revalidate_live_build_authorization,
 )
+from .builder_plane import (
+    BuilderManifest,
+    BuilderPlaneError,
+    builder_worker_branch,
+    compile_builder_manifest,
+    validate_builder_custody,
+    validate_builder_worker_evidence,
+)
 from .bot_manager import (
+    authorized_builder_available,
     load_state,
     record_worker_outcome,
     save_state,
@@ -37,6 +46,7 @@ from .free_model import redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
+    WorkerCustody,
     canonical_json,
     parse_worker_result,
     require_exact_head,
@@ -50,7 +60,7 @@ MAX_PLAN = 18_000
 MAX_ASSIGNMENTS = 3
 MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 MAX_ENCODED_ENVELOPE = 32_000
-MAX_WORKER_SECONDS = 12 * 60
+MAX_WORKER_SECONDS = 20 * 60
 MAX_DISPATCH_SECONDS = MAX_ASSIGNMENTS * MAX_WORKER_SECONDS
 
 KEYWORDS = {
@@ -408,6 +418,27 @@ def _supervisor_provenance(
     return fingerprint
 
 
+def dispatchable_specialists(
+    state: dict[str, dict],
+    *,
+    build_authorization: BuildAuthorization | None = None,
+) -> list[str]:
+    """Return due specialists while keeping approved build work continuously live.
+
+    Ordinary specialists retain the generic cooldown. An explicitly authorized
+    feature build may bypass only that cooldown; disabled/circuit-open state
+    remains authoritative through authorized_builder_available().
+    """
+    due = select_specialists_due(state)
+    if (
+        build_authorization is not None
+        and "feature-builder" not in due
+        and authorized_builder_available(state)
+    ):
+        due.append("feature-builder")
+    return due
+
+
 def route(
     plan: str,
     due: list[str],
@@ -426,17 +457,14 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Repository state grants build authority; plan text only selects
-            # whether the authorized builder is relevant to this dispatch.
-            # Ordinary CI/root-cause work must not wake a feature builder merely
-            # because some unrelated approved build task exists.
+            # Exact repository state, not model prose, grants and schedules
+            # approved build work. Plan keyword matches may increase priority
+            # but can never suppress a maintainer-approved queued build.
             matches = sum(
                 1
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
-            if not matches:
-                continue
             score = 100 + matches
         else:
             score = sum(
@@ -506,6 +534,7 @@ def _dispatch_one(
     supervisor_fingerprint: str,
     execution: ExecutionIdentity,
     build_authorization: BuildAuthorization | None = None,
+    builder_manifest: BuilderManifest | None = None,
 ) -> dict[str, Any]:
     """Run one worker in a detached worktree rooted at the admitted base."""
     repo_root = Path.cwd().resolve()
@@ -567,6 +596,23 @@ def _dispatch_one(
                     raise SecretaryAdmissionError(
                         "feature-builder missing build authorization"
                     )
+                if builder_manifest is None:
+                    builder_manifest = compile_builder_manifest(
+                        build_authorization,
+                        snapshot_fingerprint=supervisor_fingerprint,
+                        execution=execution,
+                    )
+                try:
+                    validate_builder_custody(
+                        builder_manifest,
+                        authorization=build_authorization,
+                        snapshot_fingerprint=supervisor_fingerprint,
+                        execution=execution,
+                    )
+                except BuilderPlaneError as exc:
+                    raise SecretaryAdmissionError(
+                        "feature-builder manifest custody rejected"
+                    ) from exc
                 env["SUPERVISOR_BUILD_AUTHORIZATION_B64"] = (
                     base64.b64encode(
                         canonical_json(
@@ -576,6 +622,12 @@ def _dispatch_one(
                 )
                 env["SUPERVISOR_BUILD_TASK_DIGEST"] = (
                     build_authorization.task_digest
+                )
+                env["SUPERVISOR_BUILDER_MANIFEST_B64"] = (
+                    builder_manifest.to_base64()
+                )
+                env["SUPERVISOR_BUILDER_MANIFEST_DIGEST"] = (
+                    builder_manifest.manifest_digest
                 )
 
             process = subprocess.run(
@@ -601,6 +653,20 @@ def _dispatch_one(
                     process.stdout,
                     worker=name,
                 )
+                expected_branch: str | None = None
+                if name == "feature-builder":
+                    if builder_manifest is None:
+                        raise SupervisorRuntimeError(
+                            "feature-builder evidence missing Builder Plane custody"
+                        )
+                    try:
+                        expected_branch = builder_worker_branch(
+                            builder_manifest
+                        )
+                    except BuilderPlaneError as exc:
+                        raise SupervisorRuntimeError(
+                            "feature-builder branch custody is invalid"
+                        ) from exc
                 validate_worker_evidence_custody(
                     evidence,
                     WorkerCustody(
@@ -608,7 +674,18 @@ def _dispatch_one(
                         snapshot_fingerprint=supervisor_fingerprint,
                         execution=execution,
                     ),
+                    expected_branch=expected_branch,
                 )
+                if name == "feature-builder":
+                    try:
+                        validate_builder_worker_evidence(
+                            evidence,
+                            builder_manifest,
+                        )
+                    except BuilderPlaneError as exc:
+                        raise SupervisorRuntimeError(
+                            "feature-builder evidence failed Builder Plane custody"
+                        ) from exc
             return {
                 "bot": name,
                 "returncode": process.returncode,
@@ -639,6 +716,7 @@ def dispatch(
     supervisor_fingerprint: str,
     execution: ExecutionIdentity,
     build_authorization: BuildAuthorization | None = None,
+    builder_manifest: BuilderManifest | None = None,
 ) -> list[dict[str, Any]]:
     """Dispatch registered workers with strict assignment and isolation budgets."""
     registered = {spec.name for spec in ADVANCED_BOTS}
@@ -668,16 +746,44 @@ def dispatch(
         raise SecretaryAdmissionError(
             "feature-builder assignment lacks exact build authority"
         )
+    if "feature-builder" in assignments:
+        if builder_manifest is None:
+            try:
+                builder_manifest = compile_builder_manifest(
+                    build_authorization,
+                    snapshot_fingerprint=supervisor_fingerprint,
+                    execution=execution,
+                )
+            except BuilderPlaneError as exc:
+                raise SecretaryAdmissionError(
+                    "unable to compile feature-builder manifest"
+                ) from exc
+        try:
+            validate_builder_custody(
+                builder_manifest,
+                authorization=build_authorization,
+                snapshot_fingerprint=supervisor_fingerprint,
+                execution=execution,
+            )
+        except BuilderPlaneError as exc:
+            raise SecretaryAdmissionError(
+                "feature-builder manifest custody rejected"
+            ) from exc
 
     results: list[dict[str, Any]] = []
     for name in assignments:
+        kwargs: dict[str, Any] = {
+            "supervisor_fingerprint": supervisor_fingerprint,
+            "execution": execution,
+            "build_authorization": build_authorization,
+        }
+        if name == "feature-builder":
+            kwargs["builder_manifest"] = builder_manifest
         results.append(
             _dispatch_one(
                 plan,
                 name,
-                supervisor_fingerprint=supervisor_fingerprint,
-                execution=execution,
-                build_authorization=build_authorization,
+                **kwargs,
             )
         )
     return results
@@ -731,6 +837,7 @@ def main() -> int:
             "Secretary requires Supervisor custody"
         )
 
+    builder_manifest: BuilderManifest | None = None
     if build_authorization is not None:
         try:
             build_authorization = revalidate_live_build_authorization(
@@ -740,9 +847,28 @@ def main() -> int:
             raise SecretaryAdmissionError(
                 "build authorization was revoked or changed"
             ) from exc
+        try:
+            builder_manifest = compile_builder_manifest(
+                build_authorization,
+                snapshot_fingerprint=supervisor_fingerprint,
+                execution=execution,
+            )
+            validate_builder_custody(
+                builder_manifest,
+                authorization=build_authorization,
+                snapshot_fingerprint=supervisor_fingerprint,
+                execution=execution,
+            )
+        except BuilderPlaneError as exc:
+            raise SecretaryAdmissionError(
+                "builder plane compilation failed closed"
+            ) from exc
 
     state = load_state()
-    due = select_specialists_due(state)
+    due = dispatchable_specialists(
+        state,
+        build_authorization=build_authorization,
+    )
     assignments = route(
         plan,
         due,
@@ -774,6 +900,16 @@ def main() -> int:
                     if build_authorization is not None
                     else None
                 ),
+                "builder_manifest_digest": (
+                    builder_manifest.manifest_digest
+                    if builder_manifest is not None
+                    else None
+                ),
+                "builder_stage_count": (
+                    len(builder_manifest.stages)
+                    if builder_manifest is not None
+                    else 0
+                ),
                 "worker_isolation": "detached-worktree",
             },
             indent=2,
@@ -791,6 +927,7 @@ def main() -> int:
         supervisor_fingerprint,
         execution,
         build_authorization=build_authorization,
+        builder_manifest=builder_manifest,
     )
     for result in results:
         record_worker_outcome(

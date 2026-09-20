@@ -29,12 +29,12 @@ def test_supervisor_workflow_has_no_workflow_wide_authority() -> None:
     assert "read-all" not in source
 
 
-def test_supervisor_workflow_is_unattended_and_manual_only() -> None:
+def test_supervisor_workflow_is_reusable_and_manual_only() -> None:
     source = _source()
     trigger = source.split("concurrency:\n", 1)[0]
-    assert "  schedule:" in trigger
-    assert 'cron: "7 * * * *"' in trigger
+    assert "  workflow_call:" in trigger
     assert "  workflow_dispatch:" in trigger
+    assert "  schedule:" not in trigger
     assert "pull_request:" not in trigger
     assert "push:" not in trigger
     assert "workflow_run:" not in trigger
@@ -206,7 +206,7 @@ def test_supervisor_workflow_uses_pinned_reviewed_actions() -> None:
 def test_secretary_timeout_keeps_a_bounded_execution_window() -> None:
     source = _source()
     secretary = _job_block(source, "secretary")
-    assert "timeout-minutes: 45" in secretary
+    assert "timeout-minutes: 70" in secretary
 
 def test_worker_health_surface_is_tracked_by_workflow_security() -> None:
     workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"
@@ -230,3 +230,25 @@ def test_merge_readiness_runs_worker_health_regressions() -> None:
     for fragment in required:
         assert fragment in source
 
+
+def test_builder_plane_surface_is_tracked_by_workflow_security() -> None:
+    workflow = ROOT / ".github" / "workflows" / "workflow-input-security.yml"
+    source = workflow.read_text(encoding="utf-8")
+    required = (
+        "skeleton/automation/builder_plane.py",
+        "tests/test_builder_plane.py",
+        "tests/test_builder_plane_integration.py",
+    )
+    for fragment in required:
+        assert source.count(fragment) == 2
+
+
+def test_merge_readiness_runs_builder_plane_regressions() -> None:
+    workflow = ROOT / ".github" / "workflows" / "merge-readiness.yml"
+    source = workflow.read_text(encoding="utf-8")
+    required = (
+        "tests/test_builder_plane.py",
+        "tests/test_builder_plane_integration.py",
+    )
+    for fragment in required:
+        assert fragment in source
