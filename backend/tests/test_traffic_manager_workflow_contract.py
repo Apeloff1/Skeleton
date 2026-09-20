@@ -27,7 +27,7 @@ def test_traffic_manager_is_only_routine_schedule_for_supervisor_chain() -> None
     supervisor = _source(SUPERVISOR)
     secretary = _source(SECRETARY)
 
-    assert 'cron: "*/15 * * * *"' in traffic
+    assert 'cron: "*/10 * * * *"' in traffic
     assert "  schedule:" in traffic.split("permissions:", 1)[0]
     assert "  schedule:" not in supervisor.split("concurrency:", 1)[0]
     assert "  schedule:" not in secretary.split("concurrency:", 1)[0]
