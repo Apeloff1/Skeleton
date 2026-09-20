@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
-import hmac
 import json
 import os
 from pathlib import Path
