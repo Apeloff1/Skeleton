@@ -81,6 +81,7 @@ jobs:
     permissions:
       actions: write
       contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -111,6 +112,96 @@ jobs:
           gh workflow run queue-drain.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref "$TRAFFIC_DEFAULT_BRANCH"
+
+      - name: Quench non-exempt ready PR fanout
+        env:
+          TRAFFIC_MAX_DRAFTS: '20'
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory="$RUNNER_TEMP/traffic-ready-prs.json"
+          candidates="$RUNNER_TEMP/traffic-ready-prs.txt"
+          gh api "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" > "$inventory"
+          jq -r --arg repo "$GITHUB_REPOSITORY" '
+            .[]
+            | select(.state == "open")
+            | select(.draft == false)
+            | select(.base.ref == "main")
+            | select(.head.repo.full_name == $repo)
+            | select(
+                (
+                  [
+                    .labels[]?
+                    | .name?
+                    | select(type == "string")
+                    | ascii_downcase
+                  ]
+                  | any(
+                      . == "traffic:keep-ready"
+                      or . == "ci:priority"
+                      or . == "queue:exempt"
+                    )
+                )
+                | not
+              )
+            | .number
+          ' "$inventory" | head -n "$TRAFFIC_MAX_DRAFTS" > "$candidates"
+
+          drafted=0
+          while IFS= read -r pr_number; do
+            [[ "$pr_number" =~ ^[0-9]+$ ]] || {
+              echo "::error::Invalid PR number in traffic quench inventory."
+              exit 1
+            }
+            current="$RUNNER_TEMP/traffic-pr-${pr_number}.json"
+            gh api "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" > "$current"
+            if ! jq -e --arg repo "$GITHUB_REPOSITORY" '
+              .state == "open"
+              and .draft == false
+              and .base.ref == "main"
+              and .head.repo.full_name == $repo
+              and (
+                (
+                  [
+                    .labels[]?
+                    | .name?
+                    | select(type == "string")
+                    | ascii_downcase
+                  ]
+                  | any(
+                      . == "traffic:keep-ready"
+                      or . == "ci:priority"
+                      or . == "queue:exempt"
+                    )
+                )
+                | not
+              )
+            ' "$current" >/dev/null; then
+              continue
+            fi
+
+            if gh pr ready "$pr_number" --undo --repo "$GITHUB_REPOSITORY"; then
+              drafted=$((drafted + 1))
+              continue
+            fi
+
+            # A concurrent actor may have drafted it first. Re-read and only
+            # accept that exact benign race; every other mutation failure fails.
+            gh api "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" > "$current"
+            if jq -e '.state == "open" and .draft == true' "$current" >/dev/null; then
+              continue
+            fi
+            echo "::error::Failed to quench ready PR #${pr_number}."
+            exit 1
+          done < "$candidates"
+
+          {
+            echo '## PR traffic quench'
+            echo "- Ready PRs converted to draft: ${drafted}"
+            echo "- Per-pass cap: ${TRAFFIC_MAX_DRAFTS}"
+            echo '- Exempt labels: traffic:keep-ready, ci:priority, queue:exempt'
+            echo '- Scope: same-repository open PRs targeting main only'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   dispatch:
     name: Queue admitted repository supervisor
