@@ -28,7 +28,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Sequence
 
-_ASM_ABI_VERSION = 1
+_ASM_ABI_VERSION = 2
 _SUPPORTED_ARCHES = frozenset({"x86_64", "aarch64"})
 _ARCH_ALIASES = {
     "amd64": "x86_64",
@@ -36,6 +36,7 @@ _ARCH_ALIASES = {
     "arm64": "aarch64",
 }
 _DEFAULT_BUILD_TIMEOUT_SECONDS = 60.0
+_MAX_MATRIX_ELEMENTS = 16_000_000
 
 
 class AsmAcceleratorError(RuntimeError):
@@ -197,6 +198,16 @@ class AsmVectorAccelerator:
             function.argtypes = [float_pointer, float_pointer, ctypes.c_size_t]
             function.restype = ctypes.c_float
 
+        batch = loaded.skeleton_asm_dot_batch_f32
+        batch.argtypes = [
+            float_pointer,
+            float_pointer,
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            float_pointer,
+        ]
+        batch.restype = None
+
         self._library = loaded
         self._library_path = target.resolve()
         self._architecture = arch
@@ -328,6 +339,71 @@ class AsmVectorAccelerator:
 
     def l2_sq_f32(self, left: Sequence[float], right: Sequence[float]) -> float:
         return self._binary_f32("skeleton_asm_l2_sq_f32", left, right)
+
+    def dot_batch_f32(
+        self,
+        query: Sequence[float],
+        candidates: Sequence[Sequence[float]],
+    ) -> list[float]:
+        dimensions = len(query)
+        matrix = array.array("f")
+        for candidate in candidates:
+            if len(candidate) != dimensions:
+                raise ValueError("candidate dimension mismatch")
+            matrix.extend(float(value) for value in candidate)
+        return self.dot_matrix_f32(
+            query,
+            matrix,
+            rows=len(candidates),
+            dimensions=dimensions,
+        )
+
+    def dot_matrix_f32(
+        self,
+        query: Sequence[float],
+        matrix: Sequence[float],
+        *,
+        rows: int,
+        dimensions: int | None = None,
+    ) -> list[float]:
+        if isinstance(rows, bool) or not isinstance(rows, int) or rows < 0:
+            raise ValueError("rows must be a non-negative integer")
+        dims = len(query) if dimensions is None else dimensions
+        if isinstance(dims, bool) or not isinstance(dims, int) or dims < 0:
+            raise ValueError("dimensions must be a non-negative integer")
+        if len(query) != dims:
+            raise ValueError("query dimension mismatch")
+
+        expected = rows * dims
+        if expected > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("matrix element count exceeds accelerator bound")
+        if len(matrix) != expected:
+            raise ValueError("matrix shape mismatch")
+        if rows == 0:
+            return []
+
+        query_array, query_buffer = self._float_buffer(query)
+        matrix_array, matrix_buffer = self._float_buffer(matrix)
+        output = array.array("f", [0.0]) * rows
+        output_buffer = self._float_buffer(output)[1]
+        function = self._library.skeleton_asm_dot_batch_f32
+        try:
+            function(
+                query_buffer,
+                matrix_buffer,
+                rows,
+                dims,
+                output_buffer,
+            )
+        except Exception:
+            with self._lock:
+                self._calls += 1
+                self._failures += 1
+            raise
+
+        with self._lock:
+            self._calls += 1
+        return output.tolist()
 
     def _binary_f32(
         self,
