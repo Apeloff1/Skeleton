@@ -59,7 +59,7 @@ MAX_PLAN = 18_000
 MAX_ASSIGNMENTS = 3
 MAX_ENVELOPE_AGE_SECONDS = 2 * 60 * 60
 MAX_ENCODED_ENVELOPE = 32_000
-MAX_WORKER_SECONDS = 12 * 60
+MAX_WORKER_SECONDS = 20 * 60
 MAX_DISPATCH_SECONDS = MAX_ASSIGNMENTS * MAX_WORKER_SECONDS
 
 KEYWORDS = {
@@ -435,17 +435,14 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Repository state grants build authority; plan text only selects
-            # whether the authorized builder is relevant to this dispatch.
-            # Ordinary CI/root-cause work must not wake a feature builder merely
-            # because some unrelated approved build task exists.
+            # Exact repository state grants and schedules approved build work.
+            # Plan keywords may raise priority but can never suppress a live,
+            # maintainer-approved task or create authority by themselves.
             matches = sum(
                 1
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
-            if not matches:
-                continue
             score = 100 + matches
         else:
             score = sum(
