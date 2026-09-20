@@ -29,7 +29,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Sequence
 
-_ASM_ABI_VERSION = 3
+_ASM_ABI_VERSION = 4
+_CAP_X86_SSE2 = 1 << 0
+_CAP_X86_AVX = 1 << 1
+_CAP_AARCH64_NEON = 1 << 2
 _SUPPORTED_ARCHES = frozenset({"x86_64", "aarch64"})
 _ARCH_ALIASES = {
     "amd64": "x86_64",
@@ -88,6 +91,8 @@ class AsmAcceleratorStatus:
     architecture: str
     library: str
     abi_version: int
+    capabilities: tuple[str, ...]
+    matrix_backend: str
     calls: int
     failures: int
 
@@ -199,6 +204,26 @@ class AsmVectorAccelerator:
                 f"Assembly ABI mismatch: expected {_ASM_ABI_VERSION}, got {abi_version}"
             )
 
+        try:
+            capability_function = loaded.skeleton_asm_capabilities
+        except AttributeError as exc:
+            raise AsmAcceleratorAbiError(
+                f"Assembly ABI v{_ASM_ABI_VERSION} missing symbol: "
+                "skeleton_asm_capabilities"
+            ) from exc
+        capability_function.argtypes = []
+        capability_function.restype = ctypes.c_uint64
+        capability_mask = int(capability_function())
+
+        if arch == "x86_64" and not capability_mask & _CAP_X86_SSE2:
+            raise AsmAcceleratorAbiError(
+                "x86-64 Assembly library did not report SSE2 baseline support"
+            )
+        if arch == "aarch64" and not capability_mask & _CAP_AARCH64_NEON:
+            raise AsmAcceleratorAbiError(
+                "AArch64 Assembly library did not report NEON baseline support"
+            )
+
         float_pointer = ctypes.POINTER(ctypes.c_float)
         for name in ("skeleton_asm_dot_f32", "skeleton_asm_l2_sq_f32"):
             try:
@@ -243,10 +268,43 @@ class AsmVectorAccelerator:
         ]
         matrix_batch.restype = None
 
+        selected_matrix = matrix_batch
+        matrix_backend = "neon" if arch == "aarch64" else "sse2"
+        if arch == "x86_64" and capability_mask & _CAP_X86_AVX:
+            try:
+                avx_matrix = loaded.skeleton_asm_dot_matrix_f32_avx
+            except AttributeError as exc:
+                raise AsmAcceleratorAbiError(
+                    f"Assembly ABI v{_ASM_ABI_VERSION} reported AVX but "
+                    "skeleton_asm_dot_matrix_f32_avx is missing"
+                ) from exc
+            avx_matrix.argtypes = [
+                float_pointer,
+                ctypes.c_size_t,
+                float_pointer,
+                ctypes.c_size_t,
+                ctypes.c_size_t,
+                float_pointer,
+            ]
+            avx_matrix.restype = None
+            selected_matrix = avx_matrix
+            matrix_backend = "avx"
+
+        capabilities: list[str] = []
+        if capability_mask & _CAP_X86_SSE2:
+            capabilities.append("sse2")
+        if capability_mask & _CAP_X86_AVX:
+            capabilities.append("avx")
+        if capability_mask & _CAP_AARCH64_NEON:
+            capabilities.append("neon")
+
         self._library = loaded
         self._library_path = target.resolve()
         self._architecture = arch
         self._abi_version = abi_version
+        self._capabilities = tuple(capabilities)
+        self._matrix_backend = matrix_backend
+        self._matrix_function = selected_matrix
         self._calls = 0
         self._failures = 0
         self._lock = Lock()
@@ -365,6 +423,8 @@ class AsmVectorAccelerator:
                 architecture=self._architecture,
                 library=str(self._library_path),
                 abi_version=self._abi_version,
+                capabilities=self._capabilities,
+                matrix_backend=self._matrix_backend,
                 calls=self._calls,
                 failures=self._failures,
             )
@@ -421,10 +481,11 @@ class AsmVectorAccelerator:
         matrix_array, matrix_buffer = self._float_buffer(matrix)
         output = array.array("f", [0.0]) * rows
         output_buffer = self._float_buffer(output)[1]
-        function = self._library.skeleton_asm_dot_batch_f32
+        function = self._matrix_function
         try:
             function(
                 query_buffer,
+                1,
                 matrix_buffer,
                 rows,
                 dims,
@@ -477,7 +538,7 @@ class AsmVectorAccelerator:
         matrix_array, matrix_buffer = self._float_buffer(matrix)
         output = array.array("f", [0.0]) * output_count
         output_buffer = self._float_buffer(output)[1]
-        function = self._library.skeleton_asm_dot_matrix_f32
+        function = self._matrix_function
         try:
             function(
                 query_buffer,
