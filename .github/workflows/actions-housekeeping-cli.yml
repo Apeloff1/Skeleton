@@ -3,8 +3,8 @@ name: Actions Housekeeping CLI
 on:
   workflow_dispatch:
   schedule:
-    # Hourly ARM-lane fallback for provider-stuck obsolete Actions runs.
-    - cron: '23 * * * *'
+    # Six-hour safety sweep; event-driven queue recovery handles urgent demand.
+    - cron: '23 */6 * * *'
   push:
     branches: [main]
     paths:
@@ -39,9 +39,11 @@ jobs:
       MAX_RUN_DELETES: '1000'
       LIVE_RUN_STALE_MINUTES: '10'
       LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
+      # Provider-stuck runs can reject force-cancel indefinitely. Keep a
+      # bounded retry for transient races without monopolizing the ARM lane.
       FORCE_CANCEL_ATTEMPTS: '2'
       FORCE_CANCEL_REJECT_BACKOFF_SECONDS: '1'
-      FORCE_CANCEL_POLL_SECONDS: '2'
+      FORCE_CANCEL_POLL_SECONDS: '1'
       MAX_LIVE_CANCELS: '100'
     steps:
       - name: Verify GitHub CLI
