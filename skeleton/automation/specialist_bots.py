@@ -1096,6 +1096,7 @@ def main() -> int:
                     followup=followup,
                     client=client,
                     budget=implementation_budget,
+                    builder_manifest=builder_manifest,
                 )
             else:
                 result = run_feature_build(
