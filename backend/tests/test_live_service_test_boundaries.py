@@ -43,12 +43,12 @@ def test_repository_live_service_boundary_is_clean() -> None:
     assert module.audit() == ()
 
 
-def test_unregistered_localhost_service_test_fails_closed(tmp_path: Path) -> None:
+def test_unregistered_marked_localhost_service_test_fails_closed(tmp_path: Path) -> None:
     module = _module()
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_remote.py").write_text(
-        'import pytest\nURL = "http://localhost:8123"\n',
+        'import pytest\npytestmark = pytest.mark.live_service\nURL = "http://localhost:8123"\n',
         encoding="utf-8",
     )
     findings = module.audit(
@@ -56,7 +56,46 @@ def test_unregistered_localhost_service_test_fails_closed(tmp_path: Path) -> Non
         manifest_path=_manifest(tmp_path, ("test_registered.py",)),
     )
     assert any("not registered" in finding for finding in findings)
+    assert any("absent from the manifest" in finding for finding in findings)
     assert any("missing test" in finding for finding in findings)
+
+
+def test_unmarked_endpoint_fixture_is_not_treated_as_live_io(tmp_path: Path) -> None:
+    module = _module()
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_fixture.py").write_text(
+        'URL = "http://localhost:8123"\n',
+        encoding="utf-8",
+    )
+    (tests / "test_registered.py").write_text(
+        "import pytest\npytestmark = pytest.mark.live_service\n",
+        encoding="utf-8",
+    )
+    findings = module.audit(
+        test_root=tests,
+        manifest_path=_manifest(tmp_path, ("test_registered.py",)),
+    )
+    assert findings == ()
+
+
+def test_marker_text_inside_fixture_is_not_a_module_marker(tmp_path: Path) -> None:
+    module = _module()
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_fixture.py").write_text(
+        'MARKER = "pytestmark = pytest.mark.live_service"\nURL = "http://localhost:8123"\n',
+        encoding="utf-8",
+    )
+    (tests / "test_registered.py").write_text(
+        "import pytest\npytestmark = pytest.mark.live_service\n",
+        encoding="utf-8",
+    )
+    findings = module.audit(
+        test_root=tests,
+        manifest_path=_manifest(tmp_path, ("test_registered.py",)),
+    )
+    assert findings == ()
 
 
 def test_marked_but_unregistered_test_is_rejected(tmp_path: Path) -> None:
