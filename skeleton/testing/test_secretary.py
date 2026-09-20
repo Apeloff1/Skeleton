@@ -50,3 +50,12 @@ def test_secretary_never_routes_feature_builder_without_build_authority():
         build_authorization=None,
     )
     assert "feature-builder" not in selected
+
+
+def test_route_does_not_invent_builder_when_not_in_due_set():
+    selected = route(
+        "routine repository state",
+        [],
+        build_authorization=object(),
+    )
+    assert "feature-builder" not in selected
