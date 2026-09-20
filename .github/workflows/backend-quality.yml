@@ -233,3 +233,4 @@ jobs:
           backend/tests/test_traffic_manager_workflow_contract.py
           tests/test_actions_housekeeping_live_reaper.py
           tests/test_queue_drain_housekeeping_cooldown.py
+          tests/test_arm64_workflow_trigger_scope.py
