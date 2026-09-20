@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.5",
+  "schema_version": "3.6",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -300,6 +300,18 @@
       ],
       "status": "staged",
       "note": "existing integration PRs reused; no duplicate PRs created"
+    },
+    "frontier_java_machine_wave": {
+      "revalidated": [
+        "galaxy capability lifecycle",
+        "Java batch accelerators",
+        "Java control/observability",
+        "Jeeves AI decision/planning",
+        "Jeeves frontier core/falsification/reasoning",
+        "machine repository control plane"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused; no duplicate PRs"
     }
   },
   "integrated_domains": [
