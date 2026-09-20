@@ -4,9 +4,17 @@
 .global skeleton_asm_abi_version
 .type skeleton_asm_abi_version, %function
 skeleton_asm_abi_version:
-    mov w0, #3
+    mov w0, #4
     ret
 .size skeleton_asm_abi_version, .-skeleton_asm_abi_version
+
+.align 2
+.global skeleton_asm_capabilities
+.type skeleton_asm_capabilities, %function
+skeleton_asm_capabilities:
+    mov x0, #4
+    ret
+.size skeleton_asm_capabilities, .-skeleton_asm_capabilities
 
 .align 2
 .global skeleton_asm_dot_f32
