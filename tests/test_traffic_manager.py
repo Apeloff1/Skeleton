@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from skeleton.automation.branch_merge_manager import (
+    Branch,
+    PullRequest,
+    build_plan,
+)
 from skeleton.automation.traffic_manager import (
     TrafficPolicy,
     TrafficSnapshot,
@@ -309,6 +314,33 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             "managed-automation-already-active",
         )
 
+    def test_active_branch_merger_blocks_duplicate_integration_dispatch(self) -> None:
+        decision = evaluate(
+            snapshot(
+                runs=(
+                    run(
+                        name="Branch Merge Manager",
+                        status="in_progress",
+                        conclusion="",
+                        database_id=41,
+                    ),
+                ),
+                prs=(
+                    {
+                        "number": 42,
+                        "isDraft": False,
+                        "mergeStateStatus": "BLOCKED",
+                    },
+                ),
+            ),
+            policy=self.policy,
+        )
+        self.assertFalse(decision.admit)
+        self.assertEqual(
+            decision.reason,
+            "managed-automation-already-active",
+        )
+
     def test_current_traffic_manager_run_is_excluded(self) -> None:
         decision = evaluate(
             snapshot(
@@ -480,6 +512,125 @@ class TrafficManagerAdmissionTests(unittest.TestCase):
             decision.reason,
             "no-actionable-demand",
         )
+
+
+class BranchMergePlanningTests(unittest.TestCase):
+    def test_non_draft_branch_backed_pr_dispatches(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (
+                Branch("main", protected=True),
+                Branch("fix/a"),
+                Branch("feat/b"),
+            ),
+            (
+                PullRequest(12, "fix/a", "main", False, (), "clean"),
+                PullRequest(13, "feat/b", "main", False, (), "blocked"),
+            ),
+            complete=True,
+            observed_at=NOW,
+        )
+        self.assertTrue(plan.dispatch)
+        self.assertEqual(plan.eligible_count, 2)
+        self.assertEqual([item.number for item in plan.candidates], [12, 13])
+        self.assertEqual(plan.max_merges, 2)
+
+    def test_draft_and_opt_out_are_held(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (Branch("fix/a"), Branch("fix/b")),
+            (
+                PullRequest(1, "fix/a", "main", True, (), "clean"),
+                PullRequest(
+                    2,
+                    "fix/b",
+                    "main",
+                    False,
+                    ("do-not-merge",),
+                    "clean",
+                ),
+            ),
+            complete=True,
+            observed_at=NOW,
+        )
+        self.assertFalse(plan.dispatch)
+        self.assertEqual(plan.draft_count, 1)
+        self.assertEqual(plan.opt_out_count, 1)
+
+    def test_backup_and_protected_branches_are_excluded(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (
+                Branch("backup/old"),
+                Branch("release/protected", protected=True),
+            ),
+            (
+                PullRequest(1, "backup/old", "main", False, (), "clean"),
+                PullRequest(
+                    2,
+                    "release/protected",
+                    "main",
+                    False,
+                    (),
+                    "clean",
+                ),
+            ),
+            complete=True,
+            observed_at=NOW,
+        )
+        self.assertFalse(plan.dispatch)
+        self.assertEqual(plan.eligible_count, 0)
+
+    def test_truncated_repository_inventory_fails_closed(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (Branch("fix/a"),),
+            (PullRequest(1, "fix/a", "main", False, (), "clean"),),
+            complete=False,
+            observed_at=NOW,
+        )
+        self.assertFalse(plan.dispatch)
+        self.assertEqual(plan.reason, "repository-inventory-truncated")
+
+    def test_ambiguous_duplicate_head_is_held(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (Branch("fix/a"),),
+            (
+                PullRequest(1, "fix/a", "main", False, (), "clean"),
+                PullRequest(2, "fix/a", "main", False, (), "clean"),
+            ),
+            complete=True,
+            observed_at=NOW,
+        )
+        self.assertFalse(plan.dispatch)
+        self.assertEqual(plan.ambiguous_count, 1)
+
+    def test_clean_candidates_sort_before_blocked_and_budget_caps(self) -> None:
+        plan = build_plan(
+            "Apeloff1/Skeleton",
+            "main",
+            (
+                Branch("fix/a"),
+                Branch("fix/b"),
+                Branch("fix/c"),
+            ),
+            (
+                PullRequest(7, "fix/a", "main", False, (), "blocked"),
+                PullRequest(8, "fix/b", "main", False, (), "clean"),
+                PullRequest(9, "fix/c", "main", False, (), "unstable"),
+            ),
+            complete=True,
+            max_merges=1,
+            observed_at=NOW,
+        )
+        self.assertEqual([item.number for item in plan.candidates], [8, 9, 7])
+        self.assertEqual(plan.max_merges, 1)
 
 
 if __name__ == "__main__":
