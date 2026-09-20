@@ -449,16 +449,11 @@ def evaluate(
         relieve = True
         relief_reason = "queue-capacity-exhausted"
 
-    identity_payload = json.dumps(
-        {
-            "repository": snapshot.repository,
-            "base_sha": snapshot.base_sha.lower(),
-            "observed_at": snapshot.observed_at,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    decision_fingerprint = hashlib.sha256(identity_payload).hexdigest()
+    decision_fingerprint = decision_identity_fingerprint(
+        snapshot.repository,
+        snapshot.base_sha,
+        snapshot.observed_at,
+    )
     common = {
         "base_sha": snapshot.base_sha.lower(),
         "observed_at": snapshot.observed_at,
@@ -666,6 +661,33 @@ def observe(
         pull_requests=tuple(prs),
         issues=tuple(issues),
     )
+
+
+def decision_identity_fingerprint(
+    repository: str,
+    base_sha: str,
+    observed_at: int,
+) -> str:
+    """Return the canonical digest used to bind admission evidence."""
+    snapshot = TrafficSnapshot(
+        repository=repository,
+        base_sha=base_sha,
+        observed_at=observed_at,
+        current_run_id="",
+        workflow_runs=(),
+        pull_requests=(),
+        issues=(),
+    )
+    payload = json.dumps(
+        {
+            "repository": snapshot.repository,
+            "base_sha": snapshot.base_sha.lower(),
+            "observed_at": snapshot.observed_at,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _bool_env(name: str) -> bool:
