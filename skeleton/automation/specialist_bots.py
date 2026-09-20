@@ -1009,29 +1009,66 @@ def main() -> int:
             custody,
             builder_manifest=builder_manifest,
         )
+        followup: BuildFollowup | None = None
+        publish_env: dict[str, str] | None = None
 
         if active_pr is not None:
-            existing_evidence: dict[str, Any] = {
-                "status": "existing-pr",
-                "bot": spec.name,
-                "branch": active_pr.get(
-                    "headRefName",
-                    branch,
-                ),
-                "pull_request": active_pr.get("number"),
-                "supervisor_snapshot_fingerprint": (
-                    custody.snapshot_fingerprint
-                ),
-            }
-            if build_authorization is not None:
-                existing_evidence["build_issue_number"] = (
-                    build_authorization.issue_number
+            if (
+                spec.name == "feature-builder"
+                and build_authorization is not None
+                and builder_manifest is not None
+            ):
+                followup = inspect_build_followup(
+                    execution.repository,
+                    active_pr,
+                    build_authorization,
                 )
-                existing_evidence["build_task_digest"] = (
-                    build_authorization.task_digest
+                if followup.branch != branch:
+                    raise WorkerAdmissionError(
+                        "build followup branch differs from canonical Builder branch"
+                    )
+                if not followup.repairable:
+                    existing_evidence: dict[str, Any] = {
+                        "status": "existing-pr",
+                        "bot": spec.name,
+                        "branch": branch,
+                        "pull_request": followup.pr_number,
+                        "supervisor_snapshot_fingerprint": (
+                            custody.snapshot_fingerprint
+                        ),
+                        "build_issue_number": (
+                            build_authorization.issue_number
+                        ),
+                        "build_task_digest": (
+                            build_authorization.task_digest
+                        ),
+                    }
+                    _print_status(
+                        existing_evidence
+                    )
+                    return 0
+                publish_env = _publication_env()
+                _checkout_followup_head(
+                    followup,
+                    env=publish_env,
                 )
-            _print_status(existing_evidence)
-            return 0
+            else:
+                existing_evidence = {
+                    "status": "existing-pr",
+                    "bot": spec.name,
+                    "branch": active_pr.get(
+                        "headRefName",
+                        branch,
+                    ),
+                    "pull_request": active_pr.get("number"),
+                    "supervisor_snapshot_fingerprint": (
+                        custody.snapshot_fingerprint
+                    ),
+                }
+                _print_status(
+                    existing_evidence
+                )
+                return 0
 
         plan = _bounded_text(
             args.plan,
@@ -1041,37 +1078,62 @@ def main() -> int:
         )
 
         client = FreeModelClient()
-        result = extract_plan(
-            client.chat(
-                (
-                    "You are a conservative specialist maintenance agent. "
-                    "Return JSON only."
-                ),
-                _render_prompt(
-                    spec,
-                    execution.repository,
-                    plan,
+        if spec.name == "feature-builder":
+            if (
+                build_authorization is None
+                or builder_manifest is None
+            ):
+                raise WorkerAdmissionError(
+                    "feature-builder missing canonical Builder custody"
+                )
+            implementation_budget = budget_from_manifest(
+                builder_manifest
+            )
+            if followup is not None:
+                result = run_feature_followup_repair(
+                    plan=plan,
                     build_authorization=build_authorization,
+                    followup=followup,
+                    client=client,
+                    budget=implementation_budget,
+                )
+            else:
+                result = run_feature_build(
+                    plan=plan,
+                    build_authorization=build_authorization,
+                    client=client,
                     builder_manifest=builder_manifest,
+                )
+        else:
+            result = extract_plan(
+                client.chat(
+                    (
+                        "You are a conservative specialist maintenance agent. "
+                        "Return JSON only."
+                    ),
+                    _render_prompt(
+                        spec,
+                        execution.repository,
+                        plan,
+                        build_authorization=build_authorization,
+                        builder_manifest=builder_manifest,
+                    ),
+                    max_tokens=MODEL_MAX_TOKENS,
                 ),
-                max_tokens=MODEL_MAX_TOKENS,
-            ),
-            (
-                min(spec.max_files, builder_manifest.budget.max_files)
-                if builder_manifest is not None
-                else spec.max_files
-            ),
-        )
+                spec.max_files,
+            )
+
         if builder_manifest is not None:
             validate_builder_proposal_budget(
                 result,
                 builder_manifest,
             )
-            validate_builder_regression_policy(
-                result,
-                spec,
-                builder_manifest,
-            )
+            if followup is None:
+                validate_builder_regression_policy(
+                    result,
+                    spec,
+                    builder_manifest,
+                )
 
         result["files"] = filter_noop_files(
             result["files"]
