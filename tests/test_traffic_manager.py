@@ -669,3 +669,55 @@ class TrafficDecisionEvidenceTests(unittest.TestCase):
         self.assertIn(f"observed_at={NOW}\n", rendered)
         self.assertIn('"base_sha":"' + BASE + '"', rendered)
         self.assertIn(f'"observed_at":{NOW}', rendered)
+
+
+class TrafficDecisionFingerprintTests(unittest.TestCase):
+    def _decision(self, *, sha: str = BASE, observed_at: int = NOW):
+        snapshot = TrafficSnapshot(
+            repository="Apeloff1/Skeleton",
+            base_sha=sha,
+            observed_at=observed_at,
+            current_run_id="",
+            workflow_runs=(),
+            pull_requests=(),
+            issues=(),
+        )
+        return evaluate(snapshot, force=True)
+
+    def test_fingerprint_is_stable_for_same_identity(self) -> None:
+        first = self._decision()
+        second = self._decision()
+        self.assertEqual(first.decision_fingerprint, second.decision_fingerprint)
+        self.assertRegex(first.decision_fingerprint, r"^[0-9a-f]{64}$")
+
+    def test_fingerprint_changes_when_base_sha_changes(self) -> None:
+        first = self._decision(sha="a" * 40)
+        second = self._decision(sha="b" * 40)
+        self.assertNotEqual(
+            first.decision_fingerprint,
+            second.decision_fingerprint,
+        )
+
+    def test_fingerprint_changes_when_observation_epoch_changes(self) -> None:
+        first = self._decision(observed_at=NOW)
+        second = self._decision(observed_at=NOW + 1)
+        self.assertNotEqual(
+            first.decision_fingerprint,
+            second.decision_fingerprint,
+        )
+
+    def test_fingerprint_is_exported_in_json_and_github_output(self) -> None:
+        decision = self._decision()
+        self.assertEqual(
+            decision.as_dict()["decision_fingerprint"],
+            decision.decision_fingerprint,
+        )
+        from skeleton.automation.traffic_manager import emit_github_output
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            emit_github_output(decision, str(output))
+            rendered = output.read_text(encoding="utf-8")
+        self.assertIn(
+            f"decision_fingerprint={decision.decision_fingerprint}\n",
+            rendered,
+        )
