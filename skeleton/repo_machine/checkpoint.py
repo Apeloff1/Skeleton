@@ -1,7 +1,7 @@
 """Durable steward checkpoints for fairness, recovery and stale-work detection."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
