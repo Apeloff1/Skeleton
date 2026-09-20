@@ -285,16 +285,14 @@ jobs:
             echo "::error::Admission identity differs from traffic decision custody."
             exit 1
           }
-          [[ "$TRAFFIC_ADMITTED_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Admission did not provide a full commit SHA."
-            exit 1
-          }
           [[ "$TRAFFIC_DEFAULT_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || {
             echo "::error::Default branch contains unexpected characters."
             exit 1
           }
 
-          live_sha=$(gh api             "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}"             --jq '.object.sha')
+          live_sha=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/git/ref/heads/${TRAFFIC_DEFAULT_BRANCH}" \
+            --jq '.object.sha')
           [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::GitHub returned an invalid default-branch head."
             exit 1
@@ -305,4 +303,7 @@ jobs:
             exit 0
           fi
 
-          gh workflow run supervisor.yml             --repo "$GITHUB_REPOSITORY"             --ref "$TRAFFIC_DEFAULT_BRANCH"
+          gh workflow run supervisor.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TRAFFIC_DEFAULT_BRANCH" \
+            -f "expected_base_sha=$TRAFFIC_ADMITTED_BASE_SHA"
