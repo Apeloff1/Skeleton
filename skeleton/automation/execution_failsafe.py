@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping
 
 MAX_ATTEMPTS = 2
 MAX_RESULTS = 16
+MAX_RETRY_DELAY_SECONDS = 8
 
 
 class FailureKind(str, Enum):
@@ -169,11 +170,115 @@ def retry_allowed(result: Mapping[str, Any] | object) -> bool:
     return classify_result(result).retryable
 
 
+def retry_token(
+    *,
+    worker: str,
+    attempt: int,
+    execution_fingerprint: str,
+    snapshot_fingerprint: str,
+) -> str:
+    """Bind one retry attempt to immutable execution and snapshot custody."""
+    worker = _bounded_worker(worker)
+    attempt = _bounded_attempt(attempt)
+    for label, value in (
+        ("execution", execution_fingerprint),
+        ("snapshot", snapshot_fingerprint),
+    ):
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(char not in "0123456789abcdef" for char in value)
+        ):
+            raise ValueError(f"retry {label} fingerprint is invalid")
+    return _digest(
+        {
+            "version": 1,
+            "worker": worker,
+            "attempt": attempt,
+            "execution_fingerprint": execution_fingerprint,
+            "snapshot_fingerprint": snapshot_fingerprint,
+        }
+    )
+
+
+def retry_delay_seconds(attempt: int, retry_token_value: str) -> int:
+    """Return deterministic bounded backoff with custody-derived jitter."""
+    attempt = _bounded_attempt(attempt)
+    if (
+        not isinstance(retry_token_value, str)
+        or len(retry_token_value) != 64
+        or any(char not in "0123456789abcdef" for char in retry_token_value)
+    ):
+        raise ValueError("retry token is invalid")
+    base = 1 << (attempt - 1)
+    jitter = int(retry_token_value[:2], 16) % 3
+    return min(MAX_RETRY_DELAY_SECONDS, base + jitter)
+
+
+def attach_retry_history(
+    final_result: Mapping[str, Any],
+    attempts: Iterable[Mapping[str, Any]],
+    *,
+    execution_fingerprint: str,
+    snapshot_fingerprint: str,
+) -> dict[str, Any]:
+    """Seal an ordered attempt chain onto the final admitted result."""
+    items = list(attempts)
+    if not items or len(items) > MAX_ATTEMPTS:
+        raise ValueError("retry history has invalid length")
+    outcomes = [classify_result(item) for item in items]
+    worker = outcomes[0].worker
+    if any(outcome.worker != worker for outcome in outcomes):
+        raise ValueError("retry history crosses worker custody")
+    if [outcome.attempt for outcome in outcomes] != list(range(1, len(outcomes) + 1)):
+        raise ValueError("retry history attempts are not contiguous")
+    if any(not outcome.retryable for outcome in outcomes[:-1]):
+        raise ValueError("retry history contains unauthorized transition")
+    expected_final = classify_result(final_result)
+    if expected_final != outcomes[-1]:
+        raise ValueError("retry history final result mismatch")
+    tokens = [
+        retry_token(
+            worker=worker,
+            attempt=outcome.attempt,
+            execution_fingerprint=execution_fingerprint,
+            snapshot_fingerprint=snapshot_fingerprint,
+        )
+        for outcome in outcomes
+    ]
+    history = [
+        {
+            "attempt": outcome.attempt,
+            "kind": outcome.kind.value,
+            "terminal": outcome.terminal,
+            "retryable": outcome.retryable,
+            "failure_digest": outcome.failure_digest,
+            "retry_token": token,
+        }
+        for outcome, token in zip(outcomes, tokens, strict=True)
+    ]
+    chain_payload = {
+        "version": 1,
+        "worker": worker,
+        "execution_fingerprint": execution_fingerprint,
+        "snapshot_fingerprint": snapshot_fingerprint,
+        "attempts": history,
+    }
+    return {
+        **dict(final_result),
+        "attempt_history": history,
+        "retry_chain_digest": _digest(chain_payload),
+    }
+
+
 __all__ = [
     "FailureKind",
     "FailsafeOutcome",
     "MAX_ATTEMPTS",
+    "attach_retry_history",
     "classify_result",
     "retry_allowed",
+    "retry_delay_seconds",
+    "retry_token",
     "summarize_results",
 ]
