@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.1",
+  "schema_version": "3.2",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -220,6 +220,11 @@
       "physics_stack": "15-file wave rechecked; 3 files already identical, 5 core modules diverge and are held for semantic/file-level reconciliation",
       "physics_aggregate": "77-file wave remains held; overlaps simulation stack and is not blindly merged",
       "jeeves_semantics": "compiler/semantic_plane differences detected; no overwrite performed"
+    },
+    "physics_family_audit": {
+      "branches": 11,
+      "status": "held",
+      "result": "core CCD/convex/collision/world modules diverge across candidate branches; no blind merge"
     }
   },
   "integrated_domains": [
