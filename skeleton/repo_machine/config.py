@@ -3,9 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import stat
 import tomllib
 
 from .model import ZoneRule
+
+
+MAX_CONFIG_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +42,20 @@ def _positive_int(payload: dict[str, object], name: str, default: int) -> int:
 def load_machine_config(root: str | Path) -> MachineConfig:
     root_path = Path(root).resolve()
     config_path = root_path / ".machine" / "repository.toml"
+    try:
+        info = config_path.lstat()
+    except OSError as exc:
+        raise ValueError("machine config is unavailable") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise ValueError("machine config must be a regular non-symlink file")
+    if info.st_size <= 0 or info.st_size > MAX_CONFIG_BYTES:
+        raise ValueError("machine config size is outside policy")
+    try:
+        resolved = config_path.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("machine config cannot be resolved") from exc
+    if not resolved.is_relative_to(root_path):
+        raise ValueError("machine config escapes repository root")
     with config_path.open("rb") as handle:
         raw = tomllib.load(handle)
     if not isinstance(raw, dict):
