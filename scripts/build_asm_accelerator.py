@@ -35,7 +35,7 @@ def main() -> int:
         "architecture": preflight.architecture,
         "compiler": preflight.compiler,
         "library": str(library),
-        "abi_version": 1,
+        "abi_version": 2,
         "self_test": "not-requested",
     }
 
@@ -51,6 +51,27 @@ def main() -> int:
             raise SystemExit(f"dot self-test failed: {dot} != {expected_dot}")
         if not math.isclose(l2, expected_l2, rel_tol=1e-5, abs_tol=1e-5):
             raise SystemExit(f"L2 self-test failed: {l2} != {expected_l2}")
+        matrix = [
+            2.0, 5.0, -1.5, 2.0, 8.0, -3.0, 6.0,
+            1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+        ]
+        batch = accelerator.dot_matrix_f32(
+            left,
+            matrix,
+            rows=2,
+            dimensions=len(left),
+        )
+        expected_batch = [
+            expected_dot,
+            sum(a * b for a, b in zip(left, matrix[len(left):])),
+        ]
+        if not all(
+            math.isclose(actual, expected, rel_tol=1e-5, abs_tol=1e-5)
+            for actual, expected in zip(batch, expected_batch)
+        ):
+            raise SystemExit(
+                f"batch dot self-test failed: {batch} != {expected_batch}"
+            )
         payload["self_test"] = "passed"
 
     if args.json_output:
