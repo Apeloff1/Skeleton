@@ -22,6 +22,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -34,16 +35,8 @@ from .build_authority import (
 from .free_model import FreeModelClient, ModelError, redact_secrets
 from .bot_manager import bounded_health_summary, load_state
 from .worker_health import classify_worker_prs
-from skeleton.repo_machine.builder import build_repository_model
-from skeleton.repo_machine.growth import growth_recommendations
-from skeleton.repo_machine.budgets import derive_zone_budgets
-from skeleton.repo_machine.governance import validate_governance
-from skeleton.repo_machine.hotspots import structural_hotspots
-from skeleton.repo_machine.reorganize import propose_reorganization
-from skeleton.repo_machine.health import repository_health
-from skeleton.repo_machine.planner import candidate_payload
-from skeleton.repo_machine.shards import shard_index
-from skeleton.repo_machine.steward import select_steward_plan
+from skeleton.repo_machine.builder import RepositoryModelBuilder
+from skeleton.repo_machine.session import build_machine_session
 from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
@@ -324,54 +317,57 @@ def durable_worker_health(snapshot: SupervisorSnapshot) -> dict[str, object]:
     )
 
 
+@lru_cache(maxsize=1)
 def _machine_repository_context() -> dict[str, object]:
-    """Return bounded deterministic repository-organization context."""
+    """Return one bounded machine-native repository session for planning."""
     try:
-        model = build_repository_model(Path.cwd())
+        builder = RepositoryModelBuilder(Path.cwd())
+        model = builder.build()
+        session = build_machine_session(
+            model,
+            builder.config,
+            now=1,
+        ).as_dict()
+        coordinator = session.get("coordinator", {})
+        if not isinstance(coordinator, dict):
+            coordinator = {}
         return {
             "status": "available",
             "fingerprint": model.fingerprint,
-            "health": repository_health(model).as_dict(),
-            "organization": model.machine_context(max_findings=32),
-            "work_candidates": candidate_payload(model, limit=24)["work"],
-            "steward_plan": select_steward_plan(
-                model,
-                max_objectives=3,
-            ).as_dict(),
-            "growth_recommendations": [
-                item.as_dict()
-                for item in growth_recommendations(model, limit=12)
-            ],
-            "context_shards": shard_index(model),
-            "hotspots": [
-                item.as_dict()
-                for item in structural_hotspots(model, limit=24)
-            ],
-            "governance": [
-                item.as_dict()
-                for item in validate_governance(
-                    model,
-                    RepositoryModelBuilder(Path.cwd()).config,
-                )[:24]
-            ],
-            "reorganization": [
-                item.as_dict()
-                for item in propose_reorganization(
-                    model,
-                    RepositoryModelBuilder(Path.cwd()).config,
-                    limit=16,
-                )
-            ],
-            "zone_budgets": [
-                item.as_dict()
-                for item in derive_zone_budgets(model)
-            ],
+            "selected_objectives": session.get("selected", ()),
+            "retrieval_hints": session.get("retrieval_hints", ()),
+            "constraints": session.get("constraints", ()),
+            "health": coordinator.get("health", {}),
+            "steward": coordinator.get("steward", {}),
+            "queue_ready": coordinator.get("queue_ready", ()),
+            "growth": coordinator.get("growth", ())[:8]
+            if isinstance(coordinator.get("growth"), list)
+            else (),
+            "hotspots": coordinator.get("hotspots", ())[:12]
+            if isinstance(coordinator.get("hotspots"), list)
+            else (),
+            "reorganization": coordinator.get("reorganization", ())[:8]
+            if isinstance(coordinator.get("reorganization"), list)
+            else (),
+            "governance": coordinator.get("governance", ())[:8]
+            if isinstance(coordinator.get("governance"), list)
+            else (),
+            "undocumented_zones": coordinator.get("undocumented_zones", ()),
+            "uncovered_source_sample": coordinator.get(
+                "uncovered_source_sample",
+                (),
+            )[:24]
+            if isinstance(
+                coordinator.get("uncovered_source_sample"),
+                list,
+            )
+            else (),
         }
-    except (OSError, ValueError, TypeError) as exc:
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
         return {
             "status": "degraded",
             "error_type": type(exc).__name__,
-            "work_candidates": [],
+            "selected_objectives": [],
         }
 
 
