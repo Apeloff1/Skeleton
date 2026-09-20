@@ -36,6 +36,9 @@ Target: **one coherent application** for human maintenance and automated machine
 - **Large held waves:** live-service boundaries (98/99), Jeeves decision rules (137), Jeeves frontier core (57), main-gates shell-live (67), physics aggregate validation (77).
 - **40** stale branch tips validated and normalized.
 
+- **PRs #1791–#1808:** security headers, shell AI readiness/trust, supervisor controls, tooling regressions, workflow/security controls, and vulnerability bounds staged for reconciliation.
+- Zero-file-delta supervisor/tooling lineage remains unrepresented as integrated content.
+
 ## Target layout
 
 ```text
