@@ -16,8 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def git_blob_sha(payload: bytes) -> str:
-    return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
-
+    return hashlib.sha1(\n        f"blob {len(payload)}\\0".encode("ascii") + payload,\n        usedforsecurity=False,\n    ).hexdigest()\n
 
 def test_detects_common_installable_manifests(tmp_path: Path) -> None:
     archive = tmp_path / "snapshots"
