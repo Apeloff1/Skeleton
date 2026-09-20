@@ -457,14 +457,16 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Exact repository state, not model prose, grants and schedules
-            # approved build work. Plan keyword matches may increase priority
-            # but can never suppress a maintainer-approved queued build.
+            # Exact repository state grants authority, but plan intent still
+            # gates selection. This prevents unrelated CI/repair signals from
+            # consuming an approved feature authorization.
             matches = sum(
                 1
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
+            if not matches:
+                continue
             score = 100 + matches
         else:
             score = sum(
