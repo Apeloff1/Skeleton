@@ -37,6 +37,29 @@ class _FakeKernel:
             for row in range(rows)
         ]
 
+    def dot_queries_matrix_f32(
+        self,
+        queries: object,
+        matrix: object,
+        *,
+        query_count: int,
+        rows: int,
+        dimensions: int,
+    ) -> list[float]:
+        self.calls += 1
+        self.matrix_ids.append(id(matrix))
+        query_values = list(queries)
+        matrix_values = list(matrix)
+        output: list[float] = []
+        for query_index in range(query_count):
+            query_start = query_index * dimensions
+            query = query_values[query_start : query_start + dimensions]
+            for row in range(rows):
+                row_start = row * dimensions
+                candidate = matrix_values[row_start : row_start + dimensions]
+                output.append(sum(a * b for a, b in zip(query, candidate)))
+        return output
+
 
 class _FakeAsmSearch:
     minimum_candidates = 1
@@ -236,7 +259,7 @@ def test_asm_search_adapter_batch_reuses_candidate_matrix() -> None:
         [0, 2, 1],
         [1, 2, 0],
     ]
-    assert kernel.calls == 2
+    assert kernel.calls == 1
     assert len(set(kernel.matrix_ids)) == 1
 
 
@@ -300,6 +323,7 @@ def test_real_asm_vector_store_matches_python(tmp_path) -> None:
             rel=2e-5,
             abs=2e-5,
         )
+    assert kernel.status().calls == 1
 
 
 def test_vector_store_reuses_prepared_asm_matrix_until_mutation() -> None:
