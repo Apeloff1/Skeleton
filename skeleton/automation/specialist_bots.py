@@ -24,6 +24,15 @@ from .build_authority import (
     BuildAuthorityError,
     revalidate_live_build_authorization,
 )
+from .build_followup import (
+    BuildFollowup,
+    inspect_build_followup,
+)
+from .build_plane import (
+    budget_from_manifest,
+    run_feature_build,
+)
+from .build_repair import run_feature_followup_repair
 from .builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
@@ -35,6 +44,7 @@ from .builder_plane import (
 from .advanced_bots import (
     ADVANCED_BOTS,
     BLOCKED_PREFIXES,
+    BUILD_SAFE_PREFIXES,
     SAFE_PREFIXES,
     AdvancedBot,
     allowed,
@@ -49,6 +59,7 @@ from .supervisor_runtime import (
     find_open_pr_for_worker,
     proposal_digest,
     remote_branch_exists,
+    remote_branch_head,
     require_clean_worktree,
     require_exact_head,
     require_remote_base_unchanged,
@@ -686,6 +697,8 @@ def validate_generated_files(
 
 def validate_mutation_budget(
     files: list[dict[str, str]],
+    *,
+    max_changed_lines: int = MAX_CHANGED_LINES,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
     changed = 0
@@ -700,7 +713,7 @@ def validate_mutation_budget(
             for line in delta
             if line.startswith(("+ ", "- "))
         )
-        if changed > MAX_CHANGED_LINES:
+        if changed > max_changed_lines:
             raise RuntimeError(
                 "specialist mutation line budget exceeded"
             )
@@ -771,6 +784,64 @@ def _verify_single_parent(base_sha: str) -> None:
         raise RuntimeError(
             "worker commit is not directly based on admitted base"
         )
+
+
+def _require_followup_head_unchanged(
+    followup: BuildFollowup,
+) -> None:
+    current = remote_branch_head(
+        followup.branch
+    )
+    if current != followup.head_sha:
+        raise WorkerAdmissionError(
+            "active build PR head changed during repair"
+        )
+
+
+def _checkout_followup_head(
+    followup: BuildFollowup,
+    *,
+    env: dict[str, str],
+) -> None:
+    """Fetch and detach at the exact admitted PR head without branch mutation."""
+    _require_followup_head_unchanged(
+        followup
+    )
+    subprocess.run(
+        ["gh", "auth", "setup-git"],
+        check=True,
+        env=env,
+        timeout=30,
+    )
+    _run_git(
+        [
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"refs/heads/{followup.branch}",
+        ],
+        env=env,
+        timeout=120,
+    )
+    fetched = _git_text(
+        ["rev-parse", "FETCH_HEAD"]
+    ).strip()
+    if fetched != followup.head_sha:
+        raise WorkerAdmissionError(
+            "fetched build PR head differs from admitted head"
+        )
+    _run_git(
+        [
+            "switch",
+            "--detach",
+            followup.head_sha,
+        ],
+        env=env,
+    )
+    require_clean_worktree()
+    _require_followup_head_unchanged(
+        followup
+    )
 
 
 def _render_prompt(
