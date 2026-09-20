@@ -60,6 +60,8 @@ Target: **one coherent application** for human maintenance and automated machine
 - **PR #1865:** physics aggregate validation staged; the 77-file physics wave remains reconciliation input.
 - Large held waves include bounded shell runner (300 files), Jeeves decision rules (137), merge unblockers (132), and live-service boundaries (98–99).
 
+- **Physics family boundary:** 11 remaining physics branches are held as overlapping reconciliation inputs (68–83 files each); zero-file-delta fix branches remain lineage-only.
+
 ## Target layout
 
 ```text
