@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.4",
+  "schema_version": "3.5",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -285,6 +285,21 @@
         ]
       ],
       "note": "staged only; overlapping large waves require reconciliation"
+    },
+    "semantic_domain_wave": {
+      "revalidated": [
+        "Jeeves compiler assurance",
+        "Jeeves relational semantics",
+        "Jeeves lens science",
+        "Jeeves probability frontier",
+        "repository bots",
+        "security scan evidence",
+        "Java observability augmentation",
+        "Java retrieval fusion",
+        "four role studios"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused; no duplicate PRs created"
     }
   },
   "integrated_domains": [
