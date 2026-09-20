@@ -1320,9 +1320,6 @@ def validate_builder_worker_evidence(
                 f"builder worker evidence {field} mismatch"
             )
 
-    if status == "pull-request-updated":
-        return
-
     try:
         receipt = BuilderProposalReceipt.from_payload(
             evidence.get("builder_proposal_receipt")
