@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "architecture_version": "1.0.0",
+  "architecture_tag": "arch-map/v1.0",
+  "status": "active",
+  "scope": "assembled application, machine control, and validation topology",
+  "sources": {
+    "runtime_contract": "skeleton/app/manifest.json",
+    "repository_contract": "machine/manifest.json",
+    "human_map": "docs/ARCHITECTURE_MAP.md",
+    "validator": "scripts/check_architecture_map.py"
+  },
+  "objectives": [
+    "one product shell",
+    "one application API boundary",
+    "one engine API boundary",
+    "explicit data and accelerator dependencies",
+    "machine-readable ownership and change routing",
+    "parallel validation lanes with a short critical path",
+    "no new top-level runtime island without architecture review"
+  ],
+  "principles": [
+    "runtime topology and repository topology are separate contracts linked by this map",
+    "canonical roots own behavior; support roots validate, document, automate, or accelerate it",
+    "cross-zone calls use declared interfaces instead of ad-hoc environment or path coupling",
+    "new long-running services must be declared in both the runtime manifest and this map",
+    "structural validation fails closed on unknown nodes, duplicate ownership, cycles, or missing paths",
+    "large reconciliation waves integrate by domain and file semantics rather than blind history merge"
+  ],
+  "canonical_roots": [
+    {
+      "id": "product-shell",
+      "path": "frontend",
+      "class": "runtime",
+      "owner": "human-interface",
+      "change_lane": "ui"
+    },
+    {
+      "id": "application-api",
+      "path": "backend",
+      "class": "runtime",
+      "owner": "application-api",
+      "change_lane": "api"
+    },
+    {
+      "id": "engine-runtime",
+      "path": "skeleton",
+      "class": "runtime",
+      "owner": "engine",
+      "change_lane": "engine"
+    },
+    {
+      "id": "java-accelerators",
+      "path": "java-accelerators",
+      "class": "accelerator",
+      "owner": "engine",
+      "change_lane": "accelerator"
+    },
+    {
+      "id": "machine-control",
+      "path": "machine",
+      "class": "control",
+      "owner": "repository-machine",
+      "change_lane": "machine"
+    },
+    {
+      "id": "automation",
+      "path": ".github",
+      "class": "control",
+      "owner": "repository-automation",
+      "change_lane": "automation"
+    },
+    {
+      "id": "operator-tooling",
+      "path": "scripts",
+      "class": "tooling",
+      "owner": "operators",
+      "change_lane": "tooling"
+    },
+    {
+      "id": "documentation",
+      "path": "docs",
+      "class": "documentation",
+      "owner": "architecture",
+      "change_lane": "docs"
+    }
+  ],
+  "zones": [
+    {
+      "id": "product",
+      "roots": ["frontend"],
+      "responsibility": "browser/native product experience and ingress",
+      "may_depend_on": ["application", "engine"],
+      "must_not_own": ["durable-state", "engine-primitives", "repository-write-authority"]
+    },
+    {
+      "id": "application",
+      "roots": ["backend"],
+      "responsibility": "product API, product control, application workflows",
+      "may_depend_on": ["engine", "data"],
+      "must_not_own": ["browser-routing", "repository-write-authority"]
+    },
+    {
+      "id": "engine",
+      "roots": ["skeleton"],
+      "responsibility": "AI engine, orchestration, memory, retrieval, resilience, APIs",
+      "may_depend_on": ["acceleration", "data"],
+      "must_not_own": ["product-shell-routing"]
+    },
+    {
+      "id": "acceleration",
+      "roots": ["skeleton/native", "java-accelerators"],
+      "responsibility": "optional native/JVM acceleration with deterministic fallback",
+      "may_depend_on": [],
+      "must_not_own": ["business-policy", "public-routing"]
+    },
+    {
+      "id": "data",
+      "roots": ["docker-compose.yml"],
+      "responsibility": "declared durable and vector stores",
+      "may_depend_on": [],
+      "must_not_own": ["application-policy"]
+    },
+    {
+      "id": "machine",
+      "roots": ["machine", ".machine"],
+      "responsibility": "repository structure, integration metadata, machine-facing policy",
+      "may_depend_on": ["tooling"],
+      "must_not_own": ["runtime-business-logic"]
+    },
+    {
+      "id": "tooling",
+      "roots": ["scripts", ".github"],
+      "responsibility": "validation, CI, operator and repository automation",
+      "may_depend_on": ["product", "application", "engine", "machine"],
+      "must_not_own": ["runtime-state"]
+    },
+    {
+      "id": "knowledge",
+      "roots": ["docs", "tests", "skeleton/testing", "backend/tests"],
+      "responsibility": "documentation, regression evidence, fixtures and test harnesses",
+      "may_depend_on": ["product", "application", "engine", "machine", "tooling"],
+      "must_not_own": ["production-entrypoints"]
+    }
+  ],
+  "runtime_nodes": [
+    {
+      "id": "mongo",
+      "zone": "data",
+      "manifest_service": "mongo",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "canonical": true,
+      "depends_on": []
+    },
+    {
+      "id": "chroma",
+      "zone": "data",
+      "manifest_service": "chroma",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "canonical": false,
+      "depends_on": []
+    },
+    {
+      "id": "skeleton",
+      "zone": "engine",
+      "manifest_service": "skeleton",
+      "path": "skeleton",
+      "kind": "fastapi",
+      "canonical": true,
+      "depends_on": ["mongo"]
+    },
+    {
+      "id": "backend",
+      "zone": "application",
+      "manifest_service": "backend",
+      "path": "backend",
+      "kind": "fastapi",
+      "canonical": true,
+      "depends_on": ["mongo"]
+    },
+    {
+      "id": "frontend",
+      "zone": "product",
+      "manifest_service": "frontend",
+      "path": "frontend",
+      "kind": "expo",
+      "canonical": true,
+      "depends_on": ["backend", "skeleton"]
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "frontend-backend",
+      "from": "frontend",
+      "to": "backend",
+      "transport": "http",
+      "contract": "frontend/utils/apiBase.ts -> /api/*"
+    },
+    {
+      "id": "frontend-engine",
+      "from": "frontend",
+      "to": "skeleton",
+      "transport": "http",
+      "contract": "frontend/utils/apiBase.ts -> /api/v1/*"
+    },
+    {
+      "id": "engine-health",
+      "from": "frontend",
+      "to": "skeleton",
+      "transport": "http",
+      "contract": "GET /api/v1/health/live"
+    },
+    {
+      "id": "application-health",
+      "from": "frontend",
+      "to": "backend",
+      "transport": "http",
+      "contract": "GET /api/health"
+    },
+    {
+      "id": "engine-native",
+      "from": "skeleton",
+      "to": "skeleton/native",
+      "transport": "abi",
+      "contract": "optional native ABI with Python fallback"
+    },
+    {
+      "id": "engine-java",
+      "from": "skeleton",
+      "to": "java-accelerators",
+      "transport": "process",
+      "contract": "optional Java 21 kernels with Python fallback"
+    }
+  ],
+  "change_routing": [
+    {
+      "lane": "ui",
+      "paths": ["frontend/**"],
+      "minimum_checks": ["frontend-typecheck", "frontend-export", "architecture-map"]
+    },
+    {
+      "lane": "api",
+      "paths": ["backend/**"],
+      "minimum_checks": ["backend-quality", "app-assembly", "architecture-map"]
+    },
+    {
+      "lane": "engine",
+      "paths": ["skeleton/**"],
+      "minimum_checks": ["backend-quality", "app-assembly", "architecture-map"]
+    },
+    {
+      "lane": "accelerator",
+      "paths": ["skeleton/native/**", "java-accelerators/**"],
+      "minimum_checks": ["native-or-java-contract", "architecture-map"]
+    },
+    {
+      "lane": "machine",
+      "paths": ["machine/**", ".machine/**"],
+      "minimum_checks": ["repository-hygiene", "architecture-map"]
+    },
+    {
+      "lane": "automation",
+      "paths": [".github/**", "scripts/**"],
+      "minimum_checks": ["workflow-input-security", "repository-hygiene", "architecture-map"]
+    }
+  ],
+  "optimization": {
+    "parallel_validation_lanes": [
+      ["ui"],
+      ["api"],
+      ["engine", "accelerator"],
+      ["machine", "automation"]
+    ],
+    "critical_path": [
+      "architecture-map",
+      "app-assembly",
+      "focused-domain-tests",
+      "merge-readiness"
+    ],
+    "validation_order": [
+      "static structure",
+      "focused compile/typecheck",
+      "domain tests",
+      "cross-service contract",
+      "compose/runtime topology",
+      "full merge readiness"
+    ],
+    "cache_boundaries": [
+      "frontend dependency cache keyed by frontend/yarn.lock",
+      "Python dependency cache keyed by packaging/requirements metadata",
+      "native/JVM build caches isolated from product shell validation"
+    ]
+  },
+  "top_level_policy": {
+    "new_runtime_root": "forbidden-unless-declared",
+    "runtime_roots": ["frontend", "backend", "skeleton", "java-accelerators"],
+    "control_roots": ["machine", ".machine", ".github", "scripts"],
+    "evidence_roots": ["docs", "tests"],
+    "legacy_or_support_roots_are_not_runtime_owners": true
+  },
+  "migration": {
+    "strategy": "strangler-by-domain",
+    "rules": [
+      "preserve working runtime entrypoints while moving ownership behind canonical interfaces",
+      "prefer adapters and manifests before physical file moves",
+      "move files only when import, route, package, and CI ownership are explicit",
+      "archive superseded snapshots instead of leaving competing live roots",
+      "reconcile large branch families at file/domain level"
+    ],
+    "assembly_branch_family": "integration/*",
+    "current_stack": [
+      "main",
+      "integration/app-product-shell",
+      "integration/architecture-map-v1"
+    ]
+  },
+  "invariants": [
+    "frontend is the only canonical human-interface root",
+    "backend and skeleton remain separate API processes until route and dependency ownership converge",
+    "browser clients resolve endpoints through frontend/utils/apiBase.ts",
+    "runtime service dependencies match skeleton/app/manifest.json",
+    "every architecture node and interface reference resolves to a declared node",
+    "runtime dependency graph is acyclic",
+    "architecture source files must exist in the repository",
+    "architecture changes must preserve a single machine-readable map"
+  ]
+}
