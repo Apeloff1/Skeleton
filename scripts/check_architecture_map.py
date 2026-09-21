@@ -1030,6 +1030,142 @@ def _validate_structural_blueprint(
             "construction planes missing recovery domain: " + ", ".join(missing_recovery)
         )
 
+    runtime_node_map = {
+        node.get("id"): node
+        for node in architecture.get("runtime_nodes", [])
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+
+    hosts_raw = blueprint.get("execution_hosts")
+    if not isinstance(hosts_raw, list) or not hosts_raw:
+        errors.append("structural_blueprint.execution_hosts must be a non-empty list")
+        hosts_raw = []
+    execution_hosts: dict[str, dict[str, Any]] = {}
+    for index, host in enumerate(hosts_raw):
+        label = f"structural_blueprint.execution_hosts[{index}]"
+        if not isinstance(host, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        host_id = host.get("id")
+        if not isinstance(host_id, str) or not host_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if host_id in execution_hosts:
+            errors.append(f"duplicate execution host: {host_id}")
+            continue
+        execution_hosts[host_id] = host
+        for key in ("kind", "lifecycle", "responsibility"):
+            if not isinstance(host.get(key), str) or not host[key].strip():
+                errors.append(f"execution host {host_id}.{key} must be non-empty")
+        allowed_zones = host.get("allowed_zones")
+        if not isinstance(allowed_zones, list) or not allowed_zones:
+            errors.append(f"execution host {host_id}.allowed_zones must be non-empty")
+            allowed_zones = []
+        for zone_id in allowed_zones:
+            if zone_id not in zones:
+                errors.append(
+                    f"execution host {host_id} references unknown allowed zone: {zone_id}"
+                )
+        runtime_node = host.get("runtime_node")
+        if runtime_node is not None:
+            node = runtime_node_map.get(runtime_node)
+            if node is None:
+                errors.append(
+                    f"execution host {host_id} references unknown runtime node: {runtime_node}"
+                )
+            elif node.get("zone") not in allowed_zones:
+                errors.append(
+                    f"execution host {host_id} runtime node zone {node.get('zone')} "
+                    "is not in allowed_zones"
+                )
+
+    profiles_raw = blueprint.get("execution_profiles")
+    if not isinstance(profiles_raw, list) or not profiles_raw:
+        errors.append("structural_blueprint.execution_profiles must be a non-empty list")
+        profiles_raw = []
+    execution_profiles: dict[str, dict[str, Any]] = {}
+    required_profile_fields = (
+        "lifecycle",
+        "state_mode",
+        "scale_unit",
+        "shutdown",
+        "failure_policy",
+        "side_effect_policy",
+    )
+    for index, profile in enumerate(profiles_raw):
+        label = f"structural_blueprint.execution_profiles[{index}]"
+        if not isinstance(profile, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        profile_id = profile.get("id")
+        if not isinstance(profile_id, str) or not profile_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if profile_id in execution_profiles:
+            errors.append(f"duplicate execution profile: {profile_id}")
+            continue
+        execution_profiles[profile_id] = profile
+        for key in required_profile_fields:
+            if not isinstance(profile.get(key), str) or not profile[key].strip():
+                errors.append(f"execution profile {profile_id}.{key} must be non-empty")
+
+    plane_execution_raw = blueprint.get("plane_execution")
+    if not isinstance(plane_execution_raw, list):
+        errors.append("structural_blueprint.plane_execution must be a list")
+        plane_execution_raw = []
+    plane_execution: dict[str, dict[str, Any]] = {}
+    for index, execution in enumerate(plane_execution_raw):
+        label = f"structural_blueprint.plane_execution[{index}]"
+        if not isinstance(execution, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        plane_id = execution.get("plane")
+        if plane_id not in planes:
+            errors.append(f"{label}.plane references unknown construction plane: {plane_id}")
+            continue
+        if plane_id in plane_execution:
+            errors.append(f"duplicate plane execution mapping: {plane_id}")
+            continue
+        plane_execution[plane_id] = execution
+        placement = placements.get(plane_id)
+        zone_id = execution.get("zone")
+        if placement is not None and zone_id != placement.get("zone"):
+            errors.append(
+                f"plane execution {plane_id}.zone {zone_id} does not match "
+                f"placement zone {placement.get('zone')}"
+            )
+        profile_id = execution.get("profile")
+        if profile_id not in execution_profiles:
+            errors.append(
+                f"plane execution {plane_id} references unknown profile: {profile_id}"
+            )
+        host_id = execution.get("host")
+        host = execution_hosts.get(host_id)
+        if host is None:
+            errors.append(f"plane execution {plane_id} references unknown host: {host_id}")
+        elif zone_id not in host.get("allowed_zones", []):
+            errors.append(
+                f"plane execution {plane_id} zone {zone_id} is not allowed by host {host_id}"
+            )
+        elif host.get("runtime_node") is not None:
+            node = runtime_node_map.get(host.get("runtime_node"))
+            if node is not None and node.get("zone") != zone_id:
+                errors.append(
+                    f"plane execution {plane_id} host {host_id} runs in "
+                    f"{node.get('zone')} but placement is {zone_id}"
+                )
+
+    missing_execution = sorted(set(planes) - set(plane_execution))
+    extra_execution = sorted(set(plane_execution) - set(planes))
+    if missing_execution:
+        errors.append(
+            "construction planes missing execution mapping: " + ", ".join(missing_execution)
+        )
+    if extra_execution:
+        errors.append(
+            "execution mappings without construction planes: " + ", ".join(extra_execution)
+        )
+
     invariants = blueprint.get("invariants")
     if not isinstance(invariants, list) or not invariants or any(
         not isinstance(item, str) or not item.strip() for item in invariants
@@ -1044,6 +1180,9 @@ def _validate_structural_blueprint(
         "recovery_domains": len(recovery_ids),
         "dependency_exceptions": len(exception_ids),
         "acceptance_edges": len(acceptance_ids),
+        "execution_hosts": len(execution_hosts),
+        "execution_profiles": len(execution_profiles),
+        "plane_execution": len(plane_execution),
     }
 
 
@@ -1131,6 +1270,8 @@ def main(argv: list[str] | None = None) -> int:
             f"recovery-domains={summary['structure'].get('recovery_domains', 0)}; "
             f"dependency-exceptions={summary['structure'].get('dependency_exceptions', 0)}; "
             f"acceptance-edges={summary['structure'].get('acceptance_edges', 0)}; "
+            f"execution-hosts={summary['structure'].get('execution_hosts', 0)}; "
+            f"execution-profiles={summary['structure'].get('execution_profiles', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
