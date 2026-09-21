@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 import { GameFactoryModal } from './GameFactoryModal';
@@ -34,18 +33,7 @@ interface CreatedProjectSummary {
   title: string;
 }
 
-const API_BASE = (() => {
-  if (
-    typeof window !== 'undefined'
-    && (window as any).location?.origin
-    && !(window as any).location.origin.startsWith('file:')
-  ) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.CANONICAL_API_BASE as string)
-    || CANONICAL_API_BASE
-    || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 function parseCreatedProjectPayload(payload: unknown): CreatedProjectSummary | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;

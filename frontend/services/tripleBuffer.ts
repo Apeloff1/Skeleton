@@ -20,7 +20,6 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 
 // ============================================================================
 // CONFIG

@@ -18,11 +18,10 @@ import {
   Modal, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = Constants.CANONICAL_API_BASE || '';
+const API_URL = CANONICAL_API_BASE;
 
 interface ReadingCornerProps {
   visible: boolean;

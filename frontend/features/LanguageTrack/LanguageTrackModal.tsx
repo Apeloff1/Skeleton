@@ -11,17 +11,10 @@ import {
   Modal, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.CANONICAL_API_BASE as string)
-    || CANONICAL_API_BASE || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 interface LanguageTrackModalProps {
   visible: boolean;

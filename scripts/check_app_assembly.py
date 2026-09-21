@@ -130,6 +130,8 @@ def audit_endpoint_boundary() -> None:
         "expoConfig?.extra?.EXPO_PUBLIC_SKELETON_URL",
         "http://backend:8001",
         "http://skeleton:8001",
+        "Constants.CANONICAL_API_BASE",
+        "process.env.CANONICAL_API_BASE",
     )
 
     sources = frontend_sources()

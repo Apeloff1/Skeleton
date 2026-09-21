@@ -16,16 +16,9 @@ import {
   Platform, Animated, Dimensions, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.CANONICAL_API_BASE as string)
-    || CANONICAL_API_BASE || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

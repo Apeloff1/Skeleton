@@ -18,10 +18,9 @@ import {
   Modal, ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_URL = Constants.CANONICAL_API_BASE || '';
+const API_URL = CANONICAL_API_BASE;
 
 interface JeevesEQModalProps {
   visible: boolean;
