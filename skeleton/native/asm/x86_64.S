@@ -249,12 +249,52 @@ skeleton_asm_dot_matrix_f32:
 
 .Lmatrix_row:
     xorps %xmm0, %xmm0
+    xorps %xmm3, %xmm3
+    xorps %xmm4, %xmm4
+    xorps %xmm5, %xmm5
     mov %rdi, %rsi
+
+    mov %r8, %r12
+    shr $4, %r12
+    je .Lmatrix_vec4_setup
+
+.Lmatrix_vec16:
+    movups 0(%rsi), %xmm1
+    movups 0(%r10), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm0
+
+    movups 16(%rsi), %xmm1
+    movups 16(%r10), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm3
+
+    movups 32(%rsi), %xmm1
+    movups 32(%r10), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm4
+
+    movups 48(%rsi), %xmm1
+    movups 48(%r10), %xmm2
+    mulps %xmm2, %xmm1
+    addps %xmm1, %xmm5
+
+    add $64, %rsi
+    add $64, %r10
+    dec %r12
+    jne .Lmatrix_vec16
+
+    addps %xmm3, %xmm0
+    addps %xmm4, %xmm0
+    addps %xmm5, %xmm0
+
+.Lmatrix_vec4_setup:
     mov %r8, %r12
     shr $2, %r12
-    je .Lmatrix_tail
+    and $3, %r12
+    je .Lmatrix_reduce
 
-.Lmatrix_vec:
+.Lmatrix_vec4:
     movups (%rsi), %xmm1
     movups (%r10), %xmm2
     mulps %xmm2, %xmm1
@@ -262,8 +302,9 @@ skeleton_asm_dot_matrix_f32:
     add $16, %rsi
     add $16, %r10
     dec %r12
-    jne .Lmatrix_vec
+    jne .Lmatrix_vec4
 
+.Lmatrix_reduce:
     movaps %xmm0, %xmm1
     movhlps %xmm0, %xmm1
     addps %xmm1, %xmm0
@@ -271,7 +312,6 @@ skeleton_asm_dot_matrix_f32:
     shufps $0x55, %xmm1, %xmm1
     addss %xmm1, %xmm0
 
-.Lmatrix_tail:
     mov %r8, %r12
     and $3, %r12
     je .Lmatrix_store
