@@ -191,7 +191,7 @@
     {
       "id": "model-provider",
       "owner": "skeleton/provider_runtime.py",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Engine-owned provider-neutral model request/response boundary, concrete runtime transports, policy receipts, and application compatibility facades.",
       "depends_on": [
         "foundation",
@@ -219,7 +219,14 @@
         "ProviderImageResponse",
         "ProviderSpeechRequest",
         "ProviderSpeechResponse",
-        "governed media operations share provider credentials and policy receipts with text generation"
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
       ],
       "construction": [
         "provider reads mandatory construction contract",
@@ -233,7 +240,12 @@
         "keep backend and Jeeves provider modules as non-credential compatibility facades",
         "route image generation/edit/variation through the canonical runtime",
         "route speech synthesis through the canonical runtime",
-        "keep undeclared Gemini/Grok media providers unavailable until formally onboarded"
+        "keep undeclared Gemini/Grok media providers unavailable until formally onboarded",
+        "normalize structured output, tool calls, usage and finish reasons",
+        "project only admitted tool schemas into provider requests",
+        "bind requests/responses to operation/execution/turn/context identity",
+        "propagate cancellation/deadline into provider transport",
+        "keep provider-native structured/tool/stream objects inside provider_runtime"
       ],
       "acceptance": [
         "provider contract gate",
@@ -244,9 +256,15 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
-      "failure_mode": "provider unavailable, no credential leakage"
+      "failure_mode": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration"
     },
     {
       "id": "model-routing",
@@ -1598,6 +1616,37 @@
       ]
     },
     {
+      "id": "gap-provider-interaction-protocol",
+      "plane": "model-provider",
+      "priority": "P0",
+      "status": "open",
+      "gap": "The canonical provider runtime owns text/media transport and credentials, but the text interaction contract is still fundamentally prompt/history -> text. The cognitive loop requires provider-neutral structured outputs, tool schema projection, normalized tool calls, usage, finish reasons, cancellation and optional stream deltas without leaking provider SDK objects.",
+      "construction": [
+        "define ProviderToolDefinition, ProviderToolCall, ProviderStructuredOutputSpec, ProviderUsage and ProviderFinishReason contracts",
+        "extend ProviderRequest with admitted tool definitions, response schema, tool choice policy and stable context/turn identity",
+        "extend ProviderResponse with normalized text, structured result, tool calls, usage and finish reason",
+        "normalize provider-native call ids/arguments/finish reasons before leaving provider_runtime",
+        "validate provider structured result/tool arguments under hard size/count limits",
+        "bind provider request/response identity to operation/execution/turn/context digest",
+        "support cancellation/deadline propagation into provider I/O",
+        "define normalized provider stream delta protocol while preserving non-streaming fallback",
+        "keep provider-specific message/tool schema translation inside provider_runtime adapters",
+        "deny tool calls that were not present in the admitted request tool projection"
+      ],
+      "closure_evidence": [
+        "text-only compatibility tests",
+        "structured output success/invalid schema tests",
+        "single/multiple normalized tool-call tests",
+        "unknown/unoffered tool-call rejection",
+        "tool argument size/count bound tests",
+        "finish reason normalization tests",
+        "usage normalization/unknown-field tests",
+        "deadline/cancellation provider tests",
+        "stream delta ordering/finalization tests when streaming enabled",
+        "no provider SDK/native response object escapes provider_runtime"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1819,7 +1868,8 @@
         "collapse Jeeves network providers to canonical runtime wrappers and explicit undeclared-provider denial",
         "move image generation, variation, editing, and TTS behind the canonical runtime",
         "remove route/service ownership of retired universal provider credentials",
-        "run provider-surface discovery across backend and engine source"
+        "run provider-surface discovery across backend and engine source",
+        "after surface convergence, extend the same owner with provider-neutral structured/tool/usage interaction protocol rather than creating another runtime"
       ],
       "closure_evidence": [
         "canonical async provider regression suite",
@@ -1853,7 +1903,8 @@
         "gap-conversation-state-authority",
         "gap-tool-runtime-convergence",
         "gap-context-compiler-convergence",
-        "gap-verification-evidence-contract"
+        "gap-verification-evidence-contract",
+        "gap-provider-interaction-protocol"
       ],
       "goal": "Make provider/data/action/tool/state/conversation/context/verification decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, deterministically compilable, and evidence-bound before adding more autonomy.",
       "exit": [
@@ -1869,7 +1920,8 @@
         "every cognitive model turn uses the canonical context compiler",
         "context trust/provenance/budget selection is deterministic and auditable",
         "verification outcomes are evidence/postcondition-backed rather than confidence-only",
-        "hidden chain-of-thought is not part of durable verification state"
+        "hidden chain-of-thought is not part of durable verification state",
+        "provider boundary supports normalized structured/tool interaction required by cognitive loop"
       ]
     },
     {
@@ -2920,6 +2972,46 @@
         "skeleton/intelligence/verification_policy.py",
         "skeleton/intelligence/verification_runtime.py",
         "skeleton/testing/test_verification_runtime.py"
+      ]
+    },
+    {
+      "id": "WP-P0-PROVIDER-PROTOCOL",
+      "gap": "gap-provider-interaction-protocol",
+      "wave": 1,
+      "owners": [
+        "skeleton/provider_runtime.py",
+        "skeleton/provider_contract.py",
+        "skeleton/skills",
+        "skeleton/intelligence"
+      ],
+      "objective": "Extend the single canonical provider owner from text/media transport into a complete provider-neutral interaction protocol for structured outputs and governed tool calling.",
+      "steps": [
+        "freeze provider tool/structured/usage/finish/delta contracts",
+        "extend request/response neutral envelopes",
+        "translate admitted ToolManifest projections to provider-native format",
+        "normalize provider-native tool calls and structured outputs",
+        "bind usage into execution accounting",
+        "propagate deadline/cancellation",
+        "add optional normalized streaming delta adapter",
+        "preserve text-only/media compatibility"
+      ],
+      "tests": [
+        "text compatibility",
+        "structured schema",
+        "tool normalization",
+        "unoffered tool denial",
+        "argument bounds",
+        "usage/finish reason",
+        "cancel/deadline",
+        "stream finalization",
+        "native type isolation"
+      ],
+      "exit": "the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts",
+      "planned_outputs": [
+        "provider-neutral additions in skeleton/provider_runtime.py",
+        "skeleton/testing/test_provider_structured_output.py",
+        "skeleton/testing/test_provider_tool_calls.py",
+        "skeleton/testing/test_provider_stream_deltas.py"
       ]
     },
     {
@@ -4749,5 +4841,170 @@
       }
     ],
     "privacy_rule": "verification/audit stores claims, evidence ids/digests, checks and verdicts; hidden chain-of-thought is neither required nor persisted"
+  },
+  "provider_interaction_protocol": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-provider-interaction-protocol",
+    "owner": "skeleton/provider_runtime.py",
+    "request_extension": {
+      "fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "context_id",
+        "context_digest",
+        "tools",
+        "structured_output",
+        "tool_choice",
+        "deadline",
+        "resource_budget"
+      ],
+      "tool_choice": [
+        "none",
+        "auto",
+        "required",
+        "specific"
+      ],
+      "invariants": [
+        "tools are provider-neutral admitted ToolManifest projections",
+        "specific tool choice names one offered tool",
+        "structured output schema is bounded and serializable",
+        "deadline cannot exceed enclosing operation deadline"
+      ]
+    },
+    "tool_definition": {
+      "fields": [
+        "tool_id",
+        "description",
+        "input_schema"
+      ],
+      "limits": [
+        "max tools per request",
+        "max description bytes",
+        "max schema bytes/depth/properties",
+        "no credentials/internal implementation metadata"
+      ]
+    },
+    "tool_call": {
+      "fields": [
+        "call_id",
+        "tool_id",
+        "arguments",
+        "arguments_digest"
+      ],
+      "normalization": [
+        "call_id non-empty and unique within response",
+        "tool_id must match one offered tool",
+        "arguments parse to bounded JSON object",
+        "arguments digest uses canonical JSON serialization",
+        "provider-native annotations are discarded unless mapped to declared neutral metadata"
+      ]
+    },
+    "structured_output": {
+      "request_fields": [
+        "schema_id",
+        "schema",
+        "strict"
+      ],
+      "response_fields": [
+        "schema_id",
+        "value",
+        "value_digest",
+        "valid"
+      ],
+      "rule": "provider-native structured output is structurally validated before orchestration consumes it"
+    },
+    "usage": {
+      "fields": [
+        "input_tokens",
+        "output_tokens",
+        "cached_input_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "estimated_cost",
+        "billed_cost",
+        "usage_source"
+      ],
+      "unknown_policy": "unsupported/unknown values are null/unknown, never fabricated as zero",
+      "rule": "normalized usage feeds the monotonic execution usage ledger"
+    },
+    "finish_reasons": [
+      "completed",
+      "tool_calls",
+      "length",
+      "content_filtered",
+      "refusal",
+      "cancelled",
+      "deadline",
+      "provider_error",
+      "unknown"
+    ],
+    "response": {
+      "fields": [
+        "provider",
+        "model",
+        "request_id",
+        "response_id",
+        "text",
+        "structured_output",
+        "tool_calls",
+        "finish_reason",
+        "usage",
+        "latency_ms",
+        "governance_decision_id",
+        "admission_decision_id",
+        "data_class"
+      ],
+      "invariant": "one response may include text plus tool calls only when neutral contract explicitly represents mixed mode"
+    },
+    "streaming": {
+      "optional": true,
+      "delta_fields": [
+        "response_id",
+        "sequence",
+        "kind",
+        "text_delta",
+        "tool_call_delta",
+        "usage_delta",
+        "finish_reason"
+      ],
+      "kinds": [
+        "text",
+        "tool_call",
+        "structured",
+        "usage",
+        "terminal"
+      ],
+      "rules": [
+        "sequence is monotonic per provider response",
+        "partial tool arguments are buffered/normalized before becoming ToolCallProposal",
+        "terminal delta contains/points to the same normalized final ProviderResponse",
+        "consumer may fall back to non-streaming without changing execution semantics",
+        "provider stream is not the durable operation event stream"
+      ]
+    },
+    "cancellation": {
+      "sources": [
+        "operation cancellation",
+        "deadline",
+        "shutdown",
+        "budget/policy stop before next request"
+      ],
+      "rules": [
+        "provider adapter accepts cancellation/deadline context",
+        "late response after cancellation may be recorded for telemetry but cannot reopen terminal/cancelled operation",
+        "provider retries stop when deadline/cancellation makes success unusable"
+      ]
+    },
+    "provider_native_boundary": [
+      "SDK request/response classes",
+      "native tool-call objects",
+      "native stream event types",
+      "native finish reason enums",
+      "native usage objects"
+    ],
+    "invariant": "all provider-native types terminate inside skeleton/provider_runtime.py"
   }
 }
