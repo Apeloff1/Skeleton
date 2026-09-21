@@ -12,6 +12,11 @@ from skeleton.vault.governance_registry import (
     CanonicalDataPlane,
     GovernanceRegistry,
 )
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    MemoryDeletionAdapter,
+)
+from skeleton.frontier.memory import InMemoryStore
 
 
 def _record(
@@ -386,3 +391,57 @@ def test_canonical_write_registration_rejects_identity_reuse_with_changed_metada
             purposes=("model-inference",),
             created_at=10.0,
         )
+
+
+@pytest.mark.asyncio
+async def test_governance_registry_delete_with_adapters_executes_physical_delete() -> None:
+    registry = GovernanceRegistry()
+    memory = InMemoryStore()
+    await memory.put({"id": "memory-physical", "content": "delete me", "metadata": {}})
+    registry.register_canonical_write(
+        "memory",
+        record_id="memory-physical",
+        tenant_id="tenant-a",
+        source_ref="memory://memory-physical",
+        data_class="internal",
+        purposes=("model-inference",),
+        created_at=10.0,
+    )
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("memory", MemoryDeletionAdapter(memory))
+
+    result = await registry.delete_with_adapters(
+        adapters,
+        "tenant-a",
+        record_ids=("memory-physical",),
+        now=20.0,
+    )
+
+    assert result.receipts[-1].state.value == "deleted"
+    assert await memory.search("", limit=10) == []
+    assert registry.lifecycle.get("memory-physical")["state"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_governance_registry_retention_with_adapters_executes_physical_delete() -> None:
+    registry = GovernanceRegistry()
+    memory = InMemoryStore()
+    await memory.put({"id": "memory-expired", "content": "old", "metadata": {}})
+    registry.register_canonical_write(
+        "memory",
+        record_id="memory-expired",
+        tenant_id="tenant-a",
+        source_ref="memory://memory-expired",
+        data_class="internal",
+        purposes=("model-inference",),
+        created_at=10.0,
+        retention_until=15.0,
+    )
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("memory", MemoryDeletionAdapter(memory))
+
+    results = await registry.execute_retention_with_adapters(adapters, now=20.0)
+
+    assert len(results) == 1
+    assert results[0].receipts[-1].state.value == "deleted"
+    assert await memory.search("", limit=10) == []
