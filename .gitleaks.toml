@@ -19,6 +19,6 @@ secretGroup = 1
 entropy = 4.2
 
 
-[[allowlists]]
+[allowlist]
 description = "Deterministic GameForge replay token used only in artifact tests"
 stopwords = ["operation-123"]
