@@ -52,7 +52,6 @@
     ],
     "optional_env": [
       "OPENAI_API_KEY",
-      "EMERGENT_LLM_KEY",
       "STRIPE_API_KEY",
       "SKELETON_MASTER_SECRET",
       "GF_SEAL_SECRET",
