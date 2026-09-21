@@ -12,12 +12,42 @@ from fastapi import APIRouter
 
 from skeleton.app.assembly import load_manifest
 from skeleton.app.bootstrap import public_bootstrap_payload
+from core.databases import core_db
 
 router = APIRouter(prefix="/api/app", tags=["application"])
 
 
 def _engine_internal_base() -> str:
     return os.environ.get("SKELETON_INTERNAL_URL", "http://localhost:8010").strip().rstrip("/")
+
+
+async def _probe_mongo(timeout_s: float) -> dict[str, object]:
+    started = time.monotonic()
+    try:
+        await asyncio.wait_for(core_db.command("ping"), timeout=timeout_s)
+        return {
+            "name": "mongo",
+            "ok": True,
+            "status": 200,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "detail": "healthy",
+        }
+    except asyncio.TimeoutError:
+        return {
+            "name": "mongo",
+            "ok": False,
+            "status": None,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "detail": "timeout",
+        }
+    except Exception as exc:
+        return {
+            "name": "mongo",
+            "ok": False,
+            "status": None,
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "detail": type(exc).__name__,
+        }
 
 
 def _probe_engine(timeout_s: float) -> dict[str, object]:
@@ -69,7 +99,11 @@ async def app_status(timeout_ms: int = 2500) -> dict[str, object]:
 
     timeout_ms = max(250, min(int(timeout_ms), 10_000))
     bootstrap = public_bootstrap_payload()
-    engine = await asyncio.to_thread(_probe_engine, timeout_ms / 1000.0)
+    timeout_s = timeout_ms / 1000.0
+    engine, mongo = await asyncio.gather(
+        asyncio.to_thread(_probe_engine, timeout_s),
+        _probe_mongo(timeout_s),
+    )
     services = [
         {
             "name": "backend",
@@ -79,6 +113,7 @@ async def app_status(timeout_ms: int = 2500) -> dict[str, object]:
             "detail": "healthy",
         },
         engine,
+        mongo,
     ]
     return {
         "ok": all(bool(item["ok"]) for item in services),
