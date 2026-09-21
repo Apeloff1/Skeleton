@@ -173,6 +173,53 @@ def test_build_and_get_uses_exact_built_artifact(tmp_path: Path) -> None:
     assert registry.status().abi_version == 4
 
 
+def test_rebuild_replaces_and_closes_previous_instance(tmp_path: Path) -> None:
+    probe = _preflight(tmp_path)
+    first = _FakeNativeAccelerator(Path(probe.library))
+    replacement_path = tmp_path / "replacement.so"
+    replacement_path.write_bytes(b"replacement")
+    replacement = _FakeNativeAccelerator(replacement_path)
+
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: first,
+        preflight_provider=lambda: probe,
+        builder=lambda **_kwargs: replacement_path,
+        library_loader=lambda _path: replacement,
+    )
+
+    assert registry.get() is first
+    assert registry.build_and_get() is replacement
+
+    assert first.close_calls == 1
+    assert replacement.close_calls == 0
+    assert registry.get() is replacement
+
+
+def test_failed_rebuild_preserves_healthy_loaded_instance(tmp_path: Path) -> None:
+    probe = _preflight(tmp_path)
+    first = _FakeNativeAccelerator(Path(probe.library))
+
+    def failing_builder(**_kwargs: object) -> Path:
+        raise RuntimeError("build secret payload")
+
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: first,
+        preflight_provider=lambda: probe,
+        builder=failing_builder,
+    )
+    assert registry.get() is first
+
+    with pytest.raises(RuntimeError, match="build secret payload"):
+        registry.build_and_get()
+
+    status = registry.status()
+    assert registry.get() is first
+    assert status.initialized is True
+    assert status.healthy is True
+    assert status.last_error is None
+    assert first.close_calls == 0
+
+
 def test_status_serializes_against_concurrent_close(tmp_path: Path) -> None:
     probe = _preflight(tmp_path)
     status_started = threading.Event()
