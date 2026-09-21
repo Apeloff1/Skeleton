@@ -1,0 +1,806 @@
+{
+  "schema_version": 1,
+  "ledger_version": "1.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "construction_version": "3.7.0",
+  "purpose": "Evidence-based closure ledger for every P0 gap in the fully functional AI path.",
+  "closure_states": [
+    "open",
+    "ready_for_closure",
+    "closed",
+    "reopened"
+  ],
+  "implementation_states": [
+    "planned",
+    "architecture-detailed",
+    "in_progress",
+    "implemented",
+    "complete"
+  ],
+  "rules": [
+    "gap closure is a decision backed by evidence, never inferred from file existence",
+    "ready_for_closure requires all dependency gaps closed and all required evidence present",
+    "closed requires the canonical gap status to be closed and associated blueprint status implemented/complete",
+    "a closed gap is reopened when dependent evidence becomes invalid after a lower-stage contract regression",
+    "evidence references must identify executable tests, repository artifacts, migration/restore proof, or release/golden-journey receipts",
+    "progress metadata is informative until validator-backed closure conditions are satisfied"
+  ],
+  "entries": [
+    {
+      "gap": "gap-cost-admission",
+      "plane": "cost-capacity",
+      "stage": 0,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "ResourceBudget and UsageEstimate contracts",
+        "deterministic admission receipt",
+        "token/cost/wall/retry/tool/artifact budget checks",
+        "concurrency defer and queue rejection semantics",
+        "provider pre-I/O admission",
+        "model route projection from ResourceBudget",
+        "tenant quota reservation ledger with idempotent operation binding",
+        "shared live concurrency and queue pressure controller",
+        "admission leases with failure release and completion reconciliation",
+        "provider text usage reconciliation from returned token usage",
+        "image/speech artifact-byte reconciliation",
+        "media provider admission through the shared runtime",
+        "quota exhaustion and shared saturation regression coverage"
+      ],
+      "closure_evidence_required": [
+        "budget denial test",
+        "route-under-budget test",
+        "concurrency saturation test",
+        "cost telemetry test"
+      ],
+      "outstanding_evidence": [
+        "durable tenant quota/window persistence and restart recovery",
+        "estimate-vs-actual cost telemetry in the canonical observability plane",
+        "actual tool and storage usage accounting",
+        "admission at every expensive non-provider action",
+        "cross-process/distributed pressure feed for multi-worker deployment"
+      ],
+      "blockers": [
+        "durable tenant quota/window persistence and restart recovery",
+        "estimate-vs-actual cost telemetry in the canonical observability plane",
+        "actual tool and storage usage accounting",
+        "admission at every expensive non-provider action",
+        "cross-process/distributed pressure feed for multi-worker deployment"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-governance-registry",
+      "plane": "governance",
+      "stage": 0,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "baseline data class registry",
+        "provider transfer decision receipt",
+        "restricted external transfer denial",
+        "confidential tenant requirement",
+        "provider adapter enforcement before I/O",
+        "tenant-scoped lifecycle metadata registry",
+        "payload-free export inventory",
+        "retention-expiry deletion planning",
+        "multi-target deletion receipts",
+        "registry-derived most-restrictive classification",
+        "registry-derived provider context enforced across text, image, and speech provider I/O"
+      ],
+      "closure_evidence_required": [
+        "provider transfer denial test",
+        "tenant deletion propagation test",
+        "export completeness test",
+        "retention expiry test"
+      ],
+      "outstanding_evidence": [
+        "register memory/retrieval/artifact records at their canonical write boundaries",
+        "propagate deletion actions through real storage adapters",
+        "bind export inventory to durable domain repositories",
+        "bridge provider privacy ceilings into every application route",
+        "audit retention/deletion access through the canonical observability plane"
+      ],
+      "blockers": [
+        "register memory/retrieval/artifact records at their canonical write boundaries",
+        "propagate deletion actions through real storage adapters",
+        "bind export inventory to durable domain repositories",
+        "bridge provider privacy ceilings into every application route",
+        "audit retention/deletion access through the canonical observability plane"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-provider-surface-convergence",
+      "plane": "model-provider",
+      "stage": 0,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "canonical async provider regression suite",
+        "canonical synchronous provider transport regression suite",
+        "Jeeves source has no model credentials or raw provider network I/O",
+        "provider-surface inventory gate reports only declared credential-bearing owners",
+        "SDK isolation scans backend and skeleton source",
+        "media provider boundary regression suite",
+        "application media surfaces contain no direct provider credentials or SDK imports"
+      ],
+      "outstanding_evidence": [
+        "canonical async provider regression suite",
+        "canonical synchronous provider transport regression suite",
+        "Jeeves source has no model credentials or raw provider network I/O",
+        "provider-surface inventory gate reports only declared credential-bearing owners",
+        "SDK isolation scans backend and skeleton source",
+        "media provider boundary regression suite",
+        "application media surfaces contain no direct provider credentials or SDK imports"
+      ],
+      "blockers": [],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-state-authority-convergence",
+      "plane": "data-persistence",
+      "stage": 0,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "machine-readable state authority topology",
+        "authoritative/derived/scratch/recovery classifications",
+        "durable SQLite OperationEnvelope reference repository",
+        "idempotency identity uniqueness and optimistic version fencing",
+        "terminal operation state persistence",
+        "transactional operation-state plus event-intent outbox",
+        "retry-stable outbox event identity compatible with canonical stream",
+        "operation state reopen/corruption/outbox integration regressions"
+      ],
+      "closure_evidence_required": [
+        "state topology validator passes",
+        "RAG authoritative-record migration tests",
+        "Chroma projection rebuild test",
+        "durable operation-state repository test",
+        "operation-state/event atomicity or reconciliation fault test",
+        "Mongo backup/restore rehearsal",
+        "derived-store loss and rebuild test",
+        "no authoritative domain exists solely in Chroma, process memory or snapshots"
+      ],
+      "outstanding_evidence": [
+        "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
+        "bind production orchestration paths to durable operation repository",
+        "run durable outbox dispatcher as part of runtime lifecycle",
+        "define production backup and retention policy for operation state",
+        "prove Mongo authoritative restore before all derived index rebuilds",
+        "run derived-store loss and rebuild drill"
+      ],
+      "blockers": [
+        "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
+        "bind production orchestration paths to durable operation repository",
+        "run durable outbox dispatcher as part of runtime lifecycle",
+        "define production backup and retention policy for operation state",
+        "prove Mongo authoritative restore before all derived index rebuilds",
+        "run derived-store loss and rebuild drill"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-conversation-state-authority",
+      "plane": "application-api",
+      "stage": 1,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/tests/test_conversations_api.py",
+        "backend/gameforge/jeeves/chat_contract.py",
+        "backend/routes/jeeves_compose.py",
+        "tests/test_jeeves_chat_workspace.py",
+        "frontend/src/product/conversationClient.ts"
+      ],
+      "closure_evidence_required": [
+        "new-thread and multi-turn continuation tests",
+        "client cannot inject hidden prior assistant/system messages as canonical history",
+        "cross-tenant/thread authorization denial",
+        "duplicate message idempotency test",
+        "ordered pagination and concurrent append test",
+        "edit/regenerate branch lineage test",
+        "assistant message binds to one operation and final execution result",
+        "conversation deletion/export propagation test",
+        "context projection preserves selected message/citation/tool provenance",
+        "browser refresh/reconnect reconstructs the same canonical transcript"
+      ],
+      "outstanding_evidence": [
+        "new-thread and multi-turn continuation tests",
+        "client cannot inject hidden prior assistant/system messages as canonical history",
+        "cross-tenant/thread authorization denial",
+        "duplicate message idempotency test",
+        "ordered pagination and concurrent append test",
+        "edit/regenerate branch lineage test",
+        "assistant message binds to one operation and final execution result",
+        "conversation deletion/export propagation test",
+        "context projection preserves selected message/citation/tool provenance",
+        "browser refresh/reconnect reconstructs the same canonical transcript"
+      ],
+      "blockers": [
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-memory-durable-authority",
+      "plane": "memory",
+      "stage": 1,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "durable memory write/read/restart test",
+        "tenant/user/namespace isolation tests",
+        "unverified model speculation cannot become canonical memory",
+        "preference/outcome write policy tests",
+        "dedupe/version/conflict tests",
+        "canonical memory delete/export/retention propagation tests",
+        "vector/index loss and rebuild from canonical memory test",
+        "process-memory loss does not lose canonical memory test",
+        "retrieval provenance points back to canonical memory records",
+        "memory outage produces explicit degraded continuity behavior"
+      ],
+      "outstanding_evidence": [
+        "durable memory write/read/restart test",
+        "tenant/user/namespace isolation tests",
+        "unverified model speculation cannot become canonical memory",
+        "preference/outcome write policy tests",
+        "dedupe/version/conflict tests",
+        "canonical memory delete/export/retention propagation tests",
+        "vector/index loss and rebuild from canonical memory test",
+        "process-memory loss does not lose canonical memory test",
+        "retrieval provenance points back to canonical memory records",
+        "memory outage produces explicit degraded continuity behavior"
+      ],
+      "blockers": [
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-tool-runtime-convergence",
+      "plane": "tool-runtime",
+      "stage": 1,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "tool manifest schema validation/fuzz tests",
+        "model-visible tool inventory contains only declared enabled tools",
+        "no tool module owns model provider credentials or raw provider SDK/network transport",
+        "authority/risk/approval denial tests",
+        "idempotency reservation and replay tests",
+        "sandbox boundary tests for code execution/build tools",
+        "database tool collection/tenant scope denial tests",
+        "network tool timeout/result-bound/provenance tests",
+        "compatibility registry delegates to canonical runtime",
+        "tool receipt lineage binds operation/execution/turn/call identity"
+      ],
+      "outstanding_evidence": [
+        "tool manifest schema validation/fuzz tests",
+        "model-visible tool inventory contains only declared enabled tools",
+        "no tool module owns model provider credentials or raw provider SDK/network transport",
+        "authority/risk/approval denial tests",
+        "idempotency reservation and replay tests",
+        "sandbox boundary tests for code execution/build tools",
+        "database tool collection/tenant scope denial tests",
+        "network tool timeout/result-bound/provenance tests",
+        "compatibility registry delegates to canonical runtime",
+        "tool receipt lineage binds operation/execution/turn/call identity"
+      ],
+      "blockers": [
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission",
+        "dependency must close: gap-provider-surface-convergence"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-context-compiler-convergence",
+      "plane": "prompt-context",
+      "stage": 2,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "skeleton/contracts/context.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/sources/conversation.py",
+        "skeleton/context/sources/retrieval.py",
+        "skeleton/testing/test_context_compiler.py"
+      ],
+      "closure_evidence_required": [
+        "deterministic context snapshot/digest tests",
+        "same canonical inputs produce same selected segment order under fixed budget",
+        "system/policy segments cannot be displaced by untrusted content",
+        "client history injection cannot enter trusted instruction tier",
+        "cross-tenant memory/retrieval/artifact segments are denied",
+        "token budget/output headroom tests",
+        "oversized tool/artifact result externalization tests",
+        "summary/compaction provenance tests",
+        "citation/source ids survive context projection",
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+      ],
+      "outstanding_evidence": [
+        "deterministic context snapshot/digest tests",
+        "same canonical inputs produce same selected segment order under fixed budget",
+        "system/policy segments cannot be displaced by untrusted content",
+        "client history injection cannot enter trusted instruction tier",
+        "cross-tenant memory/retrieval/artifact segments are denied",
+        "token budget/output headroom tests",
+        "oversized tool/artifact result externalization tests",
+        "summary/compaction provenance tests",
+        "citation/source ids survive context projection",
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+      ],
+      "blockers": [
+        "dependency must close: gap-conversation-state-authority",
+        "dependency must close: gap-memory-durable-authority",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-governance-registry"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-provider-interaction-protocol",
+      "plane": "model-provider",
+      "stage": 2,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "text-only compatibility tests",
+        "structured output success/invalid schema tests",
+        "single/multiple normalized tool-call tests",
+        "unknown/unoffered tool-call rejection",
+        "tool argument size/count bound tests",
+        "finish reason normalization tests",
+        "usage normalization/unknown-field tests",
+        "deadline/cancellation provider tests",
+        "stream delta ordering/finalization tests when streaming enabled",
+        "no provider SDK/native response object escapes provider_runtime"
+      ],
+      "outstanding_evidence": [
+        "text-only compatibility tests",
+        "structured output success/invalid schema tests",
+        "single/multiple normalized tool-call tests",
+        "unknown/unoffered tool-call rejection",
+        "tool argument size/count bound tests",
+        "finish reason normalization tests",
+        "usage normalization/unknown-field tests",
+        "deadline/cancellation provider tests",
+        "stream delta ordering/finalization tests when streaming enabled",
+        "no provider SDK/native response object escapes provider_runtime"
+      ],
+      "blockers": [
+        "dependency must close: gap-provider-surface-convergence",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-verification-evidence-contract",
+      "plane": "reasoning-verification",
+      "stage": 3,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "structural verification tests",
+        "claim-to-citation grounding tests",
+        "unsupported claim becomes qualified/abstain/block per policy",
+        "tool action postcondition verification tests",
+        "model verifier uses canonical provider/routing/admission boundary",
+        "self-confidence alone cannot mark evidence-required claim verified",
+        "repair lineage and max-repair tests",
+        "high-impact block cannot be bypassed by generator retry",
+        "verification receipt binds operation/execution/turn/result and evidence ids",
+        "no hidden reasoning text is required for audit/replay"
+      ],
+      "outstanding_evidence": [
+        "structural verification tests",
+        "claim-to-citation grounding tests",
+        "unsupported claim becomes qualified/abstain/block per policy",
+        "tool action postcondition verification tests",
+        "model verifier uses canonical provider/routing/admission boundary",
+        "self-confidence alone cannot mark evidence-required claim verified",
+        "repair lineage and max-repair tests",
+        "high-impact block cannot be bypassed by generator retry",
+        "verification receipt binds operation/execution/turn/result and evidence ids",
+        "no hidden reasoning text is required for audit/replay"
+      ],
+      "blockers": [
+        "dependency must close: gap-context-compiler-convergence",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-provider-interaction-protocol"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-cognitive-execution-loop",
+      "plane": "orchestration",
+      "stage": 4,
+      "gap_status": "open",
+      "implementation_state": "architecture-detailed",
+      "closure_decision": "open",
+      "evidence_present": [
+        "canonical execution loop ownership selected",
+        "execution/turn/result envelope fields defined",
+        "turn substate and recovery semantics defined",
+        "tool authority/idempotency/approval protocol defined",
+        "memory writeback policy defined",
+        "verification and finalization protocol defined",
+        "usage and observability contract defined",
+        "implementation slices ordered"
+      ],
+      "closure_evidence_required": [
+        "prompt-only execution reaches completed with one bound result receipt",
+        "single-tool and multi-tool loop tests",
+        "structured-output schema success/failure/repair tests",
+        "tool-call argument validation and authority denial tests",
+        "loop budget exhaustion terminates deterministically without further provider/tool I/O",
+        "crash after provider turn and crash after tool side effect resume without duplicate external action",
+        "waiting_for_user approval suspend/resume test",
+        "cancellation race test at model and tool boundaries",
+        "provider fallback preserves operation/turn lineage",
+        "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
+        "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
+      ],
+      "outstanding_evidence": [
+        "materialize contract modules",
+        "bind durable repositories",
+        "extend provider structured/tool output boundary",
+        "implement governed tool runtime integration",
+        "implement execution loop",
+        "implement frontend/backend transport integration",
+        "prove fault and golden-journey evidence"
+      ],
+      "blockers": [
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission",
+        "dependency must close: gap-conversation-state-authority",
+        "dependency must close: gap-memory-durable-authority",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-context-compiler-convergence",
+        "dependency must close: gap-provider-interaction-protocol",
+        "dependency must close: gap-verification-evidence-contract",
+        "materialize contract modules",
+        "bind durable repositories",
+        "extend provider structured/tool output boundary",
+        "implement governed tool runtime integration",
+        "implement execution loop",
+        "implement frontend/backend transport integration",
+        "prove fault and golden-journey evidence"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-engine-application-execution-boundary",
+      "plane": "engine-api",
+      "stage": 5,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "backend->engine authenticated submit test",
+        "delegated tenant/user/scope validation test",
+        "submit retry returns same operation/execution rather than duplicate work",
+        "deadline/trace/budget propagation test",
+        "query/result binding test",
+        "idempotent cancel and late-result fencing test",
+        "engine outage produces explicit backend degraded behavior",
+        "backend contains no runtime model credential after cutover",
+        "provider execution occurs only in Skeleton service in production topology",
+        "cross-service golden journey preserves operation/turn/receipt lineage"
+      ],
+      "outstanding_evidence": [
+        "backend->engine authenticated submit test",
+        "delegated tenant/user/scope validation test",
+        "submit retry returns same operation/execution rather than duplicate work",
+        "deadline/trace/budget propagation test",
+        "query/result binding test",
+        "idempotent cancel and late-result fencing test",
+        "engine outage produces explicit backend degraded behavior",
+        "backend contains no runtime model credential after cutover",
+        "provider execution occurs only in Skeleton service in production topology",
+        "cross-service golden journey preserves operation/turn/receipt lineage"
+      ],
+      "blockers": [
+        "dependency must close: gap-cognitive-execution-loop",
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-provider-surface-convergence"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-streaming-protocol",
+      "plane": "streaming-realtime",
+      "stage": 6,
+      "gap_status": "open",
+      "implementation_state": "in_progress",
+      "closure_decision": "open",
+      "evidence_present": [
+        "canonical operation identity and lifecycle state machine",
+        "transport-neutral stream event envelope",
+        "monotonic operation-scoped sequence",
+        "cursor replay contract",
+        "duplicate conflict detection",
+        "terminal event finality",
+        "bounded reference log with fail-closed backpressure",
+        "explicit compaction and replay-gap semantics",
+        "focused operation/stream conformance tests",
+        "durable SQLite operation event store",
+        "transactional sequence enforcement",
+        "durable terminal fencing",
+        "durable replay compaction watermark",
+        "persisted corruption rejection",
+        "durable capacity backpressure",
+        "retry-idempotent explicit event-id append for transactional outbox recovery",
+        "tenant-bound backend operation transport service",
+        "authenticated SSE route with Last-Event-ID resume",
+        "heartbeat and idle timeout integration",
+        "cancellation bridge into durable OperationEnvelope state",
+        "transactional outbox drain before replay",
+        "explicit post-header replay-gap resync event",
+        "focused tenant-isolation/cancel/replay/terminal SSE tests"
+      ],
+      "closure_evidence_required": [
+        "durable replay/compaction/terminal/backpressure persistence tests",
+        "operation lifecycle conformance tests",
+        "stream protocol conformance tests",
+        "disconnect/reconnect browser/API test",
+        "duplicate/out-of-order client reducer test",
+        "cancel race test",
+        "slow-client/backpressure test"
+      ],
+      "outstanding_evidence": [
+        "frontend reducer with sequence and event-id dedupe",
+        "frontend reconnect/resume cursor",
+        "multi-client acknowledgement/compaction strategy",
+        "distributed stream ownership for multi-worker deployment",
+        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+      ],
+      "blockers": [
+        "dependency must close: gap-cognitive-execution-loop",
+        "dependency must close: gap-engine-application-execution-boundary",
+        "dependency must close: gap-state-authority-convergence",
+        "frontend reducer with sequence and event-id dedupe",
+        "frontend reconnect/resume cursor",
+        "multi-client acknowledgement/compaction strategy",
+        "distributed stream ownership for multi-worker deployment",
+        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    },
+    {
+      "gap": "gap-e2e-golden-journeys",
+      "plane": "product-experience",
+      "stage": 7,
+      "gap_status": "open",
+      "implementation_state": "planned",
+      "closure_decision": "open",
+      "evidence_present": [],
+      "closure_evidence_required": [
+        "browser E2E suite",
+        "API trace continuity",
+        "artifact/result assertions",
+        "degraded-mode assertions"
+      ],
+      "outstanding_evidence": [
+        "browser E2E suite",
+        "API trace continuity",
+        "artifact/result assertions",
+        "degraded-mode assertions"
+      ],
+      "blockers": [
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission",
+        "dependency must close: gap-provider-surface-convergence",
+        "dependency must close: gap-conversation-state-authority",
+        "dependency must close: gap-memory-durable-authority",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-context-compiler-convergence",
+        "dependency must close: gap-provider-interaction-protocol",
+        "dependency must close: gap-verification-evidence-contract",
+        "dependency must close: gap-cognitive-execution-loop",
+        "dependency must close: gap-engine-application-execution-boundary",
+        "dependency must close: gap-streaming-protocol"
+      ],
+      "close_when": [
+        "all declared dependency gaps are closed",
+        "all closure_evidence_required items have executable evidence",
+        "associated blueprint status is implemented or complete",
+        "focused tests and architecture validators pass",
+        "gap status is changed to closed in the canonical construction contract"
+      ],
+      "reopen_when": [
+        "a lower-stage contract change invalidates closure evidence",
+        "a required regression/golden journey fails",
+        "canonical owner or state authority drifts",
+        "security/governance/provider-surface isolation regresses"
+      ]
+    }
+  ]
+}
