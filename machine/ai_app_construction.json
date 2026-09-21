@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.6.0",
-  "architecture_tag": "arch-map/v3.6",
+  "construction_version": "3.7.0",
+  "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -94,7 +94,9 @@
     "observability before optimization",
     "evaluation before promotion",
     "fallback before acceleration",
-    "migration by domain and interface, never by blind history merge"
+    "migration by domain and interface, never by blind history merge",
+    "state authority topology distinguishes authoritative, derived, scratch, recovery-aid, and transitional state",
+    "authoritative state restores before derived indexes and caches are rebuilt"
   ],
   "planes": [
     {
@@ -2538,7 +2540,10 @@
       "all open gaps scheduled exactly once",
       "all canonical envelopes and lifecycle stages have owners",
       "every construction relationship has an interface registry entry",
-      "interface registry owners/zones/contracts match canonical planes"
+      "interface registry owners/zones/contracts match canonical planes",
+      "every logical state domain has exactly one declared authority classification",
+      "derived stores are rebuildable and never the only source of canonical user, tenant, governance, operation, or release state",
+      "authoritative-unbound state is production-ineligible and must remain attached to an open P0 gap"
     ],
     "sota_complete": [
       "zero open P0 gaps",
