@@ -176,6 +176,8 @@ jobs:
           "pytest-asyncio>=0.24,<2"
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
+          "fastapi==0.141.1"
+          "httpx==0.28.1"
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
