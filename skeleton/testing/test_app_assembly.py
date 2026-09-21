@@ -50,6 +50,7 @@ def test_structural_preflight_passes_for_repository_checkout():
 def test_runtime_preflight_reports_missing_environment_without_mutating_process(monkeypatch):
     root = find_repo_root(Path(__file__))
     monkeypatch.setattr("skeleton.app.assembly.shutil.which", lambda _name: "/usr/bin/docker")
+    monkeypatch.setattr("skeleton.app.assembly._read_dotenv", lambda _path: {})
 
     checks = preflight(root, runtime=True, environ={})
     failures = {check.code for check in checks if not check.ok}
@@ -74,9 +75,15 @@ def test_up_command_is_deterministic_and_shell_free():
 def test_full_up_command_enables_optional_profile():
     command = compose_command("up", full=True, build=False)
 
-    assert "--profile" in command
-    index = command.index("--profile")
-    assert command[index + 1] == "full"
+    assert command[:6] == (
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.yml",
+        "--profile",
+        "full",
+    )
+    assert command[6:8] == ("up", "-d")
     assert "chroma" in command
 
 
