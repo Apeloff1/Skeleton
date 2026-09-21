@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.2.0",
-  "architecture_tag": "arch-map/v3.2",
+  "construction_version": "3.3.0",
+  "architecture_tag": "arch-map/v3.3",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -1370,19 +1370,24 @@
       "plane": "streaming-realtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Realtime primitives exist, but one canonical resumable event protocol is not yet proven across backend, engine and frontend.",
+      "gap": "The canonical operation and resumable event contracts now exist, but durable transport/storage and frontend reconnect/cancel integration are not yet proven end-to-end.",
       "construction": [
-        "define versioned event envelope with operation_id, event_id, sequence, type, timestamp and payload",
-        "implement server-side replay cursor and heartbeat",
-        "implement cancellation and disconnect semantics",
-        "implement frontend reducer that deduplicates and resumes ordered events",
-        "add backpressure and slow-client bounds"
+        "use skeleton/contracts/operation.py as the operation identity/state contract",
+        "use skeleton/frontier/operation_stream.py as the stream conformance contract",
+        "add durable replay storage preserving sequence/event IDs",
+        "add backend SSE or WebSocket adapter without changing envelope semantics",
+        "bridge cancellation into the canonical operation state machine",
+        "add frontend reducer, reconnect cursor, duplicate/out-of-order handling",
+        "prove heartbeat, idle timeout, backpressure, reconnect and terminal semantics end-to-end"
       ],
       "closure_evidence": [
-        "protocol contract test",
-        "disconnect/reconnect integration test",
-        "duplicate/out-of-order test",
-        "frontend E2E recovery test"
+        "operation lifecycle conformance tests",
+        "stream protocol conformance tests",
+        "durable replay adapter tests",
+        "disconnect/reconnect browser/API test",
+        "duplicate/out-of-order client reducer test",
+        "cancel race test",
+        "slow-client/backpressure test"
       ]
     },
     {
@@ -2268,7 +2273,11 @@
       "gap": "gap-streaming-protocol",
       "wave": 2,
       "owners": [
+        "skeleton/contracts/operation.py",
+        "skeleton/frontier/operation_stream.py",
         "skeleton/frontier/runtime_events.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_stream.py",
         "backend",
         "frontend"
       ],
@@ -2290,7 +2299,31 @@
         "cancel race",
         "slow client"
       ],
-      "exit": "frontend can lose transport and resume without duplicating side effects or losing terminal state"
+      "exit": "frontend can lose transport and resume without duplicating side effects or losing terminal state",
+      "progress": {
+        "state": "in_progress",
+        "completed": [
+          "canonical operation identity and lifecycle state machine",
+          "transport-neutral stream event envelope",
+          "monotonic operation-scoped sequence",
+          "cursor replay contract",
+          "duplicate conflict detection",
+          "terminal event finality",
+          "bounded reference log with fail-closed backpressure",
+          "explicit compaction and replay-gap semantics",
+          "focused operation/stream conformance tests"
+        ],
+        "remaining": [
+          "durable stream storage adapter",
+          "backend SSE or WebSocket transport",
+          "heartbeat and idle timeout integration",
+          "cancellation bridge from transport to operation state",
+          "frontend reducer with sequence and event-id dedupe",
+          "frontend reconnect/resume cursor",
+          "multi-client acknowledgement strategy",
+          "end-to-end slow-client and reconnect tests"
+        ]
+      }
     },
     {
       "id": "WP-P1-PROVIDER-REDUNDANCY",
@@ -2456,5 +2489,56 @@
       },
       "activation_policy": "deny until declared adapter + receipt + tests exist"
     }
-  ]
+  ],
+  "operation_contract": {
+    "owner": "skeleton/contracts/operation.py",
+    "state_machine_owner": "orchestration",
+    "required_properties": [
+      "stable operation_id distinct from trace_id",
+      "tenant + actor + capability binding",
+      "explicit deadline",
+      "idempotency key",
+      "declared legal state transitions",
+      "terminal states cannot transition"
+    ],
+    "states": [
+      "created",
+      "validated",
+      "authorized",
+      "admitted",
+      "queued",
+      "running",
+      "waiting_for_tool",
+      "waiting_for_user",
+      "retrying",
+      "degraded",
+      "completed",
+      "failed",
+      "cancelled"
+    ],
+    "terminal_states": [
+      "completed",
+      "failed",
+      "cancelled"
+    ]
+  },
+  "stream_protocol": {
+    "owner": "skeleton/frontier/operation_stream.py",
+    "schema_version": 1,
+    "transport_neutral": true,
+    "required_semantics": [
+      "operation-scoped event identity",
+      "monotonic positive sequence",
+      "strict JSON bounded payload",
+      "explicit replay cursor",
+      "duplicate event idempotency only for identical content",
+      "out-of-order rejection",
+      "terminal event finality",
+      "fail-closed backpressure",
+      "explicit acknowledged-history compaction",
+      "replay gap detection"
+    ],
+    "reference_implementation": "OperationEventLog",
+    "production_storage_policy": "replace storage only; preserve protocol semantics"
+  }
 }
