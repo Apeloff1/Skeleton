@@ -97,6 +97,11 @@ class AsmAcceleratorStatus:
     matrix_backend: str
     calls: int
     failures: int
+    scalar_calls: int
+    batch_calls: int
+    matrix_calls: int
+    elements_processed: int
+    results_emitted: int
 
 
 def normalize_architecture(machine: str | None = None) -> str:
@@ -315,6 +320,11 @@ class AsmVectorAccelerator:
         self._matrix_function = selected_matrix
         self._calls = 0
         self._failures = 0
+        self._scalar_calls = 0
+        self._batch_calls = 0
+        self._matrix_calls = 0
+        self._elements_processed = 0
+        self._results_emitted = 0
         self._lock = Lock()
 
     @classmethod
@@ -443,6 +453,11 @@ class AsmVectorAccelerator:
                 matrix_backend=self._matrix_backend,
                 calls=self._calls,
                 failures=self._failures,
+                scalar_calls=self._scalar_calls,
+                batch_calls=self._batch_calls,
+                matrix_calls=self._matrix_calls,
+                elements_processed=self._elements_processed,
+                results_emitted=self._results_emitted,
             )
 
     def dot_f32(self, left: Sequence[float], right: Sequence[float]) -> float:
@@ -507,13 +522,20 @@ class AsmVectorAccelerator:
                 output_buffer,
             )
         except Exception:
-            with self._lock:
-                self._calls += 1
-                self._failures += 1
+            self._record_native_call(
+                kind="batch",
+                elements=expected,
+                results=rows,
+                failed=True,
+            )
             raise
 
-        with self._lock:
-            self._calls += 1
+        self._record_native_call(
+            kind="batch",
+            elements=expected,
+            results=rows,
+            failed=False,
+        )
         return output.tolist()
 
     def dot_matrix_f32(
@@ -557,13 +579,20 @@ class AsmVectorAccelerator:
                 output_buffer,
             )
         except Exception:
-            with self._lock:
-                self._calls += 1
-                self._failures += 1
+            self._record_native_call(
+                kind="matrix",
+                elements=expected,
+                results=rows,
+                failed=True,
+            )
             raise
 
-        with self._lock:
-            self._calls += 1
+        self._record_native_call(
+            kind="matrix",
+            elements=expected,
+            results=rows,
+            failed=False,
+        )
         return output.tolist()
 
     def dot_queries_matrix_f32(
@@ -614,13 +643,20 @@ class AsmVectorAccelerator:
                 output_buffer,
             )
         except Exception:
-            with self._lock:
-                self._calls += 1
-                self._failures += 1
+            self._record_native_call(
+                kind="matrix",
+                elements=output_count * dimensions,
+                results=output_count,
+                failed=True,
+            )
             raise
 
-        with self._lock:
-            self._calls += 1
+        self._record_native_call(
+            kind="matrix",
+            elements=output_count * dimensions,
+            results=output_count,
+            failed=False,
+        )
         return output.tolist()
 
     def _binary_f32(
@@ -638,14 +674,45 @@ class AsmVectorAccelerator:
         try:
             result = float(function(left_buffer, right_buffer, len(left)))
         except Exception:
-            with self._lock:
-                self._calls += 1
-                self._failures += 1
+            self._record_native_call(
+                kind="scalar",
+                elements=len(left),
+                results=1,
+                failed=True,
+            )
             raise
 
+        self._record_native_call(
+            kind="scalar",
+            elements=len(left),
+            results=1,
+            failed=False,
+        )
+        return result
+
+    def _record_native_call(
+        self,
+        *,
+        kind: str,
+        elements: int,
+        results: int,
+        failed: bool,
+    ) -> None:
         with self._lock:
             self._calls += 1
-        return result
+            if failed:
+                self._failures += 1
+            if kind == "scalar":
+                self._scalar_calls += 1
+            elif kind == "batch":
+                self._batch_calls += 1
+            elif kind == "matrix":
+                self._matrix_calls += 1
+            else:
+                raise RuntimeError(f"unknown native call kind: {kind}")
+            self._elements_processed += elements
+            if not failed:
+                self._results_emitted += results
 
     @staticmethod
     def _float_buffer(
