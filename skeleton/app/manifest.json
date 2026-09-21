@@ -140,6 +140,10 @@
     "skeleton/app/preloader.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/installer.py",
-    "scripts/install_app.py"
+    "scripts/install_app.py",
+    "skeleton/app/windows_launcher.py",
+    "packaging/windows/launcher_entry.py",
+    "packaging/windows/SkeletonSetup.iss",
+    "scripts/windows/build_installer.ps1"
   ]
 }
