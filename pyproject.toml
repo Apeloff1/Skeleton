@@ -20,7 +20,7 @@ required-version = "==0.12.15"
 "skeleton.app" = ["manifest.json"]
 
 [build-system]
-requires = ["setuptools==83.0.0", "wheel==0.46.2"]
+requires = ["setuptools==83.0.0", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
