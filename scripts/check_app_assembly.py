@@ -407,6 +407,11 @@ def audit_production_ingress() -> None:
     check("/api/v1" not in registry, "legacy backend route registry claims engine /api/v1")
     check("/api/v1" not in server, "legacy backend server claims engine /api/v1")
 
+    engine_routes = read("skeleton/api/routes.py")
+    check('payload["application"]' in engine_routes, "engine liveness canonical application identity missing")
+    check('"component": "engine"' in engine_routes, "engine liveness component identity missing")
+    check('_APP_MANIFEST.version' in engine_routes, "engine liveness version bypasses assembly manifest")
+
 
 def audit_launcher_convergence() -> None:
     launch = read("frontend/components/LaunchCascade.tsx")
@@ -631,6 +636,8 @@ def audit_public_app_bootstrap_contract() -> None:
     )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
     check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
+    check('identity.get(key) == value' in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
