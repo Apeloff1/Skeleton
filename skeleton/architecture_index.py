@@ -177,8 +177,10 @@ PLAN_CHECKPOINTS = {
         "tracks": ("AD",),
         "research_conclusion_range": ("FR001", "FR114"),
         "research_question_range": ("RQ001", "RQ010"),
-        "source_verification_range": ("SV001", "SV046"),
-        "frontier_delta_range": ("FD001", "FD015"),
+        "source_verification_range": ("SV001", "SV050"),
+        "frontier_delta_range": ("FD001", "FD016"),
+        "contradiction_range": ("CX001", "CX024"),
+        "research_debt_range": ("RDE001", "RDE036"),
         "production_authority_granted": False,
         "research_refresh_required": True,
     }
@@ -338,8 +340,10 @@ RESEARCH_PASS_INVARIANTS = {
 
 RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
 RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
-RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 47))
-FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 16))
+RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 51))
+FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 17))
+RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
+RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
@@ -381,6 +385,26 @@ MONITORABILITY_RESEARCH_INVARIANTS = {
     "learned_detector_ood_generalization_is_not_assumed": True,
 }
 
+RESEARCH_DEBT_INVARIANTS = {
+    "open_research_debt_is_visible": True,
+    "paper_claim_alone_cannot_retire_local_debt": True,
+    "toy_reproduction_does_not_imply_scale_transfer": True,
+    "failed_reproduction_is_retained": True,
+    "partial_retirement_records_scope": True,
+    "retired_debt_can_reopen_after_material_change": True,
+    "production_claim_lists_dependent_open_debt": True,
+}
+
+RESEARCH_EXPERIMENT_RIGOR_INVARIANTS = {
+    "selection_and_tuning_budget_is_recorded": True,
+    "failed_and_diverged_runs_are_not_silently_dropped": True,
+    "baseline_receives_comparable_tuning_and_kernels": True,
+    "multiple_comparisons_are_recorded": True,
+    "lifecycle_cost_is_reported_when_material": True,
+    "negative_space_and_untested_scope_are_recorded": True,
+    "single_seed_is_not_zero_uncertainty": True,
+}
+
 
 
 
@@ -413,10 +437,14 @@ def full_summary() -> Dict[str, Any]:
         "research_question_ids": list(RESEARCH_QUESTION_IDS),
         "research_source_verification_ids": list(RESEARCH_SOURCE_VERIFICATION_IDS),
         "frontier_delta_ids": list(FRONTIER_DELTA_IDS),
+        "research_contradiction_ids": list(RESEARCH_CONTRADICTION_IDS),
+        "research_debt_ids": list(RESEARCH_DEBT_IDS),
         "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
         "research_source_audit_invariants": dict(RESEARCH_SOURCE_AUDIT_INVARIANTS),
         "research_automation_invariants": dict(RESEARCH_AUTOMATION_INVARIANTS),
         "monitorability_research_invariants": dict(MONITORABILITY_RESEARCH_INVARIANTS),
+        "research_debt_invariants": dict(RESEARCH_DEBT_INVARIANTS),
+        "research_experiment_rigor_invariants": dict(RESEARCH_EXPERIMENT_RIGOR_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
