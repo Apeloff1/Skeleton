@@ -29,6 +29,16 @@ from skeleton.vault.audit import (
     verify_chain_or_refuse,
 )
 from skeleton.vault.shamir import ShamirSeal
+from skeleton.vault.data_lifecycle import (
+    DataLifecycleRegistry,
+    DeletionAction,
+    DeletionPlan,
+    DeletionReceipt,
+    GovernedDataRecord,
+    LifecycleConflict,
+    LifecycleError,
+    LifecycleState,
+)
 from skeleton.vault.data_governance import (
     DataClass,
     DataGovernanceDenied,
@@ -61,4 +71,12 @@ __all__ = [
     "ProviderTransferRequest",
     "evaluate_provider_transfer",
     "require_provider_transfer",
+    "DataLifecycleRegistry",
+    "DeletionAction",
+    "DeletionPlan",
+    "DeletionReceipt",
+    "GovernedDataRecord",
+    "LifecycleConflict",
+    "LifecycleError",
+    "LifecycleState",
 ]
