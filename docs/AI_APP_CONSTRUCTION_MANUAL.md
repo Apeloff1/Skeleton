@@ -2763,6 +2763,8 @@ It assigns all 240 historical/edge/obscure catalogue entries across W00–W30 an
 
 Atomic queue tasks inherit risk counts from their `work_package_refs`. Builders must not interpret a low line-count change as low risk when the inherited catalog contains critical/high cases. Conversely, multiple mapped cases may be discharged by one strong invariant or failure-injection test when the evidence genuinely covers them.
 
+Critical/high obligations are also extracted into `machine/ai_edge_case_priority_queue.json`. Builders touching an owning work package should treat unresolved P0/P1 entries as explicit hardening debt and attach evidence or accepted-risk disposition rather than relying on implicit coverage.
+
 ## Fully Functional AI Closure: Detailed Runtime Assembly
 
 The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
