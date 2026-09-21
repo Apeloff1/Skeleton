@@ -1,5 +1,8 @@
 import api from '../utils/apiClient';
 
+const DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap';
+const DEFAULT_APP_STATUS_PATH = '/api/app/status';
+
 export type BootstrapService = {
   name: string;
   role: string;
@@ -20,6 +23,11 @@ export type AppBootstrap = {
     version: string;
     assembly_schema_version: number;
   };
+  contract: {
+    bootstrap: string;
+    status: string;
+    ready: string;
+  };
   profiles: {
     default: { services: string[]; layers: string[][] };
     full: { services: string[]; layers: string[][] };
@@ -28,7 +36,7 @@ export type AppBootstrap = {
 };
 
 export async function getAppBootstrap(signal?: AbortSignal): Promise<AppBootstrap | null> {
-  const result = await api.get<AppBootstrap>('/api/app/bootstrap', {
+  const result = await api.get<AppBootstrap>(DEFAULT_APP_BOOTSTRAP_PATH, {
     signal,
     cacheKey: 'app-bootstrap',
     cacheTtlMs: 30_000,
@@ -64,10 +72,12 @@ export type AppRuntimeStatus = {
 export async function getAppRuntimeStatus(
   timeoutMs = 2_500,
   signal?: AbortSignal,
+  bootstrap?: AppBootstrap | null,
 ): Promise<AppRuntimeStatus | null> {
   const boundedTimeout = Math.max(250, Math.min(timeoutMs, 10_000));
+  const path = bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH;
   const result = await api.get<AppRuntimeStatus>(
-    `/api/app/status?timeout_ms=${encodeURIComponent(String(boundedTimeout))}`,
+    `${path}?timeout_ms=${encodeURIComponent(String(boundedTimeout))}`,
     {
       signal,
       timeoutMs: boundedTimeout + 500,
