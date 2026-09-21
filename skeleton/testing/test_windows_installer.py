@@ -109,6 +109,7 @@ def test_windows_launcher_is_bundled_runtime_control_surface():
     assert "production: bool = True" in source
     assert 'compose_command("down"' in source
     assert "shell=True" not in source
+    assert "shell=False" in source
     assert "CREATE_NO_WINDOW" in source
 
 
