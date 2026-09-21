@@ -55,7 +55,7 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 [Icons]
 Name: "{group}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Repair Skeleton"; Filename: "{app}\{#AppExeName}"; Parameters: "--repair"; WorkingDir: "{app}"
-Name: "{commondesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{userdesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch Skeleton setup and runtime"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
