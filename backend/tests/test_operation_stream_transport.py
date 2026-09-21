@@ -236,3 +236,54 @@ def test_sse_event_frame_uses_sequence_as_resume_id(tmp_path: Path) -> None:
 
     operations.close()
     events.close()
+
+
+def test_transport_registers_and_acknowledges_tenant_consumer(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    operations.create(operation, now=BASE_TIME)
+
+    batch = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        after_sequence=0,
+    )
+    checkpoint = transport.acknowledge(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        sequence=batch.latest_sequence,
+    )
+
+    assert checkpoint.acknowledged_through == 1
+    assert events.safe_compaction_sequence(operation.operation_id) == 1
+
+    operations.close()
+    events.close()
+
+
+def test_transport_acknowledgement_is_tenant_bound(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation(tenant_id="tenant-a")
+    operations.create(operation, now=BASE_TIME)
+    transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+    )
+
+    with pytest.raises(OperationAccessDenied):
+        transport.acknowledge(
+            operation.operation_id,
+            tenant_id="tenant-b",
+            consumer_id="client-a",
+            sequence=1,
+        )
+
+    operations.close()
+    events.close()
