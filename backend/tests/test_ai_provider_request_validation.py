@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from skeleton.intelligence.admission import ResourceBudget
+from skeleton.vault.data_lifecycle import GovernedDataRecord
+from skeleton.vault.governance_registry import GovernanceRegistry
 
 from core.ai_provider import (
     AIMessage,
@@ -275,3 +277,72 @@ async def test_provider_retry_budget_rejects_excess_configured_attempts() -> Non
         )
 
     assert client.responses.calls == 0
+
+
+def _governance_context(
+    *,
+    record_id: str = "record-1",
+    tenant_id: str = "tenant-registry",
+    data_class: str = "confidential",
+    purpose: str = "code-assistance",
+):
+    registry = GovernanceRegistry()
+    registry.register(
+        GovernedDataRecord(
+            record_id=record_id,
+            tenant_id=tenant_id,
+            owner_plane="memory",
+            source_ref=f"memory:{record_id}",
+            data_class=data_class,
+            purposes=(purpose,),
+            deletion_targets=("memory",),
+            created_at=1.0,
+        )
+    )
+    return registry.context_for(
+        (record_id,),
+        tenant_id=tenant_id,
+        purpose=purpose,
+    )
+
+
+@pytest.mark.asyncio
+async def test_registry_context_prevents_weaker_caller_classification(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    context = _governance_context()
+
+    result = await adapter.generate(
+        ProviderRequest(
+            instructions="rules",
+            prompt="tenant governed input",
+            data_class="public",
+            purpose="code-assistance",
+            governance_context=context,
+        )
+    )
+
+    assert result.text == "ok"
+    assert result.data_class == "confidential"
+    assert result.governance_decision_id
+    assert adapter._client.responses.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_registry_context_tenant_mismatch_fails_before_provider_io(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    context = _governance_context()
+
+    with pytest.raises(ProviderPolicyError, match="tenant does not match"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="tenant governed input",
+                purpose="code-assistance",
+                tenant_id="tenant-other",
+                governance_context=context,
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
