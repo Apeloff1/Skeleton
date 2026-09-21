@@ -69,3 +69,29 @@ def test_master_plan_indexes_optimizer_and_massive_upgrade_tracks() -> None:
     assert "Massive-upgrade source seeds" in catalog
     assert "signoff_required_for_implementation_claims: true" in plan
     assert "production_authority_granted: false" in plan
+
+
+def test_machine_index_exposes_optimizer_and_massive_upgrade_invariants() -> None:
+    tracks = architecture_index.CONSTRUCTION_TRACKS
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260921-INTERNALS-OPTIMIZERS-MASSIVE-UPGRADES"
+    ]
+    optimizer = architecture_index.OPTIMIZER_CONTROL_INVARIANTS
+    massive = architecture_index.MASSIVE_UPGRADE_INVARIANTS
+
+    assert tracks["Z"] == "deep_internals_optimizer_control"
+    assert tracks["AA"] == "rare_massive_upgrades_full_stack_step_changes"
+    assert tuple(checkpoint["tracks"]) == ("Z", "AA")
+    assert checkpoint["implementation_claims_require_signed_evidence"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    assert optimizer["framework_default_is_authority"] is False
+    assert optimizer["optimizer_choice_is_versioned_policy"] is True
+    assert optimizer["parameter_class_mapping_is_explicit"] is True
+    assert optimizer["checkpoint_binds_optimizer_state"] is True
+
+    assert massive["microbenchmark_alone_can_promote"] is False
+    assert massive["production_promotion_requires_full_stack_evidence"] is True
+    assert massive["migration_plan_required"] is True
+    assert massive["rollback_plan_required"] is True
+    assert massive["signed_adr_required"] is True
