@@ -2747,6 +2747,14 @@ The P0 cognitive-loop gap closes only when executable tests prove all of the fol
 
 The cross-plane golden journey must then prove that one real request can retrieve evidence, reason, call a governed tool, suspend/resume when required, verify its answer, persist resulting state, and stream the same terminal result to the product without bypassing a canonical plane.
 
+## P0 edge-case acceptance overlay
+
+The canonical W00–W11 edge/historical construction matrix is `machine/ai_p0_edge_case_matrix.json`, explained by `docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md`.
+
+Builders working on W00–W11 must consult the mapped catalog cases before declaring hardening complete. Relevant entries become executable regression/property/fuzz/fault tests, observability checks, recovery drills, or explicit accepted risks. A planned test name in the matrix is a required construction deliverable and is not itself completion evidence.
+
+The matrix deliberately reuses the frozen Volume 000–420 architecture and the existing functional-AI dependency graph. It does not create a parallel runtime or change canonical owners.
+
 ## Fully Functional AI Closure: Detailed Runtime Assembly
 
 The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
