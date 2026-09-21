@@ -7,6 +7,14 @@ Exports:
 - Plane serializers for VectorStore, MAGStore, KnowledgeGraph, matrices
 """
 
+from skeleton.persistence.operation_store import (
+    OperationOutboxEvent,
+    OperationStoreConflict,
+    OperationStoreCorruptionError,
+    OperationStoreError,
+    SQLiteOperationStore,
+    StoredOperation,
+)
 from skeleton.persistence.snapshots import (
     SnapshotStore,
     restore_genesis_state,
@@ -22,6 +30,12 @@ from skeleton.persistence.snapshots import (
 )
 
 __all__ = [
+    "OperationOutboxEvent",
+    "OperationStoreConflict",
+    "OperationStoreCorruptionError",
+    "OperationStoreError",
+    "SQLiteOperationStore",
+    "StoredOperation",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
