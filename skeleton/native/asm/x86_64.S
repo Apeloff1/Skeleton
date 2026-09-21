@@ -391,8 +391,8 @@ skeleton_asm_dot_matrix_f32_avx:
     jne .Lavx_matrix_vec32
 
     vaddps %ymm3, %ymm0, %ymm0
+    vaddps %ymm5, %ymm4, %ymm4
     vaddps %ymm4, %ymm0, %ymm0
-    vaddps %ymm5, %ymm0, %ymm0
 
 .Lavx_matrix_vec8_setup:
     mov %r8, %r12
