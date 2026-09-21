@@ -240,63 +240,85 @@ class RAGService:
         mastery_delta: float = 0.0,
         metadata: Optional[Dict] = None
     ) -> str:
-        """Store a learning session in memory."""
-        collection = self._get_collection("learning_sessions")
-        
+        """Commit a learning session to Mongo, then project it to Chroma."""
+        timestamp = self._utc_now()
         session_id = hashlib.sha256(
-            f"{user_id}:{topic}:{datetime.utcnow().isoformat()}".encode()
+            f"{user_id}:{topic}:{timestamp}".encode()
         ).hexdigest()[:16]
-        
-        full_metadata = {
-            "user_id": user_id,
-            "topic": topic,
-            "duration_minutes": duration_minutes,
-            "mastery_delta": mastery_delta,
-            "timestamp": datetime.utcnow().isoformat(),
-            **(metadata or {})
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[full_metadata],
-            ids=[session_id]
+
+        row = self.state.put_learning_session(
+            session_id=session_id,
+            user_id=user_id,
+            topic=topic,
+            content=content,
+            duration_minutes=duration_minutes,
+            mastery_delta=mastery_delta,
+            timestamp=timestamp,
+            metadata=metadata,
         )
-        
-        return session_id
-    
+        self._project_add(
+            "learning_sessions",
+            document=row["content"],
+            metadata={
+                "session_id": row["session_id"],
+                "user_id": row["user_id"],
+                "topic": row["topic"],
+                "duration_minutes": row["duration_minutes"],
+                "mastery_delta": row["mastery_delta"],
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["session_id"],
+        )
+        return row["session_id"]
+
     def get_user_sessions(
         self,
         user_id: str,
         topic: Optional[str] = None,
         limit: int = 10
     ) -> List[Dict]:
-        """Retrieve user's learning sessions."""
+        """Read canonical learning sessions from Mongo.
+
+        user_id='*' is retained only as a projection-search compatibility path
+        for the legacy generic memory search helper. It is retrieval, not an
+        ownership/authority read.
+        """
+        if user_id != "*":
+            rows = self.state.list_learning_sessions(
+                user_id,
+                topic=topic,
+                limit=limit,
+            )
+            return [
+                {
+                    "content": row["content"],
+                    "metadata": {
+                        "session_id": row["session_id"],
+                        "user_id": row["user_id"],
+                        "topic": row["topic"],
+                        "duration_minutes": row["duration_minutes"],
+                        "mastery_delta": row["mastery_delta"],
+                        "timestamp": row["timestamp"],
+                        "authority": "mongo",
+                        **dict(row.get("metadata") or {}),
+                    },
+                }
+                for row in rows
+            ]
+
         collection = self._get_collection("learning_sessions")
-        
-        where_filter = {"user_id": user_id}
-        if topic:
-            where_filter["topic"] = topic
-        
         results = collection.query(
             query_texts=["learning session"],
             n_results=limit,
-            where=where_filter
         )
-        
         sessions = []
-        if results["documents"]:
+        if results.get("documents"):
             for i, doc in enumerate(results["documents"][0]):
-                sessions.append({
-                    "content": doc,
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {}
-                })
-        
+                meta = results.get("metadatas", [[]])[0][i] or {}
+                sessions.append({"content": doc, "metadata": meta})
         return sessions
-    
-    # =========================================================================
-    # Concepts
-    # =========================================================================
-    
+
     def store_concept(
         self,
         concept_id: str,
