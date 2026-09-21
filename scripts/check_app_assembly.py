@@ -207,6 +207,12 @@ def audit_topology_alignment() -> None:
         expo_name == manifest_name,
         f"frontend display identity drift: expo={expo_name!r} manifest={manifest_name!r}",
     )
+    manifest_version = app.get("version") if isinstance(app, dict) else None
+    expo_version = expo_config.get("version") if isinstance(expo_config, dict) else None
+    check(
+        expo_version == manifest_version,
+        f"frontend application version drift: expo={expo_version!r} manifest={manifest_version!r}",
+    )
 
 
 def audit_no_competing_root_launchers() -> None:
