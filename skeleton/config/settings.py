@@ -67,6 +67,7 @@ class OperationSettings(BaseSettings):
     state_path: str = ":memory:"
     stream_path: str = ":memory:"
     outbox_batch_size: int = Field(default=256, ge=1, le=10_000)
+    outbox_dispatch_interval_s: float = Field(default=0.5, ge=0.05, le=60.0)
     default_deadline_s: float = Field(default=120.0, gt=0.0, le=86_400.0)
 
 
