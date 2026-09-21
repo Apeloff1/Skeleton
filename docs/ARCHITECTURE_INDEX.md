@@ -15,8 +15,9 @@ When documents overlap, resolve them in this order:
 3. **Definitive architecture narrative** — [ARCHITECTURE.md](ARCHITECTURE.md).
 4. **Current construction sequence** — [BUILD_PLAN.md](BUILD_PLAN.md).
 5. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
-6. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-8. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
+7. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+9. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -68,7 +69,7 @@ A round that is not indexed is considered structurally incomplete.
 | Optimizer/training internals | `docs/BUILD_PLAN.md` Track Z | research source catalog | quality/token, stability, memory, communication, checkpoint/replay |
 | Massive upgrade program | `docs/BUILD_PLAN.md` Track AA | research/evidence evolution contract | ablation, full-stack benchmark, failure injection, migration + rollback |
 | Adversarial foundations | `docs/BUILD_PLAN.md` Track AB | `docs/architecture/masterplan-gap-audit.md` | P0 closure, fault injection, recovery, signed evidence |
-| Exotic architecture laboratory | `docs/BUILD_PLAN.md` Track AC | `docs/architecture/research-source-catalog.md` | reproduction, falsification, kill criteria, sandbox, staged graduation |
+| Exotic architecture laboratory | `docs/BUILD_PLAN.md` Track AC | `docs/architecture/exotic-architecture-lab.md` + research source catalog | reproduction, falsification, kill criteria, sandbox, staged graduation |
 | Deployment | deploy/resilience packages | build plan | canary + rollback + observability |
 | Machine organization | `.machine/`, `machine/` | architecture index | deterministic inventory + drift checks |
 
