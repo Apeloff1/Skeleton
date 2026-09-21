@@ -103,14 +103,16 @@ def test_credential_bearing_provider_surfaces_are_declared_and_receipt_gated() -
     ]
 
     assert credential_surfaces
-    assert {
+    credential_owners = {
         surface["owner"]
         for surface in credential_surfaces
-    } >= {
-        "backend/core/ai_provider.py",
-        "skeleton/jeeves/providers.py",
+    }
+    assert credential_owners >= {
+        "skeleton/provider_runtime.py",
         "skeleton/automation/free_model.py",
     }
+    assert "backend/core/ai_provider.py" not in credential_owners
+    assert "skeleton/jeeves/providers.py" not in credential_owners
     assert all(surface["receipt_required"] is True for surface in credential_surfaces)
     assert all((ROOT / surface["owner"]).is_file() for surface in credential_surfaces)
 
@@ -120,8 +122,31 @@ def test_provider_families_have_one_shared_receipt_contract() -> None:
     enforcement = contract["provider_bootstrap"]["runtime_enforcement"]
 
     assert enforcement["loader"] == "skeleton/provider_contract.py"
+    assert enforcement["activation_boundary"] == "skeleton/provider_runtime.py"
+    assert set(enforcement["compatibility_boundaries"]) == {
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py",
+    }
     assert set(enforcement["provider_families"]) == {
         "runtime_model",
         "automation_model",
     }
     assert enforcement["undeclared_provider_policy"] == "deny"
+
+
+def test_model_provider_plane_is_engine_owned() -> None:
+    contract = _contract()
+    provider_plane = next(
+        plane for plane in contract["planes"] if plane["id"] == "model-provider"
+    )
+    openai = next(
+        provider
+        for provider in contract["runtime_model_providers"]
+        if provider["id"] == "openai"
+    )
+
+    assert provider_plane["owner"] == "skeleton/provider_runtime.py"
+    assert "skeleton/provider_runtime.py" in provider_plane["evidence"]
+    assert openai["adapter"] == "skeleton/provider_runtime.py:OpenAIProviderAdapter"
+    assert openai["sync_adapter"] == "skeleton/provider_runtime.py:OpenAISyncProviderAdapter"
+    assert openai["compatibility_facade"] == "backend/core/ai_provider.py"
