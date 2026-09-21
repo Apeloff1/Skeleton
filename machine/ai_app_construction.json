@@ -1684,7 +1684,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Capacity, quota and load-shed primitives exist but provider/token/storage budgets are not yet one admission contract.",
+      "gap": "Request admission, tenant quota reservation, shared live pressure, provider/media lease enforcement and actual provider/media reconciliation now share one contract; remaining work is durable quota persistence, broader non-provider admission, and estimate-vs-actual telemetry across all expensive planes.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -1698,7 +1698,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "deterministic request admission and provider/route integration implemented; tenant quotas, live pressure and actual-usage loop remain"
+      "status_detail": "shared AdmissionRuntime now composes request budgets, tenant quota reservations, concurrency/queue pressure, provider/media leases, failure release and actual token/artifact-byte reconciliation; durable quota persistence, broad tool/storage integration and unified telemetry remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -2603,7 +2603,11 @@
         "backend/core/model_router.py",
         "skeleton/agents/swarm_quota.py",
         "skeleton/intelligence/admission.py",
-        "skeleton/testing/test_cost_admission.py"
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota.py",
+        "skeleton/testing/test_cost_admission.py",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_tenant_quota.py"
       ],
       "objective": "Reject or reroute unaffordable work before expensive allocation.",
       "steps": [
@@ -2629,14 +2633,21 @@
           "token/cost/wall/retry/tool/artifact budget checks",
           "concurrency defer and queue rejection semantics",
           "provider pre-I/O admission",
-          "model route projection from ResourceBudget"
+          "model route projection from ResourceBudget",
+          "tenant quota reservation ledger with idempotent operation binding",
+          "shared live concurrency and queue pressure controller",
+          "admission leases with failure release and completion reconciliation",
+          "provider text usage reconciliation from returned token usage",
+          "image/speech artifact-byte reconciliation",
+          "media provider admission through the shared runtime",
+          "quota exhaustion and shared saturation regression coverage"
         ],
         "remaining": [
-          "tenant quota store/integration",
-          "shared concurrency and queue pressure feed",
-          "actual provider/tool/storage usage accounting",
-          "estimate-vs-actual cost telemetry",
-          "admission at every expensive non-provider action"
+          "durable tenant quota/window persistence and restart recovery",
+          "estimate-vs-actual cost telemetry in the canonical observability plane",
+          "actual tool and storage usage accounting",
+          "admission at every expensive non-provider action",
+          "cross-process/distributed pressure feed for multi-worker deployment"
         ]
       }
     },
