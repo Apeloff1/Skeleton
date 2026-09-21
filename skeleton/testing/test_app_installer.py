@@ -128,7 +128,7 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
         python="3.11",
         checks=(PreloadCheck("host:ready", True, "ready"),),
     )
-    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner: report)
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner, **kwargs: report)
     monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
     monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
     monkeypatch.setattr(
