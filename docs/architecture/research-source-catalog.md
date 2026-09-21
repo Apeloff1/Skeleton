@@ -326,7 +326,97 @@ The catalog should keep expanding in parallel lanes rather than as one unbounded
 - benchmark contamination;
 - formal correctness.
 
-## 15. Promotion rule
+
+## 15. Optimizer internals canon and challenger set
+
+These sources seed Track Z. Inclusion means “must be reproducibly evaluated where relevant,” not “make default.”
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Gupta et al., *Shampoo: Preconditioned Stochastic Tensor Optimization* | arXiv:1802.09568 / ICML 2018 | tensor-structure-aware preconditioning; measure decomposition/preconditioner cost |
+| Dettmers et al., *8-bit Optimizers via Block-wise Quantization* | arXiv:2110.02861 | optimizer-state quantization and memory reduction with stability mechanisms |
+| Chen et al., *Symbolic Discovery of Optimization Algorithms* (Lion) | arXiv:2302.06675 / NeurIPS 2023 | sign-momentum family; lower optimizer state and large-batch behavior |
+| Liu et al., *Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training* | arXiv:2305.14342 | lightweight curvature-aware optimization candidate |
+| Mishchenko & Defazio, *Prodigy: An Expeditiously Adaptive Parameter-Free Learner* | arXiv:2306.06101 / ICML 2024 | learning-rate adaptation / reduced tuning burden candidate |
+| Zhao et al., *GaLore: Memory-Efficient LLM Training by Gradient Low-Rank Projection* | arXiv:2403.03507 | full-parameter training with low-rank gradient projection to reduce optimizer memory |
+| Defazio et al., *The Road Less Scheduled* | arXiv:2405.15682 | schedule-free optimization; removes dependence on a predeclared stop step |
+| Vyas et al., *SOAP: Improving and Stabilizing Shampoo using Adam* | arXiv:2409.11321 | combines Shampoo-style bases with Adam-like moment adaptation |
+| Jordan et al., *Muon: An optimizer for hidden layers in neural networks* | 2024 technical writeup / official implementation | orthogonalized momentum candidate for compatible matrix parameters; evaluate separately from AdamW-managed parameters |
+| Fishman et al., *Scaling FP8 training to trillion-token LLMs* | arXiv:2409.12517 | long-horizon FP8 stability, Smooth-SwiGLU, and FP8 Adam-moment evidence |
+| Peng et al., *FP8-LM: Training FP8 Large Language Models* | arXiv:2310.18313 | FP8 compute, gradients, optimizer state, and distributed communication design |
+
+### Skeleton optimizer rule
+
+No optimizer family becomes constitutional. The permanent architecture is the optimizer **contract, telemetry, checkpoint/migration semantics, parameter-class policy, and promotion gate**.
+
+Required optimizer evidence includes:
+
+- exact parameter classes using each update rule;
+- state bytes/parameter and total checkpoint footprint;
+- quality at equal tokens;
+- quality at equal wall-clock;
+- convergence/stability distribution across seeds;
+- update and gradient diagnostics;
+- sensitivity to batch/sequence/model scale;
+- precision interaction;
+- communication cost;
+- checkpoint/resume fidelity;
+- failure/recovery behavior;
+- downstream task quality;
+- rollback path.
+
+Optimizer results from small proxy models are discovery evidence. They are not sufficient proof for frontier-scale transfer.
+
+## 16. Massive-upgrade source seeds
+
+These sources seed Track AA and should be expanded through ResearchEvidence adapters.
+
+| Work | Identifier | Massive-upgrade question |
+| --- | --- | --- |
+| Gale et al., *MegaBlocks: Efficient Sparse Training with Mixture-of-Experts* | arXiv:2211.15841 | can dropless/block-sparse expert execution improve MoE efficiency without padding/token-drop compromises? |
+| Wang et al., *FP8-LM* | arXiv:2310.18313 | can low-precision training reduce compute/memory/communication at preserved quality? |
+| Jiang et al., *MegaScale: Scaling Large Language Model Training to More Than 10,000 GPUs* | OpenReview:8l8K2ABUDx | full-stack co-design, observability, fault tolerance, and straggler control at extreme scale |
+| Fang & Zhao, *USP: A Unified Sequence Parallelism Approach for Long Context Generative AI* | arXiv:2405.07719 | hybrid sequence-parallel strategies for very long context |
+| Gu et al., *LoongTrain: Efficient Training of Long-Sequence LLMs with Head-Context Parallelism* | arXiv:2406.18485 | 2D head/context parallelism and long-sequence scaling |
+| Wang et al., *DataStates-LLM: Lazy Asynchronous Checkpointing for Large Language Models* | arXiv:2406.10707 | asynchronous checkpoint staging and recovery-point tradeoffs |
+| P/D-Serve authors, *Serving Disaggregated Large Language Model at Scale* | arXiv:2408.08147 | prefill/decode disaggregation, KV transfer, dynamic placement, and scaling |
+| Fishman et al., *Scaling FP8 training to trillion-token LLMs* | arXiv:2409.12517 | long-duration numerical pathologies can differ from short-run FP8 demonstrations |
+| Wang et al., *Optimizing Large Language Model Training Using FP4 Quantization* | arXiv:2501.17116 | experimental FP4 training with mixed-precision/outlier compensation |
+| Yuan et al., *Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention* | arXiv:2502.11089 | end-to-end trainable sparse attention co-designed with hardware |
+
+### Massive-upgrade research rule
+
+A result enters Track AA only if it could materially alter at least one of:
+
+- capability envelope;
+- useful context length;
+- training cost/time;
+- inference cost/latency;
+- memory footprint;
+- cluster scale;
+- operational reliability;
+- architecture-family viability.
+
+A microbenchmark speedup is insufficient. Track AA requires full-path measurement from training or model artifact through serving and failure recovery.
+
+### Negative-evidence obligations for Z / AA
+
+The catalog must intentionally retain cases where:
+
+- optimizer gains disappear after proper tuning of the baseline;
+- memory savings shift cost to communication or checkpointing;
+- low precision passes short runs and fails late;
+- sparse attention loses important long-range behavior;
+- MoE routing collapses or concentrates load;
+- long-context claims fail useful retrieval/aggregation/reasoning tests;
+- distributed speedups vanish on a different interconnect topology;
+- speculative decoding adds overhead under low acceptance or high concurrency;
+- kernel autotuning chooses a numerically invalid fast path;
+- learned optimizer/meta-controller fails under scale or distribution shift.
+
+These negative cases are architecture assets because they narrow unsafe or wasteful promotion regions.
+
+## 17. Promotion rule
 
 The catalog may grow aggressively. Production may not.
 
