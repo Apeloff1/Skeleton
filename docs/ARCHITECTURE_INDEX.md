@@ -369,7 +369,7 @@ Track AD does not create a second research authority. It operationalizes Track Q
 The 2026-09-21 atlas currently defines:
 
 - **FR001–FR114** — scoped research conclusions;
-- **RQ001–RQ010** — unresolved frontier questions;
+- **RQ001–RQ067** — unresolved frontier questions;
 - **SV001–SV055** — verified source/status records;
 - **FD001–FD021** — post-freeze frontier-delta findings;
 - **CX001–CX024** — explicit research contradictions/tensions;
@@ -432,7 +432,7 @@ Planning checkpoint:
 PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 track=AD
 research_conclusions=FR001..FR114
-research_questions=RQ001..RQ010
+research_questions=RQ001..RQ067
 source_verifications=SV001..SV055
 frontier_delta=FD001..FD021
 contradictions=CX001..CX024
