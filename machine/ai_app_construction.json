@@ -5860,7 +5860,8 @@
       "child_execution_blueprint",
       "interactive_steering_contract",
       "ai_safety_policy_blueprint",
-      "ai_response_rendering_contract"
+      "ai_response_rendering_contract",
+      "implementation_handoff"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -8568,5 +8569,11 @@
       "provisional-to-final reconciliation",
       "accessibility"
     ]
+  },
+  "implementation_handoff": {
+    "schema_version": 1,
+    "status": "active",
+    "handoff_version": "1.0.0",
+    "path": "machine/ai_implementation_handoff.json"
   }
 }
