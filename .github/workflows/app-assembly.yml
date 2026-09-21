@@ -9,6 +9,7 @@ on:
       - "skeleton/app/**"
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
+      - "skeleton/testing/test_architecture_map.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -16,7 +17,10 @@ on:
       - "pyproject.toml"
       - ".env.example"
       - "scripts/check_app_assembly.py"
+      - "scripts/check_architecture_map.py"
       - "machine/manifest.json"
+      - "machine/architecture.json"
+      - "docs/ARCHITECTURE_MAP.md"
       - ".github/workflows/app-assembly.yml"
 
 permissions:
@@ -46,6 +50,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Validate architecture contract
+        run: python scripts/check_architecture_map.py
 
       - name: Install focused test runtime
         run: >-
@@ -87,7 +94,10 @@ jobs:
       - name: Run assembly contract tests
         env:
           PYTHONPATH: "."
-        run: python -m pytest -q skeleton/testing/test_app_assembly.py
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_architecture_map.py
+          skeleton/testing/test_app_assembly.py
 
       - name: Validate structural assembly
         env:
