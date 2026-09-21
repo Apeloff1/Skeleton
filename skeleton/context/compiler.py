@@ -54,8 +54,15 @@ class ProviderContextProjection:
     context_id: str
     context_digest: str
     instructions: str
-    messages: tuple[dict[str, str], ...]
+    history: tuple[dict[str, str], ...]
+    prompt: str
     tool_schema_contents: tuple[str, ...]
+
+    @property
+    def messages(self) -> tuple[dict[str, str], ...]:
+        if not self.prompt:
+            return self.history
+        return self.history + ({"role": "user", "content": self.prompt},)
 
 
 def _required_control(segment: ContextSegment) -> bool:
@@ -352,16 +359,41 @@ def project_provider_context(
             f"[{segment.kind.value.upper()}:{segment.source_id}]\n{content}"
         )
 
-    messages: list[dict[str, str]] = []
+    conversation = [
+        segment
+        for segment in envelope.evidence_segments
+        if segment.kind in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
+    ]
+    non_conversation = [
+        segment
+        for segment in envelope.evidence_segments
+        if segment.kind not in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
+    ]
+
+    prompt = ""
+    history: list[dict[str, str]] = []
+    if conversation:
+        last = conversation[-1]
+        prompt_index = len(conversation) - 1 if last.kind is ContextKind.USER_MESSAGE else -1
+        for index, segment in enumerate(conversation):
+            content = _require_content(segment)
+            if index == prompt_index:
+                prompt = content
+                continue
+            history.append(
+                {
+                    "role": (
+                        "user"
+                        if segment.kind is ContextKind.USER_MESSAGE
+                        else "assistant"
+                    ),
+                    "content": content,
+                }
+            )
+
     evidence_blocks: list[str] = []
-    for segment in envelope.evidence_segments:
+    for segment in non_conversation:
         content = _require_content(segment)
-        if segment.kind is ContextKind.USER_MESSAGE:
-            messages.append({"role": "user", "content": content})
-            continue
-        if segment.kind is ContextKind.ASSISTANT_MESSAGE:
-            messages.append({"role": "assistant", "content": content})
-            continue
         evidence_blocks.append(
             "\n".join(
                 (
@@ -375,7 +407,7 @@ def project_provider_context(
             )
         )
     if evidence_blocks:
-        messages.append(
+        history.append(
             {
                 "role": "user",
                 "content": (
@@ -394,7 +426,8 @@ def project_provider_context(
         context_id=envelope.context_id,
         context_digest=envelope.context_digest,
         instructions="\n\n".join(instruction_blocks),
-        messages=tuple(messages),
+        history=tuple(history),
+        prompt=prompt,
         tool_schema_contents=tool_schema_contents,
     )
 
