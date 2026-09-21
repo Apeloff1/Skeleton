@@ -416,7 +416,87 @@ The catalog must intentionally retain cases where:
 
 These negative cases are architecture assets because they narrow unsafe or wasteful promotion regions.
 
-## 17. Promotion rule
+
+## 17. Exotic architecture canon
+
+These sources seed Track AC. They are selected because they challenge one or more default assumptions of current LLM stacks: fixed tokenization, fixed depth, left-to-right decoding, dense activation, conventional weight precision, static inference-time memory, or modality-specific generation.
+
+| Work | Identifier | Exotic architectural question |
+| --- | --- | --- |
+| Behrouz et al., *Titans: Learning to Memorize at Test Time* | arXiv:2501.00663 / NeurIPS 2025 | can a bounded neural memory learn during sequence processing and outperform fixed-state recurrent or attention-only memory? |
+| Behrouz et al., *It's All Connected: A Journey Through Test-Time Memorization, Attentional Bias, Retention, and Online Optimization* (MIRAS) | arXiv:2504.13173 | can sequence architectures be systematically designed as associative memories with explicit retention and online-learning rules? |
+| Pagnoni et al., *Byte Latent Transformer: Patches Scale Better Than Tokens* | arXiv:2412.09871 | can raw-byte dynamic patching remove fixed-vocabulary tokenization while preserving or improving scaling and inference efficiency? |
+| Yu et al., *Discrete Diffusion in Large Language and Multimodal Models: A Survey* | arXiv:2506.13759 | what system contracts change when generation is iterative denoising rather than strictly autoregressive? |
+| Wang et al., *Diffusion LLMs Can Do Faster-Than-AR Inference via Discrete Diffusion Forcing* | arXiv:2508.09192 | can AR/diffusion hybrids exploit parallel generation without losing practical KV/cache efficiency? |
+| Geiping et al., *Scaling up Test-Time Compute with Latent Reasoning: A Recurrent Depth Approach* | arXiv:2502.05171 / NeurIPS 2025 | can test-time compute scale through hidden recurrence instead of longer visible reasoning traces? |
+| Sun et al., *Universal YOCO for Efficient Depth Scaling* | arXiv:2604.01220 | can parameter-shared recursive depth coexist with efficient constant-global-KV architectures? |
+| *Equilibrium Language Models* | OpenReview:lqJT6xmuH3 / ICLR 2026 | can repeated layers be replaced by fixed-point computation with implicit depth? |
+| Raposo et al., *Mixture-of-Depths* | arXiv:2404.02258 | can a model route only selected tokens through expensive depth while keeping aggregate compute predictable? |
+| Ye et al., *Differential Transformer* | arXiv:2410.05258 / MSR-TR-2024-42 | can paired/differential attention suppress irrelevant-context noise and outliers? |
+| Ma et al., *The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits* | arXiv:2402.17764 | can ternary weights define a native train-from-scratch architecture and new hardware regime rather than merely a quantization format? |
+| Ma et al., *BitNet b1.58 2B4T Technical Report* | arXiv:2504.12285 | does native 1.58-bit training remain competitive at multi-trillion-token scale? |
+| Wang et al., *BitNet a4.8* | arXiv:2411.04965 | how far can low-bit activations/KV and sparse computation extend the ternary architecture? |
+| Wang et al., *Q-Sparse: All Large Language Models can be Fully Sparsely-Activated* | arXiv:2407.10969 | can activation sparsity become a general model substrate rather than only expert sparsity? |
+| Zhang et al., *Sparse-BitNet* | 2026 arXiv / Microsoft Research | do native ternary weights and semi-structured sparsity combine unusually well under real kernels? |
+| Sun et al., *You Only Index Once: Cross-Layer Sparse Attention with Shared Routing* | arXiv:2606.06467 | can one sparse routing/index decision be reused across layers to amortize long-context routing cost? |
+| Sun et al., *Multimodal Latent Language Modeling with Next-Token Diffusion* (LatentLM) | arXiv:2412.08635 | can continuous visual/audio/video latents and discrete text share one causal language-model substrate? |
+| Gomez et al., *The Reversible Residual Network* | arXiv:1707.04585 | can exact/reconstructable hidden transformations reduce activation storage enough to justify reversible blocks in modern foundation models? |
+
+### Exotic-source interpretation rule
+
+The research above has very different evidence strength, model scales, hardware assumptions, and maturity. Skeleton must not flatten these into an "exotic SOTA" ranking.
+
+For each candidate record:
+
+- assumption being challenged;
+- implementation maturity;
+- largest credible scale demonstrated;
+- training-token scale;
+- real hardware/kernel support;
+- quality baseline;
+- wall-clock baseline;
+- serving baseline;
+- long-horizon stability;
+- portability;
+- unresolved failure modes;
+- compatibility with Track AB invariants.
+
+### Track AC anti-canon
+
+The following claims are explicitly forbidden without evidence:
+
+- "tokenizer-free" means representation problems disappear;
+- inference-time learning is equivalent to durable trustworthy memory;
+- latent reasoning is inherently safer because it is hidden;
+- diffusion is inherently faster because tokens are predicted in parallel;
+- recurrent depth gives unlimited intelligence by looping longer;
+- fixed-point convergence is guaranteed because a training loss decreased;
+- sparse FLOPs imply real wall-clock or energy savings;
+- 1-bit weights imply the entire runtime is 1-bit;
+- multimodal latent unification preserves provenance automatically;
+- generated adapters or experts are safe because they are small;
+- a world model's prediction is an observation;
+- architecture search can validate its own search objective;
+- two exotic mechanisms that each work independently will compose cleanly.
+
+### Exotic reproduction order
+
+Default reproduction order for Tier E1:
+
+1. token/byte representation microbenchmarks and BLT-style toy scaling;
+2. recurrent-depth and conditional-depth small-model experiments;
+3. test-time neural-memory isolation/replay experiments;
+4. diffusion/AR-hybrid serving prototype with tentative-output semantics;
+5. ternary + sparse-kernel measurement;
+6. differential/sparse attention retrieval and distraction tests;
+7. latent multimodal representation/provenance prototype;
+8. equilibrium/reversible-block numerical tests;
+9. only then compound architectures.
+
+The point is to find **which abstraction actually changes the Pareto frontier**, not to maximize the number of exotic mechanisms in one model.
+
+## 18. Promotion rule
+
 
 The catalog may grow aggressively. Production may not.
 
