@@ -255,7 +255,8 @@ Canonical navigation for this layer:
 - [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion;
 - [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns;
 - [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules;
-- [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md) — current frontier findings, contradictions, source-status audit, research questions, reproduction queue, and September 2026 research delta.
+- [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md) — current frontier findings, contradictions, source-status audit, research questions, reproduction queue, and September 2026 research delta;
+- [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md) — RXP001–RXP035 controlled experiment designs, falsification conditions, evidence outputs, and research-debt targets.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
@@ -301,4 +302,4 @@ For reasoning and agent research, the evaluated object is the complete inference
 
 Monitorability is a measured, versioned property that can drift with model scale, post-training, reasoning method, and monitor capability. It is therefore re-evaluated rather than assumed to improve monotonically with capability.
 
-The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md. Its FR, RQ, SV, and FD identifiers are research/evidence references, not runtime authorities.
+The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md, with executable research designs in docs/architecture/frontier-research-experiment-protocols-2026.md. FR, RQ, SV, FD, CX, RDE, and RXP identifiers are research/evidence references, not runtime authorities.
