@@ -1709,6 +1709,247 @@ Database/search/math/formal/simulation adapters can dramatically reduce free-for
 
 ---
 
+
+## FR115 — Compression is an architecture transformation, not merely a smaller file
+**Status:** ADOPT DESIGN PRINCIPLE
+**Confidence:** high
+
+Pruning, distillation, quantization, low-rank factorization, and architecture surgery can alter optimization, calibration, internal circuits, failure modes, and serving behavior even when headline benchmark scores remain close.
+
+**Skeleton consequence:** compressed artifacts receive new artifact identity and full evaluation, not "same model, smaller."
+
+## FR116 — Structured pruning plus distillation can be far cheaper than training every model size from scratch
+**Status:** FRONTIER
+**Confidence:** medium-high
+
+Minitron-style work shows credible compute savings when deriving smaller family members by pruning and retraining/distillation from a larger model.
+
+**Scope:** evidence is architecture/data/regime specific.
+
+**Skeleton consequence:** model-family construction should compare train-from-scratch against parent-derived compression.
+
+## FR117 — Distillation transfers teacher biases as well as capability
+**Status:** FOUNDATIONAL SYNTHESIS
+**Confidence:** high
+
+A student can inherit calibration errors, style biases, unsafe shortcuts, and blind spots from the teacher.
+
+**Skeleton consequence:** student evaluation includes teacher-correlated error analysis and independent ground-truth checks where possible.
+
+## FR118 — Compression method contributions must be disentangled
+**Status:** ADOPT DESIGN PRINCIPLE
+**Confidence:** high
+
+Pruning + distillation + quantization + architecture search is a compound intervention.
+
+**Skeleton consequence:** factorial/staged ablation is required before attributing gains.
+
+## FR119 — Compression can invalidate interpretability and monitorability evidence
+**Status:** FRONTIER
+**Confidence:** medium-high
+
+Quantization/pruning can change internal feature geometry without obvious aggregate behavioral change.
+
+**Skeleton consequence:** deployed compressed artifacts require revalidated interpretability/monitorability.
+
+## FR120 — Compression value is deployment-specific
+**Status:** FOUNDATIONAL SYSTEMS PRINCIPLE
+**Confidence:** high
+
+Parameter reduction without real kernel/operator support may not reduce latency or energy.
+
+**Skeleton consequence:** report real-device latency, memory, energy, operator coverage, fallback paths, and quality.
+
+## FR121 — Federated learning is not automatically private
+**Status:** FOUNDATIONAL
+**Confidence:** high
+
+Model/gradient/adapter updates and intermediate activations can leak participant data.
+
+**Skeleton consequence:** "data never left device" is not a sufficient privacy claim.
+
+## FR122 — Differential privacy provides formal bounds, but utility and composition matter
+**Status:** FOUNDATIONAL
+**Confidence:** high
+
+Privacy loss composes across repeated releases/rounds and depends on the declared mechanism and accounting assumptions.
+
+**Skeleton consequence:** privacy guarantees are versioned budget objects, not marketing labels.
+
+## FR123 — Split learning can expose raw information through intermediate activations
+**Status:** FRONTIER
+**Confidence:** medium-high
+
+Recent split/federated LLM fine-tuning work explicitly studies input leakage through autoregressive intermediate states.
+
+**Skeleton consequence:** activation transport is treated as sensitive data unless a measured/privacy-bounded transformation proves otherwise.
+
+## FR124 — Secure aggregation solves only a subset of privacy risks
+**Status:** FOUNDATIONAL SYNTHESIS
+**Confidence:** high
+
+Aggregation can hide individual updates from a central observer while leaving endpoint compromise, malicious clients, membership inference, or final-model memorization unresolved.
+
+## FR125 — Privacy budgets are lifecycle resources
+**Status:** FOUNDATIONAL
+**Confidence:** high
+
+Repeated adaptation, analytics, release, and evaluation can consume privacy budget over time.
+
+**Skeleton consequence:** privacy accounting belongs in the same durable control plane as cost/resource budgets.
+
+## FR126 — Privacy-preserving learning must include systems heterogeneity
+**Status:** FRONTIER
+**Confidence:** medium
+
+Edge/federated clients differ in compute, availability, data distribution, connectivity, and trust.
+
+**Skeleton consequence:** privacy methods are evaluated under non-IID data, dropouts, stragglers, adversarial clients, and realistic communication.
+
+## FR127 — Coding-agent diagnosis is easier than reliable patch resolution
+**Status:** FRONTIER
+**Confidence:** medium-high
+
+SWE-Bench 5G reports very high diagnosis rates while end-to-end resolution remains much lower.
+
+**Skeleton consequence:** code-agent evaluation splits localization/diagnosis from patch construction and validated resolution.
+
+## FR128 — Executable repository state is part of a coding-agent benchmark
+**Status:** REPLICATED
+**Confidence:** high
+
+Dependency resolution, builds, tests, environment setup, and service state materially affect whether a patch is valid.
+
+**Skeleton consequence:** static code review scores cannot establish software-engineering capability.
+
+## FR129 — Tests are evidence, not complete specifications
+**Status:** FOUNDATIONAL SOFTWARE PRINCIPLE
+**Confidence:** high
+
+A patch can pass available tests and still violate unstated behavior, security, performance, compatibility, or maintainability constraints.
+
+**Skeleton consequence:** code-agent validation layers tests, static analysis, contracts, diff review, and targeted adversarial cases.
+
+## FR130 — Specification retrieval helps only when the bug depends on specifications
+**Status:** FRONTIER
+**Confidence:** medium
+
+Domain context can improve specification-bound fixes but does not universally solve generic implementation defects.
+
+**Skeleton consequence:** retrieval is conditioned on evidence of domain/spec dependence.
+
+## FR131 — Code-agent success is sensitive to environment determinism
+**Status:** FOUNDATIONAL SYSTEMS PRINCIPLE
+**Confidence:** high
+
+Flaky tests, mutable dependencies, network calls, cached builds, and time-dependent fixtures create false success/failure.
+
+**Skeleton consequence:** coding-agent benchmarks pin environments and record nondeterminism.
+
+## FR132 — Patch quality includes regression surface and rollback
+**Status:** ADOPT DESIGN PRINCIPLE
+**Confidence:** high
+
+A correct local fix can create broader regressions.
+
+**Skeleton consequence:** agent-generated changes carry changed-surface analysis, rollback, and targeted regression suites.
+
+## FR133 — Human trust should be calibrated, not maximized
+**Status:** FOUNDATIONAL HCI PRINCIPLE
+**Confidence:** high
+
+Overtrust and undertrust are both system failures.
+
+**Skeleton consequence:** UI/interaction design communicates capability boundaries, uncertainty, and recovery paths.
+
+## FR134 — Undo, preview, confirmation, and reversible state are safety mechanisms
+**Status:** FOUNDATIONAL HCI PRINCIPLE
+**Confidence:** high
+
+Human oversight is meaningful only when the interface exposes consequential actions before commitment and supports recovery where possible.
+
+## FR135 — Automation bias can convert plausible model errors into human-approved errors
+**Status:** FOUNDATIONAL HUMAN-FACTORS PRINCIPLE
+**Confidence:** high
+
+Repeated model confidence or convenience can reduce independent checking.
+
+**Skeleton consequence:** critical review workflows deliberately surface evidence and disagreement rather than only a recommendation.
+
+## FR136 — Confidence presentation must map to actionable choices
+**Status:** REPLICATED HCI PRINCIPLE
+**Confidence:** high
+
+Displaying a probability without explaining what changes at different confidence levels can mislead rather than calibrate.
+
+**Skeleton consequence:** uncertainty interfaces couple confidence to ask/search/escalate/abstain options.
+
+## FR137 — Operator overload and alarm fatigue are reliability failures
+**Status:** FOUNDATIONAL HUMAN-FACTORS PRINCIPLE
+**Confidence:** high
+
+A monitor that generates too many low-value warnings can reduce real incident detection.
+
+**Skeleton consequence:** alert precision, prioritization, suppression, and recovery workflow are evaluation targets.
+
+## FR138 — Human feedback is non-stationary
+**Status:** FOUNDATIONAL HCI/LEARNING PRINCIPLE
+**Confidence:** high
+
+Preferences, workflows, norms, and operator expertise change.
+
+**Skeleton consequence:** personalization and feedback loops keep timestamp/context and support revision rather than freezing feedback as permanent truth.
+
+## FR139 — Formal counterfactual reasoning remains difficult for LLMs
+**Status:** FRONTIER
+**Confidence:** medium-high
+
+CounterBench reports large weaknesses when counterfactual reasoning must follow explicit formal rules rather than rely on commonsense priors.
+
+**Skeleton consequence:** causal/counterfactual capability gets dedicated evaluation rather than being inferred from general reasoning scores.
+
+## FR140 — Causal claims require intervention assumptions
+**Status:** FOUNDATIONAL
+**Confidence:** high
+
+Observed correlation does not identify causal effect without assumptions/design.
+
+**Skeleton consequence:** research conclusions distinguish observational association, randomized intervention, quasi-experiment, and causal model.
+
+## FR141 — Model explanations are not causal evidence by default
+**Status:** FOUNDATIONAL SYNTHESIS
+**Confidence:** high
+
+A generated rationale may correlate with behavior without being the mechanism producing it.
+
+**Skeleton consequence:** causal process claims require intervention/perturbation evidence.
+
+## FR142 — World-model claims require invariant transition structure
+**Status:** FRONTIER SYNTHESIS
+**Confidence:** medium-high
+
+Success under one encoding/action vocabulary can reflect shortcuts instead of transferable environment dynamics.
+
+**Skeleton consequence:** representation/action remapping and counterfactual transition tests are required.
+
+## FR143 — Causal discovery is vulnerable to hidden confounding and selection bias
+**Status:** FOUNDATIONAL
+**Confidence:** high
+
+Automated pattern discovery cannot identify unique causal graphs from arbitrary observational data without assumptions.
+
+**Skeleton consequence:** causal discovery outputs carry assumptions and equivalence classes, not one unquestioned graph.
+
+## FR144 — Counterfactual testing is a general robustness tool
+**Status:** ADOPT DESIGN PRINCIPLE
+**Confidence:** high
+
+Changing irrelevant attributes, representations, or upstream causes can expose shortcut dependence.
+
+**Skeleton consequence:** counterfactual variants become part of evaluation for world models, retrieval, classifiers, agents, and interpretability.
+
+---
+
 # 22. Cross-domain contradictions and unresolved questions
 
 ## RQ001 — Does more context beat retrieval?
@@ -2141,6 +2382,92 @@ Hidden evals and anti-cheating controls can themselves reduce useful experimenta
 Raw experiment throughput is misleading if review/debug/recompute cost rises proportionally.
 
 **Closure evidence:** total human+compute lifecycle study measuring accepted useful findings per unit cost.
+
+
+### Model compression, distillation, and pruning
+
+## RQ068 — When should a smaller model be trained from scratch versus derived from a larger parent?
+Need equal-lifecycle-cost comparison across pruning, distillation, architecture surgery, and scratch training.
+
+**Closure evidence:** RXP051.
+
+## RQ069 — Which teacher errors survive distillation?
+Need teacher/student correlated-error, calibration, safety, and long-tail analysis.
+
+**Closure evidence:** RXP052.
+
+## RQ070 — Which compression combinations remain interpretable and portable?
+Compound quantization/pruning/distillation can change internal mechanisms and kernel support.
+
+**Closure evidence:** RXP053 plus RXP024/RXP046.
+
+### Privacy-preserving learning and inference
+
+## RQ071 — Which privacy guarantee is required for each data flow?
+Raw data, gradients, activations, adapters, telemetry, memory, and outputs have different leakage surfaces.
+
+**Closure evidence:** RXP054.
+
+## RQ072 — Where is the utility/privacy/communication frontier for federated LLM adaptation?
+Need central, federated, DP, split, and secure-aggregation comparisons.
+
+**Closure evidence:** RXP055.
+
+## RQ073 — How should privacy budgets compose across continual adaptation?
+Repeated updates and releases can silently exhaust a formal privacy guarantee.
+
+**Closure evidence:** RXP056.
+
+### Software-engineering and code agents
+
+## RQ074 — What fraction of coding-agent failure comes from diagnosis, implementation, environment, or validation?
+End-to-end pass/fail obscures the bottleneck.
+
+**Closure evidence:** RXP057.
+
+## RQ075 — How much specification/repository context should a coding agent retrieve?
+Excess context can distract while missing domain specs blocks some fixes.
+
+**Closure evidence:** RXP058.
+
+## RQ076 — What validation stack is sufficient before an agent-generated patch is trusted?
+Tests alone are incomplete.
+
+**Closure evidence:** RXP059.
+
+### Human–AI interaction and operator science
+
+## RQ077 — How should uncertainty be presented to improve decisions rather than merely display confidence?
+Need UI/decision experiments, not calibration metrics alone.
+
+**Closure evidence:** RXP060.
+
+## RQ078 — Where should autonomy stop and confirmation begin?
+The optimal boundary depends on reversibility, stakes, confidence, and operator workload.
+
+**Closure evidence:** staged human-in-the-loop action study.
+
+## RQ079 — How do we measure automation bias and alert fatigue in long-running AI operations?
+Need realistic repeated-exposure studies.
+
+**Closure evidence:** operator-simulation protocol with false alarms and hidden true incidents.
+
+### Causal and counterfactual modeling
+
+## RQ080 — Which causal tasks require explicit symbolic/graph structure?
+General language reasoning may not be sufficient for interventions and counterfactuals.
+
+**Closure evidence:** CounterBench-style formal causal tasks plus structured causal baseline.
+
+## RQ081 — Can world-model transition structure transfer across representational remapping?
+Planning success under one representation is insufficient.
+
+**Closure evidence:** RXP047.
+
+## RQ082 — Which counterfactual interventions best expose shortcut learning?
+Need task-specific interventions that preserve semantics while changing spurious attributes.
+
+**Closure evidence:** counterfactual robustness battery across retrieval, classifiers, agents, and interpretability.
 
 ---
 
