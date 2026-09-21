@@ -23,8 +23,19 @@
         "DEBUG": "false"
       }
     },
-    "default_services": ["mongo", "skeleton", "backend", "frontend"],
-    "full_services": ["mongo", "chroma", "skeleton", "backend", "frontend"]
+    "default_services": [
+      "mongo",
+      "skeleton",
+      "backend",
+      "frontend"
+    ],
+    "full_services": [
+      "mongo",
+      "chroma",
+      "skeleton",
+      "backend",
+      "frontend"
+    ]
   },
   "runtime": {
     "required_env": [
@@ -52,7 +63,10 @@
       "public_url": "http://localhost:3000",
       "health_path": "/",
       "container_port": 3000,
-      "depends_on": ["backend", "skeleton"],
+      "depends_on": [
+        "backend",
+        "skeleton"
+      ],
       "canonical": true
     },
     {
@@ -64,7 +78,9 @@
       "public_url": "http://localhost:8001",
       "health_path": "/api/health",
       "container_port": 8001,
-      "depends_on": ["mongo"],
+      "depends_on": [
+        "mongo"
+      ],
       "canonical": true
     },
     {
@@ -76,7 +92,9 @@
       "public_url": "http://localhost:8010",
       "health_path": "/api/v1/health/live",
       "container_port": 8001,
-      "depends_on": ["mongo"],
+      "depends_on": [
+        "mongo"
+      ],
       "canonical": true
     },
     {
@@ -110,6 +128,14 @@
     "frontend/package.json",
     "frontend/Dockerfile",
     "skeleton/__main__.py",
-    "skeleton/api/server.py"
+    "skeleton/api/server.py",
+    "frontend/app/product.tsx",
+    "frontend/utils/apiBase.ts",
+    "frontend/nginx.conf",
+    "backend/core/product_kernel.py",
+    "backend/core/canonical_product_policy.py",
+    "backend/core/product_control_runtime.py",
+    "backend/routes/product_runtime.py",
+    "scripts/check_app_assembly.py"
   ]
 }
