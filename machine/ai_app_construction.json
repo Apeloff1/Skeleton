@@ -1645,5 +1645,621 @@
       "receipt_required": false,
       "status": "library"
     }
-  ]
+  ],
+  "request_lifecycle": [
+    {
+      "order": 0,
+      "id": "ingress",
+      "owner_plane": "application-api",
+      "input": "HTTP/UI request",
+      "output": "validated request envelope",
+      "failure": "400/413/422 before expensive work"
+    },
+    {
+      "order": 1,
+      "id": "identity-authority",
+      "owner_plane": "identity",
+      "input": "validated request envelope",
+      "output": "principal + tenant + capability decision",
+      "failure": "401/403; no protected state access"
+    },
+    {
+      "order": 2,
+      "id": "admission",
+      "owner_plane": "cost-capacity",
+      "input": "authorized operation",
+      "output": "budget/admission receipt",
+      "failure": "reject/defer before provider/tool allocation"
+    },
+    {
+      "order": 3,
+      "id": "orchestration",
+      "owner_plane": "orchestration",
+      "input": "admitted operation",
+      "output": "task/plan/checkpoint identity",
+      "failure": "durable failed/cancelled state"
+    },
+    {
+      "order": 4,
+      "id": "context",
+      "owner_plane": "prompt-context",
+      "input": "task + authorized evidence requests",
+      "output": "bounded provenance-preserving context envelope",
+      "failure": "degraded context or explicit retrieval failure"
+    },
+    {
+      "order": 5,
+      "id": "routing",
+      "owner_plane": "model-routing",
+      "input": "capability/privacy/cost/latency requirements",
+      "output": "route decision + provider/model plan",
+      "failure": "sanitized no-route decision"
+    },
+    {
+      "order": 6,
+      "id": "provider",
+      "owner_plane": "model-provider",
+      "input": "ProviderRequest + route",
+      "output": "normalized ProviderResponse + receipt",
+      "failure": "bounded retry/fallback or provider_unavailable"
+    },
+    {
+      "order": 7,
+      "id": "verification",
+      "owner_plane": "reasoning-verification",
+      "input": "candidate output + evidence",
+      "output": "verified/qualified result",
+      "failure": "abstain/retry/escalate according to policy"
+    },
+    {
+      "order": 8,
+      "id": "actions",
+      "owner_plane": "tool-runtime",
+      "input": "authorized proposed actions",
+      "output": "tool receipts/results",
+      "failure": "no side effect without explicit authority/idempotency"
+    },
+    {
+      "order": 9,
+      "id": "state-artifacts",
+      "owner_plane": "artifact-files",
+      "input": "results/state mutations",
+      "output": "durable state/artifact references",
+      "failure": "transaction/compensation/retry under lifecycle contract"
+    },
+    {
+      "order": 10,
+      "id": "response-stream",
+      "owner_plane": "streaming-realtime",
+      "input": "operation events/result",
+      "output": "ordered resumable client events",
+      "failure": "reconnect/resume or terminal failure event"
+    },
+    {
+      "order": 11,
+      "id": "telemetry-evaluation",
+      "owner_plane": "observability",
+      "input": "complete trace + receipts",
+      "output": "metrics/evidence/eval hooks",
+      "failure": "critical audit gaps block promotion"
+    }
+  ],
+  "data_classes": [
+    {
+      "id": "public",
+      "rank": 0,
+      "description": "Data safe for unrestricted disclosure.",
+      "provider_transfer": "allowed when purpose-aligned",
+      "logging": "allowed"
+    },
+    {
+      "id": "internal",
+      "rank": 1,
+      "description": "Repository/product internal data with no customer secret content.",
+      "provider_transfer": "allowed only to declared providers for declared purpose",
+      "logging": "sanitized"
+    },
+    {
+      "id": "confidential",
+      "rank": 2,
+      "description": "Tenant/user/business-sensitive data.",
+      "provider_transfer": "policy + tenant + purpose + minimization required",
+      "logging": "metadata only"
+    },
+    {
+      "id": "restricted",
+      "rank": 3,
+      "description": "Secrets, credentials, high-risk private data, or data explicitly prohibited from transfer.",
+      "provider_transfer": "deny unless a dedicated approved contract explicitly overrides",
+      "logging": "never raw"
+    }
+  ],
+  "trust_zones": [
+    {
+      "id": "human-client",
+      "owners": [
+        "frontend"
+      ],
+      "trust": "untrusted input origin",
+      "may_hold_secrets": false,
+      "boundaries": [
+        "application-api"
+      ]
+    },
+    {
+      "id": "application-api",
+      "owners": [
+        "backend"
+      ],
+      "trust": "authenticated but request data remains untrusted",
+      "may_hold_secrets": true,
+      "boundaries": [
+        "human-client",
+        "engine-runtime",
+        "data-plane",
+        "external-provider"
+      ]
+    },
+    {
+      "id": "engine-runtime",
+      "owners": [
+        "skeleton"
+      ],
+      "trust": "trusted code, untrusted task/evidence payloads",
+      "may_hold_secrets": false,
+      "boundaries": [
+        "application-api",
+        "data-plane",
+        "tool-sandbox",
+        "accelerators"
+      ]
+    },
+    {
+      "id": "data-plane",
+      "owners": [
+        "mongo",
+        "chroma",
+        "artifact stores"
+      ],
+      "trust": "durable governed state",
+      "may_hold_secrets": false,
+      "boundaries": [
+        "application-api",
+        "engine-runtime"
+      ]
+    },
+    {
+      "id": "external-provider",
+      "owners": [
+        "declared AI providers"
+      ],
+      "trust": "external processor; output untrusted until normalized/verified",
+      "may_hold_secrets": false,
+      "boundaries": [
+        "application-api"
+      ]
+    },
+    {
+      "id": "tool-sandbox",
+      "owners": [
+        "tool runtime"
+      ],
+      "trust": "least privilege side-effect zone",
+      "may_hold_secrets": "scoped references only",
+      "boundaries": [
+        "engine-runtime",
+        "external systems"
+      ]
+    },
+    {
+      "id": "accelerators",
+      "owners": [
+        "native",
+        "java-accelerators"
+      ],
+      "trust": "optional compute implementation",
+      "may_hold_secrets": false,
+      "boundaries": [
+        "engine-runtime"
+      ]
+    },
+    {
+      "id": "repository-automation",
+      "owners": [
+        "scripts",
+        ".github",
+        "skeleton/automation"
+      ],
+      "trust": "privileged repository control plane",
+      "may_hold_secrets": true,
+      "boundaries": [
+        "GitHub",
+        "declared automation provider"
+      ]
+    }
+  ],
+  "environment_profiles": [
+    {
+      "id": "development",
+      "network": "developer-controlled external access",
+      "secrets": "local secret injection; never committed",
+      "durability": "disposable allowed",
+      "provider_policy": "declared providers only",
+      "release_authority": "none"
+    },
+    {
+      "id": "ci",
+      "network": "minimum required; deterministic tests prefer fakes",
+      "secrets": "scoped CI secrets only",
+      "durability": "ephemeral",
+      "provider_policy": "no live provider required for merge gates",
+      "release_authority": "evidence only"
+    },
+    {
+      "id": "staging",
+      "network": "production-like allowlists",
+      "secrets": "managed secret references",
+      "durability": "production-like rehearsal",
+      "provider_policy": "declared providers + staging budgets",
+      "release_authority": "candidate validation"
+    },
+    {
+      "id": "production",
+      "network": "explicit egress policy",
+      "secrets": "managed least-privilege secret references",
+      "durability": "backup/restore/migrations required",
+      "provider_policy": "declared providers + privacy/cost/SLO admission",
+      "release_authority": "gated promotion + rollback"
+    }
+  ],
+  "canonical_envelopes": {
+    "operation": {
+      "required_fields": [
+        "operation_id",
+        "tenant_id",
+        "actor_id",
+        "capability",
+        "created_at",
+        "deadline",
+        "idempotency_key",
+        "trace_id"
+      ],
+      "owner_plane": "orchestration"
+    },
+    "provider_request": {
+      "required_fields": [
+        "instructions",
+        "prompt",
+        "history",
+        "model",
+        "max_output_tokens"
+      ],
+      "owner_plane": "model-provider"
+    },
+    "route_decision": {
+      "required_fields": [
+        "selected_endpoint",
+        "candidates",
+        "rejected",
+        "budgets",
+        "routed_at"
+      ],
+      "owner_plane": "model-routing"
+    },
+    "evidence": {
+      "required_fields": [
+        "evidence_id",
+        "source",
+        "content_hash",
+        "retrieved_at",
+        "authority",
+        "provenance"
+      ],
+      "owner_plane": "retrieval"
+    },
+    "tool_receipt": {
+      "required_fields": [
+        "tool_id",
+        "operation_id",
+        "authority",
+        "input_hash",
+        "started_at",
+        "completed_at",
+        "status",
+        "result_ref"
+      ],
+      "owner_plane": "tool-runtime"
+    },
+    "artifact": {
+      "required_fields": [
+        "artifact_id",
+        "content_hash",
+        "media_type",
+        "size",
+        "owner",
+        "tenant",
+        "malware_state",
+        "retention_state"
+      ],
+      "owner_plane": "artifact-files"
+    },
+    "stream_event": {
+      "required_fields": [
+        "operation_id",
+        "event_id",
+        "sequence",
+        "type",
+        "timestamp",
+        "payload"
+      ],
+      "owner_plane": "streaming-realtime"
+    },
+    "release_evidence": {
+      "required_fields": [
+        "source_sha",
+        "architecture_tag",
+        "construction_version",
+        "tests",
+        "evaluations",
+        "security",
+        "provenance",
+        "rollback_ref"
+      ],
+      "owner_plane": "deployment-release"
+    }
+  },
+  "release_evidence_bundle": [
+    "architecture validator output",
+    "AI construction validator output",
+    "provider bootstrap validator output",
+    "app assembly validator output",
+    "focused unit/integration test results",
+    "security/dependency/malware/provenance check results",
+    "evaluation summary for model-behavior changes",
+    "migration/preflight evidence when persistence changes",
+    "artifact/SBOM/provenance references",
+    "canary/smoke evidence",
+    "rollback target and trigger criteria"
+  ],
+  "construction_work_packages": [
+    {
+      "id": "WP-P0-PROVIDER-SURFACES",
+      "gap": "gap-provider-surface-convergence",
+      "wave": 1,
+      "owners": [
+        "skeleton/provider_contract.py",
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py",
+        "skeleton/automation/free_model.py"
+      ],
+      "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
+      "steps": [
+        "centralize receipt/digest/declaration logic in skeleton/provider_contract.py",
+        "make backend compatibility loader a re-export",
+        "receipt-gate automation and Jeeves network providers",
+        "inventory every provider-bearing surface and classify it",
+        "deny undeclared providers even when credentials exist",
+        "migrate remaining synchronous Jeeves network transport onto one canonical transport"
+      ],
+      "tests": [
+        "shared receipt parity",
+        "unsafe endpoint denial",
+        "undeclared provider denial",
+        "provider surface inventory",
+        "SDK/shadow-runtime isolation"
+      ],
+      "exit": "no credential-bearing model edge exists outside a declared receipt-governed surface"
+    },
+    {
+      "id": "WP-P0-GOVERNANCE",
+      "gap": "gap-governance-registry",
+      "wave": 1,
+      "owners": [
+        "skeleton/governance",
+        "backend/core/model_router.py",
+        "skeleton/context",
+        "skeleton/memory"
+      ],
+      "objective": "A single enforceable data classification and transfer decision before provider/tool/persistence movement.",
+      "steps": [
+        "define data-class registry",
+        "tag memory/retrieval/artifact/provider payloads",
+        "enforce purpose + tenant + provider privacy ceiling",
+        "implement deletion/export/retention hooks",
+        "emit governance decision receipts"
+      ],
+      "tests": [
+        "restricted provider denial",
+        "cross-tenant denial",
+        "deletion propagation",
+        "export inventory",
+        "retention expiry"
+      ],
+      "exit": "every provider transfer and durable write has a data-class/governance decision"
+    },
+    {
+      "id": "WP-P0-COST-ADMISSION",
+      "gap": "gap-cost-admission",
+      "wave": 1,
+      "owners": [
+        "skeleton/intelligence/capacity_planner.py",
+        "backend/core/model_router.py",
+        "skeleton/agents/swarm_quota.py"
+      ],
+      "objective": "Reject or reroute unaffordable work before expensive allocation.",
+      "steps": [
+        "define request/tenant budgets",
+        "estimate provider/token/tool/storage cost",
+        "admit before orchestration/provider execution",
+        "apply concurrency and queue limits",
+        "record actual-vs-estimated usage"
+      ],
+      "tests": [
+        "budget denial",
+        "budget-aware route",
+        "quota exhaustion",
+        "saturation shedding",
+        "usage telemetry"
+      ],
+      "exit": "all expensive operations carry an admission receipt"
+    },
+    {
+      "id": "WP-P0-STREAM",
+      "gap": "gap-streaming-protocol",
+      "wave": 2,
+      "owners": [
+        "skeleton/frontier/runtime_events.py",
+        "backend",
+        "frontend"
+      ],
+      "objective": "One ordered resumable protocol for long-running AI operations.",
+      "steps": [
+        "version event envelope",
+        "persist/reconstruct replay cursor",
+        "heartbeat and idle timeout",
+        "cancel semantics",
+        "dedupe/out-of-order reducer",
+        "backpressure and slow-client policy",
+        "terminal event rules"
+      ],
+      "tests": [
+        "ordered events",
+        "duplicate event",
+        "out-of-order event",
+        "disconnect resume",
+        "cancel race",
+        "slow client"
+      ],
+      "exit": "frontend can lose transport and resume without duplicating side effects or losing terminal state"
+    },
+    {
+      "id": "WP-P1-PROVIDER-REDUNDANCY",
+      "gap": "gap-provider-redundancy",
+      "wave": 2,
+      "owners": [
+        "backend/core/ai_provider.py",
+        "backend/core/model_router.py"
+      ],
+      "objective": "Meet an explicit availability strategy instead of implicit multi-provider claims.",
+      "steps": [
+        "choose approved second provider or approve single-provider SLO",
+        "declare adapter/capabilities/privacy/network/credentials",
+        "add routing/failover policy",
+        "inject outage/degradation faults",
+        "measure fallback latency/quality/cost"
+      ],
+      "tests": [
+        "declaration gate",
+        "outage failover or single-provider SLO evidence",
+        "quality degradation route",
+        "budget/privacy route"
+      ],
+      "exit": "provider availability objective has executable evidence"
+    },
+    {
+      "id": "WP-P0-GOLDEN-JOURNEYS",
+      "gap": "gap-e2e-golden-journeys",
+      "wave": 3,
+      "owners": [
+        "frontend",
+        "backend",
+        "skeleton",
+        "tests"
+      ],
+      "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
+      "steps": [
+        "prompt-only journey",
+        "retrieval-backed journey",
+        "tool/action journey",
+        "artifact journey",
+        "provider outage journey",
+        "cancel/reconnect journey",
+        "trace continuity assertions"
+      ],
+      "tests": [
+        "browser E2E",
+        "API contract assertions",
+        "trace/receipt assertions",
+        "degraded-mode assertions"
+      ],
+      "exit": "canonical journeys pass against assembled topology"
+    },
+    {
+      "id": "WP-P1-FEEDBACK",
+      "gap": "gap-feedback-promotion",
+      "wave": 4,
+      "owners": [
+        "skeleton/adaptive",
+        "skeleton/experiments",
+        "skeleton/evals"
+      ],
+      "objective": "Separate observation from controlled production behavior changes.",
+      "steps": [
+        "version feedback event",
+        "define consent/purpose",
+        "assign experiments + holdout",
+        "evaluate candidate",
+        "require promotion receipt",
+        "rollback baseline"
+      ],
+      "tests": [
+        "experiment isolation",
+        "eval-required promotion",
+        "rollback",
+        "feedback authorization"
+      ],
+      "exit": "feedback cannot mutate production policy without evaluated promotion"
+    },
+    {
+      "id": "WP-P1-RELEASE-SLO",
+      "gap": "gap-release-slo-loop",
+      "wave": 4,
+      "owners": [
+        "skeleton/deploy",
+        "skeleton/observability",
+        ".github"
+      ],
+      "objective": "Promotion and rollback consume objective SLO evidence.",
+      "steps": [
+        "define canary SLOs",
+        "collect error/latency/provider-quality signals",
+        "evaluate promotion window",
+        "automatic rollback trigger",
+        "operator override receipt",
+        "retain release bundle"
+      ],
+      "tests": [
+        "canary promote",
+        "canary reject",
+        "automatic rollback",
+        "override audit"
+      ],
+      "exit": "release promotion and rollback are evidence-driven and reproducible"
+    }
+  ],
+  "completion_criteria": {
+    "structural_complete": [
+      "all required planes declared and owned",
+      "plane dependency graph acyclic",
+      "all provider families and credential-bearing surfaces declared",
+      "all open gaps scheduled exactly once",
+      "all canonical envelopes and lifecycle stages have owners"
+    ],
+    "sota_complete": [
+      "zero open P0 gaps",
+      "all required acceptance gates green",
+      "golden journeys green",
+      "security/governance/provider boundaries proven",
+      "evaluation and chaos evidence current",
+      "release rollback evidence current"
+    ],
+    "prohibited_shortcuts": [
+      "marking a partial plane present without closure evidence",
+      "adding provider credentials outside declared provider surfaces",
+      "adding a runtime service to avoid an ownership decision",
+      "bypassing authority because the model requested an action",
+      "treating provider/model labels as evidence of actual execution",
+      "weakening a validator to make an undeclared architecture pass"
+    ]
+  }
 }
