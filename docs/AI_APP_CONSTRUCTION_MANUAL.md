@@ -2665,3 +2665,106 @@ A checkpoint is required before and after provider or tool boundaries. Any exter
 The P0 cognitive-loop gap closes only when executable tests prove all of the following: prompt-only completion; single- and multi-tool execution; structured-output validation and bounded repair; tool authority denial; deterministic loop-budget exhaustion; crash/replay without duplicate side effects; approval wait/resume; cancellation races; provider fallback with preserved turn lineage; and a final result receipt that binds trace, route, provider, tool, verification, usage, memory/artifact, and stream evidence.
 
 The cross-plane golden journey must then prove that one real request can retrieve evidence, reason, call a governed tool, suspend/resume when required, verify its answer, persist resulting state, and stream the same terminal result to the product without bypassing a canonical plane.
+
+## Fully Functional AI Closure: Detailed Runtime Assembly
+
+The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
+
+### Concrete module ownership
+
+The implementation extends existing canonical planes; it must not create a second agent framework.
+
+| Concern | Canonical target | Rule |
+| --- | --- | --- |
+| immutable execution contracts | `skeleton/contracts/ai_execution.py` | value contracts only; no provider SDK, HTTP, database, or tool implementation imports |
+| cognitive loop | `skeleton/intelligence/execution_runtime.py` | only owner of repeated model -> tool -> model execution for product operations |
+| durable execution repository | `skeleton/persistence/execution_repository.py` | execution, turns, checkpoints, approval, idempotency, usage, final result |
+| model normalization | `skeleton/provider_runtime.py` | provider-native structured/tool output terminates at this boundary |
+| tool execution | `skeleton/skills` | schema, authority, approval, idempotency, sandbox/resource policy |
+| realtime transport | `backend` | projects committed events; never owns operation truth |
+| product reducer | `frontend` | cursor/dedupe/gap/approval/cancel UX; rebuildable from server authority |
+
+These target files are planned outputs. Until they materialize, the cognitive-loop P0 gap remains open even if individual lower-level primitives already exist.
+
+### Execution substate and turn lineage
+
+`OperationState` remains the user-visible lifecycle authority. The cognitive runtime adds durable substate for loading, context assembly, routing, provider execution, output classification, tool authorization, human wait, tool execution, checkpointing, verification, repair, finalization, degradation, completion, failure and cancellation.
+
+Each model turn has a stable `turn_id`, monotonic `turn_index`, immutable parent lineage, context digest, route/provider identities, tool-call/result references, verification reference, usage delta and checkpoint. Sensitive raw content may remain in governed stores; the turn ledger keeps stable IDs/digests sufficient for replay and explanation.
+
+### Provider output normalization
+
+Normalize model output into final text, structured result, tool calls, mixed text/tool calls, or refusal/abstention. Provider-native tool-call objects never cross the provider boundary. Unknown or duplicate call IDs fail closed.
+
+Structured output is schema-validated. Repair is bounded to syntax/schema failures that remain policy-safe, defaults to at most two repair turns, consumes the same execution budget, and never overrides authority denial, restricted transfer, unknown tools, exhausted budgets, cancellation or expired deadlines.
+
+### Context assembly
+
+Context precedence is fixed: immutable policy; operation objective/user request; durable conversation summary; recent turns; authorized memory; authorized retrieval evidence; authorized artifacts; current execution tool results.
+
+Trust is explicit, not positional. User, retrieval, memory, artifact and tool content remains untrusted evidence. Output and tool-result headroom is reserved before packing. Mandatory policy, authority, stop policy and operation identity are never trimmed. Compaction is derived state and keeps source provenance.
+
+### Tool transaction
+
+Every proposal follows: normalization -> lookup -> argument schema validation -> data classification -> identity/scope authorization -> risk classification -> approval decision -> resource admission -> idempotency reservation -> execution -> durable receipt -> result governance -> next-turn context projection.
+
+Tool manifests declare side-effect behavior as none, intrinsically idempotent, idempotency-key protected, or compensatable. Unknown semantics fail closed. A completed `call_id` reuses the durable prior receipt; an in-progress reservation uses lease/fencing semantics.
+
+Parallel tools are allowed only without ordering dependencies, share one budget, obey `max_parallel_tools`, and join deterministically by proposal order/call ID.
+
+### Human approval
+
+Approval is durable state bound to operation, execution, turn, call, tool, exact arguments digest, risk class, expiry and deciding principal. Edited arguments require a new approval. Resume revalidates identity, policy, budget and deadline. Approval cannot override restricted transfer or missing capability authority.
+
+### Memory writeback
+
+Model text alone never causes durable memory. Eligible writes are explicit user preferences/instructions, verified outcomes, authoritative tool facts, continuity summaries, and user-approved long-term notes.
+
+Every write proposal includes namespace, data class, purpose, provenance, confidence/authority source, retention, dedupe key, and deletion/export behavior. Credentials, unverified speculation, cross-tenant data, provider-private metadata and unauthorized tool output are prohibited.
+
+### Verification ladder
+
+Verification levels are none, structural, evidence, action and high-impact. Policy selects the level; the model does not. Outcomes are `verified`, `qualified`, `abstain`, `repair`, or `block`. High-impact blocks cannot be converted to success by a plain generator retry.
+
+### Finalization transaction
+
+Finalization order is: persist final candidate/verification -> actual usage -> required tool receipts/postconditions -> governed memory writes -> artifact refs -> CAS checkpoint to finalizing -> commit `AIExecutionResult` -> terminal `OperationState` -> terminal operation event -> client acknowledgement.
+
+The target is one transaction where supported; otherwise use transactional outbox or deterministic reconciliation with terminal fencing. A client may never observe `completed` while the canonical `AIExecutionResult` is absent.
+
+### Cancellation and crash recovery
+
+Cancellation can come from user, operator, deadline, policy, budget or shutdown and is checked before each expensive/side-effecting boundary. Committed external side effects remain recorded and may require compensation; cancellation never rewrites history.
+
+| Crash point | Required recovery |
+| --- | --- |
+| before provider dispatch | resume same committed turn |
+| provider outcome unknown | use provider request/idempotency identity where available; otherwise bounded ambiguity policy |
+| provider result before checkpoint | recover receipt or issue a new bounded turn; never duplicate tools |
+| tool reserved before execution | lease/fence and execute once |
+| side effect before receipt commit | reconcile by idempotency key/postcondition; blind replay forbidden |
+| tool receipt committed | reuse receipt/result |
+| waiting for user | reload exact approval/checkpoint and revalidate |
+| finalization interrupted | terminal fence + transaction/outbox reconciliation creates one final result/event |
+
+### Usage and observability
+
+Admission begins with estimates; actual normalized usage is appended after provider/tool/artifact boundaries. Consumed budget is monotonic and unknown usage is explicit rather than zero.
+
+Required spans include `ai.execution`, `ai.context.assemble`, `ai.route`, `ai.provider.turn`, `ai.output.normalize`, `ai.tool.authorize`, `ai.tool.execute`, `ai.checkpoint`, `ai.verify`, `ai.memory.writeback`, `ai.finalize`, and `ai.stream.append`.
+
+### Cognitive state authority
+
+The state topology now reserves authoritative-unbound domains for the cognitive execution/checkpoint ledger, tool idempotency ledger, human approval ledger, execution usage ledger, and final AI result ledger. This deliberately prevents process memory, the browser, or the event stream from silently becoming authority before the production repository is materialized.
+
+### P0 build order
+
+1. Materialize immutable execution contracts and durable repository interfaces.
+2. Extend provider normalization for structured output, tool proposals, usage and finish reason.
+3. Bind tool schemas, authority, approval, resource admission and idempotency.
+4. Implement the bounded cognitive loop plus durable turn/checkpoint state.
+5. Bind verification, memory writeback, actual usage and atomic finalization.
+6. Bind backend realtime transport and frontend reducer/approval/cancel UX.
+7. Run crash injection, duplicate-side-effect protection, reconnect/slow-client tests and cross-plane golden journeys.
+
+The P0 gap remains open until the final stage has executable evidence.
