@@ -336,6 +336,48 @@ RESEARCH_PASS_INVARIANTS = {
 
 RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
 RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
+RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 37))
+FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 11))
+
+RESEARCH_SOURCE_STATUS_STATES = (
+    "accepted_peer_reviewed",
+    "preprint",
+    "submission",
+    "withdrawn",
+    "official_org_evidence",
+    "status_unresolved",
+)
+
+RESEARCH_SOURCE_AUDIT_INVARIANTS = {
+    "source_existence_is_verified": True,
+    "venue_or_submission_status_is_preserved": True,
+    "source_version_and_date_are_preserved": True,
+    "accepted_and_submitted_are_not_equivalent": True,
+    "withdrawn_work_remains_available_as_scoped_evidence": True,
+    "first_party_evidence_is_not_independent_consensus": True,
+    "status_upgrade_is_new_evidence_event": True,
+    "source_claim_scope_is_preserved": True,
+    "research_status_cannot_be_inferred_from_title_or_recency": True,
+}
+
+RESEARCH_AUTOMATION_INVARIANTS = {
+    "research_agent_cannot_mark_own_result_reproduced": True,
+    "research_agent_cannot_read_blind_promotion_answers": True,
+    "research_agent_trajectory_is_auditable": True,
+    "research_agent_generated_training_data_has_provenance": True,
+    "research_agent_experiment_uses_immutable_manifest": True,
+    "scorer_variance_cannot_be_exploited_as_success": True,
+    "research_agent_code_runs_in_sandbox": True,
+    "research_agent_result_requires_independent_recompute_or_review": True,
+}
+
+MONITORABILITY_RESEARCH_INVARIANTS = {
+    "monitorability_is_versioned_measured_property": True,
+    "monitorability_is_not_assumed_monotonic_with_capability": True,
+    "monitorability_is_revalidated_after_training_changes": True,
+    "trajectory_monitoring_does_not_replace_deterministic_authority": True,
+    "learned_detector_ood_generalization_is_not_assumed": True,
+}
 
 
 
@@ -367,6 +409,12 @@ def full_summary() -> Dict[str, Any]:
         "research_pass_invariants": dict(RESEARCH_PASS_INVARIANTS),
         "research_conclusion_ids": list(RESEARCH_CONCLUSION_IDS),
         "research_question_ids": list(RESEARCH_QUESTION_IDS),
+        "research_source_verification_ids": list(RESEARCH_SOURCE_VERIFICATION_IDS),
+        "frontier_delta_ids": list(FRONTIER_DELTA_IDS),
+        "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
+        "research_source_audit_invariants": dict(RESEARCH_SOURCE_AUDIT_INVARIANTS),
+        "research_automation_invariants": dict(RESEARCH_AUTOMATION_INVARIANTS),
+        "monitorability_research_invariants": dict(MONITORABILITY_RESEARCH_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
@@ -394,5 +442,8 @@ def full_summary() -> Dict[str, Any]:
             "Test-time neural memory, byte-latent, diffusion, recurrent-depth, equilibrium, sparse/ternary and latent-multimodal candidate families",
             "Frontier research saturation with scoped conclusions and contradiction tracking",
             "Research reproduction classes, equal-resource normalization, scale-transfer and negative-evidence retention",
+            "Source-status verification with accepted/preprint/submission/withdrawn distinctions",
+            "Versioned monitorability research and trajectory-level agent safety evidence",
+            "Research-agent anti-cheating, independent recomputation, and blind-eval isolation",
         ],
     }
