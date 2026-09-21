@@ -285,6 +285,24 @@ The catalogue **does not create new top-level volumes**. Every entry maps back t
 | `OBSCURE-029` | Hash-based CAS still needs metadata migrations | artifacts | VOL-075, VOL-136, VOL-260 | Immutable bytes can remain interpretable only with schema/codec/version lineage. |
 | `OBSCURE-030` | Reproducibility and repeatability differ | research | VOL-078, VOL-213, VOL-272 | Same setup repeating versus independent recreation are distinct evidence strengths. |
 
+## Criticality and executable evidence classification
+
+The machine catalogue now assigns every entry a `criticality`, `recommended_test_modes`, and `work_package_refs`.
+
+Concrete failure cases can call for one or more of:
+
+- property tests;
+- fuzzing;
+- negative/adversarial tests;
+- fault injection;
+- recovery drills;
+- integration tests;
+- adversarial AI evaluations;
+- platform-specific tests;
+- E2E tests.
+
+Historical entries normally produce design/ADR evidence unless they map to a concrete failure invariant. See `FULL_EDGE_CASE_BUILD_MATRIX.md` for complete W00–W30 ownership.
+
 ## Edge-case promotion rule
 
 When an implementation touches a mapped volume, relevant catalogue entries should be promoted into one or more executable forms:
