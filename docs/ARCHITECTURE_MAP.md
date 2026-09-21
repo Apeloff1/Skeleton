@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v2.6`
+**Architecture tag:** `arch-map/v3.0`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -220,6 +220,10 @@ arch-map/v2.3  explicit SOTA gap register + closure evidence
 arch-map/v2.4  fail-fast CI construction/provider gates
 arch-map/v2.5  provider receipt enforcement at direct I/O + self-describing runtime status
 arch-map/v2.6  current-state gap closure roadmap + universal construction gates
+arch-map/v2.7  legacy backend AI service/provider convergence
+arch-map/v2.8  truthful LLM/game routing through declared provider execution
+arch-map/v2.9  shared provider receipt families + provider surface inventory
+arch-map/v3.0  executable lifecycle/trust/data/work-package construction ledger
 ```
 
 ## 10. Operator commands
@@ -251,7 +255,7 @@ All AI capability construction and provider integration is governed by
 `docs/AI_APP_CONSTRUCTION_MANUAL.md`.
 
 Runtime model providers are not trusted merely because credentials exist.
-`backend/core/provider_architecture.py` must load the active contracts and
+`skeleton/provider_contract.py` must load the active contracts and
 issue a non-secret architecture receipt before `ProviderRegistry` can return an
 active adapter. Undeclared providers fail closed.
 
