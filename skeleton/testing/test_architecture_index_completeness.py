@@ -254,7 +254,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
     assert checkpoint["tracks"] == ("AD",)
     assert checkpoint["research_conclusion_range"] == ("FR001", "FR114")
-    assert checkpoint["research_question_range"] == ("RQ001", "RQ010")
+    assert checkpoint["research_question_range"] == ("RQ001", "RQ067")
     assert checkpoint["source_verification_range"] == ("SV001", "SV055")
     assert checkpoint["frontier_delta_range"] == ("FD001", "FD021")
     assert checkpoint["contradiction_range"] == ("CX001", "CX024")
@@ -264,7 +264,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert checkpoint["research_refresh_required"] is True
 
     assert len(architecture_index.RESEARCH_CONCLUSION_IDS) == 114
-    assert len(architecture_index.RESEARCH_QUESTION_IDS) == 10
+    assert len(architecture_index.RESEARCH_QUESTION_IDS) == 67
     assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 55
     assert len(architecture_index.FRONTIER_DELTA_IDS) == 21
     assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
@@ -403,6 +403,7 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "AD60. Debt retirement and reopening" in plan
     assert "AD65. Research experiment sequencing" in plan
     assert "AD72. Experiment decision-value review" in plan
+    assert "AD81. Domain-resolved question bank" in plan
     assert "FD001–FD021" in plan
 
 
