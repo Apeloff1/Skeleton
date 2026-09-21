@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.5.0",
-  "architecture_tag": "arch-map/v3.5",
+  "architecture_version": "3.6.0",
+  "architecture_tag": "arch-map/v3.6",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -16,7 +16,9 @@
     "provider_contract": "skeleton/provider_contract.py",
     "operation_contract": "skeleton/contracts/operation.py",
     "stream_contract": "skeleton/frontier/operation_stream.py",
-    "stream_store": "skeleton/frontier/operation_stream_store.py"
+    "stream_store": "skeleton/frontier/operation_stream_store.py",
+    "capability_interface_registry": "machine/capability_interfaces.json",
+    "capability_interface_validator": "scripts/check_capability_interfaces.py"
   },
   "objectives": [
     "one product shell",
@@ -36,7 +38,8 @@
     "one engine-owned provider runtime for text, image, speech, and synchronous compatibility execution",
     "application routes contain no provider credentials or direct vendor SDK imports",
     "one canonical operation identity/state machine across API, orchestration, provider, tool, and stream planes",
-    "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure"
+    "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure",
+    "every construction-plane relationship is materialized as an explicit capability interface contract"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -536,7 +539,9 @@
     "durable stream terminal state fences all later writes",
     "runtime dependency edges and acceptance-target edges are distinct relationship classes",
     "model-routing is engine-owned; application routing surfaces are composition or compatibility layers",
-    "release validation of frontend/backend contracts does not create upward engine dependencies"
+    "release validation of frontend/backend contracts does not create upward engine dependencies",
+    "every depends_on and validates relationship has exactly one capability interface registry entry",
+    "capability interface owners, zones, contract surfaces, failure semantics, and status match the canonical planes"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -618,7 +623,8 @@
       "transitional_root_may_not_own_plane": true,
       "composition_roots_may_wire_but_not_redefine_capability_ownership": true,
       "state_class_has_single_authority": true,
-      "acceptance_targets_do_not_create_zone_dependencies": true
+      "acceptance_targets_do_not_create_zone_dependencies": true,
+      "every_plane_relationship_has_interface_registry_entry": true
     },
     "plane_placements": [
       {
