@@ -518,6 +518,25 @@ The machine policy in `machine/ai_master_plan.json` declares the minimum non-emp
 
 A file existing is not “implemented.” A happy-path test is not “verified.” A benchmark win is not “hardened.” A merged PR is not “production.” Each stronger word must carry stronger machine-checkable evidence.
 
+## 24.3 Volume depth passes
+
+The masterplan is no longer allowed to remain uniformly title-level. Depth passes progressively convert frozen volumes into buildable records without falsely claiming implementation.
+
+The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DEPTH_000_040.md`. VOL-000 through VOL-040 now each carry non-empty:
+
+- requirements;
+- capabilities;
+- contracts;
+- implementation paths;
+- tests;
+- evaluations;
+- risks;
+- gaps.
+
+This covers the foundational spine from Plan Constitution through Streaming. The fields may contain planned targets; they are planning depth, not evidence. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
+
+Future depth passes should continue forward from VOL-041 using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+
 ## 25. Scope freeze and future plan evolution
 
 Volume 420 freezes breadth. New discoveries should be inserted as chapters/subchapters under an existing volume. A new top-level volume requires an ADR showing that the requirement cannot be represented cleanly within the frozen domains.
