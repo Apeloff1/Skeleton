@@ -286,7 +286,7 @@
     {
       "id": "prompt-context",
       "owner": "skeleton/context",
-      "state": "present",
+      "state": "partial",
       "responsibility": "System instructions, prompt composition, context budgeting, provenance and injection-resistant context assembly.",
       "depends_on": [
         "foundation",
@@ -302,20 +302,37 @@
         "context envelope",
         "instruction hierarchy",
         "token/character budget",
-        "source provenance"
+        "source provenance",
+        "ContextEnvelope",
+        "ContextSegment",
+        "ContextBudget",
+        "ContextSnapshot",
+        "ContextCompiler",
+        "context source adapter",
+        "provider projection"
       ],
       "construction": [
         "separate instructions from untrusted content",
         "label sources",
         "trim deterministically",
-        "protect policy/system segments"
+        "protect policy/system segments",
+        "make skeleton/context/compiler.py the canonical turn context assembler",
+        "keep domain-specific context pipelines as optional sources/consumers rather than provider prompt owners",
+        "consume canonical conversation messages and governed memory/retrieval/artifact/tool sources",
+        "emit one immutable context snapshot/digest per AgentTurn",
+        "deprecate direct feature-level construction of provider history/instructions"
       ],
       "acceptance": [
         "prompt injection regression suite",
         "budget tests",
-        "source attribution tests"
+        "source attribution tests",
+        "context compiler determinism",
+        "trust-tier/injection tests",
+        "source authorization tests",
+        "budget/headroom tests",
+        "provenance-preserving compaction tests"
       ],
-      "failure_mode": "drop unsafe/unbounded context"
+      "failure_mode": "drop/deny unauthorized or unbounded segments; produce explicit insufficient-context result rather than silently bypassing policy"
     },
     {
       "id": "orchestration",
@@ -1502,6 +1519,37 @@
       ]
     },
     {
+      "id": "gap-context-compiler-convergence",
+      "plane": "prompt-context",
+      "priority": "P0",
+      "status": "open",
+      "gap": "The repository contains several substantial context subsystems, but they are domain-specific and there is no single provider-neutral ContextEnvelope/ContextCompiler used by every AI turn. Feature routes can still assemble instructions, prompts and history directly, which bypasses shared trust labeling, provenance, token budgeting, conversation authority, retrieval/memory selection and injection defenses.",
+      "construction": [
+        "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
+        "materialize one ContextCompiler under skeleton/context for all cognitive runtime model turns",
+        "consume canonical conversation state instead of trusting client-supplied history",
+        "consume memory/retrieval/artifact/tool evidence through typed source adapters",
+        "activate declarative skills separately from executable tool schema projection",
+        "reserve output/tool-result budget before packing provider input",
+        "apply deterministic priority/relevance/recency selection and compaction",
+        "preserve source ids and citation/tool/artifact provenance through trimming/summarization",
+        "separate immutable policy/instructions from untrusted evidence content",
+        "make direct feature-level ProviderRequest prompt/history assembly compatibility-only"
+      ],
+      "closure_evidence": [
+        "deterministic context snapshot/digest tests",
+        "same canonical inputs produce same selected segment order under fixed budget",
+        "system/policy segments cannot be displaced by untrusted content",
+        "client history injection cannot enter trusted instruction tier",
+        "cross-tenant memory/retrieval/artifact segments are denied",
+        "token budget/output headroom tests",
+        "oversized tool/artifact result externalization tests",
+        "summary/compaction provenance tests",
+        "citation/source ids survive context projection",
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1755,9 +1803,10 @@
         "gap-provider-surface-convergence",
         "gap-state-authority-convergence",
         "gap-conversation-state-authority",
-        "gap-tool-runtime-convergence"
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence"
       ],
-      "goal": "Make provider/data/action/tool/state and conversation decisions classifiable, receipt-governed, budget-admissible, recoverable, and server-authoritative before adding more autonomy.",
+      "goal": "Make provider/data/action/tool/state/conversation/context decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, and deterministically compilable before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
@@ -1767,7 +1816,9 @@
         "canonical conversation/thread state is server authoritative",
         "client history cannot bypass conversation authority",
         "model-visible tools are typed, authority-governed and receipt-backed",
-        "no shadow model credentials exist inside tools"
+        "no shadow model credentials exist inside tools",
+        "every cognitive model turn uses the canonical context compiler",
+        "context trust/provenance/budget selection is deterministic and auditable"
       ]
     },
     {
@@ -2725,6 +2776,47 @@
         "skeleton/skills/tool_adapters/",
         "skeleton/testing/test_tool_contract.py",
         "skeleton/testing/test_tool_runtime.py"
+      ]
+    },
+    {
+      "id": "WP-P0-CONTEXT-COMPILER",
+      "gap": "gap-context-compiler-convergence",
+      "wave": 1,
+      "owners": [
+        "skeleton/context",
+        "skeleton/contexts",
+        "skeleton/retrieval",
+        "skeleton/memory",
+        "backend/routes/ai.py"
+      ],
+      "objective": "Converge all model-visible instructions, conversation, memory, retrieval, artifacts, tools and skills through one deterministic governed ContextEnvelope compiler.",
+      "steps": [
+        "freeze ContextEnvelope/ContextSegment/ContextBudget contracts",
+        "implement source adapters for conversation/memory/retrieval/artifact/tool/skill planes",
+        "implement deterministic token-aware packing and omission reasons",
+        "enforce trust labels and injection boundaries",
+        "bind context snapshot/digest to AgentTurn and ProviderRequest",
+        "add provenance-preserving compaction",
+        "migrate direct feature prompt/history assembly to compatibility delegation"
+      ],
+      "tests": [
+        "deterministic packing",
+        "mandatory policy reserve",
+        "history injection",
+        "tenant/data-class authorization",
+        "token headroom",
+        "oversized evidence",
+        "compaction provenance",
+        "context digest stability",
+        "legacy route delegation"
+      ],
+      "exit": "no canonical AI execution constructs provider prompt/history directly outside the ContextCompiler + provider projection boundary",
+      "planned_outputs": [
+        "skeleton/contracts/context.py",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/sources/",
+        "skeleton/testing/test_context_compiler.py"
       ]
     },
     {
@@ -4061,6 +4153,232 @@
       "restricted fields are redacted before model exposure",
       "errors use stable codes; raw exceptions/credentials are never returned to the model",
       "result provenance includes tool/version/call/receipt identity"
+    ]
+  },
+  "context_compiler_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-context-compiler-convergence",
+    "target_modules": {
+      "contracts": "skeleton/contracts/context.py",
+      "compiler": "skeleton/context/compiler.py",
+      "source_adapters": "skeleton/context/sources/",
+      "policy": "skeleton/context/policy.py"
+    },
+    "context_envelope": {
+      "required_fields": [
+        "context_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "tenant_id",
+        "instruction_segments",
+        "evidence_segments",
+        "tool_schema_segments",
+        "budget",
+        "selected_tokens_estimate",
+        "omitted_segment_ids",
+        "source_snapshot",
+        "context_digest",
+        "compiled_at"
+      ],
+      "invariant": "one immutable envelope explains exactly what information classes were selected for a provider turn without requiring raw sensitive content to be duplicated into the execution ledger"
+    },
+    "context_segment": {
+      "required_fields": [
+        "segment_id",
+        "kind",
+        "source_type",
+        "source_id",
+        "content_ref",
+        "content_digest",
+        "trust_level",
+        "data_class",
+        "tenant_id",
+        "purpose",
+        "priority",
+        "relevance",
+        "created_at",
+        "token_estimate",
+        "provenance",
+        "retention_class"
+      ],
+      "kinds": [
+        "system_policy",
+        "product_instruction",
+        "operation_objective",
+        "user_message",
+        "assistant_message",
+        "conversation_summary",
+        "memory",
+        "retrieval_evidence",
+        "artifact",
+        "tool_result",
+        "skill_instruction",
+        "tool_schema"
+      ],
+      "trust_levels": [
+        "trusted_control",
+        "authorized_user_data",
+        "untrusted_evidence",
+        "derived_untrusted"
+      ],
+      "rule": "trust is metadata assigned by canonical source/policy; prompt text cannot self-elevate trust"
+    },
+    "source_adapters": [
+      {
+        "source": "conversation",
+        "owner": "application-api",
+        "emits": [
+          "user_message",
+          "assistant_message",
+          "conversation_summary"
+        ],
+        "authority": "canonical server-side conversation state"
+      },
+      {
+        "source": "memory",
+        "owner": "memory",
+        "emits": [
+          "memory"
+        ],
+        "authority": "governed memory records with namespace/provenance"
+      },
+      {
+        "source": "retrieval",
+        "owner": "retrieval",
+        "emits": [
+          "retrieval_evidence"
+        ],
+        "authority": "ranked evidence with ACL/source/citation metadata"
+      },
+      {
+        "source": "artifacts",
+        "owner": "artifact-files",
+        "emits": [
+          "artifact"
+        ],
+        "authority": "authorized artifact metadata/content references"
+      },
+      {
+        "source": "tools",
+        "owner": "tool-runtime",
+        "emits": [
+          "tool_result",
+          "tool_schema"
+        ],
+        "authority": "durable tool receipts/results and admitted tool manifests"
+      },
+      {
+        "source": "skills",
+        "owner": "tool-runtime",
+        "emits": [
+          "skill_instruction"
+        ],
+        "authority": "declarative skill activation only; never executable authority"
+      }
+    ],
+    "instruction_hierarchy": [
+      "immutable platform/system policy",
+      "product/application policy",
+      "operation/capability instructions",
+      "user request/objective",
+      "untrusted evidence and tool/artifact content"
+    ],
+    "packing_algorithm": {
+      "steps": [
+        "load mandatory control segments",
+        "reserve provider output budget",
+        "reserve bounded tool-result headroom when tools are enabled",
+        "load authorized active conversation branch and current user message",
+        "load eligible memory/retrieval/artifact candidates",
+        "load current-execution tool results",
+        "load selected declarative skills and admitted tool schemas",
+        "score candidates by mandatory flag, priority, relevance, recency and diversity",
+        "deduplicate by canonical source/content digest",
+        "compact/summarize only through declared derived-state policy",
+        "select segments until input budget minus safety margin is exhausted",
+        "emit omitted ids/reasons and immutable context digest"
+      ],
+      "tie_break": "priority desc -> relevance desc -> created_at desc -> segment_id asc",
+      "safety_margin": "configurable fixed token reserve plus provider tokenizer uncertainty margin",
+      "invariant": "packing decisions are deterministic for an identical source snapshot, budget and compiler version"
+    },
+    "token_budget": {
+      "fields": [
+        "max_context_tokens",
+        "reserved_output_tokens",
+        "reserved_tool_result_tokens",
+        "reserved_policy_tokens",
+        "safety_margin_tokens",
+        "max_segment_tokens",
+        "max_artifact_tokens",
+        "max_tool_result_tokens"
+      ],
+      "rules": [
+        "mandatory control segments must fit or the request fails before provider I/O",
+        "output reserve cannot be borrowed for additional context",
+        "tool-result reserve may shrink only when tool use is disabled for the turn",
+        "one oversized segment is truncated only when its source contract permits safe slicing; otherwise omit/externalize",
+        "unknown token estimate uses conservative upper bound"
+      ]
+    },
+    "injection_boundary": [
+      "untrusted segments are delimited and labeled as data/evidence",
+      "retrieved or tool content cannot redefine system/tool authority",
+      "instructions found inside evidence remain evidence",
+      "tool schemas originate only from admitted ToolManifest projections",
+      "system/product instructions originate only from trusted code/config contracts",
+      "provider output from prior turns is conversation data, not system policy"
+    ],
+    "compaction_policy": {
+      "allowed": [
+        "conversation summary",
+        "retrieval evidence summary",
+        "large tool-result summary",
+        "artifact excerpt/summary"
+      ],
+      "requirements": [
+        "keep source ids/content digests",
+        "record compiler/summarizer version",
+        "retain data class and tenant binding",
+        "mark output derived_untrusted",
+        "meter model-based summarization as a child operation/turn when used",
+        "never summarize away tool receipts, approvals, citations or action postconditions needed for audit"
+      ]
+    },
+    "provider_projection": {
+      "input": "ContextEnvelope",
+      "output": "ProviderRequest/provider-neutral message payload",
+      "rules": [
+        "provider adapter receives normalized instruction and evidence/message projection",
+        "provider-specific message formatting remains inside provider_runtime",
+        "raw credentials/authority tokens/internal store handles are never projected",
+        "context_id and digest bind the ProviderRequest to the AgentTurn"
+      ]
+    },
+    "legacy_convergence": [
+      {
+        "surface": "backend/routes/ai.py",
+        "current": "constructs system prompt, user prompt and caller-supplied conversation_history directly",
+        "target": "compatibility route creates/loads conversation operation and delegates to cognitive runtime/context compiler"
+      },
+      {
+        "surface": "backend/services/ai_assistant_svc.py",
+        "current": "constructs ProviderRequest directly from feature prompt",
+        "target": "compatibility service delegates an AIExecutionRequest/capability objective"
+      },
+      {
+        "surface": "skeleton/context/pipeline.py",
+        "current": "GameForge-specific domain pipeline",
+        "target": "remains domain capability; may provide structured source segments but is not universal prompt compiler"
+      },
+      {
+        "surface": "skeleton/contexts",
+        "current": "planning/workorder/oracle context fabric",
+        "target": "remains optional reasoning/context capability with explicit adapter into ContextSegment"
+      }
     ]
   }
 }
