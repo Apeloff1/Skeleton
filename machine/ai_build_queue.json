@@ -40,7 +40,12 @@
         "RAG migration tests"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-STATE-02",
@@ -64,7 +69,12 @@
         "restart recovery"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-STATE-03",
@@ -87,7 +97,12 @@
         "derived-store loss/rebuild"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-GOV-01",
@@ -110,7 +125,15 @@
         "cross-tenant denial"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-GOV-02",
@@ -134,7 +157,15 @@
         "retention expiry"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-GOV-03",
@@ -157,7 +188,15 @@
         "redaction tests"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-COST-01",
@@ -178,7 +217,12 @@
         "reservation race"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-COST-02",
@@ -202,7 +246,12 @@
         "unknown-usage behavior"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-COST-03",
@@ -225,7 +274,12 @@
         "noisy-neighbor fairness"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-PROV-01",
@@ -246,7 +300,12 @@
         "SDK isolation"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-PROV-02",
@@ -272,7 +331,12 @@
         "text/image/speech regression"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S0-PROV-03",
@@ -294,7 +358,12 @@
         "application credential-read isolation"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-CONV-01",
@@ -321,7 +390,14 @@
         "concurrent append"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-CONV-02",
@@ -347,7 +423,14 @@
         "edit/regenerate branching"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-CONV-03",
@@ -373,7 +456,14 @@
         "delete/export"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-MEM-01",
@@ -397,7 +487,14 @@
         "namespace isolation"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-MEM-02",
@@ -423,7 +520,14 @@
         "dedupe/version"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-MEM-03",
@@ -450,7 +554,14 @@
         "delete/export/expiry"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-TOOL-01",
@@ -475,7 +586,13 @@
         "receipt lineage"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-TOOL-02",
@@ -503,7 +620,13 @@
         "network egress/result bounds"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S1-TOOL-03",
@@ -531,7 +654,13 @@
         "compatibility delegation"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-CTX-01",
@@ -559,7 +688,11 @@
         "oversized evidence"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-CTX-02",
@@ -589,7 +722,11 @@
         "policy rollback/digest"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-CTX-03",
@@ -619,7 +756,11 @@
         "prompt injection"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-PROTO-01",
@@ -645,7 +786,12 @@
         "native type isolation"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-PROTO-02",
@@ -674,7 +820,12 @@
         "cancel/deadline"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S2-PROTO-03",
@@ -701,7 +852,12 @@
         "text/media compatibility"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S3-VER-01",
@@ -726,7 +882,13 @@
         "policy level selection"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S3-VER-02",
@@ -755,7 +917,13 @@
         "tool postcondition"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S3-VER-03",
@@ -783,7 +951,13 @@
         "self-confidence non-authority"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S4-EXEC-01",
@@ -814,7 +988,11 @@
         "checkpoint compare-and-set"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S4-EXEC-02",
@@ -848,7 +1026,11 @@
         "budget/deadline/cancel"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S4-EXEC-03",
@@ -882,7 +1064,11 @@
         "full evidence binding"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S5-ENG-01",
@@ -907,7 +1093,14 @@
         "submit idempotency"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S5-ENG-02",
@@ -935,7 +1128,14 @@
         "status/result"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S5-ENG-03",
@@ -964,7 +1164,14 @@
         "cross-service golden trace"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S6-STREAM-01",
@@ -987,7 +1194,13 @@
         "ordered/duplicate/out-of-order reducer tests"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S6-STREAM-02",
@@ -1015,7 +1228,13 @@
         "multi-client cursors"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S6-STREAM-03",
@@ -1043,7 +1262,13 @@
         "terminal finality"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S7-E2E-01",
@@ -1079,7 +1304,22 @@
         "deterministic assembled topology smoke"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S7-E2E-02",
@@ -1116,7 +1356,22 @@
         "trace/receipt assertions"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     },
     {
       "task_id": "AIQ-S7-E2E-03",
@@ -1154,7 +1409,22 @@
         "release evidence completeness"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
-      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix"
     }
   ],
   "queue_invariants": [
@@ -1163,5 +1433,13 @@
     "no task can mark its gap closed directly",
     "gap closure remains controlled by machine/ai_closure_evidence.json",
     "tasks changing canonical contracts must update dependent validators/manual/typed schemas in the same lane"
-  ]
+  ],
+  "acceptance_overlays": {
+    "p0_edge_case_matrix": {
+      "contract": "machine/ai_p0_edge_case_matrix.json",
+      "human": "docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md",
+      "inheritance_rule": "Each task inherits relevant edge/historical obligations from work_package_refs. Non-applicable items require explicit disposition; planned tests are not completion evidence.",
+      "hardening_rule": "A task may implement before all inherited cases close, but its owning capability cannot be hardened/production while high-impact inherited cases lack evidence or accepted-risk disposition."
+    }
+  }
 }
