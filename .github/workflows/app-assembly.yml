@@ -1,23 +1,6 @@
 name: App Assembly
 
 on:
-  push:
-    branches:
-      - integration/app-consolidation
-    paths:
-      - "skeleton/app/**"
-      - "skeleton/__main__.py"
-      - "skeleton/testing/test_app_assembly.py"
-      - "docker-compose.yml"
-      - "docker-compose.hot.yml"
-      - "frontend/**"
-      - "backend/**"
-      - "pyproject.toml"
-      - ".env.example"
-      - "scripts/ci.sh"
-      - "scripts/check_app_assembly.py"
-      - "machine/manifest.json"
-      - ".github/workflows/app-assembly.yml"
   pull_request:
     branches:
       - main
