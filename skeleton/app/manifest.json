@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "app": {
+    "name": "Skeleton",
+    "version": "16",
+    "compose_file": "docker-compose.yml",
+    "default_services": ["mongo", "skeleton", "backend", "frontend"],
+    "full_services": ["mongo", "chroma", "skeleton", "backend", "frontend"]
+  },
+  "runtime": {
+    "required_env": [
+      "MONGO_URL",
+      "SKL_MONGO_URI",
+      "MONGO_INITDB_ROOT_PASSWORD",
+      "JWT_SECRET"
+    ],
+    "optional_env": [
+      "OPENAI_API_KEY",
+      "EMERGENT_LLM_KEY",
+      "STRIPE_API_KEY",
+      "SKELETON_MASTER_SECRET",
+      "GF_SEAL_SECRET"
+    ]
+  },
+  "services": [
+    {
+      "name": "frontend",
+      "role": "human-interface",
+      "path": "frontend",
+      "kind": "expo",
+      "public_url": "http://localhost:3000",
+      "container_port": 3000,
+      "depends_on": ["backend", "skeleton"],
+      "canonical": true
+    },
+    {
+      "name": "backend",
+      "role": "application-api",
+      "path": "backend",
+      "kind": "fastapi",
+      "entrypoint": "server:app",
+      "public_url": "http://localhost:8001",
+      "health_path": "/api/health",
+      "container_port": 8001,
+      "depends_on": ["mongo"],
+      "canonical": true
+    },
+    {
+      "name": "skeleton",
+      "role": "engine-api",
+      "path": "skeleton",
+      "kind": "fastapi",
+      "entrypoint": "skeleton.api.server:create_app",
+      "public_url": "http://localhost:8010",
+      "health_path": "/api/v1/health/live",
+      "container_port": 8001,
+      "depends_on": ["mongo"],
+      "canonical": true
+    },
+    {
+      "name": "mongo",
+      "role": "durable-store",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "container_port": 27017,
+      "depends_on": [],
+      "canonical": true
+    },
+    {
+      "name": "chroma",
+      "role": "vector-store",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "public_url": "http://localhost:8000",
+      "container_port": 8000,
+      "depends_on": [],
+      "canonical": false,
+      "profile": "full"
+    }
+  ],
+  "required_paths": [
+    "pyproject.toml",
+    "docker-compose.yml",
+    "Dockerfile",
+    "backend/server.py",
+    "backend/Dockerfile",
+    "frontend/package.json",
+    "frontend/Dockerfile",
+    "skeleton/__main__.py",
+    "skeleton/api/server.py"
+  ]
+}
