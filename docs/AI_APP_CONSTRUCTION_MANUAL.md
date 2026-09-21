@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.1`
+Architecture tag: `arch-map/v3.2`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.1.0`
+Construction version: `3.2.0`
 
 Architecture contract: `machine/architecture.json`
 
@@ -631,7 +631,7 @@ class construction work, not hidden TODOs.
 
 | Priority | Plane | Gap | Closure evidence |
 | --- | --- | --- | --- |
-| P0 | model-provider | Credential-bearing execution still exists in the transitional synchronous Jeeves provider surface. | shared receipt, undeclared-provider denial, provider-surface inventory, final transport convergence |
+| P0 | model-provider | Provider transport/credentials are structurally centralized; current-head CI still must prove repository-wide discovery and SDK isolation before closure. | shared receipt, text/image/speech convergence, undeclared-provider denial, provider-surface inventory, SDK isolation |
 | P0 | streaming-realtime | One canonical resumable event protocol is not yet proven end-to-end. | protocol contract, disconnect/reconnect, duplicate/out-of-order, frontend recovery |
 | P0 | governance | Data classification and provider-transfer policy are not yet one enforced registry. | transfer denial, deletion propagation, export completeness, retention expiry |
 | P0 | cost-capacity | Provider/token/storage/concurrency budgets are not yet one admission contract. | budget denial, budget-aware routing, saturation, cost telemetry |
@@ -1270,10 +1270,17 @@ Current construction already completed in this lane:
 
 Remaining closure:
 
-- converge synchronous Jeeves external network transport so
-  `skeleton/jeeves/providers.py` no longer owns product provider credentials;
 - retain `LocalEchoProvider` as offline deterministic fallback;
-- prove repository-wide absence of undeclared credential-bearing provider edges.
+- prove on the current head that repository-wide provider discovery reports only
+  the declared credential-bearing owners;
+- prove SDK isolation across backend and engine source;
+- close the gap only after those CI receipts are green.
+
+The canonical runtime now owns text generation, image generation, image
+variation, image editing, and speech synthesis. Application routes and
+`core/expressive_tts.py` consume provider-neutral media contracts and do not
+own runtime-model credentials. Gemini and Grok remain explicit undeclared states
+until their adapters are formally onboarded through the provider protocol.
 
 ### WP-P0-GOVERNANCE
 
