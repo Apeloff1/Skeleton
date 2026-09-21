@@ -27,6 +27,7 @@ from skeleton.intelligence.quota import (
     QuotaExceeded,
     QuotaReservation,
     QuotaUsage,
+    QuotaUsageEvent,
     TenantQuota,
     _finite_nonnegative,
     _quota_excess,
@@ -93,6 +94,29 @@ CREATE TABLE IF NOT EXISTS quota_completions (
     completed_at REAL NOT NULL,
     UNIQUE (tenant_id, operation_id)
 );
+
+
+CREATE TABLE IF NOT EXISTS quota_usage_events (
+    event_id TEXT PRIMARY KEY,
+    reservation_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    window_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    delta_operations INTEGER NOT NULL DEFAULT 0,
+    delta_input_tokens INTEGER NOT NULL DEFAULT 0,
+    delta_output_tokens INTEGER NOT NULL DEFAULT 0,
+    delta_cost_usd REAL NOT NULL DEFAULT 0,
+    delta_tool_calls INTEGER NOT NULL DEFAULT 0,
+    delta_artifact_bytes INTEGER NOT NULL DEFAULT 0,
+    recorded_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_quota_usage_events_reservation
+ON quota_usage_events (reservation_id);
+
+CREATE INDEX IF NOT EXISTS idx_quota_usage_events_tenant
+ON quota_usage_events (tenant_id);
 """
 
 
