@@ -2937,7 +2937,7 @@ Planning checkpoint:
 PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 atlas=docs/architecture/frontier-research-atlas-2026.md
 conclusions=FR001..FR114
-research_questions=RQ001..RQ010
+research_questions=RQ001..RQ067
 source_verifications=SV001..SV046
 frontier_delta=FD001..FD015
 experiment_queue=RA001..RI003
@@ -3533,6 +3533,23 @@ Research ingestion inherits:
 Maintain durable identifiers, version metadata, checksums/references where permitted, and archived provenance so evidence lineage survives disappearing or rewritten URLs.
 
 **Gate:** a mutable live URL alone is insufficient long-term provenance.
+
+### AD81. Domain-resolved question bank — ⬜
+
+Maintain RQ001–RQ067.
+
+The first ten questions remain cross-domain frontier questions; RQ011–RQ067 decompose uncertainty across all nineteen Track AD research domains.
+
+Every question records:
+- current answer/status;
+- unresolved variables;
+- discriminating experiment;
+- closure/falsification condition;
+- affected contracts;
+- relevant RDE debt;
+- refresh trigger.
+
+**Gate:** an implementation choice does not close a research question by convenience.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
