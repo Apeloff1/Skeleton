@@ -569,13 +569,13 @@
       "logical_location": "CORE_DB_NAME.conversation_threads",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-canonical",
+      "status": "authoritative-mongo-binding-added",
       "data_classes": [
         "internal",
         "confidential"
       ],
-      "transaction_scope": "thread identity/owner/status/version update",
-      "consistency": "thread owner/tenant binding and version are authoritative; client caches cannot advance thread state",
+      "transaction_scope": "atomic thread version/sequence/active-branch commit point with recoverable prepared-message intent",
+      "consistency": "thread tenant/owner/status/version and committed message_sequence are authoritative; prepared messages beyond committed sequence are invisible recovery intents; client caches cannot advance state",
       "retention": "governance controlled by thread retention class",
       "backup_restore": "required with backend core application state",
       "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
@@ -584,7 +584,14 @@
       "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
-        "backend/services/database.py"
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/databases.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/tests/test_conversations_api.py",
+        "frontend/src/product/conversationClient.ts"
       ]
     },
     {
@@ -594,13 +601,13 @@
       "logical_location": "CORE_DB_NAME.conversation_messages",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-canonical",
+      "status": "authoritative-mongo-binding-added",
       "data_classes": [
         "internal",
         "confidential"
       ],
-      "transaction_scope": "idempotent exact message append and immutable lineage update",
-      "consistency": "message identity is immutable; branch sequence is monotonic; edit/regenerate creates lineage rather than overwriting canonical history",
+      "transaction_scope": "write-ahead immutable message prepare followed by atomic exact-next thread sequence/version commit; operational commit marker is recoverable",
+      "consistency": "message identity/idempotency are immutable; only messages at or below committed thread sequence are visible; branch sequence is monotonic; edit/regenerate creates lineage rather than overwriting history",
       "retention": "inherits/strengthens thread governance policy; referenced artifacts/memory have independent retention",
       "backup_restore": "required with backend core application state",
       "migration": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
@@ -609,8 +616,16 @@
       "gap": "gap-conversation-state-authority",
       "evidence": [
         "machine/ai_app_construction.json",
-        "backend/services/database.py",
-        "backend/routes/ai.py"
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/gameforge/jeeves/chat_contract.py",
+        "backend/routes/jeeves_compose.py",
+        "backend/tests/test_conversations_api.py",
+        "tests/test_jeeves_chat_workspace.py",
+        "frontend/src/product/conversationClient.ts"
       ]
     },
     {
@@ -776,9 +791,9 @@
       "id": "thread-to-message-authority",
       "from": "conversation-thread-state",
       "to": "conversation-message-state",
-      "mode": "ordered-child-ledger",
-      "rule": "message append authorizes against thread tenant/owner/status and uses thread version or exact-next sequence fencing",
-      "failure": "unauthorized, archived/deleting, stale-version or duplicate-conflict appends fail without mutating canonical history"
+      "mode": "recoverable-write-ahead-exact-next-ledger",
+      "rule": "message append authorizes against thread tenant/owner/status, prepares an immutable idempotent message intent, then atomically advances exact-next thread sequence/version as the commit point; only committed-sequence messages are visible",
+      "failure": "unauthorized, archived/deleting, stale-version or duplicate-conflict appends fail closed; interrupted prepared intents are completed or discarded deterministically before later appends"
     },
     {
       "id": "conversation-to-cognitive-execution",
