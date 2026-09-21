@@ -21,9 +21,10 @@ When documents overlap, resolve them in this order:
 9. **Research saturation accountability** — [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md).
 10. **Historical research lineage** — [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md).
 11. **Research source topology** — [architecture/research-source-topology.md](architecture/research-source-topology.md).
-12. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-13. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-14. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+12. **Research dependency map** — [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md).
+13. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+14. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+15. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
