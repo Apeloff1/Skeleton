@@ -400,7 +400,26 @@ class DataLifecycleRegistry:
                     raise LifecycleConflict(
                         "cannot merge active records into an existing deletion plan"
                     )
-                return self._plans[active_plan_id]
+                existing = self._plans[active_plan_id]
+                outstanding = []
+                by_record = {
+                    entry.record.record_id: entry
+                    for entry in entries
+                }
+                for action in existing.actions:
+                    entry = by_record.get(action.record_id)
+                    if entry is None:
+                        continue
+                    if action.target in entry.acknowledged_targets:
+                        continue
+                    outstanding.append(action)
+                return DeletionPlan(
+                    plan_id=existing.plan_id,
+                    tenant_id=existing.tenant_id,
+                    reason=existing.reason,
+                    actions=tuple(outstanding),
+                    created_at=existing.created_at,
+                )
 
             return self._plan(
                 entries,
