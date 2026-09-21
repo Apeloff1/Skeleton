@@ -90,7 +90,7 @@ class NativeAcceleratorRegistry:
             preflight_provider or AsmVectorAccelerator.preflight
         )
         self._builder = builder or AsmVectorAccelerator.build
-        self._loader = loader or AsmVectorAccelerator
+        self._library_loader = library_loader or AsmVectorAccelerator
         self._library_loader = library_loader or AsmVectorAccelerator
         self._instance: Any | None = None
         self._last_error: str | None = None
