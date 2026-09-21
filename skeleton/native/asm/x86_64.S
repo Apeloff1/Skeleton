@@ -359,19 +359,55 @@ skeleton_asm_dot_matrix_f32_avx:
 
 .Lavx_matrix_row:
     vxorps %ymm0, %ymm0, %ymm0
+    vxorps %ymm3, %ymm3, %ymm3
+    vxorps %ymm4, %ymm4, %ymm4
+    vxorps %ymm5, %ymm5, %ymm5
     mov %rdi, %rsi
+
+    mov %r8, %r12
+    shr $5, %r12
+    je .Lavx_matrix_vec8_setup
+
+.Lavx_matrix_vec32:
+    vmovups 0(%rsi), %ymm1
+    vmulps 0(%r10), %ymm1, %ymm1
+    vaddps %ymm1, %ymm0, %ymm0
+
+    vmovups 32(%rsi), %ymm1
+    vmulps 32(%r10), %ymm1, %ymm1
+    vaddps %ymm1, %ymm3, %ymm3
+
+    vmovups 64(%rsi), %ymm1
+    vmulps 64(%r10), %ymm1, %ymm1
+    vaddps %ymm1, %ymm4, %ymm4
+
+    vmovups 96(%rsi), %ymm1
+    vmulps 96(%r10), %ymm1, %ymm1
+    vaddps %ymm1, %ymm5, %ymm5
+
+    add $128, %rsi
+    add $128, %r10
+    dec %r12
+    jne .Lavx_matrix_vec32
+
+    vaddps %ymm3, %ymm0, %ymm0
+    vaddps %ymm4, %ymm0, %ymm0
+    vaddps %ymm5, %ymm0, %ymm0
+
+.Lavx_matrix_vec8_setup:
     mov %r8, %r12
     shr $3, %r12
+    and $3, %r12
     je .Lavx_matrix_reduce
 
-.Lavx_matrix_vec:
+.Lavx_matrix_vec8:
     vmovups (%rsi), %ymm1
     vmulps (%r10), %ymm1, %ymm1
     vaddps %ymm1, %ymm0, %ymm0
     add $32, %rsi
     add $32, %r10
     dec %r12
-    jne .Lavx_matrix_vec
+    jne .Lavx_matrix_vec8
 
 .Lavx_matrix_reduce:
     vextractf128 $1, %ymm0, %xmm1
