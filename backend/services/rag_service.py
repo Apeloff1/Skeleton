@@ -156,9 +156,10 @@ class RAGService:
         """Initialize all collections."""
         global _collections
         for name in self.COLLECTIONS:
-            _collections[name] = self.client.get_or_create_collection(
-                name=f"jeeves_{name}",
-                metadata={"description": f"Jeeves {name} memory"}
+            full_name = f"jeeves_{name}"
+            _collections[full_name] = self.client.get_or_create_collection(
+                name=full_name,
+                metadata={"description": f"Jeeves {name} projection"}
             )
     
     def _get_collection(self, name: str):
