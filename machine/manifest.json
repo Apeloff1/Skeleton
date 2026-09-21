@@ -13,13 +13,22 @@
     "branch": "integration/app-consolidation",
     "base": "main",
     "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
-    "current_status": "assembly_started"
+    "current_status": "application_contract_active",
+    "pull_request": 1883,
+    "contract": "skeleton/app/manifest.json",
+    "operator": "python -m skeleton app"
   },
   "entrypoints": {
     "tests": "python -m pytest skeleton/testing -v",
     "fallback_tests": "python -m unittest discover skeleton/testing -v",
     "install": "pip install -r requirements.txt",
-    "dev_install": "pip install -r requirements-dev.txt"
+    "dev_install": "pip install -r requirements-dev.txt",
+    "app_status": "python -m skeleton app status",
+    "app_check": "python -m skeleton app check",
+    "app_up": "python -m skeleton app up",
+    "app_hot": "python -m skeleton app up --hot",
+    "app_production": "python -m skeleton app up --production",
+    "app_smoke": "python -m skeleton app smoke"
   },
   "top_level": {
     "skeleton": "application source and domain packages",
@@ -32,7 +41,10 @@
     "skeleton/testing": "test infrastructure",
     "docs": "human and architectural documentation",
     ".github": "CI and repository automation",
-    "machine": "machine-facing architecture and integration metadata"
+    "machine": "machine-facing architecture and integration metadata",
+    "frontend": "canonical Expo/browser product shell and production web ingress",
+    "backend": "application API and governed product control plane",
+    "skeleton/app": "whole-application topology, operator CLI, preflight and readiness"
   },
   "branch_families": {
     "feat": "application capabilities; inspect unique commits and files before integration",
@@ -622,7 +634,11 @@
     "automerge control plane",
     "automerge policy/evidence/ledger/model/stack",
     "automerge CLI and GitHub adapter",
-    "automerge contract checks and tests"
+    "automerge contract checks and tests",
+    "canonical application assembly boundary",
+    "frontend endpoint convergence",
+    "same-origin production ingress",
+    "explicit development/hot/production runtime modes"
   ],
   "machine_rules": [
     "Read this manifest before modifying the repository.",
@@ -632,6 +648,28 @@
     "Integrate behavior and files, not branch names.",
     "Record structural integration decisions here and in machine/README.md.",
     "Do not discard branches with unique commits without reviewing their file-level changes.",
-    "Do not blindly merge non-mergeable integration PRs; reconcile overlapping files first."
-  ]
+    "Do not blindly merge non-mergeable integration PRs; reconcile overlapping files first.",
+    "Use skeleton/app/manifest.json as the canonical runtime topology contract.",
+    "Frontend network clients must resolve application endpoints through frontend/utils/apiBase.ts.",
+    "Normal, first-run, and recovery launch paths must converge on /product.",
+    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based."
+  ],
+  "application_assembly": {
+    "contract": "skeleton/app/manifest.json",
+    "canonical_shell": "/product",
+    "compatibility_shell": "/hub",
+    "backend_api": "/api/*",
+    "engine_api": "/api/v1/*",
+    "frontend_endpoint_resolver": "frontend/utils/apiBase.ts",
+    "production_ingress": "frontend/nginx.conf",
+    "compose": "docker-compose.yml",
+    "hot_overlay": "docker-compose.hot.yml",
+    "audit": "scripts/check_app_assembly.py",
+    "workflow": ".github/workflows/app-assembly.yml",
+    "modes": [
+      "development",
+      "hot",
+      "production"
+    ]
+  }
 }
