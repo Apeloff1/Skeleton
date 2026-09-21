@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.9",
+  "schema_version": "4.0",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -353,6 +353,23 @@
         "Jeeves semantic plane"
       ],
       "note": "existing integration PRs reused; zero-file model-routing remains lineage"
+    },
+    "control_plane_builder_wave": {
+      "revalidated": [
+        "builder plane current-main",
+        "builder repair receipts v1/v2",
+        "durable run checkpoint",
+        "four agent squads",
+        "autonomous supervisor",
+        "backlog reasoning adapter",
+        "builder control plane",
+        "automerge control plane"
+      ],
+      "new_prs": [
+        1873,
+        1874
+      ],
+      "note": "existing integration PRs reused where present; overlapping control-plane changes remain staged"
     }
   },
   "integrated_domains": [
