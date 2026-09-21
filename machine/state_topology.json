@@ -1,0 +1,456 @@
+{
+  "schema_version": 1,
+  "topology_version": "1.0.0",
+  "architecture_tag": "arch-map/v3.7",
+  "status": "active",
+  "title": "Skeleton State Authority and Persistence Topology",
+  "purpose": "Define which physical stores exist, which logical state domains they host, which state is authoritative versus derived/scratch/recovery-only, and the migration/backup/rebuild rules for each.",
+  "architecture_contract": "machine/architecture.json",
+  "construction_contract": "machine/ai_app_construction.json",
+  "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+  "validator": "scripts/check_state_topology.py",
+  "principles": [
+    "storage technology does not define authority",
+    "durable does not imply authoritative",
+    "derived indexes are rebuildable projections and never the only source of canonical state",
+    "scratch state can be discarded without corrupting canonical user or engine state",
+    "authoritative durable state has an explicit migration, backup, restore, retention, and consistency contract",
+    "recovery snapshots are evidence or recovery aids unless explicitly promoted by contract",
+    "one logical state domain has one canonical authority at a time",
+    "mixed-authority stores are transitional and require an explicit open construction gap"
+  ],
+  "physical_stores": [
+    {
+      "id": "mongo",
+      "technology": "MongoDB 7",
+      "runtime_service": "mongo",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "mongo_data",
+        "mongo_config"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "primary-document-store",
+      "network": "internal application network; host binding is loopback-only",
+      "authentication": "required by compose contract",
+      "backup": "required for authoritative databases",
+      "restore": "must be proven before production promotion",
+      "migration": "logical databases have independent migration/rebuild policy",
+      "evidence": [
+        "docker-compose.yml",
+        "backend/core/databases.py",
+        "skeleton/config/settings.py"
+      ]
+    },
+    {
+      "id": "backend-data-volume",
+      "technology": "Docker named volume / filesystem",
+      "runtime_service": "backend",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "backend_data"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "application-local persistent support data; currently includes local Chroma",
+      "network": "not directly network-addressable",
+      "authentication": "process boundary",
+      "backup": "required only for any state not yet migrated to an authoritative document store; target is derived-only",
+      "restore": "rebuild derived indexes from authoritative sources after state-authority convergence",
+      "migration": "remove authoritative product state from local Chroma before treating volume as rebuildable",
+      "evidence": [
+        "docker-compose.yml",
+        "backend/services/rag_service.py"
+      ]
+    },
+    {
+      "id": "chroma-service",
+      "technology": "ChromaDB",
+      "runtime_service": "chroma",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "chroma_data"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "optional vector/retrieval projection",
+      "network": "internal network; host binding loopback-only; optional full profile",
+      "authentication": "no application auth boundary in compose; never public",
+      "backup": "optional when fully derived; rebuild is preferred",
+      "restore": "re-index from authoritative content/memory sources",
+      "migration": "index schema/version changes rebuild projection",
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py"
+      ]
+    },
+    {
+      "id": "operation-stream-sqlite",
+      "technology": "SQLite",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "file-backed-when-configured; in-memory-by-default-reference",
+      "production_role": "transport-neutral durable operation-stream reference/conformance store",
+      "network": "in-process only",
+      "authentication": "inherits owning process authority",
+      "backup": "required only if selected as production operation-event authority",
+      "restore": "reopen database and preserve exact-next sequence, compaction watermark, terminal fence",
+      "migration": "schema migration required before changing durable event/head tables",
+      "evidence": [
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/testing/test_operation_stream_store.py"
+      ]
+    },
+    {
+      "id": "process-memory",
+      "technology": "process memory",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "volatile",
+      "production_role": "cache, working memory, deterministic local index, reference implementation",
+      "network": "in-process only",
+      "authentication": "inherits process",
+      "backup": "forbidden-as-backup-strategy",
+      "restore": "rebuild from authoritative sources or start empty",
+      "migration": "none; data is disposable",
+      "evidence": [
+        "skeleton/memory/vector.py",
+        "skeleton/retrieval/index.py",
+        "skeleton/frontier/operation_stream.py"
+      ]
+    },
+    {
+      "id": "snapshot-files",
+      "technology": "JSON files",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "operator-local-opt-in",
+      "production_role": "manual recovery/debug snapshot aid",
+      "network": "filesystem only",
+      "authentication": "filesystem/process boundary",
+      "backup": "not a substitute for authoritative store backup",
+      "restore": "explicit opt-in restore into memory planes",
+      "migration": "snapshot format compatibility required before durable operational use",
+      "evidence": [
+        "skeleton/persistence/snapshots.py"
+      ]
+    }
+  ],
+  "state_domains": [
+    {
+      "id": "backend-core-app-state",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME / DB_NAME",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "present",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Mongo document/transaction boundary as implemented by domain repositories",
+      "consistency": "primary application state; writes must not be acknowledged as durable if Mongo commit fails",
+      "retention": "domain/governance controlled",
+      "backup_restore": "required",
+      "migration": "migrated production application state",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "backend/core/databases.py",
+        "backend/services/database.py"
+      ]
+    },
+    {
+      "id": "backend-seeded-content",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "CONTENT_DB_NAME = DB_NAME + _content",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "public",
+        "internal"
+      ],
+      "transaction_scope": "collection/document writes",
+      "consistency": "eventual regeneration acceptable; must not be required as sole user-state authority",
+      "retention": "replaceable/regenerable",
+      "backup_restore": "optional; code/seed source is authority",
+      "migration": "skip application-state migration and rebuild from reviewed seed/content sources",
+      "derived_from": [
+        "repository seed/content definitions"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "id": "backend-swarm-scratch",
+      "owner_plane": "jobs-durability",
+      "physical_store": "mongo",
+      "logical_location": "SWARM_DB_NAME = DB_NAME + _swarm",
+      "authority": "scratch",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "internal"
+      ],
+      "transaction_scope": "worker/agent scratch collections",
+      "consistency": "loss may cancel/recompute work but must not corrupt canonical app state",
+      "retention": "bounded/evictable target",
+      "backup_restore": "not required for canonical recovery",
+      "migration": "skip canonical app migration; rebuild/recompute",
+      "derived_from": [
+        "jobs/orchestration inputs"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "id": "engine-mongo-state",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "SKL_MONGO_DATABASE / skeleton",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "declared-partial",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "engine repository/document boundary",
+      "consistency": "engine durable writes require Mongo acknowledgement",
+      "retention": "governance controlled",
+      "backup_restore": "required before relying on engine Mongo state in production",
+      "migration": "explicit engine schema/repository migrations",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py"
+      ]
+    },
+    {
+      "id": "backend-rag-local-chroma",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "CHROMA_PERSIST_DIR=/app/data/chroma",
+      "authority": "mixed-transitional",
+      "source_of_truth": false,
+      "status": "transitional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Chroma collection operation",
+      "consistency": "retrieval projections may be rebuilt; authoritative user progress/feedback must migrate to canonical document state",
+      "retention": "mixed legacy; convergence required",
+      "backup_restore": "temporarily preserve until authoritative records are migrated; target rebuildable-only",
+      "migration": "move user_progress, feedback, session ownership and other canonical product records to Mongo; retain Chroma embeddings/projections only",
+      "derived_from": [
+        "backend-core-app-state",
+        "backend-seeded-content"
+      ],
+      "rebuildable": false,
+      "gap": "gap-state-authority-convergence",
+      "evidence": [
+        "backend/services/rag_service.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "id": "optional-vector-index",
+      "owner_plane": "retrieval",
+      "physical_store": "chroma-service",
+      "logical_location": "SKL_CHROMA_HOST/SKL_CHROMA_PORT; skeleton_memory collection by default",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present-optional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "vector collection operation",
+      "consistency": "eventually consistent projection; absence must degrade retrieval, not canonical state",
+      "retention": "rebuildable projection",
+      "backup_restore": "rebuild preferred",
+      "migration": "re-index from authoritative sources",
+      "derived_from": [
+        "engine-mongo-state",
+        "backend-core-app-state",
+        "backend-seeded-content"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py"
+      ]
+    },
+    {
+      "id": "operation-event-stream",
+      "owner_plane": "streaming-realtime",
+      "physical_store": "operation-stream-sqlite",
+      "logical_location": "SQLite namespace operation_stream",
+      "authority": "conditional-authoritative",
+      "source_of_truth": true,
+      "status": "reference",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "BEGIN IMMEDIATE append/head/compaction transaction",
+      "consistency": "exact-next monotonic sequence; duplicate identity conflict rejection; terminal finality",
+      "retention": "compaction-watermark controlled",
+      "backup_restore": "required if selected as production stream authority; otherwise conformance/reference only",
+      "migration": "schema migration + protocol conformance required",
+      "derived_from": [
+        "canonical operation state transitions"
+      ],
+      "rebuildable": false,
+      "evidence": [
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/frontier/operation_stream.py"
+      ]
+    },
+    {
+      "id": "in-process-retrieval-memory",
+      "owner_plane": "retrieval",
+      "physical_store": "process-memory",
+      "logical_location": "InvertedIndex / VectorStore / reference event log",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single-process object mutation",
+      "consistency": "best-effort local projection/cache",
+      "retention": "process lifetime",
+      "backup_restore": "none",
+      "migration": "rebuild after restart",
+      "derived_from": [
+        "backend-core-app-state",
+        "backend-seeded-content",
+        "engine-mongo-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/retrieval/index.py",
+        "skeleton/memory/vector.py",
+        "skeleton/frontier/operation_stream.py"
+      ]
+    },
+    {
+      "id": "manual-memory-snapshots",
+      "owner_plane": "data-persistence",
+      "physical_store": "snapshot-files",
+      "logical_location": ".skeleton/snapshots/*.json",
+      "authority": "recovery-aid",
+      "source_of_truth": false,
+      "status": "present-optional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single snapshot file write",
+      "consistency": "point-in-time best-effort capture of selected in-memory planes",
+      "retention": "operator controlled",
+      "backup_restore": "debug/manual recovery only",
+      "migration": "format compatibility required for restore",
+      "derived_from": [
+        "in-process-retrieval-memory"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/persistence/snapshots.py"
+      ]
+    }
+  ],
+  "state_flows": [
+    {
+      "id": "core-to-rag-projection",
+      "from": "backend-core-app-state",
+      "to": "backend-rag-local-chroma",
+      "mode": "projection",
+      "rule": "after convergence, Chroma receives indexable/minimized projection only; canonical writes commit to Mongo first",
+      "failure": "projection failure degrades retrieval but does not roll back already-committed canonical state"
+    },
+    {
+      "id": "content-to-rag-projection",
+      "from": "backend-seeded-content",
+      "to": "backend-rag-local-chroma",
+      "mode": "projection",
+      "rule": "seed/content data may be re-indexed at any time",
+      "failure": "rebuild projection"
+    },
+    {
+      "id": "authoritative-to-vector-service",
+      "from": "backend-core-app-state",
+      "to": "optional-vector-index",
+      "mode": "projection",
+      "rule": "vector service stores retrievable projection with provenance/ACL metadata",
+      "failure": "degrade retrieval; never mutate canonical source to match index"
+    },
+    {
+      "id": "engine-to-vector-service",
+      "from": "engine-mongo-state",
+      "to": "optional-vector-index",
+      "mode": "projection",
+      "rule": "engine vector index is derived from governed engine memory/content",
+      "failure": "re-index"
+    },
+    {
+      "id": "operation-to-event-stream",
+      "from": "engine-mongo-state",
+      "to": "operation-event-stream",
+      "mode": "event-log",
+      "rule": "stream events reflect canonical operation transitions; stream terminal state must agree with operation terminal state",
+      "failure": "do not report resumable durable completion without committed event/state semantics"
+    },
+    {
+      "id": "authoritative-to-in-memory",
+      "from": "backend-core-app-state",
+      "to": "in-process-retrieval-memory",
+      "mode": "cache-projection",
+      "rule": "process-local indexes/caches are discardable",
+      "failure": "rebuild/empty cache"
+    },
+    {
+      "id": "memory-to-snapshot",
+      "from": "in-process-retrieval-memory",
+      "to": "manual-memory-snapshots",
+      "mode": "manual-snapshot",
+      "rule": "snapshot is an explicit operator aid and never silently promoted to production authority",
+      "failure": "ignore/repair snapshot; authoritative state remains elsewhere"
+    }
+  ],
+  "recovery_order": [
+    "restore/authenticate Mongo physical service",
+    "restore backend-core-app-state and any materialized engine authoritative state",
+    "verify schema/index/migration compatibility",
+    "restore or reconstruct canonical operation state",
+    "restore operation-event-stream only when it is configured as production authority",
+    "regenerate backend-seeded-content and swarm scratch as needed",
+    "rebuild Chroma/vector and process-memory projections from authoritative sources",
+    "treat snapshot files as optional recovery aids only",
+    "run consistency/reconciliation checks before readiness",
+    "enable traffic only after authoritative stores are healthy and derived-store lag is within declared tolerance"
+  ],
+  "invariants": [
+    "authoritative and conditional-authoritative domains never use process-memory as their physical store",
+    "derived domains declare at least one upstream source and are rebuildable",
+    "scratch domains are never source_of_truth",
+    "mixed-transitional domains reference an open construction gap",
+    "authoritative durable domains require backup_restore and migration semantics",
+    "Chroma and in-process indexes are not the sole authority for canonical user, tenant, operation, or governance state",
+    "content and swarm logical databases are not included in canonical user-state migration merely because they share Mongo",
+    "operation-stream storage cannot claim production durability when running in-memory",
+    "snapshot-files never replace canonical backup/restore"
+  ]
+}
