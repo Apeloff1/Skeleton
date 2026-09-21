@@ -16,8 +16,6 @@ Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`,
 
 Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.
 
-No retroactive sign-offs were invented when this ledger was introduced; existing items begin unchecked until real evidence and signatures are recorded.
-
 ## Lifecycle
 
 ```text
@@ -458,7 +456,7 @@ No retroactive sign-offs were invented when this ledger was introduced; existing
 
 ## Work Packages W00–W30
 
-- [ ] `ACC-WP-W00` — WP-W00 Architecture Authority — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W00` — WP-W00 Architecture Authority — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W01` — WP-W01 Contract Primitives — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W02` — WP-W02 Kernel & Lifecycle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W03` — WP-W03 Durable State — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -495,7 +493,7 @@ No retroactive sign-offs were invented when this ledger was introduced; existing
 - [ ] `ACC-AIQ-S0-STATE-01` — AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-STATE-02` — AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-STATE-03` — AIQ-S0-STATE-03 Prove authoritative restore first and derived index/cache rebuild second. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-03` — AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
