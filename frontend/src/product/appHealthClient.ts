@@ -127,7 +127,9 @@ export async function probeAppHealth(
   ]);
 
   return {
-    ok: services.every((service) => service.ok),
+    // Direct probes are diagnostic fallback only. They cannot verify private
+    // state services, so the whole-application verdict remains fail-closed.
+    ok: false,
     checkedAt: Date.now(),
     services,
     application: bootstrap?.application ?? null,
