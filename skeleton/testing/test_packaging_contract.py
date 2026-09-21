@@ -16,6 +16,19 @@ def test_legacy_setup_entrypoint_matches_canonical_pyproject() -> None:
     assert f"skeleton-dev = {canonical}" in setup_cfg
 
 
+def test_native_assembly_sources_and_header_are_package_data() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    package_data = pyproject["tool"]["setuptools"]["package-data"]["skeleton.native"]
+    setup_cfg = (ROOT / "setup.cfg").read_text(encoding="utf-8")
+
+    assert "asm/*.S" in package_data
+    assert "asm/*.h" in package_data
+    assert "asm/*.md" in package_data
+    assert "skeleton.native =" in setup_cfg
+    assert "asm/*.S" in setup_cfg
+    assert "asm/*.h" in setup_cfg
+
+
 def test_runtime_image_excludes_development_payload() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
