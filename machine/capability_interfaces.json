@@ -59,7 +59,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "acceptance_target:deployment-release->engine-api",
@@ -164,7 +164,7 @@
         "hash integrity",
         "access expiry"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->identity",
@@ -199,7 +199,7 @@
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->memory",
@@ -236,7 +236,7 @@
         "replay",
         "corruption recovery"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->model-provider",
@@ -349,7 +349,7 @@
         "approval suspend/resume tests",
         "final result evidence-binding tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->retrieval",
@@ -387,7 +387,7 @@
         "ACL leakage tests",
         "freshness invalidation"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:artifact-files->data-persistence",
@@ -1044,7 +1044,7 @@
         "approval suspend/resume tests",
         "final result evidence-binding tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:engine-api->retrieval",
@@ -1847,7 +1847,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:operator-control->deployment-release",
@@ -1985,7 +1985,7 @@
         "serialization compatibility",
         "no heavy imports in skeleton/__init__.py"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:orchestration->memory",
@@ -2024,7 +2024,7 @@
         "replay",
         "corruption recovery"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:orchestration->model-routing",
@@ -2062,7 +2062,7 @@
         "cost/latency budget tests",
         "deterministic tie-break tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:orchestration->prompt-context",
@@ -2204,7 +2204,7 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:product-experience->engine-api",
