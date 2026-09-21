@@ -34,6 +34,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_saturation_checklist"] == "docs/architecture/research-saturation-checklist-2026.md"
     assert documents["research_historical_lineage"] == "docs/architecture/research-historical-lineage.md"
     assert documents["research_source_topology"] == "docs/architecture/research-source-topology.md"
+    assert documents["research_dependency_map"] == "docs/architecture/research-dependency-map-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -470,3 +471,30 @@ def test_historical_lineage_and_source_topology_are_complete() -> None:
 
     assert "AD73. Historical cross-discipline lineage gate" in plan
     assert "AD80. Source disappearance and archival resilience" in plan
+
+
+def test_research_dependency_map_exposes_blocking_edges() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-DEPENDENCY-MAP"
+    ]
+    assert checkpoint["domain_count"] == 19
+    assert checkpoint["research_question_range"] == ("RQ001", "RQ067")
+    assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
+    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP050")
+    assert checkpoint["historical_lineage_range"] == ("HL001", "HL110")
+    assert checkpoint["source_family_range"] == ("RS001", "RS055")
+    assert checkpoint["blocking_edges_must_be_explicit"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    root = Path(__file__).resolve().parents[2]
+    dependency_map = (
+        root / "docs" / "architecture" / "research-dependency-map-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+
+    assert "RQ -> RDE -> RXP" in dependency_map
+    assert "Critical research path" in dependency_map
+    assert "Promotion-blocker matrix" in dependency_map
+    assert "AD83. Research dependency graph" in plan
