@@ -117,6 +117,7 @@ async def test_terminal_sse_replay_emits_canonical_events_and_closes(
     response = await route.operation_events(
         _Request(),
         operation.operation_id,
+        consumer_id="route-client",
         after_sequence=0,
         user={"tenant_id": "tenant-a", "role": "viewer"},
     )
@@ -148,6 +149,7 @@ def test_json_replay_returns_resume_metadata(
 
     payload = route.operation_event_replay(
         operation.operation_id,
+        consumer_id="route-client",
         after_sequence=0,
         limit=250,
         user={"tenant_id": "tenant-a", "role": "viewer"},
@@ -183,6 +185,7 @@ def test_json_replay_maps_compaction_gap_to_resync_conflict(
     with pytest.raises(Exception) as caught:
         route.operation_event_replay(
             operation.operation_id,
+            consumer_id="route-client",
             after_sequence=0,
             limit=250,
             user={"tenant_id": "tenant-a", "role": "viewer"},
@@ -191,6 +194,71 @@ def test_json_replay_maps_compaction_gap_to_resync_conflict(
     assert getattr(caught.value, "status_code", None) == 409
     detail = getattr(caught.value, "detail", {})
     assert detail == {"error": "replay_gap", "resync_required": True}
+
+    operations.close()
+    events.close()
+
+
+def test_route_acknowledges_applied_client_cursor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    operations.create(operation, now=BASE_TIME)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    replay = route.operation_event_replay(
+        operation.operation_id,
+        consumer_id="route-client",
+        after_sequence=0,
+        limit=250,
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+    assert replay["latest_sequence"] == 1
+
+    acknowledged = route.acknowledge_operation_events(
+        operation.operation_id,
+        route.OperationAckRequest(
+            consumer_id="route-client",
+            sequence=1,
+        ),
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    assert acknowledged["ok"] is True
+    assert acknowledged["consumer"]["acknowledged_through"] == 1
+    assert events.safe_compaction_sequence(operation.operation_id) == 1
+
+    operations.close()
+    events.close()
+
+
+def test_route_ack_is_tenant_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation(tenant_id="tenant-a")
+    operations.create(operation, now=BASE_TIME)
+    transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="route-client",
+    )
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    with pytest.raises(Exception) as caught:
+        route.acknowledge_operation_events(
+            operation.operation_id,
+            route.OperationAckRequest(
+                consumer_id="route-client",
+                sequence=1,
+            ),
+            user={"tenant_id": "tenant-b", "role": "viewer"},
+        )
+
+    assert getattr(caught.value, "status_code", None) == 404
 
     operations.close()
     events.close()
