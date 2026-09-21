@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,6 +16,10 @@ import {
   ProductPillar,
   capabilitiesFor,
 } from '../src/product/productCatalog';
+import {
+  AppHealthSnapshot,
+  probeAppHealth,
+} from '../src/product/appHealthClient';
 
 const PILLARS: readonly { id: ProductPillar; title: string; subtitle: string }[] = [
   { id: 'create', title: 'Create', subtitle: 'Design, generate and ship worlds and playable projects.' },
@@ -33,8 +37,28 @@ export default function ProductShellRoute() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
+  const [health, setHealth] = useState<AppHealthSnapshot | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const isWide = width >= 760;
+
+  const refreshHealth = useCallback(async (signal?: AbortSignal) => {
+    setHealthLoading(true);
+    try {
+      const snapshot = await probeAppHealth(2_500, signal);
+      if (!signal?.aborted) setHealth(snapshot);
+    } finally {
+      if (!signal?.aborted) setHealthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    void refreshHealth(controller?.signal);
+    return () => {
+      try { controller?.abort(); } catch {}
+    };
+  }, [refreshHealth]);
 
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;
@@ -94,7 +118,55 @@ export default function ProductShellRoute() {
           <View style={styles.metricsRow}>
             <Metric label={normalizedQuery ? 'Matches' : 'Capabilities'} value={String(visibleCapabilities.length)} />
             <Metric label="Pillars" value={String(normalizedQuery ? visiblePillars.length : PILLARS.length)} />
-            <Metric label="Shell" value="Unified" />
+            <Metric
+              label="Runtime"
+              value={healthLoading && !health ? 'Checking' : health?.ok ? 'Healthy' : health ? 'Degraded' : 'Unknown'}
+            />
+          </View>
+        </View>
+
+        <View style={styles.healthPanel}>
+          <View style={styles.healthHeader}>
+            <View style={styles.healthCopy}>
+              <Text style={styles.healthTitle}>Application runtime</Text>
+              <Text style={styles.healthSubtitle}>
+                Canonical backend and Skeleton engine health from the same endpoints used by startup verification.
+              </Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Refresh application runtime health"
+              disabled={healthLoading}
+              onPress={() => void refreshHealth()}
+              style={[styles.healthRefresh, healthLoading && styles.healthRefreshDisabled]}
+              activeOpacity={0.78}
+            >
+              <Text style={styles.healthRefreshText}>{healthLoading ? 'Checking…' : 'Refresh'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.healthServices}>
+            {(['backend', 'skeleton'] as const).map((name) => {
+              const service = health?.services.find((candidate) => candidate.name === name);
+              const state = healthLoading && !service ? 'checking' : service?.ok ? 'healthy' : service ? 'degraded' : 'unknown';
+              return (
+                <View key={name} style={styles.healthService}>
+                  <View style={styles.healthServiceTop}>
+                    <Text style={styles.healthServiceName}>{name === 'backend' ? 'Application API' : 'Skeleton engine'}</Text>
+                    <Text style={[
+                      styles.healthState,
+                      state === 'healthy' ? styles.healthGood : state === 'degraded' ? styles.healthBad : styles.healthMuted,
+                    ]}>
+                      {state.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.healthDetail}>
+                    {service
+                      ? `${service.status ?? '—'} · ${service.latencyMs} ms · ${service.detail}`
+                      : 'Awaiting first probe'}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -228,6 +300,23 @@ const styles = StyleSheet.create({
   metric: { flex: 1, borderRadius: 14, backgroundColor: '#121827', paddingHorizontal: 12, paddingVertical: 12 },
   metricValue: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
   metricLabel: { color: '#748096', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.7 },
+  healthPanel: { borderRadius: 18, borderWidth: 1, borderColor: '#202737', backgroundColor: '#0F141F', padding: 16, gap: 12 },
+  healthHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  healthCopy: { flex: 1 },
+  healthTitle: { color: '#F1F5F9', fontSize: 16, fontWeight: '800' },
+  healthSubtitle: { color: '#8490A5', fontSize: 11, lineHeight: 17, marginTop: 3 },
+  healthRefresh: { minHeight: 38, justifyContent: 'center', borderRadius: 10, backgroundColor: '#20284A', paddingHorizontal: 12 },
+  healthRefreshDisabled: { opacity: 0.55 },
+  healthRefreshText: { color: '#DDE2FF', fontSize: 11, fontWeight: '800' },
+  healthServices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  healthService: { flex: 1, minWidth: 180, borderRadius: 12, backgroundColor: '#0A0F18', borderWidth: 1, borderColor: '#202737', padding: 12 },
+  healthServiceTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  healthServiceName: { color: '#DDE3EE', fontSize: 12, fontWeight: '800' },
+  healthState: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  healthGood: { color: '#7FD9A1' },
+  healthBad: { color: '#F08A9A' },
+  healthMuted: { color: '#8A96AA' },
+  healthDetail: { color: '#69758A', fontSize: 10, lineHeight: 15, marginTop: 6, fontFamily: 'monospace' },
   searchPanel: { borderRadius: 18, borderWidth: 1, borderColor: '#202737', backgroundColor: '#0F141F', padding: 16 },
   searchHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   searchCopy: { flex: 1 },
