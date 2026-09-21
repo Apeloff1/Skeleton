@@ -421,6 +421,11 @@ jobs:
                       totals['obsolete_dynamic_ai_queued'] += 1
                       local['obsolete_dynamic_ai_queued'] += 1
                       continue
+                  if closed_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['closed_dynamic_ai_queued'] += 1
+                      local['closed_dynamic_ai_queued'] += 1
+                      continue
                   if orphaned_main_workflow_run(run, current_paths):
                       selected.append(run)
                       totals['orphaned_main_queued'] += 1
@@ -485,6 +490,11 @@ jobs:
                       totals['obsolete_dynamic_ai_active'] += 1
                       local['obsolete_dynamic_ai_active'] += 1
                       continue
+                  if closed_dynamic_ai_pr_run(run):
+                      selected.append(run)
+                      totals['closed_dynamic_ai_active'] += 1
+                      local['closed_dynamic_ai_active'] += 1
+                      continue
                   if orphaned_main_workflow_run(run, current_paths):
                       selected.append(run)
                       totals['orphaned_main_active'] += 1
@@ -541,6 +551,8 @@ jobs:
                   f'obsolete_dynamic_pr_active={local["obsolete_dynamic_pr_active"]} '
                   f'obsolete_dynamic_ai_queued={local["obsolete_dynamic_ai_queued"]} '
                   f'obsolete_dynamic_ai_active={local["obsolete_dynamic_ai_active"]} '
+                  f'closed_dynamic_ai_queued={local["closed_dynamic_ai_queued"]} '
+                  f'closed_dynamic_ai_active={local["closed_dynamic_ai_active"]} '
                   f'orphaned_main_queued={local["orphaned_main_queued"]} '
                   f'orphaned_main_active={local["orphaned_main_active"]} '
                   f'duplicates={local["duplicates"]} '
