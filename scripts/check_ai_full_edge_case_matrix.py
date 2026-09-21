@@ -10,6 +10,7 @@ CATALOG = ROOT / "machine" / "ai_edge_case_catalog.json"
 FULL = ROOT / "machine" / "ai_full_edge_case_matrix.json"
 MASTER = ROOT / "machine" / "ai_master_plan.json"
 QUEUE = ROOT / "machine" / "ai_build_queue.json"
+PRIORITY = ROOT / "machine" / "ai_edge_case_priority_queue.json"
 HUMAN = ROOT / "docs" / "plan" / "FULL_EDGE_CASE_BUILD_MATRIX.md"
 
 EXPECTED_PACKAGES = [f"WP-W{i:02d}" for i in range(31)]
@@ -18,7 +19,7 @@ VALID_CRITICALITY = {"critical", "high", "medium", "low", "reference"}
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (CATALOG, FULL, MASTER, QUEUE, HUMAN):
+    for path in (CATALOG, FULL, MASTER, QUEUE, PRIORITY, HUMAN):
         if not path.is_file():
             errors.append(f"missing {path.relative_to(ROOT)}")
     if errors:
@@ -28,6 +29,7 @@ def validate() -> list[str]:
     matrix = json.loads(FULL.read_text(encoding="utf-8"))
     master = json.loads(MASTER.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
+    priority = json.loads(PRIORITY.read_text(encoding="utf-8"))
 
     catalog_entries = catalog.get("entries")
     packages = matrix.get("packages")
@@ -95,6 +97,38 @@ def validate() -> list[str]:
     if coverage.get("work_packages") != 31:
         errors.append("coverage.work_packages must equal 31")
 
+    expected_priority_ids = {
+        entry_id
+        for entry_id, entry in catalog_by_id.items()
+        if entry.get("criticality") in {"critical", "high"}
+    }
+    priority_items = priority.get("items")
+    if not isinstance(priority_items, list):
+        errors.append("priority queue items must be a list")
+    else:
+        priority_ids = [item.get("id") for item in priority_items]
+        if len(priority_ids) != len(set(priority_ids)):
+            errors.append("priority queue contains duplicate ids")
+        if set(priority_ids) != expected_priority_ids:
+            errors.append("priority queue must contain every and only critical/high catalog case")
+        for item in priority_items:
+            entry = catalog_by_id.get(item.get("id"))
+            if not entry:
+                continue
+            if item.get("criticality") != entry.get("criticality"):
+                errors.append(f"{item.get('id')}: priority criticality disagrees with catalog")
+            if set(item.get("work_package_refs", [])) != set(entry.get("work_package_refs", [])):
+                errors.append(f"{item.get('id')}: priority owners disagree with catalog")
+            if set(item.get("recommended_test_modes", [])) != set(entry.get("recommended_test_modes", [])):
+                errors.append(f"{item.get('id')}: priority evidence modes disagree with catalog")
+        counts = priority.get("counts", {})
+        if counts.get("total") != len(expected_priority_ids):
+            errors.append("priority counts.total is stale")
+        if counts.get("P0") != sum(catalog_by_id[x]["criticality"] == "critical" for x in expected_priority_ids):
+            errors.append("priority counts.P0 is stale")
+        if counts.get("P1") != sum(catalog_by_id[x]["criticality"] == "high" for x in expected_priority_ids):
+            errors.append("priority counts.P1 is stale")
+
     overlay = queue.get("acceptance_overlays", {}).get("full_program_edge_case_matrix", {})
     if overlay.get("contract") != "machine/ai_full_edge_case_matrix.json":
         errors.append("build queue missing full_program_edge_case_matrix overlay")
@@ -153,7 +187,8 @@ def main() -> int:
         "Full edge-case construction matrix: OK "
         f"({matrix['coverage']['catalog_total']} catalog entries, "
         f"{matrix['coverage']['work_packages']} work packages, "
-        f"{len(queue['tasks'])} queue tasks inheriting risk)"
+        f"{len(queue['tasks'])} queue tasks inheriting risk, "
+        f"{priority['counts']['total']} prioritized critical/high cases)"
     )
     return 0
 
