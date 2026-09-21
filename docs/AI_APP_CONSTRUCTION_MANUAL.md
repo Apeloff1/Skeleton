@@ -554,10 +554,20 @@ Development AI providers must read the four bootstrap documents before repositor
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
 - `.cursor/rules/architecture.mdc`
+- `GEMINI.md`
+
+Grok and other coding agents without a dedicated repository instruction format use
+`AGENTS.md` as the generic bootstrap entrypoint.
 
 These files are pointers, not independent architecture manuals. Duplicating architectural rules across provider files would create drift.
 
-Runtime model providers use a local activation receipt. The adapter loads the active architecture and construction contracts and verifies:
+All credential-bearing AI provider families use a local activation receipt from
+`skeleton/provider_contract.py`. Product runtime providers use the
+`runtime_model` family; repository automation uses the `automation_model`
+family. `backend/core/provider_architecture.py` is only a compatibility
+re-export.
+
+The shared loader verifies:
 
 - construction status is active;
 - construction version is supported;
@@ -577,7 +587,8 @@ current repository is already partially assembled, so active work follows this
 gap-closure roadmap:
 
 ```text
-Wave 1  policy + budget foundation
+Wave 1  policy + provider + budget foundation
+        ├─ provider-surface convergence
         ├─ governance registry
         └─ cost/capacity admission
              |
@@ -618,6 +629,7 @@ class construction work, not hidden TODOs.
 
 | Priority | Plane | Gap | Closure evidence |
 | --- | --- | --- | --- |
+| P0 | model-provider | Credential-bearing execution still exists in the transitional synchronous Jeeves provider surface. | shared receipt, undeclared-provider denial, provider-surface inventory, final transport convergence |
 | P0 | streaming-realtime | One canonical resumable event protocol is not yet proven end-to-end. | protocol contract, disconnect/reconnect, duplicate/out-of-order, frontend recovery |
 | P0 | governance | Data classification and provider-transfer policy are not yet one enforced registry. | transfer denial, deletion propagation, export completeness, retention expiry |
 | P0 | cost-capacity | Provider/token/storage/concurrency budgets are not yet one admission contract. | budget denial, budget-aware routing, saturation, cost telemetry |
@@ -681,10 +693,786 @@ python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
 python scripts/check_provider_bootstrap.py
 python scripts/check_app_assembly.py
-python -m pytest -q skeleton/testing/test_architecture_map.py skeleton/testing/test_ai_app_construction.py
+python -m pytest -q skeleton/testing/test_architecture_map.py skeleton/testing/test_ai_app_construction.py skeleton/testing/test_provider_contract.py
 python -m skeleton app check
 python -m skeleton app status --json
 docker compose -f docker-compose.yml config --quiet
 ```
 
 When these contracts disagree, construction stops until the disagreement is resolved. The solution is to repair the canonical contract or implementation, not weaken the gate.
+
+
+## 13. End-to-end request lifecycle
+
+Every non-trivial AI operation follows the same logical lifecycle even when an
+implementation optimizes away internal hops. The machine-readable source is
+`request_lifecycle` in the construction contract.
+
+```text
+0 ingress
+  -> 1 identity + authority
+  -> 2 admission / budgets
+  -> 3 orchestration + durable identity
+  -> 4 context / retrieval / memory
+  -> 5 routing
+  -> 6 provider execution
+  -> 7 verification
+  -> 8 tools / side effects
+  -> 9 state + artifacts
+  -> 10 response / resumable stream
+  -> 11 telemetry + evaluation hooks
+```
+
+### 13.1 Ingress
+
+Ingress performs cheap rejection before expensive work. Validate schema, size,
+content type, supported operation, explicit user input limits, and request
+metadata. A malformed request must never consume a provider call merely to learn
+that it was malformed.
+
+The ingress result is a validated request envelope. It is not yet authorized.
+
+### 13.2 Identity and authority
+
+Attach principal, tenant, session, and capability scope before reading protected
+memory or data. Authentication and authorization remain separate decisions.
+
+Authority is evaluated against the concrete resource and action, not a model's
+natural-language claim that an action is needed.
+
+### 13.3 Admission
+
+Admission decides whether the operation fits current cost, latency, token,
+concurrency, storage, and queue budgets. This decision occurs before spawning
+large agent graphs, provider calls, or privileged tools.
+
+The long-term contract is an admission receipt containing the budget class,
+estimated consumption, decision, and reason.
+
+### 13.4 Orchestration
+
+Create an operation ID, task/plan identity, idempotency key, deadline, and trace
+ID. Durable workflows persist enough intent to recover without repeating
+non-idempotent work.
+
+The orchestrator owns state transitions. A provider response cannot directly
+declare an operation complete.
+
+### 13.5 Context
+
+Build context from separately typed sources:
+
+```text
+system/developer instructions
+user request
+authorized session history
+authorized memory
+retrieved evidence + provenance
+tool results
+explicit product state
+```
+
+Preserve the source and trust level of each section. Do not flatten untrusted
+retrieval or tool output into system instructions.
+
+### 13.6 Routing
+
+Apply hard constraints before scoring preferences. If privacy, capability,
+context, cost, reliability, or latency constraints eliminate every endpoint,
+return a sanitized no-route decision rather than silently using an incompatible
+provider.
+
+### 13.7 Provider execution
+
+A provider adapter may execute only after a valid architecture receipt exists.
+Credentials stay at the provider edge. Timeout, retry, output-size, endpoint,
+and error-normalization rules are part of the adapter contract.
+
+### 13.8 Verification
+
+Verification converts raw candidate output into a qualified result. Depending on
+risk this may be structural validation, deterministic checks, retrieval-backed
+claim verification, policy checks, or a separate verifier.
+
+Verification failure can produce retry, abstention, escalation, or a partial
+result. It must not be silently converted into confidence.
+
+### 13.9 Actions
+
+A model can propose an action. The tool runtime decides whether that action is
+authorized, valid, affordable, safe, and idempotent.
+
+Write/destructive actions require stronger authority and receipts than reads.
+
+### 13.10 State and artifacts
+
+Persist only under the declared data lifecycle. State writes and artifacts need
+tenant ownership, hashes/versions where relevant, retention, and rollback or
+compensation behavior.
+
+### 13.11 Response and stream
+
+The response plane converts internal state into an API result or ordered event
+stream. A transient transport loss must not imply task loss.
+
+### 13.12 Telemetry and evaluation
+
+Close the trace with the route, provider/model actually used, tool receipts,
+artifact/state references, latency/cost, terminal status, and evaluation hooks.
+Operational telemetry must not contain secrets or unrestricted user payloads.
+
+## 14. Canonical envelopes
+
+The machine contract defines minimum fields; implementations may add fields but
+may not remove required semantics.
+
+### 14.1 Operation envelope
+
+Required semantic fields:
+
+- `operation_id`
+- `tenant_id`
+- `actor_id`
+- `capability`
+- `created_at`
+- `deadline`
+- `idempotency_key`
+- `trace_id`
+
+The operation ID identifies the user-visible unit of work. The trace ID can span
+multiple internal operations but must never replace idempotency identity.
+
+### 14.2 Provider request
+
+The provider-neutral boundary carries instructions, prompt, history, requested
+model, and output budget. Provider-specific optional knobs belong in a carefully
+bounded extension layer, not feature routes.
+
+### 14.3 Route decision
+
+Record selected endpoint, candidates, hard rejections, applicable budgets, and
+routing timestamp. This allows later explanation of why a provider/model was
+used without exposing credentials.
+
+### 14.4 Evidence envelope
+
+Evidence requires source, hash, retrieval time, authority/ACL context, and
+provenance. A citation without retrievable provenance is presentation metadata,
+not evidence.
+
+### 14.5 Tool receipt
+
+A tool receipt binds operation, tool, authority, normalized input hash, start/end
+time, status, and result reference. The raw secret input must not be stored just
+because a receipt exists.
+
+### 14.6 Artifact envelope
+
+Artifacts require content identity, media type, size, owner/tenant, malware
+state, and retention state. Generated artifacts and uploaded artifacts share the
+same lifecycle after creation.
+
+### 14.7 Stream event
+
+A resumable event must include operation ID, globally or operation-unique event
+ID, monotonically ordered sequence, type, timestamp, and payload.
+
+### 14.8 Release evidence
+
+A release evidence envelope binds source SHA, architecture tag, construction
+version, tests, evaluations, security evidence, provenance, and rollback target.
+
+## 15. Data classification and movement
+
+The four baseline classes are hierarchical.
+
+| Class | Typical content | Provider transfer | Logging |
+| --- | --- | --- | --- |
+| public | published docs, public examples | allowed for declared purpose | allowed |
+| internal | repository/product internals | declared provider + purpose | sanitized |
+| confidential | tenant/user/business-sensitive | explicit policy, minimization, tenant and purpose | metadata only |
+| restricted | credentials, prohibited transfer data, high-risk private material | deny by default | never raw |
+
+Classification travels with data. Copying confidential text into a prompt does
+not downgrade it to "prompt data."
+
+Every cross-boundary movement answers:
+
+1. what data class is this?
+2. which tenant/owner controls it?
+3. what purpose authorizes movement?
+4. which destination receives it?
+5. is the destination allowed for this class?
+6. what minimum subset is required?
+7. how long may it remain?
+8. how is deletion/export propagated?
+9. what receipt records the decision?
+
+Provider routing therefore consumes privacy classification as a hard constraint,
+not merely a preference score.
+
+## 16. Trust-zone topology
+
+### 16.1 Human client
+
+Treat all client input as untrusted. The frontend may improve UX validation but
+server boundaries repeat authoritative validation.
+
+### 16.2 Application API
+
+The backend can hold secret references and credentials at approved edges, but
+request payloads remain untrusted after authentication.
+
+### 16.3 Engine runtime
+
+Skeleton code is trusted executable code; task payloads, model output, memory,
+retrieved evidence, and tool results remain typed data with their own trust
+levels.
+
+### 16.4 Data plane
+
+Mongo, Chroma, and artifact storage contain durable governed state. Durable does
+not mean trusted: content may originate from users, models, or external sources.
+
+### 16.5 External provider
+
+External providers are processors at a trust boundary. Only declared providers
+receive approved data classes. Provider output is untrusted until normalized
+and, where required, verified.
+
+### 16.6 Tool sandbox
+
+Tools receive least privilege. File, network, credential, and subprocess access
+are capabilities, never defaults.
+
+### 16.7 Accelerators
+
+Native/JVM accelerators can implement compute primitives but cannot become
+policy owners. A correct fallback path must exist unless the capability is
+explicitly declared accelerator-required.
+
+### 16.8 Repository automation
+
+Repository automation is a privileged control plane. It can modify source and
+may possess scoped GitHub/provider credentials, so its model client uses the
+separate `automation_model` provider family and the same mandatory manual
+receipt.
+
+## 17. Provider surface inventory
+
+The repository currently recognizes six provider-related surfaces.
+
+| Surface | Role | Credential-bearing | Status |
+| --- | --- | ---: | --- |
+| `backend/core/ai_provider.py` | canonical product runtime provider execution | yes | canonical |
+| `backend/core/ai_provider_compat.py` | legacy backend source compatibility | no | compatibility |
+| `skeleton/jeeves/providers.py` | synchronous Jeeves network compatibility | yes | transitional |
+| `skeleton/automation/free_model.py` | repository automation model execution | yes | canonical automation |
+| `skeleton/frontier/model_runtime.py` | provider-neutral runtime protocols/adapters | no | library |
+| `skeleton/jeeves/agent/provider.py` | provider-neutral retry/cache/circuit logic | no | library |
+
+The transitional Jeeves surface is an explicit P0 convergence gap. It is now
+receipt-gated, and undeclared Anthropic activation is denied even if a legacy
+key exists. The remaining closure step is transport convergence so credential
+ownership no longer exists in two product-runtime locations.
+
+A provider-neutral library may model provider concepts without an activation
+receipt only when it does not own credentials or network activation. The moment
+it becomes credential-bearing, it must become a declared provider surface.
+
+## 18. Provider onboarding protocol
+
+Adding a runtime provider is a construction change, not a configuration toggle.
+
+1. Add a declaration to `runtime_model_providers`.
+2. Specify state, protocol, credentials, optional configuration, capabilities,
+   undeclared-capability policy, and network policy.
+3. Add a concrete adapter behind the canonical product provider boundary.
+4. Ensure the adapter cannot activate before
+   `load_provider_architecture(provider_id, provider_family="runtime_model")`.
+5. Add endpoint validation appropriate to the provider.
+6. Add bounded timeout/retry/output behavior.
+7. Normalize response and error types.
+8. Add provider metadata to routing.
+9. Add privacy ceiling and cost/latency characteristics.
+10. Add contract, malformed-output, timeout, unavailable, secret-redaction, and
+    outage tests.
+11. Add failure/fallback evaluation.
+12. Update provider-surface inventory only if a new credential-bearing owner is
+    truly necessary; normally it is not.
+13. Run all architecture/construction/provider gates.
+14. Do not advertise the provider as available until the declaration and receipt
+    path are green.
+
+Repository automation follows the same protocol under
+`automation_model_providers`; it must not be conflated with the product model
+plane.
+
+## 19. Environment profiles
+
+### Development
+
+Development may use local source mounts and disposable state. Secrets remain
+external to source. Provider declarations still apply: development is not a
+permission to bypass provider policy.
+
+### CI
+
+CI favors deterministic fakes and contract tests. Live provider access is not a
+required merge gate. CI secrets are narrowly scoped and should be unnecessary
+for static architecture validation.
+
+### Staging
+
+Staging rehearses production network policy, migrations, persistence,
+governance, budgets, and rollback. Staging budgets may be smaller but semantics
+should match production.
+
+### Production
+
+Production uses immutable images, explicit egress, managed secret references,
+durable migration/backup/restore, provider privacy/cost/SLO admission, canary
+promotion, and proven rollback.
+
+A behavior that only works under a development hot mount is not production
+functionality.
+
+## 20. Operation state machines
+
+### 20.1 Generic operation
+
+```text
+created
+ -> validated
+ -> authorized
+ -> admitted
+ -> running
+ -> {completed | failed | cancelled}
+```
+
+Optional states may include queued, waiting-for-tool, waiting-for-user,
+reconnecting, retrying, or degraded. Every state transition has one owner.
+
+### 20.2 Durable job
+
+```text
+queued
+ -> leased
+ -> running
+ -> checkpointed*
+ -> terminal
+```
+
+A lease requires expiry/fencing. A stale worker must not commit after ownership
+moves to another worker.
+
+### 20.3 Tool action
+
+```text
+proposed
+ -> validated
+ -> authorized
+ -> admitted
+ -> executing
+ -> {committed | compensated | failed | cancelled}
+```
+
+### 20.4 Artifact
+
+```text
+created/uploaded
+ -> quarantined
+ -> scanned/validated
+ -> trusted-or-rejected
+ -> retained
+ -> expired/deleted
+```
+
+### 20.5 Release
+
+```text
+source
+ -> candidate
+ -> built
+ -> verified
+ -> staged
+ -> canary
+ -> {promoted | rolled-back | rejected}
+```
+
+## 21. Failure and degradation matrix
+
+| Failure | Required behavior |
+| --- | --- |
+| provider credentials absent | report unavailable; do not fabricate model output |
+| provider undeclared | fail closed even if credentials exist |
+| provider timeout | bounded retry/fallback; sanitized error |
+| provider malformed output | reject/normalize; never trust shape implicitly |
+| no route fits privacy/cost/capability | explicit no-route result |
+| retrieval unavailable | degrade only if product contract allows context-free execution |
+| tool denied | operation records denial; no attempted side effect |
+| tool timeout | bounded cancellation/compensation policy |
+| storage unavailable | do not claim durable completion |
+| duplicate request | idempotency returns prior/in-progress result instead of duplicating side effect |
+| stale worker | fencing rejects commit |
+| stream disconnect | task continues according to operation policy; client can resume |
+| event duplicate/out-of-order | client reducer deduplicates/orders by sequence |
+| artifact scan failure | remain quarantined/rejected |
+| telemetry sink unavailable | product may degrade, but security/audit-critical evidence can block protected operations or promotion |
+| migration failure | do not route production traffic |
+| canary SLO breach | stop promotion and rollback |
+| architecture/manual mismatch | provider/build activation fails closed |
+
+## 22. Resource budget hierarchy
+
+Budgets exist at multiple scopes and are composed, not overwritten:
+
+```text
+deployment
+  -> tenant
+     -> user/session
+        -> operation
+           -> model call / tool call / retrieval / artifact
+```
+
+Budget dimensions include:
+
+- input tokens;
+- output tokens;
+- provider monetary estimate;
+- wall-clock deadline;
+- provider timeout;
+- tool timeout;
+- total retries;
+- agent fan-out;
+- concurrent operations;
+- queued operations;
+- retrieval documents/chunks;
+- memory/context characters or tokens;
+- artifact bytes;
+- storage retention;
+- network response bytes.
+
+A child operation cannot grant itself a larger budget than its parent.
+
+## 23. Concurrency, retries, and idempotency
+
+Retries multiply load and cost. Combine them with deadlines, idempotency, circuit
+breaking, queue bounds, and concurrency caps.
+
+Rules:
+
+- one layer owns retries for a given failure;
+- nested retry loops require an explicit total-attempt bound;
+- retry only errors classified as retryable;
+- preserve the operation deadline across attempts;
+- jitter backoff for shared upstream failures;
+- writes use idempotency keys or explicit compensation;
+- a timed-out caller does not automatically mean a timed-out side effect;
+- cancellation propagation is explicit.
+
+## 24. Observability contract
+
+Every significant operation should be reconstructable without exposing secrets.
+
+Minimum correlation keys:
+
+- trace ID;
+- operation ID;
+- tenant ID or privacy-safe tenant reference;
+- route/provider/model IDs;
+- tool IDs;
+- artifact/state references;
+- release/build ID where applicable.
+
+Minimum metrics:
+
+- request success/failure/cancellation;
+- p50/p95/p99 latency where volume supports it;
+- provider latency and failure class;
+- token/usage/cost estimate;
+- route rejection reasons;
+- retrieval hit/quality metrics;
+- tool success/timeout/denial;
+- queue depth and admission denial;
+- stream disconnect/resume;
+- artifact scan/rejection;
+- eval/regression result;
+- canary/rollback result.
+
+Logs are structured and redacted. Metrics should avoid cardinality explosions from
+raw user IDs, prompts, or arbitrary model text.
+
+## 25. Evaluation ladder
+
+Use the cheapest trustworthy evidence first.
+
+```text
+static/schema checks
+ -> deterministic unit tests
+ -> contract tests
+ -> integration tests
+ -> golden journeys
+ -> deterministic offline eval
+ -> model-based eval where justified
+ -> chaos/fault injection
+ -> canary production evidence
+```
+
+Model-based evaluation does not replace deterministic assertions when expected
+behavior can be encoded directly.
+
+Promotion compares against a baseline and records the dataset/eval version,
+provider/model/configuration, significant prompt/context contract version, and
+metrics.
+
+## 26. Release evidence bundle
+
+Every production candidate should be able to produce or reference:
+
+1. source SHA;
+2. architecture tag and construction version;
+3. architecture validator output;
+4. construction validator output;
+5. provider bootstrap output;
+6. app assembly output;
+7. focused and broad test evidence;
+8. security/dependency/malware/provenance evidence;
+9. behavior evaluation evidence where relevant;
+10. migration/preflight evidence when state changes;
+11. build artifact identity and SBOM/provenance;
+12. smoke/canary evidence;
+13. explicit rollback target and triggers.
+
+"CI was green earlier" is not a release evidence bundle unless it is bound to
+the exact source/artifact being promoted.
+
+## 27. Current construction work packages
+
+### WP-P0-PROVIDER-SURFACES
+
+**Objective:** one mandatory receipt semantics and ultimately one product-runtime
+credential/transport owner.
+
+Current construction already completed in this lane:
+
+- shared receipt loader: `skeleton/provider_contract.py`;
+- backend loader converted to compatibility re-export;
+- direct backend provider registry/adapter receipt enforcement;
+- AI Assistant, AI Hub, game LLM service, and legacy LLM router converged on the
+  canonical registry semantics;
+- repository automation declared as a separate provider family and receipt-gated;
+- Jeeves OpenAI/Anthropic network adapters receipt-gated;
+- Anthropic remains denied because it is undeclared;
+- provider-surface inventory and validator enforcement added.
+
+Remaining closure:
+
+- converge synchronous Jeeves external network transport so
+  `skeleton/jeeves/providers.py` no longer owns product provider credentials;
+- retain `LocalEchoProvider` as offline deterministic fallback;
+- prove repository-wide absence of undeclared credential-bearing provider edges.
+
+### WP-P0-GOVERNANCE
+
+Owners are materialized in `skeleton/kernel/governance.py`,
+`skeleton/shells/ai/governance.py`, `backend/routes/governance.py`,
+`backend/core/model_router.py`, context, and memory surfaces.
+
+Construction sequence:
+
+1. define one data-class enum/registry matching this manual;
+2. add a governance decision object with tenant, purpose, source class,
+   destination, decision, and reason;
+3. attach classification to memory and retrieval evidence;
+4. require provider-transfer decision before provider invocation;
+5. require artifact/write classification;
+6. implement retention/deletion/export hooks;
+7. emit privacy-safe decision telemetry;
+8. add denial-first tests.
+
+### WP-P0-COST-ADMISSION
+
+Construction sequence:
+
+1. define hierarchical budget object;
+2. estimate provider input/output cost before route execution;
+3. combine tenant quota, request budget, queue pressure, and deadline;
+4. produce admit/defer/reject receipt;
+5. pass residual budget to routing;
+6. meter actual provider/tool/storage use;
+7. close the estimate/actual loop;
+8. test saturation and graceful shedding.
+
+### WP-P0-STREAM
+
+Construction sequence:
+
+1. freeze stream event schema;
+2. assign monotonic per-operation sequence;
+3. persist or reconstruct replay state;
+4. define heartbeat and idle policy;
+5. define cancellation race semantics;
+6. define terminal events;
+7. implement frontend reducer with event-ID dedupe;
+8. implement resume cursor;
+9. bound per-client buffers/backpressure;
+10. test disconnects at every transition.
+
+### WP-P1-PROVIDER-REDUNDANCY
+
+Do not recreate the old "catalog says three providers" behavior. Either add a
+real declared second provider or explicitly approve a single-provider
+availability objective.
+
+A real second provider must pass the complete onboarding protocol in section 18.
+
+### WP-P0-GOLDEN-JOURNEYS
+
+The E2E suite must prove at least:
+
+- simple prompt -> result;
+- retrieval -> evidence/citation -> result;
+- tool proposal -> authority -> receipt -> result;
+- artifact creation -> validation -> reference;
+- provider unavailable -> truthful degraded state;
+- cancel while running;
+- disconnect -> reconnect -> resume;
+- duplicate submission -> idempotent behavior;
+- trace continuity across frontend/backend/engine/provider/tool.
+
+### WP-P1-FEEDBACK
+
+Feedback collection and behavior mutation are separate systems. Promotion
+requires an experiment/evaluation receipt and rollback baseline.
+
+### WP-P1-RELEASE-SLO
+
+Canary promotion consumes the same error/latency/provider-quality signals that
+operators observe. Rollback is automated for objective breach with an auditable
+override path.
+
+## 28. Work-package execution protocol
+
+When a builder takes a work package:
+
+1. read the four mandatory bootstrap documents;
+2. locate its gap and work package in the machine contract;
+3. inspect every declared owner/evidence path;
+4. confirm the gap still exists on the current base;
+5. write or refine the interface contract first;
+6. implement the smallest vertical slice that can produce closure evidence;
+7. add unit and failure tests with the slice;
+8. update observability with the behavior, not afterward;
+9. run architecture/construction/provider gates immediately;
+10. run focused domain tests;
+11. run integration/golden tests appropriate to the package;
+12. update gap status only when closure evidence exists;
+13. if architecture changed, update the machine contract and manual in the same
+    lane;
+14. never delete a gap merely because work moved to another branch.
+
+## 29. Architecture-change protocol
+
+A change is architectural when it adds or moves any of:
+
+- runtime root;
+- runtime service;
+- canonical capability owner;
+- provider family or credential-bearing provider surface;
+- cross-plane dependency;
+- durable store;
+- external trust boundary;
+- public API version;
+- authority model;
+- release/promotion mechanism.
+
+For architectural changes:
+
+```text
+proposal
+ -> machine contract update
+ -> dependency/cycle validation
+ -> implementation
+ -> migration/compatibility layer
+ -> evidence
+ -> architecture tag bump
+ -> release
+ -> compatibility retirement
+```
+
+Do not perform physical directory moves first. Establish ownership, adapters,
+imports, routes, tests, packaging, and rollback before relocating implementation.
+
+## 30. Testing matrix
+
+Each capability should be tested across these dimensions where applicable:
+
+| Dimension | Examples |
+| --- | --- |
+| happy path | valid request, valid provider response |
+| malformed input | schema/type/size violation |
+| authorization | unauthenticated, unauthorized, wrong tenant |
+| dependency unavailable | provider/storage/retrieval/tool down |
+| timeout | provider/tool/job deadline |
+| cancellation | before start, during I/O, during side effect |
+| retry | retryable vs non-retryable |
+| idempotency | duplicate submit, duplicate delivery |
+| concurrency | saturation, lease race, stale worker |
+| security | injection, SSRF, secret leakage, unsafe file |
+| privacy | prohibited provider transfer, cross-tenant retrieval |
+| observability | trace/receipt emitted and sanitized |
+| recovery | restart, reconnect, resume, restore |
+| performance | budget and backpressure |
+| compatibility | old client/manifest/schema where supported |
+| rollback | release or migration reversal |
+
+## 31. Production-readiness decision tree
+
+A capability may be marked structurally present when its owner, interfaces,
+dependencies, failure behavior, and acceptance evidence exist.
+
+It may be marked production-ready only when:
+
+```text
+declared?
+  no -> stop
+owned?
+  no -> stop
+authorized?
+  no -> stop
+bounded?
+  no -> stop
+observable?
+  no -> stop
+tested happy + failure paths?
+  no -> stop
+evaluated where nondeterministic?
+  no -> stop
+deployable and rollback-capable?
+  no -> stop
+P0 gap for this capability still open?
+  yes -> stop
+otherwise -> eligible for production promotion
+```
+
+This distinction prevents "code exists" from being confused with "system is
+operationally complete."
+
+## 32. Provider-readable construction guarantee
+
+The mandatory provider rule is enforced at three different layers:
+
+1. **Development-provider layer.** Provider-specific repository instruction
+   files point every coding agent to the same four bootstrap documents.
+2. **Runtime/automation activation layer.** Credential-bearing AI provider
+   clients call `skeleton/provider_contract.py` and receive a digest-bound
+   receipt before external I/O.
+3. **CI layer.** `scripts/check_provider_bootstrap.py` verifies instruction
+   entrypoints, shared loader semantics, provider-family declarations, provider
+   surface inventory, image materialization, SDK isolation, and receipt tokens.
+
+This is deliberately redundant. The goal is not to trust that a provider
+"probably saw" the architecture; the goal is to make architecture
+acknowledgement a condition of activation or repository work.
+
