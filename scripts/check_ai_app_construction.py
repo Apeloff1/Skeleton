@@ -462,6 +462,7 @@ def _validate_gap_register(
         return {}
     seen: set[str] = set()
     by_plane: dict[str, int] = defaultdict(int)
+    open_by_plane: dict[str, int] = defaultdict(int)
     p0_open = 0
     for index, item in enumerate(raw):
         label = f"gap_register[{index}]"
@@ -480,6 +481,8 @@ def _validate_gap_register(
             errors.append(f"gap {gap_id} references unknown plane {plane_id!r}")
             continue
         by_plane[str(plane_id)] += 1
+        if item.get("status") == "open":
+            open_by_plane[str(plane_id)] += 1
         if item.get("status") not in {"open", "closed"}:
             errors.append(f"gap {gap_id}.status must be open or closed")
         if item.get("priority") not in {"P0", "P1", "P2"}:
@@ -500,8 +503,8 @@ def _validate_gap_register(
         )
 
     for plane_id, plane in planes.items():
-        if plane.get("state") == "partial" and by_plane.get(plane_id, 0) == 0:
-            errors.append(f"partial plane lacks a construction gap: {plane_id}")
+        if plane.get("state") == "partial" and open_by_plane.get(plane_id, 0) == 0:
+            errors.append(f"partial plane lacks an open construction gap: {plane_id}")
 
     policy = contract.get("gap_closure_policy")
     if not isinstance(policy, dict):
