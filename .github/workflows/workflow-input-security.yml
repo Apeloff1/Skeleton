@@ -155,4 +155,4 @@ jobs:
       - name: Enforce workflow_run branch-completion contract
         run: python backend/scripts/check_workflow_run_branch_completions.py
       - name: Enforce bot activation security baseline
-        run: python -m skeleton.security.activation_security
+        run: python skeleton/security/activation_security.py

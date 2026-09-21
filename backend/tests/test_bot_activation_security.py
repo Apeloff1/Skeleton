@@ -159,3 +159,11 @@ def test_legacy_core_activation_module_is_a_thin_canonical_shim() -> None:
     assert "run_bot_activation_security_baseline" in source
     assert 'if __name__ == "__main__":' in source
     assert "raise SystemExit(main())" in source
+
+def test_workflow_executes_activation_gate_without_importing_skeleton_root() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/workflow-input-security.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "run: python skeleton/security/activation_security.py" in workflow
+    assert "python -m skeleton.security.activation_security" not in workflow
