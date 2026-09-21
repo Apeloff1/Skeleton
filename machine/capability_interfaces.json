@@ -2068,9 +2068,17 @@
         "input schema",
         "authority",
         "execution receipt",
-        "result/error"
+        "result/error",
+        "ToolManifest",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "ToolResult",
+        "tool schema projection",
+        "approval policy",
+        "idempotency reservation",
+        "compensation contract"
       ],
-      "target_failure_contract": "tool denied or bounded failure receipt",
+      "target_failure_contract": "tool unavailable/denied/failed with bounded durable receipt; never bypass authority or provider ownership",
       "source_acceptance": [
         "resume tests",
         "cancellation tests",
@@ -2086,9 +2094,14 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:product-experience->application-api",
@@ -2780,9 +2793,17 @@
         "input schema",
         "authority",
         "execution receipt",
-        "result/error"
+        "result/error",
+        "ToolManifest",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "ToolResult",
+        "tool schema projection",
+        "approval policy",
+        "idempotency reservation",
+        "compensation contract"
       ],
-      "target_failure_contract": "tool denied or bounded failure receipt",
+      "target_failure_contract": "tool unavailable/denied/failed with bounded durable receipt; never bypass authority or provider ownership",
       "source_acceptance": [
         "abuse corpus",
         "SSRF/path/deserialization tests",
@@ -2793,9 +2814,14 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:streaming-realtime->application-api",
@@ -2955,14 +2981,19 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
       "target_acceptance": [
         "invalid config fails startup",
         "secret redaction tests",
         "snapshot reproducibility"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:tool-runtime->foundation",
@@ -2986,14 +3017,19 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
         "no heavy imports in skeleton/__init__.py"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:tool-runtime->identity",
@@ -3018,14 +3054,19 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:tool-runtime->observability",
@@ -3052,14 +3093,19 @@
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
         "SLO dashboard/evidence"
       ],
-      "status": "present"
+      "status": "partial"
     }
   ]
 }
