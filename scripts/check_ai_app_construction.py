@@ -1589,9 +1589,9 @@ def _validate_functional_ai_closure(
                 if not isinstance(stage_item.get("exit"), str) or not stage_item["exit"].strip():
                     errors.append(f"{label}.exit must be non-empty")
 
-            if stage_numbers and sorted(stage_numbers) != list(range(min(stage_numbers), max(stage_numbers) + 1)):
+            if stage_numbers and sorted(stage_numbers) != list(range(0, max(stage_numbers) + 1)):
                 errors.append(
-                    "functional AI stage numbers must be contiguous: "
+                    "functional AI stage numbers must be contiguous from zero: "
                     + ", ".join(str(x) for x in sorted(stage_numbers))
                 )
             duplicates = sorted(
@@ -1703,6 +1703,18 @@ def _validate_functional_ai_closure(
                 errors.append(
                     f"functional AI work package {package_id}.gap must be {gap_id!r}"
                 )
+        missing_blueprints = sorted(required_p0_set - seen_gaps)
+        extra_blueprints = sorted(seen_gaps - required_p0_set)
+        if missing_blueprints:
+            errors.append(
+                "functional AI P0 gaps missing required blueprints: "
+                + ", ".join(missing_blueprints)
+            )
+        if extra_blueprints:
+            errors.append(
+                "functional AI blueprints reference non-required P0 gaps: "
+                + ", ".join(extra_blueprints)
+            )
         result["blueprints"] = len(seen_keys)
 
     required_envelopes = _nonempty_strings(
