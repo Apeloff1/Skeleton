@@ -1,0 +1,2941 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "architecture_tag": "arch-map/v3.5",
+  "construction_version": "3.5.0",
+  "status": "active",
+  "purpose": "Exact interface ledger for every construction-plane runtime dependency and acceptance target. It converts graph edges into owner-, contract-, failure-, and evidence-aware build obligations.",
+  "sources": {
+    "architecture": "machine/architecture.json",
+    "construction": "machine/ai_app_construction.json",
+    "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+  },
+  "invariants": [
+    "every depends_on edge appears exactly once as runtime_dependency",
+    "every validates edge appears exactly once as acceptance_target",
+    "owners and zones match canonical plane declarations",
+    "runtime cross-zone edges obey the zone DAG",
+    "acceptance edges carry evidence only and do not participate in runtime topological order",
+    "interface consumption never transfers target-plane state authority",
+    "target contract surface and failure contract are never empty"
+  ],
+  "entries": [
+    {
+      "id": "acceptance_target:deployment-release->application-api",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "application-api",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "backend",
+      "source_zone": "engine",
+      "target_zone": "application",
+      "boundary": "evidence-only",
+      "binding": "evidence-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness"
+      ],
+      "target_failure_contract": "typed 4xx/5xx without secret leakage",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "acceptance_target:deployment-release->engine-api",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "engine-api",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "evidence-only",
+      "binding": "evidence-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts"
+      ],
+      "target_failure_contract": "engine-specific typed failure",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "acceptance_target:deployment-release->product-experience",
+      "relation": "acceptance_target",
+      "source_plane": "deployment-release",
+      "target_plane": "product-experience",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "frontend",
+      "source_zone": "engine",
+      "target_zone": "product",
+      "boundary": "evidence-only",
+      "binding": "evidence-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "canonical endpoint resolver",
+        "stream/event reducer",
+        "optimistic state policy",
+        "accessible error state"
+      ],
+      "target_failure_contract": "recoverable user-facing degraded state",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->artifact-files",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "artifact-files",
+      "source_owner": "backend",
+      "target_owner": "skeleton/artifact_plane",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "artifact id",
+        "content hash",
+        "metadata",
+        "scan state",
+        "retention"
+      ],
+      "target_failure_contract": "quarantine artifact",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "identity",
+      "source_owner": "backend",
+      "target_owner": "skeleton/api",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "memory",
+      "source_owner": "backend",
+      "target_owner": "skeleton/memory",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance"
+      ],
+      "target_failure_contract": "memory miss without authority escalation",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "model-provider",
+      "source_owner": "backend",
+      "target_owner": "skeleton/provider_runtime.py",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation"
+      ],
+      "target_failure_contract": "provider unavailable, no credential leakage",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "orchestration",
+      "source_owner": "backend",
+      "target_owner": "skeleton/intelligence",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation"
+      ],
+      "target_failure_contract": "checkpoint and stop safely",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:application-api->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "application-api",
+      "target_plane": "retrieval",
+      "source_owner": "backend",
+      "target_owner": "skeleton/retrieval",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation"
+      ],
+      "target_failure_contract": "return insufficient-evidence result",
+      "source_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "target_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:artifact-files->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "data-persistence",
+      "source_owner": "skeleton/artifact_plane",
+      "target_owner": "skeleton/persistence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "target_failure_contract": "read-only/degraded mode where safe",
+      "source_acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "target_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:artifact-files->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "governance",
+      "source_owner": "skeleton/artifact_plane",
+      "target_owner": "skeleton/vault",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "target_failure_contract": "block transfer when classification/policy unknown",
+      "source_acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "target_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:artifact-files->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "identity",
+      "source_owner": "skeleton/artifact_plane",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:artifact-files->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "artifact-files",
+      "target_plane": "security-safety",
+      "source_owner": "skeleton/artifact_plane",
+      "target_owner": "skeleton/security",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt"
+      ],
+      "target_failure_contract": "deny/quarantine with sanitized audit",
+      "source_acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "target_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:configuration-secrets->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "configuration-secrets",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/config",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:cost-capacity->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "jobs-durability",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/agents",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery"
+      ],
+      "target_failure_contract": "park work with recovery receipt",
+      "source_acceptance": [
+        "quota exhaustion",
+        "load test",
+        "budget route selection",
+        "graceful shedding",
+        "pre-I/O provider admission denial",
+        "route budget projection",
+        "deadline/concurrency/queue admission tests"
+      ],
+      "target_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:cost-capacity->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "model-routing",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/frontier/model_routing.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry"
+      ],
+      "target_failure_contract": "NoRoute with sanitized evidence",
+      "source_acceptance": [
+        "quota exhaustion",
+        "load test",
+        "budget route selection",
+        "graceful shedding",
+        "pre-I/O provider admission denial",
+        "route budget projection",
+        "deadline/concurrency/queue admission tests"
+      ],
+      "target_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:cost-capacity->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "cost-capacity",
+      "target_plane": "observability",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "quota exhaustion",
+        "load test",
+        "budget route selection",
+        "graceful shedding",
+        "pre-I/O provider admission denial",
+        "route budget projection",
+        "deadline/concurrency/queue admission tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:data-persistence->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "data-persistence",
+      "target_plane": "configuration-secrets",
+      "source_owner": "skeleton/persistence",
+      "target_owner": "skeleton/config",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "target_failure_contract": "fail startup or disable optional capability",
+      "source_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "target_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:data-persistence->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "data-persistence",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/persistence",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:deployment-release->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "engine-api",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts"
+      ],
+      "target_failure_contract": "engine-specific typed failure",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:deployment-release->evaluation",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "evaluation",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/eval",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "eval case",
+        "dataset version",
+        "metric",
+        "threshold",
+        "promotion verdict"
+      ],
+      "target_failure_contract": "block promotion",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "deterministic smoke eval",
+        "quality regression gate",
+        "safety suite",
+        "latency/cost budget gate"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:deployment-release->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "observability",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:deployment-release->resilience",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "resilience",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/reliability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "retry policy",
+        "circuit state",
+        "degradation mode",
+        "recovery plan"
+      ],
+      "target_failure_contract": "bounded degradation",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:deployment-release->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "deployment-release",
+      "target_plane": "security-safety",
+      "source_owner": "skeleton/deploy",
+      "target_owner": "skeleton/security",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt"
+      ],
+      "target_failure_contract": "deny/quarantine with sanitized audit",
+      "source_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "target_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:engine-api->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "identity",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:engine-api->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "memory",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/memory",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance"
+      ],
+      "target_failure_contract": "memory miss without authority escalation",
+      "source_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "target_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:engine-api->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "observability",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:engine-api->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "orchestration",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/intelligence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation"
+      ],
+      "target_failure_contract": "checkpoint and stop safely",
+      "source_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "target_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:engine-api->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "engine-api",
+      "target_plane": "retrieval",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/retrieval",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation"
+      ],
+      "target_failure_contract": "return insufficient-evidence result",
+      "source_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "target_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:evaluation->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "evaluation",
+      "target_plane": "observability",
+      "source_owner": "skeleton/eval",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "deterministic smoke eval",
+        "quality regression gate",
+        "safety suite",
+        "latency/cost budget gate"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:evaluation->reasoning-verification",
+      "relation": "runtime_dependency",
+      "source_plane": "evaluation",
+      "target_plane": "reasoning-verification",
+      "source_owner": "skeleton/eval",
+      "target_owner": "skeleton/intelligence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "verdict",
+        "confidence",
+        "evidence",
+        "repair instruction"
+      ],
+      "target_failure_contract": "degrade to unverified result or block high-impact action",
+      "source_acceptance": [
+        "deterministic smoke eval",
+        "quality regression gate",
+        "safety suite",
+        "latency/cost budget gate"
+      ],
+      "target_acceptance": [
+        "falsification tests",
+        "repair convergence tests",
+        "calibration evaluation"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:feedback-learning->evaluation",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "evaluation",
+      "source_owner": "skeleton/learning",
+      "target_owner": "skeleton/eval",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "eval case",
+        "dataset version",
+        "metric",
+        "threshold",
+        "promotion verdict"
+      ],
+      "target_failure_contract": "block promotion",
+      "source_acceptance": [
+        "experiment isolation",
+        "rollback",
+        "data consent",
+        "promotion gate"
+      ],
+      "target_acceptance": [
+        "deterministic smoke eval",
+        "quality regression gate",
+        "safety suite",
+        "latency/cost budget gate"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:feedback-learning->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "governance",
+      "source_owner": "skeleton/learning",
+      "target_owner": "skeleton/vault",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "target_failure_contract": "block transfer when classification/policy unknown",
+      "source_acceptance": [
+        "experiment isolation",
+        "rollback",
+        "data consent",
+        "promotion gate"
+      ],
+      "target_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:feedback-learning->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "feedback-learning",
+      "target_plane": "observability",
+      "source_owner": "skeleton/learning",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "experiment isolation",
+        "rollback",
+        "data consent",
+        "promotion gate"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:governance->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "governance",
+      "target_plane": "configuration-secrets",
+      "source_owner": "skeleton/vault",
+      "target_owner": "skeleton/config",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "target_failure_contract": "fail startup or disable optional capability",
+      "source_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "target_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:governance->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "governance",
+      "target_plane": "identity",
+      "source_owner": "skeleton/vault",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:identity->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "identity",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/api",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:jobs-durability->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "data-persistence",
+      "source_owner": "skeleton/agents",
+      "target_owner": "skeleton/persistence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "target_failure_contract": "read-only/degraded mode where safe",
+      "source_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "target_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:jobs-durability->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "identity",
+      "source_owner": "skeleton/agents",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:jobs-durability->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "jobs-durability",
+      "target_plane": "observability",
+      "source_owner": "skeleton/agents",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:memory->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "data-persistence",
+      "source_owner": "skeleton/memory",
+      "target_owner": "skeleton/persistence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "target_failure_contract": "read-only/degraded mode where safe",
+      "source_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "target_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:memory->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/memory",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:memory->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "governance",
+      "source_owner": "skeleton/memory",
+      "target_owner": "skeleton/vault",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "target_failure_contract": "block transfer when classification/policy unknown",
+      "source_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "target_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:memory->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "memory",
+      "target_plane": "identity",
+      "source_owner": "skeleton/memory",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:model-provider->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "model-provider",
+      "target_plane": "configuration-secrets",
+      "source_owner": "skeleton/provider_runtime.py",
+      "target_owner": "skeleton/config",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "target_failure_contract": "fail startup or disable optional capability",
+      "source_acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
+      ],
+      "target_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:model-provider->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "model-provider",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/provider_runtime.py",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:model-routing->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "model-routing",
+      "target_plane": "model-provider",
+      "source_owner": "skeleton/frontier/model_routing.py",
+      "target_owner": "skeleton/provider_runtime.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation"
+      ],
+      "target_failure_contract": "provider unavailable, no credential leakage",
+      "source_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "target_acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:model-routing->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "model-routing",
+      "target_plane": "observability",
+      "source_owner": "skeleton/frontier/model_routing.py",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:observability->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "observability",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/observability",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:operator-control->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "application-api",
+      "source_owner": "backend/core/product_control_runtime.py",
+      "target_owner": "backend",
+      "source_zone": "application",
+      "target_zone": "application",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness"
+      ],
+      "target_failure_contract": "typed 4xx/5xx without secret leakage",
+      "source_acceptance": [
+        "admin auth",
+        "preflight denial",
+        "receipt integrity",
+        "audit ordering"
+      ],
+      "target_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:operator-control->deployment-release",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "deployment-release",
+      "source_owner": "backend/core/product_control_runtime.py",
+      "target_owner": "skeleton/deploy",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "build artifact",
+        "release manifest",
+        "preflight",
+        "health/readiness",
+        "rollback"
+      ],
+      "target_failure_contract": "do not promote or rollback",
+      "source_acceptance": [
+        "admin auth",
+        "preflight denial",
+        "receipt integrity",
+        "audit ordering"
+      ],
+      "target_acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:operator-control->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "observability",
+      "source_owner": "backend/core/product_control_runtime.py",
+      "target_owner": "skeleton/observability",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "admin auth",
+        "preflight denial",
+        "receipt integrity",
+        "audit ordering"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:operator-control->security-safety",
+      "relation": "runtime_dependency",
+      "source_plane": "operator-control",
+      "target_plane": "security-safety",
+      "source_owner": "backend/core/product_control_runtime.py",
+      "target_owner": "skeleton/security",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt"
+      ],
+      "target_failure_contract": "deny/quarantine with sanitized audit",
+      "source_acceptance": [
+        "admin auth",
+        "preflight denial",
+        "receipt integrity",
+        "audit ordering"
+      ],
+      "target_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:orchestration->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:orchestration->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "memory",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/memory",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance"
+      ],
+      "target_failure_contract": "memory miss without authority escalation",
+      "source_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "target_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:orchestration->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "model-routing",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/frontier/model_routing.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry"
+      ],
+      "target_failure_contract": "NoRoute with sanitized evidence",
+      "source_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "target_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:orchestration->prompt-context",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "prompt-context",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/context",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "context envelope",
+        "instruction hierarchy",
+        "token/character budget",
+        "source provenance"
+      ],
+      "target_failure_contract": "drop unsafe/unbounded context",
+      "source_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "target_acceptance": [
+        "prompt injection regression suite",
+        "budget tests",
+        "source attribution tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:orchestration->tool-runtime",
+      "relation": "runtime_dependency",
+      "source_plane": "orchestration",
+      "target_plane": "tool-runtime",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/skills",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "tool manifest",
+        "input schema",
+        "authority",
+        "execution receipt",
+        "result/error"
+      ],
+      "target_failure_contract": "tool denied or bounded failure receipt",
+      "source_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "target_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:product-experience->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "application-api",
+      "source_owner": "frontend",
+      "target_owner": "backend",
+      "source_zone": "product",
+      "target_zone": "application",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness"
+      ],
+      "target_failure_contract": "typed 4xx/5xx without secret leakage",
+      "source_acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "target_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:product-experience->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "engine-api",
+      "source_owner": "frontend",
+      "target_owner": "skeleton/api",
+      "source_zone": "product",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts"
+      ],
+      "target_failure_contract": "engine-specific typed failure",
+      "source_acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "target_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:product-experience->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "identity",
+      "source_owner": "frontend",
+      "target_owner": "skeleton/api",
+      "source_zone": "product",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:product-experience->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "product-experience",
+      "target_plane": "observability",
+      "source_owner": "frontend",
+      "target_owner": "skeleton/observability",
+      "source_zone": "product",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:prompt-context->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/context",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "prompt injection regression suite",
+        "budget tests",
+        "source attribution tests"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:prompt-context->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "identity",
+      "source_owner": "skeleton/context",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "prompt injection regression suite",
+        "budget tests",
+        "source attribution tests"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:prompt-context->retrieval",
+      "relation": "runtime_dependency",
+      "source_plane": "prompt-context",
+      "target_plane": "retrieval",
+      "source_owner": "skeleton/context",
+      "target_owner": "skeleton/retrieval",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation"
+      ],
+      "target_failure_contract": "return insufficient-evidence result",
+      "source_acceptance": [
+        "prompt injection regression suite",
+        "budget tests",
+        "source attribution tests"
+      ],
+      "target_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:reasoning-verification->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "reasoning-verification",
+      "target_plane": "model-routing",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/frontier/model_routing.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry"
+      ],
+      "target_failure_contract": "NoRoute with sanitized evidence",
+      "source_acceptance": [
+        "falsification tests",
+        "repair convergence tests",
+        "calibration evaluation"
+      ],
+      "target_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:reasoning-verification->orchestration",
+      "relation": "runtime_dependency",
+      "source_plane": "reasoning-verification",
+      "target_plane": "orchestration",
+      "source_owner": "skeleton/intelligence",
+      "target_owner": "skeleton/intelligence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation"
+      ],
+      "target_failure_contract": "checkpoint and stop safely",
+      "source_acceptance": [
+        "falsification tests",
+        "repair convergence tests",
+        "calibration evaluation"
+      ],
+      "target_acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:resilience->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "data-persistence",
+      "source_owner": "skeleton/reliability",
+      "target_owner": "skeleton/persistence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "target_failure_contract": "read-only/degraded mode where safe",
+      "source_acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "target_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:resilience->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "jobs-durability",
+      "source_owner": "skeleton/reliability",
+      "target_owner": "skeleton/agents",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery"
+      ],
+      "target_failure_contract": "park work with recovery receipt",
+      "source_acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "target_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:resilience->model-routing",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "model-routing",
+      "source_owner": "skeleton/reliability",
+      "target_owner": "skeleton/frontier/model_routing.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry"
+      ],
+      "target_failure_contract": "NoRoute with sanitized evidence",
+      "source_acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "target_acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:resilience->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "resilience",
+      "target_plane": "observability",
+      "source_owner": "skeleton/reliability",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:retrieval->data-persistence",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "data-persistence",
+      "source_owner": "skeleton/retrieval",
+      "target_owner": "skeleton/persistence",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "target_failure_contract": "read-only/degraded mode where safe",
+      "source_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "target_acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:retrieval->governance",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "governance",
+      "source_owner": "skeleton/retrieval",
+      "target_owner": "skeleton/vault",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
+      ],
+      "target_failure_contract": "block transfer when classification/policy unknown",
+      "source_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "target_acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:retrieval->memory",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "memory",
+      "source_owner": "skeleton/retrieval",
+      "target_owner": "skeleton/memory",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance"
+      ],
+      "target_failure_contract": "memory miss without authority escalation",
+      "source_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "target_acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:retrieval->model-provider",
+      "relation": "runtime_dependency",
+      "source_plane": "retrieval",
+      "target_plane": "model-provider",
+      "source_owner": "skeleton/retrieval",
+      "target_owner": "skeleton/provider_runtime.py",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation"
+      ],
+      "target_failure_contract": "provider unavailable, no credential leakage",
+      "source_acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "target_acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:security-safety->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "configuration-secrets",
+      "source_owner": "skeleton/security",
+      "target_owner": "skeleton/config",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "target_failure_contract": "fail startup or disable optional capability",
+      "source_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "target_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:security-safety->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "identity",
+      "source_owner": "skeleton/security",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:security-safety->tool-runtime",
+      "relation": "runtime_dependency",
+      "source_plane": "security-safety",
+      "target_plane": "tool-runtime",
+      "source_owner": "skeleton/security",
+      "target_owner": "skeleton/skills",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "tool manifest",
+        "input schema",
+        "authority",
+        "execution receipt",
+        "result/error"
+      ],
+      "target_failure_contract": "tool denied or bounded failure receipt",
+      "source_acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "target_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:streaming-realtime->application-api",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "application-api",
+      "source_owner": "backend",
+      "target_owner": "backend",
+      "source_zone": "application",
+      "target_zone": "application",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness"
+      ],
+      "target_failure_contract": "typed 4xx/5xx without secret leakage",
+      "source_acceptance": [
+        "slow client",
+        "disconnect/reconnect",
+        "out-of-order/duplicate event tests"
+      ],
+      "target_acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:streaming-realtime->engine-api",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "engine-api",
+      "source_owner": "backend",
+      "target_owner": "skeleton/api",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts"
+      ],
+      "target_failure_contract": "engine-specific typed failure",
+      "source_acceptance": [
+        "slow client",
+        "disconnect/reconnect",
+        "out-of-order/duplicate event tests"
+      ],
+      "target_acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:streaming-realtime->jobs-durability",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "jobs-durability",
+      "source_owner": "backend",
+      "target_owner": "skeleton/agents",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery"
+      ],
+      "target_failure_contract": "park work with recovery receipt",
+      "source_acceptance": [
+        "slow client",
+        "disconnect/reconnect",
+        "out-of-order/duplicate event tests"
+      ],
+      "target_acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:streaming-realtime->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "streaming-realtime",
+      "target_plane": "observability",
+      "source_owner": "backend",
+      "target_owner": "skeleton/observability",
+      "source_zone": "application",
+      "target_zone": "engine",
+      "boundary": "cross-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "slow client",
+        "disconnect/reconnect",
+        "out-of-order/duplicate event tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "runtime_dependency:tool-runtime->configuration-secrets",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "configuration-secrets",
+      "source_owner": "skeleton/skills",
+      "target_owner": "skeleton/config",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "target_failure_contract": "fail startup or disable optional capability",
+      "source_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "target_acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:tool-runtime->foundation",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "foundation",
+      "source_owner": "skeleton/skills",
+      "target_owner": "skeleton/kernel",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "target_failure_contract": "engine does not boot",
+      "source_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "target_acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:tool-runtime->identity",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "identity",
+      "source_owner": "skeleton/skills",
+      "target_owner": "skeleton/api",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "target_failure_contract": "deny protected operations",
+      "source_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "target_acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "status": "present"
+    },
+    {
+      "id": "runtime_dependency:tool-runtime->observability",
+      "relation": "runtime_dependency",
+      "source_plane": "tool-runtime",
+      "target_plane": "observability",
+      "source_owner": "skeleton/skills",
+      "target_owner": "skeleton/observability",
+      "source_zone": "engine",
+      "target_zone": "engine",
+      "boundary": "intra-zone",
+      "binding": "logical-contract",
+      "ownership_rule": "target retains authority; consuming this contract never transfers ownership",
+      "target_contract_surface": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "source_acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "target_acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "status": "present"
+    }
+  ]
+}
