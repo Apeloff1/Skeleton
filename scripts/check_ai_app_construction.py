@@ -438,7 +438,7 @@ def _validate_provider_bootstrap(
     if not isinstance(enforcement, dict):
         errors.append("provider_bootstrap.runtime_enforcement must be an object")
     else:
-        for key in ("loader", "activation_boundary", "docker_materialization"):
+        for key in ("loader", "activation_boundary", "docker_materialization", "engine_docker_materialization"):
             try:
                 relative = _path(enforcement.get(key))
             except ValueError as exc:
