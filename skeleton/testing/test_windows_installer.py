@@ -116,7 +116,11 @@ def test_windows_build_is_pinned_and_hashes_installer():
     source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
 
     assert '"pyinstaller==6.22.3"' in source
-    assert "git -C $RepoRoot archive" in source
+    assert "$RuntimePaths = @(" in source
+    assert '"backend"' in source
+    assert '"frontend"' in source
+    assert '"skeleton"' in source
+    assert "& git @ArchiveArgs" in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
     assert "ISCC.exe" in source
@@ -128,6 +132,9 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "runs-on: windows-latest" in source
     assert 'PYTHON_VERSION: "3.14.7"' in source
     assert "JRSoftware.InnoSetup.7" in source
+    assert "--version 7.1.0" in source
+    assert "core.longpaths true" in source
+    assert "sparse-checkout-cone-mode: false" in source
     assert "scripts/windows/build_installer.ps1" in source
     assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in source
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
