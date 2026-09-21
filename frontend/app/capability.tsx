@@ -10,8 +10,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { capabilityById } from '../src/product/productCatalog';
-import { getProductControlStatus } from '../src/product/productControlClient';
-import type { ActionReadiness } from '../src/product/productControlClient';
+import { getProductReadiness } from '../src/product/productControlClient';
+import type { PublicActionReadiness } from '../src/product/productControlClient';
 
 const PILLAR_COPY = {
   create: 'CREATE',
@@ -25,14 +25,14 @@ export default function CapabilityRoute() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const capability = useMemo(() => (id ? capabilityById(id) : undefined), [id]);
-  const [readiness, setReadiness] = useState<readonly ActionReadiness[] | null>(null);
+  const [readiness, setReadiness] = useState<readonly PublicActionReadiness[] | null>(null);
 
   useEffect(() => {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    getProductControlStatus('', controller?.signal)
+    getProductReadiness(controller?.signal)
       .then((result) => {
         if (!controller?.signal.aborted && result.ok && result.data) {
-          setReadiness(result.data.readiness.actions);
+          setReadiness(result.data.actions);
         }
       })
       .catch(() => {
