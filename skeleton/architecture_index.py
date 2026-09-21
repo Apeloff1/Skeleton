@@ -180,7 +180,7 @@ PLAN_CHECKPOINTS = {
         "created_at": "2026-09-21",
         "tracks": ("AD",),
         "research_conclusion_range": ("FR001", "FR114"),
-        "research_question_range": ("RQ001", "RQ010"),
+        "research_question_range": ("RQ001", "RQ067"),
         "source_verification_range": ("SV001", "SV055"),
         "frontier_delta_range": ("FD001", "FD021"),
         "contradiction_range": ("CX001", "CX024"),
@@ -367,7 +367,7 @@ RESEARCH_PASS_INVARIANTS = {
 }
 
 RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
-RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
+RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 68))
 RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 56))
 FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 22))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
