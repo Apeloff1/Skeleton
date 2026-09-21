@@ -77,9 +77,9 @@ def test_status_exposes_truth_gated_assurance_root_and_durability(tmp_path):
     assert status["operations"]["outbox_capacity_remaining"] == 64
     assert status["operations"]["outbox_health"]["cross_process_locking"] is True
     assert status["operations"]["outbox_health"]["leased_intent_factory"] is True
-    assert status["executors"]["coverage"]["bound_actions"] == 20
-    assert status["readiness"]["ready_actions"] == 20
-    assert status["readiness"]["ready_pct"] == 95.2
+    assert status["executors"]["coverage"]["bound_actions"] == 21
+    assert status["readiness"]["ready_actions"] == 21
+    assert status["readiness"]["ready_pct"] == 100.0
     assert status["verification"]["truth_gated"] is True
     assert status["verification"]["speculation_authoritative"] is False
     assert status["verification"]["model_consensus_is_empirical_evidence"] is False
