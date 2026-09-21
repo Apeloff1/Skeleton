@@ -17,6 +17,7 @@ When documents overlap, resolve them in this order:
 5. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
 6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
 7. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+8. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
 9. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
