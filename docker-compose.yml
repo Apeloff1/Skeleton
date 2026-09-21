@@ -106,10 +106,6 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
-      - "8081:8081"      # Metro bundler
-      - "19000:19000"    # Expo
-      - "19001:19001"    # Expo DevTools
-      - "19002:19002"    # Expo DevTools
     environment:
       # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
       # must be host-resolvable rather than Docker-internal service names.
