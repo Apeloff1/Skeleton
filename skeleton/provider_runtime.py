@@ -37,9 +37,7 @@ from skeleton.intelligence.admission import (
     AdmissionError,
     AdmissionRequest,
     ResourceBudget,
-    RuntimePressure,
     UsageEstimate,
-    require_admission,
 )
 from skeleton.intelligence.admission_runtime import (
     AdmissionLease,
