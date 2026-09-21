@@ -18301,22 +18301,27 @@
       "id": "ACC-AIQ-S0-GOV-01",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:30:59Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-21T17:33:46Z",
+        "git_sha": "74243c2ac41b40040dce059d9fdb9416dce03ada",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
+          "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
+          "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
+          "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json"
+        ],
+        "statement": "Implemented canonical governance registration for conversation, memory, retrieval, and artifact writes with targeted regression tests.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada"
       },
       "verification_signoff": {
         "signed": false,
@@ -18332,7 +18337,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:30:59Z",
+      "last_event_at_utc": "2026-09-21T17:33:46Z",
       "history": [
         {
           "sequence": 1,
@@ -18350,9 +18355,34 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-AIQ-S0-GOV-01/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:33:46Z",
+          "git_sha": "74243c2ac41b40040dce059d9fdb9416dce03ada",
+          "statement": "Implemented canonical governance registration for conversation, memory, retrieval, and artifact writes with targeted regression tests.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
+            "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
+            "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
+            "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
+        "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
+        "https://github.com/Apeloff1/Skeleton/commit/74243c2ac41b40040dce059d9fdb9416dce03ada",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json"
+      ],
       "baseline_status": "pending"
     },
     {
