@@ -66,6 +66,20 @@ Optional provider/payment/seal values remain optional until the corresponding
 feature is used. `app up` fails closed when required runtime values are empty
 or obvious placeholders.
 
+## Frontend endpoint boundary
+
+`frontend/utils/apiBase.ts` is the single endpoint resolver for browser and
+native clients. Backend clients consume `API_BASE`; Skeleton-engine clients
+consume `SKELETON_API_BASE`.
+
+Resolution is explicit override first, then browser same-origin for
+reverse-proxied deployments, then the local assembled ports
+(`:8001` backend, `:8010` Skeleton). Do not read `EXPO_PUBLIC_*_URL`
+directly from feature clients.
+
+The engine liveness contract is `GET /api/v1/health/live`; frontend health
+checks must not invent a shorter `/health` path on the Skeleton service.
+
 ## Assembly rules
 
 1. New user-facing capabilities should attach to one of the declared service
