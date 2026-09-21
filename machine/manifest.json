@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.7",
+  "schema_version": "5.8",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -590,6 +590,12 @@
         "merge/1669-safe-20260920"
       ],
       "note": "Both merge snapshots diverge materially from assembly (115 and 150 files respectively) and are retained for controlled reconciliation; no blind merge performed."
+    },
+    "tmp_wave": {
+      "lineage_only": [
+        "tmp/java-accelerator-operations-rebase-20260920"
+      ],
+      "note": "Temporary rebase branch is zero-file delta versus assembly; retained as lineage only."
     }
   },
   "integrated_domains": [
