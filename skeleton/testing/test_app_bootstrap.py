@@ -182,3 +182,20 @@ def test_frontend_health_fallback_is_fail_closed():
     assert "contractSource: bootstrap ? 'bootstrap-fallback' : 'static-fallback'" in health
     assert "ok: false" in health
     assert "'Partial'" in shell
+
+
+def test_product_shell_uses_single_runtime_readiness_source():
+    from pathlib import Path
+
+    from skeleton.app.assembly import find_repo_root
+
+    root = find_repo_root(Path(__file__))
+    product = (root / "frontend/app/product.tsx").read_text(encoding="utf-8")
+    health = (root / "frontend/src/product/appHealthClient.ts").read_text(encoding="utf-8")
+    runtime = (root / "backend/routes/app_runtime.py").read_text(encoding="utf-8")
+
+    assert "getProductReadiness" not in product
+    assert "health?.product?.available" in product
+    assert "product: runtime.product" in health
+    assert "public_readiness()" in runtime
+    assert '"product": product_readiness' in runtime
