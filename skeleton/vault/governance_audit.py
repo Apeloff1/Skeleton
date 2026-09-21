@@ -193,6 +193,59 @@ class GovernanceAuditTimeline:
             },
         )
 
+    def record_export_denied(
+        self,
+        tenant_id: str,
+        missing_owner_planes: Iterable[str],
+        *,
+        correlation_id: str | None = None,
+    ) -> AuditEntry:
+        missing = tuple(
+            sorted({str(owner).strip().lower() for owner in missing_owner_planes})
+        )
+        return self._append(
+            entry_id=_event_id(
+                "export-denied",
+                _fingerprint(tenant_id),
+                ",".join(missing),
+            ),
+            action="governance.lifecycle.export",
+            subject_key=tenant_id,
+            outcome="denied",
+            correlation_id=correlation_id,
+            metadata={
+                "tenant_fp": _fingerprint(tenant_id),
+                "missing_owner_planes": list(missing),
+            },
+        )
+
+    def record_export_failure(
+        self,
+        tenant_id: str,
+        owner_plane: str,
+        error: BaseException,
+        *,
+        correlation_id: str | None = None,
+    ) -> AuditEntry:
+        return self._append(
+            entry_id=_event_id(
+                "export-failure",
+                _fingerprint(tenant_id),
+                owner_plane,
+                type(error).__name__,
+                correlation_id or get_correlation_id(),
+            ),
+            action="governance.lifecycle.export",
+            subject_key=tenant_id,
+            outcome="failure",
+            correlation_id=correlation_id,
+            metadata={
+                "tenant_fp": _fingerprint(tenant_id),
+                "owner_plane": str(owner_plane),
+                "error_type": type(error).__name__,
+            },
+        )
+
     def record_export(
         self,
         tenant_id: str,
