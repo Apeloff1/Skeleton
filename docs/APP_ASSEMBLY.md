@@ -73,7 +73,9 @@ validated against the manifest before they are passed to Compose.
 The canonical Compose file runs application code from built images. Source
 bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development
 ports are isolated there as well, so the production topology exposes only the
-browser-facing frontend port.
+browser-facing frontend port. The frontend starts only after both backend and
+Skeleton engine health checks pass; Mongo remains a health-gated dependency of
+the API services.
 
 ```bash
 # Built development images, verified after startup
