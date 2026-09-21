@@ -393,7 +393,7 @@
     {
       "id": "reasoning-verification",
       "owner": "skeleton/intelligence",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Verification, uncertainty, repair, calibration and evidence checks around generated plans/results.",
       "depends_on": [
         "model-routing",
@@ -409,20 +409,37 @@
         "verdict",
         "confidence",
         "evidence",
-        "repair instruction"
+        "repair instruction",
+        "VerificationRequest",
+        "VerificationReceipt",
+        "ClaimRecord",
+        "EvidenceReference",
+        "PostconditionCheck",
+        "verification policy",
+        "repair directive"
       ],
       "construction": [
         "separate generator/verifier roles",
         "require evidence for high-impact claims/actions",
         "calibrate confidence",
-        "feed offline calibration results from evaluation into versioned promotion decisions without creating a runtime dependency"
+        "feed offline calibration results from evaluation into versioned promotion decisions without creating a runtime dependency",
+        "make observable evidence receipts the canonical verification output",
+        "bind claims to source/tool/artifact evidence when policy requires grounding",
+        "treat self-confidence and candidate agreement as non-authoritative signals",
+        "verify side effects by durable tool receipts and postconditions",
+        "never persist hidden chain-of-thought as a verification requirement"
       ],
       "acceptance": [
         "falsification tests",
         "repair convergence tests",
-        "calibration evaluation"
+        "calibration evaluation",
+        "claim grounding tests",
+        "tool postcondition tests",
+        "qualified/abstain/block tests",
+        "self-confidence non-authority tests",
+        "verification receipt lineage tests"
       ],
-      "failure_mode": "degrade to unverified result or block high-impact action"
+      "failure_mode": "qualify/abstain/repair/block according to risk policy; never silently promote unsupported high-impact output"
     },
     {
       "id": "tool-runtime",
@@ -1550,6 +1567,37 @@
       ]
     },
     {
+      "id": "gap-verification-evidence-contract",
+      "plane": "reasoning-verification",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Verification components exist, but the canonical runtime still lacks one durable claim/evidence/postcondition verification contract. Current confidence/rubric loops can score outputs without proving which claims were grounded, which tool side effects satisfied postconditions, or which uncertainty is calibrated. A fully functional AI finalizer needs evidence-bound verdicts rather than a generic confidence number.",
+      "construction": [
+        "define VerificationRequest, VerificationReceipt, ClaimRecord, EvidenceReference and PostconditionCheck contracts",
+        "select verification level from capability/risk policy rather than model preference",
+        "structurally validate schema/invariants before semantic verification",
+        "bind factual claims to retrieval/tool/artifact/source evidence when grounding is required",
+        "bind action verification to durable ToolExecutionReceipt and explicit postconditions",
+        "treat model self-confidence/agreement as a signal only, never sole authority for factual or action verification",
+        "route model-based verifier calls through canonical model-provider with independent bounded budget",
+        "support verified, qualified, abstain, repair and block outcomes with stable reason codes",
+        "preserve failed checks and repair lineage across bounded repair turns",
+        "persist observable verification evidence only; never require or store hidden chain-of-thought"
+      ],
+      "closure_evidence": [
+        "structural verification tests",
+        "claim-to-citation grounding tests",
+        "unsupported claim becomes qualified/abstain/block per policy",
+        "tool action postcondition verification tests",
+        "model verifier uses canonical provider/routing/admission boundary",
+        "self-confidence alone cannot mark evidence-required claim verified",
+        "repair lineage and max-repair tests",
+        "high-impact block cannot be bypassed by generator retry",
+        "verification receipt binds operation/execution/turn/result and evidence ids",
+        "no hidden reasoning text is required for audit/replay"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1804,9 +1852,10 @@
         "gap-state-authority-convergence",
         "gap-conversation-state-authority",
         "gap-tool-runtime-convergence",
-        "gap-context-compiler-convergence"
+        "gap-context-compiler-convergence",
+        "gap-verification-evidence-contract"
       ],
-      "goal": "Make provider/data/action/tool/state/conversation/context decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, and deterministically compilable before adding more autonomy.",
+      "goal": "Make provider/data/action/tool/state/conversation/context/verification decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, deterministically compilable, and evidence-bound before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
@@ -1818,7 +1867,9 @@
         "model-visible tools are typed, authority-governed and receipt-backed",
         "no shadow model credentials exist inside tools",
         "every cognitive model turn uses the canonical context compiler",
-        "context trust/provenance/budget selection is deterministic and auditable"
+        "context trust/provenance/budget selection is deterministic and auditable",
+        "verification outcomes are evidence/postcondition-backed rather than confidence-only",
+        "hidden chain-of-thought is not part of durable verification state"
       ]
     },
     {
@@ -2828,6 +2879,47 @@
         "skeleton/context/policy.py",
         "skeleton/context/sources/",
         "skeleton/testing/test_context_compiler.py"
+      ]
+    },
+    {
+      "id": "WP-P0-VERIFICATION",
+      "gap": "gap-verification-evidence-contract",
+      "wave": 1,
+      "owners": [
+        "skeleton/intelligence",
+        "skeleton/retrieval",
+        "skeleton/skills",
+        "skeleton/eval"
+      ],
+      "objective": "Converge deterministic, evidence-grounded, action-postcondition and model-assisted verification into one observable receipt contract used by finalization.",
+      "steps": [
+        "freeze verification/claim/evidence/postcondition contracts",
+        "implement risk->verification-level policy",
+        "adapt deterministic schema/citation/tool/test verifiers",
+        "add optional canonical-provider semantic verifier adapter",
+        "implement claim/evidence support mapping",
+        "implement qualified/abstain/repair/block finalization outcomes",
+        "bind receipt lineage to AIExecutionResult",
+        "feed calibrated outcomes into evaluation without storing hidden reasoning"
+      ],
+      "tests": [
+        "structural",
+        "claim grounding",
+        "citation integrity",
+        "unsupported material claim",
+        "tool postcondition",
+        "model verifier routing",
+        "self-confidence non-authority",
+        "repair lineage",
+        "high-impact block",
+        "receipt privacy"
+      ],
+      "exit": "every final result that claims verification carries an immutable observable VerificationReceipt whose required claims/actions are supported by declared evidence/checks",
+      "planned_outputs": [
+        "skeleton/contracts/verification.py",
+        "skeleton/intelligence/verification_policy.py",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/testing/test_verification_runtime.py"
       ]
     },
     {
@@ -4391,5 +4483,271 @@
         "target": "remains optional reasoning/context capability with explicit adapter into ContextSegment"
       }
     ]
+  },
+  "verification_runtime_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-verification-evidence-contract",
+    "planned_modules": {
+      "contracts": "skeleton/contracts/verification.py",
+      "policy": "skeleton/intelligence/verification_policy.py",
+      "runtime": "skeleton/intelligence/verification_runtime.py"
+    },
+    "request": {
+      "required_fields": [
+        "verification_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "capability",
+        "risk_class",
+        "required_level",
+        "candidate_ref",
+        "context_snapshot_id",
+        "evidence_refs",
+        "tool_receipt_refs",
+        "artifact_refs",
+        "budget",
+        "deadline"
+      ]
+    },
+    "receipt": {
+      "required_fields": [
+        "verification_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "candidate_ref",
+        "level",
+        "outcome",
+        "reason_codes",
+        "claim_checks",
+        "postcondition_checks",
+        "evidence_refs",
+        "verifier_route_refs",
+        "repair_directive",
+        "confidence_band",
+        "created_at",
+        "completed_at"
+      ],
+      "outcomes": [
+        "verified",
+        "qualified",
+        "abstain",
+        "repair",
+        "block"
+      ],
+      "invariant": "receipt is sufficient to explain observable verification decisions without hidden model reasoning"
+    },
+    "claim_record": {
+      "required_fields": [
+        "claim_id",
+        "candidate_ref",
+        "claim_type",
+        "text_or_digest",
+        "materiality",
+        "required_evidence_class",
+        "evidence_refs",
+        "check_status",
+        "reason_code"
+      ],
+      "claim_types": [
+        "factual",
+        "derived",
+        "prediction",
+        "recommendation",
+        "code_behavior",
+        "tool_result",
+        "action_completion",
+        "citation",
+        "format"
+      ],
+      "materiality": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "evidence_reference": {
+      "required_fields": [
+        "evidence_id",
+        "source_type",
+        "source_id",
+        "content_digest",
+        "provenance",
+        "tenant_id",
+        "data_class",
+        "retrieved_or_observed_at",
+        "authority_class"
+      ],
+      "source_types": [
+        "conversation",
+        "retrieval",
+        "memory",
+        "artifact",
+        "tool_receipt",
+        "tool_postcondition",
+        "code_test",
+        "schema",
+        "policy",
+        "provider_metadata"
+      ]
+    },
+    "levels": {
+      "none": {
+        "use_for": "low-risk creative/generative response where no factual/action guarantee is claimed",
+        "required_checks": []
+      },
+      "structural": {
+        "use_for": "machine-consumed or schema-bound output",
+        "required_checks": [
+          "schema",
+          "type",
+          "bounds",
+          "required fields",
+          "invariants"
+        ]
+      },
+      "evidence": {
+        "use_for": "factual/retrieval-backed output",
+        "required_checks": [
+          "structural",
+          "material claim extraction",
+          "claim-evidence support",
+          "citation/source integrity"
+        ]
+      },
+      "action": {
+        "use_for": "tool/state-changing output",
+        "required_checks": [
+          "structural",
+          "tool receipt status",
+          "arguments digest",
+          "postconditions",
+          "compensation state if any"
+        ]
+      },
+      "high_impact": {
+        "use_for": "configured high-impact action/result",
+        "required_checks": [
+          "all policy-selected structural/evidence/action checks",
+          "strong verifier and/or human approval according to policy"
+        ]
+      }
+    },
+    "verifier_sources": {
+      "deterministic": [
+        "schema/type validators",
+        "repository invariants",
+        "citation/source existence and digest checks",
+        "tool receipts/postconditions",
+        "unit/integration/test execution",
+        "policy decisions"
+      ],
+      "model_based": {
+        "rule": "optional semantic verifier is a separate provider turn routed through model-provider/model-routing/cost-admission",
+        "requirements": [
+          "independent verifier role/config when policy requires",
+          "bounded input/output/cost/rounds",
+          "candidate and evidence supplied without hidden generator reasoning",
+          "normalized verdict schema",
+          "verifier output remains untrusted until structural validation"
+        ]
+      },
+      "statistical": [
+        "candidate agreement",
+        "calibrated historical success",
+        "self-reported confidence"
+      ],
+      "statistical_rule": "statistical/self-confidence signals may lower confidence or trigger escalation but cannot independently verify evidence-required facts/actions"
+    },
+    "citation_grounding": {
+      "algorithm": [
+        "identify material externally checkable claims when evidence level is required",
+        "associate candidate citation/source refs with claim ids",
+        "verify referenced source exists, is authorized and matches recorded digest/version",
+        "verify source excerpt/record is relevant enough to support rather than merely mention the claim",
+        "mark unsupported/contradicted/insufficient claims separately",
+        "derive overall outcome from materiality and policy"
+      ],
+      "statuses": [
+        "supported",
+        "partially_supported",
+        "unsupported",
+        "contradicted",
+        "insufficient_evidence",
+        "not_applicable"
+      ],
+      "invariant": "a citation marker alone is not evidence of support"
+    },
+    "action_verification": {
+      "checks": [
+        "tool receipt is terminal and successful or explicitly compensated",
+        "receipt operation/execution/turn/call lineage matches proposal",
+        "arguments digest matches authorized/approved proposal",
+        "declared postcondition is observed when required",
+        "artifact/state result refs exist and are authorized",
+        "ambiguous external side effects cannot be reported as completed"
+      ]
+    },
+    "repair_policy": {
+      "inputs": [
+        "candidate_ref",
+        "failed claim/check ids",
+        "stable reason codes",
+        "allowed repair instruction",
+        "remaining budget"
+      ],
+      "rules": [
+        "repair targets observable failures only",
+        "repair does not receive or require hidden chain-of-thought",
+        "repair creates a new AgentTurn and VerificationReceipt",
+        "original failed receipt remains immutable",
+        "repair limit is bounded by StopPolicy",
+        "policy/authority/high-impact blocks are not transformed into repair unless the blocking policy explicitly allows remediation"
+      ]
+    },
+    "confidence_policy": {
+      "representation": "calibrated band plus check coverage, not a magic scalar",
+      "bands": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "inputs": [
+        "deterministic checks",
+        "evidence coverage/materiality",
+        "verifier model output when used",
+        "calibration data",
+        "uncertainty signals"
+      ],
+      "rule": "numeric confidence may be exposed as derived telemetry but cannot replace per-claim/check evidence"
+    },
+    "legacy_convergence": [
+      {
+        "surface": "skeleton/intelligence/verification.py",
+        "current": "bounded confidence/revision loop",
+        "target": "usable repair-control primitive behind canonical VerificationRequest/Receipt"
+      },
+      {
+        "surface": "skeleton/intelligence/verifier.py",
+        "current": "code-specific deterministic rubric",
+        "target": "deterministic verifier adapter that emits canonical claim/check receipts"
+      },
+      {
+        "surface": "skeleton/intelligence/uncertainty.py",
+        "current": "candidate agreement + self-confidence gate",
+        "target": "uncertainty/escalation signal only; not evidence authority"
+      },
+      {
+        "surface": "skeleton/intelligence/plan_verifier.py",
+        "current": "plan-specific score gate",
+        "target": "domain verifier adapter under canonical policy/receipt semantics"
+      }
+    ],
+    "privacy_rule": "verification/audit stores claims, evidence ids/digests, checks and verdicts; hidden chain-of-thought is neither required nor persisted"
   }
 }
