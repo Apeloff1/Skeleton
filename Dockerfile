@@ -16,6 +16,14 @@ RUN addgroup -S -g 10001 appuser \
 
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
+COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json
+COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json
+COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json
+COPY --chown=appuser:appuser machine/capability_interfaces.json ./machine/capability_interfaces.json
+COPY --chown=appuser:appuser machine/ai_runtime_schemas.json ./machine/ai_runtime_schemas.json
+COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json
+COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json
+COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md
 
 # The installer toolchain is build-time only. pip 26.2+ also carries vendored
 # packages plus an embedded CycloneDX SBOM under pip/_vendor; leaving that
