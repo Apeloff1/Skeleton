@@ -185,7 +185,7 @@ PLAN_CHECKPOINTS = {
         "frontier_delta_range": ("FD001", "FD026"),
         "contradiction_range": ("CX001", "CX024"),
         "research_debt_range": ("RDE001", "RDE036"),
-        "experiment_protocol_range": ("RXP001", "RXP035"),
+        "experiment_protocol_range": ("RXP001", "RXP050"),
         "production_authority_granted": False,
         "research_refresh_required": True,
     },
@@ -372,7 +372,7 @@ RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1
 FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 27))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
 RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
-RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 36))
+RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 51))
 HISTORICAL_RESEARCH_LINEAGE_IDS = tuple(f"HL{number:03d}" for number in range(1, 111))
 RESEARCH_SOURCE_FAMILY_IDS = tuple(f"RS{number:03d}" for number in range(1, 56))
 
