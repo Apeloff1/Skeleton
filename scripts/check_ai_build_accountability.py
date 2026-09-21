@@ -223,13 +223,13 @@ def validate() -> list[str]:
                 errors.append(f"{rid}: changed status requires signed history")
             elif str(history[-1].get("to_status", "")).lower() != status:
                 errors.append(f"{rid}: latest history to_status must match current status")
-        if status in {"in_progress", "evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
+        if status in {"in_progress", "blocked", "evidence_pending", "implemented", "integrated", "passing", "passing", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if _utc(started) is None:
                 errors.append(f"{rid}: status {status} requires started_at_utc")
-        if status in {"evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
+        if status in {"evidence_pending", "implemented", "integrated", "passing", "passing", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if not impl_signed:
                 errors.append(f"{rid}: status {status} requires implementation signoff")
-        if status in {"verified", "hardened", "production", "done", "closed", "accepted_risk"}:
+        if status in {"passing", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if not verify_signed:
                 errors.append(f"{rid}: status {status} requires verification signoff")
 
@@ -241,7 +241,7 @@ def validate() -> list[str]:
             evidence = record.get("evidence")
             if not isinstance(evidence, list) or not evidence:
                 errors.append(f"{rid}: checked item requires ledger evidence")
-            if status not in {"verified", "hardened", "production", "done", "closed", "accepted_risk"}:
+            if status not in {"passing", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
                 errors.append(f"{rid}: checked item has non-terminal status {status}")
         elif record.get("completed_at_utc") is not None:
             errors.append(f"{rid}: unchecked item cannot have completed_at_utc")
