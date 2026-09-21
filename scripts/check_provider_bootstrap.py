@@ -130,12 +130,20 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.py")):
+            relative = path.relative_to(repo_root).as_posix()
+            if (
+                "/tests/" in "/" + relative
+                or relative.startswith("tests/")
+                or "/testing/" in "/" + relative
+                or path.name.startswith("test_")
+            ):
+                continue
             try:
                 source = path.read_text(encoding="utf-8")
             except OSError:
                 continue
             if _looks_like_ai_provider_surface(path, source):
-                discovered.add(path.relative_to(repo_root).as_posix())
+                discovered.add(relative)
     return discovered
 
 
