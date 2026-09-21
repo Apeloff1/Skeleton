@@ -15,8 +15,14 @@ from ipaddress import IPv4Address, IPv6Address, ip_address
 import os
 import socket
 import time
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
+
+from core.provider_architecture import (
+    ProviderArchitectureError,
+    ProviderArchitectureReceipt,
+    load_provider_architecture,
+)
 
 
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
@@ -382,11 +388,19 @@ class OpenAIProviderAdapter(ProviderAdapter):
 
 
 class ProviderRegistry:
-    """Configuration-driven provider selector used by backend call sites."""
+    """Configuration-driven provider selector with mandatory architecture read."""
 
-    def __init__(self, adapters: Sequence[ProviderAdapter], *, active: str) -> None:
+    def __init__(
+        self,
+        adapters: Sequence[ProviderAdapter],
+        *,
+        active: str,
+        architecture_loader: Callable[[str], ProviderArchitectureReceipt] = load_provider_architecture,
+    ) -> None:
         self._adapters = {adapter.provider_id: adapter for adapter in adapters}
         self.active_id = active.strip().lower()
+        self._architecture_loader = architecture_loader
+        self._architecture_receipts: dict[str, ProviderArchitectureReceipt] = {}
 
     @classmethod
     def from_env(cls) -> "ProviderRegistry":
@@ -400,24 +414,64 @@ class ProviderRegistry:
     def active(self) -> ProviderAdapter | None:
         return self._adapters.get(self.active_id)
 
+    def _architecture_receipt(self, provider_id: str) -> ProviderArchitectureReceipt:
+        receipt = self._architecture_receipts.get(provider_id)
+        if receipt is not None:
+            return receipt
+        try:
+            receipt = self._architecture_loader(provider_id)
+        except ProviderArchitectureError as exc:
+            raise ProviderUnavailableError(
+                f"AI provider architecture acknowledgement failed: {provider_id}"
+            ) from exc
+        if receipt.provider_id != provider_id:
+            raise ProviderUnavailableError(
+                f"AI provider architecture receipt identity mismatch: {provider_id}"
+            )
+        self._architecture_receipts[provider_id] = receipt
+        return receipt
+
     @property
     def available(self) -> bool:
         adapter = self.active
-        return bool(adapter and adapter.available)
+        if adapter is None or not adapter.available:
+            return False
+        try:
+            self._architecture_receipt(self.active_id)
+        except ProviderUnavailableError:
+            return False
+        return True
 
     def require_active(self) -> ProviderAdapter:
         adapter = self.active
         if adapter is None:
             raise ProviderUnavailableError(f"unsupported AI provider: {self.active_id}")
+        self._architecture_receipt(self.active_id)
         if not adapter.available:
             raise ProviderUnavailableError(f"AI provider is not configured: {self.active_id}")
         return adapter
+
+    def architecture_receipt(self, provider_id: str | None = None) -> dict[str, Any]:
+        target = (provider_id or self.active_id).strip().lower()
+        if target not in self._adapters:
+            raise ProviderUnavailableError(f"unsupported AI provider: {target}")
+        return self._architecture_receipt(target).as_dict()
 
     def statuses(self) -> list[dict[str, Any]]:
         statuses = []
         for provider_id, adapter in sorted(self._adapters.items()):
             status = adapter.status()
             status["active"] = provider_id == self.active_id
+            try:
+                receipt = self._architecture_receipt(provider_id)
+            except ProviderUnavailableError:
+                status["architecture_acknowledged"] = False
+                status["architecture_tag"] = None
+                status["construction_version"] = None
+            else:
+                status["architecture_acknowledged"] = True
+                status["architecture_tag"] = receipt.architecture_tag
+                status["construction_version"] = receipt.construction_version
             statuses.append(status)
         return statuses
 
