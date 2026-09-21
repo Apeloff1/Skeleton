@@ -1,4 +1,6 @@
 import { API_BASE, SKELETON_API_BASE } from '../../utils/apiBase';
+import { bootstrapService, getAppBootstrap } from './appBootstrapClient';
+import type { AppBootstrap } from './appBootstrapClient';
 
 export type AppServiceHealth = {
   name: 'backend' | 'skeleton';
@@ -12,7 +14,14 @@ export type AppHealthSnapshot = {
   ok: boolean;
   checkedAt: number;
   services: readonly AppServiceHealth[];
+  application: AppBootstrap['application'] | null;
+  contractSource: 'bootstrap' | 'fallback';
 };
+
+const FALLBACK_HEALTH_PATHS = Object.freeze({
+  backend: '/api/health',
+  skeleton: '/api/v1/health/live',
+});
 
 async function probe(
   name: AppServiceHealth['name'],
@@ -79,14 +88,26 @@ export async function probeAppHealth(
   timeoutMs = 2_500,
   signal?: AbortSignal,
 ): Promise<AppHealthSnapshot> {
+  let bootstrap: AppBootstrap | null = null;
+  try {
+    bootstrap = await getAppBootstrap(signal);
+  } catch {
+    bootstrap = null;
+  }
+
+  const backendPath = bootstrapService(bootstrap, 'backend')?.health_path || FALLBACK_HEALTH_PATHS.backend;
+  const skeletonPath = bootstrapService(bootstrap, 'skeleton')?.health_path || FALLBACK_HEALTH_PATHS.skeleton;
+
   const services = await Promise.all([
-    probe('backend', API_BASE, '/api/health', timeoutMs, signal),
-    probe('skeleton', SKELETON_API_BASE, '/api/v1/health/live', timeoutMs, signal),
+    probe('backend', API_BASE, backendPath, timeoutMs, signal),
+    probe('skeleton', SKELETON_API_BASE, skeletonPath, timeoutMs, signal),
   ]);
 
   return {
     ok: services.every((service) => service.ok),
     checkedAt: Date.now(),
     services,
+    application: bootstrap?.application ?? null,
+    contractSource: bootstrap ? 'bootstrap' : 'fallback',
   };
 }
