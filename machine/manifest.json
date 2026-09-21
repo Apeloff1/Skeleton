@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.1",
+  "schema_version": "5.2",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -525,6 +525,19 @@
         "supervisor custody pre-reconcile"
       ],
       "note": "backup snapshots diverge substantially; retained as historical recovery/source material, not merge targets"
+    },
+    "stabilize_wave": {
+      "lineage_only": [
+        "most shell stabilization branches audited with zero file delta",
+        "stabilize/shell-core-20260919-v1"
+      ],
+      "new_pr": "#1876 shell orchestration stabilization",
+      "held": [
+        "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "stabilize/shell-ai-recovery-integrity-20260920-clean"
+      ],
+      "note": "large 300-file shell waves remain held for file-level reconciliation"
     }
   },
   "integrated_domains": [
