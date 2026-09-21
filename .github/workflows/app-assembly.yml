@@ -112,10 +112,10 @@ jobs:
 
       - name: Validate Compose topology
         env:
-          MONGO_URL: mongodb://admin:assembly-test@mongo:27017/tutolage?authSource=admin
-          SKL_MONGO_URI: mongodb://admin:assembly-test@mongo:27017/skeleton?authSource=admin
-          MONGO_INITDB_ROOT_PASSWORD: assembly-test-password
-          JWT_SECRET: assembly-test-jwt-secret-not-for-runtime
+          MONGO_URL: mongodb://admin:dummy@mongo:27017/tutolage?authSource=admin
+          SKL_MONGO_URI: mongodb://admin:dummy@mongo:27017/skeleton?authSource=admin
+          MONGO_INITDB_ROOT_PASSWORD: dummy
+          JWT_SECRET: not-a-real-jwt-secret
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml config --quiet
