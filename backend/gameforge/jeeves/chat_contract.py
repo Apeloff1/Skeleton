@@ -25,13 +25,33 @@ class HistoryMessage(BaseModel):
 
 
 class ChatReq(BaseModel):
-    session_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Stable conversation identifier. The server owns transcript state for this ID.",
+    )
+    client_message_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Stable client turn identifier used for retry idempotency.",
+    )
     message: str = Field(min_length=1, max_length=16000)
     image_base64: str | None = Field(default=None, max_length=MAX_ATTACHMENT_BASE64)
     pdf_base64: str | None = Field(default=None, max_length=MAX_ATTACHMENT_BASE64)
     force_all_forms: bool = False
     context: str = Field(default="", max_length=4000)
-    history: list[HistoryMessage] = Field(default_factory=list, max_length=20)
+    history: list[HistoryMessage] = Field(
+        default_factory=list,
+        max_length=20,
+        description=(
+            "Legacy bootstrap history only. Once a server transcript exists for session_id, "
+            "the backend ignores caller-supplied history and reconstructs context from durable state."
+        ),
+    )
 
     @field_validator("message")
     @classmethod
