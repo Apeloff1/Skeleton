@@ -22,6 +22,8 @@ on:
       - "skeleton/testing/test_operation_stream_store.py"
       - "skeleton/frontier/operation_stream_store.py"
       - "skeleton/contracts/operation.py"
+      - "skeleton/persistence/operation_store.py"
+      - "skeleton/testing/test_operation_store.py"
       - "skeleton/vault/data_governance.py"
       - "skeleton/vault/data_lifecycle.py"
       - "skeleton/vault/governance_registry.py"
@@ -137,6 +139,7 @@ jobs:
           python -m compileall -q
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
+          skeleton/persistence/operation_store.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
           skeleton/automation/free_model.py
           skeleton/jeeves/providers.py
@@ -166,6 +169,7 @@ jobs:
           skeleton/testing/test_governance_registry.py
           skeleton/testing/test_cost_admission.py
           skeleton/testing/test_operation_contract.py
+          skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_stream.py
           skeleton/testing/test_operation_stream_store.py
           skeleton/testing/test_app_assembly.py
