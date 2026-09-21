@@ -2934,12 +2934,196 @@ PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 atlas=docs/architecture/frontier-research-atlas-2026.md
 conclusions=FR001..FR114
 research_questions=RQ001..RQ010
+source_verifications=SV001..SV036
+frontier_delta=FD001..FD010
 experiment_queue=RA001..RI003
 production_authority_granted=false
 research_refresh_required=true
 ```
 
-**Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
+### AD39. Source-status attestation — ⬜
+
+For every priority source, record the exact current status:
+
+- accepted/peer-reviewed;
+- preprint;
+- submission/ARR;
+- withdrawn;
+- official-organization evidence;
+- unresolved.
+
+**Gate:** accepted, submitted, preprint and withdrawn are never collapsed into one "published research" label.
+
+### AD40. Identifier and version resolution — ⬜
+
+Resolve and bind:
+
+- arXiv ID/version;
+- OpenReview forum/submission ID;
+- DOI/venue where available;
+- official technical report URL identity;
+- code/model/data repository commit or release;
+- source date and last-modified date.
+
+**Gate:** a title match alone is insufficient evidence identity.
+
+### AD41. Research independence graph — ⬜
+
+Track correlated evidence through:
+
+- shared authors;
+- shared base model;
+- shared data;
+- shared benchmark;
+- shared evaluator;
+- shared code;
+- shared provider;
+- shared hardware;
+- direct method ancestry.
+
+**Gate:** five correlated papers cannot count as five independent replications.
+
+### AD42. Methods extraction and hidden-variable ledger — ⬜
+
+For consequential findings, extract:
+
+- model size/family;
+- data;
+- training tokens;
+- optimizer;
+- LR/schedule;
+- precision;
+- hardware;
+- batch;
+- context;
+- inference protocol;
+- evaluator;
+- seeds;
+- selection/tuning budget;
+- omitted/unknown variables.
+
+Unknown methods remain explicit uncertainty.
+
+### AD43. Benchmark provenance and contamination audit — ⬜
+
+For every benchmark used for architecture promotion, record:
+
+- creation/release date;
+- public/private status;
+- web availability;
+- candidate training contamination risk;
+- evaluator version;
+- saturation/headroom;
+- prompt/template version;
+- known benchmark corrections.
+
+### AD44. Research-agent governance — ⬜
+
+AI research workers must operate under:
+
+- immutable experiment manifests;
+- sandboxed code execution;
+- benchmark access controls;
+- hidden promotion holdouts;
+- scorer-variance defenses;
+- generated-data provenance;
+- trajectory audit;
+- independent recomputation or review.
+
+**Gate:** a research agent cannot mark its own result reproduced, accepted, or promotion-ready.
+
+### AD45. Monitorability/version drift research — ⬜
+
+Maintain monitorability as a versioned measured property over:
+
+- model artifact;
+- training recipe;
+- reasoning effort;
+- monitor model;
+- observations available to the monitor;
+- threat/task population;
+- adversarial evasion;
+- false-positive and false-negative evidence.
+
+**Gate:** monitorability results do not transfer automatically after model/training/reasoning changes.
+
+### AD46. Whole-trajectory safety science — ⬜
+
+Evaluation must include sequences where risk emerges from accumulation:
+
+- covert code modification;
+- motivated/misleading classification;
+- repeated privilege use;
+- delayed external side effects;
+- data exfiltration;
+- unauthorized disclosure;
+- hidden cleanup avoidance;
+- post-error recovery;
+- evaluation awareness.
+
+### AD47. First-party evidence triangulation — ⬜
+
+First-party deployment evidence may create urgent threat models and experiments, but architecture conclusions seek independent corroboration where possible.
+
+Record:
+
+- organization;
+- access asymmetry;
+- proprietary data unavailable for reproduction;
+- local replication proxy;
+- cross-lab evidence;
+- uncertainty.
+
+### AD48. September 2026 frontier-delta queue — 🧪
+
+Reproduce or operationalize the highest-impact FD findings:
+
+1. research-agent anti-cheating and independent validation;
+2. monitorability drift across model/training versions;
+3. trajectory-level safety evaluation;
+4. judge incentive/mislabeling stress tests;
+5. OOD detector generalization;
+6. counterfactual interpretability usefulness;
+7. unified KV/network/topology serving experiment;
+8. inference-protocol manifests for reasoning;
+9. factorial synthetic-data study;
+10. source-status freshness automation.
+
+### AD49. Research claim expiry and revalidation — ⬜
+
+A conclusion can expire without becoming false.
+
+Expiration triggers:
+
+- newer stronger baseline;
+- venue/status change;
+- retraction/correction;
+- new negative result;
+- model generation change;
+- hardware generation change;
+- benchmark contamination/saturation;
+- local reproduction failure;
+- production telemetry contradicting scope.
+
+Expired conclusions remain in lineage but cannot silently support new promotion decisions.
+
+### AD50. Research saturation integrity gate — ⬜
+
+Before claiming research saturation for a domain, require:
+
+- at least one foundational anchor;
+- at least one current frontier source where applicable;
+- negative/counterevidence;
+- source-status verification;
+- strongest baseline;
+- local experiment;
+- replication status;
+- scale/hardware scope;
+- unresolved contradictions;
+- refresh date;
+- implementation dependency.
+
+**Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
 ---
 
@@ -3012,8 +3196,8 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 26. 🧪 Build Track AA forks for sparse attention, hybrid blocks, MoE, long context, low precision and distributed/serving step changes.
 27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
-29. 🔨 Establish Track AD research saturation: normalize priority sources, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
-30. 🧪 Execute the AD high-information experiment queue before expensive full-scale architecture commitments.
+29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
+30. 🧪 Execute the AD high-information experiment queue plus FD001–FD010 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
 31. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
