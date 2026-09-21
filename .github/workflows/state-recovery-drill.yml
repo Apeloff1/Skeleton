@@ -1,0 +1,102 @@
+name: State Recovery Drill
+
+on:
+  pull_request:
+    paths:
+      - "scripts/state_recovery_drill.py"
+      - "skeleton/testing/test_state_recovery_drill.py"
+      - "backend/services/rag_state_repository.py"
+      - "backend/services/rag_service.py"
+      - "backend/tests/test_rag_state_authority.py"
+      - "machine/state_topology.json"
+      - "machine/ai_app_construction.json"
+      - "docker-compose.yml"
+      - ".github/workflows/state-recovery-drill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: state-recovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authoritative-first-recovery:
+    name: Authoritative-first recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      mongo:
+        image: mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' >/dev/null"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install recovery drill dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pymongo>=4.10,<5"
+
+      - name: Run pure recovery contract tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_state_recovery_drill.py
+
+      - name: Run live Mongo backup restore and rebuild drill
+        run: >-
+          python scripts/state_recovery_drill.py live-mongo
+          --uri "mongodb://127.0.0.1:27017"
+          --source-database "skeleton_recovery_drill_source"
+          --restored-database "skeleton_recovery_drill_restored"
+          --output "${RUNNER_TEMP}/state-recovery.json"
+
+      - name: Verify recovery evidence and ordering
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "state-recovery.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          phases = [
+              "seed_authority",
+              "backup_authority",
+              "destroy_restore_target",
+              "restore_authority",
+              "verify_authority",
+              "rebuild_derived",
+              "verify_derived",
+              "ready",
+          ]
+          actual = [event["phase"] for event in report["journal"]["events"]]
+          assert report["status"] == "passed"
+          assert report["journal"]["verified_authority"] is True
+          assert report["journal"]["complete"] is True
+          assert actual == phases
+          assert actual.index("verify_authority") < actual.index("rebuild_derived")
+          assert report["backup_digest"] == report["restore_digest"]
+          print("state-recovery-drill: OK")
+          print("phases:", " -> ".join(actual))
+          print("backup/restore digest:", report["backup_digest"])
+          print("derived digest:", report["derived_projection_digest"])
+          PY
