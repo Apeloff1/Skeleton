@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v1.0`  
+**Architecture tag:** `arch-map/v1.3`  
 **Machine contract:** `machine/architecture.json`  
 **Runtime contract:** `skeleton/app/manifest.json`  
 **Validator:** `python scripts/check_architecture_map.py`
@@ -189,7 +189,9 @@ uses a strangler-by-domain approach:
    history blindly.
 
 This keeps current assembly work mergeable while steadily reducing duplicate
-ownership.
+ownership. Current transitional top-level roots are `core`, `eval`, `memory`,
+`satellites`, and `.emergent`; root `deploy.py` is a legacy operator entrypoint.
+Their disposition is machine-readable in `machine/architecture.json`.
 
 ## 9. Architecture checkpoints
 
@@ -202,6 +204,8 @@ Current checkpoint chain:
 ```text
 arch-map/v1.0  canonical ownership + topology map
 arch-map/v1.1  fail-closed architecture validator
+arch-map/v1.2  regression tests for topology invariants
+arch-map/v1.3  runtime/repository linkage + fail-fast CI + transitional-root policy
 ```
 
 ## 10. Operator commands
