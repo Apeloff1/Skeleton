@@ -356,6 +356,14 @@ The matrix currently maps **173 unique historical/edge/obscure catalogue entries
 
 A W00–W11 package may reach implementation before every mapped edge case is closed, but it may not reach hardened/production status until relevant high-impact cases are either evidence-passing or recorded as explicit accepted risks with ownership.
 
+## 21.2 Full-program edge-case ownership
+
+The edge/historical catalogue is now fully owned across W00–W30 through `machine/ai_full_edge_case_matrix.json` and `docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md`.
+
+All **240 catalogue entries** have at least one work-package owner. Each entry carries criticality, recommended evidence modes and explicit work-package references. Critical/high concrete failure cases require executable evidence or an explicit accepted-risk record before the owning capability can be promoted to hardened/production.
+
+The current atomic AI build queue also inherits this matrix. Each task exposes counts for the total/critical/high/medium/reference cases inherited from its work-package references, making edge-case pressure visible to scheduling, review and promotion logic.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
