@@ -93,7 +93,7 @@ def test_inno_setup_contract_is_per_user_and_uninstallable():
     assert "PrivilegesRequired=lowest" in source
     assert "ArchitecturesAllowed=x64compatible" in source
     assert "Uninstallable=yes" in source
-    assert 'Filename: "{app}\\Skeleton.exe"' in source
+    assert 'Filename: "{app}\\{#AppExeName}"' in source
     assert 'Parameters: "--stop --quiet"' in source
     assert 'Type: files; Name: "{app}\\.env"' in source
     assert "{userdesktop}\\Skeleton" in source
