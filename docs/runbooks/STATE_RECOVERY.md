@@ -1,6 +1,6 @@
 # Authoritative-First State Recovery Runbook
 
-Architecture contract: `machine/state_topology.json`  
+Architecture contract: `machine/state_topology.json`
 Construction task: `AIQ-S0-STATE-03`
 
 ## Recovery law
