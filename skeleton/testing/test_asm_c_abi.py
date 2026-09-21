@@ -39,7 +39,7 @@ int main(void) {
 
     const float left[7] = {1.0f, -2.0f, 3.5f, 4.0f, 0.25f, 9.0f, -7.0f};
     const float right[7] = {2.0f, 5.0f, -1.5f, 2.0f, 8.0f, -3.0f, 6.0f};
-    const float expected_dot = -66.25f;
+    const float expected_dot = -72.25f;
     if (!nearf(skeleton_asm_dot_f32(left, right, 7), expected_dot)) {
         return 20;
     }
@@ -75,7 +75,7 @@ int main(void) {
     if (
         !nearf(scores[0], expected_dot) ||
         !nearf(scores[1], -2.25f) ||
-        !nearf(scores[2], 140.5f) ||
+        !nearf(scores[2], 144.25f) ||
         !nearf(scores[3], 14.5f)
     ) {
         return 31;
