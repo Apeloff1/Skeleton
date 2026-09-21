@@ -178,8 +178,8 @@ PLAN_CHECKPOINTS = {
         "tracks": ("AD",),
         "research_conclusion_range": ("FR001", "FR114"),
         "research_question_range": ("RQ001", "RQ010"),
-        "source_verification_range": ("SV001", "SV050"),
-        "frontier_delta_range": ("FD001", "FD016"),
+        "source_verification_range": ("SV001", "SV055"),
+        "frontier_delta_range": ("FD001", "FD021"),
         "contradiction_range": ("CX001", "CX024"),
         "research_debt_range": ("RDE001", "RDE036"),
         "experiment_protocol_range": ("RXP001", "RXP035"),
@@ -342,8 +342,8 @@ RESEARCH_PASS_INVARIANTS = {
 
 RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
 RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
-RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 51))
-FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 17))
+RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 56))
+FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 22))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
 RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
 RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 36))
