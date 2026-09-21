@@ -667,6 +667,10 @@ def audit_product_health_contract() -> None:
         "contractSource: 'runtime' | 'bootstrap-fallback' | 'static-fallback'" in client,
         "health contract provenance missing",
     )
+    check(
+        "ok: false," in client and "whole-application verdict remains fail-closed" in client,
+        "direct health fallback must not claim whole-app readiness",
+    )
 
     for name in ("backend", "skeleton"):
         service = services.get(name)
