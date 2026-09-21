@@ -64,8 +64,8 @@ class OperationSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SKL_OPERATION_")
 
-    state_path: str = "data/operation_state.sqlite"
-    stream_path: str = "data/operation_stream.sqlite"
+    state_path: str = ":memory:"
+    stream_path: str = ":memory:"
     outbox_batch_size: int = Field(default=256, ge=1, le=10_000)
     default_deadline_s: float = Field(default=120.0, gt=0.0, le=86_400.0)
 
