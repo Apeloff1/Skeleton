@@ -20,7 +20,12 @@ from skeleton.provider_runtime import (
     OpenAISyncProviderAdapter,
     ProviderError,
     ProviderRequest,
+    _MAX_PROVIDER_RESPONSE_BYTES as _RUNTIME_MAX_PROVIDER_RESPONSE_BYTES,
 )
+
+# Historical test/caller compatibility. Network transport now lives in the
+# canonical runtime, but the old module-level safety constant remains stable.
+_MAX_PROVIDER_RESPONSE_BYTES = _RUNTIME_MAX_PROVIDER_RESPONSE_BYTES
 
 
 class LLMProvider(Protocol):
