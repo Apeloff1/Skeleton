@@ -579,3 +579,71 @@ required dependency is unavailable, while protected provider execution lacks
 its architecture receipt, or while the product shell lacks a service it
 declares as required.
 
+
+
+### 14.9 Capability interface registry
+
+`machine/capability_interfaces.json` is the exhaustive edge ledger for the
+construction graph. The plane graph answers *what depends on what*; the
+interface registry answers *what contract is consumed at that edge, who owns
+it, how it may fail, and what evidence proves it*.
+
+Every `depends_on` and `validates` relation appears exactly once. The current
+v3.6 generation contains 86 entries. Runtime dependencies are classified as
+`intra-zone` or `cross-zone`; acceptance targets are `evidence-only`.
+No relationship is allowed to exist only in prose.
+
+Each entry binds:
+
+- source and target plane;
+- canonical source and target owner;
+- source and target zone;
+- relationship class;
+- boundary and binding class;
+- target contract surface;
+- target failure contract;
+- source and target acceptance evidence;
+- current maturity derived from the connected plane states;
+- the invariant that consuming a contract never transfers target state
+  authority.
+
+The registry deliberately repeats selected construction facts. That duplication
+is a drift detector, not a second source of truth: the validator recomputes the
+expected values from the architecture and construction contracts and rejects
+any stale copy.
+
+Run:
+
+```bash
+python scripts/check_capability_interfaces.py
+python scripts/check_capability_interfaces.py --json
+```
+
+A new plane dependency is incomplete until the interface entry exists. A moved
+plane owner is incomplete until every affected interface entry converges. A
+deleted dependency is incomplete while a stale interface entry remains.
+
+### 14.10 Interface change law
+
+Changing an existing interface follows a stricter sequence than adding ordinary
+implementation code:
+
+```text
+target contract change
+ -> compatibility/version decision
+ -> interface-registry update
+ -> target tests
+ -> consumer tests
+ -> failure-mode tests
+ -> architecture + construction validation
+ -> capability-interface validation
+ -> assembly validation
+```
+
+For breaking changes, introduce a versioned compatibility window or migrate all
+consumers in the same bounded landing lane. Do not change a target contract and
+leave consumers to infer the new behavior from runtime failures.
+
+Cross-zone interfaces receive extra scrutiny because they define architectural
+coupling. Prefer narrow immutable envelopes, explicit errors, bounded resource
+semantics, and IDs/references over shared mutable objects.
