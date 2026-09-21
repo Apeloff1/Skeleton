@@ -226,6 +226,37 @@ def audit_launcher_convergence() -> None:
     check("Enter Product" in welcome, "welcome product label drift")
 
 
+def audit_product_health_contract() -> None:
+    client = read("frontend/src/product/appHealthClient.ts")
+    shell = read("frontend/app/product.tsx")
+    raw = read("skeleton/app/manifest.json")
+    if not raw:
+        return
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+
+    services = {
+        item.get("name"): item
+        for item in manifest.get("services", [])
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    for name, base_symbol in (("backend", "API_BASE"), ("skeleton", "SKELETON_API_BASE")):
+        service = services.get(name)
+        check(isinstance(service, dict), f"manifest health service missing: {name}")
+        if not isinstance(service, dict):
+            continue
+        path = service.get("health_path")
+        check(isinstance(path, str) and bool(path), f"manifest health path missing: {name}")
+        if isinstance(path, str) and path:
+            expected = f"probe('{name}', {base_symbol}, '{path}'"
+            check(expected in client, f"product health client drift for {name}: {path}")
+
+    check("probeAppHealth" in shell, "product shell no longer probes whole-app health")
+    check("Application runtime" in shell, "product shell runtime health panel missing")
+
+
 def audit_product_control_contract() -> None:
     client = read("frontend/src/product/productControlClient.ts")
     ops = read("backend/routes/ops.py")
@@ -281,6 +312,7 @@ def main() -> int:
     audit_compose_modes()
     audit_production_ingress()
     audit_launcher_convergence()
+    audit_product_health_contract()
     audit_product_control_contract()
     audit_product_route_registry()
 
