@@ -332,10 +332,19 @@ class RootedFilesystem:
                             "created parent cannot be opened safely"
                         ) from exc
                 except OSError as exc:
-                    if exc.errno == errno.ELOOP:
-                        raise FilesystemPathError(
-                            "parent path component is a symlink"
-                        ) from exc
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                        try:
+                            entry = os.stat(
+                                part,
+                                dir_fd=current_fd,
+                                follow_symlinks=False,
+                            )
+                        except OSError:
+                            entry = None
+                        if entry is not None and stat.S_ISLNK(entry.st_mode):
+                            raise FilesystemPathError(
+                                "parent path component is a symlink"
+                            ) from exc
                     raise FilesystemPathError(
                         "parent directory cannot be opened safely"
                     ) from exc
