@@ -133,11 +133,19 @@
       "can_start_before_closure_dependencies_close": true,
       "target_paths": [
         "machine/state_topology.json",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "docs/runbooks/STATE_RECOVERY.md",
+        "docs/AI_APP_CONSTRUCTION_MANUAL.md"
       ],
       "acceptance": [
         "Mongo backup/restore drill",
-        "derived-store loss/rebuild"
+        "derived-store loss/rebuild",
+        "authoritative restore digest and index verification",
+        "derived rebuild ordering fail-closed",
+        "live isolated Mongo recovery workflow"
       ],
       "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
       "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
