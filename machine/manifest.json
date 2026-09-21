@@ -683,7 +683,12 @@
     "Use skeleton/app/manifest.json as the canonical runtime topology contract.",
     "Frontend network clients must resolve application endpoints through frontend/utils/apiBase.ts.",
     "Normal, first-run, and recovery launch paths must converge on /product.",
-    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based."
+    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based.",
+    "Read machine/state_topology.json before changing authoritative or derived state ownership.",
+    "Read machine/ai_runtime_schemas.json before changing cross-plane AI envelopes or persisted/wire record fields.",
+    "Read machine/ai_capabilities.json before adding or exposing a user-visible AI capability.",
+    "Read machine/ai_implementation_handoff.json before implementing a functional-AI P0 work package.",
+    "Update machine/ai_closure_evidence.json only from executable evidence; do not infer closure from file existence."
   ],
   "application_assembly": {
     "contract": "skeleton/app/manifest.json",
@@ -717,7 +722,11 @@
     "capability_interface_registry": "machine/capability_interfaces.json",
     "capability_interface_validator": "scripts/check_capability_interfaces.py",
     "state_topology": "machine/state_topology.json",
-    "state_topology_validator": "scripts/check_state_topology.py"
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "capability_registry": "machine/ai_capabilities.json",
+    "implementation_handoff": "machine/ai_implementation_handoff.json",
+    "closure_evidence_ledger": "machine/ai_closure_evidence.json"
   },
   "ai_app_construction": {
     "contract": "machine/ai_app_construction.json",
@@ -742,6 +751,22 @@
     "interface_registry": "machine/capability_interfaces.json",
     "interface_validator": "scripts/check_capability_interfaces.py",
     "state_topology": "machine/state_topology.json",
-    "state_topology_validator": "scripts/check_state_topology.py"
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "capability_registry": "machine/ai_capabilities.json",
+    "implementation_handoff": "machine/ai_implementation_handoff.json",
+    "closure_evidence_ledger": "machine/ai_closure_evidence.json",
+    "provider_bootstrap_documents": [
+      "machine/manifest.json",
+      "machine/architecture.json",
+      "machine/ai_app_construction.json",
+      "machine/capability_interfaces.json",
+      "machine/state_topology.json",
+      "machine/ai_runtime_schemas.json",
+      "machine/ai_capabilities.json",
+      "machine/ai_implementation_handoff.json",
+      "machine/ai_closure_evidence.json",
+      "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+    ]
   }
 }
