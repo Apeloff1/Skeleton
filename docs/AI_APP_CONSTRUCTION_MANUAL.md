@@ -1697,7 +1697,7 @@ This section is mandatory for implementation work. Logical capability design is
 not sufficient; every change must land in the physical structure declared by
 `machine/architecture.json -> structural_blueprint`.
 
-The structural checkpoint is `structure-map/v1.2`.
+The structural checkpoint is `structure-map/v1.3`.
 
 ### 35.1 Construction decision sequence
 
@@ -2229,4 +2229,151 @@ stop accepting new work
 
 A plane-specific shutdown implementation may be stricter, but it may not skip
 the guarantees encoded by its execution profile.
+
+## 37. Boot, readiness, shutdown, upgrade, and crash assembly
+
+The installer, preloader, local runtime, Compose runtime, CI smoke path, and
+future service supervisor must all derive lifecycle order from
+`machine/architecture.json -> structural_blueprint.runtime_lifecycle`.
+
+### 37.1 Preflight
+
+Before starting or upgrading the runtime, execute these gates:
+
+- `architecture-map`
+- `construction-contract`
+- `provider-bootstrap`
+- `app-assembly`
+
+A failed preflight blocks mutation/startup. Do not start a partially understood
+topology and hope later health checks repair it.
+
+### 37.2 Startup
+
+#### 0. data-foundation
+
+Nodes: `mongo`, `chroma`
+
+Mode: `parallel`
+
+Barrier: started-and-health-probe-eligible
+
+#### 1. core-services
+
+Nodes: `skeleton`, `backend`
+
+Mode: `parallel`
+
+Barrier: ready-before-dependent-product-start
+
+#### 2. product-shell
+
+Nodes: `frontend`
+
+Mode: `serial`
+
+Barrier: ready-after-backend-and-engine
+
+
+The startup sequence is not a fixed sleep schedule. A group crosses its barrier
+only through declared readiness. A fast process that is not dependency-ready
+does not unblock its consumers.
+
+### 37.3 Readiness law
+
+- a runtime node is not ready until every declared dependency is ready
+- liveness proves process survival; readiness proves dependency-safe request admission
+- degraded readiness must be explicit and cannot claim unavailable capability as healthy
+- provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed
+- product readiness requires both application and engine endpoints used by the shell
+
+Implementation consequence: installers and preloaders should present separate
+states for **starting**, **live**, **ready**, **degraded**, and **blocked**
+instead of one ambiguous "running" flag.
+
+### 37.4 Shutdown
+
+#### 0. stop-product-admission
+
+Nodes: `frontend`
+
+Action: stop new user mutations and preserve bounded resume state
+
+#### 1. drain-core-services
+
+Nodes: `backend`, `skeleton`
+
+Action: stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence
+
+#### 2. stop-data-foundation
+
+Nodes: `chroma`, `mongo`
+
+Action: fence writers, flush durable state, then stop stores
+
+
+Global rule: reverse runtime dependency order; consumers drain before dependencies stop.
+
+The goal is deterministic preservation of user-visible terminal state and
+durable authority, not merely process termination.
+
+### 37.5 Upgrade
+
+- validate architecture/construction/provider/app contracts before mutating installed runtime
+- run persistence migrations before starting code that requires the new schema and retain rollback compatibility evidence
+- replace stateless service replicas only after readiness of replacement capacity
+- drain durable workers before incompatible code replacement
+- never upgrade a dependency underneath a consumer that has not been drained or proven compatible
+- rollback uses the last release evidence pointer and must preserve durable state compatibility
+
+For the Windows installer this means upgrade is a transaction with preflight,
+drain, migration, replacement, readiness proof, and rollback evidence. Copying
+new files over a live process is not an upgrade strategy.
+
+### 37.6 Crash recovery
+
+- restart only within the owning recovery domain unless a dependency health failure requires broader restart
+- terminal operation state is never reopened by process restart
+- realtime reconnect resumes from durable cursor or returns explicit resync
+- ambiguous durable writes fail closed and require recovery evidence
+- policy/security/governance failure blocks protected work rather than bypassing the plane
+
+Recovery automation must reason in terms of recovery domains and operation
+identity. A restart may reconstruct execution, but it may not reopen a terminal
+operation, duplicate a side effect, or treat an uncertain write as successful.
+
+### 37.7 Installer/preloader state machine
+
+A compatible setup/runtime controller should expose at least:
+
+```text
+discovered
+ -> contract_validated
+ -> environment_validated
+ -> prerequisites_ready
+ -> data_foundation_starting
+ -> core_services_starting
+ -> product_starting
+ -> readiness_converging
+ -> ready
+
+ready
+ -> draining
+ -> checkpointing
+ -> stopping_consumers
+ -> stopping_dependencies
+ -> stopped
+
+ready
+ -> upgrade_preflight
+ -> drain
+ -> migrate
+ -> replace
+ -> restart
+ -> verify
+ -> {ready | rollback}
+```
+
+Every transition should emit an operation/event receipt so setup failures are
+diagnosable and resumable rather than opaque.
 
