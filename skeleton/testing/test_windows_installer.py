@@ -120,6 +120,9 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert '"backend"' in source
     assert '"frontend"' in source
     assert '"skeleton"' in source
+    assert '":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"' in source
+    assert "$MaxRuntimeRelativePathChars = 190" in source
+    assert "$PathBudgetViolations" in source
     assert "& git @ArchiveArgs" in source
     assert "Get-FileHash -Algorithm SHA256" in source
     assert "Skeleton-Setup-*-windows-x64.exe" in source
