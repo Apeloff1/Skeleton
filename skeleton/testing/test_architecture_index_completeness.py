@@ -277,6 +277,17 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert source_audit["withdrawn_work_remains_available_as_scoped_evidence"] is True
     assert source_audit["first_party_evidence_is_not_independent_consensus"] is True
     assert source_audit["status_upgrade_is_new_evidence_event"] is True
+    assert source_audit["correction_or_retraction_is_new_evidence_event"] is True
+    assert "accepted_peer_reviewed" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "accepted_poster" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "accepted_oral" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "workshop" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "submission" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "arr_submission" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "withdrawn" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "rejected" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "corrected" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
+    assert "retracted" in architecture_index.RESEARCH_SOURCE_STATUS_STATES
 
     assert automation["research_agent_cannot_mark_own_result_reproduced"] is True
     assert automation["research_agent_cannot_read_blind_promotion_answers"] is True
@@ -286,6 +297,17 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert monitorability["monitorability_is_versioned_measured_property"] is True
     assert monitorability["monitorability_is_not_assumed_monotonic_with_capability"] is True
     assert monitorability["learned_detector_ood_generalization_is_not_assumed"] is True
+
+    assert "paper_scale" in architecture_index.REPRODUCTION_CLASSES
+    assert "transfer" in architecture_index.REPRODUCTION_CLASSES
+    assert "systems" in architecture_index.REPRODUCTION_CLASSES
+    assert "adversarial" in architecture_index.REPRODUCTION_CLASSES
+    assert "open" in architecture_index.RESEARCH_DEBT_STATES
+    assert "partially_retired" in architecture_index.RESEARCH_DEBT_STATES
+    assert "supported_in_scope" in architecture_index.RESEARCH_RESULT_STATES
+    assert "null_result" in architecture_index.RESEARCH_RESULT_STATES
+    assert "falsified_in_scope" in architecture_index.RESEARCH_RESULT_STATES
+    assert "reproduction_failed" in architecture_index.RESEARCH_RESULT_STATES
 
     assert debt["open_research_debt_is_visible"] is True
     assert debt["paper_claim_alone_cannot_retire_local_debt"] is True
