@@ -1815,6 +1815,333 @@ Need controlled transfer tests across representation/action changes.
 ## RQ010 — Can research agents conduct reliable autonomous science?
 Current evidence says: useful acceleration, not reliable general autonomy.
 
+## Domain-resolved research-question bank
+
+The questions below refine the original cross-domain RQ001–RQ010 set. They are intentionally narrower, falsifiable, and tied to local evidence.
+
+### Model architecture
+
+## RQ011 — Where is the dense Transformer actually dominated?
+Need a task × sequence length × hardware × concurrency map where a non-dense candidate wins on quality, wall-clock, memory, and reliability simultaneously.
+
+**Closure evidence:** RXP001/RXP006/RXP007 plus at least one transfer-scale confirmation.
+
+## RQ012 — Which architecture advantages survive system integration?
+A model-level win may disappear after serving, checkpointing, kernels, batching, recovery, and tool/structured-output requirements.
+
+**Closure evidence:** full-stack comparison rather than isolated training loss or FLOPs.
+
+## RQ013 — How much hybrid complexity is justified?
+Attention + recurrence + MoE + sparse routing can improve local metrics while increasing debugging and recovery complexity.
+
+**Closure evidence:** lifecycle-cost Pareto frontier including operator complexity and rollback.
+
+### Representation/tokenization
+
+## RQ014 — When does byte-latent modeling beat mature subword tokenization?
+Need multilingual/code/noise/Unicode/structured-output experiments at equal wall-clock and serving cost.
+
+**Closure evidence:** RXP009.
+
+## RQ015 — Can representation changes preserve cache/tool/adapter compatibility?
+Representation identity may force invalidation of prefix caches, adapters, retrieval chunking, or structured-output assumptions.
+
+**Closure evidence:** cross-artifact conformance matrix.
+
+## RQ016 — What representation is best for mixed text/code/binary-ish streams?
+No single representation is yet established across natural language, source code, logs, identifiers, and semi-structured data.
+
+**Closure evidence:** workload-specific representation router or evidence that one scheme dominates.
+
+### Neural memory and retrieval
+
+## RQ017 — What information belongs in parametric, neural, episodic, semantic, or retrieved state?
+The boundaries should be chosen by update rate, provenance, deletion, privacy, latency, and compression—not convenience.
+
+**Closure evidence:** RXP008/RXP013/RXP014.
+
+## RQ018 — What memory policy best handles contradiction and temporal supersession?
+Append-only, latest-write-wins, graph revision, and probabilistic belief stores have different failure modes.
+
+**Closure evidence:** RXP014 with historical reconstruction.
+
+## RQ019 — Can learned memory beat retrieval while retaining replay and deletion semantics?
+Quality alone is insufficient if internal memory cannot be reconstructed, scoped, reset, or audited.
+
+**Closure evidence:** RXP008; debt RDE018.
+
+### Training data and mixtures
+
+## RQ020 — How transferable are proxy-optimized data mixtures?
+A mixture optimized at small scale may not remain optimal after model, optimizer, or context changes.
+
+**Closure evidence:** RXP002.
+
+## RQ021 — Which synthetic-data transformations preserve distributional breadth?
+Rephrasing, textbook generation, bootstrapping, verified code/proofs, and recursive generations should not be collapsed.
+
+**Closure evidence:** RXP003.
+
+## RQ022 — How much rare/low-frequency data should quality filters preserve?
+Aggressive quality filtering can remove the exact tails needed for robustness and language/domain coverage.
+
+**Closure evidence:** filter-threshold sweep with long-tail and OOD metrics.
+
+### Optimization and numerics
+
+## RQ023 — Which optimizer wins after update-scale normalization?
+Muon/SOAP/Shampoo/GaLore claims need matched tuning, update RMS, memory, and wall-clock.
+
+**Closure evidence:** RXP004.
+
+## RQ024 — What optimizer components are architecture-specific?
+Matrix orthogonalization, curvature estimates, low-rank states, and scalar/embedding parameters may require different rules.
+
+**Closure evidence:** ParameterOptimizationMap ablations.
+
+## RQ025 — Where are the actual precision failure boundaries?
+Short successful runs do not establish long-horizon FP8/FP4 stability.
+
+**Closure evidence:** RXP005 plus larger-scale/full-duration confirmation.
+
+### Test-time reasoning
+
+## RQ026 — Which tasks benefit from breadth, depth, decomposition, or verification?
+There may be no global test-time-compute policy.
+
+**Closure evidence:** RXP010 quality-cost surfaces.
+
+## RQ027 — When does more reasoning become overthinking?
+Need calibrated marginal-utility stopping rather than fixed token expansion.
+
+**Closure evidence:** compute derivative by task difficulty and method.
+
+## RQ028 — Can latent recurrence replace visible reasoning without losing controllability?
+Hidden computation may be efficient but harder to debug, monitor, and verify.
+
+**Closure evidence:** RXP007 plus monitorability comparison.
+
+### Formal reasoning and verification
+
+## RQ029 — Which Skeleton workflows are worth formalizing first?
+Formal methods are expensive; select state machines where failure cost and specification clarity justify them.
+
+**Closure evidence:** one model-checked critical workflow plus engineering-cost accounting.
+
+## RQ030 — How do we validate semantic fidelity before formal proof?
+A proof of the wrong formalization is false assurance.
+
+**Closure evidence:** RXP025.
+
+## RQ031 — When should deterministic/formal verification outrank learned evaluation?
+Need explicit routing by task formalizability, checker coverage, and proof/check cost.
+
+**Closure evidence:** mixed task portfolio comparing checker/model/human evidence.
+
+### Agents and long horizon
+
+## RQ032 — Is horizon length itself the dominant long-agent bottleneck?
+Context size, exploration, credit assignment, and action granularity are confounded in many benchmarks.
+
+**Closure evidence:** RXP016.
+
+## RQ033 — What action abstraction level minimizes error accumulation?
+Primitive actions improve control but lengthen horizon; macros reduce horizon but can create large irreversible mistakes.
+
+**Closure evidence:** primitive vs macro vs hierarchical policy comparison.
+
+## RQ034 — When do multiple agents beat one strong agent at equal total compute?
+Parallelism and specialization must exceed coordination and correlated-error cost.
+
+**Closure evidence:** RXP029.
+
+### Agent memory and procedures
+
+## RQ035 — Which future intentions belong in typed state instead of natural-language memory?
+Prospective memory may be better implemented as explicit lifecycle machinery.
+
+**Closure evidence:** RXP015.
+
+## RQ036 — How should procedures be versioned, invalidated, and superseded?
+A once-correct workflow can become dangerous after tools, APIs, or policies change.
+
+**Closure evidence:** procedural-memory lifecycle tests under tool/schema change.
+
+## RQ037 — How should reflection/consolidation avoid laundering bad observations into trusted memory?
+Reflection can compress useful patterns or amplify poison.
+
+**Closure evidence:** poison → reflection → correction campaign.
+
+### Serving and inference
+
+## RQ038 — Where is the real colocated/disaggregated serving crossover?
+The answer depends on prompt/generation mix, network, cache locality, queueing, and accelerator balance.
+
+**Closure evidence:** RXP018.
+
+## RQ039 — Which KV-management policy is best at equal memory and SLO?
+Quantization, eviction, transform coding, recompute, offload, and latent compression need downstream-quality comparisons.
+
+**Closure evidence:** RXP019.
+
+## RQ040 — How should admission control handle uncertain output length?
+Heavy-tailed generation can make reservation either wasteful or unsafe.
+
+**Closure evidence:** RXP020.
+
+### Distributed training
+
+## RQ041 — Which parallelism decomposition is optimal for each architecture/topology?
+Tensor, pipeline, sequence/context, expert, and data parallelism interact nonlinearly.
+
+**Closure evidence:** topology-aware planner study.
+
+## RQ042 — How much can training resize or recover without corrupting optimization semantics?
+Elasticity changes effective batch, optimizer state, RNG/data cursors, and communication.
+
+**Closure evidence:** live-resize/fault campaign with deterministic resume checks.
+
+## RQ043 — When is asynchronous or stale-gradient training worth the complexity?
+Throughput gains can be offset by convergence quality and reproducibility loss.
+
+**Closure evidence:** equal-wall-clock quality and staleness sensitivity study.
+
+### Multimodal and world models
+
+## RQ044 — Do multimodal post-training gains preserve perception?
+Preference optimization can improve textual answers while damaging visual/audio grounding.
+
+**Closure evidence:** RXP031.
+
+## RQ045 — What evidence is sufficient to call a representation a world model?
+Task success alone does not establish transferable transition structure.
+
+**Closure evidence:** representation/action remapping and counterfactual transition tests.
+
+## RQ046 — Should multimodal models share one latent space or retain modality-specialized state?
+Unified latent spaces improve cross-modal composition but may erase modality-specific provenance.
+
+**Closure evidence:** shared vs modular latent architecture comparison.
+
+### Evaluation science
+
+## RQ047 — How do we measure contamination risk quantitatively?
+Binary "contaminated/not contaminated" labels are often too crude.
+
+**Closure evidence:** provenance overlap, semantic similarity, release-date, and training-corpus exposure model.
+
+## RQ048 — When should a benchmark be retired?
+Saturation, contamination, poor realism, low variance, and evaluator instability are distinct retirement reasons.
+
+**Closure evidence:** benchmark health score with documented thresholds.
+
+## RQ049 — Can dynamic benchmarks remain longitudinally comparable?
+Freshness helps contamination but moving targets can destroy trend analysis.
+
+**Closure evidence:** dynamic set + stable anchors + generator-version analysis.
+
+### Safety, security, and monitorability
+
+## RQ050 — Which model behaviors remain observable enough for monitoring after stronger reasoning training?
+Monitorability may drift with model scale, hidden reasoning, and adversarial awareness.
+
+**Closure evidence:** RXP021.
+
+## RQ051 — Which learned safety detectors generalize under true distribution shift?
+In-distribution detector accuracy is insufficient.
+
+**Closure evidence:** RXP022.
+
+## RQ052 — How should authority policy interact with uncertain model intent?
+Model uncertainty or suspicious trajectories may justify extra approval, but cannot substitute for deterministic capability rules.
+
+**Closure evidence:** risk-tiered tool policy simulation.
+
+### Interpretability
+
+## RQ053 — Which interpretability method improves actual debugging decisions?
+Feature coherence is not enough.
+
+**Closure evidence:** RXP023.
+
+## RQ054 — Do explanations survive quantization, pruning, distillation, or architecture surgery?
+Deployment artifacts may have different internal mechanisms.
+
+**Closure evidence:** RXP024.
+
+## RQ055 — When is neuron-basis analysis preferable to learned feature dictionaries?
+Some circuits may already be sparse in native coordinates.
+
+**Closure evidence:** matched neuron/SAE/transcoder causal studies.
+
+### Uncertainty and calibration
+
+## RQ056 — What should confidence mean for a multi-stage agent trajectory?
+Answer confidence, retrieval confidence, tool confidence, and action confidence are not interchangeable.
+
+**Closure evidence:** stage-wise calibration model.
+
+## RQ057 — When should an agent abstain, search more, ask, or escalate?
+Uncertainty should route behavior, not merely display a percentage.
+
+**Closure evidence:** utility-calibrated selective prediction study.
+
+## RQ058 — How does calibration transfer across model/provider/version changes?
+Hosted systems can drift without API changes.
+
+**Closure evidence:** semantic canary + calibration-refresh protocol.
+
+### Continual adaptation
+
+## RQ059 — Which changes belong in memory, adapters, routing, or base weights?
+Adaptation velocity should match reversibility and evidence strength.
+
+**Closure evidence:** equal-task comparison of external memory, adapter, and weight update.
+
+## RQ060 — How can fast adaptation avoid poisoning and catastrophic forgetting?
+The faster the write path, the stronger the containment needed.
+
+**Closure evidence:** adversarial update stream with rollback/replay.
+
+## RQ061 — When should an adaptation be promoted from ephemeral to durable?
+Repeated usefulness is not enough without provenance, regression, and deletion semantics.
+
+**Closure evidence:** promotion-state experiment across adaptation layers.
+
+### Hardware, precision, and efficiency
+
+## RQ062 — Which low-precision gains are portable across hardware generations?
+Kernel/vendor support can dominate algorithmic merit.
+
+**Closure evidence:** cross-device RXP005/RXP032.
+
+## RQ063 — Do ternary/sparse architectures deliver real energy wins?
+Bit/FLOP reductions are not energy measurements.
+
+**Closure evidence:** RXP032 with real-device energy/throughput.
+
+## RQ064 — How should architecture search account for hardware lifecycle?
+A design tuned to one accelerator may become debt on the next.
+
+**Closure evidence:** multi-target cost model and portability penalty.
+
+### Research automation
+
+## RQ065 — Which research stages are safe to delegate fully?
+Literature search, code generation, experiment launch, analysis, and scientific conclusion have different failure costs.
+
+**Closure evidence:** RXP027 stage-by-stage reliability.
+
+## RQ066 — How do we detect research-agent gaming without crushing useful exploration?
+Hidden evals and anti-cheating controls can themselves reduce useful experimentation.
+
+**Closure evidence:** RXP026.
+
+## RQ067 — When is research automation net-positive after oversight cost?
+Raw experiment throughput is misleading if review/debug/recompute cost rises proportionally.
+
+**Closure evidence:** total human+compute lifecycle study measuring accepted useful findings per unit cost.
+
 ---
 
 # 23. Skeleton research experiment queue
