@@ -138,3 +138,34 @@ def test_default_smoke_profile_has_frontend_backend_and_engine():
     }
 
     assert probed == {"frontend", "backend", "skeleton"}
+
+
+def test_frontend_clients_share_canonical_runtime_endpoints():
+    root = find_repo_root(Path(__file__))
+    resolver = (root / "frontend/utils/apiBase.ts").read_text(encoding="utf-8")
+
+    assert "export const API_BASE" in resolver
+    assert "export const SKELETON_API_BASE" in resolver
+    assert "EXPO_PUBLIC_BACKEND_URL" in resolver
+    assert "EXPO_PUBLIC_SKELETON_URL" in resolver
+
+    expected_imports = {
+        "frontend/services/api.ts": "import { API_BASE } from '../utils/apiBase';",
+        "frontend/services/skeleton.ts": "import { SKELETON_API_BASE } from '../utils/apiBase';",
+        "frontend/src/utils/apiClient.ts": "import { API_BASE } from '../../utils/apiBase';",
+        "frontend/src/utils/bootHealth.ts": "import { API_BASE } from '../../utils/apiBase';",
+        "frontend/utils/safeFetch.ts": "import { API_BASE } from './apiBase';",
+        "frontend/constants/config.ts": "import { API_BASE } from '../utils/apiBase';",
+    }
+    for relative, expected in expected_imports.items():
+        source = (root / relative).read_text(encoding="utf-8")
+        assert expected in source, f"{relative} bypasses canonical runtime endpoints"
+
+
+def test_frontend_skeleton_health_matches_engine_liveness_contract():
+    root = find_repo_root(Path(__file__))
+    client = (root / "frontend/services/skeleton.ts").read_text(encoding="utf-8")
+    routes = (root / "skeleton/api/routes.py").read_text(encoding="utf-8")
+
+    assert "'/api/v1/health/live'" in client
+    assert '@router.get("/health/live")' in routes
