@@ -271,29 +271,24 @@ class SqliteTenantQuotaLedger:
         conn: sqlite3.Connection,
         tenant: str,
     ) -> QuotaUsage:
-        row = conn.execute(
-            """
-            SELECT
-                COALESCE(SUM(estimate_operations), 0) AS operations,
-                COALESCE(SUM(estimate_input_tokens), 0) AS input_tokens,
-                COALESCE(SUM(estimate_output_tokens), 0) AS output_tokens,
-                COALESCE(SUM(estimate_cost_usd), 0) AS cost_usd,
-                COALESCE(SUM(estimate_tool_calls), 0) AS tool_calls,
-                COALESCE(SUM(estimate_artifact_bytes), 0) AS artifact_bytes
-            FROM quota_reservations
-            WHERE tenant_id = ?
-            """,
+        total = QuotaUsage()
+        rows = conn.execute(
+            "SELECT * FROM quota_reservations WHERE tenant_id = ?",
             (tenant,),
-        ).fetchone()
-        assert row is not None
-        return QuotaUsage(
-            operations=int(row["operations"]),
-            input_tokens=int(row["input_tokens"]),
-            output_tokens=int(row["output_tokens"]),
-            cost_usd=float(row["cost_usd"]),
-            tool_calls=int(row["tool_calls"]),
-            artifact_bytes=int(row["artifact_bytes"]),
-        )
+        ).fetchall()
+        for row in rows:
+            reservation = SqliteTenantQuotaLedger._reservation(row)
+            observed = SqliteTenantQuotaLedger._metered_usage(
+                conn,
+                reservation.reservation_id,
+            )
+            total = total.plus(
+                SqliteTenantQuotaLedger._usage_max(
+                    reservation.estimate,
+                    observed,
+                )
+            )
+        return total
 
     @staticmethod
     def _usage_max(left: QuotaUsage, right: QuotaUsage) -> QuotaUsage:
@@ -341,29 +336,27 @@ class SqliteTenantQuotaLedger:
         tenant: str,
         reservation_id: str,
     ) -> QuotaUsage:
-        row = conn.execute(
+        total = QuotaUsage()
+        rows = conn.execute(
             """
-            SELECT
-                COALESCE(SUM(estimate_operations), 0) AS operations,
-                COALESCE(SUM(estimate_input_tokens), 0) AS input_tokens,
-                COALESCE(SUM(estimate_output_tokens), 0) AS output_tokens,
-                COALESCE(SUM(estimate_cost_usd), 0) AS cost_usd,
-                COALESCE(SUM(estimate_tool_calls), 0) AS tool_calls,
-                COALESCE(SUM(estimate_artifact_bytes), 0) AS artifact_bytes
-            FROM quota_reservations
+            SELECT * FROM quota_reservations
             WHERE tenant_id = ? AND reservation_id != ?
             """,
             (tenant, reservation_id),
-        ).fetchone()
-        assert row is not None
-        return QuotaUsage(
-            operations=int(row["operations"]),
-            input_tokens=int(row["input_tokens"]),
-            output_tokens=int(row["output_tokens"]),
-            cost_usd=float(row["cost_usd"]),
-            tool_calls=int(row["tool_calls"]),
-            artifact_bytes=int(row["artifact_bytes"]),
-        )
+        ).fetchall()
+        for row in rows:
+            reservation = SqliteTenantQuotaLedger._reservation(row)
+            observed = SqliteTenantQuotaLedger._metered_usage(
+                conn,
+                reservation.reservation_id,
+            )
+            total = total.plus(
+                SqliteTenantQuotaLedger._usage_max(
+                    reservation.estimate,
+                    observed,
+                )
+            )
+        return total
 
     @staticmethod
     def _usage_event(row: sqlite3.Row) -> QuotaUsageEvent:
