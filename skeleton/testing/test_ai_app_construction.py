@@ -150,3 +150,79 @@ def test_model_provider_plane_is_engine_owned() -> None:
     assert openai["adapter"] == "skeleton/provider_runtime.py:OpenAIProviderAdapter"
     assert openai["sync_adapter"] == "skeleton/provider_runtime.py:OpenAISyncProviderAdapter"
     assert openai["compatibility_facade"] == "backend/core/ai_provider.py"
+
+
+def test_operation_and_stream_architecture_is_materialized() -> None:
+    errors, summary = validate_construction(ROOT)
+    contract = _contract()
+
+    assert errors == []
+    assert summary["operation_stream"] == {
+        "operation_owner": "skeleton/contracts/operation.py",
+        "stream_owner": "skeleton/frontier/operation_stream.py",
+        "durable_store": "skeleton/frontier/operation_stream_store.py",
+        "stream_schema_version": 1,
+    }
+
+    operation = contract["operation_contract"]
+    assert operation["owner"] == "skeleton/contracts/operation.py"
+    assert set(operation["terminal_states"]) == {
+        "completed",
+        "failed",
+        "cancelled",
+    }
+
+    stream = contract["stream_protocol"]
+    assert stream["transport_neutral"] is True
+    assert stream["schema_version"] == 1
+    assert (
+        stream["durable_reference_store"]
+        == "skeleton/frontier/operation_stream_store.py:SQLiteOperationEventStore"
+    )
+
+    operation_fields = set(
+        contract["canonical_envelopes"]["operation"]["required_fields"]
+    )
+    assert {
+        "operation_id",
+        "tenant_id",
+        "actor_id",
+        "capability",
+        "created_at",
+        "deadline",
+        "idempotency_key",
+        "trace_id",
+    } <= operation_fields
+
+    stream_fields = set(
+        contract["canonical_envelopes"]["stream_event"]["required_fields"]
+    )
+    assert {
+        "operation_id",
+        "event_id",
+        "sequence",
+        "type",
+        "timestamp",
+        "payload",
+    } <= stream_fields
+
+
+def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
+    contract = _contract()
+    gap = next(
+        item
+        for item in contract["gap_register"]
+        if item["id"] == "gap-streaming-protocol"
+    )
+    package = next(
+        item
+        for item in contract["construction_work_packages"]
+        if item["id"] == "WP-P0-STREAM"
+    )
+
+    assert gap["status"] == "open"
+    assert package["progress"]["state"] == "in_progress"
+    assert "durable SQLite operation event store" in package["progress"]["completed"]
+    assert "durable stream storage adapter" not in package["progress"]["remaining"]
+    assert "backend SSE or WebSocket transport" in package["progress"]["remaining"]
+    assert "frontend reconnect/resume cursor" in package["progress"]["remaining"]
