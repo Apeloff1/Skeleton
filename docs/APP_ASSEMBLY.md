@@ -23,6 +23,40 @@ Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
 and can be progressively reconciled behind that boundary.
 
+## Setup and installer plane
+
+The canonical first-run path is split into three bounded layers:
+
+- `preload` is read-only. It validates Python, pip, Docker Compose, repository
+  structure, and disk headroom before setup mutates anything.
+- `setup` creates or repairs `.env` atomically. It generates local Mongo and
+  JWT secrets when required, preserves valid existing values, never prints
+  secret values, and can rotate locally generated credentials explicitly.
+- `install` composes the two phases, optionally installs the Python package,
+  validates runtime prerequisites, and validates the rendered Compose topology.
+  `--start` extends the transaction through application startup and readiness.
+
+```bash
+python -m skeleton app preload
+python -m skeleton app setup
+python -m skeleton app install
+
+# Bootstrap before the package has been installed into the interpreter
+python scripts/install_app.py
+
+# Existing managed Python environment
+python -m skeleton app install --skip-python
+
+# Install, build, start and verify the complete runtime
+python -m skeleton app install --start
+python -m skeleton app install --start --production
+```
+
+The installer does not silently install Docker or elevate privileges. Missing
+host dependencies fail closed with a remediation message. Setup writes only to
+the ignored local `.env` file; installer receipts contain key names and phase
+status, never generated secret values.
+
 ## Canonical commands
 
 ```bash
