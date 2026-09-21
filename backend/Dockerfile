@@ -67,6 +67,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY --chown=appuser:appuser backend/ .
 COPY --chown=appuser:appuser skeleton/ ./skeleton/
+COPY --chown=appuser:appuser machine/ ./machine/
+COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md
 
 USER appuser
 
