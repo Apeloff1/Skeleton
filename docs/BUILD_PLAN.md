@@ -3092,7 +3092,8 @@ Reproduce or operationalize the highest-impact FD findings:
 12. action-horizon/subgoal abstraction study;
 13. adversarial tool-metadata selection study;
 14. semantic-faithfulness vs formal-validity verifier split;
-15. research-agent stage-by-stage capability decomposition.
+15. research-agent stage-by-stage capability decomposition;
+16. typed prospective-intention-store vs retrospective-memory comparison.
 
 ### AD49. Research claim expiry and revalidation — ⬜
 
@@ -3127,6 +3128,158 @@ Before claiming research saturation for a domain, require:
 - unresolved contradictions;
 - refresh date;
 - implementation dependency.
+
+### AD51. Domain evidence matrix — ⬜
+
+Maintain one current evidence matrix across all Track AD domains:
+
+- durable evidence;
+- fragile frontier;
+- strongest counterevidence;
+- mandatory baseline;
+- blocking local experiment;
+- implementation dependency.
+
+**Gate:** no domain may be labeled "researched" from a source list alone.
+
+### AD52. Contradiction ledger — ⬜
+
+Maintain CX001–CX024 as explicit unresolved or scoped tensions.
+
+Every contradiction records:
+
+- evidence for each side;
+- scope differences;
+- methodological differences;
+- what experiment would discriminate;
+- current architecture posture.
+
+**Gate:** contradictory evidence is never averaged into a vague consensus.
+
+### AD53. Research-debt registry — ⬜
+
+Maintain RDE001–RDE036.
+
+Each debt item binds:
+
+- borrowed assumption;
+- risk if wrong;
+- claims blocked;
+- minimum retirement evidence;
+- owner;
+- refresh deadline.
+
+**Gate:** production or architecture claims disclose material open research debt.
+
+### AD54. Baseline parity contract — ⬜
+
+A challenger baseline comparison is invalid unless the reference receives comparable:
+
+- tuning budget;
+- kernels/runtime;
+- precision;
+- data;
+- context/inference budget;
+- hardware;
+- checkpoint/resume correctness;
+- evaluation exposure.
+
+### AD55. Selection-budget and multiple-comparison accounting — ⬜
+
+Record how many variants were attempted before the reported winner.
+
+Search-heavy architecture optimization must report:
+
+- configurations;
+- tuning/search algorithm;
+- pilot runs;
+- benchmark accesses;
+- failed/discarded runs;
+- human interventions.
+
+### AD56. Variance and catastrophic-failure accounting — ⬜
+
+When multiple full seeds are affordable, report them.
+
+When they are not:
+
+- run smaller-scale seed studies;
+- retain failed/diverged runs;
+- report uncertainty;
+- separately report rare catastrophic failures.
+
+**Gate:** one successful frontier run does not imply zero variance.
+
+### AD57. External-validity ledger — ⬜
+
+For every consequential result, declare which dimensions remain untested:
+
+- model family;
+- model size;
+- language/domain;
+- context length;
+- hardware;
+- topology;
+- concurrency;
+- adversarial setting;
+- failure/recovery;
+- geographic/provider environment.
+
+### AD58. Lifecycle-cost accounting — ⬜
+
+Research comparisons include material costs beyond the focal training/inference kernel:
+
+- data synthesis/filtering;
+- preprocessing;
+- index construction;
+- training;
+- optimizer state;
+- checkpoint/storage;
+- serving;
+- retrieval/search/verifier calls;
+- networking;
+- operations;
+- migration/rollback.
+
+### AD59. Research freshness SLA — ⬜
+
+Default review windows follow evidence volatility.
+
+High-volatility topics such as agents, monitorability, serving, low precision, research automation, and test-time scaling receive shorter refresh intervals than foundational results.
+
+Refresh checks:
+
+- latest version/status;
+- new code/data;
+- independent replication;
+- counterevidence;
+- stronger baseline;
+- benchmark corrections;
+- material hardware/runtime changes.
+
+### AD60. Debt retirement and reopening — ⬜
+
+Research debt states:
+
+```text
+OPEN
+ -> EXPERIMENT_DESIGNED
+ -> RUNNING
+ -> EVIDENCE_COLLECTED
+ -> CHALLENGED
+ -> RETIRED | PARTIALLY_RETIRED | INVALIDATED | DEFERRED
+```
+
+A retired debt can reopen after:
+
+- model-family change;
+- scaling regime change;
+- data/optimizer change;
+- hardware change;
+- benchmark correction;
+- local production contradiction.
+
+**Gate:** "paper says so" cannot retire local debt.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
@@ -3202,8 +3355,9 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
 29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
-30. 🧪 Execute the AD high-information experiment queue plus FD001–FD010 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
-31. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
+30. 🧪 Execute the AD high-information experiment queue plus FD001–FD016 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
+31. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
+32. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
 
