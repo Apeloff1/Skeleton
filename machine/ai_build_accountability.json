@@ -18485,11 +18485,11 @@
       "id": "ACC-AIQ-S0-GOV-02",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T17:43:11Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -18516,8 +18516,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T17:43:11Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:43:11Z",
+          "git_sha": "98ab6fd30a71dc511d550f2b13068b187b4dd9e9",
+          "statement": "Begin AIQ-S0-GOV-02 lifecycle execution adapters for deletion, retention, and export.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/98ab6fd30a71dc511d550f2b13068b187b4dd9e9",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-AIQ-S0-GOV-02/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
