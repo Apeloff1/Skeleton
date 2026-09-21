@@ -86,6 +86,9 @@ jobs:
       - name: Compile assembly surface
         run: python -m compileall -q skeleton/app skeleton/__main__.py
 
+      - name: Audit repository-wide assembly contracts
+        run: python scripts/check_app_assembly.py
+
       - name: Run assembly contract tests
         env:
           PYTHONPATH: "."
