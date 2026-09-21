@@ -1935,6 +1935,121 @@
       "invariants": [
         "cancel is idempotent and cannot reopen terminal operation"
       ]
+    },
+    "CapabilityManifest": {
+      "schema_version": 1,
+      "owner_plane": "foundation",
+      "fields": {
+        "capability_id": {
+          "type": "CapabilityId"
+        },
+        "owner_plane": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "risk_class": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "input_modalities": {
+          "type": "array<string>",
+          "max_items": 32
+        },
+        "output_modalities": {
+          "type": "array<string>",
+          "max_items": 32
+        },
+        "required_planes": {
+          "type": "array<string>",
+          "max_items": 64
+        },
+        "required_provider_capabilities": {
+          "type": "array<string>",
+          "max_items": 64
+        },
+        "tool_policy": {
+          "type": "JsonObject"
+        },
+        "memory_policy": {
+          "type": "JsonObject"
+        },
+        "retrieval_policy": {
+          "type": "JsonObject"
+        },
+        "verification_level": {
+          "type": "VerificationLevel"
+        },
+        "data_class_ceiling": {
+          "type": "DataClass"
+        },
+        "budget_profile": {
+          "type": "JsonObject"
+        },
+        "instruction_policy_ref": {
+          "type": "Ref"
+        },
+        "readiness_requirements": {
+          "type": "array<string>",
+          "max_items": 128
+        },
+        "degraded_behavior": {
+          "type": "JsonObject"
+        },
+        "golden_journeys": {
+          "type": "array<string>",
+          "max_items": 128
+        },
+        "version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        }
+      },
+      "invariants": [
+        "enabled capability is not necessarily ready",
+        "tool/data/budget/verification semantics may be tightened per operation but not widened beyond manifest policy"
+      ]
+    },
+    "InstructionPolicyRef": {
+      "schema_version": 1,
+      "owner_plane": "prompt-context",
+      "fields": {
+        "policy_id": {
+          "type": "OpaqueId"
+        },
+        "version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "platform",
+            "product",
+            "capability"
+          ]
+        },
+        "capability_id": {
+          "type": "CapabilityId",
+          "nullable": true
+        },
+        "content_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "reference identifies immutable active/evaluated instruction content"
+      ]
     }
   },
   "cross_record_invariants": [
