@@ -5883,7 +5883,8 @@
       "implementation_handoff",
       "closure_evidence_ledger",
       "ai_capability_registry",
-      "instruction_policy_registry"
+      "instruction_policy_registry",
+      "capability_registry"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -8746,5 +8747,11 @@
       "experiment assignment stability",
       "untrusted content cannot register/activate policy"
     ]
+  },
+  "capability_registry": {
+    "schema_version": 1,
+    "status": "active",
+    "registry_version": "1.0.0",
+    "path": "machine/ai_capabilities.json"
   }
 }
