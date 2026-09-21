@@ -6574,7 +6574,7 @@
         "gap": "gap-provider-surface-convergence",
         "stage": 0,
         "depends_on": [],
-        "gate": "one credential-bearing runtime provider owner with no shadow transport"
+        "gate": "one source-level credential-bearing runtime provider owner with no shadow transport; process credential relocation is deferred to the engine-boundary stage"
       },
       {
         "gap": "gap-conversation-state-authority",
@@ -6704,7 +6704,7 @@
           "gap-cost-admission",
           "gap-provider-surface-convergence"
         ],
-        "exit": "state, privacy/policy, budget and credential ownership are deterministic before higher autonomy"
+        "exit": "state, privacy/policy, budget and source-level provider ownership are deterministic before higher autonomy; process credential relocation occurs at the later engine-boundary cutover"
       },
       {
         "stage": 1,
@@ -7114,7 +7114,7 @@
     ],
     "media_rule": "text/image/edit/variation/speech all share the same governance/admission/receipt/credential boundary; media cannot be a route-owned exception",
     "automation_rule": "repository automation provider is a distinct declared surface and must not become product runtime provider ownership",
-    "deployment_rule": "after engine-boundary cutover, product runtime provider credentials are injected only into the Skeleton engine service",
+    "deployment_rule": "Source-surface convergence closes when all provider credentials/network transport are owned by the canonical provider runtime module and compatibility surfaces are non-credential facades. Moving the runtime credential from the backend process to the Skeleton engine process is a separate Stage-5 engine-boundary closure requirement.",
     "closure_evidence": [
       "provider surface inventory clean",
       "SDK/import isolation",
@@ -7122,7 +7122,7 @@
       "text/image/speech regression",
       "Jeeves/tool shadow provider denial",
       "undeclared provider denial",
-      "backend credential removal after engine cutover"
+      "compatibility application modules contain no provider credential reads or raw provider SDK/network transport"
     ]
   },
   "functional_ai_acceptance_matrix": {
