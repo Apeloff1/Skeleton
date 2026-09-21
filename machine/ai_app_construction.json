@@ -1768,7 +1768,7 @@
       "plane": "prompt-context",
       "priority": "P0",
       "status": "open",
-      "gap": "The repository contains several substantial context subsystems, but they are domain-specific and there is no single provider-neutral ContextEnvelope/ContextCompiler used by every AI turn. Feature routes can still assemble instructions, prompts and history directly, which bypasses shared trust labeling, provenance, token budgeting, conversation authority, retrieval/memory selection and injection defenses.",
+      "gap": "Canonical ContextBudget/ContextSegment/ContextEnvelope contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, and conversation/retrieval source adapters now exist. Remaining closure work is to add memory/artifact/tool/skill adapters, bind the cognitive runtime and ProviderRequest to context_id/context_digest, add provenance-preserving compaction, and migrate direct feature prompt/history construction onto the compiler.",
       "construction": [
         "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
         "materialize one ContextCompiler under skeleton/context for all cognitive runtime model turns",
@@ -1792,7 +1792,38 @@
         "summary/compaction provenance tests",
         "citation/source ids survive context projection",
         "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
-      ]
+      ],
+      "verification_state": "universal-context-contract-and-compiler-added",
+      "progress": {
+        "state": "in_progress",
+        "completed": [
+          "ContextBudget, ContextSegment and ContextEnvelope immutable contracts",
+          "stable source snapshot and context digest contract",
+          "tenant, purpose, data-class and trusted-control admission policy",
+          "mandatory platform/product/operation controls are non-evictable",
+          "deterministic priority/relevance/recency/segment-id packing",
+          "provider output and retrieval evidence remain non-control trust classes",
+          "output, tool-result, policy and safety token reserves",
+          "oversized artifact/tool-result omission boundary",
+          "explicit omitted segment IDs and reasons",
+          "provider-neutral projection with untrusted evidence delimiters",
+          "conversation source adapter with prior assistant output marked derived_untrusted",
+          "retrieval source adapter requiring tenant/data-class/purpose/provenance",
+          "determinism, injection, tenant isolation, clearance and budget regressions",
+          "App Assembly gating for context compiler contracts"
+        ],
+        "remaining": [
+          "memory source adapter for governed canonical memory records",
+          "artifact source adapter with authorization/content externalization",
+          "tool result and admitted tool schema source adapters",
+          "declarative skill instruction adapter",
+          "provenance-preserving summary/compaction implementation",
+          "bind context_id and context_digest into AgentTurn and ProviderRequest",
+          "migrate backend/routes/ai.py direct prompt/history assembly",
+          "migrate backend/services/ai_assistant_svc.py direct ProviderRequest assembly",
+          "prove all canonical cognitive model turns originate from ContextCompiler"
+        ]
+      }
     },
     {
       "id": "gap-verification-evidence-contract",
@@ -3457,9 +3488,9 @@
       "objective": "Converge all model-visible instructions, conversation, memory, retrieval, artifacts, tools and skills through one deterministic governed ContextEnvelope compiler.",
       "steps": [
         "freeze ContextEnvelope/ContextSegment/ContextBudget contracts",
-        "implement source adapters for conversation/memory/retrieval/artifact/tool/skill planes",
-        "implement deterministic token-aware packing and omission reasons",
-        "enforce trust labels and injection boundaries",
+        "implement canonical admission policy and deterministic token-aware packing",
+        "implement source adapters for conversation and retrieval",
+        "implement remaining memory/artifact/tool/skill source adapters",
         "bind context snapshot/digest to AgentTurn and ProviderRequest",
         "add provenance-preserving compaction",
         "migrate direct feature prompt/history assembly to compatibility delegation"
@@ -3482,7 +3513,20 @@
         "skeleton/context/policy.py",
         "skeleton/context/sources/",
         "skeleton/testing/test_context_compiler.py"
-      ]
+      ],
+      "progress": {
+        "state": "in_progress",
+        "completed_steps": 3,
+        "total_steps": 7,
+        "evidence": [
+          "skeleton/contracts/context.py",
+          "skeleton/context/policy.py",
+          "skeleton/context/compiler.py",
+          "skeleton/context/sources/conversation.py",
+          "skeleton/context/sources/retrieval.py",
+          "skeleton/testing/test_context_compiler.py"
+        ]
+      }
     },
     {
       "id": "WP-P0-VERIFICATION",
@@ -4973,7 +5017,7 @@
   "context_compiler_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "implementation-in-progress",
     "gap": "gap-context-compiler-convergence",
     "target_modules": {
       "contracts": "skeleton/contracts/context.py",
@@ -5194,6 +5238,23 @@
         "current": "planning/workorder/oracle context fabric",
         "target": "remains optional reasoning/context capability with explicit adapter into ContextSegment"
       }
+    ],
+    "implemented_surfaces": [
+      "context contracts",
+      "admission policy",
+      "deterministic packing",
+      "omission ledger",
+      "provider-neutral projection",
+      "conversation adapter",
+      "retrieval adapter"
+    ],
+    "remaining_surfaces": [
+      "memory adapter",
+      "artifact adapter",
+      "tool and skill adapters",
+      "compaction",
+      "AgentTurn/ProviderRequest binding",
+      "legacy route/service convergence"
     ]
   },
   "verification_runtime_blueprint": {
