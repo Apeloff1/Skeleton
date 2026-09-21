@@ -116,7 +116,7 @@ $CompilerCandidates = @(
 if (-not $CompilerCandidates) {
     throw "ISCC.exe not found. Install Inno Setup 7 (recommended) or Inno Setup 6."
 }
-$Iscc = $CompilerCandidates[0]
+$Iscc = $CompilerCandidates | Select-Object -First 1
 
 Write-Host "==> Compiling Windows setup executable with $Iscc"
 $InnoArgs = @(
