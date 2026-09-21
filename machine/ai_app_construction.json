@@ -2079,7 +2079,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative and production Skeleton reasoning is bound to durable OperationEnvelope SQLite state with transactional outbox, durable stream projection, startup reconciliation, foreground dispatch and bounded background idle retry. Formal backup/restore rehearsal, full derived-store loss recovery, and broader cognitive execution/result/approval/usage ledger bindings remain open.",
+      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative; production Skeleton reasoning uses durable OperationEnvelope state with transactional outbox and continuous reconciliation; and a live Mongo recovery drill now proves authoritative backup/restore verification before derived rebuild. Remaining work is production backup/retention policy for operation SQLite and broader cognitive execution/result/approval/usage ledger bindings.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2100,7 +2100,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "rag-and-production-operation-authority-bound-live-outbox-reconciliation-restore-and-cognitive-ledgers-open"
+      "verification_state": "rag-operation-authority-and-mongo-restore-order-proven-operation-backup-and-cognitive-ledgers-open"
     },
     {
       "id": "gap-cost-admission",
@@ -3405,12 +3405,14 @@
           "OperationEnvelope transitions commit transactional outbox intent atomically",
           "startup and foreground outbox reconciliation use retry-stable event identities",
           "bounded background dispatcher retries unpublished outbox rows during idle process time",
-          "API shutdown stops dispatcher and flushes pending outbox before store close"
+          "API shutdown stops dispatcher and flushes pending outbox before store close",
+          "live scratch Mongo logical backup/restore drill with canonical document and user-index digest verification",
+          "derived rebuild hard-fenced until authoritative restore verification passes",
+          "derived projection rebuild determinism and total Chroma-loss recovery evidence",
+          "deployment volumes labeled with declared authoritative/derived recovery roles"
         ],
         "remaining": [
-          "define production backup and retention policy for operation state",
-          "prove Mongo authoritative restore before all derived index rebuilds",
-          "run derived-store loss and rebuild drill"
+          "define production backup and retention policy for operation state"
         ]
       }
     },
@@ -6858,7 +6860,8 @@
       "migration preserves canonical ids, tenant ownership, lifecycle status and provenance",
       "downgrade/rollback policy is defined before destructive schema removal",
       "projection rebuild is never used as substitute for authoritative migration",
-      "Jeeves RAG product-state cutover commits Mongo authority before best-effort Chroma projection and supports idempotent legacy import"
+      "Jeeves RAG product-state cutover commits Mongo authority before best-effort Chroma projection and supports idempotent legacy import",
+      "State Recovery Drill uses scratch Mongo databases only and verifies logical backup/restore before allowing projection rebuild"
     ],
     "recovery_order": [
       "configuration/secrets and service identity",
@@ -6874,7 +6877,8 @@
       "derived index unavailable -> degrade retrieval/search while canonical records remain usable",
       "outbox dispatcher unavailable -> state commit may remain durable with pending delivery; reconciliation resumes later",
       "corrupt version/lineage -> fail closed and surface operator repair requirement",
-      "Jeeves Chroma projection loss -> continue canonical Mongo reads/writes and rebuild projection from Mongo"
+      "Jeeves Chroma projection loss -> continue canonical Mongo reads/writes and rebuild projection from Mongo",
+      "Recovery ordering violation -> fail closed before derived rebuild; authoritative restore must pass digest/count/index verification first"
     ],
     "closure_evidence": [
       "state topology validation",
