@@ -1660,6 +1660,702 @@ Close G131–G200: deterministic invariant/policy precedence, bootstrap/recovery
 
 ---
 
+
+## Track AC — Exotic architecture laboratory — 🧪
+
+Goal: explore architectures that may invalidate today's default assumptions about tokenization, autoregressive decoding, fixed model depth, immutable inference-time weights, dense activation, conventional precision, or the boundary between memory and computation.
+
+Track AC is deliberately **not** a production-default lane. It is a quarantined architecture laboratory. Evidence-backed candidates can graduate toward Track AA only after they demonstrate a real full-stack advantage. Speculative candidates can remain useful even if they fail, because negative evidence prevents repeated dead-end exploration.
+
+### AC0. ExoticCandidate contract — ⬜
+
+Every candidate declares:
+
+- candidate id/version;
+- architectural family;
+- hypothesis;
+- which current invariant/assumption it challenges;
+- representation/tokenizer requirements;
+- persistent vs ephemeral state;
+- whether weights/state mutate at inference time;
+- training algorithm;
+- inference algorithm;
+- compute graph shape;
+- stopping/convergence rule;
+- memory/KV/state complexity;
+- hardware assumptions;
+- distributed-training implications;
+- serving implications;
+- tool/memory/authority implications;
+- reproducibility status;
+- strongest baseline;
+- falsification test;
+- kill criteria;
+- reset/replay semantics;
+- migration/rollback path;
+- evidence maturity.
+
+**Gate:** an exotic candidate without a falsifiable advantage hypothesis remains an idea note, not an experiment.
+
+### AC1. Test-time neural memory — 🧪
+
+Prototype Titans/MIRAS-style long-term neural memory where a bounded memory module learns from the active sequence.
+
+Required separations:
+
+- model-internal ephemeral memory ≠ Skeleton durable semantic/episodic memory;
+- inference-time parameter/state updates cannot gain tool or control-plane authority;
+- per-request/per-session/resettable modes are distinct;
+- memory writes carry resource budgets and rollback/reset semantics.
+
+Measure:
+
+- recall at extreme context;
+- reasoning over recalled state;
+- state growth;
+- write/read latency;
+- interference/forgetting;
+- cross-session leakage;
+- poisoning sensitivity;
+- reproducibility after replay.
+
+**Kill:** if learned memory loses provenance-critical facts, creates cross-tenant/session leakage, or fails to outperform retrieval/context baselines at equal cost.
+
+### AC2. Tokenizer-free dynamic byte latent modeling — 🧪
+
+Evaluate BLT-style raw-byte models with learned/dynamic patches.
+
+Research questions:
+
+- can RepresentationSpec support a byte-native family without pretending token ids are universal?
+- can dynamic patch boundaries remain reproducible and cache-safe?
+- does byte-level robustness improve multilingual, rare-symbol, code, malformed-text and security-sensitive behavior?
+- how do prompt/cache/tool schema boundaries work when computation units are dynamic patches?
+
+**Kill:** if end-to-end training/serving cost or structured-output reliability loses materially to a tuned tokenizer baseline without compensating robustness.
+
+### AC3. Discrete-diffusion / iterative-denoising language generation — 🧪
+
+Build a ModelPort family that does not assume left-to-right autoregressive decode.
+
+Candidate modes:
+
+- masked-token denoising;
+- discrete diffusion;
+- block diffusion;
+- AR/diffusion hybrid;
+- parallel refinement;
+- confidence-guided remasking.
+
+Required new semantics:
+
+- draft/partial state is not committed output;
+- iteration count and convergence are budgeted;
+- tool calls cannot execute from an unstable intermediate state;
+- streaming semantics explicitly distinguish tentative vs committed text.
+
+**Kill:** if parallel decoding gains disappear under concurrency, structured output, tool use, long responses, or quality-equivalent settings.
+
+### AC4. Recurrent latent-depth reasoning — 🧪
+
+Evaluate recurrent-depth models that spend more test-time compute by repeating hidden computation rather than emitting longer visible chains.
+
+Candidates include:
+
+- shared-block recurrence;
+- Universal-Transformer-like depth recurrence;
+- YOCO-U-style partial recursion;
+- recurrent latent reasoning.
+
+Measure:
+
+- capability vs recurrence count;
+- adaptive per-token depth;
+- convergence/oscillation;
+- KV/state footprint;
+- hidden-state corruption;
+- self-speculation compatibility;
+- reasoning gains without specialized verbalized traces.
+
+**Kill:** if extra recurrence produces unstable/non-monotonic quality, uncontrollable latency, or no gain over ordinary test-time search at equal compute.
+
+### AC5. Equilibrium/fixed-point language modules — 🧪
+
+Explore implicit-depth modules that iteratively solve for a hidden fixed point.
+
+Required:
+
+- convergence detector;
+- iteration cap;
+- non-convergence fallback;
+- numerical tolerance;
+- deterministic debug mode;
+- implicit-gradient correctness tests;
+- hardware/runtime profiling.
+
+**Kill:** if convergence pathologies, training complexity, or tail latency overwhelm depth/parameter-sharing benefits.
+
+### AC6. Conditional depth / Mixture-of-Depths — 🧪
+
+Route only selected tokens through expensive layers while preserving a hard compute budget.
+
+Measure:
+
+- router stability;
+- token starvation;
+- important-token miss rate;
+- structured-output reliability;
+- adversarial routing attacks;
+- cache/layout implications;
+- quality under fixed FLOPs.
+
+**Kill:** if routing complexity or missed-token failures erase wall-clock benefit.
+
+### AC7. Differential/noise-canceling attention — 🧪
+
+Evaluate differential-attention families that explicitly subtract competing attention distributions or otherwise suppress irrelevant context.
+
+Measure:
+
+- retrieval precision;
+- long-context distraction;
+- activation outliers;
+- numerical stability;
+- extra softmax/kernel cost;
+- compatibility with sparse/flash attention;
+- prompt-injection robustness as a measured outcome, not an assumed property.
+
+### AC8. Native ternary / ~1.58-bit model family — 🧪
+
+Treat BitNet-like ternary-weight models as a distinct train-from-scratch architecture, not merely post-training quantization.
+
+Measure:
+
+- quality/token;
+- training stability;
+- CPU/GPU/NPU inference;
+- energy/memory;
+- kernel portability;
+- activation precision;
+- KV precision;
+- adapter/finetune compatibility;
+- checkpoint/storage benefits.
+
+**Massive-upgrade hook:** pair with sparsity only after independent baselines exist.
+
+### AC9. Fully sparse activation substrate — 🧪
+
+Evaluate Q-Sparse-style activation sparsity independently of MoE.
+
+Research:
+
+- token/channel sparsity;
+- block sparsity;
+- straight-through training behavior;
+- hardware-realized speedup;
+- outlier sensitivity;
+- interaction with 1.58-bit weights;
+- interaction with MoE and conditional depth.
+
+**Kill:** theoretical FLOP reduction without measured end-to-end speed/energy improvement.
+
+### AC10. Sparse-BitNet compound substrate — 🧪
+
+Jointly evaluate:
+
+- ternary weights;
+- low-bit activations;
+- semi-structured N:M sparsity;
+- sparse activations;
+- sparse KV where appropriate.
+
+This is a compound candidate and therefore requires factorial ablations. No gain may be attributed to the combined architecture without separating the contribution of each mechanism.
+
+### AC11. Cross-layer shared sparse routing — 🧪
+
+Evaluate a routing/index structure computed once or infrequently and reused across attention layers.
+
+Questions:
+
+- can routing cost be amortized?
+- does one routing error propagate through many layers?
+- can route reuse create stale attention?
+- what does it do to KV layout and distributed partitioning?
+
+### AC12. Latent multimodal language substrate — 🧪
+
+Explore continuous latent units for images/audio/video while preserving discrete text/code semantics.
+
+Candidate pattern:
+
+- shared causal backbone;
+- modality-specific encoder/decoder;
+- continuous latent vectors;
+- diffusion/refinement head for continuous outputs;
+- common provenance/authority envelope.
+
+**Gate:** modality conversion cannot erase source/time/coordinate provenance.
+
+### AC13. Reversible model blocks — 🧪
+
+Explore reversible residual/Transformer blocks to reconstruct activations during backward passes rather than store them.
+
+Measure:
+
+- activation-memory reduction;
+- recompute overhead;
+- numerical reconstruction drift;
+- interaction with low precision;
+- pipeline/tensor parallelism;
+- checkpointing complexity.
+
+### AC14. Learned context compression state — 🧪
+
+Train a model-internal compressor that converts long context into bounded latent state.
+
+It competes against:
+
+- raw long context;
+- retrieval;
+- conventional summarization;
+- Titans-style test-time memory;
+- recurrent/SSM state.
+
+Required probes:
+
+- lost-detail rate;
+- contradiction preservation;
+- provenance retention;
+- adversarial compression;
+- reversibility/inspectability.
+
+### AC15. Multi-timescale neural state — 🧪
+
+Build separate fast/medium/slow internal state channels with different decay/write rates.
+
+Examples:
+
+- token-local state;
+- segment/session state;
+- learned long-term neural state.
+
+Skeleton durable memory remains external and separately governed.
+
+### AC16. Fast-weight / weight-space working memory — 🧪
+
+Explore bounded inference-time updates to a small fast-weight module.
+
+Rules:
+
+- base model weights remain immutable;
+- fast weights have explicit scope/TTL;
+- reset is deterministic;
+- state is checksum-addressed;
+- cross-tenant/session reuse is prohibited unless explicitly promoted through normal memory policy.
+
+### AC17. Hypernetwork-generated ephemeral adapters — 🧪
+
+A controller generates small adapter weights for a task/session instead of retrieving a fixed adapter.
+
+Measure:
+
+- generation cost;
+- adapter stability;
+- reproducibility;
+- security;
+- hidden capability drift;
+- task transfer;
+- whether generated weights outperform prompt/context adaptation.
+
+### AC18. On-demand expert synthesis — 🧪
+
+Research whether rare domains/tasks justify creating temporary low-rank or micro-expert modules from demonstrations/evidence.
+
+Lifecycle:
+
+propose → train/synthesize → sandbox eval → ephemeral use → expire or submit to normal promotion.
+
+No generated expert becomes durable automatically.
+
+### AC19. Expert birth/merge/retire dynamics — 🧪
+
+For MoE-like substrates, study changing expert topology over training:
+
+- spawn overloaded specialties;
+- merge redundant experts;
+- retire dead experts;
+- rebalance routers;
+- preserve checkpoint mapping.
+
+**Kill:** topology churn that destroys reproducibility or optimizer-state continuity.
+
+### AC20. Architecture-family switching router — 🧪
+
+Allow one high-level ModelPort to route between materially different substrates:
+
+- dense Transformer;
+- recurrent-depth;
+- SSM/hybrid;
+- diffusion;
+- byte latent;
+- ternary/sparse family.
+
+Routing decision is treated as a full model-version transition with capability/semantic constraints, not merely a latency optimization.
+
+### AC21. Neural compiler / learned execution graph — 🧪
+
+Explore models that emit or select an intermediate computation graph before execution.
+
+Possible nodes:
+
+- neural block;
+- retrieval;
+- deterministic math;
+- parser;
+- symbolic solver;
+- simulator;
+- tool.
+
+Execution remains outside model authority and inherits sandbox/tool policy.
+
+### AC22. Differentiable/neuro-symbolic program substrate — 🧪
+
+Research explicit latent programs or typed symbolic intermediate representations that can be checked before execution.
+
+Target advantages:
+
+- exactness;
+- compositionality;
+- inspectable plans;
+- formal/property verification opportunities.
+
+**Kill:** symbolic overhead without measurable reliability or generalization gains.
+
+### AC23. Latent world-model simulator — 🧪
+
+Introduce a model-internal predictive environment state for tasks where action consequences matter.
+
+Strict boundaries:
+
+- simulation ≠ observation;
+- imagined state carries MODEL_GENERATED trust;
+- tools/environment receipts override predictions;
+- the simulator cannot fabricate authoritative state.
+
+### AC24. Model-predictive planning loop — 🧪
+
+Use world-model rollouts to rank candidate action sequences before real tool execution.
+
+Measure:
+
+- calibration of predicted outcomes;
+- planning depth;
+- branching cost;
+- simulator exploitation;
+- distribution shift;
+- value of real observations.
+
+### AC25. Graph-native relational substrate — 🧪
+
+Investigate architectures where entities/relations/events are first-class internal computation units rather than only retrieved text.
+
+Compare:
+
+- graph neural processing;
+- graph attention;
+- hypergraph state;
+- text+graph hybrids.
+
+Provenance must survive graph projection and aggregation.
+
+### AC26. Continuous-time / event-driven neural state — 🧪
+
+Explore continuous-time recurrent/state-space dynamics for irregular event streams.
+
+Potential domains:
+
+- telemetry;
+- markets/time series;
+- sensor streams;
+- long-running agents.
+
+Requires explicit timestamp quality and clock semantics from Track AB.
+
+### AC27. Neural cellular / local-rule recurrent substrate — 🧪
+
+Moonshot lane for computation built from repeated local update rules instead of deep unique layers.
+
+Potential advantages:
+
+- extreme parameter sharing;
+- scalable iterative compute;
+- local fault containment.
+
+Promotion bar: exceptionally high.
+
+### AC28. Spiking / neuromorphic backend — 🧪
+
+Keep an interface experiment for event-driven/spiking hardware.
+
+Research questions:
+
+- conversion vs native training;
+- latency/energy under sparse activity;
+- precision/capability loss;
+- state reset/replay;
+- portability.
+
+No hardware-efficiency claim without real-device measurement.
+
+### AC29. Analog / photonic accelerator substrate — 🧪
+
+Define only the portability boundary needed to test analog/photonic matrix engines if accessible.
+
+Required:
+
+- numeric-error model;
+- calibration;
+- drift;
+- hardware-specific reproducibility;
+- digital reference path;
+- exact artifact/hardware identity.
+
+### AC30. Error-correcting neural compute — 🧪
+
+Research selective redundancy for critical neural computations:
+
+- replicated hidden-state checks;
+- activation checksums;
+- parity-like tensor checks;
+- selective recomputation;
+- dual-path verification.
+
+Goal: tolerate silent hardware/numeric faults without tripling the full model cost.
+
+### AC31. Heterogeneous model federation — 🧪
+
+Build experiments where different model families cooperate through typed belief/evidence objects instead of plain chat.
+
+Possible roles:
+
+- reasoner;
+- verifier;
+- retriever;
+- simulator;
+- coder;
+- planner.
+
+Independence is measured by training/provider/evidence lineage, not model count.
+
+### AC32. Belief-state / probabilistic cognition layer — 🧪
+
+Represent selected uncertain propositions as explicit distributions/intervals rather than one generated sentence.
+
+Useful for:
+
+- conflicting evidence;
+- scientific claims;
+- planning under uncertainty;
+- sensor fusion.
+
+Must not imply calibrated probability where calibration evidence is absent.
+
+### AC33. Energy-based / iterative constraint inference — 🧪
+
+Explore generation as minimizing a learned or hybrid constraint energy rather than one-pass next-token prediction.
+
+Potential uses:
+
+- globally constrained structured output;
+- planning;
+- consistency repair;
+- multimodal alignment.
+
+Convergence and local-minimum behavior are first-class failure modes.
+
+### AC34. Bidirectional revise-anywhere generation — 🧪
+
+Research models that can revise earlier output positions before commit.
+
+Applications:
+
+- code;
+- structured documents;
+- proofs;
+- planning.
+
+External consumers receive only committed revisions unless the interface explicitly supports tentative edits.
+
+### AC35. Hierarchical block generation — 🧪
+
+Generate plans/segments/blocks before token-level realization.
+
+Compare:
+
+- paragraph/AST/block latent plans;
+- block diffusion;
+- multi-token prediction;
+- conventional AR decoding.
+
+Measure semantic coherence and editability, not only tokens/sec.
+
+### AC36. Self-speculative recurrent model — 🧪
+
+Use cheap early/recurrent states from the same model as draft predictions and deeper states as verifier.
+
+Research:
+
+- acceptance rate;
+- shared-error correlation;
+- cache sharing;
+- latency;
+- exact-distribution guarantees where required.
+
+### AC37. Architecture morphing / continuation training — 🧪
+
+Extend AA19 into repeatable transformation research:
+
+- dense → sparse;
+- dense → MoE;
+- token → byte-latent;
+- standard attention → differential/sparse;
+- fixed depth → recurrent depth;
+- precision reduction;
+- expert growth.
+
+Every morph requires a weight/state mapping and a baseline from scratch when affordable.
+
+### AC38. Per-request ephemeral learning — 🧪
+
+A highly quarantined lane where a small mutable module learns during one request/workflow and is destroyed afterward.
+
+Requirements:
+
+- no durable weight mutation;
+- strict budget;
+- reproducible reset;
+- poison isolation;
+- no authority amplification;
+- receipt recording that ephemeral adaptation occurred.
+
+### AC39. Self-measuring architecture controller — 🧪
+
+A controller may propose architecture/runtime choices based on measured task and hardware state.
+
+It may select among pre-approved candidates but cannot invent/promote new authority.
+
+Inputs:
+
+- task class;
+- context shape;
+- hardware pressure;
+- latency budget;
+- confidence;
+- expected marginal quality.
+
+Outputs are bounded by a declared candidate set.
+
+### AC40. Automated architecture synthesis sandbox — 🧪
+
+Moonshot lane for bounded search over block graphs, recurrence, routing, precision, memory and decoding strategies.
+
+Search can create candidates, not truth.
+
+Hard limits:
+
+- finite search space or explicit budget;
+- isolated training/eval;
+- blind promotion holdout;
+- no direct production writes;
+- mandatory simplification/ablation after discovery;
+- reproducible genotype/architecture manifest.
+
+### AC41. Exotic compound systems — 🧪
+
+Only after single mechanisms are understood, test combinations such as:
+
+- byte latent + recurrent depth;
+- recurrent depth + neural long-term memory;
+- diffusion + block autoregression;
+- ternary weights + sparse activations + conditional depth;
+- latent multimodal + diffusion heads;
+- world model + neuro-symbolic planner;
+- neural memory + retrieval + graph state.
+
+**Gate:** compound systems require factorial or staged ablation. A five-mechanism bundle cannot claim causality from one aggregate win.
+
+### AC42. Exotic anti-hype / falsification protocol — ⬜
+
+Every exotic experiment must attempt to disprove itself.
+
+Required views:
+
+- strongest tuned conventional baseline;
+- equal training tokens;
+- equal wall-clock;
+- equal inference cost;
+- equal memory;
+- equal hardware where meaningful;
+- scaling trend, not one model size;
+- downstream task quality;
+- long-tail/tail-latency;
+- failure recovery;
+- operator complexity;
+- implementation LOC/maintenance burden;
+- portability;
+- security impact.
+
+An exotic architecture is rejected or retained only as research history if the advantage disappears after full-stack normalization.
+
+### AC43. Exotic state-containment law — ⬜
+
+Any candidate with mutable inference-time neural state must declare:
+
+- state owner;
+- scope;
+- TTL;
+- tenant/session binding;
+- reset function;
+- serialization format;
+- integrity digest;
+- replay semantics;
+- poisoning boundary;
+- promotion path;
+- deletion behavior.
+
+**Invariant:** mutable neural state is never equivalent to durable trusted memory.
+
+### AC44. Exotic promotion ladder — ⬜
+
+Promotion path:
+
+idea → literature/evidence → toy reproduction → controlled scale → systems prototype → independent baseline → ablation → hostile audit → shadow → canary → Track AA candidate → production consideration.
+
+Required kill switches:
+
+- numerical instability;
+- runaway recurrence/iterations;
+- unbounded state growth;
+- cross-tenant/state leakage;
+- unreproducible hidden-state mutation;
+- inability to checkpoint/reset;
+- no measured full-stack advantage;
+- violation of Track AB P0 invariants.
+
+**Exit gate for AC:** Skeleton can test architecture-changing ideas without allowing novelty, hidden mutable state, or benchmark wins to bypass provenance, authority, recovery, or production-readiness gates.
+
+---
+
+# Exotic architecture tiers
+
+**Tier E1 — evidence-backed frontier:** AC1–AC13.  
+**Tier E2 — radical but engineering-plausible:** AC14–AC26, AC31–AC39.  
+**Tier E3 — moonshot / hardware / architecture search:** AC27–AC30, AC40–AC41.
+
+Tier is evidence maturity, not prestige. Candidates may move both directions.
+
+---
+
 # Cross-track integration contracts
 
 ## Research → absorption
@@ -1727,7 +2423,9 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 24. ⬜ Add optimizer flight recorder, numerical circuit breakers and atomic optimizer checkpoint binding.
 25. 🧪 Run optimizer challengers through equal-token/equal-wall-clock gates.
 26. 🧪 Build Track AA forks for sparse attention, hybrid blocks, MoE, long context, low precision and distributed/serving step changes.
-27. ⬜ Bind every AB/Z/AA validated or promoted state to timestamped evidence and signed artifact/ADR digests.
+27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
+28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
+29. ⬜ Bind every AB/Z/AA/AC validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
 
