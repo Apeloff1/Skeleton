@@ -1166,6 +1166,133 @@ def _validate_structural_blueprint(
             "execution mappings without construction planes: " + ", ".join(extra_execution)
         )
 
+    lifecycle = blueprint.get("runtime_lifecycle")
+    startup_group_count = 0
+    shutdown_group_count = 0
+    if not isinstance(lifecycle, dict):
+        errors.append("structural_blueprint.runtime_lifecycle must be an object")
+    else:
+        if not isinstance(lifecycle.get("derivation"), str) or not lifecycle["derivation"].strip():
+            errors.append("runtime_lifecycle.derivation must be non-empty")
+        preflight = lifecycle.get("preflight_gates")
+        if not isinstance(preflight, list) or not preflight:
+            errors.append("runtime_lifecycle.preflight_gates must be non-empty")
+            preflight = []
+        mandatory_preflight = {
+            "architecture-map",
+            "construction-contract",
+            "provider-bootstrap",
+            "app-assembly",
+        }
+        missing_preflight = sorted(mandatory_preflight - set(preflight))
+        if missing_preflight:
+            errors.append(
+                "runtime lifecycle missing mandatory preflight gates: "
+                + ", ".join(missing_preflight)
+            )
+
+        def _validate_service_groups(
+            raw_groups: object,
+            *,
+            label: str,
+            dependency_direction: str,
+        ) -> tuple[int, dict[str, int]]:
+            if not isinstance(raw_groups, list) or not raw_groups:
+                errors.append(f"runtime_lifecycle.{label} must be a non-empty list")
+                return 0, {}
+            group_ids: set[str] = set()
+            group_orders: list[int] = []
+            node_order: dict[str, int] = {}
+            for index, group in enumerate(raw_groups):
+                item_label = f"runtime_lifecycle.{label}[{index}]"
+                if not isinstance(group, dict):
+                    errors.append(f"{item_label} must be an object")
+                    continue
+                group_id = group.get("id")
+                order_value = group.get("order")
+                if not isinstance(group_id, str) or not group_id:
+                    errors.append(f"{item_label}.id must be non-empty")
+                elif group_id in group_ids:
+                    errors.append(f"duplicate {label} id: {group_id}")
+                else:
+                    group_ids.add(group_id)
+                if not isinstance(order_value, int) or isinstance(order_value, bool) or order_value < 0:
+                    errors.append(f"{item_label}.order must be a non-negative integer")
+                    continue
+                group_orders.append(order_value)
+                if group.get("mode") not in {"parallel", "serial"}:
+                    errors.append(f"{item_label}.mode must be parallel or serial")
+                detail_key = "barrier" if label == "startup_groups" else "action"
+                if not isinstance(group.get(detail_key), str) or not group[detail_key].strip():
+                    errors.append(f"{item_label}.{detail_key} must be non-empty")
+                nodes_value = group.get("nodes")
+                if not isinstance(nodes_value, list) or not nodes_value:
+                    errors.append(f"{item_label}.nodes must be non-empty")
+                    continue
+                for node_id in nodes_value:
+                    if node_id not in runtime_node_map:
+                        errors.append(f"{item_label} references unknown runtime node: {node_id}")
+                        continue
+                    if node_id in node_order:
+                        errors.append(
+                            f"runtime node {node_id} appears in multiple {label}"
+                        )
+                    else:
+                        node_order[node_id] = order_value
+            if sorted(group_orders) != list(range(len(group_orders))):
+                errors.append(f"runtime_lifecycle.{label} orders must be contiguous from 0")
+            missing_nodes = sorted(set(runtime_node_map) - set(node_order))
+            extra_nodes = sorted(set(node_order) - set(runtime_node_map))
+            if missing_nodes:
+                errors.append(
+                    f"runtime nodes missing from {label}: " + ", ".join(missing_nodes)
+                )
+            if extra_nodes:
+                errors.append(
+                    f"unknown runtime nodes in {label}: " + ", ".join(extra_nodes)
+                )
+            for node_id, node in runtime_node_map.items():
+                if node_id not in node_order:
+                    continue
+                for dependency in node.get("depends_on", []):
+                    if dependency not in node_order:
+                        continue
+                    consumer_order = node_order[node_id]
+                    dependency_order = node_order[dependency]
+                    if dependency_direction == "startup":
+                        if dependency_order >= consumer_order:
+                            errors.append(
+                                f"startup order violates runtime dependency "
+                                f"{node_id}->{dependency}: dependency group "
+                                f"{dependency_order} must precede consumer group {consumer_order}"
+                            )
+                    elif consumer_order >= dependency_order:
+                        errors.append(
+                            f"shutdown order violates runtime dependency "
+                            f"{node_id}->{dependency}: consumer group {consumer_order} "
+                            f"must precede dependency group {dependency_order}"
+                        )
+            return len(group_ids), node_order
+
+        startup_group_count, _ = _validate_service_groups(
+            lifecycle.get("startup_groups"),
+            label="startup_groups",
+            dependency_direction="startup",
+        )
+        shutdown_group_count, _ = _validate_service_groups(
+            lifecycle.get("shutdown_groups"),
+            label="shutdown_groups",
+            dependency_direction="shutdown",
+        )
+        if not isinstance(lifecycle.get("shutdown_rule"), str) or not lifecycle["shutdown_rule"].strip():
+            errors.append("runtime_lifecycle.shutdown_rule must be non-empty")
+        for list_key in ("readiness_rules", "upgrade_rules", "crash_rules"):
+            values = lifecycle.get(list_key)
+            if not isinstance(values, list) or not values or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                errors.append(f"runtime_lifecycle.{list_key} must be a non-empty string list")
+
     invariants = blueprint.get("invariants")
     if not isinstance(invariants, list) or not invariants or any(
         not isinstance(item, str) or not item.strip() for item in invariants
@@ -1183,6 +1310,8 @@ def _validate_structural_blueprint(
         "execution_hosts": len(execution_hosts),
         "execution_profiles": len(execution_profiles),
         "plane_execution": len(plane_execution),
+        "startup_groups": startup_group_count,
+        "shutdown_groups": shutdown_group_count,
     }
 
 
@@ -1272,6 +1401,8 @@ def main(argv: list[str] | None = None) -> int:
             f"acceptance-edges={summary['structure'].get('acceptance_edges', 0)}; "
             f"execution-hosts={summary['structure'].get('execution_hosts', 0)}; "
             f"execution-profiles={summary['structure'].get('execution_profiles', 0)}; "
+            f"startup-groups={summary['structure'].get('startup_groups', 0)}; "
+            f"shutdown-groups={summary['structure'].get('shutdown_groups', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
