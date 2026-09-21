@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.5.0",
+  "topology_version": "1.6.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -33,13 +33,16 @@
       "production_role": "primary-document-store",
       "network": "internal application network; host binding is loopback-only",
       "authentication": "required by compose contract",
-      "backup": "required for authoritative databases",
-      "restore": "must be proven before production promotion",
+      "backup": "required for authoritative databases; live logical scratch backup is exercised by State Recovery Drill",
+      "restore": "authoritative logical restore is verified by digest/count/index metadata before any derived rebuild",
       "migration": "logical databases have independent migration/rebuild policy",
       "evidence": [
         "docker-compose.yml",
         "backend/core/databases.py",
-        "skeleton/config/settings.py"
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -61,7 +64,9 @@
         "docker-compose.yml",
         "backend/services/rag_service.py",
         "backend/services/rag_state_repository.py",
-        "backend/tests/test_rag_state_authority.py"
+        "backend/tests/test_rag_state_authority.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -81,7 +86,10 @@
       "migration": "index schema/version changes rebuild projection",
       "evidence": [
         "docker-compose.yml",
-        "skeleton/config/settings.py"
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "backend/tests/test_rag_state_authority.py"
       ]
     },
     {
@@ -207,14 +215,17 @@
       "transaction_scope": "Mongo document/transaction boundary as implemented by domain repositories",
       "consistency": "primary application state; writes must not be acknowledged as durable if Mongo commit fails",
       "retention": "domain/governance controlled",
-      "backup_restore": "required",
+      "backup_restore": "live scratch logical backup/restore rehearsal verifies document counts, canonical document digests and user index digests before derived rebuild; production backup policy remains operator/deployment controlled",
       "migration": "migrated production application state",
       "derived_from": [],
       "rebuildable": false,
       "evidence": [
         "backend/core/databases.py",
         "backend/services/database.py",
-        "backend/services/rag_state_repository.py"
+        "backend/services/rag_state_repository.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/testing/test_state_recovery_drill.py"
       ]
     },
     {
@@ -305,7 +316,7 @@
       "transaction_scope": "Chroma collection operation",
       "consistency": "eventually consistent rebuildable projection; canonical learning sessions, user progress, co-coding state and feedback commit to Mongo first",
       "retention": "projection lifetime; canonical retention is governed in Mongo",
-      "backup_restore": "rebuild from canonical Mongo/content sources; no product-state authority depends on Chroma",
+      "backup_restore": "discard/rebuild after the authoritative Mongo restore has passed digest/count/index verification; tested for total projection loss",
       "migration": "legacy user_progress, feedback, learning-session and co-coding records import idempotently to Mongo; new writes are Mongo-first",
       "derived_from": [
         "backend-core-app-state",
@@ -317,7 +328,9 @@
         "docker-compose.yml",
         "backend/services/rag_state_repository.py",
         "backend/tests/test_rag_state_repository.py",
-        "backend/tests/test_rag_state_authority.py"
+        "backend/tests/test_rag_state_authority.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -335,7 +348,7 @@
       "transaction_scope": "vector collection operation",
       "consistency": "eventually consistent projection; absence must degrade retrieval, not canonical state",
       "retention": "rebuildable projection",
-      "backup_restore": "rebuild preferred",
+      "backup_restore": "rebuild only after authoritative source restore verification passes; backup optional when fully derived",
       "migration": "re-index from authoritative sources",
       "derived_from": [
         "engine-mongo-state",
@@ -346,7 +359,9 @@
       "rebuildable": true,
       "evidence": [
         "docker-compose.yml",
-        "skeleton/config/settings.py"
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -880,6 +895,7 @@
     "restore conversation thread/message authority and verify branch/message ordering before accepting AI chat traffic",
     "restore canonical AI memory records before rebuilding memory/vector/process-local projections",
     "verify schema/index/migration compatibility",
+    "verify authoritative document counts, canonical document digests and user index digests before any derived rebuild",
     "restore or reconstruct canonical operation state",
     "restore cognitive execution, turn and checkpoint authority before resuming AI work",
     "restore tool idempotency and human approval ledgers before allowing side-effect replay",
@@ -918,6 +934,7 @@
     "Jeeves learning sessions, user progress, co-coding ownership/state and feedback are Mongo-authoritative; Chroma is projection-only",
     "production Skeleton reasoning persists OperationEnvelope state before executing/advancing work and never treats the event stream as operation-state authority",
     "stream delivery failure leaves a durable unpublished outbox row; startup and later dispatch reconcile it using retry-stable event identity",
-    "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage"
+    "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
+    "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes"
   ]
 }
