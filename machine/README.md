@@ -110,6 +110,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Feature wave:** staged ASM vector microkernel as new PR #1875 and revalidated automation, builder, supervisor, squad, Java, and retrieval sources; existing integration PRs reused, zero-file deltas retained as lineage.
 
+- **Jeeves/frontier wave:** revalidated decision, planning, evidence, frontier reasoning, machine control, recovery, pack, runner, provider, SMB, and cockpit sources. Large topology-learning and PR-runner-hygiene waves remain held for reconciliation.
+
 ## Target layout
 
 ```text
