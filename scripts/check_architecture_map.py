@@ -848,6 +848,75 @@ def _validate_structural_blueprint(
             "the zone DAG already permits the edge or the edge is intra-zone"
         )
 
+    acceptance_raw = blueprint.get("acceptance_edges")
+    if not isinstance(acceptance_raw, list):
+        errors.append("structural_blueprint.acceptance_edges must be a list")
+        acceptance_raw = []
+    acceptance_ids: set[str] = set()
+    acceptance_pairs: set[tuple[str, str]] = set()
+    for index, edge in enumerate(acceptance_raw):
+        label = f"structural_blueprint.acceptance_edges[{index}]"
+        if not isinstance(edge, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        edge_id = edge.get("id")
+        source_plane = edge.get("source_plane")
+        target_plane = edge.get("target_plane")
+        if not isinstance(edge_id, str) or not edge_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if edge_id in acceptance_ids:
+            errors.append(f"duplicate acceptance edge id: {edge_id}")
+        acceptance_ids.add(edge_id)
+        if source_plane not in planes:
+            errors.append(
+                f"acceptance edge {edge_id} references unknown source plane: {source_plane}"
+            )
+            continue
+        if target_plane not in planes:
+            errors.append(
+                f"acceptance edge {edge_id} references unknown target plane: {target_plane}"
+            )
+            continue
+        if source_plane == target_plane:
+            errors.append(f"acceptance edge {edge_id} must not self-reference")
+        pair = (source_plane, target_plane)
+        if pair in acceptance_pairs:
+            errors.append(
+                f"duplicate acceptance edge pair: {source_plane}->{target_plane}"
+            )
+        acceptance_pairs.add(pair)
+        for key in ("kind", "rationale"):
+            if not isinstance(edge.get(key), str) or not edge[key].strip():
+                errors.append(f"acceptance edge {edge_id}.{key} must be non-empty")
+
+    construction_acceptance: set[tuple[str, str]] = set()
+    for plane_id, plane in planes.items():
+        validates = plane.get("validates", [])
+        if not isinstance(validates, list):
+            errors.append(f"construction plane {plane_id}.validates must be a list")
+            continue
+        for target_plane in validates:
+            if target_plane not in planes:
+                errors.append(
+                    f"construction plane {plane_id} validates unknown plane: {target_plane}"
+                )
+                continue
+            construction_acceptance.add((plane_id, target_plane))
+
+    missing_acceptance_edges = sorted(construction_acceptance - acceptance_pairs)
+    extra_acceptance_edges = sorted(acceptance_pairs - construction_acceptance)
+    for source_plane, target_plane in missing_acceptance_edges:
+        errors.append(
+            f"construction acceptance target lacks architecture edge: "
+            f"{source_plane}->{target_plane}"
+        )
+    for source_plane, target_plane in extra_acceptance_edges:
+        errors.append(
+            f"architecture acceptance edge lacks construction target: "
+            f"{source_plane}->{target_plane}"
+        )
+
     roots_raw = blueprint.get("composition_roots")
     if not isinstance(roots_raw, list):
         errors.append("structural_blueprint.composition_roots must be a list")
@@ -974,6 +1043,7 @@ def _validate_structural_blueprint(
         "state_authorities": len(state_names),
         "recovery_domains": len(recovery_ids),
         "dependency_exceptions": len(exception_ids),
+        "acceptance_edges": len(acceptance_ids),
     }
 
 
@@ -1060,6 +1130,7 @@ def main(argv: list[str] | None = None) -> int:
             f"placements={summary['structure'].get('plane_placements', 0)}; "
             f"recovery-domains={summary['structure'].get('recovery_domains', 0)}; "
             f"dependency-exceptions={summary['structure'].get('dependency_exceptions', 0)}; "
+            f"acceptance-edges={summary['structure'].get('acceptance_edges', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
