@@ -36,6 +36,30 @@ _SHADOW_PROVIDER_RUNTIME_MODULES = frozenset(
 )
 _ALLOWED_SHADOW_RUNTIME_IMPORTERS = frozenset()
 
+_AI_CREDENTIAL_MARKERS = frozenset(
+    {
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "SKELETON_OPENAI_API_KEY",
+        "SKELETON_ANTHROPIC_API_KEY",
+        "MODEL_API_KEY",
+        "EMERGENT_LLM_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GROQ_API_KEY",
+        "MISTRAL_API_KEY",
+        "COHERE_API_KEY",
+    }
+)
+_AI_SURFACE_PATH_TERMS = (
+    "provider",
+    "llm",
+    "model",
+    "ai_",
+    "/ai.",
+    "/ai/",
+)
+
 
 def _load() -> dict:
     try:
@@ -87,6 +111,32 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
         ):
             hits.append(name)
     return hits
+
+
+
+def _looks_like_ai_provider_surface(path: Path, source: str) -> bool:
+    relative = path.as_posix().lower()
+    if not any(term in relative for term in _AI_SURFACE_PATH_TERMS):
+        return False
+    if any(marker in source for marker in _AI_CREDENTIAL_MARKERS):
+        return True
+    return bool(_provider_sdk_imports(path))
+
+
+def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
+    discovered: set[str] = set()
+    for root_name in ("backend", "skeleton"):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            try:
+                source = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if _looks_like_ai_provider_surface(path, source):
+                discovered.add(path.relative_to(repo_root).as_posix())
+    return discovered
 
 
 def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
@@ -261,6 +311,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     )
 
     surfaces = contract.get("provider_surfaces")
+    credential_surface_owners: set[str] = set()
     if not isinstance(surfaces, list) or not surfaces:
         errors.append("provider surface inventory is missing")
     else:
@@ -285,6 +336,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 errors.append(f"provider surface owner missing: {owner}")
                 continue
             if item.get("credential_bearing") is True:
+                credential_surface_owners.add(owner)
                 if item.get("receipt_required") is not True:
                     errors.append(
                         f"credential-bearing provider surface lacks receipt: {surface_id}"
@@ -294,6 +346,14 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     errors.append(
                         f"credential-bearing provider surface does not load architecture: {owner}"
                     )
+
+    discovered_surfaces = _discover_credential_bearing_ai_surfaces(repo_root)
+    undeclared_surfaces = sorted(discovered_surfaces - credential_surface_owners)
+    if undeclared_surfaces:
+        errors.append(
+            "credential-bearing AI provider surfaces missing from construction inventory: "
+            + ", ".join(undeclared_surfaces)
+        )
 
     backend = repo_root / "backend"
     if backend.is_dir():
