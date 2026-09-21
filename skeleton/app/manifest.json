@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v3.6",
+    "tag": "arch-map/v3.7",
     "structure_tag": "structure-map/v1.3"
   },
   "runtime": {
@@ -176,7 +176,10 @@
     "skeleton/testing/test_operation_stream_store.py",
     "skeleton/frontier/model_routing.py",
     "machine/capability_interfaces.json",
-    "scripts/check_capability_interfaces.py"
+    "scripts/check_capability_interfaces.py",
+    "machine/state_topology.json",
+    "scripts/check_state_topology.py",
+    "skeleton/testing/test_state_topology.py"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -186,7 +189,7 @@
     "provider_activation_boundary": "backend/core/ai_provider.py",
     "provider_architecture_loader": "skeleton/provider_contract.py",
     "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
-    "construction_version": "3.6.0",
+    "construction_version": "3.7.0",
     "provider_runtime_boundary": "skeleton/provider_runtime.py",
     "operation_contract": "skeleton/contracts/operation.py",
     "stream_contract": "skeleton/frontier/operation_stream.py",
@@ -194,6 +197,8 @@
     "model_routing_owner": "skeleton/frontier/model_routing.py",
     "relationship_semantics": "depends_on=runtime dependency; validates=acceptance target",
     "interface_registry": "machine/capability_interfaces.json",
-    "interface_validator": "scripts/check_capability_interfaces.py"
+    "interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
   }
 }
