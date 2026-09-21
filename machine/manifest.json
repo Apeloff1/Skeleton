@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.1",
+  "schema_version": "4.2",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -380,6 +380,21 @@
         "fix/http-token-regex-hardening",
         "fix/content-type-security-boundary"
       ]
+    },
+    "security_resolution_wave": {
+      "revalidated": [
+        "deserialization aliases",
+        "HTTP token regex",
+        "content-type boundary",
+        "scraper DNS public/SSRF",
+        "CORS current-main/dotenv",
+        "build vault atomic write",
+        "canonical scan evidence"
+      ],
+      "lineage_only": [
+        "fix/issue-pass-sast-traversal"
+      ],
+      "note": "existing integration PRs reused; zero-file branch retained as lineage"
     }
   },
   "integrated_domains": [
