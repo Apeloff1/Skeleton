@@ -285,7 +285,7 @@ def test_secret_scanning_workflow_hardening_contract() -> None:
     )
     assert "  pull_request:\n" in workflow
     assert "  push:\n" in workflow
-    assert "branches:" not in workflow
+    assert "branches: [main]" in workflow
     assert "permissions:\n  contents: read\n" in workflow
     assert "persist-credentials: false" in workflow
     assert 'GITLEAKS_VERSION: "8.24.3"' in workflow
