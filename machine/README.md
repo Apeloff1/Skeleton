@@ -94,6 +94,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Orchestration/ops wave:** PR runner, provider/SMB resilience, cockpit, supervisor hierarchy/resilience, x-agent, and bot-ledger sources revalidated; existing integration PRs reused.
 
+- **Security/fix wave:** 18 security, supervisor, workflow, shell, and hardening sources revalidated; existing integration PRs reused.
+
 ## Target layout
 
 ```text
