@@ -164,7 +164,7 @@
       "stage": 0,
       "parallel_lane": "governance",
       "objective": "Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
