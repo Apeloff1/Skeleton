@@ -46,11 +46,18 @@
       }
     ],
     "runtime_enforcement": {
-      "loader": "backend/core/provider_architecture.py",
+      "loader": "skeleton/provider_contract.py",
       "activation_boundary": "backend/core/ai_provider.py",
       "docker_materialization": "backend/Dockerfile",
       "receipt_required": true,
-      "undeclared_provider_policy": "deny"
+      "undeclared_provider_policy": "deny",
+      "compatibility_loaders": [
+        "backend/core/provider_architecture.py"
+      ],
+      "provider_families": [
+        "runtime_model",
+        "automation_model"
+      ]
     }
   },
   "quality_attributes": {
@@ -1422,6 +1429,26 @@
         "automatic rollback drill",
         "release evidence artifact"
       ]
+    },
+    {
+      "id": "gap-provider-surface-convergence",
+      "plane": "model-provider",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Credential-bearing model execution still exists in the transitional synchronous Jeeves provider surface in addition to the canonical backend runtime.",
+      "construction": [
+        "require the shared architecture receipt on every Jeeves network provider before availability or I/O",
+        "deny undeclared Jeeves providers even when legacy credentials are configured",
+        "migrate Jeeves network execution behind one shared provider adapter/transport contract",
+        "retain LocalEchoProvider as an offline deterministic fallback rather than a network provider",
+        "remove legacy provider credentials after all Jeeves call sites use the canonical transport"
+      ],
+      "closure_evidence": [
+        "Jeeves OpenAI receipt enforcement test",
+        "undeclared Anthropic denial test",
+        "provider-surface inventory gate",
+        "no credential-bearing model provider outside declared provider surfaces"
+      ]
     }
   ],
   "gap_closure_policy": {
@@ -1438,13 +1465,15 @@
       "mode": "parallel",
       "gaps": [
         "gap-governance-registry",
-        "gap-cost-admission"
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
       ],
-      "goal": "Make every provider/data/action decision classifiable and budget-admissible before adding more autonomy.",
+      "goal": "Make every provider/data/action decision classifiable, receipt-governed, and budget-admissible before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
-        "traceable denial receipts"
+        "traceable denial receipts",
+        "all credential-bearing provider surfaces declared and receipt-enforced"
       ]
     },
     {
@@ -1522,5 +1551,89 @@
     "dependencies_must_reference_prior_waves": true,
     "p0_before_sota_closure": true,
     "parallelism_allowed_only_when_dependencies_are_independent": true
-  }
+  },
+  "automation_model_providers": [
+    {
+      "id": "repository-automation",
+      "state": "active",
+      "client": "skeleton/automation/free_model.py:FreeModelClient",
+      "protocol": "OpenAI-compatible chat completions over configured HTTPS endpoint",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [
+        "MODEL_API_KEY"
+      ],
+      "required_configuration": [
+        "MODEL_API_URL",
+        "MODEL_NAME"
+      ],
+      "optional_configuration": [
+        "MODEL_TIMEOUT"
+      ],
+      "capabilities": [
+        "repository-analysis",
+        "repository-planning",
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "https-only; no URL credentials; deny localhost, metadata endpoints and non-global literal IPs"
+    }
+  ],
+  "provider_surfaces": [
+    {
+      "id": "backend-runtime",
+      "family": "runtime_model",
+      "role": "canonical product runtime model execution",
+      "owner": "backend/core/ai_provider.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "canonical"
+    },
+    {
+      "id": "backend-legacy-compat",
+      "family": "runtime_model",
+      "role": "legacy backend call compatibility only",
+      "owner": "backend/core/ai_provider_compat.py",
+      "credential_bearing": false,
+      "receipt_required": true,
+      "status": "compatibility"
+    },
+    {
+      "id": "jeeves-legacy-runtime",
+      "family": "runtime_model",
+      "role": "legacy synchronous Jeeves model compatibility pending convergence",
+      "owner": "skeleton/jeeves/providers.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "transitional"
+    },
+    {
+      "id": "repository-automation",
+      "family": "automation_model",
+      "role": "repository automation and maintenance model execution",
+      "owner": "skeleton/automation/free_model.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "canonical"
+    },
+    {
+      "id": "frontier-model-runtime",
+      "family": "none",
+      "role": "provider-neutral protocol/runtime primitives; no credential ownership",
+      "owner": "skeleton/frontier/model_runtime.py",
+      "credential_bearing": false,
+      "receipt_required": false,
+      "status": "library"
+    },
+    {
+      "id": "jeeves-provider-router",
+      "family": "none",
+      "role": "provider-neutral retry/cache/circuit orchestration; concrete network providers remain separately governed",
+      "owner": "skeleton/jeeves/agent/provider.py",
+      "credential_bearing": false,
+      "receipt_required": false,
+      "status": "library"
+    }
+  ]
 }
