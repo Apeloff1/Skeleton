@@ -55,6 +55,18 @@ from skeleton.vault.governance_registry import (
     GovernanceRegistry,
     RegisteredProviderTransferDecision,
 )
+from skeleton.vault.lifecycle_adapters import (
+    DeletionExecutionResult,
+    GovernedExport,
+    LifecycleAdapterError,
+    LifecycleAdapterMissing,
+    LifecycleAdapterRegistry,
+    LifecycleExecutionError,
+    LifecycleExecutor,
+    MemoryDeletionAdapter,
+    MongoCollectionLifecycleAdapter,
+    RetrievalIndexDeletionAdapter,
+)
 
 __all__ = [
     "AccessPolicy",
@@ -91,4 +103,14 @@ __all__ = [
     "GovernanceContext",
     "GovernanceRegistry",
     "RegisteredProviderTransferDecision",
+    "DeletionExecutionResult",
+    "GovernedExport",
+    "LifecycleAdapterError",
+    "LifecycleAdapterMissing",
+    "LifecycleAdapterRegistry",
+    "LifecycleExecutionError",
+    "LifecycleExecutor",
+    "MemoryDeletionAdapter",
+    "MongoCollectionLifecycleAdapter",
+    "RetrievalIndexDeletionAdapter",
 ]
