@@ -218,21 +218,50 @@ def test_structural_plane_owners_match_construction_and_zone_roots() -> None:
         )
 
 
-def test_structural_cross_zone_dependencies_follow_zone_dag() -> None:
+def test_structural_cross_zone_dependencies_follow_zone_dag_or_exact_exception() -> None:
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    blueprint = architecture["structural_blueprint"]
     zones = {zone["id"]: zone for zone in architecture["zones"]}
     placements = {
         placement["plane"]: placement
-        for placement in architecture["structural_blueprint"]["plane_placements"]
+        for placement in blueprint["plane_placements"]
+    }
+    excepted_edges = {
+        (source_plane, exception["dependency_plane"])
+        for exception in blueprint["dependency_exceptions"]
+        for source_plane in exception["source_planes"]
     }
 
+    observed_exceptions: set[tuple[str, str]] = set()
     for plane in construction["planes"]:
         source_zone = placements[plane["id"]]["zone"]
         for dependency in plane["depends_on"]:
             target_zone = placements[dependency]["zone"]
-            if source_zone != target_zone:
-                assert target_zone in zones[source_zone]["may_depend_on"]
+            if source_zone == target_zone:
+                continue
+            if target_zone in zones[source_zone]["may_depend_on"]:
+                continue
+            edge = (plane["id"], dependency)
+            assert edge in excepted_edges
+            observed_exceptions.add(edge)
+
+    assert observed_exceptions == excepted_edges
+
+
+def test_structural_validator_rejects_missing_reverse_dependency_exception() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    broken = deepcopy(architecture)
+    broken["structural_blueprint"]["dependency_exceptions"] = []
+    zones = {zone["id"]: zone for zone in broken["zones"]}
+    errors: list[str] = []
+
+    _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
+
+    assert any(
+        "orchestration(engine) -> model-routing(application)" in error
+        for error in errors
+    )
 
 
 def test_structural_validator_rejects_owner_outside_declared_zone() -> None:
@@ -268,6 +297,7 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "recovery_domains": 8,
         "dependency_exceptions": 3,
     }
+
 
 def test_repository_manifest_links_architecture_and_structure_tags() -> None:
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
