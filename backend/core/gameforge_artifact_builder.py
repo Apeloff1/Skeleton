@@ -10,6 +10,7 @@ from __future__ import annotations
 from html import escape
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import time
@@ -18,6 +19,30 @@ from typing import Any, Iterable
 
 
 DEFAULT_ARTIFACTS_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "builds"
+
+_ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+def _built_at(value: float | int | None) -> float:
+    if value is None:
+        return time.time()
+    if isinstance(value, bool):
+        raise ValueError("built_at must be a finite timestamp")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("built_at must be a finite timestamp") from exc
+    if not math.isfinite(parsed) or parsed < 0:
+        raise ValueError("built_at must be a finite non-negative timestamp")
+    return parsed
+
+
+def _zip_write(archive: zipfile.ZipFile, name: str, data: str | bytes) -> None:
+    info = zipfile.ZipInfo(name, date_time=_ZIP_EPOCH)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o100644 << 16
+    payload = data.encode("utf-8") if isinstance(data, str) else data
+    archive.writestr(info, payload)
 
 
 def safe_segment(value: str, *, what: str = "path") -> str:
@@ -91,6 +116,7 @@ def register_artifact(
     path: str | os.PathLike[str],
     *,
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
+    built_at: float | int | None = None,
 ) -> dict[str, Any]:
     root = Path(artifacts_root).resolve()
     real = Path(path).resolve()
@@ -107,7 +133,7 @@ def register_artifact(
         "filename": real.name,
         "size_bytes": size,
         "sha256": digest,
-        "built_at": time.time(),
+        "built_at": _built_at(built_at),
     }
     try:
         _db()["gameforge_builds"].update_one(
@@ -148,6 +174,7 @@ def build_web_artifact(
     files: Iterable[dict[str, Any]] | None = None,
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     build_token: str | None = None,
+    built_at: float | int | None = None,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, workdir = artifact_build(
@@ -158,7 +185,8 @@ def build_web_artifact(
     )
     workdir.mkdir(parents=True, exist_ok=True)
 
-    payload = {"game": safe_name, "files": source_files, "built_at": time.time()}
+    timestamp = _built_at(built_at)
+    payload = {"game": safe_name, "files": source_files, "built_at": timestamp}
     data_path = resolve_under_dir(workdir, "game_data.json")
     data_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -195,8 +223,8 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
 
     zip_path = resolve_under_dir(artifacts_root, f"{build_id}.zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.write(index_path, "index.html")
-        archive.write(data_path, "game_data.json")
+        _zip_write(archive, "index.html", index_path.read_bytes())
+        _zip_write(archive, "game_data.json", data_path.read_bytes())
 
     record = register_artifact(
         build_id,
@@ -204,6 +232,7 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
         "web",
         zip_path,
         artifacts_root=artifacts_root,
+        built_at=timestamp,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
@@ -216,6 +245,7 @@ def build_source_artifact(
     files: Iterable[dict[str, Any]] | None = None,
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     build_token: str | None = None,
+    built_at: float | int | None = None,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, _workdir = artifact_build(
@@ -225,10 +255,11 @@ def build_source_artifact(
         build_token=build_token,
     )
     zip_path = resolve_under_dir(artifacts_root, f"{build_id}.zip")
+    timestamp = _built_at(built_at)
     manifest = {
         "game": safe_name,
         "file_count": len(source_files),
-        "built_at": time.time(),
+        "built_at": timestamp,
         "files": [
             _archive_member_name(item.get("filename"), fallback=f"file-{index}.txt")
             for index, item in enumerate(source_files)
@@ -236,7 +267,7 @@ def build_source_artifact(
     }
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("manifest.json", json.dumps(manifest, indent=2))
+        _zip_write(archive, "manifest.json", json.dumps(manifest, indent=2))
         used: set[str] = set()
         for index, item in enumerate(source_files):
             name = _archive_member_name(
@@ -250,7 +281,7 @@ def build_source_artifact(
                 candidate = f"{stem}-{suffix}{dot}{extension}" if dot else f"{name}-{suffix}"
                 suffix += 1
             used.add(candidate)
-            archive.writestr(f"gamefiles/{candidate}", str(item.get("content", "")))
+            _zip_write(archive, f"gamefiles/{candidate}", str(item.get("content", "")))
 
     record = register_artifact(
         build_id,
@@ -258,6 +289,7 @@ def build_source_artifact(
         "source",
         zip_path,
         artifacts_root=artifacts_root,
+        built_at=timestamp,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
