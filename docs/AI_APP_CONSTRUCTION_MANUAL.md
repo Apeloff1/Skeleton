@@ -2376,4 +2376,3 @@ ready
 
 Every transition should emit an operation/event receipt so setup failures are
 diagnosable and resumable rather than opaque.
-
