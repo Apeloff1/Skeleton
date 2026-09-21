@@ -174,7 +174,9 @@
     "skeleton/testing/test_operation_stream.py",
     "skeleton/frontier/operation_stream_store.py",
     "skeleton/testing/test_operation_stream_store.py",
-    "skeleton/frontier/model_routing.py"
+    "skeleton/frontier/model_routing.py",
+    "machine/capability_interfaces.json",
+    "scripts/check_capability_interfaces.py"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -190,6 +192,8 @@
     "stream_contract": "skeleton/frontier/operation_stream.py",
     "stream_store": "skeleton/frontier/operation_stream_store.py",
     "model_routing_owner": "skeleton/frontier/model_routing.py",
-    "relationship_semantics": "depends_on=runtime dependency; validates=acceptance target"
+    "relationship_semantics": "depends_on=runtime dependency; validates=acceptance target",
+    "interface_registry": "machine/capability_interfaces.json",
+    "interface_validator": "scripts/check_capability_interfaces.py"
   }
 }
