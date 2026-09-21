@@ -7,7 +7,10 @@ from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
     GovernedDataRecord,
 )
-from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.governance_registry import (
+    CanonicalDataPlane,
+    GovernanceRegistry,
+)
 
 
 def _record(
@@ -185,3 +188,118 @@ def test_registry_inventory_and_retention_are_same_authority() -> None:
         "memory",
         "artifact",
     }
+
+
+@pytest.mark.parametrize(
+    ("plane", "owner", "target"),
+    [
+        ("conversation", "conversation", "conversation"),
+        ("memory", "memory", "memory"),
+        ("retrieval", "retrieval", "retrieval"),
+        ("artifact", "artifact", "artifact"),
+    ],
+)
+def test_register_canonical_write_covers_required_planes(
+    plane: str,
+    owner: str,
+    target: str,
+) -> None:
+    registry = GovernanceRegistry()
+
+    record = registry.register_canonical_write(
+        plane,
+        record_id=f"{plane}-1",
+        tenant_id="tenant-a",
+        source_ref=f"{plane}://1",
+        data_class="confidential",
+        purposes=("model-inference", "verification"),
+        created_at=10.0,
+        retention_until=20.0,
+    )
+
+    row = registry.lifecycle.get(record.record_id)
+    assert row["owner_plane"] == owner
+    assert row["deletion_targets"] == [target]
+    assert row["data_class"] == "confidential"
+    assert row["purposes"] == ["model-inference", "verification"]
+    assert row["retention_until"] == 20.0
+    assert row["state"] == "active"
+
+
+def test_register_canonical_write_accepts_explicit_projection_targets() -> None:
+    registry = GovernanceRegistry()
+
+    registry.register_canonical_write(
+        CanonicalDataPlane.MEMORY,
+        record_id="memory-1",
+        tenant_id="tenant-a",
+        source_ref="memory://1",
+        data_class="internal",
+        purposes=("retrieval-synthesis",),
+        deletion_targets=("memory", "retrieval", "artifact"),
+        created_at=10.0,
+    )
+
+    plan = registry.request_deletion(
+        "tenant-a",
+        record_ids=("memory-1",),
+        now=20.0,
+    )
+
+    assert [(action.record_id, action.target) for action in plan.actions] == [
+        ("memory-1", "artifact"),
+        ("memory-1", "memory"),
+        ("memory-1", "retrieval"),
+    ]
+
+
+@pytest.mark.parametrize("plane", ["unknown", "", "vector-cache"])
+def test_register_canonical_write_rejects_unknown_planes(plane: str) -> None:
+    registry = GovernanceRegistry()
+
+    with pytest.raises(DataGovernanceDenied, match="unknown canonical data plane"):
+        registry.register_canonical_write(
+            plane,
+            record_id="bad",
+            tenant_id="tenant-a",
+            source_ref="bad://1",
+            data_class="internal",
+            purposes=("model-inference",),
+            created_at=10.0,
+        )
+
+
+def test_register_canonical_write_requires_purpose_and_preserves_registry_authority() -> None:
+    registry = GovernanceRegistry()
+
+    with pytest.raises(DataGovernanceDenied, match="at least one purpose"):
+        registry.register_canonical_write(
+            "conversation",
+            record_id="message-1",
+            tenant_id="tenant-a",
+            source_ref="conversation://message-1",
+            data_class="internal",
+            purposes=(),
+            created_at=10.0,
+        )
+
+    registry.register_canonical_write(
+        "conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation://message-1",
+        data_class="internal",
+        purposes=("model-inference",),
+        created_at=10.0,
+    )
+
+    with pytest.raises(Exception, match="record already registered"):
+        registry.register_canonical_write(
+            "conversation",
+            record_id="message-1",
+            tenant_id="tenant-a",
+            source_ref="conversation://message-1",
+            data_class="internal",
+            purposes=("model-inference",),
+            created_at=10.0,
+        )
