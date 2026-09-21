@@ -98,6 +98,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Throughput/science wave:** throughput mechanics/forge/pipeline, Ubuntu delivery, inventory gates, and Jeeves science/cost sources revalidated; zero-file model-routing remains lineage-only.
 
+- **Control-plane/builder wave:** builder, repair receipts, durable checkpoints, squads, supervisor, backlog reasoning, and automerge sources revalidated; #1873/#1874 created for newly staged deltas.
+
 ## Target layout
 
 ```text
