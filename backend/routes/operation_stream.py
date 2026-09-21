@@ -133,6 +133,28 @@ def cancel_operation(
     return {"ok": True, **result.as_dict()}
 
 
+@router.get("/{operation_id}/events/replay")
+def operation_event_replay(
+    operation_id: str,
+    after_sequence: int = Query(default=0, ge=0),
+    limit: int = Query(default=250, ge=1, le=1000),
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Authenticated cursor replay for native clients and resync flows."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        batch = _transport().replay(
+            operation_id,
+            tenant_id=tenant_id,
+            after_sequence=after_sequence,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, **batch.as_dict()}
+
+
 @router.get("/{operation_id}/events")
 async def operation_events(
     request: Request,
@@ -221,6 +243,7 @@ async def operation_events(
 
 __all__ = [
     "router",
+    "operation_event_replay",
     "_last_event_sequence",
     "_principal_tenant",
 ]
