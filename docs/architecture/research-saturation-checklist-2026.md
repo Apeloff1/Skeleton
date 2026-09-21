@@ -59,7 +59,12 @@ Local reproduction is tracked separately.
 | uncertainty/calibration | PLANNING_COVERED | REPRODUCTION_PENDING | embedded in RXP010/RXP011/RXP021 | calibration debt remains scoped |
 | continual adaptation | PLANNING_COVERED | REPRODUCTION_PENDING | RXP008, RXP030, AC fast-weight experiments | RDE018, RDE030 |
 | hardware/precision/efficiency | PLANNING_COVERED | REPRODUCTION_PENDING | RXP005, RXP019, RXP032, RXP033 | RDE008, RDE009, RDE024 |
-| research automation | PLANNING_COVERED | REPRODUCTION_PENDING | RXP026, RXP027, RXP035 | RDE033, RDE034, RDE036 |
+| research automation | PLANNING_COVERED | REPRODUCTION_PENDING | RXP026, RXP027, RXP035, RXP040, RXP050 | RDE033, RDE034, RDE036 |
+| model compression/distillation/pruning | PLANNING_COVERED | REPRODUCTION_PENDING | RXP051–RXP053 | RDE037–RDE038 |
+| privacy-preserving learning/inference | PLANNING_COVERED | REPRODUCTION_PENDING | RXP054–RXP056 | RDE039–RDE040 |
+| software-engineering/code agents | PLANNING_COVERED | REPRODUCTION_PENDING | RXP057–RXP059 | RDE041–RDE042 |
+| human–AI/operator science | PLANNING_COVERED | REPRODUCTION_PENDING | RXP060 | RDE043–RDE044 |
+| causal/counterfactual modeling | PLANNING_COVERED | REPRODUCTION_PENDING | RXP047, RXP061, RXP062 | RDE045–RDE046 |
 
 ## Cross-domain blockers
 
@@ -107,7 +112,7 @@ For PRODUCTION_EVIDENCE_READY, evidence must additionally include applicable:
 ~~~text
 checkpoint_id: PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY
 created_at: 2026-09-21T22:39:00+02:00
-scope: Track AD / 19 research domains / FR-RQ-SV-FD-CX-RDE-RXP namespaces
+scope: Track AD / 24 research domains / FR-RQ-SV-FD-CX-RDE-RXP-HL-RS namespaces
 planning_status: PLANNING_COVERED
 local_reproduction_status: REPRODUCTION_PENDING
 production_authority_granted: false
