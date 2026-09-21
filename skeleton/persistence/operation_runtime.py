@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Event, RLock, Thread
 from typing import Any
 from uuid import uuid4
 
@@ -62,6 +63,7 @@ class DurableOperationRuntime:
         stream: SQLiteOperationEventStore,
         *,
         outbox_batch_size: int = 256,
+        outbox_dispatch_interval_s: float = 0.5,
         default_deadline_s: float = 120.0,
     ) -> None:
         if orchestrator is None or not callable(getattr(orchestrator, "reason", None)):
@@ -70,6 +72,15 @@ class DurableOperationRuntime:
             raise TypeError("outbox_batch_size must be an integer")
         if outbox_batch_size < 1:
             raise ValueError("outbox_batch_size must be positive")
+        if (
+            not isinstance(outbox_dispatch_interval_s, (int, float))
+            or isinstance(outbox_dispatch_interval_s, bool)
+        ):
+            raise TypeError("outbox_dispatch_interval_s must be numeric")
+        if not 0.05 <= float(outbox_dispatch_interval_s) <= 60.0:
+            raise ValueError(
+                "outbox_dispatch_interval_s must be between 0.05 and 60 seconds"
+            )
         if not isinstance(default_deadline_s, (int, float)) or isinstance(
             default_deadline_s, bool
         ):
@@ -81,10 +92,14 @@ class DurableOperationRuntime:
         self.operations = operations
         self.stream = stream
         self.outbox_batch_size = outbox_batch_size
+        self.outbox_dispatch_interval_s = float(outbox_dispatch_interval_s)
         self.default_deadline_s = float(default_deadline_s)
         self._closed = False
         self._dispatch_failures = 0
         self._last_dispatch: OutboxDispatchReport | None = None
+        self._dispatcher_stop = Event()
+        self._dispatcher_thread: Thread | None = None
+        self._dispatcher_lock = RLock()
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.orchestrator, name)
@@ -106,6 +121,7 @@ class DurableOperationRuntime:
             SQLiteOperationStore(state_path),
             SQLiteOperationEventStore(stream_path),
             outbox_batch_size=settings.outbox_batch_size,
+            outbox_dispatch_interval_s=settings.outbox_dispatch_interval_s,
             default_deadline_s=settings.default_deadline_s,
         )
 
@@ -161,6 +177,70 @@ class DurableOperationRuntime:
 
     def _dispatch_after_commit(self, operation_id: str) -> None:
         self.dispatch_outbox(operation_id=operation_id)
+
+    def _dispatcher_loop(self) -> None:
+        while not self._dispatcher_stop.wait(self.outbox_dispatch_interval_s):
+            if self._closed:
+                return
+            self.dispatch_outbox()
+
+    @property
+    def dispatcher_running(self) -> bool:
+        thread = self._dispatcher_thread
+        return bool(thread is not None and thread.is_alive())
+
+    def start_dispatcher(self) -> bool:
+        """Start one bounded background outbox-drain loop.
+
+        Returns True only when this call started a new thread. Repeated calls are
+        idempotent. The loop uses the same retry-stable outbox identities as
+        foreground dispatch, so a crash after stream append but before ACK is
+        reconciled rather than duplicated.
+        """
+
+        with self._dispatcher_lock:
+            if self._closed:
+                raise OperationStoreError(
+                    "cannot start dispatcher on closed durable operation runtime"
+                )
+            if self.dispatcher_running:
+                return False
+            self._dispatcher_stop.clear()
+            thread = Thread(
+                target=self._dispatcher_loop,
+                name="skeleton-operation-outbox",
+                daemon=True,
+            )
+            self._dispatcher_thread = thread
+            thread.start()
+            return True
+
+    def stop_dispatcher(
+        self,
+        *,
+        timeout_s: float = 5.0,
+        flush: bool = True,
+    ) -> OutboxDispatchReport | None:
+        if (
+            not isinstance(timeout_s, (int, float))
+            or isinstance(timeout_s, bool)
+            or float(timeout_s) <= 0
+        ):
+            raise ValueError("timeout_s must be positive")
+        with self._dispatcher_lock:
+            thread = self._dispatcher_thread
+            self._dispatcher_stop.set()
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=float(timeout_s))
+        with self._dispatcher_lock:
+            if thread is not None and thread.is_alive():
+                raise OperationStoreError(
+                    "operation outbox dispatcher did not stop before timeout"
+                )
+            self._dispatcher_thread = None
+        if flush and not self._closed:
+            return self.dispatch_outbox()
+        return self._last_dispatch
 
     def _transition(
         self,
@@ -279,6 +359,8 @@ class DurableOperationRuntime:
                 "closed": self._closed,
                 "pending_outbox": pending,
                 "dispatch_failures": self._dispatch_failures,
+                "dispatcher_running": self.dispatcher_running,
+                "dispatch_interval_s": self.outbox_dispatch_interval_s,
                 "last_dispatch": (
                     None
                     if self._last_dispatch is None
@@ -290,10 +372,10 @@ class DurableOperationRuntime:
     def close(self) -> None:
         if self._closed:
             return
-        self.dispatch_outbox()
+        self.stop_dispatcher(flush=True)
+        self._closed = True
         self.operations.close()
         self.stream.close()
-        self._closed = True
 
 
 __all__ = [
