@@ -13,6 +13,10 @@ on:
       - "skeleton/testing/test_ai_app_construction.py"
       - "skeleton/testing/test_provider_contract.py"
       - "skeleton/provider_contract.py"
+      - "skeleton/vault/data_governance.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/testing/test_data_governance.py"
+      - "skeleton/testing/test_cost_admission.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -108,6 +112,7 @@ jobs:
           python -m compileall -q
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/automation/free_model.py skeleton/jeeves/providers.py
+          skeleton/vault/data_governance.py skeleton/intelligence/admission.py
           backend/core/ai_provider.py backend/core/provider_architecture.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
@@ -124,9 +129,13 @@ jobs:
           skeleton/testing/test_architecture_map.py
           skeleton/testing/test_ai_app_construction.py
           skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_data_governance.py
+          skeleton/testing/test_cost_admission.py
           skeleton/testing/test_app_assembly.py
           backend/tests/test_provider_architecture.py
           backend/tests/test_ai_provider_adapter.py
+          backend/tests/test_ai_provider_request_validation.py
+          backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
 
       - name: Validate structural assembly
