@@ -155,7 +155,7 @@ PLAN_CHECKPOINTS = {
     "PLAN-20260921-HOSTILE-GAP-AUDIT": {
         "created_at": "2026-09-21",
         "tracks": ("AB",),
-        "gap_range": ("G001", "G130"),
+        "gap_range": ("G001", "G200"),
         "production_readiness_blocked_by_applicable_open_p0": True,
         "production_authority_granted": False,
     }
@@ -179,6 +179,8 @@ MASSIVE_UPGRADE_INVARIANTS = {
     "negative_evidence_is_retained": True,
 }
 
+HOSTILE_GAP_IDS = tuple(f"G{number:03d}" for number in range(1, 201))
+
 P0_HARDENING_GAPS = (
     "G001_representation_identity",
     "G002_data_lineage",
@@ -201,6 +203,11 @@ P0_HARDENING_GAPS = (
     "G019_tamper_evident_audit",
     "G020_safe_mode_break_glass",
     "G084_trust_root_key_compromise_recovery",
+    "G131_policy_invariant_conflict_resolution",
+    "G135_recovery_dependency_cycle",
+    "G136_break_glass_dependency_independence",
+    "G161_internal_service_identity",
+    "G193_restore_external_effect_reconciliation",
 )
 
 ADVERSARIAL_HARDENING_INVARIANTS = {
@@ -230,6 +237,11 @@ ADVERSARIAL_HARDENING_INVARIANTS = {
     "signed_objects_use_canonical_serialization": True,
     "distributed_checkpoint_completion_is_manifest_atomic": True,
     "partial_or_speculative_output_is_not_committed_output": True,
+    "policy_invariant_precedence_is_deterministic": True,
+    "recovery_path_avoids_single_failed_dependency_cycles": True,
+    "break_glass_has_dependency_reduced_recovery_path": True,
+    "internal_service_identity_is_authenticated": True,
+    "restore_reconciles_external_effect_receipts_before_replay": True,
 }
 
 
@@ -251,6 +263,7 @@ def full_summary() -> Dict[str, Any]:
         "plan_checkpoints": {key: dict(value) for key, value in PLAN_CHECKPOINTS.items()},
         "optimizer_control_invariants": dict(OPTIMIZER_CONTROL_INVARIANTS),
         "massive_upgrade_invariants": dict(MASSIVE_UPGRADE_INVARIANTS),
+        "hostile_gap_ids": list(HOSTILE_GAP_IDS),
         "p0_hardening_gaps": list(P0_HARDENING_GAPS),
         "adversarial_hardening_invariants": dict(ADVERSARIAL_HARDENING_INVARIANTS),
         "key_capabilities": [
