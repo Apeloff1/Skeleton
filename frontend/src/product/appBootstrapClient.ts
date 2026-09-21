@@ -61,12 +61,25 @@ export type AppRuntimeService = {
   detail: string;
 };
 
+export type AppRuntimeProduct = {
+  available: boolean;
+  canonical_actions: number;
+  ready_actions: number;
+  ready_pct: number;
+  governed_unbound: number;
+  unsafe_actions: number;
+  policy_gaps: number;
+  attestation_sha256: string;
+  detail?: string;
+};
+
 export type AppRuntimeStatus = {
   ok: boolean;
   checked_at: string;
   application: AppBootstrap['application'];
   scope: 'public-runtime';
   services: AppRuntimeService[];
+  product: AppRuntimeProduct;
 };
 
 export async function getAppRuntimeStatus(
