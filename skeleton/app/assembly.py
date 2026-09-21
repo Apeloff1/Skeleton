@@ -28,6 +28,7 @@ class ServiceSpec:
     depends_on: tuple[str, ...] = ()
     public_url: str = ""
     health_path: str = ""
+    ingress_prefix: str = ""
     entrypoint: str = ""
     container_port: int | None = None
     canonical: bool = True
@@ -53,6 +54,7 @@ class ServiceSpec:
             depends_on=tuple(str(item) for item in raw_deps),
             public_url=str(value.get("public_url", "") or ""),
             health_path=str(value.get("health_path", "") or ""),
+            ingress_prefix=str(value.get("ingress_prefix", "") or ""),
             entrypoint=str(value.get("entrypoint", "") or ""),
             container_port=int(port) if port is not None else None,
             canonical=bool(value.get("canonical", True)),
@@ -160,12 +162,31 @@ def load_manifest() -> AssemblyManifest:
     if unknown:
         raise ValueError(f"manifest references unknown services: {sorted(unknown)}")
 
+    ingress_prefixes: dict[str, str] = {}
     for service in services:
         missing = set(service.depends_on) - set(names)
         if missing:
             raise ValueError(
                 f"service {service.name!r} depends on unknown services: {sorted(missing)}"
             )
+
+        prefix = service.ingress_prefix
+        if prefix:
+            if not prefix.startswith("/"):
+                raise ValueError(f"service {service.name!r} ingress_prefix must start with '/'")
+            if prefix != "/" and prefix.endswith("/"):
+                raise ValueError(f"service {service.name!r} ingress_prefix must not end with '/'")
+            if prefix != "/":
+                owner = ingress_prefixes.get(prefix)
+                if owner is not None:
+                    raise ValueError(
+                        f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
+                    )
+                ingress_prefixes[prefix] = service.name
+            if service.health_path and prefix != "/" and not service.health_path.startswith(prefix + "/"):
+                raise ValueError(
+                    f"service {service.name!r} health_path must live under ingress_prefix {prefix!r}"
+                )
 
     required_paths = payload.get("required_paths", ())
     if not isinstance(required_paths, list):
@@ -421,6 +442,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
                 "entrypoint": service.entrypoint,
                 "public_url": service.public_url,
                 "health_path": service.health_path,
+                "ingress_prefix": service.ingress_prefix,
                 "container_port": service.container_port,
                 "depends_on": list(service.depends_on),
                 "canonical": service.canonical,
