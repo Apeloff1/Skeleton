@@ -4,8 +4,10 @@ Skeleton Jeeves — LLM provider abstraction
 Provides:
 - LLMProvider: Interface for language model backends
 - LocalEchoProvider: Dependency-free fallback (extractive, uses memory planes)
-- OpenAIProvider / AnthropicProvider: Stubs wired for real API keys
-- get_provider: Factory honoring SKELETON_LLM_PROVIDER env var
+- OpenAIProvider / AnthropicProvider: legacy synchronous adapters gated by the
+  shared architecture/construction receipt
+- get_provider: factory honoring SKELETON_LLM_PROVIDER while denying undeclared
+  network providers
 
 Providers return plain text; JeevesCore handles session state,
 tool dispatch, and event emission around them.
@@ -16,6 +18,12 @@ from __future__ import annotations
 import json
 import os
 from typing import Any, Dict, List, Optional, Protocol
+
+from skeleton.provider_contract import (
+    ProviderArchitectureError,
+    ProviderArchitectureReceipt,
+    load_provider_architecture,
+)
 
 
 _MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -155,17 +163,35 @@ class LocalEchoProvider:
 
 
 class OpenAIProvider:
-    """OpenAI chat-completions backend. Requires SKELETON_OPENAI_API_KEY."""
+    """Legacy synchronous OpenAI adapter governed by the shared provider receipt."""
 
     name = "openai"
     supports_system_prompt = True
 
     def __init__(self, model: str = "gpt-4o-mini"):
         self.model = model
-        self._key = os.getenv("SKELETON_OPENAI_API_KEY", "").strip()
+        self._key = (
+            os.getenv("OPENAI_API_KEY", "").strip()
+            or os.getenv("SKELETON_OPENAI_API_KEY", "").strip()
+        )
+        self._architecture_receipt: ProviderArchitectureReceipt | None = None
+
+    def _ensure_architecture(self) -> ProviderArchitectureReceipt:
+        if self._architecture_receipt is None:
+            self._architecture_receipt = load_provider_architecture(
+                self.name,
+                provider_family="runtime_model",
+            )
+        return self._architecture_receipt
 
     def available(self) -> bool:
-        return bool(self._key)
+        if not self._key:
+            return False
+        try:
+            self._ensure_architecture()
+        except ProviderArchitectureError:
+            return False
+        return True
 
     def complete(
         self,
@@ -175,6 +201,15 @@ class OpenAIProvider:
         system: Optional[str] = None,
     ) -> str:
         import urllib.request
+
+        if not self._key:
+            raise RuntimeError("OpenAI provider is not configured")
+        try:
+            self._ensure_architecture()
+        except ProviderArchitectureError as exc:
+            raise RuntimeError(
+                "OpenAI provider architecture acknowledgement failed"
+            ) from exc
 
         messages = []
         if system:
@@ -192,17 +227,35 @@ class OpenAIProvider:
 
 
 class AnthropicProvider:
-    """Anthropic messages backend. Requires SKELETON_ANTHROPIC_API_KEY."""
+    """Transitional Anthropic adapter; activation requires formal declaration."""
 
     name = "anthropic"
     supports_system_prompt = True
 
     def __init__(self, model: str = "claude-haiku-4-5"):
         self.model = model
-        self._key = os.getenv("SKELETON_ANTHROPIC_API_KEY", "").strip()
+        self._key = (
+            os.getenv("ANTHROPIC_API_KEY", "").strip()
+            or os.getenv("SKELETON_ANTHROPIC_API_KEY", "").strip()
+        )
+        self._architecture_receipt: ProviderArchitectureReceipt | None = None
+
+    def _ensure_architecture(self) -> ProviderArchitectureReceipt:
+        if self._architecture_receipt is None:
+            self._architecture_receipt = load_provider_architecture(
+                self.name,
+                provider_family="runtime_model",
+            )
+        return self._architecture_receipt
 
     def available(self) -> bool:
-        return bool(self._key)
+        if not self._key:
+            return False
+        try:
+            self._ensure_architecture()
+        except ProviderArchitectureError:
+            return False
+        return True
 
     def complete(
         self,
@@ -212,6 +265,15 @@ class AnthropicProvider:
         system: Optional[str] = None,
     ) -> str:
         import urllib.request
+
+        if not self._key:
+            raise RuntimeError("Anthropic provider is not configured")
+        try:
+            self._ensure_architecture()
+        except ProviderArchitectureError as exc:
+            raise RuntimeError(
+                "Anthropic provider is not declared by the active construction contract"
+            ) from exc
 
         payload: Dict[str, Any] = {
             "model": self.model,
