@@ -210,10 +210,12 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     loader_path = runtime.get("loader")
     boundary_path = runtime.get("activation_boundary")
     docker_path = runtime.get("docker_materialization")
+    engine_docker_path = runtime.get("engine_docker_materialization")
     for label, relative in (
         ("loader", loader_path),
         ("activation boundary", boundary_path),
         ("docker materialization", docker_path),
+        ("engine docker materialization", engine_docker_path),
     ):
         if not isinstance(relative, str) or not (repo_root / relative).is_file():
             errors.append(f"runtime provider {label} is missing: {relative!r}")
@@ -301,19 +303,27 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     f"provider activation boundary does not enforce architecture token {token!r}"
                 )
 
-    if isinstance(docker_path, str) and (repo_root / docker_path).is_file():
-        docker = (repo_root / docker_path).read_text(encoding="utf-8")
-        for token in (
-            "COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json",
-            "COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json",
-            "COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json",
-            "COPY --chown=appuser:appuser machine/capability_interfaces.json ./machine/capability_interfaces.json",
-            "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
-        ):
-            if token not in docker:
-                errors.append(
-                    f"backend runtime image does not materialize provider contract: {token}"
-                )
+    required_materialized_contracts = (
+        "COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json",
+        "COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json",
+        "COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json",
+        "COPY --chown=appuser:appuser machine/capability_interfaces.json ./machine/capability_interfaces.json",
+        "COPY --chown=appuser:appuser machine/ai_runtime_schemas.json ./machine/ai_runtime_schemas.json",
+        "COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json",
+        "COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json",
+        "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    )
+    for image_label, image_path in (
+        ("backend runtime image", docker_path),
+        ("engine runtime image", engine_docker_path),
+    ):
+        if isinstance(image_path, str) and (repo_root / image_path).is_file():
+            docker = (repo_root / image_path).read_text(encoding="utf-8")
+            for token in required_materialized_contracts:
+                if token not in docker:
+                    errors.append(
+                        f"{image_label} does not materialize provider contract: {token}"
+                    )
 
     for family_key, family_label in (
         ("runtime_model_providers", "runtime"),
