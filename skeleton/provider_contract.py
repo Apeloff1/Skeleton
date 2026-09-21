@@ -34,12 +34,12 @@ class ProviderArchitectureReceipt:
     """Non-secret evidence that a provider loaded the active construction contract."""
 
     provider_id: str
-    provider_family: str
     architecture_tag: str
     construction_version: str
     contract_digest: str
     manual_path: str
     required_documents: tuple[str, ...]
+    provider_family: str = "runtime_model"
 
     def as_dict(self) -> dict[str, Any]:
         return {
