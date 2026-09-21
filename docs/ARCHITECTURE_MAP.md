@@ -300,3 +300,147 @@ compaction watermarks, bounded retained history and corruption rejection.
 A production store may replace SQLite, but it must pass the same semantics.
 Persistence technology is replaceable; stream ordering and recovery behavior are
 not.
+
+## 14. Structural blueprint — `structure-map/v1.0`
+
+The architecture now has an explicit physical-placement layer. The purpose is to
+prevent a common failure mode in a large AI repository: a capability is logically
+documented, but new code is still created in an arbitrary package, new state is
+owned twice, or a composition module quietly becomes a second implementation.
+
+The machine source of truth is
+`machine/architecture.json -> structural_blueprint`.
+
+### 14.1 Five structural levels
+
+| Level | Unit | Construction meaning |
+| --- | --- | --- |
+| L0 | repository root | A live top-level owner must be declared before it can own runtime behavior. |
+| L1 | runtime zone | Defines dependency direction and forbidden ownership. |
+| L2 | capability plane | Every AI construction plane is placed exactly once. |
+| L3 | package/module owner | The physical implementation owner for that plane. |
+| L4 | contract surface | Interfaces, envelopes, state authority, receipts and recovery behavior. |
+
+The levels are intentionally one-way. Lower levels refine higher-level
+ownership; they do not create new authority.
+
+### 14.2 Plane placement
+
+Every plane in `machine/ai_app_construction.json` must have exactly one
+placement below. The validator checks that the physical owner exists, exactly
+matches the construction contract, and is contained by the declared zone.
+
+| Plane | Zone | Physical owner | Boundary class | Exposure |
+| --- | --- | --- | --- | --- |
+| `foundation` | `engine` | `skeleton/kernel` | internal-capability | internal |
+| `identity` | `engine` | `skeleton/api` | internal-capability | internal |
+| `configuration-secrets` | `engine` | `skeleton/config` | internal-capability | internal |
+| `model-provider` | `engine` | `skeleton/provider_runtime.py` | provider-boundary | internal |
+| `model-routing` | `application` | `backend/core/model_router.py` | policy-boundary | internal |
+| `prompt-context` | `engine` | `skeleton/context` | internal-capability | internal |
+| `orchestration` | `engine` | `skeleton/intelligence` | internal-capability | internal |
+| `reasoning-verification` | `engine` | `skeleton/intelligence` | internal-capability | internal |
+| `tool-runtime` | `engine` | `skeleton/skills` | internal-capability | internal |
+| `memory` | `engine` | `skeleton/memory` | state-boundary | internal |
+| `retrieval` | `engine` | `skeleton/retrieval` | internal-capability | internal |
+| `data-persistence` | `engine` | `skeleton/persistence` | state-boundary | internal |
+| `jobs-durability` | `engine` | `skeleton/agents` | state-boundary | internal |
+| `artifact-files` | `engine` | `skeleton/artifact_plane` | state-boundary | internal |
+| `application-api` | `application` | `backend` | service-boundary | externally-reachable |
+| `engine-api` | `engine` | `skeleton/api` | service-boundary | externally-reachable |
+| `product-experience` | `product` | `frontend` | product-shell | externally-reachable |
+| `streaming-realtime` | `application` | `backend` | transport-boundary | internal |
+| `security-safety` | `engine` | `skeleton/security` | security-boundary | internal |
+| `governance` | `engine` | `skeleton/vault` | governance-boundary | internal |
+| `resilience` | `engine` | `skeleton/reliability` | internal-capability | internal |
+| `observability` | `engine` | `skeleton/observability` | telemetry-boundary | internal |
+| `evaluation` | `engine` | `skeleton/eval` | evidence-boundary | internal |
+| `feedback-learning` | `engine` | `skeleton/learning` | promotion-boundary | internal |
+| `cost-capacity` | `engine` | `skeleton/intelligence` | admission-boundary | internal |
+| `operator-control` | `application` | `backend/core/product_control_runtime.py` | control-boundary | internal |
+| `deployment-release` | `engine` | `skeleton/deploy` | release-boundary | internal |
+
+A new plane cannot be implemented first and documented later. Add or change the
+construction contract and structural placement in the same change.
+
+### 14.3 Composition roots
+
+Composition roots are the only places intended to wire multiple owned
+capabilities together. They may connect dependencies; they may not redefine the
+capability ownership they compose.
+
+| Composition root | Path | Zone | Responsibility |
+| --- | --- | --- | --- |
+| `whole-app-assembly` | `skeleton/app/assembly.py` | `engine` | Compose declared runtime services and operator topology; never absorb domain business logic. |
+| `engine-cli` | `skeleton/__main__.py` | `engine` | Dispatch operator commands into owned engine/application surfaces without creating alternate runtimes. |
+| `application-api-bootstrap` | `backend/server.py` | `application` | Mount application routes, middleware, and shared application dependencies; feature logic remains in owned modules. |
+| `product-shell-bootstrap` | `frontend/app/_layout.tsx` | `product` | Mount product providers, guards, and navigation shell; service ownership remains behind canonical API clients. |
+| `provider-runtime-composition` | `skeleton/provider_runtime.py` | `engine` | Construct credential-bearing runtime provider adapters after governance, admission, and architecture receipt checks. |
+| `model-routing-policy` | `backend/core/model_router.py` | `application` | Select among declared provider capabilities using bounded evidence and budgets without performing provider network I/O. |
+
+This distinction is important: `backend/server.py`, for example, may mount a
+route implemented elsewhere, but route mounting does not make the server module
+the owner of the feature's model/provider/memory logic.
+
+### 14.4 State authority
+
+State has one writer-of-record authority. Adapters may cache or project state,
+but they may not become a second canonical owner.
+
+| State class | Authority plane | Canonical owner |
+| --- | --- | --- |
+| `identity-and-principal` | `identity` | `skeleton/api` |
+| `runtime-configuration-and-secrets` | `configuration-secrets` | `skeleton/config` |
+| `provider-activation` | `model-provider` | `skeleton/provider_runtime.py` |
+| `conversation-and-working-memory` | `memory` | `skeleton/memory` |
+| `retrieval-index-and-ranking-state` | `retrieval` | `skeleton/retrieval` |
+| `durable-application-records` | `data-persistence` | `skeleton/persistence` |
+| `job-checkpoints-and-resume` | `jobs-durability` | `skeleton/agents` |
+| `artifact-bytes-and-metadata` | `artifact-files` | `skeleton/artifact_plane` |
+| `governance-policy-and-retention` | `governance` | `skeleton/vault` |
+| `evaluation-evidence` | `evaluation` | `skeleton/eval` |
+| `feedback-experiments-and-promotion` | `feedback-learning` | `skeleton/learning` |
+| `quota-budget-and-admission` | `cost-capacity` | `skeleton/intelligence` |
+| `release-and-rollback-evidence` | `deployment-release` | `skeleton/deploy` |
+
+When adding durable state, identify its authority class before choosing storage.
+Storage technology is replaceable; authority is not.
+
+### 14.5 Recovery domains
+
+Recovery is organized around bounded blast radii rather than process names.
+Every construction plane belongs to exactly one recovery domain.
+
+| Recovery domain | Planes | Restart scope | Required degraded behavior |
+| --- | --- | --- | --- |
+| `bootstrap-authority` | `foundation`, `identity`, `configuration-secrets` | engine bootstrap/configuration | fail closed for authority-bearing work; health may remain diagnostic-only |
+| `provider-execution` | `model-provider`, `model-routing`, `cost-capacity` | provider/routing workers | deny or route only to already-declared healthy capacity; never bypass receipts or budgets |
+| `knowledge-state` | `memory`, `retrieval`, `data-persistence`, `prompt-context` | knowledge and persistence adapters | bounded stateless mode only where the request contract permits it; never cross tenant boundaries |
+| `cognition-action` | `orchestration`, `reasoning-verification`, `jobs-durability`, `tool-runtime`, `artifact-files` | operation/job execution | checkpoint, cancel, or return partial evidence; never silently repeat side effects |
+| `service-transport` | `application-api`, `engine-api`, `streaming-realtime`, `operator-control` | API/transport process | health and explicit unavailable responses; resumable operations preserve identity and terminal state |
+| `product-shell` | `product-experience` | frontend process/session | preserve local UI state and surface backend/engine degradation without fabricating completion |
+| `security-governance` | `security-safety`, `governance` | policy/security boundary | fail closed for protected actions and external transfers |
+| `quality-release` | `observability`, `resilience`, `evaluation`, `feedback-learning`, `deployment-release` | evidence/promotion control | freeze promotion and learning mutation while preserving current known-good release |
+
+This gives operators and automated repair agents a deterministic answer to
+"what may be restarted or degraded together?" without allowing a failure in one
+plane to erase ownership boundaries.
+
+### 14.6 Dependency law
+
+The validator now rejects all of the following:
+
+- a construction plane without a structural placement;
+- duplicate placement of one plane;
+- a placement whose owner differs from the construction contract;
+- a physical owner outside its assigned zone;
+- a construction plane owned from a transitional root;
+- a cross-zone plane dependency not allowed by the zone DAG;
+- a missing or duplicate recovery-domain assignment;
+- a state class with mismatched authority;
+- a composition root outside its declared zone;
+- drift between architecture, repository, and runtime structure tags.
+
+The repository and runtime manifests carry `structure-map/v1.0` so a build
+cannot silently validate an architecture map while running a differently
+structured application.
