@@ -15,7 +15,7 @@ def test_state_topology_is_valid() -> None:
     assert errors == []
     assert summary["ok"] is True
     assert summary["architecture_tag"] == "arch-map/v3.7"
-    assert summary["topology_version"] == "1.0.0"
+    assert summary["topology_version"] == "1.5.0"
     assert summary["physical_stores"] >= 7
     assert summary["state_domains"] >= 10
     assert summary["state_flows"] >= 7
@@ -160,3 +160,31 @@ def test_swarm_scratch_and_event_stream_derive_from_canonical_operation_state() 
     )
     assert flow["from"] == "canonical-operation-state"
     assert flow["to"] == "backend-swarm-scratch"
+
+
+def test_functional_ai_memory_authority_is_canonical_and_projections_are_derived() -> None:
+    topology = _topology()
+    domains = {domain["id"]: domain for domain in topology["state_domains"]}
+
+    canonical = domains["canonical-ai-memory-records"]
+    assert canonical["authority"] == "authoritative"
+    assert canonical["source_of_truth"] is True
+    assert canonical["rebuildable"] is False
+    assert canonical["gap"] == "gap-memory-durable-authority"
+
+    for projection_id in ("optional-vector-index", "in-process-retrieval-memory"):
+        projection = domains[projection_id]
+        assert projection["source_of_truth"] is False
+        assert "canonical-ai-memory-records" in projection["derived_from"]
+
+
+def test_functional_ai_state_domains_are_required_by_construction_closure() -> None:
+    topology = _topology()
+    construction = json.loads(
+        (ROOT / "machine/ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    domain_ids = {domain["id"] for domain in topology["state_domains"]}
+
+    required = set(construction["functional_ai_closure"]["required_state_domains"])
+    assert required
+    assert required <= domain_ids
