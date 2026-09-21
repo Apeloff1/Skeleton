@@ -245,3 +245,95 @@ def test_dependency_and_acceptance_relationships_are_separate() -> None:
         "engine-api",
         "product-experience",
     }
+
+
+def test_functional_ai_closure_matches_exact_p0_set_and_dependency_dag() -> None:
+    contract = _contract()
+    closure = contract["functional_ai_closure"]
+    graph = contract["functional_ai_dependency_graph"]
+
+    declared_p0 = {
+        gap["id"]
+        for gap in contract["gap_register"]
+        if gap["priority"] == "P0"
+    }
+    required_p0 = set(closure["required_p0_gaps"])
+    graph_p0 = {node["gap"] for node in graph["nodes"]}
+    staged_p0 = {
+        gap_id
+        for stage in graph["stages"]
+        for gap_id in stage["closes"]
+    }
+
+    assert declared_p0
+    assert required_p0 == declared_p0
+    assert graph_p0 == declared_p0
+    assert staged_p0 == declared_p0
+
+    node_by_gap = {node["gap"]: node for node in graph["nodes"]}
+    for node in graph["nodes"]:
+        for dependency in node["depends_on"]:
+            assert dependency in declared_p0
+            assert node_by_gap[dependency]["stage"] < node["stage"]
+
+
+def test_functional_ai_blueprints_are_bound_to_p0_gaps_and_work_packages() -> None:
+    contract = _contract()
+    closure = contract["functional_ai_closure"]
+    gaps = {gap["id"]: gap for gap in contract["gap_register"]}
+    packages = {
+        package["id"]: package
+        for package in contract["construction_work_packages"]
+    }
+    planes = {plane["id"]: plane for plane in contract["planes"]}
+
+    for item in closure["required_blueprints"]:
+        blueprint = contract[item["key"]]
+        gap = gaps[item["gap"]]
+        package = packages[item["work_package"]]
+
+        assert blueprint["schema_version"] == 1
+        assert blueprint["gap"] == item["gap"]
+        assert gap["priority"] == "P0"
+        assert gap["plane"] == item["plane"]
+        assert package["gap"] == item["gap"]
+        if gap["status"] == "open":
+            assert planes[item["plane"]]["state"] == "partial"
+
+
+def test_functional_ai_required_envelopes_exist() -> None:
+    contract = _contract()
+    closure = contract["functional_ai_closure"]
+    envelopes = contract["canonical_envelopes"]
+
+    assert set(closure["required_envelopes"]) <= set(envelopes)
+    for envelope_id in closure["required_envelopes"]:
+        required_fields = envelopes[envelope_id]["required_fields"]
+        assert required_fields
+        assert len(required_fields) == len(set(required_fields))
+
+
+def test_functional_ai_dependency_stage_contract_is_contiguous_and_unique() -> None:
+    contract = _contract()
+    graph = contract["functional_ai_dependency_graph"]
+    stages = graph["stages"]
+
+    numbers = [stage["stage"] for stage in stages]
+    assert numbers == list(range(len(stages)))
+
+    closed = [
+        gap_id
+        for stage in stages
+        for gap_id in stage["closes"]
+    ]
+    assert len(closed) == len(set(closed))
+
+
+def test_fully_functional_ai_core_planes_remain_partial_while_p0_gaps_are_open() -> None:
+    contract = _contract()
+    closure_p0 = set(contract["functional_ai_closure"]["required_p0_gaps"])
+    planes = {plane["id"]: plane for plane in contract["planes"]}
+
+    for gap in contract["gap_register"]:
+        if gap["id"] in closure_p0 and gap["status"] == "open":
+            assert planes[gap["plane"]]["state"] == "partial"
