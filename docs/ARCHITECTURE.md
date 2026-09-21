@@ -253,7 +253,8 @@ Canonical navigation for this layer:
 - [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
 - [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
 - [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion;
-- [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns.
+- [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns;
+- [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
