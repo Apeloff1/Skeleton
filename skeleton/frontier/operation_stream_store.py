@@ -10,9 +10,11 @@ substitute another store only if the same conformance tests pass.
 
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
+import re
 import sqlite3
 import threading
 from typing import Any
@@ -32,6 +34,51 @@ from skeleton.frontier.operation_stream import (
 
 class StreamStoreCorruptionError(StreamContractError):
     """Persisted stream state cannot be interpreted safely."""
+
+
+_CONSUMER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def _consumer_id(value: str) -> str:
+    if not isinstance(value, str):
+        raise StreamContractError("consumer_id must be a string")
+    normalized = value.strip()
+    if not _CONSUMER_ID_RE.fullmatch(normalized):
+        raise StreamContractError(
+            "consumer_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
+        )
+    return normalized
+
+
+def _aware_utc(value: datetime | None = None) -> datetime:
+    instant = value or datetime.now(timezone.utc)
+    if not isinstance(instant, datetime):
+        raise StreamContractError("consumer timestamp must be a datetime")
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise StreamContractError("consumer timestamp must be timezone-aware")
+    return instant.astimezone(timezone.utc)
+
+
+@dataclass(frozen=True, slots=True)
+class StreamConsumerCheckpoint:
+    operation_id: str
+    consumer_id: str
+    acknowledged_through: int
+    lease_expires_at: datetime
+    updated_at: datetime
+
+    @property
+    def active(self) -> bool:
+        return self.lease_expires_at > datetime.now(timezone.utc)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "consumer_id": self.consumer_id,
+            "acknowledged_through": self.acknowledged_through,
+            "lease_expires_at": self.lease_expires_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
 def _reject_constant(value: str) -> object:
@@ -102,6 +149,21 @@ class SQLiteOperationEventStore:
 
                 CREATE INDEX IF NOT EXISTS idx_operation_stream_replay
                 ON operation_stream_event(namespace, operation_id, sequence);
+
+                CREATE TABLE IF NOT EXISTS operation_stream_consumer (
+                    namespace TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    consumer_id TEXT NOT NULL,
+                    acknowledged_through INTEGER NOT NULL DEFAULT 0,
+                    lease_expires_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, operation_id, consumer_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_operation_stream_consumer_lease
+                ON operation_stream_consumer(
+                    namespace, operation_id, lease_expires_at
+                );
                 """
             )
 
@@ -401,6 +463,235 @@ class SQLiteOperationEventStore:
             ).fetchall()
         return tuple(self._event_from_row(row) for row in rows)
 
+    @classmethod
+    def _consumer_from_row(
+        cls,
+        row: sqlite3.Row,
+    ) -> StreamConsumerCheckpoint:
+        try:
+            acknowledged = int(row["acknowledged_through"])
+            if acknowledged < 0:
+                raise ValueError("acknowledged_through must be non-negative")
+            return StreamConsumerCheckpoint(
+                operation_id=row["operation_id"],
+                consumer_id=_consumer_id(row["consumer_id"]),
+                acknowledged_through=acknowledged,
+                lease_expires_at=cls._decode_timestamp(row["lease_expires_at"]),
+                updated_at=cls._decode_timestamp(row["updated_at"]),
+            )
+        except (KeyError, TypeError, ValueError, StreamContractError) as exc:
+            if isinstance(exc, StreamStoreCorruptionError):
+                raise
+            raise StreamStoreCorruptionError(
+                "persisted stream consumer checkpoint is invalid"
+            ) from exc
+
+    def register_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        *,
+        lease_seconds: int = 300,
+        now: datetime | None = None,
+    ) -> StreamConsumerCheckpoint:
+        consumer = _consumer_id(consumer_id)
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or lease_seconds < 1
+            or lease_seconds > 86_400
+        ):
+            raise ValueError("lease_seconds must be an integer between 1 and 86400")
+        instant = _aware_utc(now)
+        expires = instant + timedelta(seconds=lease_seconds)
+
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_head(operation_id)
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, consumer_id, acknowledged_through,
+                           lease_expires_at, updated_at
+                    FROM operation_stream_consumer
+                    WHERE namespace = ? AND operation_id = ? AND consumer_id = ?
+                    """,
+                    (self.namespace, operation_id, consumer),
+                ).fetchone()
+                acknowledged = 0 if row is None else int(row["acknowledged_through"])
+                self._connection.execute(
+                    """
+                    INSERT INTO operation_stream_consumer(
+                        namespace, operation_id, consumer_id,
+                        acknowledged_through, lease_expires_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(namespace, operation_id, consumer_id)
+                    DO UPDATE SET
+                        lease_expires_at = excluded.lease_expires_at,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        self.namespace,
+                        operation_id,
+                        consumer,
+                        acknowledged,
+                        expires.isoformat(),
+                        instant.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return StreamConsumerCheckpoint(
+                    operation_id=operation_id,
+                    consumer_id=consumer,
+                    acknowledged_through=acknowledged,
+                    lease_expires_at=expires,
+                    updated_at=instant,
+                )
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def acknowledge_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        sequence: int,
+        *,
+        lease_seconds: int = 300,
+        now: datetime | None = None,
+    ) -> StreamConsumerCheckpoint:
+        consumer = _consumer_id(consumer_id)
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise ValueError("sequence must be a non-negative integer")
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or lease_seconds < 1
+            or lease_seconds > 86_400
+        ):
+            raise ValueError("lease_seconds must be an integer between 1 and 86400")
+        instant = _aware_utc(now)
+        expires = instant + timedelta(seconds=lease_seconds)
+
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                head = self._ensure_head(operation_id)
+                latest_row = self._connection.execute(
+                    """
+                    SELECT COALESCE(MAX(sequence), ?)
+                    FROM operation_stream_event
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (
+                        int(head["compacted_through"]),
+                        self.namespace,
+                        operation_id,
+                    ),
+                ).fetchone()
+                latest = int(latest_row[0])
+                if sequence > latest:
+                    raise StreamContractError(
+                        "cannot acknowledge beyond latest durable sequence"
+                    )
+
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, consumer_id, acknowledged_through,
+                           lease_expires_at, updated_at
+                    FROM operation_stream_consumer
+                    WHERE namespace = ? AND operation_id = ? AND consumer_id = ?
+                    """,
+                    (self.namespace, operation_id, consumer),
+                ).fetchone()
+                if row is None:
+                    raise StreamContractError(
+                        "consumer must register before acknowledging"
+                    )
+                current = int(row["acknowledged_through"])
+                acknowledged = max(current, sequence)
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_consumer
+                    SET acknowledged_through = ?,
+                        lease_expires_at = ?,
+                        updated_at = ?
+                    WHERE namespace = ? AND operation_id = ? AND consumer_id = ?
+                    """,
+                    (
+                        acknowledged,
+                        expires.isoformat(),
+                        instant.isoformat(),
+                        self.namespace,
+                        operation_id,
+                        consumer,
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return StreamConsumerCheckpoint(
+                    operation_id=operation_id,
+                    consumer_id=consumer,
+                    acknowledged_through=acknowledged,
+                    lease_expires_at=expires,
+                    updated_at=instant,
+                )
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def active_consumers(
+        self,
+        operation_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> tuple[StreamConsumerCheckpoint, ...]:
+        instant = _aware_utc(now)
+        with self._lock:
+            self._ensure_head(operation_id)
+            rows = self._connection.execute(
+                """
+                SELECT operation_id, consumer_id, acknowledged_through,
+                       lease_expires_at, updated_at
+                FROM operation_stream_consumer
+                WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                ORDER BY acknowledged_through ASC, consumer_id ASC
+                """,
+                (self.namespace, operation_id, instant.isoformat()),
+            ).fetchall()
+        return tuple(self._consumer_from_row(row) for row in rows)
+
+    def safe_compaction_sequence(
+        self,
+        operation_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        """Return the slowest active consumer ACK, or current watermark if none."""
+
+        instant = _aware_utc(now)
+        with self._lock:
+            head = self._ensure_head(operation_id)
+            row = self._connection.execute(
+                """
+                SELECT MIN(acknowledged_through)
+                FROM operation_stream_consumer
+                WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                """,
+                (self.namespace, operation_id, instant.isoformat()),
+            ).fetchone()
+            if row is None or row[0] is None:
+                return int(head["compacted_through"])
+            return max(int(head["compacted_through"]), int(row[0]))
+
+    def compact_acknowledged(
+        self,
+        operation_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        safe = self.safe_compaction_sequence(operation_id, now=now)
+        return self.compact_through(operation_id, safe)
+
     def compact_through(self, operation_id: str, sequence: int) -> int:
         if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
             raise ValueError("sequence must be a non-negative integer")
@@ -481,5 +772,6 @@ class SQLiteOperationEventStore:
 
 __all__ = [
     "SQLiteOperationEventStore",
+    "StreamConsumerCheckpoint",
     "StreamStoreCorruptionError",
 ]
