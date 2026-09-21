@@ -1028,11 +1028,54 @@
       "every construction plane is placed exactly once",
       "plane owner equals the construction contract owner",
       "plane owner is physically contained by its assigned zone",
-      "cross-zone plane dependencies follow the zone dependency DAG",
       "no transitional root owns a construction plane",
       "every declared composition root exists and belongs to its declared zone",
       "every state class has exactly one authority plane and matching owner",
-      "every construction plane belongs to exactly one recovery domain"
+      "every construction plane belongs to exactly one recovery domain",
+      "cross-zone plane dependencies follow the zone DAG unless an exact bounded dependency exception is declared",
+      "dependency exceptions never widen zone may_depend_on policy and carry a removal condition"
+    ],
+    "dependency_exceptions": [
+      {
+        "id": "model-routing-ownership-inversion",
+        "source_planes": [
+          "orchestration",
+          "reasoning-verification",
+          "resilience",
+          "cost-capacity"
+        ],
+        "dependency_plane": "model-routing",
+        "from_zone": "engine",
+        "to_zone": "application",
+        "kind": "ownership-migration",
+        "rationale": "The canonical model-routing policy is still physically owned by backend/core/model_router.py while engine planes consume its provider-neutral routing policy. The zone DAG must not be widened into an engine->application cycle.",
+        "target_owner": "skeleton/intelligence/model_router.py",
+        "removal_condition": "Move provider-neutral routing policy into the engine, leave an application compatibility facade, migrate callers, then remove this exception."
+      },
+      {
+        "id": "release-consumes-application-evidence",
+        "source_planes": [
+          "deployment-release"
+        ],
+        "dependency_plane": "application-api",
+        "from_zone": "engine",
+        "to_zone": "application",
+        "kind": "control-observation",
+        "rationale": "Release orchestration consumes application readiness and release evidence; it does not grant the engine ownership of application runtime behavior.",
+        "removal_condition": "Replace the construction prerequisite with an explicit release-evidence interface when the release evidence contract is promoted."
+      },
+      {
+        "id": "release-consumes-product-evidence",
+        "source_planes": [
+          "deployment-release"
+        ],
+        "dependency_plane": "product-experience",
+        "from_zone": "engine",
+        "to_zone": "product",
+        "kind": "control-observation",
+        "rationale": "Release orchestration consumes product build/E2E evidence; it does not import or own product-shell behavior.",
+        "removal_condition": "Replace the construction prerequisite with an explicit product release-evidence interface when the release evidence contract is promoted."
+      }
     ]
   }
 }
