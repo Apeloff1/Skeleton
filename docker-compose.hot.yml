@@ -1,0 +1,21 @@
+# Optional local hot-reload overlay for the canonical application assembly.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.hot.yml up --build
+#   python -m skeleton app up --hot
+#
+# The base compose file intentionally runs code from built images so the same
+# topology is valid for production-mode assembly. This overlay is the only
+# place where repository source is bind-mounted into application containers.
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app:ro
+      - ./skeleton:/app/skeleton:ro
+      - backend_data:/app/data
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
