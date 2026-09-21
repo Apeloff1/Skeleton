@@ -250,6 +250,7 @@ Canonical navigation for this layer:
 - [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
 - [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–Y construction sequence;
 - [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
+- [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
 - [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
 - [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion.
 
