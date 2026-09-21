@@ -16,10 +16,8 @@ import {
   ProductPillar,
   capabilitiesFor,
 } from '../src/product/productCatalog';
-import {
-  AppHealthSnapshot,
-  probeAppHealth,
-} from '../src/product/appHealthClient';
+import { probeAppHealth } from '../src/product/appHealthClient';
+import type { AppHealthSnapshot } from '../src/product/appHealthClient';
 
 const PILLARS: readonly { id: ProductPillar; title: string; subtitle: string }[] = [
   { id: 'create', title: 'Create', subtitle: 'Design, generate and ship worlds and playable projects.' },
