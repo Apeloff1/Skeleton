@@ -94,6 +94,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.game_mechanics_nexus",             "router"),
     ("routes.game_factory_quantum_core",        "router"),
     ("routes.jeeves_game_builder",              "router"),
+    ("routes.conversations",                    "router"),
     ("routes.game_deployment_pipeline",         "router"),
     ("routes.game_domains_mega_expansion",      "router"),
     ("routes.game_domains_hyperscale",          "router"),
