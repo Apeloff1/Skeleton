@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Sequence
@@ -39,6 +40,11 @@ def _parser() -> argparse.ArgumentParser:
     up = sub.add_parser("up", help="build and start the assembled application")
     up.add_argument("--full", action="store_true", help="include optional full-profile services")
     up.add_argument("--no-build", action="store_true", help="do not rebuild images")
+    up.add_argument(
+        "--production",
+        action="store_true",
+        help="use production backend and frontend image stages",
+    )
     up.add_argument(
         "--no-verify",
         action="store_true",
@@ -107,8 +113,16 @@ def _print_checks(runtime: bool, as_json: bool) -> int:
     return 0 if ok else 1
 
 
-def _run_compose(command: Sequence[str], root: Path) -> int:
-    completed = subprocess.run(list(command), cwd=root, check=False)
+def _run_compose(
+    command: Sequence[str],
+    root: Path,
+    *,
+    env_overrides: dict[str, str] | None = None,
+) -> int:
+    env = os.environ.copy()
+    if env_overrides:
+        env.update(env_overrides)
+    completed = subprocess.run(list(command), cwd=root, check=False, env=env)
     return int(completed.returncode)
 
 
@@ -134,6 +148,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
+        mode = "production" if bool(args.production) else "development"
         exit_code = _run_compose(
             compose_command(
                 "up",
@@ -142,6 +157,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 build=not bool(args.no_build),
             ),
             root,
+            env_overrides=manifest.mode_env(mode),
         )
         if exit_code or bool(args.no_verify):
             return exit_code
