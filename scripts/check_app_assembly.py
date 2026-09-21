@@ -314,6 +314,10 @@ def audit_compose_modes() -> None:
         in base,
         "frontend Skeleton public URL default drift",
     )
+    check(
+        "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
+        "backend internal Skeleton endpoint default drift",
+    )
 
 
 def audit_production_ingress() -> None:
@@ -573,11 +577,16 @@ def audit_public_app_bootstrap_contract() -> None:
 
     check('APIRouter(prefix="/api/app"' in route, "public app runtime router prefix drift")
     check('@router.get("/bootstrap")' in route, "public app bootstrap route missing")
+    check('@router.get("/status")' in route, "aggregate app runtime status route missing")
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
+    check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
     check("getAppBootstrap" in client, "frontend app bootstrap client missing")
     check("'/api/app/bootstrap'" in client, "frontend app bootstrap endpoint drift")
+    check("getAppRuntimeStatus" in client, "frontend aggregate app runtime client missing")
+    check("/api/app/status?timeout_ms=" in client, "frontend aggregate app runtime endpoint drift")
     check("bootstrapService" in client, "frontend app bootstrap service resolver missing")
 
 
@@ -598,8 +607,12 @@ def audit_product_health_contract() -> None:
         if isinstance(item, dict) and isinstance(item.get("name"), str)
     }
     check("getAppBootstrap" in client, "product health no longer consumes canonical app bootstrap")
+    check("getAppRuntimeStatus" in client, "product health bypasses aggregate app runtime status")
     check("bootstrapService" in client, "product health bypasses bootstrap service metadata")
-    check("contractSource: 'bootstrap' | 'fallback'" in client, "health contract provenance missing")
+    check(
+        "contractSource: 'runtime' | 'bootstrap-fallback' | 'static-fallback'" in client,
+        "health contract provenance missing",
+    )
 
     for name in ("backend", "skeleton"):
         service = services.get(name)
