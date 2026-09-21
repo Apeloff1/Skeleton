@@ -39,6 +39,13 @@ def _parser() -> argparse.ArgumentParser:
     up = sub.add_parser("up", help="build and start the assembled application")
     up.add_argument("--full", action="store_true", help="include optional full-profile services")
     up.add_argument("--no-build", action="store_true", help="do not rebuild images")
+    up.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="return after Compose starts without probing public application surfaces",
+    )
+    up.add_argument("--verify-attempts", type=int, default=12)
+    up.add_argument("--verify-delay", type=float, default=1.0)
 
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
@@ -46,6 +53,8 @@ def _parser() -> argparse.ArgumentParser:
     smoke = sub.add_parser("smoke", help="probe assembled public service health")
     smoke.add_argument("--full", action="store_true", help="probe the full profile")
     smoke.add_argument("--timeout", type=float, default=3.0)
+    smoke.add_argument("--attempts", type=int, default=1)
+    smoke.add_argument("--delay", type=float, default=1.0)
     smoke.add_argument("--json", action="store_true", dest="as_json")
 
     logs = sub.add_parser("logs", help="show assembled service logs")
@@ -125,7 +134,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
-        return _run_compose(
+        exit_code = _run_compose(
             compose_command(
                 "up",
                 manifest=manifest,
@@ -134,18 +143,54 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             ),
             root,
         )
+        if exit_code or bool(args.no_verify):
+            return exit_code
+
+        from skeleton.app.health import probes_ok, wait_for_application
+
+        try:
+            results = wait_for_application(
+                manifest=manifest,
+                full=bool(args.full),
+                timeout=3.0,
+                attempts=int(args.verify_attempts),
+                delay=float(args.verify_delay),
+            )
+        except ValueError as exc:
+            print(f"invalid startup verification budget: {exc}")
+            return 2
+
+        for result in results:
+            status = result.status if result.status is not None else "-"
+            print(
+                f"[{'PASS' if result.ok else 'FAIL'}] "
+                f"{result.service:<10} status={status} {result.url} {result.detail}"
+            )
+        if probes_ok(results):
+            print("application start: ready")
+            return 0
+        print("application start: services launched but readiness verification failed")
+        return 1
     if command == "smoke":
-        from skeleton.app.health import probe_application, probes_ok
+        from skeleton.app.health import probes_ok, wait_for_application
 
         timeout = float(args.timeout)
+        attempts = int(args.attempts)
+        delay = float(args.delay)
         if timeout <= 0:
             print("smoke timeout must be greater than zero")
             return 2
-        results = probe_application(
-            manifest=manifest,
-            full=bool(args.full),
-            timeout=timeout,
-        )
+        try:
+            results = wait_for_application(
+                manifest=manifest,
+                full=bool(args.full),
+                timeout=timeout,
+                attempts=attempts,
+                delay=delay,
+            )
+        except ValueError as exc:
+            print(f"invalid smoke budget: {exc}")
+            return 2
         ok = probes_ok(results)
         if bool(args.as_json):
             print(
