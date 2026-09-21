@@ -16,6 +16,10 @@ Edge/historical catalogue: [`EDGE_CASES_HISTORICAL.md`](EDGE_CASES_HISTORICAL.md
 
 Machine edge-case mirror: [`machine/ai_edge_case_catalog.json`](../../machine/ai_edge_case_catalog.json)
 
+P0 W00–W11 acceptance matrix: [`P0_EDGE_CASE_BUILD_MATRIX.md`](P0_EDGE_CASE_BUILD_MATRIX.md)
+
+Machine P0 matrix: [`machine/ai_p0_edge_case_matrix.json`](../../machine/ai_p0_edge_case_matrix.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -41,6 +45,8 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 13. `machine/ai_master_plan.json`
 14. `docs/plan/EDGE_CASES_HISTORICAL.md`
 15. `machine/ai_edge_case_catalog.json`
+16. `docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md`
+17. `machine/ai_p0_edge_case_matrix.json`
 
 The first ten remain the present implementation/construction authority. Items 11–13 add the canonical long-range index and planning authority.
 
