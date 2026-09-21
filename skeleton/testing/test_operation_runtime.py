@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import time
 from uuid import uuid4
 
 from skeleton.contracts.operation import OperationEnvelope, OperationState
@@ -205,3 +206,113 @@ def test_stats_surface_pending_outbox_and_dispatch_health(tmp_path: Path) -> Non
     assert durable["dispatch_failures"] == 0
     assert durable["last_dispatch"]["healthy"] is True
     assert result["operation_state"] == "completed"
+
+
+class _FailOnceStream:
+    def __init__(self, inner: SQLiteOperationEventStore) -> None:
+        self.inner = inner
+        self.failures_remaining = 1
+        self.append_calls = 0
+
+    def append(self, *args, **kwargs):
+        self.append_calls += 1
+        if self.failures_remaining:
+            self.failures_remaining -= 1
+            raise RuntimeError("transient stream outage")
+        return self.inner.append(*args, **kwargs)
+
+    def replay(self, *args, **kwargs):
+        return self.inner.replay(*args, **kwargs)
+
+    def close(self) -> None:
+        self.inner.close()
+
+
+def test_background_dispatcher_retries_pending_outbox_after_transient_failure(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    inner_stream = SQLiteOperationEventStore(tmp_path / "events.sqlite")
+    stream = _FailOnceStream(inner_stream)
+    runtime = DurableOperationRuntime(
+        _Reasoner(),
+        operations,
+        stream,
+        outbox_dispatch_interval_s=0.05,
+    )
+    now = datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
+    operation_id = str(uuid4())
+    operations.create(
+        OperationEnvelope(
+            operation_id=operation_id,
+            tenant_id="tenant-a",
+            actor_id="actor-a",
+            capability="intelligence.reason",
+            created_at=now,
+            deadline=now + timedelta(minutes=5),
+            idempotency_key="background-retry",
+            trace_id="background-trace",
+        ),
+        now=now,
+    )
+
+    first = runtime.dispatch_outbox()
+    assert first.healthy is False
+    assert first.remaining == 1
+
+    assert runtime.start_dispatcher() is True
+    assert runtime.start_dispatcher() is False
+
+    deadline = time.monotonic() + 2.0
+    while operations.pending_outbox() and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    assert operations.pending_outbox() == ()
+    assert runtime.dispatcher_running is True
+    replay = inner_stream.replay(ReplayCursor(operation_id))
+    assert len(replay) == 1
+    assert replay[0].type == "operation.created"
+    stats = runtime.stats()["durable_operation_runtime"]
+    assert stats["dispatch_failures"] == 1
+    assert stats["dispatcher_running"] is True
+    assert stats["dispatch_interval_s"] == 0.05
+
+    runtime.close()
+    assert runtime.dispatcher_running is False
+
+
+def test_stop_dispatcher_is_idempotent_and_flushes_pending_rows(
+    tmp_path: Path,
+) -> None:
+    runtime = DurableOperationRuntime(
+        _Reasoner(),
+        SQLiteOperationStore(tmp_path / "operations.sqlite"),
+        SQLiteOperationEventStore(tmp_path / "events.sqlite"),
+        outbox_dispatch_interval_s=0.5,
+    )
+    now = datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
+    operation_id = str(uuid4())
+    runtime.operations.create(
+        OperationEnvelope(
+            operation_id=operation_id,
+            tenant_id="tenant-a",
+            actor_id="actor-a",
+            capability="intelligence.reason",
+            created_at=now,
+            deadline=now + timedelta(minutes=5),
+            idempotency_key="stop-flush",
+            trace_id="stop-trace",
+        ),
+        now=now,
+    )
+    assert runtime.start_dispatcher() is True
+
+    report = runtime.stop_dispatcher(flush=True)
+    assert report is not None
+    assert report.remaining == 0
+    assert runtime.dispatcher_running is False
+
+    again = runtime.stop_dispatcher(flush=True)
+    assert again is not None
+    assert again.remaining == 0
+    runtime.close()
