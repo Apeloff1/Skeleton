@@ -23,7 +23,8 @@
     "state_topology_validator": "scripts/check_state_topology.py",
     "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
     "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
-    "ai_closure_evidence": "machine/ai_closure_evidence.json"
+    "ai_closure_evidence": "machine/ai_closure_evidence.json",
+    "ai_capability_registry": "machine/ai_capabilities.json"
   },
   "objectives": [
     "one product shell",
@@ -558,7 +559,8 @@
     "authoritative state recovery precedes derived projection rebuild",
     "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest",
     "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG.",
-    "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress."
+    "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress.",
+    "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies."
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
