@@ -581,7 +581,7 @@
   ],
   "structural_blueprint": {
     "schema_version": 1,
-    "structure_tag": "structure-map/v1.2",
+    "structure_tag": "structure-map/v1.3",
     "purpose": "Bind repository roots, runtime zones, capability planes, physical ownership, state authority, composition roots, and recovery domains into one validator-enforced structural model.",
     "levels": [
       {
@@ -1053,7 +1053,10 @@
       "dependency exceptions never widen zone may_depend_on policy and carry a removal condition",
       "every construction plane has exactly one execution profile and host",
       "execution host zone allowance matches physical plane placement",
-      "execution profiles define lifecycle, state, scale, shutdown, failure, and side-effect semantics"
+      "execution profiles define lifecycle, state, scale, shutdown, failure, and side-effect semantics",
+      "runtime startup/shutdown groups cover every runtime node exactly once and respect the runtime dependency DAG",
+      "runtime readiness is dependency-aware and distinct from liveness",
+      "upgrade and crash recovery preserve state authority and recovery-domain boundaries"
     ],
     "dependency_exceptions": [],
     "acceptance_edges": [
@@ -1376,7 +1379,101 @@
         "host": "operator-ci",
         "zone": "engine"
       }
-    ]
+    ],
+    "runtime_lifecycle": {
+      "derivation": "service lifecycle follows the runtime DAG; explicit groups are validated against dependency order and must not create hidden service dependencies",
+      "preflight_gates": [
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap",
+        "app-assembly"
+      ],
+      "startup_groups": [
+        {
+          "order": 0,
+          "id": "data-foundation",
+          "nodes": [
+            "mongo",
+            "chroma"
+          ],
+          "mode": "parallel",
+          "barrier": "started-and-health-probe-eligible"
+        },
+        {
+          "order": 1,
+          "id": "core-services",
+          "nodes": [
+            "skeleton",
+            "backend"
+          ],
+          "mode": "parallel",
+          "barrier": "ready-before-dependent-product-start"
+        },
+        {
+          "order": 2,
+          "id": "product-shell",
+          "nodes": [
+            "frontend"
+          ],
+          "mode": "serial",
+          "barrier": "ready-after-backend-and-engine"
+        }
+      ],
+      "readiness_rules": [
+        "a runtime node is not ready until every declared dependency is ready",
+        "liveness proves process survival; readiness proves dependency-safe request admission",
+        "degraded readiness must be explicit and cannot claim unavailable capability as healthy",
+        "provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed",
+        "product readiness requires both application and engine endpoints used by the shell"
+      ],
+      "shutdown_groups": [
+        {
+          "order": 0,
+          "id": "stop-product-admission",
+          "nodes": [
+            "frontend"
+          ],
+          "mode": "parallel",
+          "action": "stop new user mutations and preserve bounded resume state"
+        },
+        {
+          "order": 1,
+          "id": "drain-core-services",
+          "nodes": [
+            "backend",
+            "skeleton"
+          ],
+          "mode": "parallel",
+          "action": "stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence"
+        },
+        {
+          "order": 2,
+          "id": "stop-data-foundation",
+          "nodes": [
+            "chroma",
+            "mongo"
+          ],
+          "mode": "parallel",
+          "action": "fence writers, flush durable state, then stop stores"
+        }
+      ],
+      "shutdown_rule": "reverse runtime dependency order; consumers drain before dependencies stop",
+      "upgrade_rules": [
+        "validate architecture/construction/provider/app contracts before mutating installed runtime",
+        "run persistence migrations before starting code that requires the new schema and retain rollback compatibility evidence",
+        "replace stateless service replicas only after readiness of replacement capacity",
+        "drain durable workers before incompatible code replacement",
+        "never upgrade a dependency underneath a consumer that has not been drained or proven compatible",
+        "rollback uses the last release evidence pointer and must preserve durable state compatibility"
+      ],
+      "crash_rules": [
+        "restart only within the owning recovery domain unless a dependency health failure requires broader restart",
+        "terminal operation state is never reopened by process restart",
+        "realtime reconnect resumes from durable cursor or returns explicit resync",
+        "ambiguous durable writes fail closed and require recovery evidence",
+        "policy/security/governance failure blocks protected work rather than bypassing the plane"
+      ]
+    }
   },
   "relationship_semantics": {
     "runtime_dependency": "Implementation dependency that participates in the zone DAG and topological construction order.",
