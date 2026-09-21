@@ -364,6 +364,8 @@ All **240 catalogue entries** have at least one work-package owner. Each entry c
 
 The current atomic AI build queue also inherits this matrix. Each task exposes counts for the total/critical/high/medium/reference cases inherited from its work-package references, making edge-case pressure visible to scheduling, review and promotion logic.
 
+The full-program matrix also extracts a dedicated risk ledger at `machine/ai_edge_case_priority_queue.json` / `docs/plan/EDGE_CASE_PRIORITY_QUEUE.md`. It currently contains every case classified critical or high, ordered separately from the larger reference catalogue so high-risk obligations cannot disappear inside documentation volume.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
