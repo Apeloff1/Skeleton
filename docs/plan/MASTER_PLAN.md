@@ -366,6 +366,29 @@ The current atomic AI build queue also inherits this matrix. Each task exposes c
 
 The full-program matrix also extracts a dedicated risk ledger at `machine/ai_edge_case_priority_queue.json` / `docs/plan/EDGE_CASE_PRIORITY_QUEUE.md`. It currently contains every case classified critical or high, ordered separately from the larger reference catalogue so high-risk obligations cannot disappear inside documentation volume.
 
+## 21.3 Mandatory build accountability and sign-off
+
+Construction accountability is mandatory and machine-enforced through `machine/ai_build_accountability.json`, with the visible checklist in `docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md`.
+
+Every tracked volume, work package, AIQ task and vertical slice has a completion checkbox. Checkboxes are derived state and may not be hand-toggled. A checked item requires:
+
+- implementation sign-off;
+- independent verification sign-off;
+- signer identity and role;
+- RFC3339 UTC timestamp ending in `Z`;
+- full 40-character git SHA;
+- non-empty evidence references;
+- explicit attestation statement;
+- signature method;
+- completion timestamp;
+- ledger evidence.
+
+Implementation and verification signers must be different. A same-signer exception requires its own signed, timestamped, commit-bound exception record with rationale and evidence.
+
+Work that has merely started must record a UTC `started` event in the append-only history. Status promotion is therefore auditable from planned → started → implemented → verified → checked/closed.
+
+No retroactive signatures are fabricated. Items that predate the ledger remain unchecked until they receive real evidence and sign-off.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
