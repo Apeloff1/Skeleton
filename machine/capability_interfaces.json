@@ -136,7 +136,10 @@
         "replay cursor",
         "approval interaction",
         "cancel interaction",
-        "golden journey observability"
+        "golden journey observability",
+        "safe response renderer",
+        "qualified/degraded rendering",
+        "interactive steering controls"
       ],
       "target_failure_contract": "recoverable user-facing degraded state",
       "source_acceptance": [
@@ -161,7 +164,10 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "status": "partial"
     },
@@ -229,7 +235,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -244,7 +254,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -385,7 +399,10 @@
         "ExecutionCheckpoint",
         "AIExecutionResult",
         "StopPolicy",
-        "ResumeToken"
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -406,7 +423,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "status": "partial"
     },
@@ -560,7 +579,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -578,7 +601,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "present"
     },
@@ -598,7 +625,10 @@
         "policy decision",
         "risk class",
         "quarantine/deny",
-        "security receipt"
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
       ],
       "target_failure_contract": "deny/quarantine with sanitized audit",
       "source_acceptance": [
@@ -617,7 +647,10 @@
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "status": "present"
     },
@@ -672,7 +705,9 @@
         "fair queue class",
         "tenant concurrency",
         "recovery reserve",
-        "queue age policy"
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
       ],
       "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
@@ -692,7 +727,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "status": "partial"
     },
@@ -1053,7 +1089,10 @@
         "policy decision",
         "risk class",
         "quarantine/deny",
-        "security receipt"
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
       ],
       "target_failure_contract": "deny/quarantine with sanitized audit",
       "source_acceptance": [
@@ -1071,7 +1110,10 @@
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "status": "present"
     },
@@ -1091,7 +1133,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -1108,7 +1154,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -1236,7 +1286,10 @@
         "ExecutionCheckpoint",
         "AIExecutionResult",
         "StopPolicy",
-        "ResumeToken"
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -1259,7 +1312,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "status": "partial"
     },
@@ -1584,7 +1639,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -1598,7 +1657,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -1623,7 +1686,11 @@
       "source_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "target_acceptance": [
         "primitive unit suite",
@@ -1660,7 +1727,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "target_acceptance": [
         "migration forward/backward tests",
@@ -1687,7 +1755,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -1698,12 +1770,17 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "present"
     },
@@ -1741,7 +1818,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "target_acceptance": [
         "trace continuity tests",
@@ -1891,7 +1969,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -1908,7 +1990,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -2290,7 +2376,10 @@
         "policy decision",
         "risk class",
         "quarantine/deny",
-        "security receipt"
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
       ],
       "target_failure_contract": "deny/quarantine with sanitized audit",
       "source_acceptance": [
@@ -2303,7 +2392,10 @@
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "status": "present"
     },
@@ -2334,7 +2426,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "target_acceptance": [
         "primitive unit suite",
@@ -2379,7 +2473,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -2426,7 +2522,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "target_acceptance": [
         "no-route tests",
@@ -2476,7 +2574,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "target_acceptance": [
         "prompt injection regression suite",
@@ -2527,7 +2627,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "target_acceptance": [
         "schema fuzzing",
@@ -2576,7 +2678,10 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "target_acceptance": [
         "OpenAPI/schema tests",
@@ -2625,7 +2730,10 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "target_acceptance": [
         "route collision gate",
@@ -2656,7 +2764,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -2670,12 +2782,19 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -2716,7 +2835,10 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "target_acceptance": [
         "trace continuity tests",
@@ -2781,7 +2903,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -2797,7 +2923,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
@@ -2920,7 +3050,10 @@
         "ExecutionCheckpoint",
         "AIExecutionResult",
         "StopPolicy",
-        "ResumeToken"
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -2942,7 +3075,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "status": "partial"
     },
@@ -3003,7 +3138,9 @@
         "fair queue class",
         "tenant concurrency",
         "recovery reserve",
-        "queue age policy"
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
       ],
       "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
@@ -3021,7 +3158,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "status": "present"
     },
@@ -3336,7 +3474,10 @@
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "target_acceptance": [
         "invalid config fails startup",
@@ -3361,19 +3502,30 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "present"
     },
@@ -3409,7 +3561,10 @@
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "target_acceptance": [
         "schema fuzzing",
@@ -3527,7 +3682,9 @@
         "fair queue class",
         "tenant concurrency",
         "recovery reserve",
-        "queue age policy"
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
       ],
       "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
@@ -3543,7 +3700,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "status": "partial"
     },
@@ -3678,7 +3836,11 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "target_failure_contract": "deny protected operations",
       "source_acceptance": [
@@ -3695,7 +3857,11 @@
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "status": "partial"
     },
