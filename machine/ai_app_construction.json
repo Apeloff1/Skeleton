@@ -659,18 +659,28 @@
         "request bounds",
         "idempotency",
         "problem details",
-        "health/readiness"
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
       ],
       "construction": [
         "thin route handlers",
         "service/domain separation",
         "stable schemas",
-        "sanitize provider failures"
+        "sanitize provider failures",
+        "own canonical conversation/thread APIs and never trust client-supplied history as transcript authority",
+        "bind assistant messages to operation/result identity",
+        "use optimistic concurrency and idempotency for message append"
       ],
       "acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "failure_mode": "typed 4xx/5xx without secret leakage"
     },
@@ -1409,6 +1419,37 @@
   "target_maturity": "production-sota",
   "gap_register": [
     {
+      "id": "gap-conversation-state-authority",
+      "plane": "application-api",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Interactive AI chat currently permits caller-supplied conversation history without one canonical durable thread/message authority. A fully functional multi-turn AI product needs server-owned conversation identity, ordered messages, edit/regenerate branching, attachment/tool/result references, retention and context projection so the browser never becomes the transcript source of truth.",
+      "construction": [
+        "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
+        "persist thread/message authority in backend core Mongo rather than client memory or provider history",
+        "make chat ingress accept thread_id plus the new user message; server loads authorized history/context",
+        "bind each assistant message to operation_id and AIExecutionResult",
+        "support edit/regenerate by explicit branch/supersedes relationships rather than destructive transcript rewriting",
+        "bind attachments, tool receipts, citations, memory proposals and artifacts by references",
+        "define deterministic transcript projection into prompt-context under token budget",
+        "define delete/export/retention semantics through governance",
+        "define optimistic concurrency/idempotency for duplicate message submission",
+        "make frontend cache/reducer reconstructable from conversation APIs"
+      ],
+      "closure_evidence": [
+        "new-thread and multi-turn continuation tests",
+        "client cannot inject hidden prior assistant/system messages as canonical history",
+        "cross-tenant/thread authorization denial",
+        "duplicate message idempotency test",
+        "ordered pagination and concurrent append test",
+        "edit/regenerate branch lineage test",
+        "assistant message binds to one operation and final execution result",
+        "conversation deletion/export propagation test",
+        "context projection preserves selected message/citation/tool provenance",
+        "browser refresh/reconnect reconstructs the same canonical transcript"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1660,15 +1701,18 @@
         "gap-governance-registry",
         "gap-cost-admission",
         "gap-provider-surface-convergence",
-        "gap-state-authority-convergence"
+        "gap-state-authority-convergence",
+        "gap-conversation-state-authority"
       ],
-      "goal": "Make provider/data/action/state decisions classifiable, receipt-governed, budget-admissible, and recoverable before adding more autonomy.",
+      "goal": "Make provider/data/action/state and conversation decisions classifiable, receipt-governed, budget-admissible, recoverable, and server-authoritative before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
         "traceable denial receipts",
         "all credential-bearing provider surfaces declared and receipt-enforced",
-        "authoritative state survives restore independently of derived indexes"
+        "authoritative state survives restore independently of derived indexes",
+        "canonical conversation/thread state is server authoritative",
+        "client history cannot bypass conversation authority"
       ]
     },
     {
@@ -2299,6 +2343,42 @@
         "completed_at"
       ],
       "owner_plane": "orchestration"
+    },
+    "conversation_thread": {
+      "required_fields": [
+        "thread_id",
+        "tenant_id",
+        "owner_id",
+        "created_at",
+        "updated_at",
+        "status",
+        "title",
+        "retention_class",
+        "version"
+      ],
+      "owner_plane": "application-api"
+    },
+    "conversation_message": {
+      "required_fields": [
+        "message_id",
+        "thread_id",
+        "tenant_id",
+        "author_type",
+        "author_id",
+        "role",
+        "content_ref",
+        "created_at",
+        "sequence",
+        "operation_id",
+        "execution_result_id",
+        "supersedes_message_id",
+        "branch_id",
+        "artifact_refs",
+        "citation_refs",
+        "tool_receipt_refs",
+        "data_class"
+      ],
+      "owner_plane": "application-api"
     }
   },
   "release_evidence_bundle": [
@@ -2509,6 +2589,47 @@
           "run derived-store loss and rebuild drill"
         ]
       }
+    },
+    {
+      "id": "WP-P0-CONVERSATION-STATE",
+      "gap": "gap-conversation-state-authority",
+      "wave": 1,
+      "owners": [
+        "backend",
+        "skeleton/persistence",
+        "skeleton/context",
+        "frontend"
+      ],
+      "objective": "Make multi-turn conversation continuity, message ordering and branch lineage durable server-owned product state that feeds the cognitive runtime without trusting browser-supplied history.",
+      "steps": [
+        "freeze thread/message envelopes and indexes",
+        "add Mongo repositories with tenant/owner authorization and idempotent append",
+        "add conversation API with create/read/append/edit/regenerate/delete",
+        "replace canonical chat execution input from raw conversation_history to thread_id + new message",
+        "bind assistant messages to operation and AIExecutionResult",
+        "project authorized transcript into prompt-context",
+        "add frontend thread store/cache as rebuildable projection",
+        "wire governance deletion/export/retention"
+      ],
+      "tests": [
+        "thread ownership/isolation",
+        "exact ordering/concurrent append",
+        "message idempotency",
+        "client-history injection denial",
+        "edit/regenerate branching",
+        "operation/result binding",
+        "context projection",
+        "delete/export",
+        "refresh/reconnect reconstruction"
+      ],
+      "exit": "the server can reconstruct and authorize every model-visible prior message from canonical state without trusting client-supplied transcript history",
+      "planned_outputs": [
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
     },
     {
       "id": "WP-P0-COGNITIVE-LOOP",
@@ -3541,5 +3662,83 @@
         ]
       }
     ]
+  },
+  "conversation_runtime_contract": {
+    "owner_plane": "application-api",
+    "persistence_owner": "data-persistence",
+    "context_consumer": "prompt-context",
+    "authority_model": "server-authoritative-thread-and-message-ledger",
+    "ingress": {
+      "create_thread": "server creates thread_id and owner binding",
+      "append_user_message": "client submits thread_id + new message + idempotency key; not prior transcript",
+      "continue_thread": "server authorizes thread and loads canonical message projection",
+      "assistant_commit": "assistant message is committed only from a terminal or qualified AIExecutionResult"
+    },
+    "thread_states": [
+      "active",
+      "archived",
+      "deleting",
+      "deleted"
+    ],
+    "message_author_types": [
+      "user",
+      "assistant",
+      "tool",
+      "system-derived"
+    ],
+    "message_rules": [
+      "system/product policy is never stored as a user-editable conversation message",
+      "user messages are immutable after commit; edits create a new message that supersedes the prior message",
+      "assistant regeneration creates a sibling branch tied to the same causal user message rather than overwriting history",
+      "tool messages reference durable tool receipts/results rather than trusting free-form model text",
+      "message sequence is monotonic inside a branch/thread projection",
+      "content can be externalized by content_ref when large or sensitive",
+      "client-provided history is treated as untrusted display/import data unless an explicit import workflow validates and persists it"
+    ],
+    "concurrency": [
+      "append uses thread version or exact-next sequence fencing",
+      "idempotency key prevents duplicate user message creation on retries",
+      "concurrent valid appends either serialize deterministically or return conflict requiring client refresh",
+      "assistant finalization compares the causal message/thread version before commit"
+    ],
+    "branching": {
+      "edit": "new user message supersedes original and opens/continues a new branch",
+      "regenerate": "new assistant operation/result on the same causal user message with distinct branch/result identity",
+      "selection": "thread projection marks the active branch without deleting alternatives",
+      "invariant": "branch changes never rewrite immutable historical receipts"
+    },
+    "context_projection": {
+      "inputs": [
+        "active branch messages",
+        "durable summary",
+        "authorized attachments/artifacts",
+        "relevant memory",
+        "retrieval evidence",
+        "current execution tool results"
+      ],
+      "rules": [
+        "server selects canonical transcript from persisted message authority",
+        "system/product policy is injected separately from transcript",
+        "tool/citation/artifact provenance remains addressable",
+        "token trimming does not mutate stored transcript",
+        "summaries are derived projections with source message ids and version"
+      ]
+    },
+    "governance": [
+      "thread/message data class inherited or strengthened by content classification",
+      "delete propagates through message content refs, derived summaries, memory proposals and permitted indexes",
+      "export returns ordered canonical messages plus branch lineage and referenced artifacts/receipts allowed by policy",
+      "retention is thread/message policy controlled and independent from provider retention"
+    ],
+    "api_target": [
+      "POST /api/v1/conversations",
+      "GET /api/v1/conversations/{thread_id}",
+      "POST /api/v1/conversations/{thread_id}/messages",
+      "GET /api/v1/conversations/{thread_id}/messages",
+      "POST /api/v1/conversations/{thread_id}/messages/{message_id}/regenerate",
+      "POST /api/v1/conversations/{thread_id}/messages/{message_id}/edit",
+      "DELETE /api/v1/conversations/{thread_id}"
+    ],
+    "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land"
   }
 }
