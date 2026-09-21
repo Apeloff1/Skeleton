@@ -95,3 +95,55 @@ def test_machine_index_exposes_optimizer_and_massive_upgrade_invariants() -> Non
     assert massive["migration_plan_required"] is True
     assert massive["rollback_plan_required"] is True
     assert massive["signed_adr_required"] is True
+
+
+def test_hostile_gap_audit_is_machine_visible_and_fail_closed() -> None:
+    docs = architecture_index.CANONICAL_DOCUMENTS
+    tracks = architecture_index.CONSTRUCTION_TRACKS
+    gaps = architecture_index.P0_HARDENING_GAPS
+    hardening = architecture_index.ADVERSARIAL_HARDENING_INVARIANTS
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260921-HOSTILE-GAP-AUDIT"
+    ]
+
+    assert docs["masterplan_gap_audit"] == "docs/architecture/masterplan-gap-audit.md"
+    assert tracks["AB"] == "adversarial_foundations_systemic_hardening"
+    assert len(gaps) == 20
+    assert gaps[0].startswith("G001_")
+    assert gaps[-1].startswith("G020_")
+    assert checkpoint["tracks"] == ("AB",)
+    assert checkpoint["production_readiness_blocked_by_applicable_open_p0"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    assert hardening["open_applicable_p0_blocks_production_readiness"] is True
+    assert hardening["model_requires_representation_identity"] is True
+    assert hardening["training_checkpoint_requires_data_lineage_root"] is True
+    assert hardening["serving_requires_unified_model_artifact_manifest"] is True
+    assert hardening["rollback_requires_state_compatibility"] is True
+    assert hardening["blind_eval_isolated_from_training_and_search"] is True
+    assert hardening["side_effect_requires_authenticated_principal"] is True
+    assert hardening["high_risk_execution_requires_sandbox"] is True
+    assert hardening["distributed_mutation_rejects_stale_writers"] is True
+    assert hardening["backup_claim_requires_restore_drill"] is True
+    assert hardening["safe_mode_is_required"] is True
+
+
+def test_hostile_gap_audit_and_track_ab_are_canonical_plan_inputs() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+    index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
+    frontier = (root / "docs" / "FRONTIER_ARCHITECTURE.md").read_text(encoding="utf-8")
+    audit = (
+        root / "docs" / "architecture" / "masterplan-gap-audit.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Track AB — Adversarial foundations and systemic hardening" in plan
+    assert "P0 foundations precede exotic optimization" in plan
+    assert "**AB** — adversarial foundations and systemic hardening" in index
+    assert "Adversarial cross-cutting invariants" in frontier
+    assert "G001" in audit
+    assert "G070" in audit
+    assert "open P0" in audit
+    assert "pairwise" in audit
