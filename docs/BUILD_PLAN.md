@@ -1503,6 +1503,152 @@ production_authority_granted: false
 
 ---
 
+
+## Track AB — Adversarial foundations and systemic hardening — 🔨
+
+Goal: close the cross-cutting failure modes that can invalidate every higher-level capability claim.
+
+Canonical hostile audit: architecture/masterplan-gap-audit.md
+
+Track AB is a prerequisite gate for production-grade claims in Tracks R–AA. Research experiments may continue in isolation, but a subsystem cannot claim production readiness while a relevant P0 gap remains open.
+
+### AB1. Representation/tokenizer identity — ⬜
+Implement immutable RepresentationSpec with tokenizer/version, vocabulary digest, normalization, byte fallback, special tokens, encode/decode semantics, compatibility class, and migration tests.
+**Gate:** every model artifact binds exactly one representation identity.
+
+### AB2. Data lineage + deterministic mixture root — ⬜
+Implement SourceRecord, DatasetManifest, DatasetShardManifest, MixtureManifest, SampleLineage, TransformReceipt, DeletionTombstone, SyntheticExampleLineage, and HoldoutBoundary.
+**Gate:** every weight-changing checkpoint binds a reconstructable data/mixture lineage root or explicitly declares a non-reproducible limitation.
+
+### AB3. Unified model artifact manifest — ⬜
+Bind architecture, representation, weights, dtype/quantization, adapters, model code, runtime ABI, kernel requirements, training parent, optimizer parent, data root, eval root, provenance and signatures into one immutable model artifact identity.
+**Gate:** serving never loads an unbound directory of weights.
+
+### AB4. Durable schema/state evolution — ⬜
+Standardize expand → tolerant-read/dual-read → backfill → verify → reader switch → writer switch → contract migrations across databases, events, memory, receipts, manifests, eval state and optimizer state.
+**Gate:** rollback must include state compatibility, not only binary rollback.
+
+### AB5. Evaluation firewall — ⬜
+Separate development, regression, blind-promotion and production-observation evals. Budget blind-set queries and prohibit training/search optimization against exhausted holdouts.
+**Gate:** contaminated, leaked or adaptively exhausted evidence cannot justify promotion.
+
+### AB6. Principal, tenant and delegation envelope — ⬜
+Every consequential action carries authenticated principal, tenant, session, capability set, delegation chain, expiry and policy version.
+**Gate:** delegation cannot silently broaden authority; cross-tenant access fails closed.
+
+### AB7. Execution sandbox — ⬜
+Contain generated code and high-risk tools with explicit filesystem/network/process/resource/secret boundaries and cleanup verification.
+**Gate:** high-risk execution cannot share the authoritative control-plane process.
+
+### AB8. Supply-chain and artifact trust root — ⬜
+Require digests, origin, build/toolchain identity, dependency locks, SBOM where relevant, model/data license metadata, scan evidence, signature verification, revocation and quarantine.
+**Gate:** download/parse success is never equivalent to trust.
+
+### AB9. Authoritative storage consistency contract — ⬜
+Every durable store declares transaction, isolation, durability, replication, corruption detection, snapshot, backup, restore, capacity and split-brain semantics.
+**Gate:** callers cannot assume guarantees stronger than the storage adapter declares.
+
+### AB10. Distributed time, leases, fencing and event ordering — ⬜
+Introduce monotonic local deadlines, lease epochs, fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows.
+**Gate:** a stale/expired writer cannot commit after losing authority.
+
+### AB11. Secret lifecycle / taint propagation — ⬜
+Define secret fetch, scope, projection, TTL, rotation, revocation, prompt/log/trace handling, child-process inheritance, crash-dump handling and artifact scans.
+**Gate:** raw secret values do not enter ordinary config/provenance/prompts/logs by default.
+
+### AB12. Disaster recovery — ⬜
+Declare RPO/RTO and restore dependencies for every authoritative state family. Run restore drills including stale backups and unavailable dependencies.
+**Gate:** a backup does not count until restoration is verified.
+
+### AB13. Control-plane isolation — ⬜
+Reserve independent queue/capacity and authority for revoke, rollback, kill switches, configuration, identity and recovery.
+**Gate:** data-plane saturation cannot starve the system's ability to stop or recover itself.
+
+### AB14. Immutable configuration snapshot — ⬜
+Bind model routing, tool policy, memory policy, eval policy, resource policy and feature flags into a digest-addressed ConfigSnapshot.
+**Gate:** consequential eval/run evidence without reproducible config identity is invalid.
+
+### AB15. Side-effect commit/unknown/compensation protocol — ⬜
+For non-idempotent external actions, require provider idempotency, transactional protocol, compare-and-set, compensation, reconciliation, or explicit non-retryable UNKNOWN state.
+**Gate:** irreversible UNKNOWN outcomes are never blindly retried.
+
+### AB16. Deletion/tombstone propagation — ⬜
+Propagate deletion across primary records, indexes, vector stores, memories, caches, summaries, exports and future training candidates while retaining non-content audit identity where policy permits.
+
+### AB17. Training-poisoning/backdoor defense — ⬜
+Add poisoning, malicious synthetic data, preference-pair, teacher-trajectory, training-code and optimizer-state tampering scenarios to permanent evaluation.
+
+### AB18. Safe artifact deserialization/load boundary — ⬜
+Enforce size, shard-count, dtype/shape, decompression, parser, code-execution and metadata limits before privileged loading.
+
+### AB19. Tamper-evident authority audit — ⬜
+Bind actor, principal, causation, config/artifact digests and ordered integrity evidence for meaningful authority changes and side effects.
+
+### AB20. Safe mode / break glass — ⬜
+Define a unified read-only/degraded state that freezes promotion and write-capable tools, preserves diagnostics, serves only known-good artifacts, and allows tightly audited rollback/recovery.
+
+### AB21. Global resource governor and backpressure — ⬜
+Add quotas, priority classes, fairness, starvation detection, cost ceilings, control-plane reserve, admission/load shedding and explicit upstream/downstream backpressure.
+
+### AB22. Observability integrity and monitor-of-monitors — ⬜
+Detect missing/delayed telemetry, trace loss, exporter failure, timestamp skew, cardinality explosions and misleading aggregates.
+
+### AB23. Mixed-version/API/event compatibility — ⬜
+Every durable/public contract declares schema version, reader/writer floor, unknown-field behavior, negotiation, deprecation window and compatibility tests.
+
+### AB24. Structured decoding and semantic validation — ⬜
+Use schema/grammar-constrained decoding where available for machine actions; parsing and repair cannot invent privileged fields.
+
+### AB25. Calibrated uncertainty / OOD / abstention — ⬜
+Separate model probability, verifier confidence, retrieval confidence, evidence completeness and calibrated task-success/OOD estimates. Support retrieve/tool/escalate/abstain policies.
+
+### AB26. Cache coherence and tenant isolation — ⬜
+Cache identity binds tenant, artifact, representation, policy, adapters and relevant runtime semantics. Define invalidation after promotion, deletion, policy change and memory retraction.
+
+### AB27. Durable event delivery/reconciliation — ⬜
+Define outbox/inbox or equivalent delivery, dedupe, poison-event, consumer checkpoint, replay and reconciliation semantics. Exactly-once claims require proof.
+
+### AB28. Multi-agent deadlock/livelock/byzantine containment — ⬜
+Add ownership leases, bounded dependency graphs, deadlock detection, arbitration, cancellation and capability-preserving delegation.
+
+### AB29. Provenance-laundering prevention — ⬜
+Derived summaries, chunks, embeddings, translations and model outputs retain source/trust ancestry; transformation cannot raise authority.
+
+### AB30. Numeric/IR/kernel correctness envelope — ⬜
+Define model/compiler IR and dtype-specific numerical tolerances, reference implementations, randomized shape fuzzing, extreme-value tests, deterministic debug path and safe fallbacks.
+
+### AB31. Capacity, autoscaling and denial-of-wallet controls — ⬜
+Reserve failover/recovery headroom; use hysteresis for autoscaling; enforce per-principal/tenant/global spend ceilings for context, search and tools.
+
+### AB32. Telemetry privacy and parser-bomb defenses — ⬜
+Default telemetry to metadata rather than raw sensitive content. Bound bytes, nesting, archive members, decompression ratios and parsing time.
+
+### AB33. Cancellation commit barriers — ⬜
+Every side-effecting operation declares cancellable → committing → committed phases and post-commit compensation semantics.
+
+### AB34. Provider semantic drift / ABI compatibility — ⬜
+Run semantic canaries for providers/tools; artifacts declare runtime/kernel/plugin ABI requirements; installer/runtime profiles enforce compatibility.
+
+### AB35. Historical restore + retention/GC — ⬜
+Restore-test old snapshots; define evidence/provenance retention, compaction and legally required deletion without silently destroying lineage identity.
+
+### AB36. Trust-root bootstrap — ⬜
+Boot verifies keys, policy roots, manifests and trusted code before loading mutable models/plugins/policies.
+
+### AB37. Combined fault campaigns — ⬜
+Run the audit matrix across state, network, worker, artifact, authority, resource and observability axes.
+
+Requirements:
+- every P0 path: all single-axis faults;
+- every P0 side effect: pairwise state × network × authority;
+- promotion/rollback: state × artifact × observability;
+- distributed training/serving: network × worker × resource;
+- periodic selected three-axis campaigns.
+
+**Exit gate for AB:** every P0 audit finding has a canonical contract, owner, machine invariant, tests, fault injection, observability, recovery semantics and signed evidence. No subsystem with an applicable open P0 may claim production-grade status.
+
+---
+
 # Cross-track integration contracts
 
 ## Research → absorption
@@ -1542,30 +1688,37 @@ These become durable research/absorption inputs, not direct model or knowledge m
 
 # Immediate implementation order
 
-This is the preferred dependency order for construction.
+This ordering is adversarially revised: **P0 foundations precede exotic optimization or architecture promotion**.
 
 1. ✅ Repair the architecture index so base + rounds 3–22 are visible.
 2. ✅ Add a canonical human architecture index.
 3. ✅ Add the research/evidence/evolution construction contract.
-4. ⬜ Implement `ResearchEvidence` and experiment-manifest schemas.
-5. ⬜ Add source/version/provenance adapters.
-6. ⬜ Build the claim/evidence graph and evidence maturity engine.
-7. ⬜ Bind research candidates into the existing absorption/challenge fabric.
-8. ⬜ Establish evaluation registry + immutable experiment evidence bundles.
-9. ⬜ Implement ModelPort v1 and reasoning-budget contracts.
-10. ⬜ Implement trust labels and canonical tool transaction receipts.
-11. ⬜ Implement hierarchical context/memory compiler.
-12. ⬜ Implement serving scheduler/KV abstraction and hardware profiles.
-13. ⬜ Implement controlled adaptation lanes.
-14. ⬜ Implement shadow/canary/rollback scientific promotion.
-15. ⬜ Add continuous evidence refresh and architecture-deprecation machinery.
-16. ⬜ Implement the optimizer contract, stable baseline adapters, and `ParameterOptimizationMap`.
-17. ⬜ Add optimizer flight-recorder telemetry, numerical circuit breakers, and atomic optimizer checkpoint binding.
-18. 🧪 Run optimizer challengers (memory-efficient, structure-aware, orthogonalized, sign/schedule-light) through equal-token/equal-wall-clock gates.
-19. 🧪 Build Track AA fork harnesses for sparse attention, hybrid blocks, MoE, long context, low precision, and distributed/serving step changes.
-20. ⬜ Bind every Z/AA validated or promoted state to timestamped evidence and signed artifact/ADR digests.
+4. ✅ Add the hostile masterplan gap audit and machine hardening checkpoint.
+5. ⬜ AB1–AB4: representation identity, data lineage, unified model artifact and state/schema migration contracts.
+6. ⬜ AB5–AB10: evaluation firewall, principals/tenancy, sandbox, supply chain, storage semantics, leases/fencing/ordering.
+7. ⬜ AB11–AB20: secret lifecycle, DR, control-plane reserve, config snapshots, side-effect reconciliation, deletion, poisoning, safe loading, tamper-evident audit, safe mode.
+8. ⬜ AB21–AB36: resource/backpressure, observability integrity, compatibility, structured decoding, uncertainty, cache/event semantics, multi-agent containment, provenance, numeric IR, capacity/cost, parser bounds, cancellation, semantic drift/ABI, historical restore, trust-root bootstrap.
+9. ⬜ AB37: combined single-, pairwise- and selected three-axis fault campaigns.
+10. ⬜ Implement ResearchEvidence and experiment-manifest schemas.
+11. ⬜ Add source/version/provenance adapters.
+12. ⬜ Build the claim/evidence graph and evidence maturity engine.
+13. ⬜ Bind research candidates into the existing absorption/challenge fabric.
+14. ⬜ Establish evaluation registry + immutable experiment evidence bundles behind the AB5 firewall.
+15. ⬜ Implement ModelPort v1 against AB1/AB3/AB23/AB30 contracts.
+16. ⬜ Implement reasoning-budget contracts and calibrated uncertainty/abstention.
+17. ⬜ Implement trust labels and canonical tool transactions on top of AB6/AB7/AB15/AB33.
+18. ⬜ Implement hierarchical context/memory compiler with AB16/AB26/AB29 deletion, isolation and provenance semantics.
+19. ⬜ Implement serving scheduler/KV abstraction and hardware profiles with control-plane reserve/backpressure.
+20. ⬜ Implement controlled adaptation lanes with data/eval/trust boundaries.
+21. ⬜ Implement shadow/canary/rollback scientific promotion with state-compatible rollback.
+22. ⬜ Add continuous evidence refresh and architecture-deprecation machinery.
+23. ⬜ Implement optimizer contract, stable baseline adapters and ParameterOptimizationMap.
+24. ⬜ Add optimizer flight recorder, numerical circuit breakers and atomic optimizer checkpoint binding.
+25. 🧪 Run optimizer challengers through equal-token/equal-wall-clock gates.
+26. 🧪 Build Track AA forks for sparse attention, hybrid blocks, MoE, long context, low precision and distributed/serving step changes.
+27. ⬜ Bind every AB/Z/AA validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
-Parallel work is allowed where contracts are already frozen; promotion gates are not bypassed to gain speed.
+Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
 
 ---
 
