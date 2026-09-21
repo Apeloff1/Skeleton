@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Rosetta Playground — Compare code across 453 languages, execute in playground
  */
@@ -6,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, FlatList, 
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const EXEC_LANGS = new Set(['Python','JavaScript','TypeScript','Go','Rust','C','C++']);
 

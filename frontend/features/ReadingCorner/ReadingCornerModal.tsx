@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Reading Corner v11.8 - Comprehensive Library System
  * Full-Stack Massive Library with 1600+ Hours of Content
@@ -21,7 +22,7 @@ import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = Constants.expoConfig?.extra?.EXPO_BACKEND_URL || '';
+const API_URL = Constants.CANONICAL_API_BASE || '';
 
 interface ReadingCornerProps {
   visible: boolean;

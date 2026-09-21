@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Multi-Agent Orchestration Modal v11.3.0
  * AI Agent Swarms for Complex Task Execution
@@ -13,7 +14,7 @@ import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface MultiAgentModalProps {
   visible: boolean;

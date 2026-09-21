@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * SOTA 2026 Features Modal v11.3.0
  * Predictive Assistance, Auto-Refactoring, Multi-Model Orchestration
@@ -12,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface SOTAModalProps {
   visible: boolean;
