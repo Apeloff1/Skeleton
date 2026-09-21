@@ -2862,3 +2862,37 @@ A model invocation is not treated as a normal tool adapter. Nested model work is
 ### Closure
 
 The tool-runtime plane stays `partial` until tool inventory convergence, credential isolation, schema fuzzing, authority/approval, idempotency replay, sandbox, database-scope, network-policy, compatibility-delegation and receipt-lineage tests pass.
+
+## Fully Functional AI Closure: Canonical Context Compiler
+
+The repository already contains rich context, planning, retrieval and memory subsystems, but those do not by themselves define the exact provider input for a generic AI turn. The canonical runtime therefore requires one `ContextEnvelope` compiler.
+
+### Contract
+
+`ContextEnvelope` is immutable per turn and contains operation/execution/turn identity, trusted instruction segments, untrusted evidence segments, admitted tool schemas, token budget, omitted segment IDs/reasons, source snapshot and a context digest.
+
+Each `ContextSegment` carries kind, source type/id, content reference/digest, trust level, data class, tenant, purpose, priority, relevance, timestamp, token estimate, provenance and retention.
+
+### Source order
+
+The compiler reads from canonical conversation state, governed memory, retrieval evidence, artifacts, current tool results, declarative skills and admitted ToolManifest projections. Domain-specific context pipelines remain valid capabilities, but they feed typed segments into the compiler rather than owning provider prompts.
+
+### Trust hierarchy
+
+Trusted system/product policy is structurally separate from user/retrieved/tool/artifact/model content. Text inside untrusted evidence cannot elevate itself to policy. Prior assistant output is conversation data, never system authority.
+
+### Budgeting
+
+Reserve output tokens before selecting context. Reserve bounded tool-result headroom when tools are enabled. Mandatory control segments either fit or the request fails before provider I/O. Candidate ordering is deterministic under a fixed source snapshot and compiler version.
+
+### Compaction
+
+Conversation, retrieval, artifact and tool-result summaries are derived/untrusted projections. They preserve source IDs/digests, data class, tenant, summarizer/compiler version and provenance. Tool receipts, approvals, citations and action postconditions required for audit cannot be summarized away.
+
+### Provider projection
+
+Only the provider boundary formats the envelope into provider-specific messages. Feature routes and services stop constructing authoritative provider history directly. `backend/routes/ai.py` and `backend/services/ai_assistant_svc.py` become compatibility delegates into conversation + cognitive runtime + context compiler.
+
+### Closure
+
+The prompt-context plane remains `partial` until deterministic packing, policy-reserve, injection, tenant/data authorization, budget headroom, oversized evidence, compaction provenance, context-digest and legacy-delegation tests pass.
