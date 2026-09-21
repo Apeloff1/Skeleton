@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.1.0",
+  "plan_version": "1.2.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -9503,5 +9503,109 @@
     ],
     "completion_mode": "derived_from_existing_accountability",
     "rule": "Construction waves order and gate work; they do not replace AIQ dependencies, gap closure, vertical-slice evidence, or signed accountability."
+  },
+  "volume_maturity_policy": {
+    "specified": {
+      "meaning": "scope and canonical identity are defined; implementation may not exist",
+      "required_nonempty_fields": []
+    },
+    "scaffolded": {
+      "meaning": "requirements and intended capability/contract shape are explicit enough to build",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "risks",
+        "gaps"
+      ]
+    },
+    "implemented": {
+      "meaning": "code/config exists behind declared contracts with focused tests",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "risks",
+        "gaps"
+      ]
+    },
+    "integrated": {
+      "meaning": "implementation participates in assembled runtime with integration evidence",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "risks",
+        "gaps"
+      ]
+    },
+    "verified": {
+      "meaning": "independent evidence demonstrates acceptance behavior",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "evidence",
+        "risks",
+        "gaps"
+      ]
+    },
+    "hardened": {
+      "meaning": "failure, security, recovery and mapped high-impact edge obligations are closed or explicitly accepted",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "evidence",
+        "risks"
+      ]
+    },
+    "production": {
+      "meaning": "release/rollback/operations/SLO evidence exists and signed accountability is complete",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "evidence",
+        "risks"
+      ]
+    },
+    "experimental": {
+      "meaning": "bounded research candidate; must not be treated as production authority",
+      "required_nonempty_fields": [
+        "requirements",
+        "risks",
+        "gaps"
+      ]
+    },
+    "deprecated": {
+      "meaning": "replacement/retirement path is explicit",
+      "required_nonempty_fields": [
+        "risks",
+        "gaps"
+      ]
+    },
+    "retired": {
+      "meaning": "removed from active production authority with retained lineage/evidence",
+      "required_nonempty_fields": [
+        "evidence"
+      ]
+    },
+    "promotion_rule": "Status promotion is invalid unless all fields required by the target maturity state are non-empty and signed accountability permits the corresponding implementation_status.",
+    "anti_shortcut": "File existence, LOC, a passing happy path, or documentation alone cannot satisfy a maturity promotion."
   }
 }
