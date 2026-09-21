@@ -28,6 +28,10 @@ on:
       - "skeleton/vault/data_lifecycle.py"
       - "skeleton/vault/governance_registry.py"
       - "skeleton/intelligence/admission.py"
+      - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/quota.py"
+      - "skeleton/testing/test_admission_runtime.py"
+      - "skeleton/testing/test_tenant_quota.py"
       - "skeleton/testing/test_data_governance.py"
       - "skeleton/testing/test_data_lifecycle.py"
       - "skeleton/testing/test_governance_registry.py"
@@ -145,6 +149,7 @@ jobs:
           skeleton/jeeves/providers.py
           skeleton/vault/data_governance.py skeleton/vault/data_lifecycle.py
           skeleton/vault/governance_registry.py skeleton/intelligence/admission.py
+          skeleton/intelligence/admission_runtime.py skeleton/intelligence/quota.py
           backend/core/ai_provider.py backend/core/provider_architecture.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
@@ -168,6 +173,8 @@ jobs:
           skeleton/testing/test_data_lifecycle.py
           skeleton/testing/test_governance_registry.py
           skeleton/testing/test_cost_admission.py
+          skeleton/testing/test_admission_runtime.py
+          skeleton/testing/test_tenant_quota.py
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_stream.py
