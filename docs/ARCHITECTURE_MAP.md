@@ -303,7 +303,7 @@ A production store may replace SQLite, but it must pass the same semantics.
 Persistence technology is replaceable; stream ordering and recovery behavior are
 not.
 
-## 14. Structural blueprint — `structure-map/v1.1`
+## 14. Structural blueprint — `structure-map/v1.2`
 
 The architecture now has an explicit physical-placement layer. The purpose is to
 prevent a common failure mode in a large AI repository: a capability is logically
@@ -443,7 +443,7 @@ The validator now rejects all of the following:
 - a composition root outside its declared zone;
 - drift between architecture, repository, and runtime structure tags.
 
-The repository and runtime manifests carry `structure-map/v1.1` so a build
+The repository and runtime manifests carry `structure-map/v1.2` so a build
 cannot silently validate an architecture map while running a differently
 structured application.
 
@@ -481,3 +481,74 @@ planning, routing provenance, and routing evaluation.
 `backend/core/model_router.py` remains an application compatibility and policy
 surface during convergence. It may expose application-facing routing helpers,
 but it is not the canonical owner of model-routing state or provider execution.
+
+### 14.9 Execution topology
+
+Physical ownership and execution placement are separate contracts. A package can
+own a capability without becoming its own process, and a process may host many
+planes without inheriting their domain ownership.
+
+Execution hosts:
+
+| Host | Kind | Runtime node | Allowed zones | Lifecycle |
+| --- | --- | --- | --- | --- |
+| `skeleton-service` | runtime-service | `skeleton` | `engine` | compose-managed |
+| `backend-service` | runtime-service | `backend` | `application` | compose-managed |
+| `frontend-client` | client-runtime | `frontend` | `product` | session-managed |
+| `operator-ci` | control-execution | none | `engine` | run-scoped |
+
+Execution profiles:
+
+| Profile | Lifecycle | State mode | Scale unit | Failure policy |
+| --- | --- | --- | --- | --- |
+| `library` | consumer-scoped | none-or-ephemeral | consumer-process | propagate-to-owning-plane |
+| `request-service` | long-lived | externalized | service-replica | fail-health-and-reject-new-work |
+| `provider-edge` | request-scoped-io | external-provider | consumer-process | fail-closed-or-explicit-router-degrade |
+| `durable-state` | long-lived | authoritative-durable | partition-or-replica | reject-ambiguous-writes |
+| `durable-worker` | long-lived-worker | checkpointed | worker-replica | retry-idempotently-or-terminalize |
+| `policy-control` | consumer-scoped | policy-or-ledger | consumer-process | fail-closed-for-authority-bearing-decisions |
+| `realtime-transport` | long-lived | durable-cursor-plus-bounded-buffer | transport-replica | reconnect-resume-or-explicit-resync |
+| `product-client` | user-session | ephemeral-session | client-session | surface-degraded-mode-and-reconnect |
+| `evidence-control` | continuous-or-run-scoped | append-only-evidence | observer-or-worker | do-not-fabricate-evidence; freeze-dependent-promotion |
+| `release-control` | release-run | release-evidence-and-rollback-pointer | operator-or-ci-run | no-promotion-on-incomplete-evidence |
+
+Plane-to-execution mapping:
+
+| Plane | Zone | Host | Profile |
+| --- | --- | --- | --- |
+| `foundation` | `engine` | `skeleton-service` | `library` |
+| `identity` | `engine` | `skeleton-service` | `policy-control` |
+| `configuration-secrets` | `engine` | `skeleton-service` | `policy-control` |
+| `model-provider` | `engine` | `skeleton-service` | `provider-edge` |
+| `model-routing` | `engine` | `skeleton-service` | `policy-control` |
+| `prompt-context` | `engine` | `skeleton-service` | `library` |
+| `orchestration` | `engine` | `skeleton-service` | `durable-worker` |
+| `reasoning-verification` | `engine` | `skeleton-service` | `library` |
+| `tool-runtime` | `engine` | `skeleton-service` | `provider-edge` |
+| `memory` | `engine` | `skeleton-service` | `durable-state` |
+| `retrieval` | `engine` | `skeleton-service` | `durable-state` |
+| `data-persistence` | `engine` | `skeleton-service` | `durable-state` |
+| `jobs-durability` | `engine` | `skeleton-service` | `durable-worker` |
+| `artifact-files` | `engine` | `skeleton-service` | `durable-state` |
+| `application-api` | `application` | `backend-service` | `request-service` |
+| `engine-api` | `engine` | `skeleton-service` | `request-service` |
+| `product-experience` | `product` | `frontend-client` | `product-client` |
+| `streaming-realtime` | `application` | `backend-service` | `realtime-transport` |
+| `security-safety` | `engine` | `skeleton-service` | `policy-control` |
+| `governance` | `engine` | `skeleton-service` | `policy-control` |
+| `resilience` | `engine` | `skeleton-service` | `policy-control` |
+| `observability` | `engine` | `skeleton-service` | `evidence-control` |
+| `evaluation` | `engine` | `skeleton-service` | `evidence-control` |
+| `feedback-learning` | `engine` | `skeleton-service` | `evidence-control` |
+| `cost-capacity` | `engine` | `skeleton-service` | `policy-control` |
+| `operator-control` | `application` | `backend-service` | `policy-control` |
+| `deployment-release` | `engine` | `operator-ci` | `release-control` |
+
+This mapping deliberately avoids a microservice-per-plane design. The engine
+process hosts many independently owned planes, while deployment/release runs in
+operator/CI scope instead of pretending to be another application service.
+
+The validator rejects missing or duplicate plane execution mappings, unknown
+profiles or hosts, host/zone mismatches, runtime-node/zone mismatches, and
+incomplete execution-profile semantics.
+
