@@ -167,3 +167,18 @@ def test_manifest_public_contract_is_fail_closed():
     next(item for item in self_dependency["services"] if item["name"] == "backend")["depends_on"].append("backend")
     with pytest.raises(ValueError, match="cannot depend on itself"):
         parse_manifest(self_dependency)
+
+
+def test_frontend_health_fallback_is_fail_closed():
+    from pathlib import Path
+
+    from skeleton.app.assembly import find_repo_root
+
+    root = find_repo_root(Path(__file__))
+    health = (root / "frontend/src/product/appHealthClient.ts").read_text(encoding="utf-8")
+    shell = (root / "frontend/app/product.tsx").read_text(encoding="utf-8")
+
+    assert "whole-application verdict remains fail-closed" in health
+    assert "contractSource: bootstrap ? 'bootstrap-fallback' : 'static-fallback'" in health
+    assert "ok: false" in health
+    assert "'Partial'" in shell
