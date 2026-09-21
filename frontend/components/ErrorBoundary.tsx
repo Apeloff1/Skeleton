@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * ErrorBoundary — top-level React error catcher.
  *
@@ -12,7 +13,7 @@ import { getSessionId } from '../utils/modalLogger';
 import { navToSafeMode } from '../utils/bootTracer';
 import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 interface State {
   error: Error | null;

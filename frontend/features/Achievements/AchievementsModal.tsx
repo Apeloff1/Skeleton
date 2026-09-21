@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Achievements Modal — ULTRASCALE Edition
  * Displays 10,000 achievements with category filters, rarity tiers, search, pagination
@@ -11,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#94A3B8',
