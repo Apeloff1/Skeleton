@@ -499,6 +499,25 @@ edge/history entry
 
 A successful happy path does not close a P0 gap when mapped high-impact failure cases remain undefined.
 
+## 24.2 Volume maturity promotion contract
+
+Volume status is now a machine-enforced maturity claim rather than a descriptive label.
+
+- **specified** — canonical scope/identity exists; implementation may not.
+- **scaffolded** — requirements, capability shape, contracts, risks and gaps are explicit enough to build.
+- **implemented** — implementation paths and focused tests exist behind declared contracts.
+- **integrated** — the capability participates in the assembled runtime and has integration/evaluation coverage.
+- **verified** — independent acceptance evidence exists.
+- **hardened** — failure/security/recovery and applicable high-impact edge obligations are closed or explicitly accepted.
+- **production** — release, rollback, operations/SLO evidence and signed accountability support the claim.
+- **experimental** — bounded research candidate, never production authority by implication.
+- **deprecated** — replacement/retirement path is explicit.
+- **retired** — removed from active authority while lineage/evidence remain preserved.
+
+The machine policy in `machine/ai_master_plan.json` declares the minimum non-empty traceability fields required for each maturity state. The master-plan validator rejects promotions that skip those fields.
+
+A file existing is not “implemented.” A happy-path test is not “verified.” A benchmark win is not “hardened.” A merged PR is not “production.” Each stronger word must carry stronger machine-checkable evidence.
+
 ## 25. Scope freeze and future plan evolution
 
 Volume 420 freezes breadth. New discoveries should be inserted as chapters/subchapters under an existing volume. A new top-level volume requires an ADR showing that the requirement cannot be represented cleanly within the frozen domains.
