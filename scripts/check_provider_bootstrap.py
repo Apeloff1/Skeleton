@@ -143,6 +143,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         boundary = (repo_root / boundary_path).read_text(encoding="utf-8")
         required_tokens = (
             "load_provider_architecture",
+            "_ensure_architecture",
             "_architecture_receipt",
             "architecture_acknowledged",
         )
@@ -155,7 +156,9 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     if isinstance(docker_path, str) and (repo_root / docker_path).is_file():
         docker = (repo_root / docker_path).read_text(encoding="utf-8")
         for token in (
-            "COPY --chown=appuser:appuser machine/ ./machine/",
+            "COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json",
+            "COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json",
+            "COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json",
             "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
         ):
             if token not in docker:
