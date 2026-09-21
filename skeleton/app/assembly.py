@@ -141,10 +141,19 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     raw_services = payload.get("services")
     if not isinstance(raw_services, list) or not raw_services:
         raise ValueError("manifest requires at least one service")
+    if not all(isinstance(item, Mapping) for item in raw_services):
+        raise ValueError("manifest services must contain objects")
     services = tuple(ServiceSpec.from_mapping(item) for item in raw_services)
     names = tuple(service.name for service in services)
     if len(set(names)) != len(names):
         raise ValueError("service names must be unique")
+
+    app_name = app.get("name")
+    app_version = app.get("version")
+    if not isinstance(app_name, str) or not app_name.strip():
+        raise ValueError("app name must be a non-empty string")
+    if not isinstance(app_version, str) or not app_version.strip():
+        raise ValueError("app version must be a non-empty string")
 
     raw_contract = app.get("public_contract")
     if not isinstance(raw_contract, dict):
@@ -184,6 +193,12 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     unknown = (set(default_services) | set(full_services)) - set(names)
     if unknown:
         raise ValueError(f"manifest references unknown services: {sorted(unknown)}")
+    if not default_services:
+        raise ValueError("default_services must not be empty")
+    if not full_services:
+        raise ValueError("full_services must not be empty")
+    if not set(default_services).issubset(set(full_services)):
+        raise ValueError("full_services must contain every default service")
 
     ingress_prefixes: dict[str, str] = {}
     for service in services:
@@ -193,23 +208,40 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
                 f"service {service.name!r} depends on unknown services: {sorted(missing)}"
             )
 
+        if service.name in service.depends_on:
+            raise ValueError(f"service {service.name!r} cannot depend on itself")
+        if service.health_path and not service.health_path.startswith("/"):
+            raise ValueError(f"service {service.name!r} health_path must start with '/'")
+
         prefix = service.ingress_prefix
         if prefix:
             if not prefix.startswith("/"):
                 raise ValueError(f"service {service.name!r} ingress_prefix must start with '/'")
             if prefix != "/" and prefix.endswith("/"):
                 raise ValueError(f"service {service.name!r} ingress_prefix must not end with '/'")
-            if prefix != "/":
-                owner = ingress_prefixes.get(prefix)
-                if owner is not None:
-                    raise ValueError(
-                        f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
-                    )
-                ingress_prefixes[prefix] = service.name
+            owner = ingress_prefixes.get(prefix)
+            if owner is not None:
+                raise ValueError(
+                    f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
+                )
+            ingress_prefixes[prefix] = service.name
             if service.health_path and prefix != "/" and not service.health_path.startswith(prefix + "/"):
                 raise ValueError(
                     f"service {service.name!r} health_path must live under ingress_prefix {prefix!r}"
                 )
+
+    backend = next((service for service in services if service.name == "backend"), None)
+    if backend is None:
+        raise ValueError("manifest requires canonical backend service")
+    contract_prefix = public_contract["prefix"]
+    backend_prefix = backend.ingress_prefix
+    if not backend_prefix or (
+        contract_prefix != backend_prefix
+        and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
+    ):
+        raise ValueError(
+            "public application contract must live inside backend ingress prefix"
+        )
 
     required_paths = payload.get("required_paths", ())
     if not isinstance(required_paths, list):
@@ -222,8 +254,8 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
 
     return AssemblyManifest(
         schema_version=1,
-        name=str(app.get("name", "Skeleton")),
-        version=str(app.get("version", "")),
+        name=app_name.strip(),
+        version=app_version.strip(),
         compose_file=str(app.get("compose_file", "docker-compose.yml")),
         hot_compose_file=str(app.get("hot_compose_file", "docker-compose.hot.yml")),
         public_contract=public_contract,
