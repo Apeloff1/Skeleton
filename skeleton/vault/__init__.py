@@ -29,6 +29,15 @@ from skeleton.vault.audit import (
     verify_chain_or_refuse,
 )
 from skeleton.vault.shamir import ShamirSeal
+from skeleton.vault.data_governance import (
+    DataClass,
+    DataGovernanceDenied,
+    DataGovernanceError,
+    ProviderTransferDecision,
+    ProviderTransferRequest,
+    evaluate_provider_transfer,
+    require_provider_transfer,
+)
 
 __all__ = [
     "AccessPolicy",
@@ -45,4 +54,11 @@ __all__ = [
     "AuditLog",
     "verify_chain_or_refuse",
     "ShamirSeal",
+    "DataClass",
+    "DataGovernanceDenied",
+    "DataGovernanceError",
+    "ProviderTransferDecision",
+    "ProviderTransferRequest",
+    "evaluate_provider_transfer",
+    "require_provider_transfer",
 ]
