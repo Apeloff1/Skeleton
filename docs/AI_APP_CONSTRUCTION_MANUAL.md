@@ -570,7 +570,28 @@ Runtime model providers use a local activation receipt. The adapter loads the ac
 
 The receipt is local metadata. It does not contain credentials and does not require sending the manual to the external model.
 
-## 8. Assembly checklist
+## 8. Current SOTA gap register
+
+The construction contract intentionally distinguishes a structurally complete
+application map from a fully closed SOTA implementation. Open gaps are first-
+class construction work, not hidden TODOs.
+
+| Priority | Plane | Gap | Closure evidence |
+| --- | --- | --- | --- |
+| P0 | streaming-realtime | One canonical resumable event protocol is not yet proven end-to-end. | protocol contract, disconnect/reconnect, duplicate/out-of-order, frontend recovery |
+| P0 | governance | Data classification and provider-transfer policy are not yet one enforced registry. | transfer denial, deletion propagation, export completeness, retention expiry |
+| P0 | cost-capacity | Provider/token/storage/concurrency budgets are not yet one admission contract. | budget denial, budget-aware routing, saturation, cost telemetry |
+| P0 | product-experience | Canonical AI golden journeys need one cross-plane browser/API E2E suite. | prompt, retrieval, tool, artifact, outage, reconnect/cancel journeys |
+| P1 | feedback-learning | Feedback-to-production promotion is not yet one controlled pipeline. | experiment isolation, eval-before-promotion, rollback, consent |
+| P1 | model-provider | OpenAI is canonical today; SOTA redundancy needs a second declared provider or an explicit single-provider SLO decision. | failover test or approved SLO, routing telemetry |
+| P1 | deployment-release | Canary promotion/rollback should consume the same SLO evidence produced by observability. | promotion test, automatic rollback drill, release evidence |
+
+The exact construction steps for each gap live in
+`machine/ai_app_construction.json`. P0 gaps block claiming full SOTA
+completion. They do not block safe incremental construction when the gap remains
+explicit and the change preserves the canonical contracts.
+
+## 9. Assembly checklist
 
 Before merging a new AI capability, confirm:
 
@@ -591,7 +612,7 @@ Before merging a new AI capability, confirm:
 - deployment and rollback impact understood;
 - architecture, construction, provider-bootstrap, assembly, and relevant domain gates pass.
 
-## 9. Definition of done
+## 10. Definition of done
 
 A functional AI application is not "done" because it can answer a prompt. It is construction-complete when the complete request lifecycle is governed:
 
@@ -613,7 +634,7 @@ identity
 
 Every edge in that chain must have an owner, a contract, a failure mode, and executable evidence.
 
-## 10. Canonical commands
+## 11. Canonical commands
 
 ```bash
 python scripts/check_architecture_map.py
