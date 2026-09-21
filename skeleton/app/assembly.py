@@ -68,6 +68,7 @@ class AssemblyManifest:
     name: str
     version: str
     compose_file: str
+    modes: dict[str, dict[str, str]]
     default_services: tuple[str, ...]
     full_services: tuple[str, ...]
     required_env: tuple[str, ...]
@@ -84,6 +85,12 @@ class AssemblyManifest:
             if service.name == name:
                 return service
         raise KeyError(name)
+
+    def mode_env(self, name: str) -> dict[str, str]:
+        try:
+            return dict(self.modes[name])
+        except KeyError as exc:
+            raise KeyError(f"unknown application mode: {name}") from exc
 
 
 @dataclass(frozen=True)
@@ -128,6 +135,24 @@ def load_manifest() -> AssemblyManifest:
     if len(set(names)) != len(names):
         raise ValueError("service names must be unique")
 
+    raw_modes = app.get("modes", {"development": {}})
+    if not isinstance(raw_modes, dict) or not raw_modes:
+        raise ValueError("app modes must be a non-empty object")
+    modes: dict[str, dict[str, str]] = {}
+    for mode_name, raw_mode in raw_modes.items():
+        if not isinstance(mode_name, str) or not mode_name.strip():
+            raise ValueError("app mode names must be non-empty strings")
+        if not isinstance(raw_mode, dict):
+            raise ValueError(f"app mode {mode_name!r} must be an object")
+        mode_env: dict[str, str] = {}
+        for key, value in raw_mode.items():
+            if not isinstance(key, str) or not key.strip() or not isinstance(value, str):
+                raise ValueError(f"app mode {mode_name!r} must contain string env values")
+            mode_env[key] = value
+        modes[mode_name] = mode_env
+    if "development" not in modes or "production" not in modes:
+        raise ValueError("app modes must define development and production")
+
     default_services = tuple(str(item) for item in app.get("default_services", ()))
     full_services = tuple(str(item) for item in app.get("full_services", ()))
     unknown = (set(default_services) | set(full_services)) - set(names)
@@ -155,6 +180,7 @@ def load_manifest() -> AssemblyManifest:
         name=str(app.get("name", "Skeleton")),
         version=str(app.get("version", "")),
         compose_file=str(app.get("compose_file", "docker-compose.yml")),
+        modes=modes,
         default_services=default_services,
         full_services=full_services,
         required_env=tuple(str(item) for item in required_env),
@@ -343,6 +369,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
         "name": manifest.name,
         "version": manifest.version,
         "compose_file": manifest.compose_file,
+        "modes": {name: dict(values) for name, values in manifest.modes.items()},
         "default_services": list(manifest.default_services),
         "full_services": list(manifest.full_services),
         "required_env": list(manifest.required_env),
