@@ -1,8 +1,8 @@
 
 # Research Dependency Map — 2026-09-22
 
-Status: canonical Track AD dependency map  
-Purpose: connect open research to construction decisions  
+Status: canonical Track AD dependency map
+Purpose: connect open research to construction decisions
 Authority: planning/evidence routing only; no production authority
 
 ## 0. Why this exists
