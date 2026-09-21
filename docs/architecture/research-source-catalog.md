@@ -437,7 +437,7 @@ These sources seed Track AC. They are selected because they challenge one or mor
 | Ma et al., *BitNet b1.58 2B4T Technical Report* | arXiv:2504.12285 | does native 1.58-bit training remain competitive at multi-trillion-token scale? |
 | Wang et al., *BitNet a4.8* | arXiv:2411.04965 | how far can low-bit activations/KV and sparse computation extend the ternary architecture? |
 | Wang et al., *Q-Sparse: All Large Language Models can be Fully Sparsely-Activated* | arXiv:2407.10969 | can activation sparsity become a general model substrate rather than only expert sparsity? |
-| Zhang et al., *Sparse-BitNet* | 2026 arXiv / Microsoft Research | do native ternary weights and semi-structured sparsity combine unusually well under real kernels? |
+| Zhang et al., *Sparse-BitNet* | arXiv:2603.05168 / Microsoft Research | do native ternary weights and semi-structured sparsity combine unusually well under real kernels? |
 | Sun et al., *You Only Index Once: Cross-Layer Sparse Attention with Shared Routing* | arXiv:2606.06467 | can one sparse routing/index decision be reused across layers to amortize long-context routing cost? |
 | Sun et al., *Multimodal Latent Language Modeling with Next-Token Diffusion* (LatentLM) | arXiv:2412.08635 | can continuous visual/audio/video latents and discrete text share one causal language-model substrate? |
 | Gomez et al., *The Reversible Residual Network* | arXiv:1707.04585 | can exact/reconstructable hidden transformations reduce activation storage enough to justify reversible blocks in modern foundation models? |
