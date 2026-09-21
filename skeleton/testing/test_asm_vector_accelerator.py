@@ -74,7 +74,10 @@ class _FakeFunction:
 class _StaleAbiLibrary:
     def __init__(self, version: int = 4) -> None:
         self.skeleton_asm_abi_version = _FakeFunction(version)
-        self.skeleton_asm_capabilities = _FakeFunction(1)
+        # Architecture-neutral fixture: advertise both baseline capability bits
+        # so this stale-library test reaches the intended missing-symbol guard on
+        # both x86-64 and AArch64 CI runners.
+        self.skeleton_asm_capabilities = _FakeFunction((1 << 0) | (1 << 2))
         self.skeleton_asm_dot_f32 = _FakeFunction()
         self.skeleton_asm_l2_sq_f32 = _FakeFunction()
 
