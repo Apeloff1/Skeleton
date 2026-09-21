@@ -5649,7 +5649,8 @@
       "model_routing_execution_policy",
       "ai_observability_blueprint",
       "ai_evaluation_release_blueprint",
-      "scheduler_fairness_policy"
+      "scheduler_fairness_policy",
+      "runtime_schema_catalog"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -8056,5 +8057,12 @@
       "global saturation",
       "operation parallelism cap"
     ]
+  },
+  "runtime_schema_catalog": {
+    "schema_version": 1,
+    "status": "active",
+    "catalog_version": "1.0.0",
+    "path": "machine/ai_runtime_schemas.json",
+    "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review"
   }
 }
