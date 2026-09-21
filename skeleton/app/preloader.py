@@ -137,22 +137,25 @@ def inspect_host(
         )
     )
 
-    pip_check = _command_check(
-        [sys.executable, "-m", "pip", "--version"],
-        code="host:pip",
-        label="pip",
-        remediation="Install pip for the active Python interpreter.",
-        runner=runner,
-    )
-    checks.append(
-        PreloadCheck(
-            code=pip_check.code,
-            ok=pip_check.ok,
-            detail=pip_check.detail,
-            required=require_pip,
-            remediation=pip_check.remediation if require_pip else "",
+    if require_pip:
+        checks.append(
+            _command_check(
+                [sys.executable, "-m", "pip", "--version"],
+                code="host:pip",
+                label="pip",
+                remediation="Install pip for the active Python interpreter.",
+                runner=runner,
+            )
         )
-    )
+    else:
+        checks.append(
+            PreloadCheck(
+                code="host:pip",
+                ok=True,
+                required=False,
+                detail="pip is not required by the bundled application runtime",
+            )
+        )
 
     docker = shutil.which("docker")
     checks.append(
