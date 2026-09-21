@@ -633,6 +633,26 @@ Evidence:
 `backend/tests/test_rag_state_authority.py`, and
 `machine/state_topology.json`.
 
+### Cost-admission checkpoint — durable tenant quotas
+
+The durable-quota slice of `gap-cost-admission` now has a reference backend at
+`skeleton/intelligence/quota_sqlite.py`.
+
+It preserves quota windows, active reservations, committed usage, completed
+operation identities, and actual-usage reconciliation across process restart.
+Mutations use SQLite WAL plus `BEGIN IMMEDIATE`, so workers sharing the same
+durable database file cannot independently overbook the same tenant quota or
+double-reserve the same operation.
+
+This closes **AIQ-S0-COST-01**, not the whole cost-admission gap. Cross-host
+pressure coordination and overload shedding remain in COST-03; tool/artifact/
+storage actual-usage accounting and unified telemetry remain in COST-02.
+
+Evidence:
+`skeleton/testing/test_tenant_quota_sqlite.py`,
+`skeleton/testing/test_tenant_quota.py`, and
+`skeleton/testing/test_admission_runtime.py`.
+
 ### Stage 0 — authority-policy-foundations
 
 - `gap-state-authority-convergence`
