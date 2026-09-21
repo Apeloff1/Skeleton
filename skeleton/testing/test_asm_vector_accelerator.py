@@ -326,6 +326,44 @@ def test_multi_query_matrix_scores_in_one_native_call(tmp_path: Path) -> None:
     assert accelerator.status().calls == 1
 
 
+def test_multi_query_matrix_covers_unrolled_body_and_tail(
+    tmp_path: Path,
+) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    dimensions = 35
+    query_a = [float(index - 9) / 7.0 for index in range(dimensions)]
+    query_b = [float((index * 5) % 19 - 9) / 6.0 for index in range(dimensions)]
+    row_a = [float((index * 3) % 17 - 8) / 5.0 for index in range(dimensions)]
+    row_b = [float(23 - index) / 11.0 for index in range(dimensions)]
+    row_c = [float((index * 7) % 23 - 11) / 9.0 for index in range(dimensions)]
+
+    actual = accelerator.dot_queries_matrix_f32(
+        query_a + query_b,
+        row_a + row_b + row_c,
+        query_count=2,
+        rows=3,
+        dimensions=dimensions,
+    )
+    expected = [
+        sum(a * b for a, b in zip(query, row))
+        for query in (query_a, query_b)
+        for row in (row_a, row_b, row_c)
+    ]
+
+    assert actual == pytest.approx(
+        expected,
+        rel=4e-5,
+        abs=4e-5,
+    )
+    assert accelerator.status().calls == 1
+
+
 def test_length_mismatch_is_rejected_before_native_call(tmp_path: Path) -> None:
     status = _supported_preflight(tmp_path)
     if not status.build_ready:
