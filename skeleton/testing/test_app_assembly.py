@@ -24,7 +24,7 @@ def test_manifest_is_self_consistent():
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(manifest.service_names)
     assert set(manifest.default_services).issubset(manifest.service_names)
     assert set(manifest.full_services).issubset(manifest.service_names)
-    assert manifest.architecture["tag"] == "arch-map/v2.0"
+    assert manifest.architecture["tag"] == "arch-map/v2.6"
     assert manifest.construction["contract"] == "machine/ai_app_construction.json"
     assert manifest.construction["provider_activation_boundary"] == "backend/core/ai_provider.py"
 
