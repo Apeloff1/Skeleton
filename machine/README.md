@@ -134,6 +134,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Archive wave:** both historical snapshots revalidated; unique deltas remain available as recovery/source material and neither is a merge target.
 
+- **Temporary branches:** `tmp/java-accelerator-operations-rebase-20260920` is zero-file lineage versus assembly; no integration action required.
+
 ## Target layout
 
 ```text
