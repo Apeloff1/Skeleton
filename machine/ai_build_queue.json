@@ -213,7 +213,7 @@
       "stage": 0,
       "parallel_lane": "governance",
       "objective": "Wire delete/export/retention decisions through real durable-store and projection adapters.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S0-GOV-01"
       ],
