@@ -6,8 +6,8 @@ Updated 2026-09-21.
 
 This is the current construction sequence for turning Skeleton into a durable, model-neutral AI system. It preserves completed historical work while adding the research, reasoning, serving, learning, evaluation, and promotion layers required for a system that can improve as AI research changes.
 
-Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)  
-Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)  
+Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)
+Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)
 Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
 
 ## 0. Construction constitution
