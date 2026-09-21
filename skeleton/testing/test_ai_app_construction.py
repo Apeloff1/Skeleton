@@ -16,8 +16,8 @@ def test_complete_ai_construction_contract_is_valid() -> None:
 
     assert errors == []
     assert summary["ok"] is True
-    assert summary["architecture_tag"] == "arch-map/v3.0"
-    assert summary["construction_version"] == "3.0.0"
+    assert summary["architecture_tag"] == "arch-map/v3.1"
+    assert summary["construction_version"] == "3.1.0"
     assert summary["planes"] >= 26
     assert summary["runtime_providers"] == ["openai"]
     assert summary["automation_providers"] == ["repository-automation"]
