@@ -10,8 +10,10 @@ from scripts.check_architecture_map import (
     REPO_ROOT,
     _normalized_repo_path,
     _validate_runtime_dag,
+    _validate_zone_dag,
     validate_architecture,
 )
+from scripts.check_source_path_inventory import classify_path
 
 
 def _load(path: Path) -> dict:
@@ -150,3 +152,27 @@ def test_top_level_policy_is_disjoint_and_materialized() -> None:
             assert relative not in seen
             seen.add(relative)
             assert (REPO_ROOT / relative).exists()
+
+
+def test_zone_dependency_graph_is_acyclic() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    zones = {zone["id"]: zone for zone in architecture["zones"]}
+    errors: list[str] = []
+
+    order = _validate_zone_dag(zones, errors)
+    positions = {zone_id: index for index, zone_id in enumerate(order)}
+
+    assert errors == []
+    assert set(order) == set(zones)
+    for zone_id, zone in zones.items():
+        for dependency in zone["may_depend_on"]:
+            assert positions[dependency] < positions[zone_id]
+
+
+def test_transitional_roots_are_not_canonical_source_inventory() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    transitional = architecture["top_level_policy"]["transitional_roots"]
+
+    assert "core" in transitional
+    assert classify_path("core/activation_security.py") == "first-party"
+    assert classify_path("eval/fixtures/example.json") == "fixture"

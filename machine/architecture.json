@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "1.3.0",
-  "architecture_tag": "arch-map/v1.3",
+  "architecture_version": "1.4.0",
+  "architecture_tag": "arch-map/v1.4",
   "status": "active",
   "scope": "assembled application, machine control, and validation topology",
   "sources": {
@@ -162,9 +162,7 @@
         ".machine"
       ],
       "responsibility": "repository structure, integration metadata, machine-facing policy",
-      "may_depend_on": [
-        "tooling"
-      ],
+      "may_depend_on": [],
       "must_not_own": [
         "runtime-business-logic"
       ]
@@ -476,6 +474,7 @@
     "browser clients resolve endpoints through frontend/utils/apiBase.ts",
     "runtime service dependencies match skeleton/app/manifest.json",
     "every architecture node and interface reference resolves to a declared node",
+    "zone dependency graph is acyclic",
     "runtime dependency graph is acyclic",
     "architecture source files must exist in the repository",
     "architecture changes must preserve a single machine-readable map"

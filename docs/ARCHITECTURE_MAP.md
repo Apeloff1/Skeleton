@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v1.3`  
+**Architecture tag:** `arch-map/v1.4`  
 **Machine contract:** `machine/architecture.json`  
 **Runtime contract:** `skeleton/app/manifest.json`  
 **Validator:** `python scripts/check_architecture_map.py`
@@ -163,6 +163,7 @@ The architecture validator enforces these rules directly:
 - canonical root paths exist;
 - runtime nodes and zones resolve;
 - runtime dependencies reference known nodes;
+- the ownership-zone dependency graph is acyclic;
 - the runtime dependency graph is acyclic;
 - runtime node `path`, `kind`, `canonical`, and `depends_on` fields match
   `skeleton/app/manifest.json` exactly;
@@ -206,6 +207,7 @@ arch-map/v1.0  canonical ownership + topology map
 arch-map/v1.1  fail-closed architecture validator
 arch-map/v1.2  regression tests for topology invariants
 arch-map/v1.3  runtime/repository linkage + fail-fast CI + transitional-root policy
+arch-map/v1.4  acyclic ownership zones + source-inventory alignment
 ```
 
 ## 10. Operator commands

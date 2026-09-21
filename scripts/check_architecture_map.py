@@ -130,6 +130,7 @@ def _validate_roots(
 
 def _validate_zones(
     architecture: dict[str, Any],
+    repo_root: Path,
     errors: list[str],
 ) -> dict[str, dict[str, Any]]:
     zones = _collect_unique_ids(
@@ -144,9 +145,14 @@ def _validate_zones(
         else:
             for index, root in enumerate(roots):
                 try:
-                    _normalized_repo_path(root)
+                    normalized = _normalized_repo_path(root)
                 except ValueError as exc:
                     errors.append(f"zones.{zone_id}.roots[{index}]: {exc}")
+                    continue
+                if not (repo_root / normalized).exists():
+                    errors.append(
+                        f"zones.{zone_id}.roots[{index}] points to missing path {normalized}"
+                    )
         may_depend_on = zone.get("may_depend_on")
         if not isinstance(may_depend_on, list):
             errors.append(f"zones.{zone_id}.may_depend_on must be a list")
@@ -159,6 +165,36 @@ def _validate_zones(
             if dependency == zone_id:
                 errors.append(f"zones.{zone_id} must not depend on itself")
     return zones
+
+
+def _validate_zone_dag(
+    zones: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> list[str]:
+    """Return a deterministic dependency-first zone order or reject cycles."""
+    indegree = {zone_id: 0 for zone_id in zones}
+    outgoing: dict[str, list[str]] = defaultdict(list)
+    for zone_id, zone in zones.items():
+        for dependency in zone.get("may_depend_on", []):
+            if dependency not in zones:
+                continue
+            outgoing[dependency].append(zone_id)
+            indegree[zone_id] += 1
+
+    queue = deque(sorted(zone_id for zone_id, degree in indegree.items() if degree == 0))
+    order: list[str] = []
+    while queue:
+        current = queue.popleft()
+        order.append(current)
+        for follower in sorted(outgoing[current]):
+            indegree[follower] -= 1
+            if indegree[follower] == 0:
+                queue.append(follower)
+
+    if len(order) != len(zones):
+        cyclic = sorted(zone_id for zone_id, degree in indegree.items() if degree > 0)
+        errors.append(f"zone dependency graph contains a cycle: {', '.join(cyclic)}")
+    return order
 
 
 def _validate_runtime_nodes(
@@ -469,7 +505,8 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
 
     _validate_source_contracts(architecture, repo_root, errors)
     roots = _validate_roots(architecture, repo_root, errors)
-    zones = _validate_zones(architecture, errors)
+    zones = _validate_zones(architecture, repo_root, errors)
+    zone_order = _validate_zone_dag(zones, errors)
     nodes = _validate_runtime_nodes(architecture, zones, errors)
     order = _validate_runtime_dag(nodes, errors)
     _validate_runtime_manifest_alignment(architecture, nodes, repo_root, errors)
@@ -483,6 +520,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
         "architecture_tag": architecture.get("architecture_tag"),
         "canonical_roots": len(roots),
         "zones": len(zones),
+        "zone_order": zone_order,
         "runtime_nodes": len(nodes),
         "runtime_order": order,
         "interfaces": len(architecture.get("interfaces", []))
@@ -515,6 +553,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
     else:
+        zone_order = " -> ".join(summary["zone_order"])
         order = " -> ".join(summary["runtime_order"])
         print(
             "architecture-map: OK "
@@ -524,6 +563,7 @@ def main(argv: list[str] | None = None) -> int:
             f"nodes={summary['runtime_nodes']}; "
             f"interfaces={summary['interfaces']}; "
             f"top-level={summary['top_level_paths']}; "
+            f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
     return 1 if errors else 0
