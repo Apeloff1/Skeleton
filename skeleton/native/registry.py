@@ -69,6 +69,7 @@ class NativeAcceleratorRuntimeStatus:
 
 PreflightProvider = Callable[[], AsmAcceleratorPreflight]
 AcceleratorFactory = Callable[[], Any]
+LibraryLoader = Callable[[Path], Any]
 Builder = Callable[..., Path]
 LibraryLoader = Callable[[Path], Any]
 
@@ -89,6 +90,7 @@ class NativeAcceleratorRegistry:
             preflight_provider or AsmVectorAccelerator.preflight
         )
         self._builder = builder or AsmVectorAccelerator.build
+        self._loader = loader or AsmVectorAccelerator
         self._library_loader = library_loader or AsmVectorAccelerator
         self._instance: Any | None = None
         self._last_error: str | None = None
@@ -179,6 +181,12 @@ class NativeAcceleratorRegistry:
             )
         raw = status_method()
         library = str(getattr(raw, "library", preflight.library))
+        matrix_backend_raw = getattr(raw, "matrix_backend", None)
+        abi_version_raw = getattr(raw, "abi_version", None)
+        if abi_version_raw is None:
+            raise NativeAcceleratorRegistryError(
+                f"{name} native accelerator status does not expose abi_version"
+            )
         return NativeAcceleratorRuntimeStatus(
             name=name,
             initialized=True,
@@ -191,9 +199,13 @@ class NativeAcceleratorRegistry:
             source_available=preflight.source_available,
             compiler_available=preflight.compiler_available,
             library_available=Path(library).is_file(),
-            abi_version=int(getattr(raw, "abi_version")),
+            abi_version=int(abi_version_raw),
             capabilities=tuple(getattr(raw, "capabilities", ())),
-            matrix_backend=str(getattr(raw, "matrix_backend")),
+            matrix_backend=(
+                None
+                if matrix_backend_raw is None
+                else str(matrix_backend_raw)
+            ),
             calls=int(getattr(raw, "calls", 0)),
             failures=int(getattr(raw, "failures", 0)),
             last_error=last_error,
