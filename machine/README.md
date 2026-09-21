@@ -112,6 +112,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Jeeves/frontier wave:** revalidated decision, planning, evidence, frontier reasoning, machine control, recovery, pack, runner, provider, SMB, and cockpit sources. Large topology-learning and PR-runner-hygiene waves remain held for reconciliation.
 
+- **Ops/throughput wave:** revalidated supervisor contracts, PR runner, provider/SMB resilience, cockpit tooling, throughput mechanics/pipeline, Ubuntu delivery, and x-agent orchestration; zero-file authority/observability branches remain lineage-only.
+
 ## Target layout
 
 ```text
