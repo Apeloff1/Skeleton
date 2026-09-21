@@ -296,8 +296,8 @@ The audit also defines a multi-axis fault campaign across state, network, worker
 
 Planning checkpoint:
 
-PLAN-20260921-HOSTILE-GAP-AUDIT  
-scope=G001..G200 + Track AB  
+PLAN-20260921-HOSTILE-GAP-AUDIT
+scope=G001..G200 + Track AB
 production_readiness_blocked_by_applicable_open_P0=true
 
 
@@ -335,7 +335,7 @@ The authority rules are stricter than the research scope:
 
 Planning checkpoint:
 
-PLAN-20260921-EXOTIC-ARCHITECTURE-LAB  
-scope=Track AC1..AC44  
-production_authority_granted=false  
+PLAN-20260921-EXOTIC-ARCHITECTURE-LAB
+scope=Track AC1..AC44
+production_authority_granted=false
 promotion_requires_track_ab_p0_closure=true
