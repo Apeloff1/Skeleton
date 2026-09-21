@@ -1086,6 +1086,227 @@ def _validate_construction_ledger(
     }
 
 
+def _validate_operation_stream_contracts(
+    contract: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, Any]:
+    operation = contract.get("operation_contract")
+    stream = contract.get("stream_protocol")
+    envelopes = contract.get("canonical_envelopes")
+
+    result = {
+        "operation_owner": None,
+        "stream_owner": None,
+        "durable_store": None,
+        "stream_schema_version": None,
+    }
+
+    if not isinstance(operation, dict):
+        errors.append("operation_contract must be an object")
+    else:
+        try:
+            owner = _path(operation.get("owner"))
+        except ValueError as exc:
+            errors.append(f"operation_contract.owner: {exc}")
+        else:
+            result["operation_owner"] = owner
+            path = repo_root / owner
+            if not path.is_file():
+                errors.append(f"operation contract owner is missing: {owner}")
+            else:
+                text = path.read_text(encoding="utf-8", errors="replace")
+                for token in (
+                    "class OperationEnvelope",
+                    "class OperationState",
+                    "OperationTransitionError",
+                    "TERMINAL_OPERATION_STATES",
+                ):
+                    if token not in text:
+                        errors.append(
+                            f"operation contract owner lacks required primitive {token!r}"
+                        )
+
+        states = _nonempty_strings(
+            operation.get("states"),
+            label="operation_contract.states",
+            errors=errors,
+        )
+        terminal = _nonempty_strings(
+            operation.get("terminal_states"),
+            label="operation_contract.terminal_states",
+            errors=errors,
+        )
+        required_states = {
+            "created",
+            "validated",
+            "authorized",
+            "admitted",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+        }
+        missing_states = sorted(required_states - set(states))
+        if missing_states:
+            errors.append(
+                "operation_contract.states missing required states: "
+                + ", ".join(missing_states)
+            )
+        if set(terminal) != {"completed", "failed", "cancelled"}:
+            errors.append(
+                "operation_contract.terminal_states must be exactly completed, failed, cancelled"
+            )
+        if not set(terminal).issubset(set(states)):
+            errors.append("operation terminal states must be declared operation states")
+        _nonempty_strings(
+            operation.get("required_properties"),
+            label="operation_contract.required_properties",
+            errors=errors,
+        )
+
+    if not isinstance(stream, dict):
+        errors.append("stream_protocol must be an object")
+    else:
+        try:
+            owner = _path(stream.get("owner"))
+        except ValueError as exc:
+            errors.append(f"stream_protocol.owner: {exc}")
+        else:
+            result["stream_owner"] = owner
+            path = repo_root / owner
+            if not path.is_file():
+                errors.append(f"stream protocol owner is missing: {owner}")
+            else:
+                text = path.read_text(encoding="utf-8", errors="replace")
+                for token in (
+                    "class StreamEvent",
+                    "class ReplayCursor",
+                    "class OperationEventLog",
+                    "StreamBackpressureError",
+                    "StreamReplayGapError",
+                    "StreamTerminalError",
+                ):
+                    if token not in text:
+                        errors.append(
+                            f"stream protocol owner lacks required primitive {token!r}"
+                        )
+
+        schema_version = stream.get("schema_version")
+        if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+            errors.append("stream_protocol.schema_version must be an integer")
+        elif schema_version < 1:
+            errors.append("stream_protocol.schema_version must be positive")
+        else:
+            result["stream_schema_version"] = schema_version
+
+        if stream.get("transport_neutral") is not True:
+            errors.append("stream_protocol.transport_neutral must be true")
+        _nonempty_strings(
+            stream.get("required_semantics"),
+            label="stream_protocol.required_semantics",
+            errors=errors,
+        )
+        _nonempty_strings(
+            stream.get("persistence_semantics"),
+            label="stream_protocol.persistence_semantics",
+            errors=errors,
+        )
+
+        durable = stream.get("durable_reference_store")
+        if not isinstance(durable, str) or ":" not in durable:
+            errors.append(
+                "stream_protocol.durable_reference_store must be path:Class"
+            )
+        else:
+            relative, symbol = durable.rsplit(":", 1)
+            try:
+                normalized = _path(relative)
+            except ValueError as exc:
+                errors.append(f"stream_protocol.durable_reference_store: {exc}")
+            else:
+                result["durable_store"] = normalized
+                path = repo_root / normalized
+                if not path.is_file():
+                    errors.append(f"durable stream store is missing: {normalized}")
+                else:
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                    if not symbol or f"class {symbol}" not in text:
+                        errors.append(
+                            "durable stream store class is missing: "
+                            f"{durable}"
+                        )
+                    for token in (
+                        "StreamReplayGapError",
+                        "StreamTerminalError",
+                        "StreamBackpressureError",
+                        "compacted_through",
+                    ):
+                        if token not in text:
+                            errors.append(
+                                f"durable stream store lacks required semantic token {token!r}"
+                            )
+
+    if not isinstance(envelopes, dict):
+        errors.append(
+            "canonical_envelopes must exist for operation/stream validation"
+        )
+    else:
+        operation_envelope = envelopes.get("operation")
+        stream_envelope = envelopes.get("stream_event")
+        if not isinstance(operation_envelope, dict):
+            errors.append("canonical_envelopes.operation must be an object")
+        else:
+            fields = operation_envelope.get("required_fields")
+            if not isinstance(fields, list):
+                errors.append(
+                    "canonical_envelopes.operation.required_fields must be a list"
+                )
+            else:
+                required = {
+                    "operation_id",
+                    "tenant_id",
+                    "actor_id",
+                    "capability",
+                    "created_at",
+                    "deadline",
+                    "idempotency_key",
+                    "trace_id",
+                }
+                missing = sorted(required - set(fields))
+                if missing:
+                    errors.append(
+                        "canonical operation envelope missing fields: "
+                        + ", ".join(missing)
+                    )
+
+        if not isinstance(stream_envelope, dict):
+            errors.append("canonical_envelopes.stream_event must be an object")
+        else:
+            fields = stream_envelope.get("required_fields")
+            if not isinstance(fields, list):
+                errors.append(
+                    "canonical_envelopes.stream_event.required_fields must be a list"
+                )
+            else:
+                required = {
+                    "operation_id",
+                    "event_id",
+                    "sequence",
+                    "type",
+                    "timestamp",
+                    "payload",
+                }
+                missing = sorted(required - set(fields))
+                if missing:
+                    errors.append(
+                        "canonical stream event envelope missing fields: "
+                        + ", ".join(missing)
+                    )
+
+    return result
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -1139,6 +1360,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     )
     provider_surfaces = _validate_provider_surfaces(contract, repo_root, errors)
     ledger = _validate_construction_ledger(contract, planes, repo_root, errors)
+    operation_stream = _validate_operation_stream_contracts(
+        contract, repo_root, errors
+    )
     gates = _validate_acceptance_gates(contract, errors)
     gaps = _validate_gap_register(contract, planes, errors)
     roadmap = _validate_execution_roadmap(contract, errors)
@@ -1173,6 +1397,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "automation_providers": automation_providers,
         "provider_surfaces": provider_surfaces,
         "construction_ledger": ledger,
+        "operation_stream": operation_stream,
         "provider_documents": must_read,
         "acceptance_gates": gates,
         "gaps": gaps,
@@ -1208,6 +1433,7 @@ def main(argv: list[str] | None = None) -> int:
             f"surfaces={summary['provider_surfaces']}; "
             f"lifecycle={summary['construction_ledger'].get('lifecycle_stages', 0)}; "
             f"work-packages={summary['construction_ledger'].get('work_packages', 0)}; "
+            f"stream-schema={summary['operation_stream'].get('stream_schema_version')}; "
             f"gates={len(summary['acceptance_gates'])}; "
             f"gaps={summary['gaps'].get('total', 0)}; "
             f"p0-open={summary['gaps'].get('p0_open', 0)}; "
