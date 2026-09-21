@@ -84,6 +84,7 @@ CANONICAL_DOCUMENTS = {
     "sota_absorb_engine": "docs/architecture/sota-absorb-engine.md",
     "adaptive_absorption_fabric": "docs/architecture/adaptive-absorption-fabric.md",
     "masterplan_gap_audit": "docs/architecture/masterplan-gap-audit.md",
+    "exotic_architecture_lab": "docs/architecture/exotic-architecture-lab.md",
 }
 
 EVIDENCE_STATES = (
