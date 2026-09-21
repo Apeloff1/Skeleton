@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.2.0",
+  "plan_version": "1.3.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -191,19 +191,51 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define authoritative precedence among runtime truth, construction authority, target plan and evidence.",
+        "Freeze top-level breadth at VOL-420 unless an ADR proves existing domains are insufficient.",
+        "Require signed, timestamped, evidence-backed accountability for completion-bearing work."
+      ],
+      "capabilities": [
+        "plan validation",
+        "authority resolution",
+        "traceability and breadth-freeze enforcement"
+      ],
+      "contracts": [
+        "MasterPlanRecord",
+        "PlanAuthorityRule",
+        "ArchitectureADR",
+        "AccountabilityLink"
+      ],
+      "implementation_paths": [
+        "docs/plan/MASTER_PLAN.md",
+        "docs/plan/MASTER_INDEX.md",
+        "machine/ai_master_plan.json",
+        "machine/ai_build_accountability.json"
+      ],
+      "tests": [
+        "scripts/check_ai_master_plan.py",
+        "skeleton/testing/test_ai_master_plan.py"
+      ],
+      "evaluations": [
+        "planned:plan-authority drift mutation suite",
+        "planned:breadth-freeze bypass negative tests"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "human/machine plan divergence",
+        "status inflation without evidence",
+        "parallel planning systems bypassing canonical authority"
+      ],
+      "gaps": [
+        "continue deepening remaining volumes beyond current depth passes",
+        "bind future ADR workflow to explicit review/promotion rules"
+      ],
       "accountability_id": "ACC-VOL-000",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 1,
@@ -213,19 +245,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Preserve scientific claims with source, method, result, limitation and correction/retraction lineage.",
+        "Track historical techniques by problem/mechanism/failure mode/modern analogue instead of citation popularity.",
+        "Separate replication status and negative results from narrative confidence."
+      ],
+      "capabilities": [
+        "research lineage",
+        "historical mechanism registry",
+        "replication/negative-result tracking"
+      ],
+      "contracts": [
+        "ResearchSource",
+        "ResearchClaim",
+        "ReplicationRecord",
+        "RetractionRecord"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/research",
+        "docs/plan/EDGE_CASES_HISTORICAL.md",
+        "machine/ai_edge_case_catalog.json"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_research_lineage.py",
+        "scripts/check_ai_edge_case_catalog.py"
+      ],
+      "evaluations": [
+        "planned:source-quality calibration",
+        "planned:replication-status consistency evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "cargo-culting historically famous techniques",
+        "source selection bias",
+        "retracted/corrected findings surviving as current truth"
+      ],
+      "gaps": [
+        "research ingestion implementation is incomplete",
+        "cross-source citation graph needs executable reconciliation"
+      ],
       "accountability_id": "ACC-VOL-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 2,
@@ -235,19 +298,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Maintain one canonical architecture graph for roots, ownership zones, runtime DAGs and interfaces.",
+        "Reject illegal dependencies and undeclared production components before dependency-heavy tests.",
+        "Represent target/current drift as explicit gaps rather than implicit exceptions."
+      ],
+      "capabilities": [
+        "architecture graph",
+        "ownership validation",
+        "fitness functions"
+      ],
+      "contracts": [
+        "ArchitectureNode",
+        "OwnershipZone",
+        "DependencyEdge",
+        "BoundaryRule"
+      ],
+      "implementation_paths": [
+        "machine/architecture.json",
+        "docs/ARCHITECTURE_MAP.md",
+        "scripts/check_architecture_map.py"
+      ],
+      "tests": [
+        "skeleton/testing/test_architecture_map.py",
+        "tests/test_architecture_boundaries.py"
+      ],
+      "evaluations": [
+        "planned:architecture mutation/fault suite",
+        "planned:dependency-cycle regression evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "documentation/runtime split brain",
+        "transitional roots becoming accidental owners",
+        "cyclic dependency growth"
+      ],
+      "gaps": [
+        "expand architecture fitness checks to all generated/runtime components",
+        "automate owner lookup for newly created paths"
+      ],
       "accountability_id": "ACC-VOL-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 3,
@@ -257,19 +351,51 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Give every serialized contract stable identity, owner, version, compatibility rule and migration semantics.",
+        "Fail closed on ambiguous security-sensitive serialization including duplicate keys/non-finite values.",
+        "Define absent/null, unknown-enum, canonicalization and cross-runtime numeric/text semantics."
+      ],
+      "capabilities": [
+        "schema registry",
+        "compatibility validation",
+        "canonical serialization"
+      ],
+      "contracts": [
+        "ContractDescriptor",
+        "SchemaVersion",
+        "CompatibilityRule",
+        "CanonicalEncoding"
+      ],
+      "implementation_paths": [
+        "skeleton/contracts",
+        "machine/ai_runtime_schemas.json",
+        "machine/capability_interfaces.json"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_contract_serialization_edges.py",
+        "planned:skeleton/testing/test_contract_compatibility.py",
+        "planned:skeleton/testing/test_contract_unicode_edges.py"
+      ],
+      "evaluations": [
+        "planned:cross-runtime conformance corpus",
+        "planned:schema evolution compatibility matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "schema drift",
+        "privileged defaults from unknown values",
+        "cross-language round-trip divergence"
+      ],
+      "gaps": [
+        "materialize shared conformance vectors",
+        "complete producer/consumer inventory for every canonical contract"
+      ],
       "accountability_id": "ACC-VOL-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 4,
@@ -279,19 +405,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Bootstrap services in deterministic dependency order with explicit readiness and shutdown semantics.",
+        "Propagate cancellation, deadline, budget and operation identity through all runtime layers.",
+        "Prevent orphan work and unbounded background execution after terminal operation state."
+      ],
+      "capabilities": [
+        "runtime bootstrap",
+        "lifecycle supervision",
+        "operation admission/cancellation"
+      ],
+      "contracts": [
+        "OperationEnvelope",
+        "ExecutionContext",
+        "LifecycleState",
+        "ServiceHealth"
+      ],
+      "implementation_paths": [
+        "skeleton/app",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "machine/manifest.json"
+      ],
+      "tests": [
+        "skeleton/testing/test_app_assembly.py",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
+      ],
+      "evaluations": [
+        "planned:crash-at-every-lifecycle-boundary suite",
+        "planned:shutdown/cancellation latency evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "orphan tasks",
+        "readiness before dependencies are usable",
+        "shutdown ordering data loss"
+      ],
+      "gaps": [
+        "unify service supervision semantics across backend and engine",
+        "expand cancellation propagation coverage into all connectors"
+      ],
       "accountability_id": "ACC-VOL-004",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 5,
@@ -301,19 +460,53 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Declare authoritative, derived, cache and ephemeral state classes with one canonical owner each.",
+        "Use transactional/outbox or explicit compensation semantics for cross-boundary durable changes.",
+        "Define migration, backup, restore, deletion and retention behavior for every persistent class."
+      ],
+      "capabilities": [
+        "repository abstraction",
+        "transaction/outbox persistence",
+        "migration and recovery"
+      ],
+      "contracts": [
+        "StateOwner",
+        "RepositoryTransaction",
+        "MigrationPlan",
+        "BackupManifest"
+      ],
+      "implementation_paths": [
+        "machine/state_topology.json",
+        "skeleton/persistence",
+        "backend/services/database.py",
+        "scripts/state_recovery_drill.py"
+      ],
+      "tests": [
+        "skeleton/testing/test_state_recovery_drill.py",
+        "skeleton/testing/test_operation_store.py",
+        "backend/tests/test_rag_state_authority.py"
+      ],
+      "evaluations": [
+        "planned:partial-commit fault matrix",
+        "planned:restore consistency evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "split-brain ownership",
+        "partial multi-store writes",
+        "rollback incompatibility",
+        "backup that cannot restore"
+      ],
+      "gaps": [
+        "converge remaining legacy state owners",
+        "add migration compatibility rehearsal to release qualification"
+      ],
       "accountability_id": "ACC-VOL-005",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 6,
@@ -323,19 +516,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Version training data with rights, integrity, deduplication, contamination and PII metadata.",
+        "Bind every model artifact to exact data/code/config/hardware/evaluation lineage.",
+        "Keep research/training candidates isolated from production promotion authority."
+      ],
+      "capabilities": [
+        "dataset governance",
+        "training run registry",
+        "model artifact registry"
+      ],
+      "contracts": [
+        "DatasetManifest",
+        "TrainingRun",
+        "ModelArtifact",
+        "TrainingLineage"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/modeling",
+        "planned:skeleton/training",
+        "planned:machine/model_registry.json"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_dataset_manifest.py",
+        "planned:skeleton/testing/test_training_lineage.py"
+      ],
+      "evaluations": [
+        "planned:contamination audit",
+        "planned:reproducible small-model training baseline"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "data rights violations",
+        "benchmark contamination",
+        "irreproducible training provenance"
+      ],
+      "gaps": [
+        "native training infrastructure remains a target capability",
+        "model registry contract needs implementation"
+      ],
       "accountability_id": "ACC-VOL-006",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 7,
@@ -345,19 +569,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Expose provider-neutral inference with streaming, cancellation, structured output and bounded retries.",
+        "Treat caches/batching/speculation as optimizations that cannot alter semantic correctness.",
+        "Record usage, latency, provider/model identity and terminal reason for every request."
+      ],
+      "capabilities": [
+        "model execution",
+        "streaming inference",
+        "inference optimization control"
+      ],
+      "contracts": [
+        "ModelRequest",
+        "ModelResult",
+        "ModelStreamEvent",
+        "InferenceUsage"
+      ],
+      "implementation_paths": [
+        "skeleton/provider_runtime.py",
+        "skeleton/provider_contract.py",
+        "backend/services/ai_service.py",
+        "planned:skeleton/inference"
+      ],
+      "tests": [
+        "tests/test_model_runtime.py",
+        "backend/tests/test_ai_provider_reliability.py",
+        "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      ],
+      "evaluations": [
+        "planned:stream/cancel/failover matrix",
+        "planned:latency-cost-quality characterization"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "duplicate provider effects during retry",
+        "KV/prefix cache semantic corruption",
+        "uncancelled expensive work"
+      ],
+      "gaps": [
+        "continuous batching and local serving need dedicated implementation",
+        "speculative decoding requires measured correctness gates"
+      ],
       "accountability_id": "ACC-VOL-007",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 8,
@@ -367,19 +624,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Route by capability, policy, privacy/data boundary, reliability, latency and cost constraints.",
+        "Make fallback an explicit decision that cannot silently weaken residency/privacy/security requirements.",
+        "Persist route rationale and usage for evaluation and replay."
+      ],
+      "capabilities": [
+        "model selection",
+        "fallback policy",
+        "route evaluation"
+      ],
+      "contracts": [
+        "ProviderDescriptor",
+        "ModelDescriptor",
+        "RouteRequest",
+        "RouteDecision"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/routing",
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/quota.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_model_routing.py",
+        "planned:skeleton/testing/test_routing_privacy.py"
+      ],
+      "evaluations": [
+        "planned:router regret evaluation",
+        "planned:provider outage/fallback benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "fallback changes privacy boundary",
+        "cost optimizer degrades quality silently",
+        "stale provider health"
+      ],
+      "gaps": [
+        "implement canonical router registry",
+        "add learned-routing experiments only behind champion/challenger evaluation"
+      ],
       "accountability_id": "ACC-VOL-008",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 9,
@@ -389,19 +677,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Compile immutable policy, user objective, durable state, authorized memory/retrieval, tools and model constraints into typed context.",
+        "Preserve trust classification and provenance through truncation, compression and reordering.",
+        "Budget tokens by authority and task value without allowing untrusted content to displace mandatory policy."
+      ],
+      "capabilities": [
+        "context compilation",
+        "trust-preserving compression",
+        "context budgeting"
+      ],
+      "contracts": [
+        "CompiledContext",
+        "ContextSegment",
+        "TrustLabel",
+        "ContextBudget"
+      ],
+      "implementation_paths": [
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/sources"
+      ],
+      "tests": [
+        "skeleton/testing/test_context_compiler.py",
+        "planned:skeleton/testing/test_context_trust_geometry.py"
+      ],
+      "evaluations": [
+        "planned:long-context policy-retention eval",
+        "planned:injection-under-compression adversarial eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "policy trimmed from long context",
+        "instruction laundering",
+        "trust labels lost during compression"
+      ],
+      "gaps": [
+        "add semantic compression with invariant checks",
+        "measure context utility versus cost across task classes"
+      ],
       "accountability_id": "ACC-VOL-009",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 10,
@@ -411,19 +730,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Separate working, conversation, episodic, semantic, procedural, project and artifact memory classes.",
+        "Gate durable memory writes through privacy, deduplication, contradiction and promotion rules.",
+        "Support deletion/retention propagation into derived embeddings/indexes and backups."
+      ],
+      "capabilities": [
+        "memory write policy",
+        "memory retrieval",
+        "memory reconciliation/GC"
+      ],
+      "contracts": [
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryDecision",
+        "MemoryTombstone"
+      ],
+      "implementation_paths": [
+        "skeleton/memory",
+        "skeleton/vault",
+        "planned:skeleton/memory/reconciliation.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_memory_promotion.py",
+        "planned:skeleton/testing/test_memory_poisoning.py",
+        "planned:skeleton/testing/test_memory_deletion.py"
+      ],
+      "evaluations": [
+        "planned:memory usefulness/interference evaluation",
+        "planned:long-horizon stale-memory regression"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "memory poisoning",
+        "tombstone resurrection",
+        "cross-project leakage",
+        "stale contradiction"
+      ],
+      "gaps": [
+        "durable project-memory owner needs convergence",
+        "memory quality/GC scoring needs implementation"
+      ],
       "accountability_id": "ACC-VOL-010",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 11,
@@ -433,19 +785,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Support lexical, dense, hybrid, metadata, temporal, graph, code-symbol and multi-hop retrieval behind common evidence contracts.",
+        "Apply authorization/data-scope filters at query time before ranking.",
+        "Return source/version/time/provenance and make stale/partial results explicit."
+      ],
+      "capabilities": [
+        "retrieval query execution",
+        "hybrid ranking",
+        "evidence packaging"
+      ],
+      "contracts": [
+        "RetrievalQuery",
+        "RetrievalResult",
+        "RetrievedChunk",
+        "RetrievalEvidence"
+      ],
+      "implementation_paths": [
+        "skeleton/retrieval",
+        "backend/services/rag_service.py",
+        "backend/services/rag_state_repository.py"
+      ],
+      "tests": [
+        "tests/test_retrieval_pipeline_internals.py",
+        "tests/test_quad_retrieval_internals.py",
+        "planned:skeleton/testing/test_retrieval_tenant_scope.py"
+      ],
+      "evaluations": [
+        "planned:retrieval relevance/freshness suite",
+        "planned:poisoning and stale-index adversarial eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "stale index",
+        "tenant filter applied after ranking",
+        "retrieval poisoning",
+        "embedding incompatibility"
+      ],
+      "gaps": [
+        "canonical reranker interface is incomplete",
+        "index migration/freshness service needs implementation"
+      ],
       "accountability_id": "ACC-VOL-011",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 12,
@@ -455,19 +840,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Represent entity, relation, claim, evidence, scope, time and source separately.",
+        "Allow contradictory claims to coexist with explicit provenance rather than destructive overwrite.",
+        "Support reconciliation and snapshots without erasing historical truth state."
+      ],
+      "capabilities": [
+        "claim graph",
+        "temporal knowledge",
+        "knowledge reconciliation"
+      ],
+      "contracts": [
+        "Entity",
+        "Relation",
+        "Claim",
+        "EvidenceRecord",
+        "KnowledgeSnapshot"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/knowledge",
+        "planned:skeleton/knowledge/reconciliation.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_claim_scope_time.py",
+        "planned:skeleton/testing/test_knowledge_contradictions.py"
+      ],
+      "evaluations": [
+        "planned:temporal QA consistency eval",
+        "planned:contradiction reconciliation eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "false reconciliation",
+        "scope/time mismatch",
+        "source monoculture"
+      ],
+      "gaps": [
+        "knowledge store implementation is incomplete",
+        "define confidence/verification interaction without collapsing them"
+      ],
       "accountability_id": "ACC-VOL-012",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 13,
@@ -477,19 +893,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Select bounded cognitive strategies based on task, risk, budget and available evidence.",
+        "Record structured decision state sufficient for replay/eval without depending on hidden reasoning text.",
+        "Enforce stopping rules across search, reflection, critique and repair."
+      ],
+      "capabilities": [
+        "strategy registry",
+        "bounded cognitive loop",
+        "metacognitive control"
+      ],
+      "contracts": [
+        "CognitiveStrategy",
+        "StrategyDecision",
+        "CognitiveStep",
+        "StopDecision"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/intelligence/cognitive_runtime.py",
+        "planned:skeleton/intelligence/strategy_registry.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_cognitive_stop_policy.py",
+        "planned:skeleton/testing/test_strategy_budget.py"
+      ],
+      "evaluations": [
+        "planned:strategy selection quality/cost eval",
+        "planned:looping adversarial scenarios"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "unbounded reasoning loops",
+        "self-confidence treated as verification",
+        "strategy selection overfits benchmark"
+      ],
+      "gaps": [
+        "materialize cognitive runtime contracts",
+        "build replayable strategy evaluation harness"
+      ],
       "accountability_id": "ACC-VOL-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 14,
@@ -499,19 +945,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Represent plans as dependency DAGs with preconditions, postconditions, capabilities, budgets and deadlines.",
+        "Statically detect cycles, unreachable nodes, missing capabilities and absent terminal behavior.",
+        "Support simulation/critical-path analysis without bypassing authority constraints."
+      ],
+      "capabilities": [
+        "plan construction",
+        "plan static analysis",
+        "plan scheduling/simulation"
+      ],
+      "contracts": [
+        "Plan",
+        "PlanStep",
+        "PlanDependency",
+        "PlanValidationResult"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/planning",
+        "planned:skeleton/planning/analyzer.py",
+        "planned:skeleton/planning/simulator.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_plan_static_analyzer.py",
+        "planned:skeleton/testing/test_plan_cycles.py"
+      ],
+      "evaluations": [
+        "planned:plan success/calibration eval",
+        "planned:specification-gaming plan suite"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "invalid plans reaching execution",
+        "goal drift",
+        "scheduler optimization violating hard constraints"
+      ],
+      "gaps": [
+        "workflow IR/DSL compiler needs implementation",
+        "formalizable invariants need selection"
+      ],
       "accountability_id": "ACC-VOL-014",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 15,
@@ -521,19 +998,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Treat every tool as a privileged execution surface with independent authorization.",
+        "Validate input/output schemas, classification, risk, budget and idempotency before execution.",
+        "Bind postconditions and durable receipts to the originating operation."
+      ],
+      "capabilities": [
+        "tool registry",
+        "governed invocation",
+        "side-effect receipts/compensation"
+      ],
+      "contracts": [
+        "ToolDescriptor",
+        "ToolProposal",
+        "ToolInvocation",
+        "ToolResult",
+        "SideEffectReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/skills",
+        "planned:skeleton/tools",
+        "skeleton/automation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_tool_authorization.py",
+        "skeleton/testing/test_shell_*.py",
+        "planned:skeleton/testing/test_tool_idempotency.py"
+      ],
+      "evaluations": [
+        "planned:tool misuse adversarial suite",
+        "planned:postcondition verification coverage"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "tool description prompt injection",
+        "shell/path/network injection",
+        "duplicate side effects"
+      ],
+      "gaps": [
+        "normalize all connectors onto one invocation contract",
+        "complete compensation/saga integration"
+      ],
       "accountability_id": "ACC-VOL-015",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 16,
@@ -543,19 +1053,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define agent identity, role, objective scope, authority, capability set, memory policy and resource limits.",
+        "Require delegated authority to be a mechanical subset of parent authority.",
+        "Persist lifecycle/checkpoint state for cancellation, recovery and audit."
+      ],
+      "capabilities": [
+        "agent lifecycle",
+        "delegation",
+        "agent checkpointing"
+      ],
+      "contracts": [
+        "AgentDescriptor",
+        "AgentInstance",
+        "DelegationGrant",
+        "AgentCheckpoint"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/agents",
+        "tests/test_agent_coordination.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_agent_delegation.py",
+        "planned:skeleton/testing/test_agent_checkpoint.py"
+      ],
+      "evaluations": [
+        "planned:agent-task completion eval",
+        "planned:authority-escalation adversarial eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "authority creep",
+        "orphan agents",
+        "role prompt confused with permission"
+      ],
+      "gaps": [
+        "durable agent supervisor needs implementation",
+        "agent resource accounting needs convergence"
+      ],
       "accountability_id": "ACC-VOL-016",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 17,
@@ -565,19 +1105,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Coordinate multiple agents with explicit handoff packets, leases/fencing, conflict domains and bounded fan-out.",
+        "Resolve disagreement by evidence/verification policy rather than majority text alone.",
+        "Prevent mutation collisions and stale workers from committing."
+      ],
+      "capabilities": [
+        "multi-agent scheduling",
+        "handoff",
+        "conflict arbitration"
+      ],
+      "contracts": [
+        "AgentHandoff",
+        "WorkLease",
+        "FencingToken",
+        "ConflictRecord"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/agents/orchestrator.py",
+        "tests/test_agent_coordination.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_agent_leases.py",
+        "planned:skeleton/testing/test_agent_conflicts.py"
+      ],
+      "evaluations": [
+        "planned:swarm coordination eval",
+        "planned:false-consensus adversarial eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "false consensus",
+        "deadlock/livelock",
+        "stale lease holder writes",
+        "fan-out explosion"
+      ],
+      "gaps": [
+        "formalize conflict-domain registry",
+        "implement bounded consensus/arbitration policies"
+      ],
       "accountability_id": "ACC-VOL-017",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 18,
@@ -587,19 +1158,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Support long-running operations with durable checkpoints, resumable plans, deadline/budget enforcement and human override.",
+        "Make pause/wait/retry states explicit and recoverable after process/node restarts.",
+        "Detect goal drift and require re-authorization when objective/authority context materially changes."
+      ],
+      "capabilities": [
+        "durable long-horizon execution",
+        "checkpoint/resume",
+        "goal-drift control"
+      ],
+      "contracts": [
+        "LongRunningOperation",
+        "Checkpoint",
+        "ResumeToken",
+        "OverrideDecision"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/autonomy",
+        "planned:skeleton/persistence/execution_repository.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_long_horizon_resume.py",
+        "planned:skeleton/testing/test_goal_drift.py"
+      ],
+      "evaluations": [
+        "planned:multi-hour simulated task suite",
+        "planned:restart/recovery autonomy eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "zombie work",
+        "budget leakage",
+        "goal drift",
+        "approval expiry during pause"
+      ],
+      "gaps": [
+        "persistent scheduler needs implementation",
+        "human override UX/API must be unified"
+      ],
       "accountability_id": "ACC-VOL-018",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 19,
@@ -609,19 +1211,48 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Keep simulation/world-model state clearly separated from real-world authority and side effects.",
+        "Represent uncertainty and model assumptions in simulated transitions.",
+        "Use simulation for planning/challenge without allowing simulated success to count as real postcondition evidence."
+      ],
+      "capabilities": [
+        "environment simulation",
+        "counterfactual evaluation",
+        "world-state abstraction"
+      ],
+      "contracts": [
+        "WorldState",
+        "SimulationStep",
+        "SimulationResult",
+        "AssumptionSet"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/simulation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_simulation_authority_boundary.py",
+        "planned:skeleton/testing/test_simulation_determinism.py"
+      ],
+      "evaluations": [
+        "planned:sim-to-real calibration",
+        "planned:counterfactual planning eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "simulation treated as real evidence",
+        "model bias compounds through rollouts",
+        "non-deterministic environment assumptions"
+      ],
+      "gaps": [
+        "environment adapter standard missing",
+        "uncertainty propagation policy needs definition"
+      ],
       "accountability_id": "ACC-VOL-019",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 20,
@@ -631,19 +1262,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use typed modality contracts for images, documents, audio, speech and video with provenance and classification.",
+        "Preserve cross-modal alignment and source identity when extracting or transforming content.",
+        "Treat hidden/embedded instructions and metadata as untrusted evidence, not policy."
+      ],
+      "capabilities": [
+        "multimodal ingestion",
+        "cross-modal representation",
+        "multimodal artifact handling"
+      ],
+      "contracts": [
+        "MediaArtifact",
+        "ModalitySegment",
+        "MediaProvenance",
+        "CrossModalReference"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/multimodal",
+        "backend/routes/media.py"
+      ],
+      "tests": [
+        "backend/tests/test_ai_provider_media.py",
+        "planned:skeleton/testing/test_multimodal_trust.py"
+      ],
+      "evaluations": [
+        "planned:cross-modal retrieval eval",
+        "planned:hidden-instruction multimodal adversarial suite"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "embedded prompt injection",
+        "metadata privacy leakage",
+        "cross-modal misalignment"
+      ],
+      "gaps": [
+        "document/audio/video pipelines need convergence",
+        "modality-specific sanitization policies need implementation"
+      ],
       "accountability_id": "ACC-VOL-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 21,
@@ -653,19 +1314,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Build repository intelligence from files, symbols, imports, ownership, tests and change history.",
+        "Track index freshness and provenance so stale code graphs are visible.",
+        "Provide impact queries without treating heuristic dependency inference as certainty."
+      ],
+      "capabilities": [
+        "repository graph",
+        "symbol search",
+        "impact analysis"
+      ],
+      "contracts": [
+        "RepositoryNode",
+        "SymbolRecord",
+        "DependencyRecord",
+        "ImpactQuery"
+      ],
+      "implementation_paths": [
+        "skeleton/repo_intelligence",
+        "planned:machine/repository_graph.json"
+      ],
+      "tests": [
+        "skeleton/testing/test_repo_intelligence_git_index.py",
+        "planned:skeleton/testing/test_repo_graph_freshness.py"
+      ],
+      "evaluations": [
+        "planned:impact-prediction precision/recall eval",
+        "planned:cross-language symbol resolution eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "stale index",
+        "false dependency confidence",
+        "generated/vendor code pollution"
+      ],
+      "gaps": [
+        "complete cross-language graph extraction",
+        "connect ownership/test mapping to change planner"
+      ],
       "accountability_id": "ACC-VOL-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 22,
@@ -675,19 +1366,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
+        "Isolate workspaces and mutation leases to prevent concurrent destructive edits.",
+        "Require patch provenance, focused regression evidence and rollback/revert path."
+      ],
+      "capabilities": [
+        "change planning",
+        "leased editing",
+        "autonomous repair verification"
+      ],
+      "contracts": [
+        "ChangePlan",
+        "EditLease",
+        "PatchReceipt",
+        "ReviewVerdict"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/repo_engineering",
+        "skeleton/automation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_repo_edit_leases.py",
+        "planned:skeleton/testing/test_autonomous_repair_flow.py"
+      ],
+      "evaluations": [
+        "planned:repair success without regression benchmark",
+        "planned:concurrent-edit collision suite"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "destructive edits",
+        "test gaming",
+        "merge races",
+        "self-review bias"
+      ],
+      "gaps": [
+        "transactional workspace layer incomplete",
+        "independent reviewer/verifier routing needs full integration"
+      ],
       "accountability_id": "ACC-VOL-022",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 23,
@@ -697,19 +1419,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Generate code/policy/prompt/config/artifact candidates only inside bounded experiment scopes.",
+        "Compare candidates against champion baselines using explicit acceptance metrics.",
+        "Prevent forge candidates from directly mutating production."
+      ],
+      "capabilities": [
+        "candidate generation",
+        "artifact competition",
+        "promotion proposal"
+      ],
+      "contracts": [
+        "CandidateArtifact",
+        "ExperimentTrial",
+        "ChampionRecord",
+        "PromotionProposal"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/forge",
+        "planned:skeleton/experiments"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_forge_isolation.py",
+        "planned:skeleton/testing/test_champion_challenger.py"
+      ],
+      "evaluations": [
+        "planned:candidate quality/cost benchmark",
+        "planned:reward-hacking adversarial eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "candidate escapes sandbox",
+        "metric gaming",
+        "baseline drift"
+      ],
+      "gaps": [
+        "champion/challenger registry needs implementation",
+        "standard candidate artifact schema needs integration"
+      ],
       "accountability_id": "ACC-VOL-023",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 24,
@@ -719,19 +1471,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Collect learning signals with source, scope, confidence and outcome provenance.",
+        "Turn signals into versioned candidates rather than direct production mutation.",
+        "Measure regressions, distribution shift and rollback safety before promotion."
+      ],
+      "capabilities": [
+        "learning-signal registry",
+        "update candidate generation",
+        "controlled adaptation"
+      ],
+      "contracts": [
+        "LearningSignal",
+        "UpdateCandidate",
+        "AdaptationRun",
+        "PromotionDecision"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/learning",
+        "planned:skeleton/experiments"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_learning_signal_lineage.py",
+        "planned:skeleton/testing/test_no_direct_self_modify.py"
+      ],
+      "evaluations": [
+        "planned:offline-to-online transfer eval",
+        "planned:feedback-loop stability eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "self-reinforcing bad feedback",
+        "silent behavior drift",
+        "reward hacking"
+      ],
+      "gaps": [
+        "define durable signal retention/privacy policy",
+        "online adaptation remains experimental until rollback evidence exists"
+      ],
       "accountability_id": "ACC-VOL-024",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 25,
@@ -741,19 +1523,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Maintain explicit hazard/risk taxonomy and safe default behavior for high-impact operations.",
+        "Separate safety policy from model preference/confidence.",
+        "Provide human override/escalation paths without allowing silent authority escalation."
+      ],
+      "capabilities": [
+        "risk classification",
+        "safety gating",
+        "safe degradation"
+      ],
+      "contracts": [
+        "RiskClass",
+        "SafetyDecision",
+        "SafetyConstraint",
+        "EscalationRequest"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/safety",
+        "skeleton/intelligence/verification_runtime.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_safety_high_impact.py",
+        "planned:skeleton/testing/test_safe_degradation.py"
+      ],
+      "evaluations": [
+        "planned:hazard coverage review",
+        "planned:false-positive/false-negative calibration"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "overblocking legitimate tasks",
+        "underblocking dangerous actions",
+        "policy inconsistency across surfaces"
+      ],
+      "gaps": [
+        "system-level hazard analysis needs formal artifact",
+        "safety-policy versioning needs runtime binding"
+      ],
       "accountability_id": "ACC-VOL-025",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 26,
@@ -763,19 +1575,53 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Enforce least privilege, secret isolation, sandboxing, egress control and supply-chain integrity across model/tool/CI/runtime boundaries.",
+        "Authorize normalized resources at the last responsible moment to resist TOCTOU and parsing differentials.",
+        "Keep secrets referenced rather than copied into prompts/logs/artifacts."
+      ],
+      "capabilities": [
+        "identity/access security",
+        "sandbox/egress controls",
+        "supply-chain security"
+      ],
+      "contracts": [
+        "SecurityContext",
+        "SecretRef",
+        "EgressPolicy",
+        "SandboxPolicy"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "backend/scripts",
+        "scripts/check_repository_python_sast.py"
+      ],
+      "tests": [
+        "skeleton/testing/test_security_rooted_fs.py",
+        "skeleton/testing/test_security_archive_sandbox.py",
+        "skeleton/testing/test_security_outbound_http.py"
+      ],
+      "evaluations": [
+        "planned:threat-model coverage review",
+        "planned:continuous adversarial security suite"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "TOCTOU",
+        "SSRF/DNS rebinding",
+        "path/archive escape",
+        "secret leakage",
+        "dependency compromise"
+      ],
+      "gaps": [
+        "complete unified threat model",
+        "bind runtime tool permissions to capability-security primitives"
+      ],
       "accountability_id": "ACC-VOL-026",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 27,
@@ -785,19 +1631,52 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Classify data at ingestion and preserve classification through derived artifacts.",
+        "Implement retention, deletion, export and residency semantics across source, projection, embedding, cache and backup.",
+        "Minimize data exposure to providers/tools by policy."
+      ],
+      "capabilities": [
+        "data classification",
+        "lifecycle governance",
+        "privacy enforcement"
+      ],
+      "contracts": [
+        "DataClassification",
+        "RetentionPolicy",
+        "DeletionReceipt",
+        "ExportManifest"
+      ],
+      "implementation_paths": [
+        "skeleton/vault",
+        "backend/routes/governance.py",
+        "machine/state_topology.json"
+      ],
+      "tests": [
+        "skeleton/testing/test_data_governance.py",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_lifecycle_adapters.py"
+      ],
+      "evaluations": [
+        "planned:deletion completeness drill",
+        "planned:provider-data-minimization audit"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "derived data survives deletion",
+        "backup retains sensitive data",
+        "cross-tenant leakage",
+        "residency drift"
+      ],
+      "gaps": [
+        "regional policy mapping remains incomplete",
+        "prove deletion through all future derived stores"
+      ],
       "accountability_id": "ACC-VOL-027",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 28,
@@ -807,19 +1686,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Represent identities, roles, grants, approvals and delegation as explicit versioned authority objects.",
+        "Require child/delegated authority to be a subset with expiry and revocation semantics.",
+        "Audit every privileged decision with policy version and evidence."
+      ],
+      "capabilities": [
+        "authority evaluation",
+        "approval workflow",
+        "delegation/revocation"
+      ],
+      "contracts": [
+        "AuthorityGrant",
+        "DelegationGrant",
+        "ApprovalRecord",
+        "PolicyDecision"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/policy",
+        "skeleton/vault/governance_audit.py"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_authority_subset.py",
+        "planned:skeleton/testing/test_approval_expiry.py"
+      ],
+      "evaluations": [
+        "planned:policy decision consistency eval",
+        "planned:revocation propagation drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "stale grants",
+        "approval fatigue",
+        "confused deputy",
+        "policy version skew"
+      ],
+      "gaps": [
+        "policy DSL/compiler needs implementation",
+        "unify user/service/agent authority evaluation"
+      ],
       "accountability_id": "ACC-VOL-028",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 29,
@@ -829,19 +1739,51 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use bounded retry/backoff/jitter, circuit breakers, bulkheads, queues, DLQ and load shedding as explicit policies.",
+        "Treat timeout as unknown outcome unless a postcondition proves failure/success.",
+        "Preserve availability without violating correctness or authority."
+      ],
+      "capabilities": [
+        "reliability policy",
+        "failure isolation",
+        "backpressure/load shedding"
+      ],
+      "contracts": [
+        "RetryPolicy",
+        "CircuitBreakerState",
+        "BulkheadPolicy",
+        "DeadLetterRecord"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "planned:skeleton/runtime/resilience"
+      ],
+      "tests": [
+        "skeleton/testing/test_orchestration_reliability_profiles.py",
+        "skeleton/testing/test_state_reliability_profiles.py",
+        "skeleton/testing/test_api_gateway_reliability_profiles.py"
+      ],
+      "evaluations": [
+        "planned:retry-storm chaos suite",
+        "planned:error-budget/SLO evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "retry storms",
+        "thundering herd",
+        "cascading failure",
+        "false failure after timeout"
+      ],
+      "gaps": [
+        "standardize retry budgets across connectors",
+        "connect SLO/error-budget state to admission control"
+      ],
       "accountability_id": "ACC-VOL-029",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 30,
@@ -851,19 +1793,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Model partitions, ordering, leases/fencing, clocks, idempotency and consistency choices explicitly.",
+        "Ensure stale workers cannot commit after lease loss.",
+        "Define remote execution/message semantics under duplication, delay, reordering and partial failure."
+      ],
+      "capabilities": [
+        "distributed coordination",
+        "lease/fencing",
+        "remote execution protocol"
+      ],
+      "contracts": [
+        "Lease",
+        "FencingToken",
+        "MessageEnvelope",
+        "RemoteExecutionRequest"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/distributed",
+        "planned:skeleton/workers"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_stale_lease_fencing.py",
+        "planned:skeleton/testing/test_partition_semantics.py"
+      ],
+      "evaluations": [
+        "planned:network-partition chaos suite",
+        "planned:distributed recovery eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "split brain",
+        "clock/order confusion",
+        "ABA/stale lease",
+        "duplicate remote execution"
+      ],
+      "gaps": [
+        "remote execution protocol needs implementation",
+        "consistency choices need per-data-class documentation"
+      ],
       "accountability_id": "ACC-VOL-030",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 31,
@@ -873,19 +1846,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Inventory CPU/GPU/RAM/VRAM/storage/network/NUMA/interconnect resources with freshness.",
+        "Admit/place work using hard resource constraints before optimization preferences.",
+        "Handle OOM, device reset, thermal throttling and heterogeneous hardware explicitly."
+      ],
+      "capabilities": [
+        "hardware discovery",
+        "resource admission",
+        "placement inputs"
+      ],
+      "contracts": [
+        "ResourceSnapshot",
+        "DeviceDescriptor",
+        "PlacementRequest",
+        "CapacityReservation"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/compute",
+        "planned:skeleton/hardware"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_resource_admission.py",
+        "planned:skeleton/testing/test_device_loss.py"
+      ],
+      "evaluations": [
+        "planned:capacity calibration",
+        "planned:heterogeneous-placement benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "VRAM fragmentation",
+        "stale capacity",
+        "NUMA/interconnect penalties",
+        "device reset"
+      ],
+      "gaps": [
+        "hardware topology collector needs implementation",
+        "resource reservation must bind to scheduler"
+      ],
       "accountability_id": "ACC-VOL-031",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 32,
@@ -895,19 +1899,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use native acceleration only behind stable capability/ABI boundaries with safe fallback.",
+        "Require memory/thread safety and deterministic error translation across FFI.",
+        "Version ABI and platform feature detection."
+      ],
+      "capabilities": [
+        "native capability registry",
+        "FFI boundary",
+        "accelerated kernels"
+      ],
+      "contracts": [
+        "NativeCapability",
+        "ABIManifest",
+        "NativeCallResult"
+      ],
+      "implementation_paths": [
+        "skeleton/native",
+        "java-accelerators",
+        "planned:native"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_native_abi.py",
+        "planned:skeleton/testing/test_native_fallback.py"
+      ],
+      "evaluations": [
+        "planned:native-vs-reference correctness benchmark",
+        "planned:platform ABI matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "undefined behavior",
+        "ABI drift",
+        "native crash corrupts process",
+        "silent numerical divergence"
+      ],
+      "gaps": [
+        "select acceleration targets by profiling evidence",
+        "expand isolation strategy for crash-prone native code"
+      ],
       "accountability_id": "ACC-VOL-032",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 33,
@@ -917,19 +1952,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use JVM components only where they provide measured interoperability/performance/operational benefit.",
+        "Define serialization, lifecycle, backpressure and failure boundaries between Python/native/JVM planes.",
+        "Prevent classpath/config/runtime drift from changing core semantics."
+      ],
+      "capabilities": [
+        "JVM accelerator/service integration",
+        "cross-runtime protocol",
+        "JVM lifecycle control"
+      ],
+      "contracts": [
+        "JvmCapability",
+        "JvmRequest",
+        "JvmResult",
+        "JvmRuntimeDescriptor"
+      ],
+      "implementation_paths": [
+        "java-accelerators",
+        "planned:jvm"
+      ],
+      "tests": [
+        "planned:java-accelerators/src/test",
+        "planned:skeleton/testing/test_jvm_boundary.py"
+      ],
+      "evaluations": [
+        "planned:JVM-versus-reference benchmark",
+        "planned:GC/backpressure soak test"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "classpath drift",
+        "GC pauses",
+        "serialization mismatch",
+        "duplicate runtime authority"
+      ],
+      "gaps": [
+        "identify workloads where JVM is actually beneficial",
+        "standardize protocol/version negotiation"
+      ],
       "accountability_id": "ACC-VOL-033",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 34,
@@ -939,19 +2005,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Correlate logs, metrics, traces, model/tool usage and durable receipts by operation identity.",
+        "Redact secrets/sensitive data before emission.",
+        "Make one operation reconstructable without relying on ephemeral process memory."
+      ],
+      "capabilities": [
+        "distributed tracing",
+        "structured logging",
+        "metrics/SLO telemetry"
+      ],
+      "contracts": [
+        "TraceContext",
+        "LogEvent",
+        "MetricSample",
+        "UsageRecord"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "tests/test_observability.py",
+        "tests/test_runtime_observability_bridge.py"
+      ],
+      "tests": [
+        "skeleton/testing/test_frontier_observability_correlation.py",
+        "tests/test_orchestration_error_redaction.py"
+      ],
+      "evaluations": [
+        "planned:trace completeness evaluation",
+        "planned:observability overhead benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "secret leakage in telemetry",
+        "missing spans hide failure",
+        "high-cardinality cost explosion"
+      ],
+      "gaps": [
+        "unify event/trace IDs across all surfaces",
+        "define production retention/cardinality budgets"
+      ],
       "accountability_id": "ACC-VOL-034",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 35,
@@ -961,19 +2058,51 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Version every benchmark/eval with dataset, config, environment, model, inference budget and statistical method.",
+        "Track contamination and baseline provenance.",
+        "Separate capability, regression, system, long-horizon and production-outcome evals."
+      ],
+      "capabilities": [
+        "evaluation registry",
+        "benchmark harness",
+        "statistical reporting"
+      ],
+      "contracts": [
+        "EvaluationSpec",
+        "EvaluationRun",
+        "BenchmarkRecord",
+        "BaselineRecord"
+      ],
+      "implementation_paths": [
+        "eval",
+        "tests",
+        "planned:skeleton/evaluation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_eval_reproducibility.py",
+        "planned:skeleton/testing/test_benchmark_metadata.py"
+      ],
+      "evaluations": [
+        "planned:baseline reproduction suite",
+        "planned:confidence-interval/stability analysis"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "benchmark cherry-picking",
+        "contamination",
+        "non-comparable configs",
+        "single-seed conclusions"
+      ],
+      "gaps": [
+        "consolidate existing eval harnesses",
+        "define canonical statistical policy by metric type"
+      ],
       "accountability_id": "ACC-VOL-035",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 36,
@@ -983,19 +2112,50 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Maintain adversarial cases mapped to threat/edge obligations and capability owners.",
+        "Keep adversarial judge/verifier independence measurable.",
+        "Promote discovered failures into durable regression cases."
+      ],
+      "capabilities": [
+        "red-team corpus",
+        "adversarial mutation",
+        "failure-to-regression pipeline"
+      ],
+      "contracts": [
+        "AdversarialCase",
+        "AttackAttempt",
+        "AdversarialVerdict",
+        "RegressionPromotion"
+      ],
+      "implementation_paths": [
+        "tests/test_adversarial_engine.py",
+        "tests/test_tri_adversarial_engine.py",
+        "planned:skeleton/evaluation/adversarial"
+      ],
+      "tests": [
+        "tests/test_adversarial_judge_isolation.py",
+        "planned:skeleton/testing/test_adversarial_regression_promotion.py"
+      ],
+      "evaluations": [
+        "planned:attack coverage and novelty evaluation",
+        "planned:judge-correlation analysis"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "evaluator leakage",
+        "attack overfitting",
+        "false sense of safety from static corpus"
+      ],
+      "gaps": [
+        "automated mutation/fuzz bridge needs implementation",
+        "link every P0/P1 risk to executable adversarial evidence where applicable"
+      ],
       "accountability_id": "ACC-VOL-036",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 37,
@@ -1005,19 +2165,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Represent verification separately from generator confidence and acceptance policy.",
+        "Support structural, evidence, postcondition, execution, mathematical, independent-model and human verification modes.",
+        "Bind verdicts to claim/action/artifact versions and evidence."
+      ],
+      "capabilities": [
+        "verification routing",
+        "claim/action verification",
+        "repair/block/abstain semantics"
+      ],
+      "contracts": [
+        "VerificationRecord",
+        "VerificationRequest",
+        "VerificationVerdict",
+        "RepairRecord"
+      ],
+      "implementation_paths": [
+        "skeleton/intelligence/verification_runtime.py",
+        "planned:skeleton/verification"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_verification_independence.py",
+        "planned:skeleton/testing/test_postcondition_verification.py"
+      ],
+      "evaluations": [
+        "planned:verifier calibration",
+        "planned:generator-verifier correlation eval"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "self-confidence treated as proof",
+        "correlated verifier failure",
+        "stale evidence verifies changed artifact"
+      ],
+      "gaps": [
+        "materialize verifier registry",
+        "define risk-tier routing thresholds"
+      ],
       "accountability_id": "ACC-VOL-037",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 38,
@@ -1027,19 +2217,49 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Track end-to-end lineage from source/user input through context/model/tool/agent/artifact/output.",
+        "Canonicalize before hashing/signing and version the canonicalization algorithm.",
+        "Preserve lineage through transforms, copies, caches and release artifacts."
+      ],
+      "capabilities": [
+        "provenance graph",
+        "attestation/signing",
+        "lineage query"
+      ],
+      "contracts": [
+        "ProvenanceNode",
+        "ProvenanceEdge",
+        "Attestation",
+        "CanonicalizationProfile"
+      ],
+      "implementation_paths": [
+        "planned:skeleton/provenance",
+        "machine/ai_build_accountability.json"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_provenance_tamper.py",
+        "planned:skeleton/testing/test_canonical_signing.py"
+      ],
+      "evaluations": [
+        "planned:lineage completeness evaluation",
+        "planned:tamper-evidence drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "canonicalization mismatch",
+        "missing lineage edge",
+        "signature detached from semantic content"
+      ],
+      "gaps": [
+        "integrate artifact/release provenance",
+        "define external attestation interoperability"
+      ],
       "accountability_id": "ACC-VOL-038",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 39,
@@ -1049,19 +2269,51 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use versioned event envelopes with stable identity, causation/correlation and ordering metadata.",
+        "Implement transactional outbox/inbox where events bridge durable state and async consumers.",
+        "Support replay, compaction and schema evolution without duplicating side effects."
+      ],
+      "capabilities": [
+        "event publication",
+        "idempotent consumption",
+        "replay/compaction"
+      ],
+      "contracts": [
+        "EventEnvelope",
+        "EventCursor",
+        "OutboxRecord",
+        "InboxRecord"
+      ],
+      "implementation_paths": [
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/persistence"
+      ],
+      "tests": [
+        "skeleton/testing/test_operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "planned:skeleton/testing/test_event_replay.py"
+      ],
+      "evaluations": [
+        "planned:duplicate/out-of-order fault suite",
+        "planned:event replay determinism evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "duplicate/out-of-order events",
+        "consumer side effect before inbox marker",
+        "schema drift"
+      ],
+      "gaps": [
+        "formalize event compatibility registry",
+        "add compaction/replay retention contracts"
+      ],
       "accountability_id": "ACC-VOL-039",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 40,
@@ -1071,19 +2323,53 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define resumable streaming with stable event IDs, sequence semantics, cursors and terminal finality.",
+        "Bound server/client buffering with backpressure and resync behavior.",
+        "Reconcile provisional UI content against authoritative terminal state."
+      ],
+      "capabilities": [
+        "operation streaming",
+        "resume/replay",
+        "backpressure/reconciliation"
+      ],
+      "contracts": [
+        "StreamFrame",
+        "ResumeCursor",
+        "StreamTerminal",
+        "ReplayGap"
+      ],
+      "implementation_paths": [
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "frontend",
+        "skeleton/frontier/operation_stream.py"
+      ],
+      "tests": [
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
+        "planned:frontend operation reducer tests"
+      ],
+      "evaluations": [
+        "planned:disconnect/reconnect matrix",
+        "planned:slow-client/cancel-race E2E"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "cursor compaction gap",
+        "duplicate provisional content",
+        "slow-client memory growth",
+        "cancel/complete race"
+      ],
+      "gaps": [
+        "materialize multi-client cursor compaction tests",
+        "bind frontend reducer evidence into canonical release suite"
+      ],
       "accountability_id": "ACC-VOL-040",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-000-040"
     },
     {
       "id": 41,
@@ -9607,5 +10893,28 @@
     },
     "promotion_rule": "Status promotion is invalid unless all fields required by the target maturity state are non-empty and signed accountability permits the corresponding implementation_status.",
     "anti_shortcut": "File existence, LOC, a passing happy path, or documentation alone cannot satisfy a maturity promotion."
-  }
+  },
+  "depth_passes": [
+    {
+      "id": "DP-000-040",
+      "title": "Foundational architecture-to-streaming depth pass",
+      "volume_range": [
+        0,
+        40
+      ],
+      "status": "specified_depth",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "risks",
+        "gaps"
+      ],
+      "evidence_policy": "evidence may remain empty while implementation_status is unverified; evidence must become non-empty under the volume maturity promotion policy before verified+ states.",
+      "purpose": "Replace title-only placeholders in the foundational 41 volumes with buildable requirements, contracts, test/eval intent, risks and known gaps."
+    }
+  ]
 }
