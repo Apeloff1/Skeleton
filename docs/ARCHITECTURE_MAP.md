@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v3.3`
+**Architecture tag:** `arch-map/v3.4`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -227,6 +227,7 @@ arch-map/v3.0  executable lifecycle/trust/data/work-package construction ledger
 arch-map/v3.1  Wave 1 governance + resource admission enforced before provider I/O
 arch-map/v3.2  unified governed text/image/speech provider runtime + media credential convergence
 arch-map/v3.3  canonical operation lifecycle + resumable stream contract
+arch-map/v3.4  durable operation stream store + replay watermark semantics
 ```
 
 ## 10. Operator commands
@@ -287,3 +288,15 @@ conflict detection, terminal finality and fail-closed backpressure.
 The current reference `OperationEventLog` is a conformance oracle, not the
 production durable store. Production storage may change only the persistence
 mechanism, not protocol semantics.
+
+
+## 13. Durable operation stream storage
+
+`skeleton/frontier/operation_stream_store.py` is the durable reference store
+for the operation stream protocol. It preserves protocol semantics across
+process restart: exact-next sequence, terminal fencing, replay cursors,
+compaction watermarks, bounded retained history and corruption rejection.
+
+A production store may replace SQLite, but it must pass the same semantics.
+Persistence technology is replaceable; stream ordering and recovery behavior are
+not.
