@@ -641,3 +641,186 @@ Exotic evidence receives additional refresh triggers:
 - architecture simplification showing the exotic component was unnecessary.
 
 A simpler architecture that matches an exotic candidate's measured benefit is preferred unless the exotic candidate retains another material full-stack advantage.
+
+
+## 23. Research conclusion and contradiction contract
+
+The research atlas introduces a distinction between **source evidence** and **current engineering conclusion**.
+
+A `ResearchEvidence` record describes what a source/run says.
+A `ResearchConclusion` describes the narrow conclusion Skeleton currently draws from the evidence graph.
+
+Canonical shape:
+
+```text
+ResearchConclusion
+  conclusion_id
+  domain
+  statement
+  scope:
+    task_population
+    model_families
+    scale_range
+    data_regime
+    hardware
+    software/runtime
+    evaluation_version
+  status
+  confidence:
+    mechanism
+    scale_transfer
+    systems
+    portability
+    production
+  evidence_for[]
+  evidence_against[]
+  unresolved_variables[]
+  strongest_baseline
+  local_reproduction_status
+  falsification_condition
+  next_experiment
+  last_reviewed_at
+  review_at
+```
+
+### 23.1 Contradictions are graph structure
+
+Two credible sources that disagree create a contradiction edge; they do not get averaged into an artificial consensus score.
+
+A contradiction record captures:
+
+```text
+Contradiction
+  claim_a
+  claim_b
+  differing_population
+  differing_model
+  differing_scale
+  differing_data
+  differing_hyperparameter_budget
+  differing_hardware
+  differing_metric
+  differing_evaluator
+  differing_implementation
+  resolution_status
+```
+
+Allowed resolution statuses:
+
+- `explained_by_scope`;
+- `explained_by_implementation`;
+- `explained_by_measurement`;
+- `locally_reproduced_a`;
+- `locally_reproduced_b`;
+- `mixed`;
+- `unresolved`.
+
+Publication recency or venue prestige is not a resolution method.
+
+### 23.2 Reproduction classes
+
+Every local reproduction is one of:
+
+1. `sanity` — establish that the mechanism is real;
+2. `paper_scale` — match the reported setting;
+3. `transfer` — change model/data/hardware;
+4. `systems` — validate end-to-end wall-clock/cost;
+5. `adversarial` — deliberately search for failure regions.
+
+Passing a sanity reproduction does not imply scale/system/production confidence.
+
+### 23.3 Resource-normalized comparisons
+
+Comparative evidence may expose several views simultaneously:
+
+```text
+equal_tokens
+equal_training_flops
+equal_wall_clock
+equal_accelerator_hours
+equal_peak_memory
+equal_inference_latency
+equal_cost_budget
+equal_tuning_budget
+```
+
+The evidence record must say which normalization produced a claimed advantage.
+
+### 23.4 Research status integrity
+
+Exact source status is preserved:
+
+- peer reviewed;
+- accepted poster/oral;
+- official deployment/system evidence;
+- preprint;
+- workshop;
+- submission;
+- rejected;
+- withdrawn;
+- negative/null reproduction.
+
+A rejected or withdrawn result may remain useful negative or hypothesis-generating evidence. Its status may not be silently upgraded.
+
+### 23.5 Research-agent independence
+
+An agent that proposes a hypothesis or implements an experiment cannot alone establish that the hypothesis is reproduced.
+
+Closure evidence requires one or more of:
+
+- deterministic execution/test;
+- independent evaluation path;
+- held-out evidence;
+- separately versioned verifier;
+- configured human signoff.
+
+## 24. Research question contract
+
+Open research questions use a stable identifier and never disappear because a convenient implementation choice was made.
+
+```text
+ResearchQuestion
+  question_id
+  statement
+  affected_contracts[]
+  current_conclusion
+  evidence_for[]
+  evidence_against[]
+  unknowns[]
+  next_experiment
+  falsification_or_resolution_condition
+  review_at
+```
+
+A question closes only when the evidence record says why. A closed question can reopen if new contradictory evidence arrives.
+
+## 25. Research refresh cadence
+
+Refresh priority is driven by velocity and system importance rather than one global interval.
+
+High-velocity domains:
+
+- test-time reasoning;
+- agent systems;
+- serving/KV/network;
+- model safety/monitorability;
+- optimizers/low precision;
+- exotic model architectures.
+
+Medium-velocity domains:
+
+- memory/retrieval;
+- evaluation science;
+- interpretability;
+- multimodal/world models.
+
+Foundational results are reviewed less frequently but are still re-evaluated if:
+
+- a replication fails;
+- hardware changes the realized system result;
+- a benchmark becomes contaminated;
+- a new architecture invalidates an assumption;
+- the original source is corrected/retracted.
+
+The canonical dated synthesis for this planning round is
+`docs/architecture/frontier-research-atlas-2026.md`.
