@@ -213,6 +213,16 @@ def audit_topology_alignment() -> None:
         expo_version == manifest_version,
         f"frontend application version drift: expo={expo_version!r} manifest={manifest_version!r}",
     )
+    public_contract = app.get("public_contract") if isinstance(app, dict) else None
+    check(isinstance(public_contract, dict), "manifest public application contract missing")
+    if isinstance(public_contract, dict):
+        check(public_contract.get("prefix") == "/api/app", "public application contract prefix drift")
+        for name in ("bootstrap", "status", "ready"):
+            value = public_contract.get(name)
+            check(
+                isinstance(value, str) and value.startswith("/"),
+                f"public application contract route invalid: {name}={value!r}",
+            )
 
 
 def audit_no_competing_root_launchers() -> None:
@@ -584,9 +594,22 @@ def audit_public_app_bootstrap_contract() -> None:
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
         check(forbidden not in bootstrap, f"public bootstrap leaks internal field: {forbidden}")
 
-    check('APIRouter(prefix="/api/app"' in route, "public app runtime router prefix drift")
-    check('@router.get("/bootstrap")' in route, "public app bootstrap route missing")
-    check('@router.get("/status")' in route, "aggregate app runtime status route missing")
+    check(
+        'APIRouter(prefix=_MANIFEST.public_contract["prefix"]' in route,
+        "public app runtime router must use manifest prefix",
+    )
+    check(
+        '@router.get(_MANIFEST.public_contract["bootstrap"])' in route,
+        "public app bootstrap route must use manifest contract",
+    )
+    check(
+        '@router.get(_MANIFEST.public_contract["status"])' in route,
+        "aggregate app runtime status route must use manifest contract",
+    )
+    check(
+        '@router.get(_MANIFEST.public_contract["ready"])' in route,
+        "aggregate app readiness route must use manifest contract",
+    )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
     check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
@@ -596,9 +619,9 @@ def audit_public_app_bootstrap_contract() -> None:
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
     check("getAppBootstrap" in client, "frontend app bootstrap client missing")
-    check("'/api/app/bootstrap'" in client, "frontend app bootstrap endpoint drift")
+    check("DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client, "frontend bootstrap seed endpoint drift")
     check("getAppRuntimeStatus" in client, "frontend aggregate app runtime client missing")
-    check("/api/app/status?timeout_ms=" in client, "frontend aggregate app runtime endpoint drift")
+    check("bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH" in client, "frontend runtime path bypasses bootstrap contract")
     check("bootstrapService" in client, "frontend app bootstrap service resolver missing")
 
 
