@@ -992,7 +992,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.quality not in {"standard", "hd", "low", "medium", "high", "auto"}:
             raise ProviderInvocationError("image provider quality is unsupported")
 
-        governance, admission = _require_media_policy(
+        governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
             data_class=request.data_class,
@@ -1005,33 +1005,52 @@ class OpenAIProviderAdapter(ProviderAdapter):
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
             output_tokens=request.count,
+            admission_runtime=self.admission_runtime,
         )
-        client = self._get_client()
         started = time.perf_counter()
         try:
-            response = await client.images.generate(
-                model=request.model,
-                prompt=request.prompt,
-                size=request.size,
-                quality=request.quality,
-                n=request.count,
-                response_format="b64_json",
-            )
-        except ProviderError:
+            client = self._get_client()
+            try:
+                response = await client.images.generate(
+                    model=request.model,
+                    prompt=request.prompt,
+                    size=request.size,
+                    quality=request.quality,
+                    n=request.count,
+                    response_format="b64_json",
+                )
+            except ProviderError:
+                raise
+            except Exception as exc:
+                raise ProviderInvocationError("image provider request failed") from exc
+            images = _extract_b64_images(response, fallback_prompt=request.prompt)
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
             raise
-        except Exception as exc:
-            raise ProviderInvocationError("image provider request failed") from exc
 
-        images = _extract_b64_images(response, fallback_prompt=request.prompt)
+        latency_seconds = max(0.0, time.perf_counter() - started)
+        actual = _media_actual_usage(
+            estimate,
+            wall_seconds=latency_seconds,
+            artifact_bytes=_image_artifact_bytes(images),
+        )
+        try:
+            self.admission_runtime.complete(lease.operation_id, actual)
+        except AdmissionRuntimeError as exc:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise ProviderPolicyError(
+                "image provider usage reconciliation failed"
+            ) from exc
+
         request_id = getattr(response, "id", None)
         return ProviderImageResponse(
             images=images,
             provider=self.provider_id,
             model=request.model,
             request_id=str(request_id) if request_id else None,
-            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
-            admission_decision_id=admission.decision_id,
+            admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
         )
 
@@ -1052,7 +1071,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if count < 1 or count > 4:
             raise ProviderInvocationError("image variation count must be between one and four")
 
-        governance, admission = _require_media_policy(
+        governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-variation",
             data_class=data_class,
@@ -1064,30 +1083,50 @@ class OpenAIProviderAdapter(ProviderAdapter):
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
             output_tokens=count,
+            admission_runtime=self.admission_runtime,
         )
-        client = self._get_client()
         source = io.BytesIO(image)
         source.name = "image.png"
         started = time.perf_counter()
         try:
-            response = await client.images.create_variation(
-                image=source,
-                n=count,
-                size=size,
-                response_format="b64_json",
-            )
-        except Exception as exc:
-            raise ProviderInvocationError("image variation request failed") from exc
-        images = _extract_b64_images(response, fallback_prompt="variation")
+            client = self._get_client()
+            try:
+                response = await client.images.create_variation(
+                    image=source,
+                    n=count,
+                    size=size,
+                    response_format="b64_json",
+                )
+            except Exception as exc:
+                raise ProviderInvocationError("image variation request failed") from exc
+            images = _extract_b64_images(response, fallback_prompt="variation")
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise
+
+        latency_seconds = max(0.0, time.perf_counter() - started)
+        actual = _media_actual_usage(
+            estimate,
+            wall_seconds=latency_seconds,
+            artifact_bytes=_image_artifact_bytes(images),
+        )
+        try:
+            self.admission_runtime.complete(lease.operation_id, actual)
+        except AdmissionRuntimeError as exc:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise ProviderPolicyError(
+                "image variation usage reconciliation failed"
+            ) from exc
+
         request_id = getattr(response, "id", None)
         return ProviderImageResponse(
             images=images,
             provider=self.provider_id,
             model="image-variation",
             request_id=str(request_id) if request_id else None,
-            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
-            admission_decision_id=admission.decision_id,
+            admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
         )
 
@@ -1111,7 +1150,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if not isinstance(prompt, str) or not prompt.strip():
             raise ProviderInvocationError("image edit prompt must be non-empty")
 
-        governance, admission = _require_media_policy(
+        governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose="image-edit",
             data_class=data_class,
@@ -1122,8 +1161,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             resource_budget=ResourceBudget(),
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
+            admission_runtime=self.admission_runtime,
         )
-        client = self._get_client()
         source = io.BytesIO(image)
         source.name = "image.png"
         kwargs: dict[str, Any] = {
@@ -1139,19 +1178,39 @@ class OpenAIProviderAdapter(ProviderAdapter):
             kwargs["mask"] = mask_file
         started = time.perf_counter()
         try:
-            response = await client.images.edit(**kwargs)
-        except Exception as exc:
-            raise ProviderInvocationError("image edit request failed") from exc
-        images = _extract_b64_images(response, fallback_prompt=prompt)
+            client = self._get_client()
+            try:
+                response = await client.images.edit(**kwargs)
+            except Exception as exc:
+                raise ProviderInvocationError("image edit request failed") from exc
+            images = _extract_b64_images(response, fallback_prompt=prompt)
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise
+
+        latency_seconds = max(0.0, time.perf_counter() - started)
+        actual = _media_actual_usage(
+            estimate,
+            wall_seconds=latency_seconds,
+            artifact_bytes=_image_artifact_bytes(images),
+        )
+        try:
+            self.admission_runtime.complete(lease.operation_id, actual)
+        except AdmissionRuntimeError as exc:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise ProviderPolicyError(
+                "image edit usage reconciliation failed"
+            ) from exc
+
         request_id = getattr(response, "id", None)
         return ProviderImageResponse(
             images=images,
             provider=self.provider_id,
             model="image-edit",
             request_id=str(request_id) if request_id else None,
-            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
-            admission_decision_id=admission.decision_id,
+            admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
         )
 
@@ -1167,7 +1226,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if request.response_format not in {"mp3", "wav", "opus", "aac", "flac", "pcm"}:
             raise ProviderInvocationError("speech provider format is unsupported")
 
-        governance, admission = _require_media_policy(
+        governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
             purpose=request.purpose,
             data_class=request.data_class,
@@ -1179,35 +1238,55 @@ class OpenAIProviderAdapter(ProviderAdapter):
             governance_context=request.governance_context,
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
+            admission_runtime=self.admission_runtime,
         )
-        client = self._get_client()
         started = time.perf_counter()
         try:
-            response = await client.audio.speech.create(
-                model=request.model,
-                voice=request.voice,
-                input=request.text,
-                speed=request.speed,
-                response_format=request.response_format,
-            )
-            raw = getattr(response, "content", None)
-            if raw is None:
-                reader = getattr(response, "read", None)
-                if reader is None:
-                    raise ProviderInvocationError("speech provider returned malformed response")
-                raw = reader()
-                if inspect.isawaitable(raw):
-                    raw = await raw
-        except ProviderError:
-            raise
-        except Exception as exc:
-            raise ProviderInvocationError("speech provider request failed") from exc
+            client = self._get_client()
+            try:
+                response = await client.audio.speech.create(
+                    model=request.model,
+                    voice=request.voice,
+                    input=request.text,
+                    speed=request.speed,
+                    response_format=request.response_format,
+                )
+                raw = getattr(response, "content", None)
+                if raw is None:
+                    reader = getattr(response, "read", None)
+                    if reader is None:
+                        raise ProviderInvocationError("speech provider returned malformed response")
+                    raw = reader()
+                    if inspect.isawaitable(raw):
+                        raw = await raw
+            except ProviderError:
+                raise
+            except Exception as exc:
+                raise ProviderInvocationError("speech provider request failed") from exc
 
-        if not isinstance(raw, (bytes, bytearray)) or not raw:
-            raise ProviderInvocationError("speech provider returned empty audio")
-        audio = bytes(raw)
-        if len(audio) > _MAX_PROVIDER_MEDIA_BYTES:
-            raise ProviderInvocationError("speech provider response exceeded size limit")
+            if not isinstance(raw, (bytes, bytearray)) or not raw:
+                raise ProviderInvocationError("speech provider returned empty audio")
+            audio = bytes(raw)
+            if len(audio) > _MAX_PROVIDER_MEDIA_BYTES:
+                raise ProviderInvocationError("speech provider response exceeded size limit")
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise
+
+        latency_seconds = max(0.0, time.perf_counter() - started)
+        actual = _media_actual_usage(
+            estimate,
+            wall_seconds=latency_seconds,
+            artifact_bytes=len(audio),
+        )
+        try:
+            self.admission_runtime.complete(lease.operation_id, actual)
+        except AdmissionRuntimeError as exc:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise ProviderPolicyError(
+                "speech provider usage reconciliation failed"
+            ) from exc
+
         request_id = getattr(response, "request_id", None) or getattr(response, "id", None)
         return ProviderSpeechResponse(
             audio=audio,
@@ -1215,9 +1294,9 @@ class OpenAIProviderAdapter(ProviderAdapter):
             model=request.model,
             response_format=request.response_format,
             request_id=str(request_id) if request_id else None,
-            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
-            admission_decision_id=admission.decision_id,
+            admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
         )
 
