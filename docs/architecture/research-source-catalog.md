@@ -1,0 +1,351 @@
+# Research Source Catalog — Historical Canon, Frontier Inputs, and Anti-Canon
+
+Status: architecture research catalog
+Updated: 2026-09-21
+
+This catalog is the reading and evidence map behind Skeleton's SOTA construction plan. It is intentionally broader than a list of currently fashionable LLM papers. The goal is to preserve the strongest historical ideas, understand the systems work that made them practical, and retain negative/failure lessons so the architecture does not repeatedly rediscover old mistakes.
+
+**Important:** inclusion is not endorsement of every claim. Each item enters the ResearchEvidence pipeline and receives local scope, maturity, replication, contradiction, cost, and reproducibility metadata before it can affect architecture.
+
+## 1. Sequence-model foundations
+
+| Work | Identifier | Lasting architectural lesson |
+| --- | --- | --- |
+| Sutskever et al., *Sequence to Sequence Learning with Neural Networks* | arXiv:1409.3215 | encoder/decoder decomposition; sequence transduction as a reusable interface |
+| Bahdanau et al., *Neural Machine Translation by Jointly Learning to Align and Translate* | arXiv:1409.0473 | learned content-dependent attention |
+| Vaswani et al., *Attention Is All You Need* | arXiv:1706.03762 | parallel attention-based sequence modeling |
+| Devlin et al., *BERT* | arXiv:1810.04805 | bidirectional pretraining and representation transfer |
+| Brown et al., *Language Models are Few-Shot Learners* | arXiv:2005.14165 | in-context learning becomes an explicit capability to measure |
+| Kaplan et al., *Scaling Laws for Neural Language Models* | arXiv:2001.08361 | model/data/compute performance relationships should be measured |
+| Hoffmann et al., *Training Compute-Optimal Large Language Models* | arXiv:2203.15556 | parameter count without sufficient data is not a rational scaling target |
+
+### Skeleton rule
+
+The kernel must not assume that the next best sequence model is a Transformer. These papers inform ModelPort implementations and compute planning, not core authority/state semantics.
+
+## 2. Transformer component evolution
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Ba et al., *Layer Normalization* | arXiv:1607.06450 | normalization is a first-class training stability choice |
+| Zhang & Sennrich, *Root Mean Square Layer Normalization* | arXiv:1910.07467 | evaluate cheaper normalization primitives |
+| Shazeer, *GLU Variants Improve Transformer* | arXiv:2002.05202 | gated feed-forward variants, including the SwiGLU family |
+| Su et al., *RoFormer* | arXiv:2104.09864 | rotary position representation |
+| Press et al., *Train Short, Test Long: Attention with Linear Biases* | arXiv:2108.12409 | positional strategy affects extrapolation and memory cost |
+
+### Skeleton rule
+
+Normalization, activation, positional encoding, attention layout, and cache format are versioned model-implementation choices. They do not leak into higher-level task or memory contracts.
+
+## 3. Sparse and alternative model substrates
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Shazeer et al., *Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer* | arXiv:1701.06538 | conditional computation |
+| Lepikhin et al., *GShard* | arXiv:2006.16668 | large sparse expert models plus distributed sharding |
+| Fedus et al., *Switch Transformers* | arXiv:2101.03961 | simplified expert routing and sparse scaling |
+| Dai et al., *DeepSeekMoE* | arXiv:2401.06066 | fine-grained/shared expert specialization |
+| Gu & Dao, *Mamba: Linear-Time Sequence Modeling with Selective State Spaces* | arXiv:2312.00752 | attention is not the only viable sequence substrate |
+| Lieber et al., *Jamba* | arXiv:2403.19887 | hybrid attention/SSM/MoE systems are viable |
+
+### Skeleton rule
+
+Keep **system routing** and **model-internal expert routing** separate. A provider/model router cannot depend on the internal expert topology of a candidate model.
+
+## 4. Distributed training, adaptation, and data quality
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Hinton et al., *Distilling the Knowledge in a Neural Network* | arXiv:1503.02531 | teacher/student transfer as a controlled training primitive |
+| Shoeybi et al., *Megatron-LM* | arXiv:1909.08053 | tensor/model parallel training |
+| Rajbhandari et al., *ZeRO* | arXiv:1910.02054 | partition optimizer/gradient/parameter memory |
+| Hu et al., *LoRA* | arXiv:2106.09685 | parameter-efficient adaptation behind stable base weights |
+| Dettmers et al., *QLoRA* | arXiv:2305.14314 | quantized-base parameter-efficient finetuning |
+| Lee et al., *Deduplicating Training Data Makes Language Models Better* | arXiv:2107.06499 | data duplication affects memorization, evaluation contamination, and efficiency |
+| Kirkpatrick et al., *Overcoming Catastrophic Forgetting in Neural Networks* | arXiv:1612.00796 | continual adaptation requires explicit forgetting/regression controls |
+
+### Skeleton rule
+
+Training is an artifact-producing subsystem. Training never writes directly into a deployed model slot. The result is versioned, evaluated, challenged, canaried, and promoted.
+
+## 5. Retrieval and external memory
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Guu et al., *REALM* | arXiv:2002.08909 | retrieval can participate in pretraining |
+| Karpukhin et al., *Dense Passage Retrieval* | arXiv:2004.04906 | dense retrieval as a specialized evidence lookup primitive |
+| Khattab & Zaharia, *ColBERT* | arXiv:2004.12832 | late interaction offers a different quality/cost point |
+| Lewis et al., *Retrieval-Augmented Generation* | arXiv:2005.11401 | non-parametric evidence can ground generation |
+| Borgeaud et al., *Improving Language Models by Retrieving from Trillions of Tokens* | arXiv:2112.04426 | retrieval can trade external memory for parametric scale |
+| Gao et al., *Precise Zero-Shot Dense Retrieval without Relevance Labels (HyDE)* | arXiv:2212.10496 | generated intermediate retrieval representations can improve zero-shot search |
+| Park et al., *Generative Agents* | arXiv:2304.03442 | memory streams, reflection, and retrieval as agent-architecture inspiration |
+| Packer et al., *MemGPT* | arXiv:2310.08560 | explicit memory hierarchy and context management |
+
+### Skeleton rule
+
+Retrieval is evidence acquisition, not truth acquisition. Retrieved material keeps provenance, freshness, and trust labels all the way into the context compiler.
+
+## 6. Reasoning and neuro-symbolic execution
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Wei et al., *Chain-of-Thought Prompting Elicits Reasoning in Large Language Models* | arXiv:2201.11903 | deliberate intermediate reasoning can improve selected tasks |
+| Wang et al., *Self-Consistency Improves Chain of Thought Reasoning* | arXiv:2203.11171 | multiple trajectories can outperform one greedy path |
+| Gao et al., *PAL: Program-aided Language Models* | arXiv:2211.10435 | delegate exact computation to deterministic runtimes |
+| Yao et al., *Tree of Thoughts* | arXiv:2305.10601 | explicit bounded search/backtracking |
+| Shinn et al., *Reflexion* | arXiv:2303.11366 | episodic feedback can improve repeated attempts without weight updates |
+| Madaan et al., *Self-Refine* | arXiv:2303.17651 | generation-feedback-refinement loop as an optional reasoning pattern |
+| Snell et al., *Scaling LLM Test-Time Compute Optimally can be More Effective than Scaling Model Parameters* | OpenReview:4FWAwZtd2n | inference compute should be allocated by task/difficulty rather than fixed globally |
+
+### Skeleton rule
+
+These become **budgeted reasoning modes**, never mandatory universal chains. The controller measures whether extra search/critique actually improves task success per unit compute.
+
+## 7. Tool use and action
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Karpas et al., *MRKL Systems* | arXiv:2205.00445 | modular neuro-symbolic routing to expert tools |
+| Yao et al., *ReAct* | arXiv:2210.03629 | interleave reasoning, action, and environment observation |
+| Schick et al., *Toolformer* | arXiv:2302.04761 | learn when API use is useful |
+| Gao et al., *PAL* | arXiv:2211.10435 | use executable tools for exact subproblems |
+
+### Skeleton rule
+
+The model proposes `ToolIntent`. The authority/execution plane validates and executes it. Model competence never implies permission.
+
+## 8. Post-training and preference learning
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Schulman et al., *Proximal Policy Optimization Algorithms* | arXiv:1707.06347 | stable policy optimization primitive |
+| Ouyang et al., *Training Language Models to Follow Instructions with Human Feedback* | arXiv:2203.02155 | instruction tuning + preference feedback can strongly alter model behavior |
+| Bai et al., *Constitutional AI: Harmlessness from AI Feedback* | arXiv:2212.08073 | machine-generated critique/preference data can participate in alignment pipelines |
+| Wang et al., *Self-Instruct* | arXiv:2212.10560 | synthetic instruction generation as a data-expansion method |
+| Rafailov et al., *Direct Preference Optimization* | arXiv:2305.18290 | preference optimization without an explicit RL loop |
+
+### Skeleton rule
+
+No single post-training algorithm is constitutional. SFT, DPO-family methods, reward modeling, RL, distillation, and future methods sit behind the same dataset/evaluation/promotion contract.
+
+## 9. Inference and serving systems
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Dao et al., *FlashAttention* | arXiv:2205.14135 | IO-aware exact attention can change the systems bottleneck |
+| Dao, *FlashAttention-2* | arXiv:2307.08691 | work partitioning and hardware utilization matter as much as asymptotics |
+| Yu et al., *Orca: A Distributed Serving System for Transformer-Based Generative Models* | OSDI 2022 / arXiv:2206.02658 | iteration-level scheduling and continuous serving batches |
+| Kwon et al., *Efficient Memory Management for Large Language Model Serving with PagedAttention* | arXiv:2309.06180 | page/block-managed KV cache reduces fragmentation and improves serving |
+| Leviathan et al., *Fast Inference from Transformers via Speculative Decoding* | arXiv:2211.17192 | exact-distribution speculative execution can accelerate autoregressive decoding |
+| Agrawal et al., *Sarathi* | arXiv:2308.16369 | chunked prefill helps manage prefill/decode interference |
+
+### Skeleton rule
+
+Inference owns scheduling, cache, batching, kernels, and hardware utilization. It does not own cognition policy, tool authority, durable memory, or application state.
+
+## 10. Evaluation and benchmark discipline
+
+| Work / benchmark | Identifier | Construction relevance |
+| --- | --- | --- |
+| Hendrycks et al., *MMLU* | arXiv:2009.03300 | broad academic knowledge/capability slice |
+| Lin et al., *TruthfulQA* | arXiv:2109.07958 | test imitative falsehoods/truthfulness failure |
+| Srivastava et al., *BIG-bench* | arXiv:2206.04615 | broad task diversity and emergent failure discovery |
+| Liang et al., *HELM* | arXiv:2211.09110 | multi-metric holistic model evaluation |
+| Liu et al., *AgentBench* | arXiv:2308.03688 | agent behavior across interactive environments |
+| Mialon et al., *GAIA* | arXiv:2311.12983 | real-world assistant tasks combining reasoning, tools, web, and multimodality |
+| Jimenez et al., *SWE-bench* | arXiv:2310.06770 | repository-level software engineering |
+| Xie et al., *OSWorld* | arXiv:2404.07972 | realistic computer-use tasks |
+
+### Skeleton rule
+
+Benchmarks are **sensors**, not objectives. Never declare a universal winner from one score. Store exact benchmark version, task population, contamination risk, runtime configuration, and raw evidence.
+
+## 11. Security and instruction-boundary research
+
+| Work | Identifier | Construction relevance |
+| --- | --- | --- |
+| Greshake et al., *More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models* | arXiv:2302.12173 | indirect prompt injection is a system integration problem |
+| Zhan et al., *InjecAgent* | arXiv:2403.02691 | tool-integrated agents require adversarial indirect-injection evaluation |
+| Wallace et al., *The Instruction Hierarchy* | arXiv:2404.13208 | explicit privilege ordering between instruction sources |
+
+### Skeleton rule
+
+Authority metadata is carried structurally. The model is never asked to infer privilege solely from prose.
+
+## 12. What to extract from each paper
+
+A paper is not represented only by title/abstract.
+
+Extraction must include:
+
+1. problem definition;
+2. exact claimed contribution;
+3. baseline;
+4. task population;
+5. dataset/version;
+6. model size/family;
+7. training and inference budget;
+8. hardware and systems assumptions;
+9. metrics;
+10. uncertainty/significance where reported;
+11. ablations;
+12. negative results;
+13. limitations;
+14. code/weights availability;
+15. license;
+16. later replications;
+17. contradictions/critiques;
+18. applicability to Skeleton;
+19. cheapest meaningful reproduction;
+20. architecture contract potentially affected.
+
+## 13. Anti-canon — failures we preserve deliberately
+
+The anti-canon is as important as the canon. These are failure patterns the architecture should make difficult.
+
+### Bigger model = better system
+
+False as a construction rule. Model scale competes with data, training compute, inference cost, memory, latency, tool quality, retrieval, and lifetime workload.
+
+### More context = memory solved
+
+False. Context is transient working state. Durable memory needs identity, provenance, retrieval policy, contradiction handling, expiry, deletion, and promotion.
+
+### More search = better reasoning
+
+False. Search can amplify weak heuristics, correlated verifier mistakes, or reward hacking. Search needs budgets, deduplication, stop rules, and independent checks.
+
+### More agents = more intelligence
+
+False. Additional agents can add coordination overhead and correlated error. Add agents only when specialization, parallelism, diversity, or fault isolation is measured.
+
+### Majority vote = truth
+
+False. Ten correlated instances of one model are not ten independent witnesses. Verifier and evidence independence must be represented explicitly.
+
+### RAG result = fact
+
+False. Retrieval is source selection. The retrieved item may be stale, poisoned, irrelevant, contradictory, or wrong.
+
+### Tool-capable model = authorized actor
+
+False. Capability to emit an action string does not grant permission to execute it.
+
+### Passing tests = correct in all relevant ways
+
+False. Tests provide scoped evidence. Property tests, fuzzing, differential checks, adversarial evaluation, formal methods, and runtime monitoring may be required.
+
+### Benchmark rank = architecture truth
+
+False. Benchmarks have populations, versions, contamination risks, measurement noise, and incentives. A useful benchmark result becomes one edge in the evidence graph.
+
+### Live self-training = continuous learning solved
+
+False. Uncontrolled updates create forgetting, poisoning, drift, irreproducibility, and rollback problems. Adaptation velocities remain separated.
+
+### Confidence score = calibrated certainty
+
+False. Confidence requires empirical calibration against observed outcomes and may drift by task/domain.
+
+### Paper prestige = reproducibility
+
+False. Venue/source reputation is metadata, not a substitute for local reproduction and challenge.
+
+## 14. Research expansion queues
+
+The catalog should keep expanding in parallel lanes rather than as one unbounded reading list.
+
+### Architecture lane
+
+- new attention variants;
+- state-space/recurrent hybrids;
+- sparse conditional compute;
+- memory-augmented architectures;
+- multimodal fusion;
+- modular neural systems.
+
+### Training lane
+
+- data quality and mixture optimization;
+- optimizer/stability improvements;
+- distributed training;
+- low-precision training;
+- parameter-efficient adaptation;
+- continual learning;
+- distillation/compression.
+
+### Reasoning lane
+
+- adaptive compute;
+- search;
+- verifier-guided inference;
+- program/symbolic assistance;
+- uncertainty estimation;
+- decomposition;
+- planning.
+
+### Systems lane
+
+- KV/cache architectures;
+- disaggregated prefill/decode;
+- prefix sharing;
+- continuous batching;
+- speculative decoding;
+- quantization;
+- kernel fusion;
+- heterogeneous hardware.
+
+### Memory/retrieval lane
+
+- hybrid sparse+dense retrieval;
+- reranking;
+- graph retrieval;
+- temporal retrieval;
+- memory consolidation;
+- provenance;
+- long-context routing.
+
+### Agent/tool lane
+
+- tool learning;
+- computer use;
+- multi-agent coordination;
+- permissions;
+- durable workflow state;
+- transactionality;
+- recovery.
+
+### Evaluation/safety lane
+
+- realistic task environments;
+- process/outcome verification;
+- calibration;
+- prompt injection;
+- data poisoning;
+- capability elicitation;
+- benchmark contamination;
+- formal correctness.
+
+## 15. Promotion rule
+
+The catalog may grow aggressively. Production may not.
+
+A catalog entry can become a production architecture change only through:
+
+```text
+catalog
+ -> ResearchEvidence
+ -> scoped claim
+ -> local reproduction
+ -> candidate implementation
+ -> baseline comparison
+ -> ablation
+ -> adversarial/system evaluation
+ -> ADR
+ -> shadow
+ -> canary
+ -> promoted immutable version
+ -> monitoring
+```
+
+This asymmetry is intentional: **fast research intake, slow evidence-based promotion**.
