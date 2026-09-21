@@ -12,10 +12,13 @@ is success and the registry can then acknowledge the outstanding target.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 import inspect
 from typing import Any, Mapping, Protocol, runtime_checkable
 
+from skeleton.observability.correlation import correlation_scope, get_correlation_id
+from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
     DeletionAction,
@@ -100,14 +103,33 @@ class LifecycleAdapterRegistry:
                 f"missing export adapter for owner plane: {key}"
             ) from exc
 
-    def preflight_plan(self, plan: DeletionPlan) -> None:
-        missing = sorted(
-            {
-                action.target
-                for action in plan.actions
-                if _required_name(action.target, "deletion target") not in self._deletion
-            }
+    def missing_deletion_targets(self, plan: DeletionPlan) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    _required_name(action.target, "deletion target")
+                    for action in plan.actions
+                    if _required_name(action.target, "deletion target") not in self._deletion
+                }
+            )
         )
+
+    def missing_export_owners(
+        self,
+        records: tuple[Mapping[str, Any], ...],
+    ) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    _required_name(row.get("owner_plane"), "owner plane")
+                    for row in records
+                    if _required_name(row.get("owner_plane"), "owner plane") not in self._export
+                }
+            )
+        )
+
+    def preflight_plan(self, plan: DeletionPlan) -> None:
+        missing = self.missing_deletion_targets(plan)
         if missing:
             raise LifecycleAdapterMissing(
                 "missing deletion adapters: " + ", ".join(missing)
@@ -219,9 +241,18 @@ class LifecycleExecutor:
         self,
         lifecycle: DataLifecycleRegistry,
         adapters: LifecycleAdapterRegistry,
+        *,
+        timeline: GovernanceAuditTimeline | None = None,
     ) -> None:
         self.lifecycle = lifecycle
         self.adapters = adapters
+        self.timeline = timeline
+
+    def _correlation_context(self):
+        active = get_correlation_id()
+        if self.timeline is None or active:
+            return nullcontext(active or None)
+        return correlation_scope()
 
     async def execute_deletion_plan(
         self,
@@ -229,30 +260,58 @@ class LifecycleExecutor:
         *,
         now: float | None = None,
     ) -> DeletionExecutionResult:
-        self.adapters.preflight_plan(plan)
-        receipts: list[DeletionReceipt] = []
-        for action in plan.actions:
-            adapter = self.adapters.deletion(action.target)
-            try:
-                await adapter.delete(action)
-            except Exception as exc:
-                if isinstance(exc, LifecycleAdapterError):
-                    raise
-                raise LifecycleExecutionError(
-                    f"deletion adapter failed for {action.target}:{action.record_id}"
-                ) from exc
-            receipts.append(
-                self.lifecycle.acknowledge_deletion(
+        with self._correlation_context() as correlation_id:
+            if self.timeline is not None:
+                self.timeline.record_plan(plan, correlation_id=correlation_id)
+
+            missing = self.adapters.missing_deletion_targets(plan)
+            if missing:
+                if self.timeline is not None:
+                    self.timeline.record_preflight_denied(
+                        plan,
+                        missing,
+                        correlation_id=correlation_id,
+                    )
+                raise LifecycleAdapterMissing(
+                    "missing deletion adapters: " + ", ".join(missing)
+                )
+
+            receipts: list[DeletionReceipt] = []
+            for action in plan.actions:
+                adapter = self.adapters.deletion(action.target)
+                try:
+                    await adapter.delete(action)
+                except Exception as exc:
+                    if self.timeline is not None:
+                        self.timeline.record_failure(
+                            action,
+                            exc,
+                            correlation_id=correlation_id,
+                        )
+                    if isinstance(exc, LifecycleAdapterError):
+                        raise
+                    raise LifecycleExecutionError(
+                        f"deletion adapter failed for {action.target}:{action.record_id}"
+                    ) from exc
+
+                receipt = self.lifecycle.acknowledge_deletion(
                     plan.plan_id,
                     action.record_id,
                     action.target,
                     now=now,
                 )
+                receipts.append(receipt)
+                if self.timeline is not None:
+                    self.timeline.record_receipt(
+                        action,
+                        receipt,
+                        correlation_id=correlation_id,
+                    )
+
+            return DeletionExecutionResult(
+                plan_id=plan.plan_id,
+                receipts=tuple(receipts),
             )
-        return DeletionExecutionResult(
-            plan_id=plan.plan_id,
-            receipts=tuple(receipts),
-        )
 
     async def execute_retention_expiry(
         self,
@@ -261,41 +320,82 @@ class LifecycleExecutor:
     ) -> tuple[DeletionExecutionResult, ...]:
         plans = self.lifecycle.plan_retention_expiry(now=now)
         # Preflight every plan before the first physical side effect.
-        for plan in plans:
-            self.adapters.preflight_plan(plan)
-        results = []
-        for plan in plans:
-            results.append(await self.execute_deletion_plan(plan, now=now))
-        return tuple(results)
+        with self._correlation_context() as correlation_id:
+            for plan in plans:
+                missing = self.adapters.missing_deletion_targets(plan)
+                if missing:
+                    if self.timeline is not None:
+                        self.timeline.record_plan(
+                            plan,
+                            correlation_id=correlation_id,
+                        )
+                        self.timeline.record_preflight_denied(
+                            plan,
+                            missing,
+                            correlation_id=correlation_id,
+                        )
+                    raise LifecycleAdapterMissing(
+                        "missing deletion adapters: " + ", ".join(missing)
+                    )
+
+            results = []
+            for plan in plans:
+                results.append(await self.execute_deletion_plan(plan, now=now))
+            return tuple(results)
 
     async def export_tenant(self, tenant_id: str) -> GovernedExport:
         inventory = self.lifecycle.export_inventory(tenant_id)
         rows = tuple(inventory["records"])
-        # Preflight canonical owner exporters before reading anything.
-        for row in rows:
-            self.adapters.exporter(str(row["owner_plane"]))
 
-        exported: list[dict[str, Any]] = []
-        for row in rows:
-            adapter = self.adapters.exporter(str(row["owner_plane"]))
-            try:
-                payload = await adapter.export(row)
-            except Exception as exc:
-                if isinstance(exc, LifecycleAdapterError):
-                    raise
-                raise LifecycleExecutionError(
-                    f"export adapter failed for {row['owner_plane']}:{row['record_id']}"
-                ) from exc
-            exported.append(
-                {
-                    "governance": dict(row),
-                    "payload": None if payload is None else dict(payload),
-                }
+        with self._correlation_context() as correlation_id:
+            missing = self.adapters.missing_export_owners(rows)
+            if missing:
+                if self.timeline is not None:
+                    self.timeline.record_export_denied(
+                        str(inventory["tenant_id"]),
+                        missing,
+                        correlation_id=correlation_id,
+                    )
+                raise LifecycleAdapterMissing(
+                    "missing export adapters: " + ", ".join(missing)
+                )
+
+            exported: list[dict[str, Any]] = []
+            for row in rows:
+                adapter = self.adapters.exporter(str(row["owner_plane"]))
+                try:
+                    payload = await adapter.export(row)
+                except Exception as exc:
+                    if self.timeline is not None:
+                        self.timeline.record_export_failure(
+                            str(inventory["tenant_id"]),
+                            str(row["owner_plane"]),
+                            exc,
+                            correlation_id=correlation_id,
+                        )
+                    if isinstance(exc, LifecycleAdapterError):
+                        raise
+                    raise LifecycleExecutionError(
+                        f"export adapter failed for {row['owner_plane']}:{row['record_id']}"
+                    ) from exc
+                exported.append(
+                    {
+                        "governance": dict(row),
+                        "payload": None if payload is None else dict(payload),
+                    }
+                )
+
+            result = GovernedExport(
+                tenant_id=str(inventory["tenant_id"]),
+                records=tuple(exported),
             )
-        return GovernedExport(
-            tenant_id=str(inventory["tenant_id"]),
-            records=tuple(exported),
-        )
+            if self.timeline is not None:
+                self.timeline.record_export(
+                    result.tenant_id,
+                    list(result.records),
+                    correlation_id=correlation_id,
+                )
+            return result
 
 
 __all__ = [
