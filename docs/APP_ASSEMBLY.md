@@ -57,7 +57,7 @@ validated against the manifest before they are passed to Compose.
 ## Runtime modes
 
 The canonical Compose file runs application code from built images. Source
-bind-mounts are isolated in `docker-compose.hot.yml`.
+bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development ports are isolated there as well, so the production topology exposes only the browser-facing frontend port.
 
 ```bash
 # Built development images, verified after startup
