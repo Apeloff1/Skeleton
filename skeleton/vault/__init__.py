@@ -49,6 +49,8 @@ from skeleton.vault.data_governance import (
     require_provider_transfer,
 )
 from skeleton.vault.governance_registry import (
+    CanonicalDataPlane,
+    CanonicalWritePolicy,
     GovernanceContext,
     GovernanceRegistry,
     RegisteredProviderTransferDecision,
@@ -84,6 +86,8 @@ __all__ = [
     "LifecycleConflict",
     "LifecycleError",
     "LifecycleState",
+    "CanonicalDataPlane",
+    "CanonicalWritePolicy",
     "GovernanceContext",
     "GovernanceRegistry",
     "RegisteredProviderTransferDecision",
