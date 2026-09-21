@@ -319,7 +319,7 @@
       "stage": 0,
       "parallel_lane": "cost-admission",
       "objective": "Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
