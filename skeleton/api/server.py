@@ -217,6 +217,7 @@ class ServerState:
             get_settings().operation,
         )
         runtime.dispatch_outbox()
+        runtime.start_dispatcher()
         self.operation_runtime = runtime
         self.intelligence = runtime
         return runtime
