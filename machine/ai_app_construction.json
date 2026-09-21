@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.0.0",
-  "architecture_tag": "arch-map/v3.0",
+  "construction_version": "3.1.0",
+  "architecture_tag": "arch-map/v3.1",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
