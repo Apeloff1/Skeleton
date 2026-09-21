@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.0.0",
+  "topology_version": "1.1.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -154,6 +154,24 @@
       "migration": "snapshot format compatibility required before durable operational use",
       "evidence": [
         "skeleton/persistence/snapshots.py"
+      ]
+    },
+    {
+      "id": "cognitive-execution-unbound",
+      "technology": "planned durable execution repository; production binding not yet materialized",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "unbound",
+      "production_role": "future authoritative storage boundary for AI execution, turn/checkpoint, approval, idempotency, usage and final-result state",
+      "network": "in-process repository contract until production adapter is selected",
+      "authentication": "inherits orchestration/tool authority and tenant binding",
+      "backup": "unimplemented until production repository binding",
+      "restore": "unimplemented until production repository binding; recovery semantics are defined in the cognitive runtime blueprint",
+      "migration": "future repository schema must preserve execution/turn identity, checkpoint fencing, approval binding, idempotency reservations, usage monotonicity and final-result terminality",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
       ]
     }
   ],
@@ -417,6 +435,130 @@
       "evidence": [
         "skeleton/persistence/snapshots.py"
       ]
+    },
+    {
+      "id": "cognitive-execution-ledger",
+      "owner_plane": "orchestration",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "AIExecutionRequest / AgentTurn / ExecutionCheckpoint",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "execution/turn/checkpoint compare-and-set boundary",
+      "consistency": "turn index and checkpoint version are monotonic; only one resumable canonical checkpoint may be current for an execution",
+      "retention": "operation/governance lifecycle controlled",
+      "backup_restore": "required after durable repository binding; restore must recreate exact latest committed checkpoint and turn lineage",
+      "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    },
+    {
+      "id": "tool-idempotency-ledger",
+      "owner_plane": "tool-runtime",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "tool call reservation / execution receipt by operation_id + call_id",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "reserve/fence/complete one tool call identity",
+      "consistency": "one call_id has one canonical reservation and terminal receipt; a completed side effect is never executed again during replay",
+      "retention": "at least as long as the operation/result remains replayable or auditable",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/skills/manifest.py"
+      ]
+    },
+    {
+      "id": "human-approval-ledger",
+      "owner_plane": "tool-runtime",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "approval record bound to operation/execution/turn/call and arguments digest",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "request/decision/expiry transition for one approval identity",
+      "consistency": "approval applies only to the exact arguments digest and authority context; edited or expired requests require a new approval",
+      "retention": "auditable through operation lifecycle and applicable governance retention",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    },
+    {
+      "id": "execution-usage-ledger",
+      "owner_plane": "cost-capacity",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "per-operation/per-turn estimated and actual resource consumption",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal"
+      ],
+      "transaction_scope": "monotonic append/update of normalized usage deltas",
+      "consistency": "consumed budget cannot decrease; unknown actual usage is explicit and never normalized to zero",
+      "retention": "billing/telemetry policy controlled; aggregate retention may exceed raw execution-detail retention",
+      "backup_restore": "required when used for quota/billing/release evidence",
+      "migration": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/intelligence/admission.py"
+      ]
+    },
+    {
+      "id": "final-ai-result-ledger",
+      "owner_plane": "orchestration",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "AIExecutionResult terminal record",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "terminal result + verification/receipt references committed with execution terminal fence",
+      "consistency": "at most one canonical final result per execution; OperationState may not become completed before the final result exists",
+      "retention": "operation/governance lifecycle controlled; artifacts/memory have their own referenced retention policies",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
     }
   ],
   "state_flows": [
@@ -483,6 +625,46 @@
       "mode": "scratch-materialization",
       "rule": "swarm scratch is materialized from admitted/running operation inputs and worker decomposition; it never becomes canonical operation or product state",
       "failure": "discard or recompute scratch from the canonical operation/work request; never promote scratch after an ambiguous worker failure"
+    },
+    {
+      "id": "operation-to-cognitive-execution",
+      "from": "canonical-operation-state",
+      "to": "cognitive-execution-ledger",
+      "mode": "authority-binding",
+      "rule": "one admitted OperationEnvelope binds to the canonical execution identity and checkpoint lineage; execution substate may refine but never contradict operation lifecycle state",
+      "failure": "checkpoint conflict or missing binding fails closed and the operation cannot advance to provider/tool execution"
+    },
+    {
+      "id": "cognitive-to-tool-idempotency",
+      "from": "cognitive-execution-ledger",
+      "to": "tool-idempotency-ledger",
+      "mode": "side-effect-fence",
+      "rule": "every side-effecting tool proposal obtains a durable call_id reservation before execution and commits a terminal receipt before the cognitive loop can reuse the result",
+      "failure": "ambiguous side effect enters reconciliation; blind replay is forbidden"
+    },
+    {
+      "id": "cognitive-to-human-approval",
+      "from": "cognitive-execution-ledger",
+      "to": "human-approval-ledger",
+      "mode": "suspension-decision",
+      "rule": "approval-required actions persist an exact arguments digest and move the operation to waiting_for_user until a valid decision is committed",
+      "failure": "expired, mismatched or unauthorized approval leaves the action denied and resumable checkpoint intact"
+    },
+    {
+      "id": "cognitive-to-usage-ledger",
+      "from": "cognitive-execution-ledger",
+      "to": "execution-usage-ledger",
+      "mode": "metering",
+      "rule": "provider/tool/artifact boundaries append normalized actual usage deltas against the original execution budget without resetting consumed resources",
+      "failure": "unknown usage is recorded explicitly; policy may degrade or block further expensive work"
+    },
+    {
+      "id": "cognitive-to-final-result",
+      "from": "cognitive-execution-ledger",
+      "to": "final-ai-result-ledger",
+      "mode": "terminal-finalization",
+      "rule": "verified final output and evidence references are committed before the enclosing operation transitions to completed",
+      "failure": "incomplete finalization remains recoverable and cannot emit a completed terminal event"
     }
   ],
   "recovery_order": [
@@ -490,6 +672,9 @@
     "restore backend-core-app-state and any materialized engine authoritative state",
     "verify schema/index/migration compatibility",
     "restore or reconstruct canonical operation state",
+    "restore cognitive execution, turn and checkpoint authority before resuming AI work",
+    "restore tool idempotency and human approval ledgers before allowing side-effect replay",
+    "restore execution usage and final AI result ledgers before terminal reconciliation",
     "restore operation-event-stream only when it is configured as production authority",
     "regenerate backend-seeded-content and swarm scratch as needed",
     "rebuild Chroma/vector and process-memory projections from authoritative sources",
@@ -507,6 +692,11 @@
     "content and swarm logical databases are not included in canonical user-state migration merely because they share Mongo",
     "operation-stream storage cannot claim production durability when running in-memory",
     "snapshot-files never replace canonical backup/restore",
-    "authoritative-unbound domains are transitional only, production-ineligible, and must reference an open P0 gap"
+    "authoritative-unbound domains are transitional only, production-ineligible, and must reference an open P0 gap",
+    "cognitive execution checkpoints, tool idempotency reservations, approvals, usage and final AI results cannot rely on process memory or client stream state",
+    "a completed operation requires an authoritative final AI result record when the operation used the cognitive runtime",
+    "approval decisions are bound to exact tool argument digests and cannot be replayed across edited calls",
+    "tool side-effect recovery consults the idempotency ledger before any retry",
+    "usage consumption is monotonic across retries, repairs and resumed turns"
   ]
 }
