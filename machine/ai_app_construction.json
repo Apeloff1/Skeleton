@@ -306,8 +306,7 @@
       "responsibility": "Verification, uncertainty, repair, calibration and evidence checks around generated plans/results.",
       "depends_on": [
         "model-routing",
-        "orchestration",
-        "evaluation"
+        "orchestration"
       ],
       "evidence": [
         "skeleton/intelligence/verifier.py",
@@ -324,7 +323,8 @@
       "construction": [
         "separate generator/verifier roles",
         "require evidence for high-impact claims/actions",
-        "calibrate confidence"
+        "calibrate confidence",
+        "feed offline calibration results from evaluation into versioned promotion decisions without creating a runtime dependency"
       ],
       "acceptance": [
         "falsification tests",
