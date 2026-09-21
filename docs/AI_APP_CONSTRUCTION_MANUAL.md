@@ -2765,6 +2765,27 @@ Atomic queue tasks inherit risk counts from their `work_package_refs`. Builders 
 
 Critical/high obligations are also extracted into `machine/ai_edge_case_priority_queue.json`. Builders touching an owning work package should treat unresolved P0/P1 entries as explicit hardening debt and attach evidence or accepted-risk disposition rather than relying on implicit coverage.
 
+## Mandatory construction accountability
+
+The build accountability source of truth is `machine/ai_build_accountability.json`; its visible projection is `docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md`.
+
+Every implementation unit must follow this sequence:
+
+```text
+[ ] planned
+ -> timestamped start event
+ -> implementation + evidence
+ -> implementation sign-off
+ -> independent verification
+ -> verification sign-off
+ -> validator
+ -> [x] complete
+```
+
+All timestamps are UTC RFC3339. Sign-offs bind to a full git SHA and non-empty evidence references. A checkbox is not completion evidence by itself and may not be manually checked. CI rejects checked-but-unsigned items, unsigned completed states, missing timestamps, partial sign-offs, stale queue/volume mirrors, malformed history ordering and non-independent verification without an explicit signed exception.
+
+The ledger is append-oriented: corrections supersede earlier events instead of rewriting history.
+
 ## Fully Functional AI Closure: Detailed Runtime Assembly
 
 The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
