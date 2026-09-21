@@ -216,3 +216,26 @@ def test_snapshot_exposes_pressure_without_budget_payloads() -> None:
         "active_operations": ("op-1",),
         "quota_enabled": False,
     }
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -1.0])
+def test_admit_rejects_invalid_wall_clock(value: float) -> None:
+    runtime = AdmissionRuntime()
+
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        runtime.admit(_request("op-clock"), now_wall=value)
+
+    assert runtime.pressure.active_operations == 0
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -1.0])
+def test_complete_rejects_invalid_wall_clock_without_releasing_lease(
+    value: float,
+) -> None:
+    runtime = AdmissionRuntime()
+    runtime.admit(_request("op-clock"), now_wall=10.0)
+
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        runtime.complete("op-clock", UsageEstimate(), now_wall=value)
+
+    assert runtime.pressure.active_operations == 1
