@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "extra": {
       "EXPO_BACKEND_URL": "",
-      "EXPO_PUBLIC_BACKEND_URL": ""
+      "EXPO_PUBLIC_BACKEND_URL": "",
+      "EXPO_PUBLIC_SKELETON_URL": ""
     },
     "ios": {
       "supportsTablet": true,

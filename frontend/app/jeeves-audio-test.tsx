@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /jeeves-audio-test — P2 Jeeves TTS audio diagnostics route.
  *
@@ -25,7 +26,7 @@ import {
 } from '../features/Academy/tts';
 import { useSettings } from '../state/settingsStore';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 const CONTEXTS: { ctx: JeevesContext; label: string; sample: string; icon: any; tone: string }[] = [
   { ctx: 'greeting',              label: 'Greeting',              sample: 'A pleasure to see you again. Shall we continue where we left off?', icon: 'hand-left',         tone: '#A78BFA' },

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /champions — 🏛️ Hall of Champions.
  *
@@ -15,7 +16,7 @@ import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 import theme from '../theme/tokens';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const C = theme.colors, S = theme.spacing, R = theme.radii;
 
 interface Champion {

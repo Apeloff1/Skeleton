@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /rosetta — Full Rosetta Challenge Runner.
  *
@@ -12,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
 const LANGS = ['Python','JavaScript','TypeScript','Go','Rust','C','C++'];
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'];

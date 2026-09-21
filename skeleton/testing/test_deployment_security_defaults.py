@@ -53,15 +53,22 @@ def test_compose_pins_stateful_images_and_hardens_non_root_app_services() -> Non
 
 def test_api_runtime_filesystems_are_read_only_with_bounded_tmpfs() -> None:
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    hot = (REPO_ROOT / "docker-compose.hot.yml").read_text(encoding="utf-8")
     skeleton = _service_block(compose, "skeleton")
     backend = _service_block(compose, "backend")
+    hot_backend = _service_block(hot, "backend")
 
     for service in (skeleton, backend):
         assert "read_only: true" in service
         assert "tmpfs:\n      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777" in service
 
-    assert "./backend:/app:ro" in backend
-    assert "./skeleton:/app/skeleton:ro" in backend
+    # Canonical/base assembly must be image-backed. Repository source mounts are
+    # development-only and belong exclusively to the explicit hot-reload overlay.
+    assert "./backend:/app:ro" not in backend
+    assert "./skeleton:/app/skeleton:ro" not in backend
+    assert "./backend:/app:ro" in hot_backend
+    assert "./skeleton:/app/skeleton:ro" in hot_backend
+
     assert "backend_data:/app/data" in backend
     assert "backend_data:/app/data:ro" not in backend
     assert "/app/__pycache__" not in backend

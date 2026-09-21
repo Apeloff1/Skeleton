@@ -5,13 +5,9 @@
  * This module is the typed client for the hexagonal Skeleton backend.
  */
 
-import Constants from 'expo-constants';
+import { SKELETON_API_BASE } from '../utils/apiBase';
 
-const BASE =
-  (Constants.expoConfig?.extra?.EXPO_SKELETON_URL as string | undefined) ||
-  (Constants.expoConfig?.extra?.EXPO_PUBLIC_SKELETON_URL as string | undefined) ||
-  (Constants.expoConfig?.extra?.EXPO_BACKEND_URL as string | undefined) ||
-  '';
+const BASE = SKELETON_API_BASE;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE}${path}`;
@@ -32,7 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const skeletonAPI = {
-  health: () => request<{ status: string; checks: Record<string, boolean> }>('/health'),
+  health: () => request<{ alive: boolean }>('/api/v1/health/live'),
 
   capabilities: () =>
     request<Array<{ name: string; kind: string; version: string }>>('/api/v1/capabilities'),

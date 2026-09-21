@@ -6,7 +6,9 @@
  * tighter per-attempt timeout for startup paths where backend availability is
  * useful telemetry, but must not delay the first interactive screen.
  */
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+import { API_BASE } from '../../utils/apiBase';
+
+const BACKEND = API_BASE;
 
 export interface BootHealthResult {
   ok: boolean;

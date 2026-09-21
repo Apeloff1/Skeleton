@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /camera-director — 🎥 Cinematic Camera Director.
  * Forge a complete camera system (rigs, per-scene shot lists, cutscenes) that
@@ -14,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { playClipsSequential, stopCinematic } from '../src/utils/cinematicVoice';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Rig = { id: string; type: string; label?: string; fov?: number; use?: string; notes?: string; easing?: string };
 type Shot = { shot_id?: string; rig?: string; movement?: string; target?: string; fov?: number; duration_s?: number; easing?: string; trigger?: string };

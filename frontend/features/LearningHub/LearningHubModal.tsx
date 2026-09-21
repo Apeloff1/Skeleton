@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Learning Hub Modal v12.5 - Multi-Layer Learning System
  * 
@@ -25,7 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_BASE = CANONICAL_API_BASE || '';
 
 interface LearningHubModalProps {
   visible: boolean;

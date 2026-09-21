@@ -24,34 +24,13 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { API_BASE, API_FALLBACK_BASE } from './apiBase';
 
 // ── Backend URL ladder ────────────────────────────────────────────────
-function _webOriginIfBrowser(): string {
-  // On Expo Web, prefer the page's own origin so /api/* routes through
-  // whichever URL the user loaded (preview, deploy, custom domain).
-  // This is critical so the app keeps working when the EXPO_PUBLIC_BACKEND_URL
-  // env baked at build time doesn't match the actual deploy host.
-  if (typeof window !== 'undefined') {
-    const loc: any = (window as any).location;
-    if (loc && typeof loc.origin === 'string' && loc.origin && !loc.origin.startsWith('file:')) {
-      return loc.origin.replace(/\/+$/, '');
-    }
-  }
-  return '';
-}
-const WEB_ORIGIN = _webOriginIfBrowser();
-const PRIMARY =
-  WEB_ORIGIN ||
-  (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_BACKEND_URL ||
-  process.env.EXPO_PUBLIC_BACKEND_URL ||
-  '';
-const FALLBACK =
-  (Constants.expoConfig?.extra as any)?.EXPO_PUBLIC_BACKEND_FALLBACK_URL ||
-  process.env.EXPO_PUBLIC_BACKEND_FALLBACK_URL ||
-  '';
-
-export const BACKEND_URLS: string[] = [PRIMARY, FALLBACK].filter(Boolean) as string[];
+// Endpoint ownership lives in apiBase.ts. This layer only adds transport
+// resilience across the already-resolved primary and optional fallback.
+export const BACKEND_URLS: string[] = [API_BASE, API_FALLBACK_BASE]
+  .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index);
 
 export function resolveUrl(pathOrUrl: string, host?: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;

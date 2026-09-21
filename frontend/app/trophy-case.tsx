@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /trophy-case — 🏆 Trophy Case.
  * Surfaces the previously-stranded `tournament_rewards` collection via
@@ -12,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { speakCinematic, stopCinematic } from '../src/utils/cinematicVoice';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Reward = {
   reward: string;

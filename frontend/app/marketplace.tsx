@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /marketplace — Creator Marketplace (one-time game purchases via Stripe).
  *
@@ -16,7 +17,7 @@ import { useHaptics } from '../src/hooks/useHaptics';
 import { awardXp } from '../src/utils/liveops';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 async function getVisitorId(): Promise<string> {
   let id = await safeGetItem('mkt_visitor_id');

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
  * ║    THERMAL MONITOR v1.0 — Overheat Mitigation System Dashboard          ║
@@ -19,16 +20,9 @@ import {
   Modal, ActivityIndicator, Animated, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 
 // ═══════════════ TYPES ═══════════════

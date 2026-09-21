@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * SOTA Extended Modal v11.6
  * 15+ Bleeding Edge Features - April 2026
@@ -12,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface SOTAExtendedModalProps {
   visible: boolean;

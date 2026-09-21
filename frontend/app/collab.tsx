@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /collab — Live Collaboration session UI.
  *
@@ -18,7 +19,7 @@ import { shareResult, copyToClipboard } from '../utils/shareResult';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 import { toast } from '../components/Toast';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
 
 type Session = {

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 // ============================================================================
 // CODEDOCK v9.0.0 - AI FEATURE SUGGESTIONS MODAL
 // Self-evolving AI-powered feature discovery
@@ -48,7 +49,7 @@ export const AISuggestionsModal: React.FC<AISuggestionsModalProps> = ({
   const [activeView, setActiveView] = useState<'suggestions' | 'sota'>('suggestions');
   const [sotaLoading, setSotaLoading] = useState(false);
 
-  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  const backendUrl = CANONICAL_API_BASE || '';
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);

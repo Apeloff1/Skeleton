@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 // Item Foundry — every agent forges a full item (skin + code + placement) folded into gamefiles.
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Linking } from 'react-native';
@@ -10,7 +11,7 @@ import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const Construct3DView = lazyDefault(() => import('../src/components/Construct3DView'));
 const GalaxyStudioFactoryModal = lazyDefault(() => import('../features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = CANONICAL_API_BASE || '';
 const T = { bg: '#0A0A0A', card: '#141414', border: '#1F2937', accent: '#7C9CFF', accent2: '#A78BFA',
   good: '#34D399', warn: '#FBBF24', text: '#E5E7EB', dim: '#94A3B8', muted: '#64748B' };
 

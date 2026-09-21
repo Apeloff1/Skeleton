@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 /**
  * selfHeal — exponential-backoff retry + auto-recovery helpers.
  *
@@ -10,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { recordEvent } from './modalLogger';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE;
 
 export interface RetryOpts {
   attempts?: number;     // default 4

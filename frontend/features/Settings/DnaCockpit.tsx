@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * DnaCockpit — collapsible "100-slider" cockpit reusable across Jeeves /
  * Academy / Builder settings.
@@ -59,7 +60,7 @@ interface Props {
   presets?: Record<string, PresetFn>;
 }
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 export default function DnaCockpit({
   title, groups, dna, onChange, onResetGroup, onResetAll, accent = '#a78bfa',

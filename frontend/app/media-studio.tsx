@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /media-studio — Jeeves in-game Media Studio.
  * Generates REAL in-game images (main character, cast, promos, landscapes) and
@@ -15,7 +16,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import api from '../src/utils/apiClient';
 
 const BG = '#0b1220', CARD = '#111a2e', PURPLE = '#7c3aed', GREEN = '#22c55e', AMBER = '#f59e0b', MUTE = '#64748b', FG = '#e2e8f0';
-const BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/$/, '');
+const BASE = (CANONICAL_API_BASE || '').replace(/\/$/, '');
 
 const VIDEO_TYPES = [
   { id: 'clip30', label: '30s Gameplay', icon: 'game-controller-outline' },

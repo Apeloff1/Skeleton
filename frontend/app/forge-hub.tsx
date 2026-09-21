@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
@@ -7,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 // Light /asset preview cache + a hard budget on auto-preview fetches so a huge
 // catalog never floods the network on a low-RAM device (chips past the budget
 // fetch their palette only when tapped). apiFetch also caps concurrency at 6.

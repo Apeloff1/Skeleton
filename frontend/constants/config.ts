@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { AppConfig } from '../types';
+import { API_BASE } from '../utils/apiBase';
 
 export const VERSION = '9.0.0';
 export const CODENAME = 'Ultimate Hub';
@@ -53,7 +54,7 @@ export const FEATURES = [
   'voice_commands',
 ];
 
-export const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+export const API_URL = API_BASE;
 
 export const STORAGE_KEYS = {
   THEME: 'codedock_theme',

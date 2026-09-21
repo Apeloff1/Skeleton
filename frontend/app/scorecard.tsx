@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /scorecard — 🩺 10-Level Quality Scorecard + hard 95 delivery gate.
  * Shows every audit level, the gate verdict (ship-ready badge), fix-it deep-links,
@@ -10,7 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 function bandColor(s: number) {
   return s >= 95 ? '#4ade80' : s >= 85 ? '#60a5fa' : s >= 70 ? '#fbbf24' : s >= 50 ? '#fb923c' : '#f87171';

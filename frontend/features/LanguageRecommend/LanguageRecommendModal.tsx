@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Language Recommend Modal v16.0
  * Jeeves recommends the best programming language for your goals
@@ -9,16 +10,9 @@ import {
   Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 interface LanguageRecommendModalProps {
   visible: boolean;

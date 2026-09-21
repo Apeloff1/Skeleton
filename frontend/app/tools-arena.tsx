@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /tools-arena — Power-user surface for the 8 complex backend tools.
  *
@@ -27,7 +28,7 @@ import theme from '../theme/tokens';
 import { useModalLogger } from '../utils/modalLogger';
 import RetryBanner from '../components/UI/RetryBanner';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;
 
 type ToolId =

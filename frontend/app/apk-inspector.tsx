@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /apk-inspector — Deep introspection of the most recent APKs.
  *
@@ -26,7 +27,7 @@ import { useModalLogger } from '../utils/modalLogger';
 import { toast } from '../components/Toast';
 import { useFeatureFlag } from '../utils/featureFlags';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;
 
 type ToolchainStatus = {

@@ -16,6 +16,13 @@ export type ReadinessReport = {
   canonical_actions: number; ready_actions: number; ready_pct: number; governed_unbound: number;
   unsafe_actions: number; policy_gaps: number; actions: ActionReadiness[]; attestation_sha256: string;
 };
+export type PublicActionReadiness = Pick<
+  ActionReadiness,
+  'capability_id' | 'action' | 'state' | 'replay_safe' | 'effect_class' | 'blockers'
+>;
+export type PublicReadinessReport = Omit<ReadinessReport, 'actions'> & {
+  actions: PublicActionReadiness[];
+};
 export type AssuranceInvariant = { id: string; severity: 'hard' | 'warning'; passed: boolean; detail: string };
 export type AssuranceReport = {
   posture: 'healthy' | 'degraded' | 'blocked'; hard_failures: number; warnings: number;
@@ -100,6 +107,7 @@ export type OperationAdmission = { operation_id: string; capability_id: string; 
 export type AdmitOperationInput = { capability_id: string; domain: string; action: string; principal: string; actor_weight: number; payload: Record<string, unknown>; quorum_approved?: boolean; idempotency_key?: string };
 
 const ROOT = '/api/admin/ops/product-control';
+const PUBLIC_ROOT = '/api/product';
 function tokenQuery(token: string): string { return token ? `?token=${encodeURIComponent(token)}` : ''; }
 function tokenQueryWith(token: string, params: Record<string, string | number>): string {
   const query = new URLSearchParams(); if (token) query.set('token', token);
@@ -108,6 +116,13 @@ function tokenQueryWith(token: string, params: Record<string, string | number>):
 }
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
   return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, { signal, cacheKey: 'product-control-status', cacheTtlMs: 5_000 });
+}
+export function getProductReadiness(signal?: AbortSignal): Promise<ApiResult<PublicReadinessReport>> {
+  return api.get<PublicReadinessReport>(`${PUBLIC_ROOT}/readiness`, {
+    signal,
+    cacheKey: 'product-readiness',
+    cacheTtlMs: 5_000,
+  });
 }
 export function getDeploymentPreflight(token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<ControlPlaneDeploymentPreflight>> {
   return api.get<ControlPlaneDeploymentPreflight>(`${ROOT}/deployment-preflight${tokenQueryWith(token, { max_attempts: maxAttempts })}`,

@@ -82,8 +82,6 @@ services:
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
-      - ./backend:/app:ro
-      - ./skeleton:/app/skeleton:ro
       - backend_data:/app/data
     depends_on:
       mongo:
@@ -103,22 +101,17 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: development
+      target: ${FRONTEND_BUILD_TARGET:-development}
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-      - "8081:8081"      # Metro bundler
-      - "19000:19000"    # Expo
-      - "19001:19001"    # Expo DevTools
-      - "19002:19002"    # Expo DevTools
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
     environment:
-      - EXPO_PUBLIC_BACKEND_URL=http://backend:8001
-      - EXPO_PUBLIC_SKELETON_URL=http://skeleton:8001
+      # EXPO_PUBLIC_* values are embedded into the browser bundle, so they
+      # must be host-resolvable rather than Docker-internal service names.
+      - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}
+      - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
       - NODE_ENV=${NODE_ENV:-development}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
       - skeleton

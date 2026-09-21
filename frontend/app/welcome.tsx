@@ -1,6 +1,6 @@
 /**
  * Welcome — First-launch animated splash with starfall background.
- * Sits at /welcome route. Auto-redirects to / after 4s OR on tap.
+ * Sits at /welcome route. Auto-redirects to the canonical product shell OR on tap.
  * AsyncStorage flag prevents re-display on subsequent app opens.
  */
 import { NATIVE_DRIVER } from '../src/utils/platformStyles';
@@ -68,7 +68,7 @@ export default function WelcomeScreen() {
       float.start();
     } catch {/* swallow */}
 
-    // Auto-advance safety net: if user hasn't tapped in 6 s, go to hub
+    // Auto-advance safety net: if user hasn't tapped in 6 s, go to the product shell
     // anyway. Prevents being stuck on a frozen welcome screen.
     const auto = setTimeout(() => {
       handleEnter();
@@ -84,7 +84,7 @@ export default function WelcomeScreen() {
   const handleEnter = async () => {
     // safeSetItem has a 800ms hard timeout — never blocks navigation.
     try { await safeSetItem(WELCOME_FLAG_KEY, '1'); } catch { /* ignore */ }
-    try { router.replace('/hub'); } catch {/* swallow */}
+    try { router.replace('/product'); } catch {/* swallow */}
   };
 
   const btnTranslateY = btnFloat.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
@@ -124,7 +124,7 @@ export default function WelcomeScreen() {
           ]}
         >
           <TouchableOpacity style={styles.btn} onPress={handleEnter} activeOpacity={0.8}>
-            <Text style={styles.btnText}>Enter the Hub</Text>
+            <Text style={styles.btnText}>Enter Product</Text>
             <Ionicons name="arrow-forward-outline" size={18} color="#fff" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
           <Text style={styles.tapHint}>tap anywhere to continue</Text>

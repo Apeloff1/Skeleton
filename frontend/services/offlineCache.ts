@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * Offline Cache Service — ULTRASCALE
  * Fetches all collections from /api/academy/offline/manifest and /offline/dump
@@ -5,7 +6,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE;
 
 const CACHE_VERSION_KEY = '@tutolage_cache_version';
 const CACHE_PREFIX = '@tutolage_offline_';

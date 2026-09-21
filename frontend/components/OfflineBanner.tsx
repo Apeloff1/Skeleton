@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * OfflineBanner — slim top-of-screen banner shown when the device is
  * offline. Lives inside _layout.tsx so it's visible everywhere.
@@ -19,7 +20,7 @@ import { setOfflineState } from '../utils/safeFetch';
 import { toast } from './Toast';
 import { isReduceMotionOn } from '../utils/haptics';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 async function probeOnline(): Promise<boolean> {
   if (!BACKEND) return false;

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 /**
  * useNetworkStatus — online/offline + connection-type awareness.
  *
@@ -19,7 +20,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '../components/Toast';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE;
 
 export type NetType = 'wifi' | 'cellular' | 'ethernet' | 'other' | 'unknown' | 'none';
 

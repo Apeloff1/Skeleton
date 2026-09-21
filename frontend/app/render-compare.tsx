@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /render-compare — 🖼️ Side-by-side Worldforge render compare (big-win e).
  * Pick a mode/layer for each pane and compare the two extreme-pixel renders side by side.
@@ -8,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const MODES = ['cartographic', 'globe', 'nasa', 'bloom', 'thematic'];
 
 function renderUrl(mode: string, seed: number, master: boolean) {

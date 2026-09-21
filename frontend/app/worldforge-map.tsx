@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /worldforge-map — interactive LOD "slippy map" explorer.
  * Streams chunked virtual-texture tiles from /stream/tile/{z}/{x}/{y}.png,
@@ -10,7 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHaptics } from '../src/hooks/useHaptics';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_API_URL || '';
+const BACKEND = CANONICAL_API_BASE || process.env.EXPO_PUBLIC_API_URL || '';
 const TILE = 200;
 const MAX_Z = 2;
 

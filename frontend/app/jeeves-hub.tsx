@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /jeeves-hub — Jeeves operator console.
  *
@@ -23,7 +24,7 @@ import { useRouter } from 'expo-router';
 import { useFeatureFlag } from '../utils/featureFlags';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
 const REQUEST_TIMEOUT_MS = 10_000;
 const SLOW_THRESHOLD_MS = 1_500;

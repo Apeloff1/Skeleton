@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -8,7 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 const C = {
   bg: '#0b0f1a', card: '#141b2e', alt: '#1b2438', border: '#2a3550',
   text: '#eef2fb', muted: '#8a96b2', accent: '#34D399', good: '#43d39e',

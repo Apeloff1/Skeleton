@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * RecentArtifactsStrip — a compact horizontal strip on the Hub showing the
  * last ZIP/APK artifacts the creator shipped, with one-tap re-download.
@@ -11,7 +12,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../src/utils/apiClient';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Artifact = { build_id: string; kind: 'zip' | 'apk'; size_bytes: number; download_url: string };
 

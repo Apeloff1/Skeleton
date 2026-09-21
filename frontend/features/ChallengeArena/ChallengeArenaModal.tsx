@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Rosetta Challenge Arena — Translate code between languages, auto-graded
  */
@@ -6,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput,
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const DIFFICULTIES = [
   { id: 'medium', label: 'Medium', color: '#F59E0B', icon: 'flash' as const },

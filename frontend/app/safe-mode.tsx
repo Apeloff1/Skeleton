@@ -5,7 +5,7 @@
  *   • Last successful boot timestamp
  *   • The recorded boot trace (steps the app reached before crashing)
  *   • Crash count
- *   • Buttons: "Try Hub again", "Reset welcome flag", "Wipe app state"
+ *   • Buttons: "Try Product again", "Reset welcome flag", "Wipe app state"
  *
  * This is the ultimate safety net: even if /hub crashes on every launch,
  * the user always has a way to recover without uninstall/reinstall.
@@ -47,9 +47,9 @@ export default function SafeModeRoute() {
     setFlagsBump(n => n + 1);
   };
 
-  const tryHub = async () => {
+  const tryProduct = async () => {
     await clearCrashes();
-    router.replace('/hub');
+    router.replace('/product');
   };
 
   const resetWelcome = async () => {
@@ -78,7 +78,7 @@ export default function SafeModeRoute() {
         <Text style={styles.badge}>Safe Mode</Text>
         <Text style={styles.title}>CodeDock detected repeated crashes</Text>
         <Text style={styles.sub}>
-          The app has crashed {crashCount} time{crashCount === 1 ? '' : 's'} in a row before reaching the Hub.
+          The app has crashed {crashCount} time{crashCount === 1 ? '' : 's'} in a row before reaching the product shell.
           You can try again, reset just the welcome state, or wipe everything.
         </Text>
       </View>
@@ -151,8 +151,8 @@ export default function SafeModeRoute() {
         <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={wipeAll}>
           <Text style={styles.btnAltText}>Wipe all</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btn} onPress={tryHub}>
-          <Text style={styles.btnText}>Try Hub</Text>
+        <TouchableOpacity style={styles.btn} onPress={tryProduct}>
+          <Text style={styles.btnText}>Try Product</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

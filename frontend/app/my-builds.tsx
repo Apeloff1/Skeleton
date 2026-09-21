@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * ═══════════════════════════════════════════════════════════════════════
  *  My Builds Gallery — every completed Galaxy Studio build, auto-saved.
@@ -30,7 +31,7 @@ import { toast } from '../components/Toast';
 
 const BACKEND =
   (typeof window !== 'undefined' ? window.location.origin : '') ||
-  (process.env.EXPO_PUBLIC_BACKEND_URL as string) || '';
+  (CANONICAL_API_BASE as string) || '';
 
 type BuildRow = {
   build_id: string;
