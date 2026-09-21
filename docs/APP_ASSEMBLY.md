@@ -81,6 +81,18 @@ directly from feature clients.
 The engine liveness contract is `GET /api/v1/health/live`; frontend health
 checks must not invent a shorter `/health` path on the Skeleton service.
 
+## Production web ingress
+
+The production Nginx image is the browser-facing ingress for the assembled app.
+When no explicit public endpoint override is baked into the Expo export,
+`apiBase.ts` uses the browser origin. Nginx then routes:
+
+- `/api/v1/*` to the Skeleton engine service.
+- all other `/api/*` traffic to the application backend.
+
+Development remains explicit-port based (`:8001` backend and `:8010` engine)
+because the Expo development server is not the production reverse proxy.
+
 ## Assembly rules
 
 1. New user-facing capabilities should attach to one of the declared service
