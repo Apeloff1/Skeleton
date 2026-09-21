@@ -410,7 +410,7 @@
     {
       "id": "tool-runtime",
       "owner": "skeleton/skills",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Tool discovery, typed invocation, authority checks, sandboxing, idempotency and result normalization.",
       "depends_on": [
         "foundation",
@@ -421,28 +421,49 @@
       "evidence": [
         "skeleton/skills",
         "backend/services/tool_registry.py",
-        "skeleton/api/admit_write.py"
+        "skeleton/api/admit_write.py",
+        "skeleton/skills/manifest.py",
+        "skeleton/skills/registry.py"
       ],
       "required_interfaces": [
         "tool manifest",
         "input schema",
         "authority",
         "execution receipt",
-        "result/error"
+        "result/error",
+        "ToolManifest",
+        "ToolExecutionRequest",
+        "ToolExecutionReceipt",
+        "ToolResult",
+        "tool schema projection",
+        "approval policy",
+        "idempotency reservation",
+        "compensation contract"
       ],
       "construction": [
         "register tools declaratively",
         "validate arguments",
         "separate read/write/destructive authority",
-        "sandbox untrusted execution"
+        "sandbox untrusted execution",
+        "separate declarative SkillManifest from executable ToolManifest",
+        "make skeleton/skills the canonical execution contract/runtime owner",
+        "make backend/services/tool_registry.py compatibility-only",
+        "forbid credential-bearing nested model tools",
+        "declare side-effect/idempotency/approval/network/sandbox policy per tool",
+        "persist normalized execution receipts"
       ],
       "acceptance": [
         "schema fuzzing",
         "authority denial",
         "idempotency",
-        "timeout/resource limit tests"
+        "timeout/resource limit tests",
+        "tool inventory convergence test",
+        "shadow provider tool denial",
+        "sandbox boundary test",
+        "network/database scope tests",
+        "durable tool receipt lineage test"
       ],
-      "failure_mode": "tool denied or bounded failure receipt"
+      "failure_mode": "tool unavailable/denied/failed with bounded durable receipt; never bypass authority or provider ownership"
     },
     {
       "id": "memory",
@@ -1450,6 +1471,37 @@
       ]
     },
     {
+      "id": "gap-tool-runtime-convergence",
+      "plane": "tool-runtime",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Tool execution is split between declarative skeleton/skills manifests and an application-owned flat backend tool registry that lacks canonical typed schemas, authority/risk/approval metadata, idempotency semantics and durable receipts. The backend registry also contains a nested credential-bearing LLM tool, creating a shadow provider path. A fully functional agentic AI cannot safely expose this surface directly to models.",
+      "construction": [
+        "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
+        "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
+        "register every executable tool with input/output schema, authority class, side-effect class, approval policy, timeout, concurrency, cost estimate, network policy and idempotency/compensation mode",
+        "remove or wrap application-owned flat dispatch so backend/services/tool_registry.py becomes compatibility-only",
+        "retire direct credential-bearing llm_chat tool transport; nested model work must route through the canonical provider/orchestration boundary",
+        "move code compile/run/package execution behind dedicated sandbox/executor boundaries rather than long-lived backend subprocess ownership",
+        "replace arbitrary mongo_query with narrowly scoped repository-backed read capabilities and tenant/collection allowlists",
+        "govern web/network tools with egress policy, bounded result size/time and content provenance",
+        "emit durable ToolExecutionReceipt for every allowed/denied/failed action",
+        "project only approved ToolManifest schemas to model providers"
+      ],
+      "closure_evidence": [
+        "tool manifest schema validation/fuzz tests",
+        "model-visible tool inventory contains only declared enabled tools",
+        "no tool module owns model provider credentials or raw provider SDK/network transport",
+        "authority/risk/approval denial tests",
+        "idempotency reservation and replay tests",
+        "sandbox boundary tests for code execution/build tools",
+        "database tool collection/tenant scope denial tests",
+        "network tool timeout/result-bound/provenance tests",
+        "compatibility registry delegates to canonical runtime",
+        "tool receipt lineage binds operation/execution/turn/call identity"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1702,9 +1754,10 @@
         "gap-cost-admission",
         "gap-provider-surface-convergence",
         "gap-state-authority-convergence",
-        "gap-conversation-state-authority"
+        "gap-conversation-state-authority",
+        "gap-tool-runtime-convergence"
       ],
-      "goal": "Make provider/data/action/state and conversation decisions classifiable, receipt-governed, budget-admissible, recoverable, and server-authoritative before adding more autonomy.",
+      "goal": "Make provider/data/action/tool/state and conversation decisions classifiable, receipt-governed, budget-admissible, recoverable, and server-authoritative before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
@@ -1712,7 +1765,9 @@
         "all credential-bearing provider surfaces declared and receipt-enforced",
         "authoritative state survives restore independently of derived indexes",
         "canonical conversation/thread state is server authoritative",
-        "client history cannot bypass conversation authority"
+        "client history cannot bypass conversation authority",
+        "model-visible tools are typed, authority-governed and receipt-backed",
+        "no shadow model credentials exist inside tools"
       ]
     },
     {
@@ -2629,6 +2684,47 @@
         "skeleton/contracts/conversation.py",
         "skeleton/persistence/conversation_repository.py",
         "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "id": "WP-P0-TOOL-RUNTIME",
+      "gap": "gap-tool-runtime-convergence",
+      "wave": 1,
+      "owners": [
+        "skeleton/skills",
+        "backend/services/tool_registry.py",
+        "skeleton/security",
+        "skeleton/intelligence"
+      ],
+      "objective": "Converge all model-callable actions onto one typed, authority-aware, idempotent, sandbox/network-governed tool runtime before the cognitive loop can execute side effects.",
+      "steps": [
+        "freeze ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
+        "add canonical tool registry/runtime under skeleton/skills",
+        "inventory/classify legacy backend tools",
+        "retire nested credential-bearing llm_chat provider path",
+        "adapt safe read/network/sandbox/build tools behind explicit adapters",
+        "add approval/idempotency reservation and result governance",
+        "make backend flat registry delegate only",
+        "project minimal admitted tool schemas to provider runtime"
+      ],
+      "tests": [
+        "manifest/schema fuzz",
+        "authority/approval",
+        "idempotency/replay",
+        "credential isolation",
+        "sandbox escape/resource",
+        "database scope",
+        "network egress/timeout/result bound",
+        "compatibility delegation",
+        "receipt lineage"
+      ],
+      "exit": "every model-callable tool is declared, minimally projected, policy-admitted, idempotency-aware and receipt-backed, with no executable shadow registry or nested provider credential path",
+      "planned_outputs": [
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_adapters/",
+        "skeleton/testing/test_tool_contract.py",
+        "skeleton/testing/test_tool_runtime.py"
       ]
     },
     {
@@ -3740,5 +3836,231 @@
       "DELETE /api/v1/conversations/{thread_id}"
     ],
     "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land"
+  },
+  "tool_runtime_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-tool-runtime-convergence",
+    "conceptual_split": {
+      "skill": {
+        "contract": "skeleton/skills/manifest.py:SkillManifest",
+        "purpose": "declarative instruction/capability guidance injected into context",
+        "executable": false,
+        "rule": "skills may guide reasoning but cannot smuggle commands, entrypoints or authority"
+      },
+      "tool": {
+        "planned_contract": "skeleton/skills/tool_contract.py:ToolManifest",
+        "planned_runtime": "skeleton/skills/tool_runtime.py",
+        "purpose": "typed governed external/internal action available to the cognitive loop",
+        "executable": true,
+        "rule": "execution only through canonical runtime after schema, authority, policy, approval, admission and idempotency checks"
+      }
+    },
+    "tool_manifest": {
+      "required_fields": [
+        "tool_id",
+        "version",
+        "description",
+        "input_schema",
+        "output_schema",
+        "capabilities",
+        "authority_class",
+        "risk_class",
+        "side_effect_class",
+        "idempotency_mode",
+        "approval_policy",
+        "timeout_seconds",
+        "max_concurrency",
+        "network_policy",
+        "data_policy",
+        "cost_model",
+        "result_size_limit",
+        "enabled"
+      ],
+      "authority_classes": [
+        "read",
+        "write",
+        "destructive",
+        "external_commit",
+        "privileged"
+      ],
+      "risk_classes": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "side_effect_classes": [
+        "none",
+        "local_reversible",
+        "local_irreversible",
+        "external_reversible",
+        "external_irreversible"
+      ],
+      "idempotency_modes": [
+        "not_required",
+        "intrinsic",
+        "idempotency_key",
+        "reservation_fence",
+        "compensatable"
+      ],
+      "approval_policies": [
+        "never",
+        "policy",
+        "always",
+        "operator_only"
+      ],
+      "invariants": [
+        "write/destructive/external_commit/privileged tools cannot declare not_required idempotency unless execution is provably side-effect free",
+        "external irreversible or critical tools require explicit approval policy",
+        "networked tools declare egress destinations/protocol class",
+        "tool schemas are bounded and reject additional unknown fields unless explicitly allowed",
+        "tool description/instructions cannot grant authority"
+      ]
+    },
+    "execution_request": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "arguments",
+        "arguments_digest",
+        "principal",
+        "tenant_id",
+        "authority_context",
+        "resource_budget",
+        "deadline",
+        "trace_id"
+      ]
+    },
+    "execution_receipt": {
+      "required_fields": [
+        "receipt_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "manifest_version",
+        "arguments_digest",
+        "authority_decision",
+        "approval_id",
+        "idempotency_key",
+        "started_at",
+        "completed_at",
+        "status",
+        "result_ref",
+        "postcondition_ref",
+        "usage",
+        "error_code",
+        "compensation_ref"
+      ],
+      "statuses": [
+        "denied",
+        "waiting_approval",
+        "reserved",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "ambiguous",
+        "compensated"
+      ]
+    },
+    "model_projection": {
+      "includes": [
+        "tool_id",
+        "description",
+        "input_schema"
+      ],
+      "excludes": [
+        "credentials",
+        "internal entrypoint",
+        "raw authority tokens",
+        "network secrets",
+        "database handles",
+        "compensation implementation",
+        "operator-only metadata"
+      ],
+      "rule": "the provider sees only the minimal normalized callable schema for tools admitted to the current operation/principal"
+    },
+    "registry_convergence": {
+      "current_compatibility": "backend/services/tool_registry.py",
+      "target_owner": "skeleton/skills/tool_runtime.py",
+      "rules": [
+        "compatibility registry delegates by tool_id to canonical runtime",
+        "no backend compatibility function performs privileged external I/O itself after convergence",
+        "legacy tool names may alias canonical IDs during a bounded migration window",
+        "unknown tool names fail closed without exposing the entire privileged inventory to untrusted callers"
+      ],
+      "legacy_findings": [
+        {
+          "tool": "llm_chat",
+          "issue": "owns EMERGENT_LLM_KEY and raw LLM transport inside tool registry",
+          "target": "retire credential path; nested model invocation becomes orchestration/model-provider capability"
+        },
+        {
+          "tool": "compile_code",
+          "issue": "spawns local compiler subprocess from backend",
+          "target": "dedicated sandbox/executor adapter with quotas and artifact receipts"
+        },
+        {
+          "tool": "run_code",
+          "issue": "compatibility stub points toward playground but no canonical tool contract",
+          "target": "sandbox execution tool adapter only"
+        },
+        {
+          "tool": "package_build",
+          "issue": "performs build and artifact persistence from flat registry",
+          "target": "governed build capability with idempotency/artifact receipts"
+        },
+        {
+          "tool": "mongo_query",
+          "issue": "accepts arbitrary collection/filter projection against application database",
+          "target": "replace with scoped named repository/query tools and allowlists"
+        },
+        {
+          "tool": "web_search",
+          "issue": "direct network/search library execution without canonical egress/data/result policy",
+          "target": "network tool adapter with timeout, egress class, result bounds and provenance"
+        }
+      ]
+    },
+    "execution_pipeline": [
+      "resolve manifest/version",
+      "validate input schema and hard bounds",
+      "classify data/purpose",
+      "authorize principal/tenant/capability",
+      "evaluate risk and approval policy",
+      "evaluate security/network/sandbox policy",
+      "estimate/admit resource usage",
+      "reserve idempotency/fence",
+      "execute adapter under timeout/concurrency limits",
+      "normalize/validate output schema and size",
+      "verify postcondition when required",
+      "commit durable receipt/result reference",
+      "classify/govern result for model/context exposure",
+      "emit telemetry/stream progress"
+    ],
+    "adapter_classes": {
+      "pure": "deterministic/in-process side-effect-free computation",
+      "repository_read": "narrow governed read through canonical repository",
+      "repository_write": "transactional governed state mutation with idempotency",
+      "sandbox": "isolated code/build/file execution",
+      "network": "explicit egress external I/O",
+      "artifact": "artifact creation/transform under lifecycle policy",
+      "operator": "privileged administrative action requiring explicit authority"
+    },
+    "nested_model_rule": "A model invocation is not an ordinary tool implementation. Recursive/submodel work is scheduled by orchestration and executed by model-provider so provider governance, routing, budgets and receipts remain intact.",
+    "result_policy": [
+      "tool result is untrusted evidence until normalized/verified",
+      "raw result exceeding limit is externalized to artifact storage and projected by bounded summary/ref",
+      "restricted fields are redacted before model exposure",
+      "errors use stable codes; raw exceptions/credentials are never returned to the model",
+      "result provenance includes tool/version/call/receipt identity"
+    ]
   }
 }
