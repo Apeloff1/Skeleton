@@ -74,7 +74,7 @@ backends and never own business policy.
 
 ## 3. Contract layering
 
-There are four canonical contract layers, each with one job:
+There are five canonical contract layers, each with one job:
 
 1. **`skeleton/app/manifest.json` — runtime contract.** Services, runtime modes,
    health paths, required environment, and Compose topology.
@@ -86,10 +86,14 @@ There are four canonical contract layers, each with one job:
    lanes, and migration policy.
 4. **`machine/ai_app_construction.json` — AI construction contract.** Required
    capability planes, build phases, provider bootstraps, acceptance gates, gap
-   register, and closure evidence. Its human manual is
+   register, and closure evidence.
+5. **`machine/capability_interfaces.json` — interface contract.** Exact runtime
+   dependency and acceptance edges, owners, zones, consumed contract surfaces,
+   failure semantics, and maturity. The human build manual is
    `docs/AI_APP_CONSTRUCTION_MANUAL.md`.
 
-`scripts/check_architecture_map.py`, `scripts/check_ai_app_construction.py`, and
+`scripts/check_architecture_map.py`, `scripts/check_ai_app_construction.py`,
+`scripts/check_capability_interfaces.py`, and
 `scripts/check_provider_bootstrap.py` link the layers. It rejects drift when the
 architecture service graph no longer exactly matches the runtime manifest.
 
@@ -239,6 +243,7 @@ arch-map/v3.6  exception-free model-routing ownership convergence + explicit acc
 # Validate architecture and complete AI construction contracts
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
+python scripts/check_capability_interfaces.py
 python scripts/check_provider_bootstrap.py
 
 # Machine-readable architecture result
@@ -251,7 +256,7 @@ python -m skeleton app check
 python -m skeleton app status --json
 ```
 
-Architecture changes should keep all four commands deterministic and
+Architecture changes should keep all five commands deterministic and
 non-interactive.
 
 
