@@ -736,13 +736,21 @@ class OpenAIProviderAdapter(ProviderAdapter):
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         model = _validate_request(request, default_model=self.model)
+        effective_data_class, effective_purpose, effective_tenant_id = (
+            _effective_governance_fields(
+                data_class=request.data_class,
+                purpose=request.purpose,
+                tenant_id=request.tenant_id,
+                governance_context=request.governance_context,
+            )
+        )
         try:
             governance = require_provider_transfer(
                 ProviderTransferRequest(
                     provider_id=self.provider_id,
-                    data_class=request.data_class,
-                    purpose=request.purpose,
-                    tenant_id=request.tenant_id,
+                    data_class=effective_data_class,
+                    purpose=effective_purpose,
+                    tenant_id=effective_tenant_id,
                     source="skeleton/provider_runtime.py",
                 )
             )
@@ -760,7 +768,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             admission = require_admission(
                 AdmissionRequest(
                     operation_id=_provider_operation_id(request),
-                    tenant_id=(request.tenant_id or "unbound"),
+                    tenant_id=(effective_tenant_id or "unbound"),
                     capability="model-inference",
                     budget=request.resource_budget,
                     estimate=UsageEstimate(
@@ -837,6 +845,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=request.prompt,
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
+            governance_context=request.governance_context,
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
             output_tokens=request.count,
@@ -1011,6 +1020,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             content=request.text,
             estimated_cost_usd=request.estimated_cost_usd,
             resource_budget=request.resource_budget,
+            governance_context=request.governance_context,
             timeout_seconds=self.timeout_seconds,
             provider_attempts=self.max_retries + 1,
         )
@@ -1164,13 +1174,21 @@ class OpenAISyncProviderAdapter:
         model = _validate_request(request, default_model=self.model)
         self._ensure_architecture()
 
+        effective_data_class, effective_purpose, effective_tenant_id = (
+            _effective_governance_fields(
+                data_class=request.data_class,
+                purpose=request.purpose,
+                tenant_id=request.tenant_id,
+                governance_context=request.governance_context,
+            )
+        )
         try:
             governance = require_provider_transfer(
                 ProviderTransferRequest(
                     provider_id=self.provider_id,
-                    data_class=request.data_class,
-                    purpose=request.purpose,
-                    tenant_id=request.tenant_id,
+                    data_class=effective_data_class,
+                    purpose=effective_purpose,
+                    tenant_id=effective_tenant_id,
                     source="skeleton/provider_runtime.py",
                 )
             )
@@ -1188,7 +1206,7 @@ class OpenAISyncProviderAdapter:
             admission = require_admission(
                 AdmissionRequest(
                     operation_id=_provider_operation_id(request),
-                    tenant_id=(request.tenant_id or "unbound"),
+                    tenant_id=(effective_tenant_id or "unbound"),
                     capability="model-inference",
                     budget=request.resource_budget,
                     estimate=UsageEstimate(
