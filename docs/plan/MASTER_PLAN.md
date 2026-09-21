@@ -370,7 +370,7 @@ The full-program matrix also extracts a dedicated risk ledger at `machine/ai_edg
 
 Construction accountability is mandatory and machine-enforced through `machine/ai_build_accountability.json`, with the visible checklist in `docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md`.
 
-Every tracked volume, work package, AIQ task and vertical slice has a completion checkbox. Checkboxes are derived state and may not be hand-toggled. A checked item requires:
+Every tracked volume, work package, AIQ task, vertical slice, and historical/edge/obscure obligation has a completion checkbox. Checkboxes are derived state and may not be hand-toggled. A checked item requires:
 
 - implementation sign-off;
 - independent verification sign-off;
@@ -387,7 +387,7 @@ Implementation and verification signers must be different. A same-signer excepti
 
 Work that has merely started must record a UTC `started` event in the append-only history. Status promotion is therefore auditable from planned → started → implemented → verified → checked/closed.
 
-No retroactive signatures are fabricated. Items that predate the ledger remain unchecked until they receive real evidence and sign-off.
+Unbound/manual attestations are not accepted; signatures must bind to GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC. No retroactive signatures are fabricated. Items that predate the ledger remain unchecked until they receive real evidence and sign-off.
 
 ## 22. Vertical-slice acceptance ladder
 
