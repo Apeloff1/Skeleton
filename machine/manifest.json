@@ -37,7 +37,7 @@
         "state": "ready",
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
-        "tag": "arch-map/v1.4"
+        "tag": "arch-map/v2.0"
       }
     ],
     "product_shell_pr": 1902,
@@ -666,6 +666,10 @@
     "explicit development/hot/production runtime modes"
   ],
   "machine_rules": [
+    "Do not add a provider SDK import outside the canonical provider boundary.",
+    "All runtime model providers must activate through backend/core/ai_provider.py after backend/core/provider_architecture.py issues a valid architecture receipt.",
+    "Read machine/ai_app_construction.json and docs/AI_APP_CONSTRUCTION_MANUAL.md before implementing or assembling AI capabilities.",
+    "Read machine/architecture.json before modifying runtime structure.",
     "Read this manifest before modifying the repository.",
     "Prefer package-local imports over root-level coupling.",
     "Keep heavy subsystems out of skeleton/__init__.py.",
@@ -701,8 +705,19 @@
     "contract": "machine/architecture.json",
     "documentation": "docs/ARCHITECTURE_MAP.md",
     "validator": "scripts/check_architecture_map.py",
-    "tag": "arch-map/v1.4",
+    "tag": "arch-map/v2.0",
     "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit",
-    "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling"
+    "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling",
+    "construction_contract": "machine/ai_app_construction.json",
+    "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "provider_bootstrap": "fail-closed"
+  },
+  "ai_app_construction": {
+    "contract": "machine/ai_app_construction.json",
+    "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "validator": "scripts/check_ai_app_construction.py",
+    "provider_validator": "scripts/check_provider_bootstrap.py",
+    "construction_version": "2.0.0",
+    "provider_rule": "all runtime providers must load/acknowledge active contracts before activation; undeclared providers are denied"
   }
 }
