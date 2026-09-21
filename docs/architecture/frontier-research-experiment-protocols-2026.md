@@ -1037,6 +1037,451 @@ Targets: RDE036.
 
 ---
 
+
+# RXP036 — Continual-adapter interference geometry
+
+Question: Can sequential adapter updates preserve old behavior while leaving reusable capacity for future tasks?
+
+Arms:
+- ordinary sequential LoRA;
+- replay-based LoRA;
+- orthogonality-constrained adapter;
+- selective subspace de-correlation;
+- program-memory/slot-based adapter;
+- fresh adapter per task reference.
+
+Measurements:
+- new-task adaptation;
+- old-task retention;
+- forward transfer;
+- backward transfer;
+- update-subspace overlap;
+- adapter bytes;
+- inference overhead;
+- privacy/replay cost;
+- rollback fidelity.
+
+Stress:
+- related tasks;
+- conflicting tasks;
+- long task sequences;
+- small-data updates;
+- adversarial poisoned update.
+
+Targets: RQ059–RQ061 and continual-adaptation debt.
+
+---
+
+# RXP037 — Trajectory-level uncertainty and calibration
+
+Question: Which uncertainty representation best predicts long-horizon agent failure?
+
+Compare:
+- final-answer self-confidence;
+- per-step self-confidence;
+- external model confidence;
+- verifier disagreement;
+- retrieval/tool uncertainty;
+- trajectory-checkpoint calibration;
+- ensemble/disagreement features.
+
+Stratify by:
+- trajectory length;
+- failure stage;
+- tool count;
+- retrieval dependence;
+- model family;
+- OOD shift.
+
+Metrics:
+- ECE/Brier/log score where suitable;
+- selective risk;
+- error detection;
+- late-horizon overconfidence;
+- calibration under shift;
+- abstention/escalation utility.
+
+Targets: RQ056–RQ058.
+
+---
+
+# RXP038 — Multimodal perception-aware post-training
+
+Question: Can preference/RL improvement increase answer scores while reducing visual dependence or grounding?
+
+Arms:
+- SFT baseline;
+- standard multimodal DPO;
+- visual-contrast preference objective;
+- token-level visual relevance weighting;
+- perception-aware RL;
+- language-only preference ablation.
+
+Tasks:
+- object/attribute grounding;
+- OCR;
+- spatial;
+- chart/document;
+- visual math;
+- adversarial text-image conflict.
+
+Metrics:
+- answer quality;
+- hallucination;
+- visual grounding;
+- token/trajectory visual dependence;
+- language-prior shortcut score;
+- calibration;
+- perception-only probes.
+
+Targets: RQ044 and FD025–FD026.
+
+---
+
+# RXP039 — Formal-prover loop decomposition
+
+Question: Which parts of agentic formal proving create the gain?
+
+Ablate:
+- informal blueprint;
+- theorem retrieval;
+- decomposition;
+- parallel workers;
+- compiler feedback;
+- repair loop;
+- verified-proof memory;
+- RL/SFT on repair traces.
+
+Baselines:
+- direct whole-proof generation;
+- search-only prover;
+- general coding agent + Lean;
+- specialized prover.
+
+Metrics:
+- solve rate;
+- verifier calls;
+- tokens;
+- wall-clock;
+- proof length;
+- invalid proof attempts;
+- semantic-faithfulness audit.
+
+Targets: RQ029–RQ031 and FD022.
+
+---
+
+# RXP040 — Scientific work-identity and status conflict resolution
+
+Question: Can the research ingest system correctly unify preprint/submission/proceedings/code artifacts and preserve conflicting status metadata?
+
+Construct cases:
+- arXiv + OpenReview + proceedings;
+- withdrawn submission + surviving preprint;
+- renamed/revised work;
+- duplicate title;
+- conference workshop vs main-conference ambiguity;
+- correction/retraction;
+- multiple code repositories.
+
+Metrics:
+- identity precision/recall;
+- false merge;
+- false split;
+- status correctness;
+- version lineage;
+- decision-time attestation replay.
+
+Targets: AD39–AD41, AD75.
+
+---
+
+# RXP041 — Evidence-independence graph validation
+
+Question: How much does naive paper count overstate independent evidence?
+
+Create evidence sets sharing:
+- authors;
+- lab;
+- base model;
+- code;
+- benchmark;
+- evaluator;
+- synthetic teacher;
+- dataset.
+
+Compare:
+- naive citation count;
+- manually adjudicated independence;
+- graph-discounted consensus.
+
+Metrics:
+- consensus calibration;
+- false confidence;
+- sensitivity to edge weights;
+- missed hidden dependencies.
+
+Targets: RQ047–RQ049 and AD41.
+
+---
+
+# RXP042 — Benchmark contamination-risk quantification
+
+Question: Can contamination risk be estimated with useful granularity rather than a binary label?
+
+Signals:
+- release date;
+- web/public exposure;
+- exact overlap;
+- near-duplicate overlap;
+- semantic overlap;
+- benchmark solution exposure;
+- code repository exposure;
+- model-family training disclosure;
+- suspicious memorization signatures.
+
+Output:
+- contamination evidence vector;
+- calibrated risk band;
+- uncertainty.
+
+Validate against:
+- known contaminated controls;
+- synthetic clean controls;
+- newly created private tasks.
+
+Targets: RQ047.
+
+---
+
+# RXP043 — Benchmark saturation and retirement
+
+Question: When does a benchmark stop providing useful model discrimination?
+
+Track:
+- score ceiling;
+- between-model variance;
+- error diversity;
+- rank stability;
+- contamination;
+- realism;
+- evaluator noise;
+- marginal information from new models.
+
+Decision states:
+- healthy;
+- narrowing;
+- saturated;
+- contaminated;
+- unstable;
+- retire/anchor-only.
+
+Targets: RQ048.
+
+---
+
+# RXP044 — Dynamic benchmark longitudinal stability
+
+Question: Can a changing benchmark remain comparable over time?
+
+Design:
+- fixed anchor subset;
+- rolling fresh subset;
+- generator version;
+- difficulty matching;
+- duplicate/leakage filtering;
+- human audit subset.
+
+Metrics:
+- anchor/fresh correlation;
+- difficulty drift;
+- evaluator drift;
+- generation bias;
+- model rank stability;
+- contamination resistance.
+
+Targets: RQ049 and RDE035.
+
+---
+
+# RXP045 — Provider/model semantic drift canary
+
+Question: How quickly can Skeleton detect behavior changes from a hosted model whose public identifier/API is unchanged?
+
+Canary families:
+- instruction following;
+- structured output;
+- tool schema;
+- refusal/safety boundary;
+- calibration;
+- reasoning style;
+- long-context retrieval;
+- latency.
+
+Record:
+- provider identifier;
+- date;
+- request config;
+- observed fingerprint;
+- output distribution changes.
+
+Targets: RQ058.
+
+---
+
+# RXP046 — Cross-hardware portability matrix
+
+Question: Which optimization/architecture wins survive device and runtime changes?
+
+Devices/runtime classes:
+- CPU;
+- NVIDIA GPU generation A/B;
+- AMD/ROCm where available;
+- Windows/DirectML where relevant;
+- remote provider;
+- future accelerator adapter.
+
+Candidates:
+- dense BF16;
+- FP8;
+- FP4;
+- ternary;
+- sparse;
+- speculative;
+- KV-compressed.
+
+Metrics:
+- quality;
+- throughput;
+- TTFT;
+- memory;
+- energy;
+- operator coverage;
+- fallback;
+- engineering complexity.
+
+Targets: RQ062–RQ064.
+
+---
+
+# RXP047 — World-model invariance and counterfactual transfer
+
+Question: Does a model learn transferable transition structure or representation-specific shortcuts?
+
+Interventions:
+- rename actions;
+- permute symbols;
+- switch textual/visual encoding;
+- remap coordinates;
+- change topology;
+- alter irrelevant visual style;
+- counterfactual transition query;
+- unseen composition.
+
+Metrics:
+- planning success;
+- transition prediction;
+- representation invariance;
+- counterfactual consistency;
+- sample efficiency after remapping.
+
+Targets: RQ045.
+
+---
+
+# RXP048 — Instruction convention conflict benchmark
+
+Question: Can models follow valid explicit instructions that conflict with strong learned answer conventions without weakening higher-priority policy?
+
+Cases:
+- reverse conventional output order;
+- unusual valid schema;
+- suppress customary explanation;
+- use non-default units/notation;
+- cross-language response;
+- anti-template instruction;
+- conflicting lower-priority text.
+
+Metrics:
+- user-intent compliance;
+- system/developer hierarchy preservation;
+- format correctness;
+- convention-reversion rate.
+
+Targets: FD021.
+
+---
+
+# RXP049 — Retain–forget entanglement unlearning
+
+Question: How does semantic/representational closeness between forget and retain data affect unlearning?
+
+Partition:
+- forget set;
+- adjacent retain set;
+- remote retain set.
+
+Compare:
+- policy-only suppression;
+- gradient-ascent style unlearning;
+- constrained/augmented-Lagrangian candidate;
+- representation-editing candidate;
+- retrain reference.
+
+Attack:
+- relearning;
+- extraction;
+- jailbreak;
+- unrelated finetuning;
+- quantization/compression.
+
+Metrics:
+- forget efficacy;
+- adjacent retain damage;
+- remote retain damage;
+- privacy leakage;
+- robustness;
+- compute.
+
+Targets: RDE030 and FD020.
+
+---
+
+# RXP050 — Research source-adapter conformance
+
+Question: Can every research source adapter preserve identity, versions, status, corrections, artifacts, and failures without granting authority?
+
+Test adapter classes:
+- arXiv;
+- OpenReview;
+- ACL/PMLR/proceedings;
+- Crossref/OpenAlex/DBLP;
+- GitHub/Hugging Face;
+- standards/advisories;
+- retraction/correction source.
+
+Conformance checks:
+- exact identifier;
+- pagination/retry;
+- version transition;
+- withdrawn/retracted state;
+- duplicate work resolution;
+- artifact link;
+- rate-limit handling;
+- malformed metadata;
+- source disappearance.
+
+Security:
+- hostile metadata;
+- oversized artifact;
+- archive bomb;
+- malicious repository;
+- secret-bearing test fixture.
+
+Targets: AD74–AD80 and RDE036.
+
+---
+
 # 36. Experiment sequencing policy
 
 Recommended first wave:
@@ -1049,7 +1494,11 @@ Recommended first wave:
 7. RXP004 optimizer geometry;
 8. RXP003 synthetic data;
 9. RXP021 monitorability;
-10. RXP026 research-agent anti-cheating.
+10. RXP026 research-agent anti-cheating;
+11. RXP037 trajectory calibration;
+12. RXP038 multimodal perception-aware post-training;
+13. RXP040 work-identity/status resolution;
+14. RXP045 provider semantic drift canaries.
 
 Expensive architecture/exotic runs wait for:
 - stable baseline;
