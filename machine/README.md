@@ -116,6 +116,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Held merge waves:** repo-machine-gates (115 files) and safe-1669 (150 files) revalidated; both remain staged for file-level reconciliation rather than blind merge.
 
+- **Temporary branch lineage:** Java accelerator rebase temp branch is zero-file versus assembly; no duplicate integration created.
+
 ## Target layout
 
 ```text
