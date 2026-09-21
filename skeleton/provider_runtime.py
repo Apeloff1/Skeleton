@@ -26,6 +26,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from skeleton.provider_contract import (
     ProviderArchitectureError,
@@ -39,6 +40,11 @@ from skeleton.intelligence.admission import (
     RuntimePressure,
     UsageEstimate,
     require_admission,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionLease,
+    AdmissionRuntime,
+    AdmissionRuntimeError,
 )
 from skeleton.vault.data_governance import (
     DataGovernanceDenied,
@@ -533,6 +539,114 @@ def _provider_operation_id(request: ProviderRequest) -> str:
     return "provider-" + digest.hexdigest()[:24]
 
 
+def _provider_admission_operation_id(request: ProviderRequest) -> str:
+    """Use canonical operation identity when present, else one invocation lease ID."""
+
+    if request.operation_id is not None:
+        return request.operation_id.strip()
+    return "provider-invocation-" + str(uuid4())
+
+
+def _provider_usage_estimate(
+    request: ProviderRequest,
+    *,
+    requested_output_tokens: int,
+    timeout_seconds: float,
+    provider_attempts: int,
+) -> UsageEstimate:
+    return UsageEstimate(
+        input_tokens=_estimated_input_tokens(request),
+        output_tokens=requested_output_tokens,
+        cost_usd=float(request.estimated_cost_usd),
+        wall_seconds=timeout_seconds,
+        provider_attempts=max(1, provider_attempts),
+    )
+
+
+def _usage_int(value: object, fallback: int) -> int:
+    if isinstance(value, bool):
+        return fallback
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed >= 0 else fallback
+
+
+def _actual_provider_usage(
+    response: object,
+    *,
+    estimate: UsageEstimate,
+    wall_seconds: float,
+    attempts_used: int = 1,
+) -> UsageEstimate:
+    usage = (
+        response.get("usage")
+        if isinstance(response, Mapping)
+        else getattr(response, "usage", None)
+    )
+    if isinstance(usage, Mapping):
+        input_value = usage.get("input_tokens")
+        output_value = usage.get("output_tokens")
+    else:
+        input_value = getattr(usage, "input_tokens", None)
+        output_value = getattr(usage, "output_tokens", None)
+
+    return UsageEstimate(
+        input_tokens=_usage_int(input_value, estimate.input_tokens),
+        output_tokens=_usage_int(output_value, estimate.output_tokens),
+        cost_usd=estimate.cost_usd,
+        wall_seconds=max(0.0, float(wall_seconds)),
+        provider_attempts=max(1, int(attempts_used)),
+        tool_calls=estimate.tool_calls,
+        artifact_bytes=estimate.artifact_bytes,
+    )
+
+
+def _admit_provider_request(
+    runtime: AdmissionRuntime,
+    request: ProviderRequest,
+    *,
+    tenant_id: str | None,
+    requested_output_tokens: int,
+    timeout_seconds: float,
+    provider_attempts: int,
+) -> tuple[AdmissionLease, UsageEstimate]:
+    estimate = _provider_usage_estimate(
+        request,
+        requested_output_tokens=requested_output_tokens,
+        timeout_seconds=timeout_seconds,
+        provider_attempts=provider_attempts,
+    )
+    try:
+        lease = runtime.admit(
+            AdmissionRequest(
+                operation_id=_provider_admission_operation_id(request),
+                tenant_id=(tenant_id or "unbound"),
+                capability="model-inference",
+                budget=request.resource_budget,
+                estimate=estimate,
+            )
+        )
+    except (AdmissionError, AdmissionRuntimeError) as exc:
+        raise ProviderPolicyError(
+            "model provider request denied by resource admission"
+        ) from exc
+    return lease, estimate
+
+
+def _release_provider_lease(
+    runtime: AdmissionRuntime,
+    lease: AdmissionLease,
+) -> None:
+    try:
+        runtime.release(lease.operation_id)
+    except AdmissionRuntimeError:
+        # Preserve the provider failure as the primary error. A runtime
+        # implementation must keep release idempotent/recoverable.
+        pass
+
+
 def _media_operation_id(
     provider_id: str,
     purpose: str,
@@ -669,6 +783,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         timeout_seconds: float = 45.0,
         max_retries: int = 2,
         client: Any | None = None,
+        admission_runtime: AdmissionRuntime | None = None,
     ) -> None:
         self.api_key = (api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = (model or os.getenv("AI_MODEL") or "gpt-5.5").strip()
@@ -678,6 +793,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         self._client = client
         self._sdk_import_error: Exception | None = None
         self._provider_architecture_receipt: ProviderArchitectureReceipt | None = None
+        self.admission_runtime = admission_runtime or AdmissionRuntime()
 
     def _ensure_architecture(self) -> ProviderArchitectureReceipt:
         receipt = self._provider_architecture_receipt
@@ -764,62 +880,68 @@ class OpenAIProviderAdapter(ProviderAdapter):
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
-        try:
-            admission = require_admission(
-                AdmissionRequest(
-                    operation_id=_provider_operation_id(request),
-                    tenant_id=(effective_tenant_id or "unbound"),
-                    capability="model-inference",
-                    budget=request.resource_budget,
-                    estimate=UsageEstimate(
-                        input_tokens=_estimated_input_tokens(request),
-                        output_tokens=requested_output,
-                        cost_usd=float(request.estimated_cost_usd),
-                        wall_seconds=self.timeout_seconds,
-                        provider_attempts=self.max_retries + 1,
-                    ),
-                    pressure=RuntimePressure(),
-                )
-            )
-        except AdmissionError as exc:
-            raise ProviderPolicyError(
-                "model provider request denied by resource admission"
-            ) from exc
-
-        client = self._get_client()
-        messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
-        messages.append({"role": "user", "content": request.prompt})
-
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "instructions": request.instructions,
-            "input": messages,
-        }
-        if request.max_output_tokens is not None:
-            kwargs["max_output_tokens"] = request.max_output_tokens
+        lease, estimate = _admit_provider_request(
+            self.admission_runtime,
+            request,
+            tenant_id=effective_tenant_id,
+            requested_output_tokens=requested_output,
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+        )
 
         started = time.perf_counter()
         try:
-            response = await client.responses.create(**kwargs)
-        except ProviderError:
-            raise
-        except Exception as exc:
-            raise ProviderInvocationError("model provider request failed") from exc
+            client = self._get_client()
+            messages: list[dict[str, str]] = [
+                message.as_openai_input() for message in request.history
+            ]
+            messages.append({"role": "user", "content": request.prompt})
 
-        text = str(getattr(response, "output_text", "") or "").strip()
-        if not text:
-            raise ProviderInvocationError("model provider returned an empty response")
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "instructions": request.instructions,
+                "input": messages,
+            }
+            if request.max_output_tokens is not None:
+                kwargs["max_output_tokens"] = request.max_output_tokens
+
+            try:
+                response = await client.responses.create(**kwargs)
+            except ProviderError:
+                raise
+            except Exception as exc:
+                raise ProviderInvocationError("model provider request failed") from exc
+
+            text = str(getattr(response, "output_text", "") or "").strip()
+            if not text:
+                raise ProviderInvocationError("model provider returned an empty response")
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise
+
+        latency_seconds = max(0.0, time.perf_counter() - started)
+        actual = _actual_provider_usage(
+            response,
+            estimate=estimate,
+            wall_seconds=latency_seconds,
+        )
+        try:
+            self.admission_runtime.complete(lease.operation_id, actual)
+        except AdmissionRuntimeError as exc:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise ProviderPolicyError(
+                "model provider usage reconciliation failed"
+            ) from exc
 
         request_id = getattr(response, "id", None)
-        latency_ms = (time.perf_counter() - started) * 1000
         return ProviderResponse(
             text=text,
             provider=self.provider_id,
             model=model,
             request_id=str(request_id) if request_id else None,
-            latency_ms=round(latency_ms, 2),
+            latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
-            admission_decision_id=admission.decision_id,
+            admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
         )
 
@@ -1085,6 +1207,7 @@ class OpenAISyncProviderAdapter:
         base_url: str | None = None,
         timeout_seconds: float = 45.0,
         max_retries: int = 2,
+        admission_runtime: AdmissionRuntime | None = None,
     ) -> None:
         self.api_key = (
             api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
@@ -1096,6 +1219,7 @@ class OpenAISyncProviderAdapter:
         self.timeout_seconds = max(1.0, float(timeout_seconds))
         self.max_retries = max(0, int(max_retries))
         self._provider_architecture_receipt: ProviderArchitectureReceipt | None = None
+        self.admission_runtime = admission_runtime or AdmissionRuntime()
 
     def _ensure_architecture(self) -> ProviderArchitectureReceipt:
         receipt = self._provider_architecture_receipt
@@ -1202,29 +1326,17 @@ class OpenAISyncProviderAdapter:
             if request.max_output_tokens is not None
             else min(4_096, request.resource_budget.max_output_tokens)
         )
-        try:
-            admission = require_admission(
-                AdmissionRequest(
-                    operation_id=_provider_operation_id(request),
-                    tenant_id=(effective_tenant_id or "unbound"),
-                    capability="model-inference",
-                    budget=request.resource_budget,
-                    estimate=UsageEstimate(
-                        input_tokens=_estimated_input_tokens(request),
-                        output_tokens=requested_output,
-                        cost_usd=float(request.estimated_cost_usd),
-                        wall_seconds=self.timeout_seconds,
-                        provider_attempts=self.max_retries + 1,
-                    ),
-                    pressure=RuntimePressure(),
-                )
-            )
-        except AdmissionError as exc:
-            raise ProviderPolicyError(
-                "model provider request denied by resource admission"
-            ) from exc
+        lease, estimate = _admit_provider_request(
+            self.admission_runtime,
+            request,
+            tenant_id=effective_tenant_id,
+            requested_output_tokens=requested_output,
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+        )
 
         if not self.api_key:
+            _release_provider_lease(self.admission_runtime, lease)
             raise ProviderUnavailableError("OPENAI_API_KEY is not configured")
 
         messages: list[dict[str, str]] = [
@@ -1252,41 +1364,64 @@ class OpenAISyncProviderAdapter:
 
         started = time.perf_counter()
         last_error: BaseException | None = None
-        for _attempt in range(self.max_retries + 1):
-            try:
-                with urllib.request.urlopen(
-                    outbound,
-                    timeout=self.timeout_seconds,
-                ) as response:
-                    payload = self._decode_response(response)
-                text = self._extract_response_text(payload)
-                request_id = payload.get("id")
-                latency_ms = (time.perf_counter() - started) * 1000
-                return ProviderResponse(
-                    text=text,
-                    provider=self.provider_id,
-                    model=model,
-                    request_id=(
-                        str(request_id)
-                        if isinstance(request_id, (str, int))
-                        else None
-                    ),
-                    latency_ms=round(latency_ms, 2),
-                    governance_decision_id=governance.decision_id,
-                    admission_decision_id=admission.decision_id,
-                    data_class=governance.data_class,
-                )
-            except ProviderError:
-                raise
-            except (
-                urllib.error.URLError,
-                TimeoutError,
-                OSError,
-                ValueError,
-            ) as exc:
-                last_error = exc
-                continue
+        attempts_used = 0
+        try:
+            for _attempt in range(self.max_retries + 1):
+                attempts_used += 1
+                try:
+                    with urllib.request.urlopen(
+                        outbound,
+                        timeout=self.timeout_seconds,
+                    ) as response:
+                        payload = self._decode_response(response)
+                    text = self._extract_response_text(payload)
+                    request_id = payload.get("id")
+                    latency_seconds = max(0.0, time.perf_counter() - started)
+                    actual = _actual_provider_usage(
+                        payload,
+                        estimate=estimate,
+                        wall_seconds=latency_seconds,
+                        attempts_used=attempts_used,
+                    )
+                    try:
+                        self.admission_runtime.complete(
+                            lease.operation_id,
+                            actual,
+                        )
+                    except AdmissionRuntimeError as exc:
+                        _release_provider_lease(self.admission_runtime, lease)
+                        raise ProviderPolicyError(
+                            "model provider usage reconciliation failed"
+                        ) from exc
+                    return ProviderResponse(
+                        text=text,
+                        provider=self.provider_id,
+                        model=model,
+                        request_id=(
+                            str(request_id)
+                            if isinstance(request_id, (str, int))
+                            else None
+                        ),
+                        latency_ms=round(latency_seconds * 1000, 2),
+                        governance_decision_id=governance.decision_id,
+                        admission_decision_id=lease.decision.decision_id,
+                        data_class=governance.data_class,
+                    )
+                except ProviderError:
+                    raise
+                except (
+                    urllib.error.URLError,
+                    TimeoutError,
+                    OSError,
+                    ValueError,
+                ) as exc:
+                    last_error = exc
+                    continue
+        except BaseException:
+            _release_provider_lease(self.admission_runtime, lease)
+            raise
 
+        _release_provider_lease(self.admission_runtime, lease)
         raise ProviderInvocationError("model provider request failed") from last_error
 
 
