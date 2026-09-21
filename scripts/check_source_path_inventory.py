@@ -96,6 +96,7 @@ FIRST_PARTY_PREFIXES = (
     "tests/",
     "docs/",
     ".github/",
+    ".cursor/",
     "memory/",
     "satellites/",
     ".emergent/",
