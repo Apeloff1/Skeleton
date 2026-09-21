@@ -2968,3 +2968,55 @@ Deadline/cancellation propagates into provider I/O. A late response may be recor
 ### Closure
 
 The model-provider plane remains `partial` until text compatibility, structured schema, tool-call normalization, unoffered-tool denial, argument bounds, usage/finish normalization, cancellation/deadline, optional stream finalization and native-type isolation tests pass.
+
+## Fully Functional AI Closure: Application-to-Engine Execution Boundary
+
+The assembled runtime currently has a source/process ownership mismatch: Skeleton owns the provider/orchestration code contract, but backend can execute copied Skeleton code in-process and currently receives runtime model credentials. The final architecture separates product state from engine execution across an authenticated internal service boundary.
+
+### Target ownership
+
+Backend owns user/product authentication ingress, conversation/thread/message state, product workflows, application rate limits and product-facing realtime projection. Skeleton owns cognitive execution, model routing/provider transport, context compilation, governed tools, verification and execution/turn/checkpoint/result authority.
+
+After cutover, backend must not own runtime model credentials or a local provider fallback.
+
+### Internal execution API
+
+The initial transport is versioned HTTP/JSON on the private runtime network, but network privacy alone is not authorization. Backend authenticates as a service principal and delegates a bounded user/tenant/capability authority envelope.
+
+Canonical commands:
+
+- `POST /api/v1/executions` — idempotent create-or-return-existing; returns quickly with operation/execution identity;
+- `GET /api/v1/executions/{operation_id}` — authoritative status/result projection;
+- `POST /api/v1/executions/{operation_id}/cancel` — idempotent authority-bound cancellation;
+- `GET /api/v1/executions/{operation_id}/events` — replayable operation-event projection.
+
+Long-running work is never tied to the lifetime of the submit HTTP request.
+
+### Delegated authority
+
+Service identity and end-user identity are distinct. The engine validates the backend service principal plus actor, tenant, scopes, capability, expiry and request binding. Backend cannot grant scopes outside its declared delegation policy. The raw user JWT does not become the engine service credential.
+
+### Retry and failure law
+
+Submit retries use stable operation/idempotency identity; uncertain submit outcome is resolved by querying that identity before creating anything new. Status is safe to retry. Event replay uses cursor semantics. Cancel is idempotent and cannot reopen terminal state.
+
+Engine unavailability produces explicit degraded backend AI readiness; it never triggers an undeclared local provider fallback.
+
+### Credential/process cutover
+
+1. Keep current compatibility execution while engine contracts are built.
+2. Add engine submit/status/cancel/events plus service/delegated auth.
+3. Migrate backend AI/conversation routes to the engine client and block shadow local provider calls in tests.
+4. Prove cross-service golden journeys, cancellation, replay and degraded behavior.
+5. Move runtime provider credentials to the Skeleton service only and remove them from backend deployment.
+6. Convert `backend/core/ai_provider.py` into a remote compatibility client or retire it after callers migrate.
+
+Do not remove the backend credential before delegation parity is proven. Do not claim process convergence while backend still requires runtime provider credentials.
+
+### Frontend rule
+
+Canonical product conversation/assistant actions enter through backend because backend owns product/conversation authority. Direct frontend-to-engine access remains limited to explicitly declared engine-native surfaces such as health or separately authorized future capabilities.
+
+### Closure
+
+The engine-api plane remains `partial` until service/delegated auth, submit idempotency, trace/deadline/budget propagation, status/result, cancellation fencing, engine-outage behavior, cross-service replay and process credential-isolation tests pass.
