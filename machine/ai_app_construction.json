@@ -75,7 +75,8 @@
       "compatibility_boundaries": [
         "backend/core/ai_provider.py",
         "skeleton/jeeves/providers.py"
-      ]
+      ],
+      "engine_docker_materialization": "Dockerfile"
     }
   },
   "quality_attributes": {
