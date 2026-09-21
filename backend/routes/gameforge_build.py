@@ -10,11 +10,9 @@ PyInstaller) are reported honestly as unavailable unless the toolchain is instal
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
-import time
 import zipfile
 from typing import Optional
 
