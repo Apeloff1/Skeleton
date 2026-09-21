@@ -29,6 +29,7 @@ from skeleton.vault.data_lifecycle import (
     GovernedDataRecord,
     LifecycleState,
 )
+from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.lifecycle_adapters import (
     DeletionExecutionResult,
     GovernedExport,
@@ -377,6 +378,7 @@ class GovernanceRegistry:
         adapters: LifecycleAdapterRegistry,
         tenant_id: str,
         *,
+        timeline: GovernanceAuditTimeline | None = None,
         record_ids: Iterable[str] | None = None,
         reason: str = "tenant-request",
         now: float | None = None,
@@ -392,12 +394,14 @@ class GovernanceRegistry:
         return await LifecycleExecutor(
             self.lifecycle,
             adapters,
+            timeline=timeline,
         ).execute_deletion_plan(plan, now=now)
 
     async def execute_retention_with_adapters(
         self,
         adapters: LifecycleAdapterRegistry,
         *,
+        timeline: GovernanceAuditTimeline | None = None,
         now: float | None = None,
     ) -> tuple[DeletionExecutionResult, ...]:
         """Plan expired records and physically delete them through adapters."""
@@ -405,18 +409,22 @@ class GovernanceRegistry:
         return await LifecycleExecutor(
             self.lifecycle,
             adapters,
+            timeline=timeline,
         ).execute_retention_expiry(now=now)
 
     async def export_with_adapters(
         self,
         adapters: LifecycleAdapterRegistry,
         tenant_id: str,
+        *,
+        timeline: GovernanceAuditTimeline | None = None,
     ) -> GovernedExport:
         """Export canonical payloads through owner-plane adapters."""
 
         return await LifecycleExecutor(
             self.lifecycle,
             adapters,
+            timeline=timeline,
         ).export_tenant(tenant_id)
 
     def request_deletion(self, *args: Any, **kwargs: Any):
