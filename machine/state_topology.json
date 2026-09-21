@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.3.0",
+  "topology_version": "1.4.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -610,6 +610,32 @@
         "backend/services/database.py",
         "backend/routes/ai.py"
       ]
+    },
+    {
+      "id": "verification-receipt-ledger",
+      "owner_plane": "reasoning-verification",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "immutable verification receipt commit per candidate/turn with bounded repair lineage",
+      "consistency": "one receipt version is immutable; later repair creates a new turn/receipt; final result references the selected terminal receipt",
+      "retention": "operation/evaluation/governance policy controlled; raw hidden reasoning is not retained",
+      "backup_restore": "required after durable repository binding because finalization/evaluation can depend on receipt identity",
+      "migration": "preserve verification id, operation/execution/turn/candidate lineage, outcome/reason codes, claim/postcondition checks and evidence refs",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-verification-evidence-contract",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/intelligence/verification.py",
+        "skeleton/intelligence/verifier.py"
+      ]
     }
   ],
   "state_flows": [
@@ -740,6 +766,22 @@
       "mode": "assistant-message-projection",
       "rule": "a verified/qualified AIExecutionResult becomes an assistant message by immutable result reference plus allowed rendered content; message commit never fabricates a result identity",
       "failure": "if assistant-message projection fails, the execution result remains authoritative and projection is retried idempotently"
+    },
+    {
+      "id": "cognitive-to-verification",
+      "from": "cognitive-execution-ledger",
+      "to": "verification-receipt-ledger",
+      "mode": "candidate-verification",
+      "rule": "a candidate result enters policy-selected verification and commits an immutable receipt before repair/finalization decisions",
+      "failure": "missing/failed required verification prevents completed finalization; result may be qualified/abstained/blocked according to policy"
+    },
+    {
+      "id": "verification-to-final-result",
+      "from": "verification-receipt-ledger",
+      "to": "final-ai-result-ledger",
+      "mode": "finalization-evidence",
+      "rule": "AIExecutionResult references the exact terminal verification receipt selected for the final candidate",
+      "failure": "final result cannot claim verified status without the required receipt/check coverage"
     }
   ],
   "recovery_order": [
@@ -776,6 +818,8 @@
     "usage consumption is monotonic across retries, repairs and resumed turns",
     "conversation thread/message authority is server-side durable state; client-submitted history never becomes authoritative by being sent to a model",
     "assistant conversation messages reference canonical operation/execution results rather than treating provider text as standalone durable truth",
-    "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts"
+    "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts",
+    "verification receipts persist observable claims, evidence references, checks and outcomes but never require hidden chain-of-thought",
+    "a final AI result that claims verification references an immutable verification receipt with policy-required check coverage"
   ]
 }
