@@ -46,6 +46,7 @@ on:
       - 'tests/test_worker_health.py'
       - 'skeleton/testing/test_bot_manager.py'
       - 'core/activation_security.py'
+      - 'skeleton/security/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_repair_intake.py'
@@ -90,6 +91,7 @@ on:
       - 'tests/test_worker_health.py'
       - 'skeleton/testing/test_bot_manager.py'
       - 'core/activation_security.py'
+      - 'skeleton/security/activation_security.py'
       - 'core/shift_supervisor/model_gateway.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_repair_intake.py'
@@ -153,4 +155,4 @@ jobs:
       - name: Enforce workflow_run branch-completion contract
         run: python backend/scripts/check_workflow_run_branch_completions.py
       - name: Enforce bot activation security baseline
-        run: python -m core.activation_security
+        run: python -m skeleton.security.activation_security
