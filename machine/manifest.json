@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.2",
+  "schema_version": "4.3",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -395,6 +395,23 @@
         "fix/issue-pass-sast-traversal"
       ],
       "note": "existing integration PRs reused; zero-file branch retained as lineage"
+    },
+    "automation_ci_wave": {
+      "revalidated": [
+        "actions live-run reaper",
+        "actions queue pressure",
+        "automation reconciliation",
+        "automerge workflow branches",
+        "autonomous PR URL evidence",
+        "branch control/backpressure",
+        "CI current-main/hygiene",
+        "closed bot ledger",
+        "CodeQL dedupe",
+        "Dependabot fail-closed automerge",
+        "frontier PR push coalescing",
+        "ARM/nonpreemptive housekeeping"
+      ],
+      "note": "existing integration PRs reused; source branches remain available for controlled reconciliation"
     }
   },
   "integrated_domains": [
