@@ -395,3 +395,18 @@ def test_live_status_rejects_non_positive_timeout(capsys):
 
     assert exit_code == 2
     assert "timeout must be greater than zero" in capsys.readouterr().out
+
+
+def test_public_product_readiness_route_is_registered():
+    root = find_repo_root(Path(__file__))
+    route = (root / "backend/routes/product_runtime.py").read_text(encoding="utf-8")
+    registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
+    client = (root / "frontend/src/product/productControlClient.ts").read_text(encoding="utf-8")
+    capability = (root / "frontend/app/capability.tsx").read_text(encoding="utf-8")
+
+    assert 'APIRouter(prefix="/api/product"' in route
+    assert '@router.get("/readiness")' in route
+    assert '("routes.product_runtime",' in registry
+    assert "const PUBLIC_ROOT = '/api/product';" in client
+    assert "getProductReadiness" in capability
+    assert "getProductControlStatus(''," not in capability
