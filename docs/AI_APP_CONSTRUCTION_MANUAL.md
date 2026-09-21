@@ -606,6 +606,33 @@ The current repository is beyond generic plane mapping. Functional-AI closure no
 
 Dependencies are **closure prerequisites**, not a ban on starting independent implementation earlier behind stable contracts.
 
+### State-authority checkpoint — Jeeves RAG product state
+
+The RAG product-state slice of `gap-state-authority-convergence` is now implemented
+as Mongo-first authority:
+
+- learning-session ownership/content, user progress, co-coding ownership/state,
+  and feedback commit to core Mongo through
+  `backend/services/rag_state_repository.py`;
+- local Chroma collections are rebuildable semantic projections only;
+- a Chroma projection failure does not roll back an accepted Mongo write;
+- co-coding retrieval hits are checked against canonical Mongo ownership before
+  they can re-enter product context;
+- legacy Chroma product-state records have an idempotent import path;
+- user-owned Chroma projections can be rebuilt after total projection loss from
+  canonical Mongo state.
+
+This does **not** close the full state-authority P0 gap. Production operation
+repository binding, durable outbox runtime dispatch, authoritative Mongo
+backup/restore rehearsal, and full derived-store recovery remain required.
+
+Evidence:
+`backend/services/rag_service.py`,
+`backend/services/rag_state_repository.py`,
+`backend/tests/test_rag_state_repository.py`,
+`backend/tests/test_rag_state_authority.py`, and
+`machine/state_topology.json`.
+
 ### Stage 0 — authority-policy-foundations
 
 - `gap-state-authority-convergence`
