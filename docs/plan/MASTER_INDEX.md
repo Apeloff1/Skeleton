@@ -32,6 +32,10 @@ Mandatory build accountability: [`BUILD_ACCOUNTABILITY_LEDGER.md`](BUILD_ACCOUNT
 
 Machine accountability ledger: [`machine/ai_build_accountability.json`](../../machine/ai_build_accountability.json)
 
+Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
+
+Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -61,6 +65,8 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 17. `machine/ai_p0_edge_case_matrix.json`
 18. `docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md`
 19. `machine/ai_full_edge_case_matrix.json`
+20. `docs/plan/MASTER_BUILD_SEQUENCE.md`
+21. `machine/ai_master_build_sequence.json`
 
 The first ten remain the present implementation/construction authority. Items 11–13 add the canonical long-range index and planning authority.
 
@@ -104,6 +110,8 @@ The first ten remain the present implementation/construction authority. Items 11
 | XX | Construction, Acceptance & Scope Control | Work packages, vertical slices, DoD, traceability, acceptance gates, build waves and breadth freeze. |
 
 ## Build-depth transition
+
+The master build sequence provides the canonical middle layer between frozen architecture breadth and atomic implementation. It assigns W00–W30 to MBW-00..07, preserves AIQ task authority, and makes dependency/promotion/stop conditions explicit without creating a second completion mechanism.
 
 Breadth is frozen. Future work should preferentially deepen the following chain:
 
