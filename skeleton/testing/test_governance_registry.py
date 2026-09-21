@@ -6,6 +6,7 @@ from skeleton.vault.data_governance import DataGovernanceDenied
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
     GovernedDataRecord,
+    LifecycleConflict,
 )
 from skeleton.vault.governance_registry import (
     CanonicalDataPlane,
@@ -293,7 +294,7 @@ def test_register_canonical_write_requires_purpose_and_preserves_registry_author
         created_at=10.0,
     )
 
-    with pytest.raises(Exception, match="record already registered"):
+    with pytest.raises(LifecycleConflict, match="record already registered"):
         registry.register_canonical_write(
             "conversation",
             record_id="message-1",
