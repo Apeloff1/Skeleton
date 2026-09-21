@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v2.0`
+**Architecture tag:** `arch-map/v2.6`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -218,6 +218,8 @@ arch-map/v2.1  mandatory runtime provider architecture acknowledgement
 arch-map/v2.2  construction/provider fail-closed validators
 arch-map/v2.3  explicit SOTA gap register + closure evidence
 arch-map/v2.4  fail-fast CI construction/provider gates
+arch-map/v2.5  provider receipt enforcement at direct I/O + self-describing runtime status
+arch-map/v2.6  current-state gap closure roadmap + universal construction gates
 ```
 
 ## 10. Operator commands
