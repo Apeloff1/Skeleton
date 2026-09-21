@@ -37,6 +37,7 @@ python -m skeleton app check --runtime
 
 # Build and start the core application
 python -m skeleton app up
+# app up waits for frontend + backend + engine readiness before success
 
 # Include optional Chroma
 python -m skeleton app up --full
@@ -50,7 +51,7 @@ python -m skeleton app config
 python -m skeleton app down
 ```
 
-After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
+After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
 ## Runtime configuration
