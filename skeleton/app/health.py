@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -93,3 +94,31 @@ def probe_application(
 
 def probes_ok(results: tuple[ProbeResult, ...]) -> bool:
     return bool(results) and all(result.ok for result in results)
+
+
+def wait_for_application(
+    *,
+    manifest: AssemblyManifest | None = None,
+    full: bool = False,
+    timeout: float = 3.0,
+    attempts: int = 10,
+    delay: float = 1.0,
+) -> tuple[ProbeResult, ...]:
+    """Retry whole-application probes until healthy or the budget is exhausted."""
+
+    if attempts < 1:
+        raise ValueError("attempts must be at least one")
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+    if delay < 0:
+        raise ValueError("delay must not be negative")
+
+    manifest = manifest or load_manifest()
+    latest: tuple[ProbeResult, ...] = ()
+    for attempt in range(attempts):
+        latest = probe_application(manifest=manifest, full=full, timeout=timeout)
+        if probes_ok(latest):
+            return latest
+        if attempt + 1 < attempts and delay:
+            time.sleep(delay)
+    return latest
