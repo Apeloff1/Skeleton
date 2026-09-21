@@ -2755,6 +2755,14 @@ Builders working on W00–W11 must consult the mapped catalog cases before decla
 
 The matrix deliberately reuses the frozen Volume 000–420 architecture and the existing functional-AI dependency graph. It does not create a parallel runtime or change canonical owners.
 
+### Full W00–W30 edge ownership
+
+The full-program acceptance overlay is `machine/ai_full_edge_case_matrix.json` with human guidance in `docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md`.
+
+It assigns all 240 historical/edge/obscure catalogue entries across W00–W30 and records recommended evidence modes such as property testing, fuzzing, adversarial evaluation, negative testing, fault injection, recovery drills, platform testing, integration and E2E validation.
+
+Atomic queue tasks inherit risk counts from their `work_package_refs`. Builders must not interpret a low line-count change as low risk when the inherited catalog contains critical/high cases. Conversely, multiple mapped cases may be discharged by one strong invariant or failure-injection test when the evidence genuinely covers them.
+
 ## Fully Functional AI Closure: Detailed Runtime Assembly
 
 The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
