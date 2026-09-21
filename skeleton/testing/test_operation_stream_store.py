@@ -130,3 +130,57 @@ def test_sqlite_stream_detects_persisted_payload_corruption(tmp_path: Path) -> N
 
         with pytest.raises(StreamStoreCorruptionError):
             store.replay(ReplayCursor(operation_id))
+
+
+def test_sqlite_stream_explicit_event_id_append_is_retry_idempotent(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    event_id = str(uuid4())
+    timestamp = datetime.now(timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        first = store.append(
+            operation_id,
+            "operation.validated",
+            {"state": "validated", "version": 2},
+            event_id=event_id,
+            timestamp=timestamp,
+        )
+        retry = store.append(
+            operation_id,
+            "operation.validated",
+            {"state": "validated", "version": 2},
+            event_id=event_id,
+            timestamp=timestamp,
+        )
+
+        assert retry.as_dict() == first.as_dict()
+        assert store.head(operation_id)["latest_sequence"] == 1
+        assert len(store.replay(ReplayCursor(operation_id))) == 1
+
+
+def test_sqlite_stream_explicit_event_id_conflict_fails_closed(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    event_id = str(uuid4())
+    timestamp = datetime.now(timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        store.append(
+            operation_id,
+            "operation.progress",
+            {"step": 1},
+            event_id=event_id,
+            timestamp=timestamp,
+        )
+
+        with pytest.raises(StreamDuplicateConflictError):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": 2},
+                event_id=event_id,
+                timestamp=timestamp,
+            )
