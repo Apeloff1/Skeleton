@@ -3267,3 +3267,41 @@ Ordinary logs use IDs, digests and allowlisted metadata instead of raw prompts/t
 Evaluation has layered evidence: deterministic contract tests, scenario tests with fake providers/tools, full golden journeys on assembled services, tightly budgeted live-provider staging smoke where configured, and canary/release gates. Baselines are capability- and version-specific and include runtime/model/routing-policy identity.
 
 Release evidence includes architecture/construction validation, P0 focused tests, golden journeys, security/provider-surface scans, migration/restore proof, eval regression reports, and build/artifact provenance. Rollback may revert deployment, routing/model policy or feature enablement, but never by discarding canonical user or operation state.
+
+## Fully Functional AI Closure: Typed Runtime Schema Catalog
+
+The field-name envelopes in the construction contract are refined by `machine/ai_runtime_schemas.json`. That catalog is a mandatory architecture source linked from the runtime manifest and validated against every canonical envelope.
+
+It defines common ID/timestamp/digest conventions, enums, nullability, size/bounds, typed records and cross-record invariants for operation, resource budget, conversation, context, provider/tool interaction, memory, verification, final results, delegated authority, engine commands, stream events and stable errors.
+
+Every canonical envelope has exactly one `envelope_record_map` entry. CI rejects a missing typed record, missing required field, owner-plane mismatch, schema/version drift, or architecture-tag mismatch.
+
+Implementations in Python, API/OpenAPI, Mongo repositories and frontend types should be generated from or checked against the same semantics rather than independently guessing field meaning.
+
+## Fully Functional AI Closure: Authority and Child Execution
+
+Authentication establishes identity; it does not grant model/tool authority. `AuthorityContext` binds principal type, tenant, scopes/capabilities, resource constraints, authentication strength, issue/expiry time and source.
+
+Tool read/write/destructive/external-commit/privileged actions require explicit action/resource authority. Human approval is additional authorization for the exact action digest; it cannot manufacture authority that the principal did not possess.
+
+Child/sub-agent work stays inside the same orchestration runtime. A child inherits immutable tenant/actor lineage, an explicit subset of parent authority, a reserved subset of parent budget, and a deadline no later than the parent. Fanout, recursion depth and total child count are hard bounded.
+
+Child results return by durable result reference. Child agents do not exchange hidden chain-of-thought as runtime state. Parent cancellation propagates to interruptible children, while already committed child side effects remain receipt-backed.
+
+## Fully Functional AI Closure: Interactive Steering
+
+User interaction during a running operation is modeled as commands rather than implicit prompt mutation.
+
+Supported semantics include cancel, approve, deny, provide required input, interrupt-and-replace, and queue follow-up. A waiting operation can resume from the same checkpoint when the pending wait contract is satisfied. A normal new conversational message creates a new causal operation; it does not invisibly alter an already-dispatched provider request.
+
+Interrupt-and-replace requests cancellation of the active operation, commits the new user message/branch, and starts replacement execution under defined side-effect ordering/fencing. Terminal state wins over late cancel/approval. Duplicate steering commands are idempotent.
+
+## Fully Functional AI Closure: Safety and Safe Rendering
+
+Safety decisions occur at request ingress, provider transfer, tool proposal/action, provider output normalization, final rendering and artifact boundaries. Decisions are versioned receipts with risk class, outcome and stable reason codes.
+
+The generator is not the safety authority. A model refusal is not a substitute for tool authorization; a model request cannot override a tool/security block; unsafe provider output can be quarantined before product exposure.
+
+Assistant text, Markdown and HTML are untrusted display content. Product rendering uses a safe renderer, safe link-protocol policy, inert code blocks, authorized artifact links and canonical citation metadata. Tool/action status comes from durable receipts rather than prose.
+
+Qualified, abstained, blocked and degraded results remain visually distinguishable from verified completion. Provisional streamed text is reconciled to the canonical assistant message/result on terminal commit. Rendering and approval controls meet accessibility requirements.
