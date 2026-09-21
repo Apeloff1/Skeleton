@@ -1,0 +1,108 @@
+name: App Assembly
+
+on:
+  push:
+    branches:
+      - integration/app-consolidation
+    paths:
+      - "skeleton/app/**"
+      - "skeleton/__main__.py"
+      - "skeleton/testing/test_app_assembly.py"
+      - "docker-compose.yml"
+      - "frontend/**"
+      - "backend/**"
+      - "pyproject.toml"
+      - ".env.example"
+      - "scripts/ci.sh"
+      - ".github/workflows/app-assembly.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "skeleton/app/**"
+      - "skeleton/__main__.py"
+      - "skeleton/testing/test_app_assembly.py"
+      - "docker-compose.yml"
+      - "frontend/**"
+      - "backend/**"
+      - "pyproject.toml"
+      - ".env.example"
+      - ".github/workflows/app-assembly.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-assembly-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.16"
+
+jobs:
+  assembly-contract:
+    name: Assembly Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Install focused test runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Compile assembly surface
+        run: python -m compileall -q skeleton/app skeleton/__main__.py
+
+      - name: Run assembly contract tests
+        env:
+          PYTHONPATH: "."
+        run: python -m pytest -q skeleton/testing/test_app_assembly.py
+
+      - name: Validate structural assembly
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m skeleton app check
+          python -m skeleton app status --json > /tmp/skeleton-app-status.json
+          python -m json.tool /tmp/skeleton-app-status.json >/dev/null
+
+      - name: Validate Compose topology
+        env:
+          MONGO_URL: mongodb://admin:assembly-test@mongo:27017/tutolage?authSource=admin
+          SKL_MONGO_URI: mongodb://admin:assembly-test@mongo:27017/skeleton?authSource=admin
+          MONGO_INITDB_ROOT_PASSWORD: assembly-test-password
+          JWT_SECRET: assembly-test-jwt-secret-not-for-runtime
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Verify wheel contains assembly manifest
+        run: |
+          python -m pip wheel --no-deps . -w /tmp/wheelhouse
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("/tmp/wheelhouse").glob("skeleton-*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one Skeleton wheel, found {len(wheels)}")
+          with ZipFile(wheels[0]) as archive:
+              names = set(archive.namelist())
+          required = {
+              "skeleton/app/__init__.py",
+              "skeleton/app/assembly.py",
+              "skeleton/app/cli.py",
+              "skeleton/app/health.py",
+              "skeleton/app/manifest.json",
+          }
+          missing = sorted(required - names)
+          if missing:
+              raise SystemExit(f"wheel missing assembly payload: {missing}")
+          print(f"verified {wheels[0].name}")
+          PY
