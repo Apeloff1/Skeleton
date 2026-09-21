@@ -131,27 +131,38 @@ def test_windows_build_is_pinned_and_hashes_installer():
 
 
 def test_windows_runtime_payload_respects_portable_path_budget():
-    runtime_roots = (
-        Path("backend"),
-        Path("frontend"),
-        Path("skeleton"),
-        Path("scripts"),
-        Path("packaging"),
+    # The installer payload is created by git archive, so validate exactly the
+    # tracked files that can enter that archive. CI creates frontend/node_modules
+    # before this test runs; walking the workspace would incorrectly treat those
+    # transient dependencies as installer payload.
+    completed = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--",
+            "backend",
+            "frontend",
+            "skeleton",
+            "scripts",
+            "packaging",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
+    tracked_paths = [line.strip().replace("\\", "/") for line in completed.stdout.splitlines()]
     violations: list[tuple[int, str]] = []
 
-    for root in runtime_roots:
-        for path in root.rglob("*"):
-            if not path.is_file():
-                continue
-            relative = path.as_posix()
-            if (
-                relative.startswith("backend/gameforge/jeeves/jeeves_mastermap_")
-                and relative.endswith(".json")
-            ):
-                continue
-            if len(relative) > 190:
-                violations.append((len(relative), relative))
+    for relative in tracked_paths:
+        if not relative:
+            continue
+        if (
+            relative.startswith("backend/gameforge/jeeves/jeeves_mastermap_")
+            and relative.endswith(".json")
+        ):
+            continue
+        if len(relative) > 190:
+            violations.append((len(relative), relative))
 
     assert violations == [], (
         "Windows runtime payload exceeds the 190-character relative path budget: "
