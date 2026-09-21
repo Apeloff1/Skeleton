@@ -89,8 +89,60 @@ def audit_manifest() -> None:
     if isinstance(services, list):
         names = [item.get("name") for item in services if isinstance(item, dict)]
         check(len(names) == len(set(names)), "assembly service names must be unique")
+        known_names = {name for name in names if isinstance(name, str)}
         for required in ("frontend", "backend", "skeleton", "mongo"):
             check(required in names, f"canonical service missing: {required}")
+
+        dependencies: dict[str, tuple[str, ...]] = {}
+        for item in services:
+            if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                continue
+            name = item["name"]
+            raw_deps = item.get("depends_on", [])
+            check(isinstance(raw_deps, list), f"service {name} depends_on must be a list")
+            deps = tuple(dep for dep in raw_deps if isinstance(dep, str)) if isinstance(raw_deps, list) else ()
+            check(
+                set(deps).issubset(known_names),
+                f"service {name} references unknown dependencies: {sorted(set(deps) - known_names)}",
+            )
+            dependencies[name] = deps
+
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(name: str, trail: tuple[str, ...]) -> None:
+            if name in visited:
+                return
+            if name in visiting:
+                cycle = " -> ".join((*trail, name))
+                FAILURES.append(f"assembly service dependency cycle: {cycle}")
+                return
+            visiting.add(name)
+            for dependency in dependencies.get(name, ()):
+                visit(dependency, (*trail, name))
+            visiting.remove(name)
+            visited.add(name)
+
+        for name in sorted(dependencies):
+            visit(name, ())
+
+        default_services = app.get("default_services", [])
+        full_services = app.get("full_services", [])
+        check(isinstance(default_services, list), "default_services must be a list")
+        check(isinstance(full_services, list), "full_services must be a list")
+        if isinstance(default_services, list) and isinstance(full_services, list):
+            check(
+                set(default_services).issubset(known_names),
+                f"default profile references unknown services: {sorted(set(default_services) - known_names)}",
+            )
+            check(
+                set(full_services).issubset(known_names),
+                f"full profile references unknown services: {sorted(set(full_services) - known_names)}",
+            )
+            check(
+                set(default_services).issubset(set(full_services)),
+                "full profile must contain every default service",
+            )
 
     required_paths = manifest.get("required_paths", [])
     check(isinstance(required_paths, list), "required_paths must be a list")
@@ -98,6 +150,63 @@ def audit_manifest() -> None:
         for relative in required_paths:
             if isinstance(relative, str):
                 check((ROOT / relative).exists(), f"manifest required path missing: {relative}")
+
+
+
+def _compose_service_names(source: str) -> set[str]:
+    names: set[str] = set()
+    inside_services = False
+    for line in source.splitlines():
+        if line == "services:":
+            inside_services = True
+            continue
+        if inside_services and line and not line.startswith(" "):
+            break
+        if not inside_services:
+            continue
+        match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+        if match:
+            names.add(match.group(1))
+    return names
+
+
+def audit_topology_alignment() -> None:
+    raw_manifest = read("skeleton/app/manifest.json")
+    compose = read("docker-compose.yml")
+    frontend_config = read("frontend/app.json")
+    if not raw_manifest or not compose or not frontend_config:
+        return
+
+    try:
+        manifest = json.loads(raw_manifest)
+        expo = json.loads(frontend_config)
+    except json.JSONDecodeError as exc:
+        FAILURES.append(f"application identity/topology JSON invalid: {exc}")
+        return
+
+    manifest_services = {
+        item.get("name")
+        for item in manifest.get("services", [])
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    compose_services = _compose_service_names(compose)
+    check(
+        manifest_services == compose_services,
+        f"manifest/compose service drift: manifest={sorted(manifest_services)} compose={sorted(compose_services)}",
+    )
+
+    app = manifest.get("app", {})
+    expo_config = expo.get("expo", {})
+    manifest_name = app.get("name") if isinstance(app, dict) else None
+    expo_name = expo_config.get("name") if isinstance(expo_config, dict) else None
+    check(
+        isinstance(manifest_name, str) and bool(manifest_name.strip()),
+        "assembly manifest application name missing",
+    )
+    check(
+        expo_name == manifest_name,
+        f"frontend display identity drift: expo={expo_name!r} manifest={manifest_name!r}",
+    )
 
 
 def audit_no_competing_root_launchers() -> None:
@@ -498,6 +607,7 @@ def audit_product_route_registry() -> None:
 
 def main() -> int:
     audit_manifest()
+    audit_topology_alignment()
     audit_no_competing_root_launchers()
     audit_endpoint_boundary()
     audit_compose_modes()

@@ -13,7 +13,7 @@ and one operator command.
 | Service | Role | Public development endpoint |
 | --- | --- | --- |
 | `frontend` | Expo / browser interface | `http://localhost:3000` |
-| `backend` | Tutolage application API | `http://localhost:8001` |
+| `backend` | Skeleton application API | `http://localhost:8001` |
 | `skeleton` | Skeleton v16 engine API | `http://localhost:8010` |
 | `mongo` | durable state | local-only host binding |
 | `chroma` | optional vector store | `http://localhost:8000` with `--full` |
@@ -23,12 +23,19 @@ Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
 and can be progressively reconciled behind that boundary.
 
+The canonical displayed application name is **Skeleton**. Expo now uses that
+display name as well. Existing mobile slug, URL scheme, bundle identifier, and
+Android package identifiers remain unchanged in this pass so installed-client
+upgrade compatibility is not broken merely to rename internal history.
+
 ## Canonical commands
 
 ```bash
-# Inspect topology
+# Inspect topology and dependency-aware startup order
 python -m skeleton app status
 python -m skeleton app status --live
+python -m skeleton app plan
+python -m skeleton app plan --full
 
 # Structural repository validation
 python -m skeleton app check
@@ -52,13 +59,19 @@ python -m skeleton app config
 python -m skeleton app down
 ```
 
-After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
+After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.
+
+The launcher now derives startup order from manifest dependencies. `app plan` exposes the dependency layers, automatically closes over transitive dependencies, and rejects cycles. `app up` consumes the same plan, so the inspected topology and the executed topology cannot silently diverge.
+
+The CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
 ## Runtime modes
 
 The canonical Compose file runs application code from built images. Source
-bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development\nports are isolated there as well, so the production topology exposes only the\nbrowser-facing frontend port.
+bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development
+ports are isolated there as well, so the production topology exposes only the
+browser-facing frontend port.
 
 ```bash
 # Built development images, verified after startup
@@ -125,7 +138,9 @@ because the Expo development server is not the production reverse proxy.
    service DNS names are internal implementation details and must not be
    embedded into the exported frontend bundle.
 4. `python -m skeleton app check` is the minimum structural regression gate
-   for assembly work.
-5. Existing subsystem PRs should reconcile into
-   `integration/app-consolidation` rather than create a competing assembly
-   trunk.
+   for assembly work; it includes the manifest dependency-graph verdict.
+5. The manifest and Docker Compose must declare the same service set, and the
+   Expo display name must match the manifest application name.
+6. Existing subsystem work should reconcile through bounded integration
+   branches based on the latest assembled `main`; do not revive the superseded
+   mega-diff consolidation trunk or create a competing application root.

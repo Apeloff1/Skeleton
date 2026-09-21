@@ -287,6 +287,31 @@ def preflight(
             )
         )
 
+    try:
+        from skeleton.app.plan import validate_manifest_topology
+
+        default_plan, full_plan = validate_manifest_topology(manifest)
+    except ValueError as exc:
+        checks.append(
+            AssemblyCheck(
+                code="topology:graph",
+                ok=False,
+                message=f"application topology invalid: {exc}",
+            )
+        )
+    else:
+        checks.append(
+            AssemblyCheck(
+                code="topology:graph",
+                ok=True,
+                message=(
+                    "application topology valid: "
+                    f"default={len(default_plan.services)} services, "
+                    f"full={len(full_plan.services)} services"
+                ),
+            )
+        )
+
     if runtime:
         docker = shutil.which("docker")
         checks.append(
@@ -339,12 +364,20 @@ def compose_command(
         base.extend(["-f", manifest.hot_compose_file])
 
     if action == "up":
-        if full:
-            base.extend(["--profile", "full"])
+        from skeleton.app.plan import build_plan
+
+        plan = build_plan(manifest=manifest, full=full)
+        profiles: list[str] = []
+        for service_name in plan.services:
+            profile = manifest.service(service_name).profile
+            if profile and profile not in profiles:
+                profiles.append(profile)
+        for profile in profiles:
+            base.extend(["--profile", profile])
         command = [*base, "up", "-d"]
         if build:
             command.append("--build")
-        command.extend(manifest.full_services if full else manifest.default_services)
+        command.extend(plan.services)
         return tuple(command)
     if action == "down":
         return tuple([*base, "down", "--remove-orphans"])
