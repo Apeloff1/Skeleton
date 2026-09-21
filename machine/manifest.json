@@ -10,13 +10,35 @@
     "server": "uvicorn"
   },
   "assembly": {
-    "branch": "integration/app-consolidation",
+    "branch": "integration/app-product-shell",
     "base": "main",
     "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
-    "current_status": "application_contract_active",
-    "pull_request": 1883,
+    "current_status": "part_1_landed_part_2_ready_architecture_stacked",
+    "pull_request": 1902,
     "contract": "skeleton/app/manifest.json",
-    "operator": "python -m skeleton app"
+    "operator": "python -m skeleton app",
+    "architecture_contract": "machine/architecture.json",
+    "architecture_branch": "integration/architecture-map-v1",
+    "layers": [
+      {
+        "name": "core-runtime-control-plane",
+        "state": "landed",
+        "ref": "main",
+        "pr": 1901
+      },
+      {
+        "name": "product-shell-deployment",
+        "state": "ready",
+        "ref": "integration/app-product-shell",
+        "pr": 1902
+      },
+      {
+        "name": "architecture-map",
+        "state": "stacked",
+        "ref": "integration/architecture-map-v1",
+        "tag": "arch-map/v1.3"
+      }
+    ]
   },
   "entrypoints": {
     "tests": "python -m pytest skeleton/testing -v",
@@ -671,5 +693,12 @@
       "hot",
       "production"
     ]
+  },
+  "architecture": {
+    "contract": "machine/architecture.json",
+    "documentation": "docs/ARCHITECTURE_MAP.md",
+    "validator": "scripts/check_architecture_map.py",
+    "tag": "arch-map/v1.3",
+    "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit"
   }
 }
