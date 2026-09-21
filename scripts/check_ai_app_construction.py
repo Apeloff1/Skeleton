@@ -1717,6 +1717,21 @@ def _validate_functional_ai_closure(
             )
         result["blueprints"] = len(seen_keys)
 
+    supporting = _nonempty_strings(
+        closure.get("required_supporting_contracts"),
+        label="functional_ai_closure.required_supporting_contracts",
+        errors=errors,
+    )
+    for key in supporting:
+        value = contract.get(key)
+        if not isinstance(value, dict):
+            errors.append(f"functional AI supporting contract missing/object required: {key}")
+            continue
+        if value.get("schema_version") != 1:
+            errors.append(f"functional AI supporting contract {key}.schema_version must be 1")
+        if value.get("status") != "active":
+            errors.append(f"functional AI supporting contract {key}.status must be active")
+
     required_envelopes = _nonempty_strings(
         closure.get("required_envelopes"),
         label="functional_ai_closure.required_envelopes",
