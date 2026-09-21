@@ -71,7 +71,7 @@ def test_lifecycle_moves_from_pending_bound_to_confirmed(tmp_path):
 
 
 def test_unbound_lifecycle_is_explicit(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = ProductControlPlane(tmp_path, bind_native_executors=False)
     operation = plane.admit(
         capability_id="studio",
         domain="studio",
