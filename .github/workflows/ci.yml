@@ -293,6 +293,7 @@ jobs:
         run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
+      - run: yarn test:operation-stream
       - run: yarn export:web
   docker:
     name: "Docker Build"
