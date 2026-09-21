@@ -38,6 +38,8 @@ services:
       - SKL_MONGO_DATABASE=skeleton
       - SKL_CHROMA_HOST=chroma
       - SKL_CHROMA_PORT=8000
+      - SKL_OPERATION_STATE_PATH=/app/data/operation_state.sqlite
+      - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
     depends_on:
       mongo:
         condition: service_healthy
@@ -47,6 +49,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    volumes:
+      - skeleton_data:/app/data
     networks:
       - tutolage
 
@@ -183,6 +187,8 @@ volumes:
   mongo_config:
     driver: local
   backend_data:
+    driver: local
+  skeleton_data:
     driver: local
   chroma_data:
     driver: local
