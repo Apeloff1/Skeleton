@@ -199,14 +199,18 @@
         "ProviderRequest",
         "ProviderResponse",
         "ProviderAdapter",
-        "provider architecture receipt"
+        "provider architecture receipt",
+        "governance decision receipt",
+        "admission decision receipt"
       ],
       "construction": [
         "provider reads mandatory construction contract",
         "declare capabilities/models",
         "bound retries/timeouts",
         "normalize errors",
-        "never expose credentials"
+        "never expose credentials",
+        "evaluate data governance before provider client access",
+        "evaluate resource admission before provider client access"
       ],
       "acceptance": [
         "provider contract gate",
@@ -773,25 +777,35 @@
       ],
       "evidence": [
         "skeleton/vault",
-        "skeleton/artifact_plane"
+        "skeleton/artifact_plane",
+        "skeleton/vault/data_governance.py",
+        "skeleton/testing/test_data_governance.py"
       ],
       "required_interfaces": [
         "data class",
         "retention rule",
         "deletion request",
         "export request",
-        "provider privacy policy"
+        "provider privacy policy",
+        "ProviderTransferRequest",
+        "ProviderTransferDecision",
+        "provider transfer receipt"
       ],
       "construction": [
         "classify data before provider/tool transfer",
         "tenant deletion workflow",
         "audit access/export",
-        "document provider retention"
+        "document provider retention",
+        "enforce baseline provider transfer policy before external model I/O",
+        "bind confidential provider transfer to tenant identity"
       ],
       "acceptance": [
         "deletion propagation",
         "export completeness",
-        "provider privacy routing tests"
+        "provider privacy routing tests",
+        "restricted provider transfer denial",
+        "confidential tenant binding",
+        "transfer receipt determinism"
       ],
       "failure_mode": "block transfer when classification/policy unknown"
     },
@@ -948,25 +962,36 @@
       "evidence": [
         "skeleton/intelligence/capacity_planner.py",
         "skeleton/agents/swarm_quota.py",
-        "skeleton/agents/swarm_load_shed.py"
+        "skeleton/agents/swarm_load_shed.py",
+        "skeleton/intelligence/admission.py",
+        "skeleton/testing/test_cost_admission.py"
       ],
       "required_interfaces": [
         "budget",
         "quota",
         "cost estimate",
-        "admission decision"
+        "admission decision",
+        "ResourceBudget",
+        "UsageEstimate",
+        "AdmissionRequest",
+        "AdmissionDecision"
       ],
       "construction": [
         "budget per request/tenant",
         "rate limits",
         "concurrency caps",
-        "cache where semantics permit"
+        "cache where semantics permit",
+        "issue deterministic admission receipt before provider allocation",
+        "project ResourceBudget into model-routing hard cost/output/deadline constraints"
       ],
       "acceptance": [
         "quota exhaustion",
         "load test",
         "budget route selection",
-        "graceful shedding"
+        "graceful shedding",
+        "pre-I/O provider admission denial",
+        "route budget projection",
+        "deadline/concurrency/queue admission tests"
       ],
       "failure_mode": "reject/defer low-priority work"
     },
@@ -1340,7 +1365,8 @@
         "tenant deletion propagation test",
         "export completeness test",
         "retention expiry test"
-      ]
+      ],
+      "status_detail": "baseline provider-transfer enforcement implemented; lifecycle/deletion/export/retention and broader data tagging remain"
     },
     {
       "id": "gap-feedback-promotion",
@@ -1380,7 +1406,8 @@
         "route-under-budget test",
         "concurrency saturation test",
         "cost telemetry test"
-      ]
+      ],
+      "status_detail": "deterministic request admission and provider/route integration implemented; tenant quotas, live pressure and actual-usage loop remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -1932,7 +1959,12 @@
         "prompt",
         "history",
         "model",
-        "max_output_tokens"
+        "max_output_tokens",
+        "data_class",
+        "purpose",
+        "tenant_id",
+        "operation_id",
+        "resource_budget"
       ],
       "owner_plane": "model-provider"
     },
@@ -2006,6 +2038,31 @@
         "rollback_ref"
       ],
       "owner_plane": "deployment-release"
+    },
+    "admission_decision": {
+      "required_fields": [
+        "decision_id",
+        "status",
+        "operation_id",
+        "tenant_id",
+        "capability",
+        "reason_code",
+        "remaining"
+      ],
+      "owner_plane": "cost-capacity"
+    },
+    "provider_transfer_decision": {
+      "required_fields": [
+        "decision_id",
+        "permitted",
+        "provider_id",
+        "data_class",
+        "purpose",
+        "tenant_bound",
+        "reason_code",
+        "routing_privacy"
+      ],
+      "owner_plane": "governance"
     }
   },
   "release_evidence_bundle": [
@@ -2060,7 +2117,9 @@
         "backend/routes/governance.py",
         "backend/core/model_router.py",
         "skeleton/context",
-        "skeleton/memory"
+        "skeleton/memory",
+        "skeleton/vault/data_governance.py",
+        "skeleton/testing/test_data_governance.py"
       ],
       "objective": "A single enforceable data classification and transfer decision before provider/tool/persistence movement.",
       "steps": [
@@ -2077,7 +2136,24 @@
         "export inventory",
         "retention expiry"
       ],
-      "exit": "every provider transfer and durable write has a data-class/governance decision"
+      "exit": "every provider transfer and durable write has a data-class/governance decision",
+      "progress": {
+        "state": "in_progress",
+        "completed": [
+          "baseline data class registry",
+          "provider transfer decision receipt",
+          "restricted external transfer denial",
+          "confidential tenant requirement",
+          "provider adapter enforcement before I/O"
+        ],
+        "remaining": [
+          "classify memory/retrieval/artifact data",
+          "provider privacy ceiling bridge into all routes",
+          "tenant deletion propagation",
+          "export inventory",
+          "retention expiry enforcement"
+        ]
+      }
     },
     {
       "id": "WP-P0-COST-ADMISSION",
@@ -2086,7 +2162,9 @@
       "owners": [
         "skeleton/intelligence/capacity_planner.py",
         "backend/core/model_router.py",
-        "skeleton/agents/swarm_quota.py"
+        "skeleton/agents/swarm_quota.py",
+        "skeleton/intelligence/admission.py",
+        "skeleton/testing/test_cost_admission.py"
       ],
       "objective": "Reject or reroute unaffordable work before expensive allocation.",
       "steps": [
@@ -2103,7 +2181,25 @@
         "saturation shedding",
         "usage telemetry"
       ],
-      "exit": "all expensive operations carry an admission receipt"
+      "exit": "all expensive operations carry an admission receipt",
+      "progress": {
+        "state": "in_progress",
+        "completed": [
+          "ResourceBudget and UsageEstimate contracts",
+          "deterministic admission receipt",
+          "token/cost/wall/retry/tool/artifact budget checks",
+          "concurrency defer and queue rejection semantics",
+          "provider pre-I/O admission",
+          "model route projection from ResourceBudget"
+        ],
+        "remaining": [
+          "tenant quota store/integration",
+          "shared concurrency and queue pressure feed",
+          "actual provider/tool/storage usage accounting",
+          "estimate-vs-actual cost telemetry",
+          "admission at every expensive non-provider action"
+        ]
+      }
     },
     {
       "id": "WP-P0-STREAM",
