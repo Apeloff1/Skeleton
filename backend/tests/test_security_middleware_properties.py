@@ -74,7 +74,7 @@ def test_generated_request_id_corpus_is_always_bounded_and_header_safe() -> None
             assert canonical == decoded
             assert legacy == decoded
         else:
-            assert len(canonical) == 16
+            assert len(canonical) == 32
             assert len(legacy) == 16
 
 
