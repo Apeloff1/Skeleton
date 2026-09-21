@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v2.6"
+    "tag": "arch-map/v3.0"
   },
   "runtime": {
     "required_env": [
@@ -156,7 +156,10 @@
     "AGENTS.md",
     "CLAUDE.md",
     ".github/copilot-instructions.md",
-    ".cursor/rules/architecture.mdc"
+    ".cursor/rules/architecture.mdc",
+    "skeleton/provider_contract.py",
+    "skeleton/testing/test_provider_contract.py",
+    "GEMINI.md"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -164,6 +167,8 @@
     "validator": "scripts/check_ai_app_construction.py",
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
     "provider_activation_boundary": "backend/core/ai_provider.py",
-    "provider_architecture_loader": "backend/core/provider_architecture.py"
+    "provider_architecture_loader": "skeleton/provider_contract.py",
+    "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
+    "construction_version": "3.0.0"
   }
 }
