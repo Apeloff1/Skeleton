@@ -5,12 +5,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.vault.data_lifecycle import GovernedDataRecord
 from skeleton.vault.governance_registry import GovernanceRegistry
 
 from core.ai_provider import (
     OpenAIProviderAdapter,
     ProviderImageRequest,
+    ProviderInvocationError,
     ProviderPolicyError,
     ProviderSpeechRequest,
 )
@@ -286,3 +289,77 @@ async def test_speech_honors_registry_classification_before_io() -> None:
         )
 
     assert client.speech.kwargs is None
+
+
+@pytest.mark.asyncio
+async def test_image_usage_reconciles_decoded_artifact_bytes_into_tenant_quota() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-media",
+        TenantQuota(
+            window_id="window-media",
+            max_operations=10,
+            max_input_tokens=10_000,
+            max_output_tokens=100,
+            max_cost_usd=10.0,
+            max_artifact_bytes=100,
+            max_concurrent_operations=2,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="text-model",
+        client=client,
+        admission_runtime=runtime,
+    )
+
+    result = await adapter.generate_image(
+        ProviderImageRequest(
+            prompt="quota image",
+            operation_id="image-op",
+            tenant_id="tenant-media",
+            estimated_cost_usd=0.2,
+        )
+    )
+
+    assert result.images[0]["data"] == "aGVsbG8="
+    snapshot = ledger.snapshot("tenant-media")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["committed"]["operations"] == 1
+    assert snapshot["committed"]["artifact_bytes"] == 5
+    assert snapshot["committed"]["cost_usd"] == 0.2
+    assert runtime.pressure.active_operations == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_image_payload_releases_admission_lease() -> None:
+    class _InvalidImages(_FakeImages):
+        async def generate(self, **kwargs):
+            self.generate_kwargs = kwargs
+            return SimpleNamespace(
+                id="bad-image",
+                data=[SimpleNamespace(b64_json="not***base64")],
+            )
+
+    client = _FakeClient()
+    client.images = _InvalidImages()
+    runtime = AdmissionRuntime()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="text-model",
+        client=client,
+        admission_runtime=runtime,
+    )
+
+    with pytest.raises(ProviderInvocationError, match="invalid base64"):
+        await adapter.generate_image(
+            ProviderImageRequest(
+                prompt="bad image",
+                operation_id="bad-image-op",
+                tenant_id="tenant-media",
+            )
+        )
+
+    assert runtime.pressure.active_operations == 0
