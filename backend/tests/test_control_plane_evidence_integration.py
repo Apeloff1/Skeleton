@@ -1,6 +1,29 @@
 import asyncio
 
 from core.product_control_plane import ProductControlPlane
+from core.product_executor_registry import ProductExecutorRegistry
+
+
+def _plane_without_build_executor(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    source = plane.executors
+    filtered = ProductExecutorRegistry()
+    for item in source.snapshot():
+        pair = (item["capability_id"], item["action"])
+        if pair == ("studio", "build.submit"):
+            continue
+        binding = source.require(*pair)
+        filtered.register(
+            pair[0],
+            pair[1],
+            binding.executor,
+            name=binding.name,
+            version=binding.version,
+            effect_class=binding.effect_class,
+            replay_safe=binding.replay_safe,
+        )
+    plane.executors = filtered
+    return plane
 
 
 def test_bound_admission_transitions_from_pending_to_confirmed(tmp_path):
@@ -34,7 +57,7 @@ def test_bound_admission_transitions_from_pending_to_confirmed(tmp_path):
 
 
 def test_unbound_operation_is_visible_as_unbound_evidence(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = _plane_without_build_executor(tmp_path)
     admitted = plane.admit(
         capability_id="studio",
         domain="studio",
@@ -49,7 +72,7 @@ def test_unbound_operation_is_visible_as_unbound_evidence(tmp_path):
 
 
 def test_execution_ledger_reconstructs_multiple_operations(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = _plane_without_build_executor(tmp_path)
     bound = plane.admit(
         capability_id="studio", domain="studio", action="project.create",
         principal="creator", actor_weight=0, payload={"title": "A"},

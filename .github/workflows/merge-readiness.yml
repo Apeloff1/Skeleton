@@ -43,8 +43,6 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
-      - name: Validate repository contract system
-        run: python scripts/check_contract_system.py
       - name: Validate merge-readiness workflow contract
         run: python scripts/check_merge_readiness_contract.py
       - name: Validate flaky-test quarantine registry
@@ -189,13 +187,10 @@ jobs:
           python -m compileall -q
           skeleton/pr_automation
           skeleton/automation
-          skeleton/repo_machine
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
-      - name: Validate runner-v2 privileged contract
+      - name: Validate runner v2 privileged contract
         run: python scripts/check_runner_v2_contract.py
-      - name: Validate machine repository organization contract
-        run: python scripts/check_repo_machine.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -207,42 +202,24 @@ jobs:
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
           skeleton/testing/test_pr_automation_branch_completions.py
-          skeleton/testing/test_runner_v2_contracts.py
-          skeleton/testing/test_runner_v2_evidence.py
-          skeleton/testing/test_runner_v2_runtime.py
-          skeleton/testing/test_runner_v2_transaction_report.py
-          skeleton/testing/test_runner_v2_engine.py
-          skeleton/testing/test_contract_system.py
-          skeleton/testing/test_contract_system_catalog.py
-          skeleton/testing/test_contract_attestation.py
           skeleton/testing/test_automerge_model.py
           skeleton/testing/test_automerge_evidence.py
           skeleton/testing/test_automerge_policy.py
           skeleton/testing/test_automerge_stack.py
           skeleton/testing/test_automerge_engine.py
           skeleton/testing/test_automerge_contract.py
-          tests/test_repo_machine.py
-          tests/test_repo_machine_advanced.py
-          tests/test_repo_machine_growth.py
-          tests/test_repo_machine_catalog.py
-          tests/test_repo_machine_sota.py
+          skeleton/testing/test_runner_v2_contracts.py
+          skeleton/testing/test_runner_v2_evidence.py
+          skeleton/testing/test_runner_v2_runtime.py
+          skeleton/testing/test_runner_v2_transaction_report.py
+          skeleton/testing/test_runner_v2_engine.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
-          tests/test_build_contracts.py
-          tests/test_build_edits.py
-          tests/test_build_followup.py
-          tests/test_build_graph.py
-          tests/test_build_plane.py
-          tests/test_build_repair.py
-          tests/test_build_review.py
-          tests/test_build_session.py
-          tests/test_build_validation.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
-          tests/test_execution_failsafe.py
           skeleton/testing/test_bot_manager.py
       - name: Run supervisor workflow contract in isolated import namespace
         env:

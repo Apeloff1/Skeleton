@@ -8,7 +8,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from core.activation_security import enforce_bot_activation_security
+from skeleton.security.activation_security import enforce_bot_activation_security
 from .prompts import compose_system_prompt
 
 

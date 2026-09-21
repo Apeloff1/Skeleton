@@ -8,6 +8,7 @@ from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSI
 from core.charter_policy import Rule
 from core.deployment_checkpoint_witness import sign_deployment_checkpoint_pin
 from core.product_control_plane import ProductControlPlane
+from core.product_control_runtime import public_readiness
 from core.product_operations import OperationRejected
 
 
@@ -77,9 +78,9 @@ def test_status_exposes_truth_gated_assurance_root_and_durability(tmp_path):
     assert status["operations"]["outbox_capacity_remaining"] == 64
     assert status["operations"]["outbox_health"]["cross_process_locking"] is True
     assert status["operations"]["outbox_health"]["leased_intent_factory"] is True
-    assert status["executors"]["coverage"]["bound_actions"] == 15
-    assert status["readiness"]["ready_actions"] == 15
-    assert status["readiness"]["ready_pct"] == 71.4
+    assert status["executors"]["coverage"]["bound_actions"] == 21
+    assert status["readiness"]["ready_actions"] == 21
+    assert status["readiness"]["ready_pct"] == 100.0
     assert status["verification"]["truth_gated"] is True
     assert status["verification"]["speculation_authoritative"] is False
     assert status["verification"]["model_consensus_is_empirical_evidence"] is False
@@ -137,3 +138,17 @@ def test_external_checkpoint_pin_does_not_mutate_system_root(tmp_path, monkeypat
     assert witness["current_quorum"]["reached"] is True
     assert witness["requirement_satisfied"] is True
     assert plane.system_root()["root_sha256"] == root_before
+
+
+def test_public_readiness_projection_is_complete_and_sanitized(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    report = public_readiness(plane)
+
+    assert report["canonical_actions"] == 21
+    assert report["ready_actions"] == 21
+    assert report["ready_pct"] == 100.0
+    assert len(report["actions"]) == 21
+    assert all(item["state"] == "native_ready" for item in report["actions"])
+    assert all("executor_name" not in item for item in report["actions"])
+    assert all("executor_version" not in item for item in report["actions"])
+    assert all("policy_present" not in item for item in report["actions"])

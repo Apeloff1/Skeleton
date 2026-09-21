@@ -1,0 +1,675 @@
+{
+  "schema_version": "6.0",
+  "project": "Tutolage Skeleton",
+  "version": "16.0.0",
+  "purpose": "machine-readable map for automated agents and tooling",
+  "runtime": {
+    "language": "python",
+    "version": "3.11",
+    "web": "fastapi",
+    "server": "uvicorn"
+  },
+  "assembly": {
+    "branch": "integration/app-consolidation",
+    "base": "main",
+    "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
+    "current_status": "application_contract_active",
+    "pull_request": 1883,
+    "contract": "skeleton/app/manifest.json",
+    "operator": "python -m skeleton app"
+  },
+  "entrypoints": {
+    "tests": "python -m pytest skeleton/testing -v",
+    "fallback_tests": "python -m unittest discover skeleton/testing -v",
+    "install": "pip install -r requirements.txt",
+    "dev_install": "pip install -r requirements-dev.txt",
+    "app_status": "python -m skeleton app status",
+    "app_check": "python -m skeleton app check",
+    "app_up": "python -m skeleton app up",
+    "app_hot": "python -m skeleton app up --hot",
+    "app_production": "python -m skeleton app up --production",
+    "app_smoke": "python -m skeleton app smoke"
+  },
+  "top_level": {
+    "skeleton": "application source and domain packages",
+    "skeleton/agents": "agent orchestration and swarm runtime",
+    "skeleton/kernel": "core domain primitives",
+    "skeleton/config": "configuration and snapshots",
+    "skeleton/retrieval": "retrieval, fusion and ranking",
+    "skeleton/vault": "access control and key management",
+    "skeleton/observability": "telemetry and sampling",
+    "skeleton/testing": "test infrastructure",
+    "docs": "human and architectural documentation",
+    ".github": "CI and repository automation",
+    "machine": "machine-facing architecture and integration metadata",
+    "frontend": "canonical Expo/browser product shell and production web ingress",
+    "backend": "application API and governed product control plane",
+    "skeleton/app": "whole-application topology, operator CLI, preflight and readiness"
+  },
+  "branch_families": {
+    "feat": "application capabilities; inspect unique commits and files before integration",
+    "fix": "repairs and hardening; integrate when they add distinct behavior",
+    "reconcile": "integration/reconciliation work; preserve unique commits and resolve overlap",
+    "stabilize": "stabilization work; stale tips already contained in main were normalized",
+    "merge": "merge-oriented work; unique commits are preserved for review",
+    "tmp": "temporary work; stale tips already contained in main were normalized"
+  },
+  "recent_integration": {
+    "validated_stale_branches_normalized": 40,
+    "merged_into_assembly": [
+      {
+        "pr": 1701,
+        "head": "fix/bot-manager-runtime-deps",
+        "status": "merged",
+        "sha": "addad395849ca9e4c70388e701267d5fc45ce80f"
+      }
+    ],
+    "integrated_without_branch_merge": [
+      {
+        "domain": "backlog reasoning adapter",
+        "source": "feat/backlog-reasoning-adapter-current-main-v2",
+        "status": "integrated_file_level"
+      },
+      {
+        "domain": "builder plane control",
+        "source": "feat/builder-plane-control-plane",
+        "status": "integrated_file_level"
+      }
+    ],
+    "queued_pr_range": {
+      "first": 1702,
+      "last": 1865,
+      "status": "staged_or_queued_non_mergeable"
+    },
+    "newly_staged": {
+      "prs": "1865",
+      "domains": [
+        "galaxy lifecycle",
+        "Java accelerators/control/observability/retrieval",
+        "Jeeves AI decision/planning/evidence",
+        "Jeeves frontier chains",
+        "topology learning",
+        "machine repository control",
+        "merge blocker recovery",
+        "MW/pack capability waves",
+        "pack J sibling ports",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift manager",
+        "tools cockpit",
+        "supervisor downstream/hierarchy/resilience",
+        "throughput mechanics/pipeline",
+        "Ubuntu delivery",
+        "x-agent orchestration",
+        "repo-bot/inventory gates",
+        "Jeeves scientific/compiler/cortex/lens/semantic planes",
+        "model routing",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "x-harness",
+        "physics aggregate validation",
+        "workflow security/scope fixes",
+        "repository contract/archive/import safety",
+        "secret-scan contracts/evidence",
+        "repair intake hardening"
+      ]
+    },
+    "large_reconciliation": [
+      {
+        "source": "fix/merge-unblockers-20260920",
+        "pr": 1764,
+        "files": 132
+      },
+      {
+        "source": "fix/live-service-test-boundaries-20260920",
+        "pr": 1754,
+        "files": 98
+      },
+      {
+        "source": "fix/main-gates-shell-live-20260920",
+        "status": "held",
+        "files": 67
+      },
+      {
+        "source": "fix/jeeves-decision-rules-20260919-drain",
+        "status": "held",
+        "files": 137
+      },
+      {
+        "source": "fix/jeeves-frontier-core-clean-20260919",
+        "status": "held",
+        "files": 57
+      },
+      {
+        "source": "fix/physics-aggregate-validation",
+        "status": "held",
+        "files": 77
+      },
+      {
+        "source": "feat/jeeves-topology-learning",
+        "pr": 1828,
+        "files": 20,
+        "commits": 129
+      }
+    ],
+    "no_op_lineage": "Branches with zero file delta versus assembly are retained as lineage and not represented as integrated content.",
+    "held_waves": [
+      {
+        "source": "feat/pr-runner-hygiene-pack-e-20260920",
+        "files": 111,
+        "reason": "large reconciliation input"
+      },
+      {
+        "source": "merge/repo-machine-gates-20260920",
+        "files": 115,
+        "reason": "large reconciliation input"
+      },
+      {
+        "source": "merge/1669-safe-20260920",
+        "files": 150,
+        "reason": "large reconciliation input"
+      },
+      {
+        "source": "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "files": 300,
+        "commits": 446,
+        "reason": "large overlapping shell stabilization wave"
+      },
+      {
+        "source": "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "files": 300,
+        "commits": 355,
+        "reason": "large overlapping shell stabilization wave"
+      },
+      {
+        "source": "feat/bounded-shell-runner-20260918",
+        "files": 300,
+        "reason": "large shell/runtime reconciliation"
+      },
+      {
+        "source": "fix/jeeves-decision-rules-20260919-drain",
+        "files": 137,
+        "commits": 63,
+        "reason": "large Jeeves reconciliation"
+      },
+      {
+        "source": "fix/merge-unblockers-20260920",
+        "files": 132,
+        "commits": 33,
+        "reason": "large merge-unblocker reconciliation"
+      },
+      {
+        "source": "fix/live-service-test-boundaries-20260920",
+        "files": "98-99",
+        "reason": "parallel live-service boundary variants"
+      },
+      {
+        "source": "physics feature family",
+        "files": "68-83 per branch",
+        "reason": "revalidated; high overlap, held for consolidated physics assembly"
+      },
+      {
+        "source": "feat/jeeves-topology-learning",
+        "files": 20,
+        "commits": 129,
+        "reason": "large capability wave; staged/held for file-level reconciliation"
+      },
+      {
+        "source": "feat/pr-runner-hygiene-pack-e-20260920",
+        "files": 111,
+        "reason": "staged as PR #1867; large hygiene wave held for reconciliation"
+      },
+      {
+        "source": "feat/bounded-shell-runner-20260918",
+        "files": 300,
+        "reason": "300-file shell wave held"
+      },
+      {
+        "source": "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "files": 300,
+        "reason": "300-file shell wave held"
+      },
+      {
+        "source": "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "files": 300,
+        "reason": "300-file shell wave held"
+      }
+    ],
+    "lineage_note": "Fix-wave PRs 1791-1802 remain staged source material; repeated branch comparison confirms their file deltas, so they are not no-op lineage.",
+    "assembly_status": "queue_audited_through_1865",
+    "queue_recheck": {
+      "prs": "1860-1865",
+      "status": "file-level reconciled",
+      "result": "network replication and x-harness content already present byte-for-byte on assembly; retained PRs are lineage/source references"
+    },
+    "lineage_noop_examples": [
+      "reconcile/network-replication-current-main-v2",
+      "reconcile/x-harness-current-main-v2"
+    ],
+    "reconciliation_note": {
+      "physics_stack": "15-file wave rechecked; 3 files already identical, 5 core modules diverge and are held for semantic/file-level reconciliation",
+      "physics_aggregate": "77-file wave remains held; overlaps simulation stack and is not blindly merged",
+      "jeeves_semantics": "compiler/semantic_plane differences detected; no overwrite performed"
+    },
+    "physics_family_audit": {
+      "branches": 11,
+      "status": "held",
+      "result": "core CCD/convex/collision/world modules diverge across candidate branches; no blind merge"
+    },
+    "latest_staging": {
+      "prs": [
+        1868,
+        1869,
+        1870,
+        1871,
+        1872
+      ],
+      "held_large_waves": [
+        [
+          "merge/repo-machine-gates-20260920",
+          115
+        ],
+        [
+          "merge/1669-safe-20260920",
+          150
+        ],
+        [
+          "fix/merge-unblockers-20260920",
+          132
+        ],
+        [
+          "fix/live-service-test-boundaries-20260920",
+          98
+        ],
+        [
+          "fix/live-service-test-manifest-boundary",
+          99
+        ],
+        [
+          "fix/jeeves-decision-rules-20260919-drain",
+          137
+        ],
+        [
+          "fix/main-gates-shell-live-20260920",
+          67
+        ]
+      ],
+      "note": "staged only; overlapping large waves require reconciliation"
+    },
+    "semantic_domain_wave": {
+      "revalidated": [
+        "Jeeves compiler assurance",
+        "Jeeves relational semantics",
+        "Jeeves lens science",
+        "Jeeves probability frontier",
+        "repository bots",
+        "security scan evidence",
+        "Java observability augmentation",
+        "Java retrieval fusion",
+        "four role studios"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused; no duplicate PRs created"
+    },
+    "frontier_java_machine_wave": {
+      "revalidated": [
+        "galaxy capability lifecycle",
+        "Java batch accelerators",
+        "Java control/observability",
+        "Jeeves AI decision/planning",
+        "Jeeves frontier core/falsification/reasoning",
+        "machine repository control plane"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused; no duplicate PRs"
+    },
+    "orchestration_ops_wave": {
+      "revalidated": [
+        "pack J sibling ports",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor",
+        "supervisor downstream/hierarchy/resilience",
+        "x-agent orchestration",
+        "closed bot ledger",
+        "hardened repo bots"
+      ],
+      "status": "staged",
+      "note": "existing integration PRs reused"
+    },
+    "security_fix_wave": {
+      "count": 18,
+      "status": "staged",
+      "note": "all existing integration PRs reused; no duplicates created"
+    },
+    "throughput_science_wave": {
+      "staged": [
+        "throughput deterministic mechanics",
+        "throughput forge",
+        "throughput middleware",
+        "Ubuntu 9k delivery",
+        "inventory gates",
+        "Jeeves adaptive science",
+        "Jeeves cortex cost learning"
+      ],
+      "lineage_only": [
+        "model-routing-current-main-v3"
+      ],
+      "revalidated_existing": [
+        "network replication",
+        "X harness",
+        "Jeeves machine semantics",
+        "Jeeves semantic plane"
+      ],
+      "note": "existing integration PRs reused; zero-file model-routing remains lineage"
+    },
+    "control_plane_builder_wave": {
+      "revalidated": [
+        "builder plane current-main",
+        "builder repair receipts v1/v2",
+        "durable run checkpoint",
+        "four agent squads",
+        "autonomous supervisor",
+        "backlog reasoning adapter",
+        "builder control plane",
+        "automerge control plane"
+      ],
+      "new_prs": [
+        1873,
+        1874
+      ],
+      "note": "existing integration PRs reused where present; overlapping control-plane changes remain staged"
+    },
+    "security_reliability_contract_wave": {
+      "revalidated": 12,
+      "status": "staged",
+      "note": "repair intake, repo attention/bots/contracts, archive/import safety, and secret-scan contracts/evidence revalidated; existing integration PRs reused",
+      "unresolved_compare": [
+        "fix/deserialization-safety-hardening",
+        "fix/http-token-regex-hardening",
+        "fix/content-type-security-boundary"
+      ]
+    },
+    "security_resolution_wave": {
+      "revalidated": [
+        "deserialization aliases",
+        "HTTP token regex",
+        "content-type boundary",
+        "scraper DNS public/SSRF",
+        "CORS current-main/dotenv",
+        "build vault atomic write",
+        "canonical scan evidence"
+      ],
+      "lineage_only": [
+        "fix/issue-pass-sast-traversal"
+      ],
+      "note": "existing integration PRs reused; zero-file branch retained as lineage"
+    },
+    "automation_ci_wave": {
+      "revalidated": [
+        "actions live-run reaper",
+        "actions queue pressure",
+        "automation reconciliation",
+        "automerge workflow branches",
+        "autonomous PR URL evidence",
+        "branch control/backpressure",
+        "CI current-main/hygiene",
+        "closed bot ledger",
+        "CodeQL dedupe",
+        "Dependabot fail-closed automerge",
+        "frontier PR push coalescing",
+        "ARM/nonpreemptive housekeeping"
+      ],
+      "note": "existing integration PRs reused; source branches remain available for controlled reconciliation"
+    },
+    "reconciliation_wave": {
+      "revalidated": [
+        "closed bot ledger",
+        "hardened repo bots",
+        "inventory gates",
+        "Jeeves adaptive scientific core",
+        "compiler pipeline assurance",
+        "cortex cost learning",
+        "lens science",
+        "probability frontier",
+        "relational semantics",
+        "semantic plane",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "X harness"
+      ],
+      "lineage_only": [
+        "game replay",
+        "quality",
+        "physics character motor",
+        "model routing v3/v4"
+      ],
+      "note": "existing integration PRs reused; zero-file comparisons remain lineage-only"
+    },
+    "feature_wave": {
+      "revalidated": 46,
+      "note": "Feature family revalidated against assembly. Existing integration PRs cover the meaningful staged branches; zero-file branches remain lineage. Large overlapping shell, PR-runner, Jeeves topology, and physics families remain held for reconciliation.",
+      "held": [
+        "feat/bounded-shell-runner-20260918",
+        "feat/jeeves-topology-learning",
+        "feat/pr-runner-hygiene-pack-e-20260920",
+        "physics feature family"
+      ]
+    },
+    "jeeves_frontier_wave": {
+      "revalidated": [
+        "Jeeves decision",
+        "Jeeves planning",
+        "evidence augmentation",
+        "frontier core/falsification/reasoning",
+        "machine repository control",
+        "merge blocker recovery",
+        "MW/pack A/pack C/pack J",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor"
+      ],
+      "held": [
+        "feat/jeeves-topology-learning",
+        "feat/pr-runner-hygiene-pack-e-20260920"
+      ],
+      "note": "topology learning remains a 129-commit reconciliation input; PR runner hygiene remains a 111-file wave"
+    },
+    "ops_throughput_wave": {
+      "revalidated": [
+        "supervisor downstream/hierarchy/resilience",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor",
+        "throughput deterministic/forge/request pipeline",
+        "Ubuntu 9k delivery",
+        "x-agent orchestration"
+      ],
+      "lineage_only": [
+        "supervisor delegation authority",
+        "throughput observability correlation"
+      ],
+      "note": "existing integration PRs reused; zero-file branches remain lineage-only"
+    },
+    "held_merge_waves": {
+      "revalidated": [
+        "merge/repo-machine-gates-20260920",
+        "merge/1669-safe-20260920"
+      ],
+      "note": "115-file and 150-file waves remain held for file-level reconciliation; no blind merge"
+    },
+    "tmp_lineage": {
+      "revalidated": [
+        "tmp/java-accelerator-operations-rebase-20260920"
+      ],
+      "note": "zero-file delta versus assembly; retained as lineage only"
+    },
+    "archive_wave": {
+      "revalidated": [
+        "archive/pr-runner-v2-pre-reconcile-20260920",
+        "archive/workflow-secret-output-pre-rebase-20260920"
+      ],
+      "note": "Historical archive snapshots retain unique file deltas but diverge substantially from assembly; retained as recovery/source material and not merge targets."
+    },
+    "backup_wave": {
+      "revalidated": [
+        "autonomous supervisor pre-reconcile",
+        "autonomous supervisor pre-secret-clean",
+        "security code-scan pre-sync",
+        "supervisor 1544 pre-stack",
+        "supervisor custody pre-reconcile"
+      ],
+      "note": "backup snapshots diverge substantially; retained as historical recovery/source material, not merge targets"
+    },
+    "stabilize_wave": {
+      "lineage_only": [
+        "most shell stabilization branches audited with zero file delta",
+        "stabilize/shell-core-20260919-v1"
+      ],
+      "new_pr": "#1876 shell orchestration stabilization",
+      "held": [
+        "stabilize/shell-ai-durable-foundation-20260919-v1",
+        "stabilize/shell-ai-ensemble-evals-20260919-v1",
+        "stabilize/shell-ai-recovery-integrity-20260920-clean"
+      ],
+      "note": "large 300-file shell waves remain held for file-level reconciliation"
+    },
+    "reconcile_wave": {
+      "revalidated": "27 reconcile branches",
+      "lineage_only": [
+        "additive planes",
+        "assets",
+        "build incremental",
+        "eval",
+        "game replay",
+        "generated sandbox",
+        "model routing v3/v4",
+        "physics character motor",
+        "quality"
+      ],
+      "staged_existing": [
+        "closed bot ledger",
+        "hardened repo bots",
+        "inventory gates",
+        "Jeeves adaptive scientific core",
+        "compiler pipeline assurance",
+        "cortex cost learning",
+        "lens science",
+        "machine semantics",
+        "probability frontier",
+        "relational semantics",
+        "semantic plane",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "X-harness"
+      ],
+      "note": "Meaningful reconcile branches are already represented by integration PRs; zero-file deltas remain lineage only."
+    },
+    "fix_wave": {
+      "revalidated": [
+        "actions live-run reaper",
+        "actions queue pressure",
+        "ARM64 manifest",
+        "automation reconcile",
+        "automerge workflow run",
+        "autonomous PR URL evidence",
+        "autonomous supervisor current-main",
+        "backlog reasoner",
+        "branch archive",
+        "branch control",
+        "branch flow",
+        "build vault",
+        "builder repair receipts",
+        "canonical scan evidence"
+      ],
+      "lineage_only": [
+        "branch-clean-fail-closed current-main"
+      ],
+      "note": "revalidated fix branches are already represented in integration staging; no duplicate integration PRs created."
+    },
+    "merge_wave": {
+      "held": [
+        "merge/repo-machine-gates-20260920",
+        "merge/1669-safe-20260920"
+      ],
+      "note": "Both merge snapshots diverge materially from assembly (115 and 150 files respectively) and are retained for controlled reconciliation; no blind merge performed."
+    },
+    "tmp_wave": {
+      "lineage_only": [
+        "tmp/java-accelerator-operations-rebase-20260920"
+      ],
+      "note": "Temporary rebase branch is zero-file delta versus assembly; retained as lineage only."
+    },
+    "chore_wave": {
+      "new_pr": "#1877 small backlog drain",
+      "lineage_only": [
+        "chore/housekeeping-general-runner-20260918"
+      ],
+      "note": "One distinct 4-file housekeeping/backlog delta staged; zero-file housekeeping branch remains lineage only."
+    },
+    "validation_docs_perf_wave": {
+      "new_prs": [
+        "#1878",
+        "#1879",
+        "#1880",
+        "#1881",
+        "#1882"
+      ],
+      "note": "Staged 5 distinct test/docs/performance deltas; all were file-level changes versus assembly."
+    }
+  },
+  "integrated_domains": [
+    "automation runtime dependency repair",
+    "backlog reasoning adapter",
+    "builder plane control",
+    "automerge control plane",
+    "automerge policy/evidence/ledger/model/stack",
+    "automerge CLI and GitHub adapter",
+    "automerge contract checks and tests",
+    "canonical application assembly boundary",
+    "frontend endpoint convergence",
+    "same-origin production ingress",
+    "explicit development/hot/production runtime modes"
+  ],
+  "machine_rules": [
+    "Read this manifest before modifying the repository.",
+    "Prefer package-local imports over root-level coupling.",
+    "Keep heavy subsystems out of skeleton/__init__.py.",
+    "Use integration/app-consolidation as the assembly workspace.",
+    "Integrate behavior and files, not branch names.",
+    "Record structural integration decisions here and in machine/README.md.",
+    "Do not discard branches with unique commits without reviewing their file-level changes.",
+    "Do not blindly merge non-mergeable integration PRs; reconcile overlapping files first.",
+    "Use skeleton/app/manifest.json as the canonical runtime topology contract.",
+    "Frontend network clients must resolve application endpoints through frontend/utils/apiBase.ts.",
+    "Normal, first-run, and recovery launch paths must converge on /product.",
+    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based."
+  ],
+  "application_assembly": {
+    "contract": "skeleton/app/manifest.json",
+    "canonical_shell": "/product",
+    "compatibility_shell": "/hub",
+    "backend_api": "/api/*",
+    "engine_api": "/api/v1/*",
+    "frontend_endpoint_resolver": "frontend/utils/apiBase.ts",
+    "production_ingress": "frontend/nginx.conf",
+    "compose": "docker-compose.yml",
+    "hot_overlay": "docker-compose.hot.yml",
+    "audit": "scripts/check_app_assembly.py",
+    "workflow": ".github/workflows/app-assembly.yml",
+    "modes": [
+      "development",
+      "hot",
+      "production"
+    ]
+  }
+}
