@@ -43,6 +43,11 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
+    smoke = sub.add_parser("smoke", help="probe assembled public service health")
+    smoke.add_argument("--full", action="store_true", help="probe the full profile")
+    smoke.add_argument("--timeout", type=float, default=3.0)
+    smoke.add_argument("--json", action="store_true", dest="as_json")
+
     logs = sub.add_parser("logs", help="show assembled service logs")
     logs.add_argument("service", nargs="?", default="")
     logs.add_argument("-f", "--follow", action="store_true")
@@ -129,6 +134,40 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             ),
             root,
         )
+    if command == "smoke":
+        from skeleton.app.health import probe_application, probes_ok
+
+        timeout = float(args.timeout)
+        if timeout <= 0:
+            print("smoke timeout must be greater than zero")
+            return 2
+        results = probe_application(
+            manifest=manifest,
+            full=bool(args.full),
+            timeout=timeout,
+        )
+        ok = probes_ok(results)
+        if bool(args.as_json):
+            print(
+                json.dumps(
+                    {
+                        "ok": ok,
+                        "full": bool(args.full),
+                        "results": [result.to_dict() for result in results],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            for result in results:
+                status = result.status if result.status is not None else "-"
+                print(
+                    f"[{'PASS' if result.ok else 'FAIL'}] "
+                    f"{result.service:<10} status={status} {result.url} {result.detail}"
+                )
+            print("application smoke: healthy" if ok else "application smoke: unhealthy")
+        return 0 if ok else 1
     if command == "down":
         return _run_compose(compose_command("down", manifest=manifest), root)
     if command == "ps":
