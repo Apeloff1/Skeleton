@@ -1694,24 +1694,61 @@ buffered only by a higher-level adapter with explicit bounded policy.
 `operation.completed`, `operation.failed`, and `operation.cancelled` are
 terminal. No later progress/result event may be appended for that operation.
 
-### 33.7 Backpressure
+### 33.7 Backpressure and consumer acknowledgement
 
 The reference log backpressures publishers when its retained window is full.
 Production adapters may use bounded queues, durable streams, credits or consumer
 acks, but may not silently drop unacknowledged operation events.
 
-### 33.8 Remaining stream closure work
+The SQLite reference store implements leased consumer acknowledgements. Every
+live client registers a bounded `consumer_id` lease and advances a monotonic
+`acknowledged_through` sequence only after applying and durably recording its
+local resume cursor. Safe compaction is the minimum acknowledgement across all
+active consumers. If no active consumer exists, compaction does not advance
+implicitly.
 
-This does not close the P0 streaming gap. Remaining required work is:
+Consumer leases expire deliberately. An abandoned client must not block
+retention forever; after expiry it no longer constrains compaction and must
+perform explicit resync if its persisted cursor predates retained history.
+Consumer identity is transport/session identity, not authorization. Tenant
+authorization is checked separately before replay, acknowledgement, status, or
+cancellation.
 
-1. production runtime binding for the durable operation store, outbox dispatcher, and durable stream store;
-2. backend SSE or WebSocket transport;
-3. heartbeat and idle timeout;
-4. cancellation bridge into `OperationEnvelope`;
-5. frontend reducer with event-ID and sequence handling;
-6. reconnect cursor and resync UX;
-7. multi-client acknowledgement strategy;
-8. slow-client, cancel-race and disconnect/reconnect E2E evidence.
+For the assembled frontend, event payloads remain memory-only. Only the
+operation replay cursor is persisted. The app session receives a non-secret
+consumer lease identity, registers it on replay, persists the cursor after
+successful reducer application, and then acknowledges that sequence.
+
+### 33.8 Current backend/frontend transport
+
+The backend exposes one canonical transport surface under
+`/api/operations/{operation_id}`:
+
+- status from durable `OperationEnvelope` authority;
+- authenticated JSON cursor replay for Expo/native clients;
+- authenticated SSE replay/follow with `Last-Event-ID`;
+- explicit consumer acknowledgement;
+- cancellation through the canonical operation state machine;
+- heartbeat and idle-close behavior;
+- explicit replay-gap/resync signaling.
+
+The frontend uses `frontend/services/operationStreamReducer.ts` as the pure
+state transition contract and `frontend/services/operationStream.ts` as the
+authenticated cursor/replay client. Duplicate IDs, out-of-order events,
+sequence gaps, cross-operation events, unsupported schema versions, and
+post-terminal events fail closed into `resync_required`.
+
+### 33.9 Remaining stream closure work
+
+The local/reference streaming stack is substantially implemented. Remaining
+required work is:
+
+1. bind production orchestration to the durable operation/outbox/stream stores;
+2. define distributed single-writer or partition ownership for multi-worker deployment;
+3. automate acknowledgement-safe retention/compaction policy;
+4. add user-visible reconnect/resync UX to the screens consuming long operations;
+5. prove slow-client, process-restart, disconnect/reconnect and cancel-race behavior in browser/device E2E;
+6. prove equivalent semantics for any future non-SQLite production stream backend.
 
 
 ## 34. Durable stream store
