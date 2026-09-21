@@ -573,7 +573,7 @@
   ],
   "structural_blueprint": {
     "schema_version": 1,
-    "structure_tag": "structure-map/v1.0",
+    "structure_tag": "structure-map/v1.1",
     "purpose": "Bind repository roots, runtime zones, capability planes, physical ownership, state authority, composition roots, and recovery domains into one validator-enforced structural model.",
     "levels": [
       {
