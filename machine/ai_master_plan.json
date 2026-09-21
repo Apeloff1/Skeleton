@@ -7785,6 +7785,16 @@
         "WP-W11"
       ],
       "policy": "Mapped edge/historical obligations must become executable evidence or explicit accepted risk before hardening."
+    },
+    "full_edge_case_matrix": {
+      "machine": "machine/ai_full_edge_case_matrix.json",
+      "human": "docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md",
+      "work_packages": [
+        "WP-W00",
+        "WP-W30"
+      ],
+      "coverage": "all 240 catalogue entries have one or more W00-W30 owners",
+      "policy": "Critical/high cases require executable evidence or explicit accepted-risk disposition before hardened/production state."
     }
   }
 }
