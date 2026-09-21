@@ -1425,5 +1425,97 @@
     "closure_requires_evidence": true,
     "closure_requires_state_update": true,
     "no_silent_gap_deletion": true
+  },
+  "execution_roadmap": [
+    {
+      "wave": 1,
+      "id": "policy-and-budget-foundation",
+      "mode": "parallel",
+      "gaps": [
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "goal": "Make every provider/data/action decision classifiable and budget-admissible before adding more autonomy.",
+      "exit": [
+        "provider/data transfer policy enforced",
+        "per-request and per-tenant admission budgets enforced",
+        "traceable denial receipts"
+      ]
+    },
+    {
+      "wave": 2,
+      "id": "realtime-and-provider-resilience",
+      "mode": "parallel",
+      "gaps": [
+        "gap-streaming-protocol",
+        "gap-provider-redundancy"
+      ],
+      "depends_on": [
+        "policy-and-budget-foundation"
+      ],
+      "goal": "Make long-running AI work resumable and provider failure survivable under explicit privacy/cost policy.",
+      "exit": [
+        "resumable ordered event protocol proven",
+        "provider outage behavior proven",
+        "routing/fallback telemetry available"
+      ]
+    },
+    {
+      "wave": 3,
+      "id": "golden-journey-integration",
+      "mode": "serial-after-wave-2",
+      "gaps": [
+        "gap-e2e-golden-journeys"
+      ],
+      "depends_on": [
+        "realtime-and-provider-resilience"
+      ],
+      "goal": "Prove the complete human-to-provider/tool/memory/artifact lifecycle in one cross-plane suite.",
+      "exit": [
+        "all canonical golden journeys pass",
+        "degraded and recovery journeys pass",
+        "trace continuity proven"
+      ]
+    },
+    {
+      "wave": 4,
+      "id": "learning-and-release-control",
+      "mode": "parallel",
+      "gaps": [
+        "gap-feedback-promotion",
+        "gap-release-slo-loop"
+      ],
+      "depends_on": [
+        "golden-journey-integration"
+      ],
+      "goal": "Close the loop from observed outcomes to controlled improvements and reversible production promotion.",
+      "exit": [
+        "feedback promotion requires evaluation",
+        "baseline rollback proven",
+        "canary SLO promotion and rollback proven"
+      ]
+    },
+    {
+      "wave": 5,
+      "id": "sota-closure",
+      "mode": "serial",
+      "gaps": [],
+      "depends_on": [
+        "learning-and-release-control"
+      ],
+      "goal": "Re-run architecture, construction, security, evaluation, chaos, performance and release evidence with no open P0 gaps.",
+      "exit": [
+        "zero open P0 construction gaps",
+        "all required gates green",
+        "SLO and rollback evidence current",
+        "manual and machine contracts agree"
+      ]
+    }
+  ],
+  "roadmap_policy": {
+    "open_gap_must_be_scheduled": true,
+    "dependencies_must_reference_prior_waves": true,
+    "p0_before_sota_closure": true,
+    "parallelism_allowed_only_when_dependencies_are_independent": true
   }
 }
