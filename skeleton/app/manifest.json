@@ -42,7 +42,7 @@
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
     "tag": "arch-map/v3.5",
-    "structure_tag": "structure-map/v1.1"
+    "structure_tag": "structure-map/v1.2"
   },
   "runtime": {
     "required_env": [
