@@ -236,7 +236,7 @@ class GovernanceRegistry:
         }
         if created_at is not None:
             kwargs["created_at"] = created_at
-        return self.register(GovernedDataRecord(**kwargs))
+        return self.lifecycle.ensure_registered(GovernedDataRecord(**kwargs))
 
     def context_for(
         self,
