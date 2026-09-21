@@ -1434,7 +1434,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "baseline provider-transfer enforcement implemented; lifecycle/deletion/export/retention and broader data tagging remain"
+      "status_detail": "canonical lifecycle and registry contracts now enforce tenant, purpose, retention/deletion/export metadata and registry-derived provider classification; broader memory/retrieval/artifact registration plus durable adapter propagation remain"
     },
     {
       "id": "gap-feedback-promotion",
@@ -2267,14 +2267,20 @@
           "provider transfer decision receipt",
           "restricted external transfer denial",
           "confidential tenant requirement",
-          "provider adapter enforcement before I/O"
+          "provider adapter enforcement before I/O",
+          "tenant-scoped lifecycle metadata registry",
+          "payload-free export inventory",
+          "retention-expiry deletion planning",
+          "multi-target deletion receipts",
+          "registry-derived most-restrictive classification",
+          "registry-derived provider context enforced across text, image, and speech provider I/O"
         ],
         "remaining": [
-          "classify memory/retrieval/artifact data",
-          "provider privacy ceiling bridge into all routes",
-          "tenant deletion propagation",
-          "export inventory",
-          "retention expiry enforcement"
+          "register memory/retrieval/artifact records at their canonical write boundaries",
+          "propagate deletion actions through real storage adapters",
+          "bind export inventory to durable domain repositories",
+          "bridge provider privacy ceilings into every application route",
+          "audit retention/deletion access through the canonical observability plane"
         ]
       }
     },
