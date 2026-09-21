@@ -37,7 +37,7 @@
         "state": "ready",
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
-        "tag": "arch-map/v3.5",
+        "tag": "arch-map/v3.6",
         "structure_tag": "structure-map/v1.2"
       }
     ],
