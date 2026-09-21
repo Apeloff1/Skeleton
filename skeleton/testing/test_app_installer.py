@@ -103,7 +103,7 @@ def test_installer_stops_before_mutation_when_preloader_blocks(tmp_path, monkeyp
         python="3.11",
         checks=(PreloadCheck("host:docker", False, "missing", remediation="install docker"),),
     )
-    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner: report)
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner, **kwargs: report)
 
     called = []
     monkeypatch.setattr(
