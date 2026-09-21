@@ -446,12 +446,53 @@ class AsmVectorAccelerator:
             if len(candidate) != dimensions:
                 raise ValueError("candidate dimension mismatch")
             matrix.extend(float(value) for value in candidate)
-        return self.dot_matrix_f32(
+        return self._dot_batch_flat_f32(
             query,
             matrix,
             rows=len(candidates),
             dimensions=dimensions,
         )
+
+    def _dot_batch_flat_f32(
+        self,
+        query: Sequence[float],
+        matrix: Sequence[float],
+        *,
+        rows: int,
+        dimensions: int,
+    ) -> list[float]:
+        if len(query) != dimensions:
+            raise ValueError("query dimension mismatch")
+        expected = rows * dimensions
+        if expected > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("matrix element count exceeds accelerator bound")
+        if len(matrix) != expected:
+            raise ValueError("matrix shape mismatch")
+        if rows == 0:
+            return []
+
+        query_array, query_buffer = self._float_buffer(query)
+        matrix_array, matrix_buffer = self._float_buffer(matrix)
+        output = array.array("f", [0.0]) * rows
+        output_buffer = self._float_buffer(output)[1]
+        function = self._library.skeleton_asm_dot_batch_f32
+        try:
+            function(
+                query_buffer,
+                matrix_buffer,
+                rows,
+                dimensions,
+                output_buffer,
+            )
+        except Exception:
+            with self._lock:
+                self._calls += 1
+                self._failures += 1
+            raise
+
+        with self._lock:
+            self._calls += 1
+        return output.tolist()
 
     def dot_matrix_f32(
         self,
