@@ -70,10 +70,10 @@ The frontier build must not hard-code one model provider into the kernel. Provid
 
 ## Runtime profiles
 
-`minimal` — kernel + runtime only.  
-`ai` — intelligence + memory + tools.  
-`game` — AI + game + simulation.  
-`learning` — AI + memory + tutoring.  
+`minimal` — kernel + runtime only.
+`ai` — intelligence + memory + tools.
+`game` — AI + game + simulation.
+`learning` — AI + memory + tutoring.
 `studio` — all application planes + cockpit.
 
 The default developer environment should remain lightweight; optional profiles prevent the full multi-GB asset plane from becoming a prerequisite for ordinary source development.
@@ -112,16 +112,16 @@ A lower-level implementation or historical architecture round cannot waive these
 
 The frontier architecture reserves the following canonical primitive families:
 
-RepresentationSpec  
-DatasetManifest / MixtureManifest / HoldoutBoundary  
-ModelArtifactManifest  
-ConfigSnapshot  
-Principal / DelegationChain  
-ToolIntent / ValidatedToolCall / ToolExecutionReceipt  
-LeaseEpoch / FencingToken  
-SchemaVersion / MigrationPlan  
-DeletionTombstone  
-AuditEvent  
+RepresentationSpec
+DatasetManifest / MixtureManifest / HoldoutBoundary
+ModelArtifactManifest
+ConfigSnapshot
+Principal / DelegationChain
+ToolIntent / ValidatedToolCall / ToolExecutionReceipt
+LeaseEpoch / FencingToken
+SchemaVersion / MigrationPlan
+DeletionTombstone
+AuditEvent
 RecoveryManifest
 
 Exact implementation types may evolve, but their authority boundaries may not disappear.
