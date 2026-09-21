@@ -43,6 +43,16 @@
         "provider": "cursor",
         "path": ".cursor/rules/architecture.mdc",
         "required": true
+      },
+      {
+        "provider": "google-gemini",
+        "path": "GEMINI.md",
+        "required": true
+      },
+      {
+        "provider": "xai-grok",
+        "path": "AGENTS.md",
+        "required": true
       }
     ],
     "runtime_enforcement": {
