@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.0.0",
+  "plan_version": "1.1.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -23,7 +23,9 @@
     ],
     "human_construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "master_index": "docs/plan/MASTER_INDEX.md",
-    "master_plan": "docs/plan/MASTER_PLAN.md"
+    "master_plan": "docs/plan/MASTER_PLAN.md",
+    "master_build_sequence": "machine/ai_master_build_sequence.json",
+    "master_build_sequence_human": "docs/plan/MASTER_BUILD_SEQUENCE.md"
   },
   "laws": [
     "durable governed state is authoritative",
@@ -9486,5 +9488,20 @@
     "human": "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md",
     "mandatory": true,
     "rule": "No tracked plan item may be represented as complete without validated checkbox, UTC timestamped implementation signoff, independent verification signoff, git revision and evidence."
+  },
+  "build_depth_sequence": {
+    "contract": "machine/ai_master_build_sequence.json",
+    "human": "docs/plan/MASTER_BUILD_SEQUENCE.md",
+    "wave_range": [
+      "MBW-00",
+      "MBW-07"
+    ],
+    "wave_count": 8,
+    "primary_work_package_coverage": [
+      "WP-W00",
+      "WP-W30"
+    ],
+    "completion_mode": "derived_from_existing_accountability",
+    "rule": "Construction waves order and gate work; they do not replace AIQ dependencies, gap closure, vertical-slice evidence, or signed accountability."
   }
 }
