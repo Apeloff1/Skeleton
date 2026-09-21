@@ -570,7 +570,47 @@ Runtime model providers use a local activation receipt. The adapter loads the ac
 
 The receipt is local metadata. It does not contain credentials and does not require sending the manual to the external model.
 
-## 8. Current SOTA gap register
+## 8. Current-state execution roadmap
+
+The generic construction phases describe how to build the system from zero. The
+current repository is already partially assembled, so active work follows this
+gap-closure roadmap:
+
+```text
+Wave 1  policy + budget foundation
+        ├─ governance registry
+        └─ cost/capacity admission
+             |
+             v
+Wave 2  realtime + provider resilience
+        ├─ resumable event protocol
+        └─ provider redundancy / explicit single-provider SLO
+             |
+             v
+Wave 3  golden journey integration
+        └─ prompt + retrieval + tools + artifacts + outage + reconnect E2E
+             |
+             v
+Wave 4  controlled learning + release control
+        ├─ feedback/eval/promotion pipeline
+        └─ canary SLO promotion + automatic rollback
+             |
+             v
+Wave 5  SOTA closure
+        └─ zero P0 gaps + all gates + chaos/eval/release evidence
+```
+
+Wave 1 tracks can proceed in parallel. Wave 2 starts only after data-transfer
+policy and admission budgets are enforceable. The golden E2E suite comes after
+realtime/provider failure semantics are stable; otherwise it would encode
+temporary behavior. Learning and automated release promotion come last because
+they must consume trustworthy evaluation and operational evidence.
+
+The machine-readable source for this sequence is
+`execution_roadmap` in `machine/ai_app_construction.json`. Every open gap must
+appear exactly once before SOTA closure.
+
+## 9. Current SOTA gap register
 
 The construction contract intentionally distinguishes a structurally complete
 application map from a fully closed SOTA implementation. Open gaps are first-
@@ -591,7 +631,7 @@ The exact construction steps for each gap live in
 completion. They do not block safe incremental construction when the gap remains
 explicit and the change preserves the canonical contracts.
 
-## 9. Assembly checklist
+## 10. Assembly checklist
 
 Before merging a new AI capability, confirm:
 
@@ -612,7 +652,7 @@ Before merging a new AI capability, confirm:
 - deployment and rollback impact understood;
 - architecture, construction, provider-bootstrap, assembly, and relevant domain gates pass.
 
-## 10. Definition of done
+## 11. Definition of done
 
 A functional AI application is not "done" because it can answer a prompt. It is construction-complete when the complete request lifecycle is governed:
 
@@ -634,7 +674,7 @@ identity
 
 Every edge in that chain must have an owner, a contract, a failure mode, and executable evidence.
 
-## 11. Canonical commands
+## 12. Canonical commands
 
 ```bash
 python scripts/check_architecture_map.py
