@@ -122,7 +122,13 @@
         "canonical endpoint resolver",
         "stream/event reducer",
         "optimistic state policy",
-        "accessible error state"
+        "accessible error state",
+        "canonical conversation client",
+        "operation event reducer",
+        "replay cursor",
+        "approval interaction",
+        "cancel interaction",
+        "golden journey observability"
       ],
       "target_failure_contract": "recoverable user-facing degraded state",
       "source_acceptance": [
@@ -137,9 +143,15 @@
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->artifact-files",
@@ -2247,7 +2259,13 @@
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
       "target_acceptance": [
         "OpenAPI/schema tests",
@@ -2290,7 +2308,13 @@
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
       "target_acceptance": [
         "route collision gate",
@@ -2329,14 +2353,20 @@
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:product-experience->observability",
@@ -2364,14 +2394,20 @@
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
         "SLO dashboard/evidence"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:prompt-context->foundation",
