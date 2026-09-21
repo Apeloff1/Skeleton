@@ -36,6 +36,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_source_topology"] == "docs/architecture/research-source-topology.md"
     assert documents["research_dependency_map"] == "docs/architecture/research-dependency-map-2026.md"
     assert documents["research_execution_program"] == "docs/architecture/research-execution-program-2026.md"
+    assert documents["research_program_scorecard"] == "docs/architecture/research-program-scorecard-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -533,3 +534,38 @@ def test_research_execution_program_is_wave_gated() -> None:
     assert "Result-to-plan update" in program
     assert "AD89. Wave-based research execution program" in plan
     assert "AD96. Research execution signoff" in plan
+
+
+def test_research_program_scorecard_separates_planning_from_evidence() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-PROGRAM-SCORECARD"
+    ]
+    assert checkpoint["domain_count"] == 24
+    assert checkpoint["research_findings"] == 144
+    assert checkpoint["research_questions"] == 82
+    assert checkpoint["source_attestations"] == 72
+    assert checkpoint["frontier_deltas"] == 31
+    assert checkpoint["contradictions"] == 24
+    assert checkpoint["research_debt_items"] == 46
+    assert checkpoint["experiment_protocols"] == 62
+    assert checkpoint["historical_anchors"] == 110
+    assert checkpoint["source_families"] == 55
+    assert checkpoint["planning_coverage_is_not_reproduction"] is True
+    assert checkpoint["single_scalar_score_forbidden"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    root = Path(__file__).resolve().parents[2]
+    scorecard = (
+        root / "docs" / "architecture" / "research-program-scorecard-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+
+    assert "There is **no single research completion score**" in scorecard
+    assert "local_protocol_execution_claimed_by_this_planning_pass: 0" in scorecard
+    assert "PLANNING COVERAGE" in scorecard
+    assert "LOCAL REPRODUCTION" in scorecard
+    assert "PRODUCTION EVIDENCE READINESS" in scorecard
+    assert "AD97. Multidimensional research scorecard" in plan
+    assert "AD104. Planning/evidence/readiness separation" in plan
