@@ -17084,11 +17084,11 @@
       "id": "ACC-WP-W03",
       "type": "work_package",
       "title": "WP-W03 Durable State",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:32:26Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -17115,8 +17115,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:32:26Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:32:26Z",
+          "git_sha": "ca563c56e49590216b84da23a4ebbec7d470abb0",
+          "statement": "Begin WP-W03 Durable State for canonical state authority and lifecycle execution.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/ca563c56e49590216b84da23a4ebbec7d470abb0",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W03/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
@@ -17124,11 +17142,11 @@
       "id": "ACC-WP-W04",
       "type": "work_package",
       "title": "WP-W04 Events & Streaming Ledger",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:32:31Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -17155,8 +17173,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:32:31Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:32:31Z",
+          "git_sha": "2e2e4e142261865ca401ec69357ababf0ed5cf1a",
+          "statement": "Begin WP-W04 Events & Streaming Ledger for durable event/state reconciliation work.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2e2e4e142261865ca401ec69357ababf0ed5cf1a",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W04/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
@@ -17244,11 +17280,11 @@
       "id": "ACC-WP-W07",
       "type": "work_package",
       "title": "WP-W07 Memory",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:32:37Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -17275,8 +17311,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:32:37Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:32:37Z",
+          "git_sha": "52ef325c52ebb7ee68bc02d8453b13112381f305",
+          "statement": "Begin WP-W07 Memory for governed canonical memory lifecycle integration.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/52ef325c52ebb7ee68bc02d8453b13112381f305",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W07/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
@@ -17284,11 +17338,11 @@
       "id": "ACC-WP-W08",
       "type": "work_package",
       "title": "WP-W08 Retrieval",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:32:43Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -17315,8 +17369,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:32:43Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:32:43Z",
+          "git_sha": "cd2352c7efb7764f8907d392225cefb0f6d2606d",
+          "statement": "Begin WP-W08 Retrieval for governed derived-index and deletion/rebuild semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/cd2352c7efb7764f8907d392225cefb0f6d2606d",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W08/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
@@ -17324,11 +17396,11 @@
       "id": "ACC-WP-W09",
       "type": "work_package",
       "title": "WP-W09 Knowledge & Evidence",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:32:48Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -17355,8 +17427,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:32:48Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:32:48Z",
+          "git_sha": "99f26763e3d7bec0b3e7b015d33951f185850128",
+          "statement": "Begin WP-W09 Knowledge for evidence/provenance governance integration.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/99f26763e3d7bec0b3e7b015d33951f185850128",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W09/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
