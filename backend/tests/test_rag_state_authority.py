@@ -263,3 +263,45 @@ def test_stats_distinguish_mongo_authority_from_rebuildable_projection() -> None
     assert stats["authority"]["collections"]["user_progress"] == 1
     assert stats["projection"]["store"] == "chroma"
     assert stats["projection"]["rebuildable"] is True
+
+
+def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() -> None:
+    service, state, _, client = _service()
+    session_id = service.store_learning_session(
+        "u1",
+        "python",
+        "rebuild me",
+        10,
+    )
+    service.store_cocoding_context(
+        "code-1",
+        "u1",
+        "python",
+        "canonical context",
+        ["print(1)"],
+        ["ship"],
+    )
+    feedback_id = service.store_feedback(
+        "u1",
+        "rating",
+        "useful",
+        rating=5,
+    )
+
+    # Simulate total loss of all user-owned vector projections.
+    client.collections["jeeves_learning_sessions"].rows.clear()
+    client.collections["jeeves_cocoding_context"].rows.clear()
+    client.collections["jeeves_feedback"].rows.clear()
+
+    rebuilt = service.rebuild_projections_from_mongo()
+
+    assert rebuilt == {
+        "learning_sessions": 1,
+        "cocoding_context": 1,
+        "feedback": 1,
+        "failed": 0,
+    }
+    assert session_id in client.collections["jeeves_learning_sessions"].rows
+    assert "code-1" in client.collections["jeeves_cocoding_context"].rows
+    assert feedback_id in client.collections["jeeves_feedback"].rows
+    assert state.get_user_progress("u1") == {}
