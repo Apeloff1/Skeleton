@@ -87,7 +87,8 @@
         "AI execution cancel",
         "delegated authority envelope",
         "idempotent service command",
-        "operation event replay"
+        "operation event replay",
+        "capability readiness endpoint/projection"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -110,7 +111,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "status": "partial"
     },
@@ -139,7 +141,8 @@
         "golden journey observability",
         "safe response renderer",
         "qualified/degraded rendering",
-        "interactive steering controls"
+        "interactive steering controls",
+        "capability readiness projection"
       ],
       "target_failure_contract": "recoverable user-facing degraded state",
       "source_acceptance": [
@@ -167,7 +170,8 @@
         "artifact/media E2E where declared",
         "XSS/unsafe-link tests",
         "steering race UX",
-        "qualified/degraded state accessibility"
+        "qualified/degraded state accessibility",
+        "capability readiness/degraded UX"
       ],
       "status": "partial"
     },
@@ -669,7 +673,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -680,7 +685,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "present"
     },
@@ -871,7 +877,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -884,7 +891,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
@@ -910,7 +918,8 @@
         "AI execution cancel",
         "delegated authority envelope",
         "idempotent service command",
-        "operation event replay"
+        "operation event replay",
+        "capability readiness endpoint/projection"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -933,7 +942,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "status": "partial"
     },
@@ -1149,7 +1159,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -1198,7 +1209,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -1248,7 +1260,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "target_acceptance": [
         "trace continuity tests",
@@ -1301,7 +1314,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "target_acceptance": [
         "resume tests",
@@ -1353,7 +1367,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -1680,7 +1695,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -1695,7 +1711,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "present"
     },
@@ -1888,7 +1905,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -1905,7 +1923,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
@@ -2055,7 +2074,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -2078,7 +2098,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
@@ -2212,7 +2233,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -2228,7 +2250,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "present"
     },
@@ -2414,7 +2437,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -2433,7 +2457,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
@@ -2562,7 +2587,9 @@
         "ContextSnapshot",
         "ContextCompiler",
         "context source adapter",
-        "provider projection"
+        "provider projection",
+        "InstructionPolicyRef",
+        "instruction policy version/digest"
       ],
       "target_failure_contract": "drop/deny unauthorized or unbounded segments; produce explicit insufficient-context result rather than silently bypassing policy",
       "source_acceptance": [
@@ -2586,7 +2613,9 @@
         "trust-tier/injection tests",
         "source authorization tests",
         "budget/headroom tests",
-        "provenance-preserving compaction tests"
+        "provenance-preserving compaction tests",
+        "instruction policy activation/rollback",
+        "context digest policy binding"
       ],
       "status": "partial"
     },
@@ -2681,7 +2710,8 @@
         "artifact/media E2E where declared",
         "XSS/unsafe-link tests",
         "steering race UX",
-        "qualified/degraded state accessibility"
+        "qualified/degraded state accessibility",
+        "capability readiness/degraded UX"
       ],
       "target_acceptance": [
         "OpenAPI/schema tests",
@@ -2716,7 +2746,8 @@
         "AI execution cancel",
         "delegated authority envelope",
         "idempotent service command",
-        "operation event replay"
+        "operation event replay",
+        "capability readiness endpoint/projection"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -2733,7 +2764,8 @@
         "artifact/media E2E where declared",
         "XSS/unsafe-link tests",
         "steering race UX",
-        "qualified/degraded state accessibility"
+        "qualified/degraded state accessibility",
+        "capability readiness/degraded UX"
       ],
       "target_acceptance": [
         "route collision gate",
@@ -2744,7 +2776,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "status": "partial"
     },
@@ -2785,7 +2818,8 @@
         "artifact/media E2E where declared",
         "XSS/unsafe-link tests",
         "steering race UX",
-        "qualified/degraded state accessibility"
+        "qualified/degraded state accessibility",
+        "capability readiness/degraded UX"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -2838,7 +2872,8 @@
         "artifact/media E2E where declared",
         "XSS/unsafe-link tests",
         "steering race UX",
-        "qualified/degraded state accessibility"
+        "qualified/degraded state accessibility",
+        "capability readiness/degraded UX"
       ],
       "target_acceptance": [
         "trace continuity tests",
@@ -2867,7 +2902,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -2878,12 +2914,15 @@
         "trust-tier/injection tests",
         "source authorization tests",
         "budget/headroom tests",
-        "provenance-preserving compaction tests"
+        "provenance-preserving compaction tests",
+        "instruction policy activation/rollback",
+        "context digest policy binding"
       ],
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
@@ -2918,7 +2957,9 @@
         "trust-tier/injection tests",
         "source authorization tests",
         "budget/headroom tests",
-        "provenance-preserving compaction tests"
+        "provenance-preserving compaction tests",
+        "instruction policy activation/rollback",
+        "context digest policy binding"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -2965,7 +3006,9 @@
         "trust-tier/injection tests",
         "source authorization tests",
         "budget/headroom tests",
-        "provenance-preserving compaction tests"
+        "provenance-preserving compaction tests",
+        "instruction policy activation/rollback",
+        "context digest policy binding"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -3640,7 +3683,8 @@
         "AI execution cancel",
         "delegated authority envelope",
         "idempotent service command",
-        "operation event replay"
+        "operation event replay",
+        "capability readiness endpoint/projection"
       ],
       "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
@@ -3657,7 +3701,8 @@
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
-        "process credential ownership test"
+        "process credential ownership test",
+        "capability readiness contract tests"
       ],
       "status": "partial"
     },
@@ -3799,7 +3844,8 @@
       "target_contract_surface": [
         "stable error types",
         "event/capability identity",
-        "deterministic serialization"
+        "deterministic serialization",
+        "CapabilityManifest identity/version"
       ],
       "target_failure_contract": "engine does not boot",
       "source_acceptance": [
@@ -3816,7 +3862,8 @@
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
-        "no heavy imports in skeleton/__init__.py"
+        "no heavy imports in skeleton/__init__.py",
+        "capability manifest serialization/compatibility"
       ],
       "status": "partial"
     },
