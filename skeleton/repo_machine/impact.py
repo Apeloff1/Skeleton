@@ -33,8 +33,15 @@ class ImpactReport:
         }
 
 
+def _normalize_path(path: str) -> str:
+    normalized = path.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized.lstrip("/")
+
+
 def _zone_for_path(model: RepositoryModel, path: str) -> str:
-    normalized = path.replace("\\", "/").lstrip("./")
+    normalized = _normalize_path(path)
     exact = {item.path: item.zone for item in model.files}
     if normalized in exact:
         return exact[normalized]
@@ -56,7 +63,7 @@ def analyze_impact(
     if isinstance(transitive_depth, bool) or not isinstance(transitive_depth, int) or not 0 <= transitive_depth <= 16:
         raise ValueError("transitive_depth must be in [0,16]")
     paths = tuple(sorted({
-        str(path).replace("\\", "/").lstrip("./")
+        _normalize_path(str(path))
         for path in changed_paths
         if str(path).strip()
     }))
