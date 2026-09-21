@@ -14,7 +14,7 @@ from skeleton.app.assembly import (
     load_manifest,
     preflight,
 )
-from skeleton.app.health import ProbeResult, probe_application, probe_url, probes_ok
+from skeleton.app.health import ProbeResult, probe_application, probe_url, probes_ok, wait_for_application
 
 __all__ = [
     "AssemblyCheck",
@@ -28,4 +28,5 @@ __all__ = [
     "probe_application",
     "probe_url",
     "probes_ok",
+    "wait_for_application",
 ]
