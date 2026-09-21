@@ -57,7 +57,13 @@
         "high": 11,
         "medium": 21,
         "reference": 11
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-STATE-02",
@@ -98,7 +104,13 @@
         "high": 11,
         "medium": 21,
         "reference": 11
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-STATE-03",
@@ -138,7 +150,13 @@
         "high": 11,
         "medium": 21,
         "reference": 11
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-GOV-01",
@@ -181,7 +199,13 @@
         "high": 12,
         "medium": 34,
         "reference": 24
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-GOV-02",
@@ -225,7 +249,13 @@
         "high": 12,
         "medium": 34,
         "reference": 24
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-GOV-03",
@@ -268,7 +298,13 @@
         "high": 12,
         "medium": 34,
         "reference": 24
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-COST-01",
@@ -306,7 +342,13 @@
         "high": 6,
         "medium": 30,
         "reference": 13
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-COST-02",
@@ -347,7 +389,13 @@
         "high": 6,
         "medium": 30,
         "reference": 13
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-COST-03",
@@ -387,7 +435,13 @@
         "high": 6,
         "medium": 30,
         "reference": 13
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-PROV-01",
@@ -425,7 +479,13 @@
         "high": 2,
         "medium": 17,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-PROV-02",
@@ -468,7 +528,13 @@
         "high": 2,
         "medium": 17,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S0-PROV-03",
@@ -507,7 +573,13 @@
         "high": 2,
         "medium": 17,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-CONV-01",
@@ -553,7 +625,13 @@
         "high": 16,
         "medium": 49,
         "reference": 25
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-CONV-02",
@@ -598,7 +676,13 @@
         "high": 16,
         "medium": 49,
         "reference": 25
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-CONV-03",
@@ -643,7 +727,13 @@
         "high": 16,
         "medium": 49,
         "reference": 25
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-MEM-01",
@@ -686,7 +776,13 @@
         "high": 3,
         "medium": 22,
         "reference": 16
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-MEM-02",
@@ -731,7 +827,13 @@
         "high": 3,
         "medium": 22,
         "reference": 16
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-MEM-03",
@@ -777,7 +879,13 @@
         "high": 3,
         "medium": 22,
         "reference": 16
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-TOOL-01",
@@ -820,7 +928,13 @@
         "high": 7,
         "medium": 42,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-TOOL-02",
@@ -866,7 +980,13 @@
         "high": 7,
         "medium": 42,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S1-TOOL-03",
@@ -912,7 +1032,13 @@
         "high": 7,
         "medium": 42,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-CTX-01",
@@ -956,7 +1082,13 @@
         "high": 0,
         "medium": 4,
         "reference": 4
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-CTX-02",
@@ -1002,7 +1134,13 @@
         "high": 0,
         "medium": 4,
         "reference": 4
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-CTX-03",
@@ -1048,7 +1186,13 @@
         "high": 0,
         "medium": 4,
         "reference": 4
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-PROTO-01",
@@ -1091,7 +1235,13 @@
         "high": 5,
         "medium": 26,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-PROTO-02",
@@ -1137,7 +1287,13 @@
         "high": 5,
         "medium": 26,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S2-PROTO-03",
@@ -1181,7 +1337,13 @@
         "high": 5,
         "medium": 26,
         "reference": 8
-      }
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S3-VER-01",
@@ -1224,7 +1386,13 @@
         "high": 7,
         "medium": 37,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S3-VER-02",
@@ -1271,7 +1439,13 @@
         "high": 7,
         "medium": 37,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S3-VER-03",
@@ -1317,7 +1491,13 @@
         "high": 7,
         "medium": 37,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S4-EXEC-01",
@@ -1364,7 +1544,13 @@
         "high": 5,
         "medium": 26,
         "reference": 10
-      }
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S4-EXEC-02",
@@ -1414,7 +1600,13 @@
         "high": 5,
         "medium": 26,
         "reference": 10
-      }
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S4-EXEC-03",
@@ -1464,7 +1656,13 @@
         "high": 5,
         "medium": 26,
         "reference": 10
-      }
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S5-ENG-01",
@@ -1508,7 +1706,13 @@
         "high": 7,
         "medium": 60,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S5-ENG-02",
@@ -1555,7 +1759,13 @@
         "high": 7,
         "medium": 60,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S5-ENG-03",
@@ -1603,7 +1813,13 @@
         "high": 7,
         "medium": 60,
         "reference": 21
-      }
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S6-STREAM-01",
@@ -1644,7 +1860,13 @@
         "high": 7,
         "medium": 54,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S6-STREAM-02",
@@ -1690,7 +1912,13 @@
         "high": 7,
         "medium": 54,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S6-STREAM-03",
@@ -1736,7 +1964,13 @@
         "high": 7,
         "medium": 54,
         "reference": 18
-      }
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S7-E2E-01",
@@ -1799,7 +2033,13 @@
         "high": 20,
         "medium": 91,
         "reference": 44
-      }
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S7-E2E-02",
@@ -1863,7 +2103,13 @@
         "high": 20,
         "medium": 91,
         "reference": 44
-      }
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     },
     {
       "task_id": "AIQ-S7-E2E-03",
@@ -1928,7 +2174,13 @@
         "high": 20,
         "medium": 91,
         "reference": 44
-      }
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
     }
   ],
   "queue_invariants": [
@@ -1951,5 +2203,10 @@
       "inheritance_rule": "Each task inherits the union of catalogue cases mapped to its work_package_refs. Critical/high cases require executable evidence or explicit accepted-risk disposition before hardened/production status.",
       "source_catalog": "machine/ai_edge_case_catalog.json"
     }
+  },
+  "accountability": {
+    "contract": "machine/ai_build_accountability.json",
+    "human_ledger": "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md",
+    "policy": "Every task starts unchecked. Starting work requires a UTC timestamped history event. Completion requires implementation + independent verification signoff, git SHA, evidence, and a derived [x] checkbox."
   }
 }
