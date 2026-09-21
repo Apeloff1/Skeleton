@@ -9,7 +9,7 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-FULL_DEPLOY_NEEDS = "needs: [skeleton-test, java-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
+FULL_DEPLOY_NEEDS = "needs: [skeleton-test, java-accelerators, assembly-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
 UV_REQUIRED_VERSION = "==0.12.15"
