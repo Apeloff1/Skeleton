@@ -143,6 +143,7 @@ CONSTRUCTION_TRACKS = {
     "Z": "deep_internals_optimizer_control",
     "AA": "rare_massive_upgrades_full_stack_step_changes",
     "AB": "adversarial_foundations_systemic_hardening",
+    "AC": "exotic_architecture_laboratory",
 }
 
 PLAN_CHECKPOINTS = {
@@ -158,6 +159,15 @@ PLAN_CHECKPOINTS = {
         "gap_range": ("G001", "G200"),
         "production_readiness_blocked_by_applicable_open_p0": True,
         "production_authority_granted": False,
+    },
+    "PLAN-20260921-EXOTIC-ARCHITECTURE-LAB": {
+        "created_at": "2026-09-21",
+        "tracks": ("AC",),
+        "tier_e1_range": ("AC1", "AC13"),
+        "tier_e2_ranges": (("AC14", "AC26"), ("AC31", "AC39")),
+        "tier_e3_ranges": (("AC27", "AC30"), ("AC40", "AC41")),
+        "production_authority_granted": False,
+        "promotion_requires_track_ab_p0_closure": True,
     }
 }
 
@@ -244,6 +254,33 @@ ADVERSARIAL_HARDENING_INVARIANTS = {
     "restore_reconciles_external_effect_receipts_before_replay": True,
 }
 
+EXOTIC_ARCHITECTURE_TIERS = {
+    "E1": tuple(f"AC{number}" for number in range(1, 14)),
+    "E2": tuple(
+        [f"AC{number}" for number in range(14, 27)]
+        + [f"AC{number}" for number in range(31, 40)]
+    ),
+    "E3": tuple(
+        [f"AC{number}" for number in range(27, 31)]
+        + [f"AC{number}" for number in range(40, 42)]
+    ),
+}
+
+EXOTIC_ARCHITECTURE_INVARIANTS = {
+    "exotic_candidate_has_falsifiable_hypothesis": True,
+    "exotic_candidate_declares_kill_criteria": True,
+    "mutable_neural_state_is_not_trusted_durable_memory": True,
+    "inference_time_mutation_has_owner_scope_ttl_and_reset": True,
+    "tentative_generation_is_not_committed_output": True,
+    "exotic_candidate_cannot_execute_tools_from_uncommitted_state": True,
+    "compound_exotics_require_component_ablation": True,
+    "microbenchmark_only_result_cannot_promote": True,
+    "architecture_search_cannot_self_promote": True,
+    "track_ab_p0_invariants_remain_binding": True,
+    "promotion_to_production_requires_track_aa_path": True,
+}
+
+
 
 def full_summary() -> Dict[str, Any]:
     """Return the complete architecture summary across all indexed rounds."""
@@ -266,6 +303,8 @@ def full_summary() -> Dict[str, Any]:
         "hostile_gap_ids": list(HOSTILE_GAP_IDS),
         "p0_hardening_gaps": list(P0_HARDENING_GAPS),
         "adversarial_hardening_invariants": dict(ADVERSARIAL_HARDENING_INVARIANTS),
+        "exotic_architecture_tiers": {key: list(value) for key, value in EXOTIC_ARCHITECTURE_TIERS.items()},
+        "exotic_architecture_invariants": dict(EXOTIC_ARCHITECTURE_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
@@ -289,5 +328,7 @@ def full_summary() -> Dict[str, Any]:
             "Controlled fast, medium, and slow adaptation velocities",
             "Adversarial foundations and systemic hardening construction track",
             "P0 production-readiness blockers for identity, data, artifacts, state, evals, sandboxing, storage, recovery, and audit",
+            "Quarantined exotic architecture laboratory with falsification and kill criteria",
+            "Test-time neural memory, byte-latent, diffusion, recurrent-depth, equilibrium, sparse/ternary and latent-multimodal candidate families",
         ],
     }
