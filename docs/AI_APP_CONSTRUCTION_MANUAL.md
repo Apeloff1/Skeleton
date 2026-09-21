@@ -62,7 +62,7 @@ The runtime service topology stays intentionally small. Complex AI behavior belo
 | Application API | `backend/` | Product/business routes and control plane |
 | Engine runtime/API | `skeleton/` | AI engine, orchestration, memory, retrieval, agents |
 | Runtime model provider boundary | `backend/core/ai_provider.py` | Provider-neutral contract and concrete adapters |
-| Model routing | `backend/core/model_router.py` | Capability/privacy/cost/quality selection |
+| Model routing | `skeleton/frontier/model_routing.py` | Canonical capability/privacy/cost/quality routing; backend router is compatibility/composition |
 | Native acceleration | `skeleton/native/` | Optional, fallback-safe |
 | JVM acceleration | `java-accelerators/` | Optional, fallback-safe |
 | Repository machine contract | `machine/` | Machine-readable structure and construction policy |
@@ -1735,7 +1735,7 @@ physical destination map for implementation:
 | `identity` | `engine` | `skeleton/api` | internal-capability |
 | `configuration-secrets` | `engine` | `skeleton/config` | internal-capability |
 | `model-provider` | `engine` | `skeleton/provider_runtime.py` | provider-boundary |
-| `model-routing` | `application` | `backend/core/model_router.py` | policy-boundary |
+| `model-routing` | `engine` | `skeleton/frontier/model_routing.py` | policy-boundary |
 | `prompt-context` | `engine` | `skeleton/context` | internal-capability |
 | `orchestration` | `engine` | `skeleton/intelligence` | internal-capability |
 | `reasoning-verification` | `engine` | `skeleton/intelligence` | internal-capability |
@@ -1941,21 +1941,59 @@ A structural change is complete only when:
 - focused behavioral tests for the changed plane pass;
 - no transitional root has become a new runtime authority.
 
-### 35.9 Reverse dependency exception procedure
+### 35.9 Dependency and acceptance-edge procedure
 
-A reverse dependency is architecture debt, not permission to widen the zone
-graph. When a construction prerequisite cannot yet follow the runtime zone DAG:
+The production dependency graph is exception-free. Do not use a reverse runtime
+dependency to express that one plane merely checks another plane's output.
 
-1. keep the zone DAG unchanged;
-2. declare the exact source plane(s) and dependency plane;
-3. classify the exception as `ownership-migration` or
-   `control-observation`;
-4. document why the dependency is not equivalent to runtime ownership;
-5. for ownership migration, declare the intended destination owner;
-6. provide a concrete removal condition;
-7. add regression coverage proving the exception is both necessary and exact;
-8. remove the exception as soon as the edge becomes legal or disappears.
+Use `depends_on` only when the source plane requires the target implementation
+at runtime or construction time. That edge participates in the topological
+order and must follow the zone DAG.
 
-Never use a wildcard exception, root-wide exception, or an exception that
-creates an implicit cyclic zone dependency.
+Use `validates` when the source consumes readiness, test, evaluation, build,
+or release evidence from another plane without importing or owning that plane.
+Every `validates` relation is mirrored by an exact
+`structural_blueprint.acceptance_edges` entry.
 
+For a proposed cross-zone relationship:
+
+1. decide whether implementation is actually required;
+2. if yes, place the dependency in `depends_on` and verify the zone DAG allows
+   it;
+3. if the zone DAG would cycle, move the capability owner downward or introduce
+   a stable interface rather than widening the graph;
+4. if only evidence is consumed, use `validates`;
+5. bind the acceptance edge to a named evidence contract and regression test;
+6. never use an acceptance edge to call implementation code or acquire state
+   authority.
+
+`structural_blueprint.dependency_exceptions` is currently empty. A future
+exception would require an explicit temporary migration case and should be
+treated as a blocker to architectural closure, not normal operating structure.
+
+
+
+### 35.10 Model-routing ownership convergence
+
+Canonical model routing is now engine-owned by
+`skeleton/frontier/model_routing.py`. This is the layer orchestration may
+depend on for capability matching, routing plans, provider ordering, budget
+projection, fallback semantics, provenance, and routing evaluation.
+
+`backend/core/model_router.py` remains materialized because application routes
+and compatibility call sites still consume its API. Treat it as a convergence
+surface, not a second routing authority. New engine code must not depend on the
+backend module.
+
+The convergence target is:
+
+```text
+application request
+  -> application facade / request shaping
+  -> engine model-routing contract
+  -> provider runtime
+  -> declared provider
+```
+
+The reverse direction is prohibited. Engine orchestration, resilience,
+verification, and cost admission do not import application routing code.
