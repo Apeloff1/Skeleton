@@ -91,16 +91,16 @@ def artifact_build(
     return safe_name, build_id, resolve_under_dir(root, build_id)
 
 
-def _db():
+def database():
     from core.databases import get_sync_db
 
-    return get_sync_db()
+    return get_syncdatabase()
 
 
 def gamefiles(game_name: str) -> list[dict[str, Any]]:
     try:
         return list(
-            _db()["gameforge_gamefiles"].find(
+            database()["gameforge_gamefiles"].find(
                 {"game_name": game_name},
                 {"_id": 0},
             )
@@ -136,7 +136,7 @@ def register_artifact(
         "built_at": _built_at(built_at),
     }
     try:
-        _db()["gameforge_builds"].update_one(
+        database()["gameforge_builds"].update_one(
             {"build_id": build_id},
             {"$set": dict(record)},
             upsert=True,
