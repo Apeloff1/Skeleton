@@ -2419,6 +2419,633 @@ Required metrics:
 **Maturity warning:** one recent preprint is not enough to constitutionalize the design. Treat as a high-information challenger.
 
 
+
+
+---
+
+# 25C. Domain evidence matrix
+
+This matrix compresses the research state into engineering decisions. "Durable" means the conclusion is stable enough to shape an interface or baseline. "Fragile frontier" means promising but still highly conditional. "Blocking unknown" is the question Skeleton must answer locally before claiming a robust default.
+
+| Domain | Durable evidence | Fragile frontier | Strong counterevidence / failure mode | Mandatory baseline | Blocking local experiment |
+| --- | --- | --- | --- | --- | --- |
+| Model architecture | dense attention remains a mature reference; hybridization is normal | sparse attention, recurrent depth, equilibrium, differential attention | theoretical FLOPs often fail to become wall-clock wins; rare-token routing failures | tuned dense Transformer | equal-token/equal-wall-clock dense vs hybrid/sparse/recurrent matrix |
+| Representation/tokenization | representation identity is part of model identity | byte-latent/dynamic patching | tokenizer-free does not eliminate normalization, cache, structure or sequence-accounting problems | stable subword tokenizer | code/Unicode/noise/multilingual + serving-cost byte-latent study |
+| Neural memory/retrieval | external memory needs provenance, update and deletion; LC and RAG are complementary | Titans/MIRAS neural memory, typed prospective stores, multi-granularity memory | append-only memory accumulates contradictions; neural state loses provenance and can leak | BM25 + dense RAG + full-context | retrieval/update/forgetting/prospective/poisoning suite |
+| Data/mixtures | mixture and data quality materially affect compute efficiency | learned/multi-fidelity mixture optimization, synthetic bootstrapping | proxy mixture transfer can fail; synthetic recursion can narrow support | fixed documented mixture | 3-scale mixture transfer + natural/synthetic factorial |
+| Optimization/numerics | tuned AdamW/BF16 is the reference | Muon/SOAP, low-rank optimizer state, FP8, FP4 | update-scale unfairness, late-run instability, communication cost | AdamW + BF16 | update-RMS matched optimizer × precision × batch study |
+| Test-time reasoning | extra compute can help; strategy is task-dependent | adaptive search, recurrent latent depth, dynamic verifier allocation | overthinking, correlated candidates, verifier bottleneck | direct decoding | quality/cost curves across direct, BoN, sequential, prefix search, verifier allocation |
+| Formal reasoning | deterministic proof checking is stronger evidence for formalized claims | neural theorem provers, diffusion proof generation, autoformalization | formally valid proof can encode the wrong user statement | standard solver/prover + human semantic check | semantic-faithfulness vs formal-validity benchmark |
+| Agents/long horizon | executable-state evaluation is required; long trajectories add unique failure modes | RL long-horizon training, action abstraction, multi-agent research | horizon length alone destabilizes training; final success hides damage | single strong agent, same compute | controlled horizon ladder with primitive vs macro actions/subgoals |
+| Agent memory/procedures | retrieval alone is insufficient; selective forgetting/update matter | prospective-memory stores and trigger policies | false alarms and stale-intent execution can be worse than forgetting | retrospective memory | PM-Bench-like trigger/false-alarm/authority test |
+| Serving/inference | continuous batching, KV lifecycle and cache locality matter | P/D disaggregation, network-aware decode, KV transform coding | network transfer, queueing, prediction error can erase disaggregation gains | colocated serving | colocated vs P/D vs deflection under topology/load sweep |
+| Distributed training | topology and collectives materially determine realized scaling | elastic live resize, 6D+ placement search | stragglers, all-to-all tails, checkpoint migration complexity | fixed known-good topology | topology-aware planner vs fixed layouts with fault injection |
+| Multimodal/world models | modality provenance and grounding must remain explicit | shared continuous latent language, world-model planning | textual quality can improve while perception/grounding regresses | modality-specific encoders + text fusion | perception/grounding/temporal/provenance regression suite |
+| Evaluation science | contamination, saturation and evaluator drift are distinct | dynamic/private/generated evals | dynamic benchmarks can themselves be poorly standardized; judge-model correlation | deterministic/public + blind holdout | contamination/saturation/evaluator-independence audit |
+| Safety/security/monitorability | deterministic policy/capability boundaries are mandatory | CoT monitoring, action-level monitors, learned deception detectors | monitorability drifts; narrow lie detectors fail OOD; judges can mislabel | deterministic authority + red-team suite | versioned monitorability/evasion/false-negative campaign |
+| Interpretability | intervention-based evidence is stronger than feature labels alone | circuit tracing, SAEs/transcoders, neuron-basis circuits | attractive explanations may not predict counterfactual behavior; compression changes internals | behavior-only baseline | counterfactual prediction + intervention + deployed-artifact transfer |
+| Uncertainty/calibration | calibration is task/population specific | trajectory-level confidence and OOD routing | confidence can be confidently wrong after tool/retrieval failures | simple held-out calibration | per-stage trajectory calibration and abstention policy study |
+| Continual adaptation | external memory/adapters are easier to isolate than live base-weight updates | fast weights, test-time neural adaptation | poisoning, forgetting, irreproducibility, reset failures | immutable base + external memory | memory vs adapter vs ephemeral fast-weight adaptation |
+| Hardware/precision | wall-clock/memory/bandwidth beat theoretical FLOPs | native ternary, FP4, sparse+low-bit, photonic/neuromorphic | specialized gains may disappear on another device/runtime | BF16 dense kernels | cross-hardware quality/latency/energy/portability matrix |
+| Research automation | agents can materially accelerate bounded research workflows | autonomous experiment loops, automated alignment research | agents can game metrics, fail implementation, or self-confirm | human-supervised workflow | stage-by-stage research benchmark with hidden scoring/recompute |
+
+## 25C.1 Domain conclusion rule
+
+A domain can have multiple simultaneous truths:
+
+```text
+stable interface
++ mandatory baseline
++ promising challenger
++ known failure mode
++ unresolved question
+```
+
+Do not force these into one "winner."
+
+---
+
+# 25D. Contradiction and tension ledger — CX001..CX024
+
+Contradictions are stored because averaging conflicting papers into a vague consensus destroys useful information.
+
+## CX001 — More inference compute vs overthinking
+
+**Support:** test-time compute improves many difficult reasoning tasks.
+
+**Counter:** sequential reasoning can plateau or regress; additional tokens may amplify an early wrong premise.
+
+**Resolution experiment:** response-quality derivative over compute, stratified by task difficulty and strategy.
+
+**Architecture consequence:** marginal-benefit stopping is mandatory.
+
+## CX002 — Parallel sampling vs candidate correlation
+
+**Support:** Best-of-N/self-consistency raises the chance of including a correct candidate.
+
+**Counter:** samples from one model/prompt can be highly correlated; N overstates effective diversity.
+
+**Resolution experiment:** estimate semantic/error correlation and effective sample size.
+
+## CX003 — Learned verifier vs deterministic checker
+
+**Support:** learned verifiers scale to open-ended tasks.
+
+**Counter:** they can share model-family biases, be gamed, or mislabel.
+
+**Resolution:** deterministic evidence dominates where available; learned verification remains scoped.
+
+## CX004 — RLVR accuracy vs reasoning faithfulness
+
+**Support:** RLVR raises success on verifiable domains.
+
+**Counter:** outcome reward need not make the generated reasoning causally important or sufficient.
+
+**Resolution:** evaluate outcome, process, causal perturbation, and cross-domain transfer separately.
+
+## CX005 — Synthetic data improvement vs model collapse
+
+**Support:** synthetic bootstrapping/rephrasing can improve data-constrained training.
+
+**Counter:** synthetic-only recursive distributions can lose diversity or reinforce errors.
+
+**Resolution:** generator-type × ancestry-depth × real-anchor × model-scale factorial.
+
+## CX006 — Quality filtering vs diversity
+
+**Support:** stronger quality filters improve token efficiency.
+
+**Counter:** filters may remove rare languages, unusual styles, edge-case reasoning and long-tail knowledge.
+
+**Resolution:** track quality and coverage as separate axes.
+
+## CX007 — Long context vs RAG
+
+**Support LC:** eliminates retrieval miss and preserves global information.
+
+**Support RAG:** lower cost, explicit source selection, freshness and provenance.
+
+**Resolution:** empirical router by workload; neither becomes constitutional.
+
+## CX008 — Graph/agentic retrieval vs BM25/hybrid retrieval
+
+**Support complex retrieval:** relational/multi-step queries may benefit from graph and iterative search.
+
+**Counter:** lexical methods remain extremely strong, cheap and scalable in many regimes.
+
+**Resolution:** corpus-scale Pareto comparison including build/maintenance cost.
+
+## CX009 — Neural memory vs external memory
+
+**Support neural:** learned state can compress/update online.
+
+**Counter external:** provenance, deletion, inspection and deterministic replay are far stronger.
+
+**Resolution:** neural memory remains ephemeral until it wins on equal-cost tasks without violating authority/provenance.
+
+## CX010 — More memory vs stale/poisoned memory
+
+**Support:** more retained information can improve recall.
+
+**Counter:** stale or malicious memories can dominate retrieval and propagate through reflection.
+
+**Resolution:** measure utility against age, contradiction, trust and poison.
+
+## CX011 — MoE capacity vs communication
+
+**Support:** larger total parameter count with bounded active compute.
+
+**Counter:** all-to-all, load imbalance and hot experts can dominate runtime.
+
+**Resolution:** quality-per-wall-clock and topology-specific scaling.
+
+## CX012 — Sparse FLOPs vs realized performance
+
+**Support:** sparse attention/activations reduce nominal compute.
+
+**Counter:** indexing, routing and irregular memory access can erase gains.
+
+**Resolution:** real-device wall-clock/energy only.
+
+## CX013 — Low precision efficiency vs long-horizon numerical stability
+
+**Support:** FP8/low-bit methods reduce bandwidth/memory and increase throughput.
+
+**Counter:** outliers, accumulation and optimizer-state errors may cause rare catastrophic instability.
+
+**Resolution:** full-duration training and checkpoint/resume tests.
+
+## CX014 — Native ternary architecture vs post-training quantization
+
+**Support native:** training from scratch around low-bit weights may change scaling and kernels.
+
+**Counter PTQ:** simpler deployment path with mature compatibility.
+
+**Resolution:** treat as different research families, never one "low-bit" category.
+
+## CX015 — Interpretability feature coherence vs causal usefulness
+
+**Support:** coherent learned features/circuits can generate useful hypotheses.
+
+**Counter:** CHIVE-like results show activation-reading tools may fail to improve counterfactual behavior prediction.
+
+**Resolution:** usefulness requires downstream predictive/intervention uplift.
+
+## CX016 — SAE basis vs native neuron basis
+
+**Support SAE/transcoder:** superposition motivates learned sparse features.
+
+**Counter:** some tasks exhibit sparse causal circuits directly in neuron space.
+
+**Resolution:** benchmark both bases.
+
+## CX017 — CoT monitoring usefulness vs monitorability erosion
+
+**Support:** current reasoning traces can reveal suspicious intent/behavior.
+
+**Counter:** model/training changes can make traces less informative or easier to manipulate.
+
+**Resolution:** monitorability is versioned and adversarially tested.
+
+## CX018 — Specialized safety detector vs prompted general model
+
+**Support specialized:** cheap focused classifier can be efficient in-distribution.
+
+**Counter:** narrow fine-tuning may generalize poorly OOD.
+
+**Resolution:** OOD/evasion benchmark plus deterministic policy fallback.
+
+## CX019 — Multi-agent collaboration vs coordination overhead
+
+**Support:** specialized agents can parallelize or cross-check.
+
+**Counter:** duplicated work, shared errors, communication cost and authority complexity.
+
+**Resolution:** equal-total-compute comparison to one strong agent.
+
+## CX020 — Long-horizon RL vs horizon reduction
+
+**Support:** extending training horizon can teach long workflows.
+
+**Counter:** controlled evidence shows horizon length itself destabilizes exploration/credit assignment.
+
+**Resolution:** compare raw horizon expansion against macro-actions/subgoals and curriculum.
+
+## CX021 — Dynamic benchmarks vs reproducibility
+
+**Support:** dynamic/private tasks reduce contamination.
+
+**Counter:** changing tasks complicate longitudinal comparability and may introduce generation/evaluator bias.
+
+**Resolution:** preserve benchmark-generation versions and anchor subsets.
+
+## CX022 — Formal correctness vs semantic correctness
+
+**Support:** theorem prover/model checker can establish exact properties.
+
+**Counter:** wrong formalization can be perfectly proved.
+
+**Resolution:** semantic translation is an independent verification stage.
+
+## CX023 — Automated research acceleration vs autonomous science
+
+**Support:** agents can accelerate coding, analysis and literature workflows.
+
+**Counter:** realistic research extension and robust independent validation remain difficult; agents can exploit scoring.
+
+**Resolution:** stage-by-stage scoring and independent recomputation.
+
+## CX024 — First-party deployment evidence vs independent consensus
+
+**Support:** first-party labs observe deployment-scale phenomena unavailable publicly.
+
+**Counter:** evidence can share organizational models, data, measurement choices and incentives.
+
+**Resolution:** use urgently for threat models, but track independence and seek cross-lab/local replication.
+
+---
+
+# 25E. Research debt ledger — RDE001..RDE036
+
+Research debt is an architecture assumption with insufficient local evidence. Debt can be acceptable temporarily, but it must be visible.
+
+Each debt item has:
+
+```text
+assumption
+risk_if_wrong
+blocking_claims
+minimum_retirement_evidence
+owner
+refresh_deadline
+```
+
+## RDE001 — Dense baseline quality
+
+Skeleton needs one reproducible dense reference with known data, optimizer, tokenizer, hardware and inference protocol.
+
+**Blocks:** claims that sparse/hybrid/exotic models are better.
+
+**Retire with:** stable small + medium baseline runs.
+
+## RDE002 — ModelPort true family neutrality
+
+Interfaces may still silently assume autoregressive KV-based decoding.
+
+**Blocks:** production claims for SSM/diffusion/recurrent-depth adapters.
+
+**Retire with:** at least three materially different family conformance implementations.
+
+## RDE003 — Representation portability
+
+Current contracts have not yet proven fixed-token and byte-latent compatibility.
+
+**Retire with:** one byte/dynamic-patch adapter passing cache/tool/structured-output tests.
+
+## RDE004 — Scaling-law transfer
+
+No local evidence yet establishes transfer of proxy scaling laws across changed data/optimizer architecture.
+
+**Retire with:** multi-size/multi-token fit and held-out scale prediction.
+
+## RDE005 — Mixture optimization transfer
+
+Learned mixture weights may not transfer upward in model scale.
+
+**Retire with:** proxy-to-larger model transfer experiment.
+
+## RDE006 — Synthetic-data ancestry limits
+
+The acceptable recursion depth and natural-data anchor ratio are unknown.
+
+**Retire with:** ancestry factorial over multiple generations.
+
+## RDE007 — AdamW challenger fairness
+
+Optimizer comparison can be invalid without equal update scale and tuning budget.
+
+**Retire with:** update-RMS-matched optimizer matrix.
+
+## RDE008 — FP8 full-run reliability
+
+Short runs are not enough to establish late-stage stability.
+
+**Retire with:** full-duration or statistically convincing long-horizon run plus resume/recovery.
+
+## RDE009 — FP4 viability
+
+Evidence remains too immature for default planning assumptions.
+
+**Retire with:** independent long-run replication on supported hardware.
+
+## RDE010 — Reasoning strategy router
+
+Skeleton has no measured mapping from task/difficulty/budget to reasoning strategy.
+
+**Retire with:** cross-task quality-cost frontier and calibrated routing model.
+
+## RDE011 — Verifier independence
+
+Different verifier processes may still share model/data failure modes.
+
+**Retire with:** explicit lineage graph + correlated-error experiment.
+
+## RDE012 — Reasoning causal faithfulness
+
+Trace correctness is not established by answer correctness.
+
+**Retire with:** trace perturbation/sufficiency evaluation.
+
+## RDE013 — Retrieval router
+
+No local evidence chooses among LC, BM25, dense, hybrid, graph and agentic search by workload.
+
+**Retire with:** corpus/workload ladder.
+
+## RDE014 — Graph RAG value
+
+Graph construction cost may exceed task benefit.
+
+**Retire with:** relational task wins at acceptable lifecycle cost.
+
+## RDE015 — Memory belief revision
+
+The durable memory plane has not yet demonstrated contradiction/supersession/retraction correctness.
+
+**Retire with:** temporal contradiction benchmark.
+
+## RDE016 — Prospective memory architecture
+
+Typed intention store is promising but locally unproven.
+
+**Retire with:** prompt/RAG/typed/learned comparison with false-alarm and authority metrics.
+
+## RDE017 — Memory poisoning containment
+
+Reflection/consolidation can amplify poisoned memories.
+
+**Retire with:** persistent poison + cleanup + retraction campaign.
+
+## RDE018 — Neural memory value
+
+Titans/MIRAS-style state has not locally beaten retrieval/context under equal cost.
+
+**Retire with:** request-local neural-memory benchmark including reset/provenance.
+
+## RDE019 — Long-horizon action abstraction
+
+The right macro-action/subgoal granularity is unknown.
+
+**Retire with:** controlled action-horizon study.
+
+## RDE020 — Multi-agent advantage
+
+The repo does not yet show a robust equal-compute win over one strong agent.
+
+**Retire with:** controlled collaboration benchmark.
+
+## RDE021 — Tool-selection robustness
+
+Tool metadata manipulation has not been tested locally.
+
+**Retire with:** equivalent-tool adversarial description/name mutations.
+
+## RDE022 — P/D serving crossover point
+
+The workload/topology where disaggregation wins is unknown.
+
+**Retire with:** colocated/disaggregated/deflection sweep.
+
+## RDE023 — Network-aware scheduler benefit
+
+Network telemetry can be stale or noisy.
+
+**Retire with:** topology-aware routing under injected congestion/staleness.
+
+## RDE024 — KV compression quality frontier
+
+Reconstruction error is not enough.
+
+**Retire with:** downstream quality at equal bytes across quantization/eviction/transform coding.
+
+## RDE025 — Output-length reservation
+
+Admission policy under heavy-tailed generation lengths is not locally characterized.
+
+**Retire with:** trace-driven reservation simulation + overload tests.
+
+## RDE026 — Interpretability usefulness
+
+No local proof that interpretability tooling improves debugging or intervention selection.
+
+**Retire with:** counterfactual/fault-localization user study or automated benchmark.
+
+## RDE027 — Interpretability after compression
+
+Feature/circuit maps may not survive quantization/pruning.
+
+**Retire with:** pre/post-deployment artifact comparison.
+
+## RDE028 — Monitorability stability
+
+Current models/training variants have not been mapped for CoT/action monitorability.
+
+**Retire with:** model × training × reasoning-effort monitorability grid.
+
+## RDE029 — Detector OOD robustness
+
+Specialized learned safety detectors have not demonstrated strong OOD guarantees.
+
+**Retire with:** adversarial/OOD benchmark and calibrated abstention.
+
+## RDE030 — Unlearning promise boundary
+
+Runtime deletion and weight-level unlearning still require explicit product/architecture semantics.
+
+**Retire with:** deletion policy + multi-metric weight-unlearning benchmark.
+
+## RDE031 — Multimodal post-training stability
+
+Textual preference gains may distort perception/grounding.
+
+**Retire with:** before/after perception and grounding regression.
+
+## RDE032 — Formal semantic fidelity
+
+Formal checkers prove the encoded statement, not intent.
+
+**Retire with:** natural-language↔formal equivalence benchmark and human/deterministic controls.
+
+## RDE033 — Research-agent anti-cheating
+
+Automated researchers may exploit scorer variance or benchmark visibility.
+
+**Retire with:** hidden-eval, independent recomputation and adversarial scoring tests.
+
+## RDE034 — Research-agent implementation competence
+
+Literature synthesis ability does not establish reliable experimental implementation.
+
+**Retire with:** REx/FIRE-like internal extension tasks.
+
+## RDE035 — Dynamic benchmark quality
+
+Dynamic benchmark generation can itself introduce bias, instability and evaluator leakage.
+
+**Retire with:** benchmark-generator validation and anchor-set stability study.
+
+## RDE036 — Research freshness automation
+
+The plan has manual refresh rules but no proven automatic stale-evidence detector.
+
+**Retire with:** source/version/status watcher plus deterministic change receipts.
+
+---
+
+# 25F. Research-debt retirement rules
+
+A debt item moves through:
+
+```text
+OPEN
+ -> EXPERIMENT_DESIGNED
+ -> RUNNING
+ -> EVIDENCE_COLLECTED
+ -> CHALLENGED
+ -> RETIRED | PARTIALLY_RETIRED | INVALIDATED | DEFERRED
+```
+
+Rules:
+
+- "paper says so" cannot retire local research debt;
+- a toy reproduction normally retires only toy-scale debt;
+- failed reproduction increases evidence value rather than disappearing;
+- partial retirement records the exact scale/task/hardware boundary;
+- a retired item can reopen after a material model, hardware, data or benchmark change;
+- production claims list every still-open debt they depend on.
+
+---
+
+# 25G. Statistical and experimental rigor contract
+
+Every consequential experiment must record:
+
+## G.1 Selection/tuning budget
+
+Report:
+
+- number of configurations tried;
+- search strategy;
+- hyperparameter ranges;
+- pilot runs;
+- discarded runs and reasons;
+- benchmark accesses;
+- human intervention.
+
+A challenger that received 100 tuning attempts cannot be compared naively to a baseline tuned once.
+
+## G.2 Variance
+
+Report where material:
+
+- seeds;
+- mean/median;
+- dispersion/confidence interval;
+- catastrophic failure count;
+- tail behavior.
+
+For expensive frontier runs where multiple full seeds are infeasible, use smaller-scale seed studies plus explicit uncertainty rather than pretending one run has zero variance.
+
+## G.3 Stopping and censoring
+
+Predeclare or record:
+
+- early-stop rule;
+- failed/OOM runs;
+- timeout handling;
+- diverged runs;
+- missing metrics.
+
+Never remove failed runs silently from an optimizer/system comparison.
+
+## G.4 Multiple comparisons
+
+If architecture search evaluates many candidates, record search multiplicity. A single best score after thousands of trials has different evidentiary strength from a predeclared comparison.
+
+## G.5 Baseline parity
+
+Baseline gets:
+
+- current kernels;
+- comparable tuning budget;
+- comparable hardware;
+- comparable precision;
+- comparable data;
+- comparable inference/search budget.
+
+"Novel method beats intentionally weak baseline" is rejected evidence.
+
+## G.6 Lifecycle cost
+
+System claims include, when relevant:
+
+- training;
+- preprocessing/data synthesis;
+- index construction;
+- checkpoint/storage;
+- serving;
+- network;
+- verifier/search;
+- operator complexity;
+- migration;
+- rollback.
+
+## G.7 Negative-space reporting
+
+Record what was **not** tested:
+
+- other model families;
+- other languages;
+- long-tail tasks;
+- alternative hardware;
+- high concurrency;
+- failures;
+- adversarial settings.
+
+This prevents accidental universalization.
+
+---
+
+# 25H. Research freshness tiers
+
+Recommended default refresh intervals:
+
+| Evidence class | Default review window | Faster trigger |
+| --- | ---: | --- |
+| foundational theory/interface | 12 months | contradictory major result |
+| accepted frontier architecture | 90 days | independent scale replication/failure |
+| preprint frontier | 30–60 days | version/venue/code release |
+| submission/ARR | 30 days | decision/revision |
+| withdrawn/rejected | 90 days | substantially revised resubmission |
+| official deployment evidence | 30–60 days | model/system generation change |
+| safety/monitorability | 30 days | new capability/training recipe |
+| serving/hardware | 30–60 days | hardware/runtime generation change |
+| benchmark/eval | 60 days | contamination/saturation/correction |
+| research-agent capability | 30 days | major agent/model/tool release |
+
+Refresh does not mean reread everything. It means verify:
+
+```text
+status
+latest version
+new independent evidence
+new counterevidence
+code/data availability
+stronger baseline
+scope-changing result
+```
+
+
 # 26. Research anti-patterns
 
 Skeleton must reject the following reasoning:
