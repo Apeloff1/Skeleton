@@ -29,6 +29,8 @@ def test_manifest_is_self_consistent():
     assert manifest.construction["provider_activation_boundary"] == "backend/core/ai_provider.py"
     assert manifest.construction["provider_architecture_loader"] == "skeleton/provider_contract.py"
     assert manifest.construction["construction_version"] == "3.6.0"
+    assert manifest.construction["interface_registry"] == "machine/capability_interfaces.json"
+    assert manifest.construction["interface_validator"] == "scripts/check_capability_interfaces.py"
     assert manifest.construction["operation_contract"] == "skeleton/contracts/operation.py"
     assert manifest.construction["stream_contract"] == "skeleton/frontier/operation_stream.py"
     assert manifest.construction["stream_store"] == "skeleton/frontier/operation_stream_store.py"
