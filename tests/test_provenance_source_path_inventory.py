@@ -27,6 +27,8 @@ LIVE_EXAMPLES = (
     (".github/workflows/provenance-policy.yml", "first-party"),
     (".machine/README.md", "first-party"),
     (".machine/repository.toml", "first-party"),
+    ("machine/README.md", "first-party"),
+    ("machine/manifest.json", "first-party"),
     ("README.md", "first-party"),
     ("satellites/gameforge-middleware/README.md", "first-party"),
     ("skeleton/testing/data/frontier_npc_source_fixture.json", "fixture"),
@@ -135,6 +137,8 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path(".github/workflows/ci.yml"), "first-party")
         self.assertEqual(policy.classify_path(".machine/README.md"), "first-party")
         self.assertEqual(policy.classify_path(".machine/repository.toml"), "first-party")
+        self.assertEqual(policy.classify_path("machine/README.md"), "first-party")
+        self.assertEqual(policy.classify_path("machine/manifest.json"), "first-party")
         self.assertEqual(policy.classify_path("satellites/gameforge-middleware/README.md"), "first-party")
         self.assertEqual(policy.classify_path("README.md"), "first-party")
         self.assertEqual(policy.classify_path("memory/PRD.md"), "first-party")

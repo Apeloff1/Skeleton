@@ -97,6 +97,7 @@ FIRST_PARTY_PREFIXES = (
     "satellites/",
     ".emergent/",
     ".machine/",
+    "machine/",
 )
 
 BINARY_SUFFIXES = frozenset(
