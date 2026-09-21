@@ -13,6 +13,7 @@ than trusted from a caller-supplied label.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 from typing import Any, Iterable
 
@@ -46,6 +47,64 @@ def _record_ids(values: Iterable[str]) -> tuple[str, ...]:
     if not normalized:
         raise DataGovernanceDenied("at least one governed record is required")
     return normalized
+
+
+class CanonicalDataPlane(str, Enum):
+    """Governed owner planes whose durable writes require lifecycle registration."""
+
+    CONVERSATION = "conversation"
+    MEMORY = "memory"
+    RETRIEVAL = "retrieval"
+    ARTIFACT = "artifact"
+
+    @classmethod
+    def parse(cls, value: "CanonicalDataPlane | str") -> "CanonicalDataPlane":
+        if isinstance(value, cls):
+            return value
+        text = str(value).strip().lower().replace("_", "-")
+        aliases = {
+            "conversation": cls.CONVERSATION,
+            "conversation-state": cls.CONVERSATION,
+            "memory": cls.MEMORY,
+            "retrieval": cls.RETRIEVAL,
+            "artifact": cls.ARTIFACT,
+            "artifact-plane": cls.ARTIFACT,
+        }
+        try:
+            return aliases[text]
+        except KeyError as exc:
+            raise DataGovernanceDenied("unknown canonical data plane") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalWritePolicy:
+    plane: CanonicalDataPlane
+    owner_plane: str
+    default_deletion_targets: tuple[str, ...]
+
+
+_CANONICAL_WRITE_POLICIES = {
+    CanonicalDataPlane.CONVERSATION: CanonicalWritePolicy(
+        plane=CanonicalDataPlane.CONVERSATION,
+        owner_plane="conversation",
+        default_deletion_targets=("conversation",),
+    ),
+    CanonicalDataPlane.MEMORY: CanonicalWritePolicy(
+        plane=CanonicalDataPlane.MEMORY,
+        owner_plane="memory",
+        default_deletion_targets=("memory",),
+    ),
+    CanonicalDataPlane.RETRIEVAL: CanonicalWritePolicy(
+        plane=CanonicalDataPlane.RETRIEVAL,
+        owner_plane="retrieval",
+        default_deletion_targets=("retrieval",),
+    ),
+    CanonicalDataPlane.ARTIFACT: CanonicalWritePolicy(
+        plane=CanonicalDataPlane.ARTIFACT,
+        owner_plane="artifact",
+        default_deletion_targets=("artifact",),
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +166,60 @@ class GovernanceRegistry:
 
     def register(self, record: GovernedDataRecord) -> GovernedDataRecord:
         return self.lifecycle.register(record)
+
+    def register_canonical_write(
+        self,
+        plane: CanonicalDataPlane | str,
+        *,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: DataClass | str | int,
+        purposes: Iterable[str],
+        deletion_targets: Iterable[str] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+    ) -> GovernedDataRecord:
+        """Register lifecycle metadata for one canonical plane write.
+
+        The registry stores metadata only. Callers must commit the actual durable
+        write in the owning repository and use this record to drive export,
+        retention and deletion propagation. Projection-specific deletion targets
+        should be supplied explicitly when the write is copied beyond its owner
+        plane; the default targets only the canonical owner.
+        """
+
+        canonical = CanonicalDataPlane.parse(plane)
+        policy = _CANONICAL_WRITE_POLICIES[canonical]
+        normalized_purposes = tuple(
+            dict.fromkeys(
+                _required_text(value, "purpose").lower()
+                for value in purposes
+            )
+        )
+        if not normalized_purposes:
+            raise DataGovernanceDenied("at least one purpose is required")
+
+        targets = (
+            tuple(deletion_targets)
+            if deletion_targets is not None
+            else policy.default_deletion_targets
+        )
+        kwargs: dict[str, Any] = {
+            "record_id": _required_text(record_id, "record_id"),
+            "tenant_id": _required_text(tenant_id, "tenant_id"),
+            "owner_plane": policy.owner_plane,
+            "source_ref": _required_text(source_ref, "source_ref"),
+            "data_class": DataClass.parse(data_class),
+            "purposes": normalized_purposes,
+            "deletion_targets": targets,
+            "retention_until": retention_until,
+            "exportable": bool(exportable),
+        }
+        if created_at is not None:
+            kwargs["created_at"] = created_at
+        return self.register(GovernedDataRecord(**kwargs))
 
     def context_for(
         self,
@@ -247,6 +360,8 @@ class GovernanceRegistry:
 
 
 __all__ = [
+    "CanonicalDataPlane",
+    "CanonicalWritePolicy",
     "GovernanceContext",
     "GovernanceRegistry",
     "RegisteredProviderTransferDecision",
