@@ -249,6 +249,23 @@ def _validate_runtime_manifest_alignment(
         errors.append(str(exc))
         return
 
+    link = manifest.get("architecture")
+    if not isinstance(link, dict):
+        errors.append(f"{runtime_relative}.architecture must be an object")
+    else:
+        expected_link = {
+            "contract": ARCHITECTURE_PATH.as_posix(),
+            "validator": architecture.get("sources", {}).get("validator"),
+            "documentation": architecture.get("sources", {}).get("human_map"),
+            "tag": architecture.get("architecture_tag"),
+        }
+        for field, expected in expected_link.items():
+            if link.get(field) != expected:
+                errors.append(
+                    f"{runtime_relative}.architecture.{field} drift: "
+                    f"manifest={link.get(field)!r} expected={expected!r}"
+                )
+
     raw_services = manifest.get("services")
     if not isinstance(raw_services, list):
         errors.append(f"{runtime_relative}.services must be a list")
@@ -384,6 +401,55 @@ def _validate_change_routing(
         )
 
 
+def _validate_top_level_policy(
+    architecture: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> int:
+    policy = architecture.get("top_level_policy")
+    if not isinstance(policy, dict):
+        errors.append("top_level_policy must be an object")
+        return 0
+    if policy.get("new_runtime_root") != "forbidden-unless-declared":
+        errors.append(
+            "top_level_policy.new_runtime_root must be 'forbidden-unless-declared'"
+        )
+
+    categories = (
+        "runtime_roots",
+        "control_roots",
+        "evidence_roots",
+        "transitional_roots",
+        "legacy_root_entrypoints",
+    )
+    seen: dict[str, str] = {}
+    count = 0
+    for category in categories:
+        values = policy.get(category)
+        if not isinstance(values, list):
+            errors.append(f"top_level_policy.{category} must be a list")
+            continue
+        for index, raw_path in enumerate(values):
+            try:
+                path = _normalized_repo_path(raw_path)
+            except ValueError as exc:
+                errors.append(f"top_level_policy.{category}[{index}]: {exc}")
+                continue
+            prior = seen.get(path)
+            if prior is not None:
+                errors.append(
+                    f"top-level path {path} is declared in both {prior} and {category}"
+                )
+            else:
+                seen[path] = category
+            if not (repo_root / path).exists():
+                errors.append(
+                    f"top_level_policy.{category} references missing path {path}"
+                )
+            count += 1
+    return count
+
+
 def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[str, Any]]:
     errors: list[str] = []
     architecture_path = repo_root / ARCHITECTURE_PATH
@@ -409,6 +475,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
     _validate_runtime_manifest_alignment(architecture, nodes, repo_root, errors)
     _validate_interfaces(architecture, nodes, roots, repo_root, errors)
     _validate_change_routing(architecture, roots, errors)
+    top_level_paths = _validate_top_level_policy(architecture, repo_root, errors)
 
     summary = {
         "ok": not errors,
@@ -421,6 +488,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
         "interfaces": len(architecture.get("interfaces", []))
         if isinstance(architecture.get("interfaces"), list)
         else 0,
+        "top_level_paths": top_level_paths,
         "errors": errors,
     }
     return errors, summary
@@ -455,6 +523,7 @@ def main(argv: list[str] | None = None) -> int:
             f"zones={summary['zones']}; "
             f"nodes={summary['runtime_nodes']}; "
             f"interfaces={summary['interfaces']}; "
+            f"top-level={summary['top_level_paths']}; "
             f"runtime-order={order})"
         )
     return 1 if errors else 0
