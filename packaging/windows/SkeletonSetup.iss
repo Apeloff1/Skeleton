@@ -62,3 +62,6 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch Skeleton setup and runtime
 
 [UninstallRun]
 Filename: "{app}\{#AppExeName}"; Parameters: "--stop --quiet"; WorkingDir: "{app}"; RunOnceId: "StopSkeleton"; Flags: runhidden skipifdoesntexist
+
+[UninstallDelete]
+Type: files; Name: "{app}\.env"
