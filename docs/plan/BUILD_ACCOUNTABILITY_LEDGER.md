@@ -8,15 +8,18 @@ Machine authority: [`machine/ai_build_accountability.json`](../../machine/ai_bui
 
 Every tracked plan item has a completion checkbox. **The checkbox is not allowed to be checked manually.** It becomes `[x]` only after the machine validator confirms both mandatory sign-offs, timestamps, git revision and evidence.
 
+Every lifecycle/status event is also signed as an accountable attestation with actor identity, actor type, role, UTC timestamp, full git SHA, statement, signature method, and from/to status.
+
 Required completion chain:
 
 ```text
-[ ] planned
-  -> STARTED event + UTC timestamp
+[ ] planned / catalogued
+  -> signed STARTED event + UTC timestamp
   -> implementation evidence
-  -> builder/implementer sign-off + UTC timestamp + git SHA
+  -> implementation sign-off + UTC timestamp + git SHA
   -> independent verification evidence
   -> verifier sign-off + UTC timestamp + git SHA
+  -> signed status/completion event
   -> validator confirms evidence + independence
   -> [x] completed
 ```
@@ -553,11 +556,254 @@ All entries below intentionally start unchecked/unsigned unless real evidence ex
 - [ ] `ACC-VS-006` — VS-006 — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-VS-007` — VS-007 — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
+## Historical / Edge / Obscure Catalogue
+
+- [ ] `ACC-HIST-AI-001` — HIST-AI-001 General Problem Solver — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-002` — HIST-AI-002 STRIPS planning — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-003` — HIST-AI-003 SHRDLU — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-004` — HIST-AI-004 DENDRAL — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-005` — HIST-AI-005 MYCIN — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-006` — HIST-AI-006 HEARSAY-II blackboard — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-007` — HIST-AI-007 Rete networks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-008` — HIST-AI-008 Truth Maintenance Systems — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-009` — HIST-AI-009 SOAR — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-010` — HIST-AI-010 ACT-R — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-011` — HIST-AI-011 Subsumption architecture — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-012` — HIST-AI-012 Behavior trees — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-013` — HIST-AI-013 Contract Net Protocol — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-014` — HIST-AI-014 BDI agents — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-015` — HIST-AI-015 Society of Mind — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-016` — HIST-AI-016 Cyc — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-017` — HIST-AI-017 Case-based reasoning — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-018` — HIST-AI-018 Genetic algorithms — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-019` — HIST-AI-019 Genetic programming — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-020` — HIST-AI-020 Hopfield networks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-021` — HIST-AI-021 Boltzmann machines — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-022` — HIST-AI-022 Reservoir computing — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-023` — HIST-AI-023 LSTM/GRU — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-024` — HIST-AI-024 Attention before Transformers — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-025` — HIST-AI-025 Transformer architecture — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-026` — HIST-AI-026 Mixture of Experts — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-027` — HIST-AI-027 Memory Networks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-028` — HIST-AI-028 Neural Turing Machine — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-029` — HIST-AI-029 Differentiable Neural Computer — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-030` — HIST-AI-030 Information retrieval lineage — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-031` — HIST-AI-031 Latent Semantic Analysis — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-032` — HIST-AI-032 PageRank — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-033` — HIST-AI-033 Blackboard architectures — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-034` — HIST-AI-034 Pandemonium architecture — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-035` — HIST-AI-035 Stigmergy — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-036` — HIST-AI-036 Ant Colony Optimization — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-037` — HIST-AI-037 Monte Carlo Tree Search — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-038` — HIST-AI-038 Alpha-beta search — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-039` — HIST-AI-039 A* search — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-AI-040` — HIST-AI-040 Constraint satisfaction — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-001` — HIST-SYS-001 Actor model — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-002` — HIST-SYS-002 Communicating Sequential Processes — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-003` — HIST-SYS-003 Petri nets — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-004` — HIST-SYS-004 Linda tuple spaces — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-005` — HIST-SYS-005 Erlang supervision trees — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-006` — HIST-SYS-006 Tandem NonStop — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-007` — HIST-SYS-007 Write-ahead logging — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-008` — HIST-SYS-008 MVCC — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-009` — HIST-SYS-009 Two-phase commit — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-010` — HIST-SYS-010 Sagas — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-011` — HIST-SYS-011 Lamport clocks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-012` — HIST-SYS-012 Vector clocks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-013` — HIST-SYS-013 Chandy-Lamport snapshots — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-014` — HIST-SYS-014 Paxos — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-015` — HIST-SYS-015 Raft — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-016` — HIST-SYS-016 FLP impossibility — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-017` — HIST-SYS-017 CAP theorem — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-018` — HIST-SYS-018 End-to-end principle — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-019` — HIST-SYS-019 Capability security — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-020` — HIST-SYS-020 Saltzer–Schroeder principles — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-021` — HIST-SYS-021 Bell-LaPadula / Biba — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-022` — HIST-SYS-022 Microkernels — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-023` — HIST-SYS-023 Unix pipes — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-024` — HIST-SYS-024 Plan 9 namespaces — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-025` — HIST-SYS-025 Smalltalk image persistence — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-026` — HIST-SYS-026 MapReduce — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-027` — HIST-SYS-027 Google File System lineage — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-028` — HIST-SYS-028 Dynamo-style systems — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-029` — HIST-SYS-029 Bigtable lineage — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-HIST-SYS-030` — HIST-SYS-030 Borg-style cluster scheduling — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-001` — EDGE-CONTRACT-001 Duplicate JSON object keys — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-002` — EDGE-CONTRACT-002 Missing versus explicit null — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-003` — EDGE-CONTRACT-003 Unknown enum value after rolling upgrade — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-004` — EDGE-CONTRACT-004 Unknown fields stripped then reserialized — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-005` — EDGE-CONTRACT-005 NaN and Infinity in JSON-adjacent stacks — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-006` — EDGE-CONTRACT-006 Negative zero — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-007` — EDGE-CONTRACT-007 Integer precision above JavaScript safe range — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-008` — EDGE-CONTRACT-008 Unicode normalization mismatch — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-009` — EDGE-CONTRACT-009 Bidirectional control characters — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-010` — EDGE-CONTRACT-010 Zero-width and confusable characters — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-011` — EDGE-CONTRACT-011 Case folding differences — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-012` — EDGE-CONTRACT-012 Trailing whitespace/control characters — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-013` — EDGE-CONTRACT-013 Locale-sensitive casing — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-014` — EDGE-CONTRACT-014 Timezone offset ambiguity — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-015` — EDGE-CONTRACT-015 DST fold/gap — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-016` — EDGE-CONTRACT-016 Leap-second / clock-step assumptions — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-017` — EDGE-CONTRACT-017 Extremely long IDs/strings — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-018` — EDGE-CONTRACT-018 Empty collection semantics — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-019` — EDGE-CONTRACT-019 Map ordering assumptions — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-CONTRACT-020` — EDGE-CONTRACT-020 Canonicalization before signing — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-001` — EDGE-DIST-001 Lost acknowledgement after successful commit — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-002` — EDGE-DIST-002 Duplicate event delivery — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-003` — EDGE-DIST-003 Out-of-order events — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-004` — EDGE-DIST-004 Event gap during reconnect — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-005` — EDGE-DIST-005 Terminal event emitted before durable final result — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-006` — EDGE-DIST-006 Process crash after external side effect but before receipt — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-007` — EDGE-DIST-007 Stale lease holder resumes — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-008` — EDGE-DIST-008 Lease expires during long syscall — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-009` — EDGE-DIST-009 ABA state change — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-010` — EDGE-DIST-010 Split brain — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-011` — EDGE-DIST-011 Network partition with healthy processes — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-012` — EDGE-DIST-012 Retry storm — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-013` — EDGE-DIST-013 Reconnect storm — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-014` — EDGE-DIST-014 Thundering herd on cache miss — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-015` — EDGE-DIST-015 Cache stampede after TTL boundary — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-016` — EDGE-DIST-016 Poison message — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-017` — EDGE-DIST-017 Head-of-line blocking — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-018` — EDGE-DIST-018 Priority inversion — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-019` — EDGE-DIST-019 Starvation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-020` — EDGE-DIST-020 Livelock — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-021` — EDGE-DIST-021 Deadlock — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-022` — EDGE-DIST-022 Clock skew invalidates lease math — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-023` — EDGE-DIST-023 Read-after-write not guaranteed — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-024` — EDGE-DIST-024 Write skew under snapshot isolation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-025` — EDGE-DIST-025 Partial multi-store update — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-026` — EDGE-DIST-026 Outbox row committed but publisher dies — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-027` — EDGE-DIST-027 Consumer commits side effect before inbox marker — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-028` — EDGE-DIST-028 Queue invisibility timeout too short — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-029` — EDGE-DIST-029 Backpressure ignored by producer — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DIST-030` — EDGE-DIST-030 Cancellation races with completion — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-001` — EDGE-AI-001 Indirect prompt injection in retrieved document — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-002` — EDGE-AI-002 Instruction laundering through tool output — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-003` — EDGE-AI-003 Memory poisoning — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-004` — EDGE-AI-004 Stale memory overrides current user intent — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-005` — EDGE-AI-005 Retrieval citation laundering — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-006` — EDGE-AI-006 Semantic duplicate evidence — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-007` — EDGE-AI-007 Chunk boundary severs qualifier — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-008` — EDGE-AI-008 Wrong temporal scope — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-009` — EDGE-AI-009 Wrong population/domain scope — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-010` — EDGE-AI-010 Embedding-model mismatch — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-011` — EDGE-AI-011 Stale vector index after source deletion — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-012` — EDGE-AI-012 Context compression drops exception — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-013` — EDGE-AI-013 Policy trimmed from long context — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-014` — EDGE-AI-014 Tool schema version race — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-015` — EDGE-AI-015 Duplicate model tool-call IDs — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-016` — EDGE-AI-016 Malformed partial structured output — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-017` — EDGE-AI-017 Provider finishes stream without terminal usage — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-018` — EDGE-AI-018 Provider alias silently changes model revision — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-019` — EDGE-AI-019 Tokenizer changes under same model family — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-020` — EDGE-AI-020 Fallback model lacks required modality/tool support — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-021` — EDGE-AI-021 Fallback changes privacy boundary — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-022` — EDGE-AI-022 Model repeats same failing tool forever — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-023` — EDGE-AI-023 Verifier shares same correlated error — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-024` — EDGE-AI-024 False consensus among agents — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-025` — EDGE-AI-025 Judge position/order bias — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-026` — EDGE-AI-026 Benchmark contamination — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-027` — EDGE-AI-027 Hidden test leakage through tool/search access — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-028` — EDGE-AI-028 Reward hacking / specification gaming — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-029` — EDGE-AI-029 Sycophancy overrides evidence — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-030` — EDGE-AI-030 Hallucinated authorization — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-031` — EDGE-AI-031 Approval becomes stale after argument edit — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-032` — EDGE-AI-032 Approval expires while queued — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-033` — EDGE-AI-033 Memory feedback loop — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-034` — EDGE-AI-034 Retrieval feedback loop — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-035` — EDGE-AI-035 Self-improvement evaluator overfits candidate — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-036` — EDGE-AI-036 Long-horizon goal drift — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-037` — EDGE-AI-037 Tool result too large for context — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-038` — EDGE-AI-038 Model refusal semantics differ by provider — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-039` — EDGE-AI-039 Partial tool success — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-AI-040` — EDGE-AI-040 Unknown external effect after timeout — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-001` — EDGE-SEC-001 TOCTOU authorization race — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-002` — EDGE-SEC-002 Symlink escape — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-003` — EDGE-SEC-003 Hardlink aliasing — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-004` — EDGE-SEC-004 Path traversal after decoding — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-005` — EDGE-SEC-005 Zip Slip — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-006` — EDGE-SEC-006 Tarbomb / decompression bomb — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-007` — EDGE-SEC-007 Archive symlink chain — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-008` — EDGE-SEC-008 Windows reserved device names — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-009` — EDGE-SEC-009 Alternate data streams — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-010` — EDGE-SEC-010 Case-insensitive path collision — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-011` — EDGE-SEC-011 DNS rebinding — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-012` — EDGE-SEC-012 Redirect crosses egress boundary — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-013` — EDGE-SEC-013 Metadata-service SSRF — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-014` — EDGE-SEC-014 IPv4-mapped IPv6 bypass — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-015` — EDGE-SEC-015 Secret in exception/log payload — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-016` — EDGE-SEC-016 Environment-variable inheritance — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-017` — EDGE-SEC-017 Temporary-file race — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-018` — EDGE-SEC-018 Shell quoting divergence — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-019` — EDGE-SEC-019 Executable shadowing via PATH — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-SEC-020` — EDGE-SEC-020 Stale credential after revocation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-001` — EDGE-DATA-001 Tombstone resurrection — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-002` — EDGE-DATA-002 Orphaned blob after metadata rollback — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-003` — EDGE-DATA-003 Metadata points to missing blob — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-004` — EDGE-DATA-004 Hash collision assumption — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-005` — EDGE-DATA-005 Corrupt backup discovered only during restore — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-006` — EDGE-DATA-006 Migration partially applied — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-007` — EDGE-DATA-007 Rollback code cannot read new data shape — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-008` — EDGE-DATA-008 Index built from inconsistent source snapshot — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-009` — EDGE-DATA-009 Data retention applies to source but not derived embedding — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-DATA-010` — EDGE-DATA-010 Backup retains deleted sensitive data — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-001` — EDGE-HW-001 Disk full during atomic write — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-002` — EDGE-HW-002 Inode exhaustion with free bytes — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-003` — EDGE-HW-003 GPU reset mid-inference — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-004` — EDGE-HW-004 VRAM fragmentation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-005` — EDGE-HW-005 Mixed-precision overflow/underflow — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-006` — EDGE-HW-006 Nondeterministic GPU kernels — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-007` — EDGE-HW-007 Thermal throttling — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-008` — EDGE-HW-008 NUMA remote-memory penalty — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-009` — EDGE-HW-009 Suspend/resume invalidates timers/connections — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-HW-010` — EDGE-HW-010 Driver/runtime version mismatch — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-001` — EDGE-UX-001 Double-submit across tabs — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-002` — EDGE-UX-002 Browser refresh during running operation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-003` — EDGE-UX-003 Offline draft later submitted twice — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-004` — EDGE-UX-004 Cancel clicked after server completed — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-005` — EDGE-UX-005 Stale optimistic update — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-006` — EDGE-UX-006 Huge streaming output freezes UI — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-007` — EDGE-UX-007 Screen reader misses streaming status — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-008` — EDGE-UX-008 Locale changes numeric meaning — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-009` — EDGE-UX-009 User clock wildly wrong — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-EDGE-UX-010` — EDGE-UX-010 Multi-device concurrent conversation append — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-001` — OBSCURE-001 Failure detectors are suspicion, not truth — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-002` — OBSCURE-002 Exactly-once is usually an end-to-end property — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-003` — OBSCURE-003 Fencing is stronger than locks alone — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-004` — OBSCURE-004 Cancellation is a protocol — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-005` — OBSCURE-005 Timeout means unknown, not failed — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-006` — OBSCURE-006 Derived indexes are disposable only if source truth is complete — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-007` — OBSCURE-007 Garbage collection is part of data architecture — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-008` — OBSCURE-008 Negative caching can preserve outages — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-009` — OBSCURE-009 Jitter is a correctness aid under correlated retry — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-010` — OBSCURE-010 Read repair can resurrect stale data — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-011` — OBSCURE-011 Checksums verify bytes, not meaning — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-012` — OBSCURE-012 Schema validation is not semantic validation — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-013` — OBSCURE-013 A successful process exit is not proof of intended effect — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-014` — OBSCURE-014 Backups are write-only until restoration is proven — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-015` — OBSCURE-015 Metrics can lie by omission — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-016` — OBSCURE-016 Average latency hides queue collapse — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-017` — OBSCURE-017 Fair scheduling can reduce throughput — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-018` — OBSCURE-018 Compression changes trust geometry — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-019` — OBSCURE-019 Consensus among correlated models is not independent evidence — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-020` — OBSCURE-020 Abstention is a valid successful outcome — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-021` — OBSCURE-021 Unknown usage must stay unknown — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-022` — OBSCURE-022 Policy version belongs in receipts — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-023` — OBSCURE-023 Model version belongs in evidence lineage — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-024` — OBSCURE-024 Tool description is attacker-controlled context unless curated — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-025` — OBSCURE-025 Capability discovery can become privilege discovery — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-026` — OBSCURE-026 Silence is not agreement in multi-agent systems — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-027` — OBSCURE-027 A lease is not ownership history — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-028` — OBSCURE-028 Wall-clock timestamps cannot prove causality — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `catalogued` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+
 ## Signing semantics
 
-A sign-off is an accountable attestation, not merely a name typed into Markdown. The machine record must contain the required identity, UTC timestamp, commit SHA and evidence fields. Where cryptographic Git/Sigstore/SSH/GPG/OIDC signing is available, `signature_ref` should point to that verification record.
+A sign-off is an accountable attestation, not merely a name typed into Markdown. The machine record must contain the required identity, UTC timestamp, commit SHA and evidence fields. Lifecycle events are held to the same attribution standard.
 
-Release/artifact cryptographic-signing requirements remain separate and may be stricter than this construction ledger.
+Where cryptographic Git/Sigstore/SSH/GPG/OIDC signing is available, `signature_ref` points to that verification record. Release/artifact cryptographic-signing requirements remain separate and may be stricter than this construction ledger.
 
 ## Audit rule
 
