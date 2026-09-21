@@ -352,6 +352,8 @@ jobs:
               'obsolete_main': 0,
               'duplicates': 0,
               'stale_dynamic_active': 0,
+              'closed_dynamic_ai_queued': 0,
+              'closed_dynamic_ai_active': 0,
               'obsolete_pr_queued': 0,
               'obsolete_pr_active': 0,
               'obsolete_dynamic_pr_queued': 0,
