@@ -811,7 +811,7 @@
     {
       "id": "product-experience",
       "owner": "frontend",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Human interaction shell, streaming state, conversation/task UX, artifacts, errors, settings and control views.",
       "depends_on": [
         "application-api",
@@ -828,20 +828,36 @@
         "canonical endpoint resolver",
         "stream/event reducer",
         "optimistic state policy",
-        "accessible error state"
+        "accessible error state",
+        "canonical conversation client",
+        "operation event reducer",
+        "replay cursor",
+        "approval interaction",
+        "cancel interaction",
+        "golden journey observability"
       ],
       "construction": [
         "single network resolver",
         "explicit loading/error/retry states",
         "stream cancellation",
-        "offline/reconnect behavior"
+        "offline/reconnect behavior",
+        "render canonical conversation state rather than browser-owned transcript authority",
+        "reduce replayable operation events idempotently",
+        "surface approval/cancel/degraded/reconnect states",
+        "bind displayed assistant result to canonical message/result identity"
       ],
       "acceptance": [
         "typecheck",
         "web export",
         "route registry",
         "E2E happy/degraded paths",
-        "accessibility"
+        "accessibility",
+        "multi-turn conversation E2E",
+        "tool approval E2E",
+        "refresh/reconnect E2E",
+        "cancel race E2E",
+        "provider/engine degraded E2E",
+        "artifact/media E2E where declared"
       ],
       "failure_mode": "recoverable user-facing degraded state"
     },
@@ -5323,6 +5339,18 @@
         "gap": "gap-cognitive-execution-loop",
         "plane": "orchestration",
         "work_package": "WP-P0-COGNITIVE-LOOP"
+      },
+      {
+        "key": "realtime_delivery_blueprint",
+        "gap": "gap-streaming-protocol",
+        "plane": "streaming-realtime",
+        "work_package": "WP-P0-STREAM"
+      },
+      {
+        "key": "golden_journey_blueprint",
+        "gap": "gap-e2e-golden-journeys",
+        "plane": "product-experience",
+        "work_package": "WP-P0-GOLDEN-JOURNEYS"
       }
     ],
     "required_envelopes": [
@@ -5359,14 +5387,30 @@
       "final-ai-result-ledger"
     ],
     "closure_order": [
-      "conversation + state authority",
-      "tool runtime + provider interaction + context compiler + verification",
+      "state authority + governance + cost admission + provider surface ownership",
+      "conversation + context + provider interaction + governed tools + evidence verification",
       "cognitive execution loop + authenticated application/engine boundary",
       "runtime provider credential/process cutover",
-      "realtime transport/recovery",
-      "cross-plane golden journeys"
+      "realtime delivery/recovery",
+      "cross-plane golden journeys",
+      "zero open P0 gaps"
     ],
-    "invariant": "No fully-functional-AI completion claim is valid while a listed P0 gap is open or its blueprint/envelope/state/work-package contract is missing."
+    "invariant": "No fully-functional-AI completion claim is valid while a listed P0 gap is open or its blueprint/envelope/state/work-package contract is missing.",
+    "required_p0_gaps": [
+      "gap-cognitive-execution-loop",
+      "gap-context-compiler-convergence",
+      "gap-conversation-state-authority",
+      "gap-cost-admission",
+      "gap-e2e-golden-journeys",
+      "gap-engine-application-execution-boundary",
+      "gap-governance-registry",
+      "gap-provider-interaction-protocol",
+      "gap-provider-surface-convergence",
+      "gap-state-authority-convergence",
+      "gap-streaming-protocol",
+      "gap-tool-runtime-convergence",
+      "gap-verification-evidence-contract"
+    ]
   },
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
@@ -5541,5 +5585,282 @@
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
     "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
+  },
+  "realtime_delivery_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-streaming-protocol",
+    "canonical_source": "skeleton/frontier/operation_stream.py",
+    "durable_store": "skeleton/frontier/operation_stream_store.py",
+    "product_transport": {
+      "default": "SSE",
+      "optional": "WebSocket may be added without changing event envelope semantics",
+      "command_direction": "cancel/approval/other mutations use authenticated HTTP commands; the event stream is server-to-client state projection",
+      "backend_role": "authorize product subscriber, consume/project engine operation events, preserve engine event identity/sequence",
+      "frontend_role": "idempotent reducer over operation_id + event_id + sequence with durable/recoverable cursor"
+    },
+    "event_taxonomy": [
+      "operation_state",
+      "execution_state",
+      "assistant_content",
+      "tool_proposed",
+      "tool_authorized",
+      "approval_required",
+      "tool_started",
+      "tool_completed",
+      "usage_updated",
+      "verification_updated",
+      "artifact_ready",
+      "degraded",
+      "terminal"
+    ],
+    "content_streaming": {
+      "rule": "provider token deltas are not copied blindly into product state; coalesce into bounded assistant_content events under the operation stream contract",
+      "coalescing": "configurable by bytes/time; final canonical message/result is authoritative",
+      "reconnect": "client replays durable content/control events when retained; if compacted, fetch canonical operation/result/conversation snapshot and continue from current cursor"
+    },
+    "cursor": {
+      "fields": [
+        "operation_id",
+        "sequence",
+        "event_id"
+      ],
+      "rules": [
+        "cursor only advances after reducer accepts event",
+        "duplicate event id with identical content is idempotent",
+        "same event id with different content is corruption/conflict",
+        "sequence gap triggers replay request; never skip silently",
+        "cursor too old after compaction returns explicit replay gap/resync requirement"
+      ]
+    },
+    "heartbeat": {
+      "default_seconds": 15,
+      "configurable_range_seconds": [
+        10,
+        60
+      ],
+      "rule": "heartbeat proves transport liveness only and does not advance operation state"
+    },
+    "multi_client": {
+      "strategy": "each client/session keeps its own cursor; client acknowledgement is advisory and not operation authority",
+      "compaction": "bounded retention/terminal policy, not indefinite wait for every historical client",
+      "stale_client": "explicit replay gap -> authoritative snapshot/resync"
+    },
+    "backpressure": {
+      "transport_queue": "bounded per subscriber",
+      "slow_client": "disconnect/fail stream with last accepted cursor; operation continues unless explicit product policy couples disconnect to cancellation",
+      "durable_stream": "canonical append capacity/backpressure remains fail-closed according to stream protocol",
+      "invariant": "one slow browser cannot block unrelated operations or cause silent event loss"
+    },
+    "cancellation": {
+      "request": "authenticated idempotent HTTP cancellation command",
+      "race": "terminal result vs cancel uses operation terminal fencing; exactly one terminal state wins",
+      "disconnect": "disconnect alone does not imply cancellation unless request policy explicitly says so"
+    },
+    "terminal": {
+      "rules": [
+        "canonical AIExecutionResult is committed before completed terminal event",
+        "exactly one terminal operation event",
+        "terminal payload references result/failure and final cursor",
+        "events after terminal are rejected"
+      ]
+    },
+    "security": [
+      "subscriber reauthorizes tenant/actor access to operation",
+      "event payload obeys data classification/redaction",
+      "tool arguments and restricted internal receipts are referenced/redacted unless product policy permits",
+      "stream URL/cursor is not an authorization credential"
+    ],
+    "frontend_reducer": {
+      "planned_target": "frontend product operation/conversation state layer",
+      "states": [
+        "connecting",
+        "live",
+        "reconnecting",
+        "resync_required",
+        "terminal",
+        "failed"
+      ],
+      "rules": [
+        "pure/idempotent reduction where practical",
+        "ignore exact duplicates",
+        "reject sequence gaps until replay/resync",
+        "assistant_content applies to provisional display only until canonical assistant message/result commit",
+        "approval_required renders explicit action; no automatic approval",
+        "terminal reconciles displayed provisional content to canonical message/result"
+      ]
+    },
+    "tests": [
+      "ordered delivery",
+      "duplicate event",
+      "corrupt duplicate",
+      "sequence gap",
+      "disconnect/reconnect replay",
+      "compacted cursor resync",
+      "heartbeat timeout",
+      "slow-client bounded queue",
+      "multi-client independent cursors",
+      "cancel/complete race",
+      "terminal finality",
+      "tenant authorization"
+    ]
+  },
+  "golden_journey_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-e2e-golden-journeys",
+    "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
+    "test_modes": {
+      "ci": "deterministic fake provider/tool adapters; no live provider secret required",
+      "integration": "Compose services with Mongo and deterministic provider harness",
+      "staging": "declared live provider smoke under strict budget and non-destructive tools",
+      "production": "post-deploy synthetic smoke only; never mutation-heavy acceptance suite"
+    },
+    "journeys": [
+      {
+        "id": "prompt-only",
+        "proves": [
+          "conversation append",
+          "engine submit",
+          "context compile",
+          "route/provider turn",
+          "verification/finalization",
+          "assistant message commit",
+          "terminal event"
+        ]
+      },
+      {
+        "id": "multi-turn",
+        "proves": [
+          "server transcript authority",
+          "context projection",
+          "message ordering",
+          "refresh reconstruction"
+        ]
+      },
+      {
+        "id": "retrieval-grounded",
+        "proves": [
+          "authorized retrieval",
+          "citation/evidence refs",
+          "claim verification",
+          "source display"
+        ]
+      },
+      {
+        "id": "read-tool",
+        "proves": [
+          "tool schema projection",
+          "authority",
+          "execution receipt",
+          "tool result -> next model turn"
+        ]
+      },
+      {
+        "id": "write-tool-with-approval",
+        "proves": [
+          "waiting_for_user",
+          "argument-digest approval",
+          "idempotency reservation",
+          "postcondition verification",
+          "resume"
+        ]
+      },
+      {
+        "id": "artifact",
+        "proves": [
+          "artifact input/output reference",
+          "scan/governance",
+          "bounded context projection",
+          "result linkage"
+        ]
+      },
+      {
+        "id": "media-capability",
+        "conditional": "run when declared provider capability is enabled",
+        "proves": [
+          "canonical provider media boundary",
+          "artifact result",
+          "credential isolation"
+        ]
+      },
+      {
+        "id": "cancel",
+        "proves": [
+          "cancel command",
+          "provider/tool boundary checks",
+          "terminal fencing",
+          "no duplicate side effect"
+        ]
+      },
+      {
+        "id": "reconnect",
+        "proves": [
+          "cursor replay",
+          "dedupe",
+          "canonical terminal reconciliation"
+        ]
+      },
+      {
+        "id": "provider-outage",
+        "proves": [
+          "bounded failure/fallback policy",
+          "degraded result/state",
+          "no credential leakage"
+        ]
+      },
+      {
+        "id": "engine-outage",
+        "proves": [
+          "backend degraded readiness",
+          "no undeclared local provider fallback",
+          "recoverable user state"
+        ]
+      },
+      {
+        "id": "governance-delete-export",
+        "proves": [
+          "conversation/memory/artifact inventory",
+          "deletion/export propagation",
+          "derived projection handling"
+        ]
+      }
+    ],
+    "global_assertions": [
+      "one tenant/user identity remains consistent across product, operation, execution and result",
+      "one trace correlates backend, engine, provider/tool and finalization spans",
+      "one operation id and one canonical final result",
+      "assistant message references the final execution result",
+      "all expensive boundaries have admission/usage evidence",
+      "all external data/tool transfers have governance/authority evidence",
+      "no side effect is duplicated during retry/reconnect",
+      "client-visible completed state never precedes durable final result",
+      "no provider credential appears in browser/backend product payload/log",
+      "failure paths are typed and reconstructable after refresh"
+    ],
+    "fault_injection": [
+      "provider timeout before response",
+      "provider response then crash before checkpoint",
+      "tool reservation then crash",
+      "tool side effect then crash before receipt",
+      "stream disconnect mid-response",
+      "slow client",
+      "Mongo transient failure",
+      "engine process restart",
+      "backend process restart",
+      "approval expires before resume"
+    ],
+    "evidence_bundle": [
+      "browser/API assertions",
+      "operation/execution/message/result ids",
+      "trace/span ids",
+      "provider/tool/governance/admission/verification receipts",
+      "stream cursor/replay assertions",
+      "state repository assertions",
+      "no-secret/no-duplicate-side-effect assertions"
+    ],
+    "closure_rule": "all mandatory journeys and applicable conditional capability journeys pass on the assembled topology; deterministic CI remains green without live provider credentials"
   }
 }
