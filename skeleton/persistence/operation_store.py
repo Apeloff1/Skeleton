@@ -527,21 +527,40 @@ class SQLiteOperationStore:
     def pending_outbox(
         self,
         *,
+        operation_id: str | None = None,
         limit: int = 1000,
     ) -> tuple[OperationOutboxEvent, ...]:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
             raise ValueError("limit must be a positive integer")
+        operation = None
+        if operation_id is not None:
+            operation = str(operation_id).strip()
+            if not operation:
+                raise OperationStoreError("operation_id is required")
+
         with self._lock:
-            rows = self._connection.execute(
-                """
-                SELECT *
-                FROM operation_outbox
-                WHERE namespace = ? AND published_at IS NULL
-                ORDER BY created_at ASC, operation_id ASC, operation_version ASC
-                LIMIT ?
-                """,
-                (self.namespace, limit),
-            ).fetchall()
+            if operation is None:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM operation_outbox
+                    WHERE namespace = ? AND published_at IS NULL
+                    ORDER BY created_at ASC, operation_id ASC, operation_version ASC
+                    LIMIT ?
+                    """,
+                    (self.namespace, limit),
+                ).fetchall()
+            else:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM operation_outbox
+                    WHERE namespace = ? AND operation_id = ? AND published_at IS NULL
+                    ORDER BY operation_version ASC
+                    LIMIT ?
+                    """,
+                    (self.namespace, operation, limit),
+                ).fetchall()
         return tuple(self._outbox_from_row(row) for row in rows)
 
     def acknowledge_outbox(
