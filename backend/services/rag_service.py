@@ -13,8 +13,10 @@
 import hashlib
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from .rag_state_repository import RAGStateConflict, RAGStateRepository
 
 # Lazy import ChromaDB to handle missing dependency gracefully
 _chroma_client = None
@@ -134,16 +136,20 @@ class RAGService:
     - feedback: User feedback and ratings
     """
     
-    COLLECTIONS = [
+    # Chroma collections are retrieval projections only. Structured user
+    # progress is intentionally absent: it is canonical Mongo state.
+    PROJECTION_COLLECTIONS = [
         "learning_sessions",
         "concepts",
-        "user_progress",
         "cocoding_context",
-        "feedback"
+        "feedback",
     ]
-    
-    def __init__(self):
+    COLLECTIONS = PROJECTION_COLLECTIONS
+
+    def __init__(self, state_repository: RAGStateRepository | None = None):
         self.client = get_chroma_client()
+        self.state = state_repository or RAGStateRepository()
+        self._projection_failures = 0
         self._init_collections()
     
     def _init_collections(self):
@@ -156,14 +162,70 @@ class RAGService:
             )
     
     def _get_collection(self, name: str):
-        """Get a collection by name."""
+        """Get a rebuildable projection collection by name."""
         full_name = f"jeeves_{name}"
         if full_name not in _collections:
             _collections[full_name] = self.client.get_or_create_collection(
                 name=full_name,
-                metadata={"description": f"Jeeves {name} memory"}
+                metadata={"description": f"Jeeves {name} projection"}
             )
         return _collections[full_name]
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _projection_metadata(values: Dict[str, Any]) -> Dict[str, Any]:
+        """Keep Chroma metadata projection-safe and payload-light."""
+        allowed = (str, int, float, bool)
+        projected: Dict[str, Any] = {}
+        for key, value in values.items():
+            if value is None:
+                continue
+            if isinstance(value, allowed):
+                projected[str(key)] = value
+            else:
+                projected[str(key)] = json.dumps(
+                    value,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                )
+        return projected
+
+    def _project_add(
+        self,
+        collection_name: str,
+        *,
+        document: str,
+        metadata: Dict[str, Any],
+        record_id: str,
+    ) -> bool:
+        """Best-effort projection after canonical state has committed."""
+        try:
+            collection = self._get_collection(collection_name)
+            try:
+                collection.delete(ids=[record_id])
+            except Exception:
+                pass
+            collection.add(
+                documents=[document],
+                metadatas=[self._projection_metadata(metadata)],
+                ids=[record_id],
+            )
+            return True
+        except Exception:
+            self._projection_failures += 1
+            return False
+
+    @staticmethod
+    def _canonical_cocoding_content(row: Dict[str, Any]) -> str:
+        content = f"Context: {row.get('context', '')}\n\nCode:\n"
+        content += "\n---\n".join(str(item) for item in row.get("code_snippets", []))
+        content += "\n\nDecisions:\n"
+        content += "\n".join(f"- {item}" for item in row.get("decisions", []))
+        return content
     
     # =========================================================================
     # Learning Sessions
