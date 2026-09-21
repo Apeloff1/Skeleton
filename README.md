@@ -5,6 +5,10 @@ AI game engine and agent orchestration framework.
 ## Quick Start
 
 ```bash
+# Inspect canonical topology, then optionally probe live runtime health
+python -m skeleton app status
+python -m skeleton app status --live
+
 # Validate the repository-wide application assembly
 python -m skeleton app check
 
