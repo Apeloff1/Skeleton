@@ -2089,7 +2089,7 @@ Status vocabulary:
 | SV004 | *Towards Load-Aware Prefill Deflection for Disaggregated LLM Serving*, arXiv:2607.02043 | PREPRINT | supports queue/KV-transfer-aware serving research; not universal default |
 | SV005 | *Robust KV Cache Management for LLM Serving under Output Token Length Uncertainty*, arXiv:2607.16892 | PREPRINT | supports distributionally robust KV reservation experiments |
 | SV006 | *KV Cache Compression Through the Lens of Transform Coding*, arXiv:2608.14191 | PREPRINT | supports attention-aware rate-distortion framing; needs independent systems replication |
-| SV007 | *Set Diffusion: Interpolating Token Orderings Between Autoregression and Diffusion for Fast and Flexible Decoding*, arXiv:2607.01775 | ICML 2026 per arXiv record | raises diffusion-generation evidence maturity, but serving/tool semantics remain open |
+| SV007 | *Set Diffusion: Interpolating Token Orderings Between Autoregression and Diffusion for Fast and Flexible Decoding*, arXiv:2607.01775 | PREPRINT; venue acceptance not independently confirmed in this audit | promising diffusion-generation evidence; serving/tool semantics remain open |
 | SV008 | *To Infinity and Beyond: Tool-Use Unlocks Length Generalization in State Space Models* | ICLR 2026 Oral | strong evidence for tool-interactive SSM length-generalization mechanism in stated tasks |
 | SV009 | MemGAS / *From Single to Multi-Granularity...* | ICLR 2026 Poster | supports multi-granularity conversational-memory challenger |
 | SV010 | *Data Mixture Optimization: A Multi-fidelity Multi-scale Bayesian Framework* | NeurIPS 2025 Poster | supports sequential/multi-fidelity mixture search; tested scale remains bounded |
@@ -2097,7 +2097,7 @@ Status vocabulary:
 | SV012 | *Demystifying Synthetic Data in LLM Pre-training*, arXiv:2510.01631 | PREPRINT | large controlled evidence; treat synthetic-data ratio conclusions as regime-specific |
 | SV013 | *Outcome Rewards Do Not Guarantee Verifiable or Causally Important Reasoning*, arXiv:2604.22074 | PREPRINT | important counterevidence against equating RLVR accuracy with faithful reasoning |
 | SV014 | AgentSecBench, arXiv:2605.26269 | PREPRINT | supports capability/dataflow security framing; test models/scenarios are limited |
-| SV015 | MemoryAgentBench, arXiv:2507.05257 | PREPRINT | supports retrieval/update/long-range/forgetting decomposition |
+| SV015 | MemoryAgentBench / *Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions* | ICLR 2026 conference paper | strong accepted benchmark evidence for accurate retrieval, test-time learning, long-range understanding, and selective forgetting |
 | SV016 | MemBench, arXiv:2506.21605 | PREPRINT | supports factual/reflective memory, effectiveness/efficiency/capacity evaluation |
 | SV017 | PAT-Agent, arXiv:2509.23675 | ASE 2025 accepted per arXiv record | strong evidence for generator + model-checker + repair-loop decomposition |
 | SV018 | ToolTweak, OpenReview:dQXa5jvpQN | SUBMISSION to ICLR 2026 | preserve attack as research threat; do not treat defenses as settled |
@@ -2121,7 +2121,7 @@ Status vocabulary:
 | SV036 | OpenAI, *Our framework for reporting model misalignment* (2026-09-16) | OFFICIAL-ORG-EVIDENCE / reporting framework | motivates incident-to-eval feedback and standardized disclosure categories |
 | SV037 | NetKV, arXiv:2606.03910 | PREPRINT | supports network-aware decode selection; current evidence is simulator/trace scoped |
 | SV038 | MemoryDocDataSet, arXiv:2606.04442 | PREPRINT | supports joint conversational-memory + long-document evaluation; synthetic benchmark scope must remain explicit |
-| SV039 | PM-Bench, arXiv:2607.12385 | COLM 2026 conference paper per arXiv record | establishes prospective memory as a distinct agent evaluation family |
+| SV039 | PM-Bench, arXiv:2607.12385 | PREPRINT; venue acceptance not independently confirmed in this audit | establishes prospective memory as a distinct agent evaluation family, but remains recent |
 | SV040 | TriggerBench, arXiv:2606.23459 | PREPRINT | strengthens prospective-memory precision/recall, false-alarm and attentional-load evaluation |
 | SV041 | FIRE-Bench, arXiv:2602.02905 | PREPRINT / released benchmark | research-agent rediscovery benchmark; distinguishes planning/analysis failures from implementation failures |
 | SV042 | Goedel-Prover-V2, arXiv:2508.03613 | PREPRINT with released code/models | strong formal theorem-proving evidence; benchmark and test-time-compute scope remains explicit |
@@ -2129,6 +2129,10 @@ Status vocabulary:
 | SV044 | EVICPRESS, arXiv:2512.14946 | PREPRINT | supports joint KV compression/eviction rather than independent cache policies |
 | SV045 | *On Training Large Language Models for Long-Horizon Tasks: An Empirical Study of Horizon Length* | ICML 2026 regular | strong controlled evidence that horizon length itself destabilizes training and action abstraction/subgoals help |
 | SV046 | LoRA-Pre | ICLR 2026 conference paper | strengthens low-rank optimizer-state challenger evidence; still requires matched local optimizer baselines |
+| SV047 | *Making Prospective Memory SLM-Shaped: Typed Intention Stores for Small-Model Agents*, arXiv:2609.01272 | PREPRINT, submitted 2026-09-01 | emerging evidence that moving trigger/lifecycle mechanics into typed external state can sharply improve prospective-memory reliability |
+| SV048 | ThinkBooster, arXiv:2606.06915 | PREPRINT with released framework | supports modular quality-cost evaluation of multiple test-time-compute strategies and scorers |
+| SV049 | Pythagoras-Prover, arXiv:2606.12594 | PREPRINT with open models/code claimed by paper | supports compute-efficient formal proving, verified curricula, and diffusion-style proof generation experiments |
+| SV050 | *Recent Advances in Large Language Model Benchmarks against Data Contamination: From Static to Dynamic Evaluation*, arXiv:2502.17521 | SURVEY/PREPRINT | strengthens requirement that dynamic benchmarks themselves need standardized quality criteria |
 
 ## 25A.1 Status discipline
 
@@ -2170,7 +2174,7 @@ Therefore:
 5. Data Mixture Optimization is a **NeurIPS 2025 Poster**.
 6. *To Infinity and Beyond* is an **ICLR 2026 Oral**, raising evidence maturity for the stated SSM/tool-use mechanism.
 7. PAT-Agent is reported by arXiv as **accepted at ASE 2025**.
-8. Set Diffusion's arXiv record states **ICML 2026**.
+8. Set Diffusion exists as arXiv:2607.01775, but this audit did not independently confirm a venue acceptance; keep it at preprint maturity.
 9. Equilibrium Language Models remains conservatively **emerging/status-unresolved** in Skeleton until acceptance is independently established.
 10. First-party 2026 monitorability and agent-safety evidence is useful for failure-mode design, but remains distinct from peer-reviewed independent evidence.
 
@@ -2383,6 +2387,36 @@ FIRE-Bench emphasizes rediscovery of verifiable scientific insights, while RExBe
 - self-audit.
 
 A system may be excellent at one stage and poor at another.
+
+
+## FD016 — Typed intention stores are a serious architecture challenger for prospective memory
+
+The September 2026 Typed Intention Store preprint reports that explicitly moving prospective-memory lifecycle logic into typed state can substantially outperform retrospective-memory-only scaffolds on PM-Bench, including with smaller models.
+
+**Why this matters:** it suggests some "memory capability" deficits may be better solved by explicit state machines than by asking a larger model to remember harder.
+
+**Skeleton consequence:** prospective-memory experiments must compare:
+
+1. prompt-only;
+2. ordinary retrospective memory;
+3. RAG memory;
+4. typed intention store;
+5. learned prospective-memory policy;
+6. hybrid typed + learned selector.
+
+Required metrics:
+
+- intention precision;
+- intention recall;
+- false alarms;
+- missed triggers;
+- premature execution;
+- stale-intent execution;
+- authority revalidation;
+- state/storage cost;
+- model size dependence.
+
+**Maturity warning:** one recent preprint is not enough to constitutionalize the design. Treat as a high-information challenger.
 
 
 # 26. Research anti-patterns
