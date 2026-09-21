@@ -6,10 +6,12 @@ Before modifying, generating, reviewing, repairing, or assembling repository cod
 2. `machine/architecture.json`
 3. `machine/ai_app_construction.json`
 4. `machine/capability_interfaces.json`
-5. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+5. `machine/state_topology.json`
 6. `machine/ai_runtime_schemas.json`
-7. `machine/ai_implementation_handoff.json`
-8. `machine/ai_closure_evidence.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
 
 The machine contracts are authoritative. Do not create a new runtime root, provider boundary, service, capability owner, or cross-plane dependency unless it is declared there first.
 
