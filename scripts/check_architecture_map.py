@@ -294,6 +294,7 @@ def _validate_runtime_manifest_alignment(
             "validator": architecture.get("sources", {}).get("validator"),
             "documentation": architecture.get("sources", {}).get("human_map"),
             "tag": architecture.get("architecture_tag"),
+            "structure_tag": architecture.get("structural_blueprint", {}).get("structure_tag"),
         }
         for field, expected in expected_link.items():
             if link.get(field) != expected:
@@ -351,6 +352,69 @@ def _validate_runtime_manifest_alignment(
                 f"runtime service {name}.depends_on drift: "
                 f"architecture={architecture_deps!r} manifest={manifest_deps!r}"
             )
+
+
+
+def _validate_repository_manifest_alignment(
+    architecture: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> None:
+    sources = architecture.get("sources", {})
+    repository_path = sources.get("repository_contract")
+    try:
+        repository_relative = _normalized_repo_path(repository_path)
+        manifest = _load_json(repo_root / repository_relative)
+    except ValueError as exc:
+        errors.append(f"repository contract: {exc}")
+        return
+
+    assembly = manifest.get("assembly")
+    if not isinstance(assembly, dict):
+        errors.append(f"{repository_relative}.assembly must be an object")
+        return
+
+    structure_tag = architecture.get("structural_blueprint", {}).get("structure_tag")
+    expected = {
+        "architecture_contract": ARCHITECTURE_PATH.as_posix(),
+        "structure_tag": structure_tag,
+    }
+    for field, value in expected.items():
+        if assembly.get(field) != value:
+            errors.append(
+                f"{repository_relative}.assembly.{field} drift: "
+                f"manifest={assembly.get(field)!r} expected={value!r}"
+            )
+
+    layers = assembly.get("layers")
+    if not isinstance(layers, list):
+        errors.append(f"{repository_relative}.assembly.layers must be a list")
+        return
+    architecture_layers = [
+        layer
+        for layer in layers
+        if isinstance(layer, dict) and layer.get("name") == "architecture-map"
+    ]
+    if len(architecture_layers) != 1:
+        errors.append(
+            f"{repository_relative}.assembly.layers must contain exactly one architecture-map layer"
+        )
+        return
+    layer = architecture_layers[0]
+    if layer.get("tag") != architecture.get("architecture_tag"):
+        errors.append(
+            f"{repository_relative} architecture layer tag drift: "
+            f"manifest={layer.get('tag')!r} expected={architecture.get('architecture_tag')!r}"
+        )
+    if layer.get("structure_tag") != structure_tag:
+        errors.append(
+            f"{repository_relative} architecture layer structure_tag drift: "
+            f"manifest={layer.get('structure_tag')!r} expected={structure_tag!r}"
+        )
+    if layer.get("ref") != assembly.get("architecture_branch"):
+        errors.append(
+            f"{repository_relative} architecture layer ref must equal assembly.architecture_branch"
+        )
 
 
 def _validate_interfaces(
@@ -838,6 +902,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
     nodes = _validate_runtime_nodes(architecture, zones, errors)
     order = _validate_runtime_dag(nodes, errors)
     _validate_runtime_manifest_alignment(architecture, nodes, repo_root, errors)
+    _validate_repository_manifest_alignment(architecture, repo_root, errors)
     _validate_interfaces(architecture, nodes, roots, repo_root, errors)
     _validate_change_routing(architecture, roots, errors)
     top_level_paths = _validate_top_level_policy(architecture, repo_root, errors)
