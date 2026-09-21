@@ -136,3 +136,34 @@ def test_backend_public_identity_converges_on_skeleton():
     assert '"legacy_name": "CodeDock Quantum Nexus"' in health
     assert 'title="Skeleton Application API"' in server
     assert 'logging.getLogger("Skeleton.Backend")' in server
+
+
+def test_manifest_public_contract_is_fail_closed():
+    import json
+    from copy import deepcopy
+    from importlib import resources
+
+    import pytest
+
+    from skeleton.app.assembly import parse_manifest
+
+    payload = json.loads(resources.files("skeleton.app").joinpath("manifest.json").read_text())
+    manifest = parse_manifest(payload)
+    assert manifest.contract_path("bootstrap") == "/api/app/bootstrap"
+    assert manifest.contract_path("status") == "/api/app/status"
+    assert manifest.contract_path("ready") == "/api/app/ready"
+
+    outside_backend = deepcopy(payload)
+    outside_backend["app"]["public_contract"]["prefix"] = "/control"
+    with pytest.raises(ValueError, match="inside backend ingress"):
+        parse_manifest(outside_backend)
+
+    duplicate_route = deepcopy(payload)
+    duplicate_route["app"]["public_contract"]["ready"] = "/status"
+    with pytest.raises(ValueError, match="routes must be unique"):
+        parse_manifest(duplicate_route)
+
+    self_dependency = deepcopy(payload)
+    next(item for item in self_dependency["services"] if item["name"] == "backend")["depends_on"].append("backend")
+    with pytest.raises(ValueError, match="cannot depend on itself"):
+        parse_manifest(self_dependency)
