@@ -106,6 +106,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Automation/CI wave:** revalidated action runners, queue pressure, reconciliation, branch control, CI hygiene, bot ledger, CodeQL, Dependabot, frontier push coalescing, and housekeeping sources; existing integration PRs reused.
 
+- **Reconciliation wave:** revalidated repo-bot, security-evidence, physics, network/X-harness, and Jeeves semantic/science sources; game-replay, quality, character-motor, and model-routing zero-file deltas remain lineage-only.
+
 ## Target layout
 
 ```text
