@@ -11,6 +11,7 @@ from typing import Any, Callable
 from core.academy_product import continue_learning, practice, progress as academy_progress
 from core.curiosity_engine import CuriosityEngine
 from core.deployment_planner import compile_deployment_plan
+from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
 from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
 from core.knowledge_augmented_jeeves import KnowledgeAugmentedJeeves
 from core.product_executor_registry import ProductExecutorRegistry
@@ -23,6 +24,7 @@ Provider = Callable[[], dict[str, Any] | list[dict[str, Any]]]
 
 _CONTRACTS = {
     "native.studio.project.create": (1, "state", True),
+    "native.studio.build.submit": (1, "state", True),
     "native.studio.pipeline.inspect": (1, "query", True),
     "native.worldforge.world.create": (1, "state", True),
     "native.worldforge.world.systems.compose": (1, "state", True),
@@ -98,6 +100,43 @@ class NativeProductExecutors:
         return self._write(operation, executor, {"project_id": operation.id, "title": title[:200],
             "genre": str(payload.get("genre") or "unspecified")[:80], "brief": str(payload.get("brief") or payload.get("prompt") or "")[:20_000],
             "template": str(payload.get("template") or "blank")[:120], "owner": operation.principal, "state": "created"})
+
+    def submit_build(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.studio.build.submit"
+        if self._already_complete(operation, executor): return True
+
+        game_name_raw = payload.get("game_name")
+        if game_name_raw is None:
+            game_name_raw = payload.get("name") or payload.get("title")
+        if not isinstance(game_name_raw, str) or not game_name_raw.strip():
+            raise ValueError("game_name is required")
+        game_name = game_name_raw.strip()
+        if len(game_name) > 200:
+            raise ValueError("game_name must be at most 200 characters")
+
+        kind_raw = payload.get("kind", "web")
+        if not isinstance(kind_raw, str):
+            raise ValueError("kind must be a string")
+        kind = kind_raw.strip().lower()
+        if kind not in {"web", "source"}:
+            raise ValueError("kind must be 'web' or 'source'")
+
+        supplied = payload.get("files")
+        files = None
+        if supplied is not None:
+            if not isinstance(supplied, list) or not all(isinstance(item, dict) for item in supplied):
+                raise ValueError("files must be an array of objects when supplied")
+            files = [dict(item) for item in supplied]
+
+        builder = build_web_artifact if kind == "web" else build_source_artifact
+        artifact = builder(
+            game_name,
+            files=files,
+            build_token=operation.id,
+        )
+        public = dict(artifact)
+        public.pop("path", None)
+        return self._write(operation, executor, {"build": public})
 
     def pipeline_inspect(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.studio.pipeline.inspect"
@@ -296,6 +335,7 @@ class NativeProductExecutors:
 
     def register_into(self, registry: ProductExecutorRegistry) -> ProductExecutorRegistry:
         registry.register("studio", "project.create", self.create_project, name="native.studio.project.create", version=1, effect_class="state", replay_safe=True)
+        registry.register("studio", "build.submit", self.submit_build, name="native.studio.build.submit", version=1, effect_class="state", replay_safe=True)
         if self.operations_provider is not None: registry.register("studio", "pipeline.inspect", self.pipeline_inspect, name="native.studio.pipeline.inspect", version=1, effect_class="query", replay_safe=True)
         registry.register("world-forge", "world.create", self.create_world, name="native.worldforge.world.create", version=1, effect_class="state", replay_safe=True)
         registry.register("world-forge", "world.systems.compose", self.compose_world_systems, name="native.worldforge.world.systems.compose", version=1, effect_class="state", replay_safe=True)
