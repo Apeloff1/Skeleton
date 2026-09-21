@@ -406,20 +406,47 @@ def _validate_provider_bootstrap(
             errors.append("runtime provider activation receipts must be required")
         if enforcement.get("undeclared_provider_policy") != "deny":
             errors.append("undeclared runtime provider policy must be deny")
+        families = _nonempty_strings(
+            enforcement.get("provider_families"),
+            label="runtime_enforcement.provider_families",
+            errors=errors,
+        )
+        for required_family in ("runtime_model", "automation_model"):
+            if required_family not in families:
+                errors.append(
+                    f"runtime_enforcement.provider_families missing {required_family}"
+                )
+        compatibility = _nonempty_strings(
+            enforcement.get("compatibility_loaders"),
+            label="runtime_enforcement.compatibility_loaders",
+            errors=errors,
+        )
+        for relative in compatibility:
+            try:
+                normalized = _path(relative)
+            except ValueError as exc:
+                errors.append(f"runtime_enforcement.compatibility_loaders: {exc}")
+                continue
+            if not (repo_root / normalized).exists():
+                errors.append(
+                    f"provider compatibility loader is missing: {normalized}"
+                )
     return must_read
 
 
-def _validate_runtime_providers(
+def _validate_provider_declarations(
     contract: dict[str, Any],
+    key: str,
+    label_name: str,
     errors: list[str],
 ) -> list[str]:
-    raw = contract.get("runtime_model_providers")
+    raw = contract.get(key)
     if not isinstance(raw, list) or not raw:
-        errors.append("runtime_model_providers must be a non-empty list")
+        errors.append(f"{key} must be a non-empty list")
         return []
     providers: list[str] = []
     for index, item in enumerate(raw):
-        label = f"runtime_model_providers[{index}]"
+        label = f"{key}[{index}]"
         if not isinstance(item, dict):
             errors.append(f"{label} must be an object")
             continue
@@ -428,15 +455,15 @@ def _validate_runtime_providers(
             errors.append(f"{label}.id must be non-empty")
             continue
         if provider_id in providers:
-            errors.append(f"duplicate runtime model provider: {provider_id}")
+            errors.append(f"duplicate {label_name} provider: {provider_id}")
         providers.append(provider_id)
-        for key in (
+        for required in (
             "architecture_read_required",
             "construction_manual_read_required",
             "activation_receipt_required",
         ):
-            if item.get(key) is not True:
-                errors.append(f"provider {provider_id}.{key} must be true")
+            if item.get(required) is not True:
+                errors.append(f"provider {provider_id}.{required} must be true")
         capabilities = _nonempty_strings(
             item.get("capabilities"),
             label=f"provider {provider_id}.capabilities",
@@ -449,6 +476,77 @@ def _validate_runtime_providers(
                 f"provider {provider_id} undeclared_capability_policy must be deny"
             )
     return providers
+
+
+def _validate_provider_surfaces(
+    contract: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> int:
+    raw = contract.get("provider_surfaces")
+    if not isinstance(raw, list) or not raw:
+        errors.append("provider_surfaces must be a non-empty list")
+        return 0
+
+    bootstrap = contract.get("provider_bootstrap")
+    enforcement = bootstrap.get("runtime_enforcement", {}) if isinstance(bootstrap, dict) else {}
+    families = set(enforcement.get("provider_families", [])) if isinstance(enforcement, dict) else set()
+    allowed_status = {"canonical", "compatibility", "transitional", "library"}
+    seen_ids: set[str] = set()
+
+    for index, item in enumerate(raw):
+        label = f"provider_surfaces[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        surface_id = item.get("id")
+        if not isinstance(surface_id, str) or not surface_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if surface_id in seen_ids:
+            errors.append(f"duplicate provider surface id: {surface_id}")
+        seen_ids.add(surface_id)
+
+        family = item.get("family")
+        if family != "none" and family not in families:
+            errors.append(
+                f"provider surface {surface_id} references undeclared family {family!r}"
+            )
+        if item.get("status") not in allowed_status:
+            errors.append(
+                f"provider surface {surface_id}.status must be one of {sorted(allowed_status)}"
+            )
+
+        try:
+            owner = _path(item.get("owner"))
+        except ValueError as exc:
+            errors.append(f"provider surface {surface_id}.owner: {exc}")
+        else:
+            if not (repo_root / owner).exists():
+                errors.append(
+                    f"provider surface {surface_id} owner path is missing: {owner}"
+                )
+
+        credential_bearing = item.get("credential_bearing")
+        receipt_required = item.get("receipt_required")
+        if not isinstance(credential_bearing, bool):
+            errors.append(
+                f"provider surface {surface_id}.credential_bearing must be boolean"
+            )
+        if not isinstance(receipt_required, bool):
+            errors.append(
+                f"provider surface {surface_id}.receipt_required must be boolean"
+            )
+        if credential_bearing is True and receipt_required is not True:
+            errors.append(
+                f"credential-bearing provider surface must require receipt: {surface_id}"
+            )
+        if family == "none" and credential_bearing is True:
+            errors.append(
+                f"credential-bearing provider surface must declare a provider family: {surface_id}"
+            )
+
+    return len(raw)
 
 
 def _validate_gap_register(
@@ -716,7 +814,13 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     planes, plane_order = _validate_planes(contract, repo_root, errors)
     phase_order = _validate_phases(contract, planes, errors)
     must_read = _validate_provider_bootstrap(contract, repo_root, errors)
-    providers = _validate_runtime_providers(contract, errors)
+    providers = _validate_provider_declarations(
+        contract, "runtime_model_providers", "runtime model", errors
+    )
+    automation_providers = _validate_provider_declarations(
+        contract, "automation_model_providers", "automation model", errors
+    )
+    provider_surfaces = _validate_provider_surfaces(contract, repo_root, errors)
     gates = _validate_acceptance_gates(contract, errors)
     gaps = _validate_gap_register(contract, planes, errors)
     roadmap = _validate_execution_roadmap(contract, errors)
@@ -748,6 +852,8 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "plane_states": dict(sorted(states.items())),
         "phases": phase_order,
         "runtime_providers": providers,
+        "automation_providers": automation_providers,
+        "provider_surfaces": provider_surfaces,
         "provider_documents": must_read,
         "acceptance_gates": gates,
         "gaps": gaps,
@@ -779,6 +885,8 @@ def main(argv: list[str] | None = None) -> int:
             f"version={summary['construction_version']}; "
             f"planes={summary['planes']}; states={states}; "
             f"providers={','.join(summary['runtime_providers'])}; "
+            f"automation={','.join(summary['automation_providers'])}; "
+            f"surfaces={summary['provider_surfaces']}; "
             f"gates={len(summary['acceptance_gates'])}; "
             f"gaps={summary['gaps'].get('total', 0)}; "
             f"p0-open={summary['gaps'].get('p0_open', 0)}; "
