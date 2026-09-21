@@ -108,13 +108,24 @@ jobs:
             Remove-Item -LiteralPath $installDir -Recurse -Force
           }
 
+          $setupLog = Join-Path $env:RUNNER_TEMP "SkeletonSetup-smoke.log"
+          if (Test-Path -LiteralPath $setupLog) {
+            Remove-Item -LiteralPath $setupLog -Force
+          }
           $install = Start-Process -FilePath $installer.FullName -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
+            "/SP-",
+            "/LOG=$setupLog",
             "/DIR=$installDir"
           ) -Wait -PassThru
           if ($install.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $setupLog) {
+              Write-Host "---- Inno Setup smoke log tail ----"
+              Get-Content -LiteralPath $setupLog -Tail 160
+              Write-Host "---- end Inno Setup smoke log ----"
+            }
             throw "silent installer exited $($install.ExitCode)"
           }
 
@@ -145,6 +156,7 @@ jobs:
           }
 
       - name: Upload Windows installer
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Skeleton-Windows-Installer-${{ github.sha }}
