@@ -37,7 +37,7 @@
         "state": "ready",
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
-        "tag": "arch-map/v3.0"
+        "tag": "arch-map/v3.1"
       }
     ],
     "product_shell_pr": 1902,
@@ -705,7 +705,7 @@
     "contract": "machine/architecture.json",
     "documentation": "docs/ARCHITECTURE_MAP.md",
     "validator": "scripts/check_architecture_map.py",
-    "tag": "arch-map/v3.0",
+    "tag": "arch-map/v3.1",
     "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit",
     "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling",
     "construction_contract": "machine/ai_app_construction.json",
@@ -718,7 +718,7 @@
     "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "validator": "scripts/check_ai_app_construction.py",
     "provider_validator": "scripts/check_provider_bootstrap.py",
-    "construction_version": "3.0.0",
+    "construction_version": "3.1.0",
     "provider_rule": "all credential-bearing AI provider families must load and acknowledge the active contracts through skeleton/provider_contract.py before activation; undeclared providers are denied",
     "shared_provider_contract": "skeleton/provider_contract.py",
     "provider_families": [
