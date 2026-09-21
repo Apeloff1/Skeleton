@@ -362,7 +362,7 @@
         "confidential"
       ],
       "transaction_scope": "BEGIN IMMEDIATE operation transition plus transactional outbox intent",
-      "consistency": "legal monotonic OperationEnvelope transitions with optimistic version fencing, terminal finality, idempotency identity and same-transaction outbox intent; live /intelligence/reason uses DurableOperationRuntime",
+      "consistency": "legal monotonic OperationEnvelope transitions with optimistic version fencing, terminal finality, idempotency identity and same-transaction outbox intent; live /intelligence/reason uses DurableOperationRuntime with bounded background outbox reconciliation",
       "retention": "operation/governance lifecycle controlled; mounted persistence exists while formal backup/retention rehearsal remains STATE-03 work",
       "backup_restore": "persistent Compose binding and SQLite reopen/restart reconciliation are implemented; full operator backup/restore rehearsal remains required",
       "migration": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
@@ -378,7 +378,8 @@
         "skeleton/api/server.py",
         "skeleton/config/settings.py",
         "docker-compose.yml",
-        "skeleton/testing/test_operation_runtime.py"
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
       ]
     },
     {
@@ -394,7 +395,7 @@
         "confidential"
       ],
       "transaction_scope": "BEGIN IMMEDIATE append/head/compaction transaction",
-      "consistency": "durable exact-next resumable projection of committed operation outbox intents; stream delivery never advances canonical operation state",
+      "consistency": "durable exact-next resumable projection of committed operation outbox intents; stream delivery never advances canonical operation state; bounded background dispatch retries unpublished rows during idle process time",
       "retention": "consumer-watermark/compaction controlled; retain to satisfy resume policy",
       "backup_restore": "persistent Compose binding is implemented; reopen preserves replay semantics and startup reconciliation drains unpublished operation outbox rows",
       "migration": "preserve event IDs, sequence, terminal fence, replay watermark and consumer acknowledgements",
@@ -408,7 +409,8 @@
         "skeleton/persistence/operation_runtime.py",
         "skeleton/api/server.py",
         "docker-compose.yml",
-        "skeleton/testing/test_operation_runtime.py"
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
       ]
     },
     {
@@ -748,8 +750,8 @@
       "from": "canonical-operation-state",
       "to": "operation-event-stream",
       "mode": "event-log",
-      "rule": "production Skeleton reasoning commits OperationEnvelope state plus deterministic outbox intent atomically; DurableOperationRuntime publishes the retry-stable event and acknowledges only after durable stream acceptance",
-      "failure": "stream publication failure leaves canonical state committed and the outbox pending; startup/next dispatch reconciles it idempotently, including crash-after-append-before-ack"
+      "rule": "production Skeleton reasoning commits OperationEnvelope state plus deterministic outbox intent atomically; DurableOperationRuntime publishes the retry-stable event, acknowledges only after durable stream acceptance, and runs a bounded background dispatcher for idle-period reconciliation",
+      "failure": "stream publication failure leaves canonical state committed and the outbox pending; background/startup/foreground dispatch reconciles idempotently, including crash-after-append-before-ack"
     },
     {
       "id": "authoritative-to-in-memory",
