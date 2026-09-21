@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -292,7 +293,7 @@ function VaultCard() {
   const buildUrl = React.useCallback(() => {
     const id = stats?.newest_build_id;
     if (!id) return null;
-    const base = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+    const base = CANONICAL_API_BASE || '';
     return `${base}/api/galaxy-studio/download/${id}`;
   }, [stats]);
 
@@ -348,7 +349,7 @@ function VaultCard() {
           onPress={() => {
             const id = stats?.newest_build_id;
             if (!id) { toast.warn('No build to export yet'); return; }
-            const base = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+            const base = CANONICAL_API_BASE || '';
             Linking.openURL(`${base}/api/galaxy-studio/download/${id}`).catch(() => toast.warn('Could not open export'));
           }}
           disabled={!stats?.newest_build_id}

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import { useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
@@ -93,7 +94,7 @@ export default function GalaxyStudioSettings() {
   async function clearZombies() {
     try {
       setAdminLoading(true);
-      const res = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || ''}/api/galaxy-studio/clear-zombies`, { method: 'POST' });
+      const res = await fetch(`${CANONICAL_API_BASE || ''}/api/galaxy-studio/clear-zombies`, { method: 'POST' });
       const json = await res.json();
       toast.info(`Memory: ${json.summary.mem}\nMongo: ${json.summary.mongo}\nOrphan tasks: ${json.summary.orphan_tasks}`);
       await refreshAdmin();
@@ -105,7 +106,7 @@ export default function GalaxyStudioSettings() {
   async function refreshAdmin() {
     try {
       setAdminLoading(true);
-      const res = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || ''}/api/galaxy-studio/admin-status`);
+      const res = await fetch(`${CANONICAL_API_BASE || ''}/api/galaxy-studio/admin-status`);
       const json = await res.json();
       setAdminStatus(json);
     } catch (e: any) {

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /playable — Real Playable Export (Phase V.1).
  *
@@ -20,7 +21,7 @@ import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { awardXp, getVisitorId } from '../src/utils/liveops';
 import theme from '../theme/tokens';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 /**
  * GeneratingPreview — premium "compiling" placeholder shown while a build runs.
