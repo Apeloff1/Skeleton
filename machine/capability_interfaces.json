@@ -1117,9 +1117,16 @@
         "verdict",
         "confidence",
         "evidence",
-        "repair instruction"
+        "repair instruction",
+        "VerificationRequest",
+        "VerificationReceipt",
+        "ClaimRecord",
+        "EvidenceReference",
+        "PostconditionCheck",
+        "verification policy",
+        "repair directive"
       ],
-      "target_failure_contract": "degrade to unverified result or block high-impact action",
+      "target_failure_contract": "qualify/abstain/repair/block according to risk policy; never silently promote unsupported high-impact output",
       "source_acceptance": [
         "deterministic smoke eval",
         "quality regression gate",
@@ -1129,9 +1136,14 @@
       "target_acceptance": [
         "falsification tests",
         "repair convergence tests",
-        "calibration evaluation"
+        "calibration evaluation",
+        "claim grounding tests",
+        "tool postcondition tests",
+        "qualified/abstain/block tests",
+        "self-confidence non-authority tests",
+        "verification receipt lineage tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:feedback-learning->evaluation",
@@ -2389,7 +2401,12 @@
       "source_acceptance": [
         "falsification tests",
         "repair convergence tests",
-        "calibration evaluation"
+        "calibration evaluation",
+        "claim grounding tests",
+        "tool postcondition tests",
+        "qualified/abstain/block tests",
+        "self-confidence non-authority tests",
+        "verification receipt lineage tests"
       ],
       "target_acceptance": [
         "no-route tests",
@@ -2397,7 +2414,7 @@
         "cost/latency budget tests",
         "deterministic tie-break tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:reasoning-verification->orchestration",
@@ -2429,7 +2446,12 @@
       "source_acceptance": [
         "falsification tests",
         "repair convergence tests",
-        "calibration evaluation"
+        "calibration evaluation",
+        "claim grounding tests",
+        "tool postcondition tests",
+        "qualified/abstain/block tests",
+        "self-confidence non-authority tests",
+        "verification receipt lineage tests"
       ],
       "target_acceptance": [
         "resume tests",
@@ -2442,7 +2464,7 @@
         "approval suspend/resume tests",
         "final result evidence-binding tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:resilience->data-persistence",
