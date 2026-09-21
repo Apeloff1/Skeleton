@@ -102,6 +102,24 @@ Optional provider/payment/seal values remain optional until the corresponding
 feature is used. `app up` fails closed when required runtime values are empty
 or obvious placeholders.
 
+## Public application bootstrap
+
+The backend exposes `GET /api/app/bootstrap` as the sanitized runtime contract
+for browser and native clients. Its payload is built directly from
+`skeleton/app/manifest.json` and includes the canonical application identity,
+service roles, dependency layers, profile membership, and declared health
+paths. It intentionally excludes runtime environment names/values, container
+ports, internal URLs, and process entrypoints.
+
+The product shell fetches this contract before probing runtime health. If the
+backend itself is unreachable, it falls back to the last static health-path
+contract so the engine can still be diagnosed independently. The UI surfaces
+whether health came from `bootstrap` or `fallback` metadata.
+
+Legacy `/api/health` fields remain compatibility-stable; canonical Skeleton
+identity is attached there as `canonical_application` while new clients use
+`/api/app/bootstrap` as the source of truth.
+
 ## Frontend endpoint boundary
 
 `frontend/utils/apiBase.ts` is the single endpoint resolver for browser and
