@@ -118,6 +118,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Temporary branch lineage:** Java accelerator rebase temp branch is zero-file versus assembly; no duplicate integration created.
 
+- **Archive lineage:** PR-runner and workflow-secret-output snapshots remain historical source material after revalidation; neither is treated as a merge target.
+
 ## Target layout
 
 ```text
