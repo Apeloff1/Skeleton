@@ -1616,7 +1616,47 @@ architecture violation for governed expensive work.
 correlation. `idempotency_key` participates in duplicate identity and must not
 be replaced by the trace identifier.
 
-### 33.2 Event protocol
+### 33.2 Durable operation authority and transactional outbox
+
+Use `skeleton/persistence/operation_store.py` as the reference durable binding
+for the canonical operation state machine. The store persists operation identity,
+state, optimistic version, and update time. A repeated idempotency identity
+returns the original operation instead of creating parallel work; a reused
+operation ID with different immutable identity fails closed.
+
+Every accepted create or transition writes an outbox event intent in the same
+SQLite transaction as the operation state change. The outbox event ID is
+deterministic for `namespace + operation_id + operation_version`, so dispatch
+into `SQLiteOperationEventStore` can retry the exact event safely. The
+dispatcher acknowledges an outbox row only after durable stream acceptance.
+
+The authority rule is:
+
+```text
+OperationEnvelope durable state
+        |
+        | same transaction
+        v
+transactional outbox intent
+        |
+        | retry-stable dispatch
+        v
+canonical operation event stream
+        |
+        v
+SSE / WebSocket / polling projection
+```
+
+The stream never advances operation truth. If dispatch fails, the unpublished
+outbox row remains recovery work. A process restart reloads the durable
+operation state and resumes pending outbox delivery; terminal operation state is
+never reopened to make transport recovery easier.
+
+The SQLite repository is the reference/conformance implementation. Production
+may replace it only with a backend that preserves the same identity, version,
+terminal-state, transaction/outbox, backup, restore, and migration semantics.
+
+### 33.3 Event protocol
 
 Use `skeleton/frontier/operation_stream.py` as the protocol oracle.
 
@@ -1633,14 +1673,14 @@ Every event has:
 The reference log intentionally fails on overflow. Dropping retained events to
 make room is prohibited because it can turn a reconnect into silent state loss.
 
-### 33.3 Replay
+### 33.4 Replay
 
 A reconnect presents the operation ID plus last acknowledged sequence. Replay
 returns later events in sequence. If requested history was compacted, return an
 explicit replay-gap failure and reconstruct from durable operation state or force
 a state resync; never pretend that no events occurred.
 
-### 33.4 Duplicate and ordering semantics
+### 33.5 Duplicate and ordering semantics
 
 The same event ID may be accepted twice only when its full canonical content is
 identical. Reusing an event ID for different content is corruption.
@@ -1649,22 +1689,22 @@ Pre-built events from durable producers must arrive at exactly the next
 sequence. Out-of-order delivery is rejected at the protocol boundary and may be
 buffered only by a higher-level adapter with explicit bounded policy.
 
-### 33.5 Terminal events
+### 33.6 Terminal events
 
 `operation.completed`, `operation.failed`, and `operation.cancelled` are
 terminal. No later progress/result event may be appended for that operation.
 
-### 33.6 Backpressure
+### 33.7 Backpressure
 
 The reference log backpressures publishers when its retained window is full.
 Production adapters may use bounded queues, durable streams, credits or consumer
 acks, but may not silently drop unacknowledged operation events.
 
-### 33.7 Remaining stream closure work
+### 33.8 Remaining stream closure work
 
 This does not close the P0 streaming gap. Remaining required work is:
 
-1. durable stream storage preserving event IDs and sequence;
+1. production runtime binding for the durable operation store, outbox dispatcher, and durable stream store;
 2. backend SSE or WebSocket transport;
 3. heartbeat and idle timeout;
 4. cancellation bridge into `OperationEnvelope`;
