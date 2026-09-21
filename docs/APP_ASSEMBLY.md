@@ -28,6 +28,7 @@ and can be progressively reconciled behind that boundary.
 ```bash
 # Inspect topology
 python -m skeleton app status
+python -m skeleton app status --live
 
 # Structural repository validation
 python -m skeleton app check
