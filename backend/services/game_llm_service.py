@@ -16,7 +16,6 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 
 import os
 import json
-import uuid
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from core.outcall_manager import outcalls
