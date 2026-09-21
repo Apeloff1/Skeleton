@@ -1277,5 +1277,153 @@
     "missing_acceptance_gate": "forbidden",
     "partial_plane_policy": "allowed only when construction requirements and promotion gates remain explicit",
     "promotion_rule": "No plane moves to complete/present without executable evidence for its acceptance conditions."
+  },
+  "target_maturity": "production-sota",
+  "gap_register": [
+    {
+      "id": "gap-streaming-protocol",
+      "plane": "streaming-realtime",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Realtime primitives exist, but one canonical resumable event protocol is not yet proven across backend, engine and frontend.",
+      "construction": [
+        "define versioned event envelope with operation_id, event_id, sequence, type, timestamp and payload",
+        "implement server-side replay cursor and heartbeat",
+        "implement cancellation and disconnect semantics",
+        "implement frontend reducer that deduplicates and resumes ordered events",
+        "add backpressure and slow-client bounds"
+      ],
+      "closure_evidence": [
+        "protocol contract test",
+        "disconnect/reconnect integration test",
+        "duplicate/out-of-order test",
+        "frontend E2E recovery test"
+      ]
+    },
+    {
+      "id": "gap-governance-registry",
+      "plane": "governance",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Governance primitives exist but data classification and provider-transfer policy are not yet one enforced registry.",
+      "construction": [
+        "define data classes and transfer purposes",
+        "bind data class to memory, artifact, retrieval and provider payloads",
+        "enforce provider privacy ceiling before transfer",
+        "implement deletion propagation and export inventory",
+        "audit access and retention decisions"
+      ],
+      "closure_evidence": [
+        "provider transfer denial test",
+        "tenant deletion propagation test",
+        "export completeness test",
+        "retention expiry test"
+      ]
+    },
+    {
+      "id": "gap-feedback-promotion",
+      "plane": "feedback-learning",
+      "priority": "P1",
+      "status": "open",
+      "gap": "Adaptive and experiment components exist but feedback-to-production promotion is not a single controlled pipeline.",
+      "construction": [
+        "define versioned feedback event",
+        "separate feedback collection from behavior mutation",
+        "define experiment assignment and holdout",
+        "require evaluation receipt before promotion",
+        "implement rollback to baseline"
+      ],
+      "closure_evidence": [
+        "experiment isolation test",
+        "promotion requires eval test",
+        "rollback test",
+        "consent/data-use test"
+      ]
+    },
+    {
+      "id": "gap-cost-admission",
+      "plane": "cost-capacity",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Capacity, quota and load-shed primitives exist but provider/token/storage budgets are not yet one admission contract.",
+      "construction": [
+        "define per-request and per-tenant budgets",
+        "meter input/output tokens and provider cost",
+        "enforce concurrency and queue budgets",
+        "feed budget constraints into model routing",
+        "expose cost/usage telemetry without secrets"
+      ],
+      "closure_evidence": [
+        "budget denial test",
+        "route-under-budget test",
+        "concurrency saturation test",
+        "cost telemetry test"
+      ]
+    },
+    {
+      "id": "gap-provider-redundancy",
+      "plane": "model-provider",
+      "priority": "P1",
+      "status": "open",
+      "gap": "The canonical provider boundary is operational with OpenAI, but SOTA availability requires a second declared provider or a deliberate single-provider SLO decision.",
+      "construction": [
+        "add second provider only through ProviderAdapter contract or explicitly accept single-provider availability target",
+        "declare capabilities, privacy ceiling, credentials and network policy",
+        "add routing/failover evidence",
+        "run outage and quality-degradation exercises"
+      ],
+      "closure_evidence": [
+        "declared provider contract",
+        "provider outage failover test or approved single-provider SLO",
+        "routing telemetry"
+      ]
+    },
+    {
+      "id": "gap-e2e-golden-journeys",
+      "plane": "product-experience",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Product assembly is structurally validated, but canonical AI golden journeys need one cross-plane E2E suite.",
+      "construction": [
+        "define prompt-only journey",
+        "define retrieval-backed journey",
+        "define tool/action journey",
+        "define artifact journey",
+        "define provider outage/degraded journey",
+        "define reconnect/cancel journey"
+      ],
+      "closure_evidence": [
+        "browser E2E suite",
+        "API trace continuity",
+        "artifact/result assertions",
+        "degraded-mode assertions"
+      ]
+    },
+    {
+      "id": "gap-release-slo-loop",
+      "plane": "deployment-release",
+      "priority": "P1",
+      "status": "open",
+      "gap": "Release controls exist but automated canary promotion/rollback should consume the same SLO evidence produced by observability.",
+      "construction": [
+        "define promotion SLO thresholds",
+        "collect canary error/latency/provider-quality signals",
+        "automate promotion decision",
+        "automate rollback trigger with operator override receipt",
+        "retain release evidence"
+      ],
+      "closure_evidence": [
+        "canary promotion test",
+        "automatic rollback drill",
+        "release evidence artifact"
+      ]
+    }
+  ],
+  "gap_closure_policy": {
+    "partial_plane_requires_open_gap": true,
+    "p0_gaps_block_sota_complete": true,
+    "closure_requires_evidence": true,
+    "closure_requires_state_update": true,
+    "no_silent_gap_deletion": true
   }
 }
