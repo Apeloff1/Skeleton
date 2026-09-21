@@ -351,24 +351,73 @@ The canonical dated synthesis is [architecture/frontier-research-atlas-2026.md](
 Track AD does not create a second research authority. It operationalizes Track Q by maintaining:
 
 - scoped research conclusions;
-- explicit confidence;
-- source maturity;
+- explicit confidence and source maturity;
 - supporting and contradictory evidence;
 - unresolved variables;
 - local reproduction status;
 - scale/hardware/system transfer;
 - falsification conditions;
-- next experiments;
-- refresh dates.
+- open research debt;
+- statistical/tuning-budget rigor;
+- source-status freshness;
+- next experiments and refresh dates.
 
 The 2026-09-21 atlas currently defines:
 
-- **FR001–FR114** research conclusions;
-- **RQ001–RQ010** unresolved frontier questions;
-- a staged local experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability;
-- an initial priority normalization list of fifty source records.
+- **FR001–FR114** — scoped research conclusions;
+- **RQ001–RQ010** — unresolved frontier questions;
+- **SV001–SV050** — verified source/status records;
+- **FD001–FD016** — post-freeze frontier-delta findings;
+- **CX001–CX024** — explicit research contradictions/tensions;
+- **RDE001–RDE036** — local research-debt items;
+- a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
 
 Research conclusions are not production defaults. A conclusion can recommend a contract, baseline, experiment, watch state or negative guardrail. Architecture changes still require the normal experiment/ADR/shadow/canary path.
+
+### Research source-status discipline
+
+Skeleton preserves distinctions among:
+
+- accepted/peer-reviewed;
+- preprint;
+- submission/ARR;
+- withdrawn;
+- official-organization evidence;
+- unresolved status.
+
+A status change is a new evidence event. It does not retroactively alter the exact evidence known to an earlier architecture decision.
+
+### Research-debt discipline
+
+A borrowed assumption remains visible until locally retired. A paper or external benchmark result alone cannot retire local research debt.
+
+Debt can be:
+
+```text
+OPEN
+EXPERIMENT_DESIGNED
+RUNNING
+EVIDENCE_COLLECTED
+CHALLENGED
+RETIRED
+PARTIALLY_RETIRED
+INVALIDATED
+DEFERRED
+```
+
+Retirement records exact task/model/hardware/scale scope and can reopen after material changes.
+
+### Research-rigor discipline
+
+Consequential comparisons report:
+
+- tuning/selection budget;
+- failed/diverged runs;
+- variance or explicit uncertainty;
+- multiple-comparison/search pressure;
+- baseline parity;
+- lifecycle cost;
+- untested/external-validity dimensions.
 
 Planning checkpoint:
 
@@ -377,6 +426,10 @@ PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 track=AD
 research_conclusions=FR001..FR114
 research_questions=RQ001..RQ010
+source_verifications=SV001..SV050
+frontier_delta=FD001..FD016
+contradictions=CX001..CX024
+research_debt=RDE001..RDE036
 production_authority_granted=false
 research_refresh_required=true
 ```
