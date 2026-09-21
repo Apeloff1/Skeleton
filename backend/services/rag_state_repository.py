@@ -268,6 +268,19 @@ class RAGStateRepository:
         )
         return copy.deepcopy(candidate)
 
+    def get_cocoding_context(
+        self,
+        session_id: str,
+        *,
+        user_id: str,
+    ) -> dict[str, Any] | None:
+        session = _required_text(session_id, "session_id")
+        user = _required_text(user_id, "user_id")
+        row = self._collection(self.COCODING).find_one(
+            {"session_id": session, "user_id": user}
+        )
+        return self._without_native_id(row)
+
     def list_cocoding_context(
         self,
         user_id: str,
@@ -318,6 +331,22 @@ class RAGStateRepository:
             return existing
         coll.insert_one(copy.deepcopy(candidate))
         return copy.deepcopy(candidate)
+
+    def stats(self) -> dict[str, int]:
+        return {
+            "learning_sessions": int(
+                self._collection(self.LEARNING).count_documents({})
+            ),
+            "user_progress": int(
+                self._collection(self.PROGRESS).count_documents({})
+            ),
+            "cocoding_context": int(
+                self._collection(self.COCODING).count_documents({})
+            ),
+            "feedback": int(
+                self._collection(self.FEEDBACK).count_documents({})
+            ),
+        }
 
 
 __all__ = [
