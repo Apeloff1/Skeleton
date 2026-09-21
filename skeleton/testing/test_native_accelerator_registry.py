@@ -9,10 +9,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from skeleton.native.asm_accelerator import AsmAcceleratorPreflight
+from skeleton.native import registry as native_registry_module
+from skeleton.native.asm_accelerator import (
+    AsmAcceleratorPreflight,
+    get_default_asm_accelerator,
+)
 from skeleton.native.registry import (
     NativeAcceleratorRegistry,
     NativeAcceleratorRegistryError,
+    get_default_native_registry,
 )
 
 
@@ -306,6 +311,67 @@ def test_close_releases_registry_reference_and_calls_optional_close(
 
     assert instance.close_calls == 1
     assert registry.initialized() is False
+
+
+def test_default_registry_is_process_singleton(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(native_registry_module, "_default_registry", None)
+
+    first = get_default_native_registry()
+    second = get_default_native_registry()
+
+    assert first is second
+
+
+def test_legacy_default_asm_getter_uses_shared_registry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe = _preflight(tmp_path)
+    instance = _FakeNativeAccelerator(Path(probe.library))
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: instance,
+        preflight_provider=lambda: probe,
+    )
+    monkeypatch.setattr(native_registry_module, "_default_registry", registry)
+
+    actual = get_default_asm_accelerator()
+
+    assert actual is instance
+    assert registry.get() is instance
+    assert registry.initialized() is True
+
+
+def test_legacy_default_asm_getter_can_explicitly_build_missing_library(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe = _preflight(tmp_path, library_available=False)
+    built = tmp_path / "built-default.so"
+    instance = _FakeNativeAccelerator(built)
+    build_calls = 0
+
+    def builder(**_kwargs: object) -> Path:
+        nonlocal build_calls
+        build_calls += 1
+        built.write_bytes(b"built")
+        return built
+
+    registry = NativeAcceleratorRegistry(
+        preflight_provider=lambda: probe,
+        builder=builder,
+        library_loader=lambda path: instance
+        if path == built
+        else (_ for _ in ()).throw(AssertionError("unexpected path")),
+    )
+    monkeypatch.setattr(native_registry_module, "_default_registry", registry)
+
+    actual = get_default_asm_accelerator(build_if_missing=True)
+
+    assert actual is instance
+    assert build_calls == 1
+    assert registry.initialized() is True
 
 
 def test_unknown_native_accelerator_names_fail_closed(tmp_path: Path) -> None:
