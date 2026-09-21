@@ -824,3 +824,449 @@ Foundational results are reviewed less frequently but are still re-evaluated if:
 
 The canonical dated synthesis for this planning round is
 `docs/architecture/frontier-research-atlas-2026.md`.
+
+
+## 26. Source status attestation contract
+
+Research source identity and research status are separate from the source's scientific claim.
+
+Canonical shape:
+
+```text
+SourceStatusAttestation
+  attestation_id
+  evidence_id
+  identifier
+  source_version
+  observed_at
+  source_class
+  venue
+  venue_status
+  decision_status
+  published_at
+  last_modified_at
+  code_release
+  data_release
+  model_release
+  retraction_or_correction
+  primary_source_ref
+  verifier_actor
+  attestation_digest
+```
+
+Allowed status families include:
+
+- accepted_peer_reviewed;
+- accepted_poster;
+- accepted_oral;
+- workshop;
+- preprint;
+- submission;
+- arr_submission;
+- withdrawn;
+- rejected;
+- official_org_evidence;
+- corrected;
+- retracted;
+- status_unresolved.
+
+### 26.1 Status transition semantics
+
+A status transition creates a new attestation:
+
+```text
+SUBMISSION
+ -> ACCEPTED
+```
+
+does not mutate history into "it was accepted when we used it."
+
+Architecture decisions retain the attestation version they actually used.
+
+### 26.2 First-party evidence
+
+First-party operational evidence can receive high mechanism or systems relevance without being counted as independent consensus.
+
+Required metadata:
+
+- organization;
+- proprietary access advantage;
+- public reproducibility limitations;
+- local proxy experiment;
+- cross-lab corroboration;
+- independence class.
+
+---
+
+## 27. Reproduction record contract
+
+Canonical shape:
+
+```text
+ReproductionRecord
+  reproduction_id
+  target_evidence_id
+  reproduction_class
+  protocol_id
+  implementation_source
+  code_commit
+  environment_manifest
+  hardware_manifest
+  data_manifest
+  model_artifact
+  baseline_artifacts[]
+  tuning_budget
+  seed_policy
+  raw_results
+  summarized_results
+  failure_runs[]
+  uncertainty
+  deviations_from_source[]
+  conclusion
+  reviewed_by
+  signed_at
+```
+
+Reproduction classes:
+
+- sanity;
+- paper_scale;
+- transfer;
+- systems;
+- adversarial;
+- negative;
+- independent.
+
+A result can satisfy multiple classes, but the exact evidence must be present.
+
+### 27.1 Failed reproduction
+
+Failed reproduction is not absence of evidence.
+
+Record:
+
+- inability to match reported metric;
+- implementation ambiguity;
+- missing hyperparameter;
+- hardware mismatch;
+- data unavailable;
+- instability;
+- budget exhaustion;
+- contradictory outcome.
+
+The result becomes negative/mixed evidence rather than disappearing.
+
+---
+
+## 28. Research debt contract
+
+Canonical shape:
+
+```text
+ResearchDebt
+  debt_id
+  assumption
+  domain
+  opened_at
+  opened_by
+  reason
+  risk_if_wrong
+  blocking_claims[]
+  affected_contracts[]
+  evidence_currently_relied_on[]
+  minimum_retirement_evidence
+  owner
+  target_experiment
+  refresh_at
+  state
+  retirement_scope
+  retirement_evidence[]
+  reopened_from
+```
+
+States:
+
+```text
+OPEN
+EXPERIMENT_DESIGNED
+RUNNING
+EVIDENCE_COLLECTED
+CHALLENGED
+RETIRED
+PARTIALLY_RETIRED
+INVALIDATED
+DEFERRED
+```
+
+Rules:
+
+- external literature alone does not retire local debt;
+- small-scale reproduction does not retire scale-transfer debt;
+- production claims disclose material open debt;
+- retirement is scoped to task/model/data/hardware/eval;
+- debt can reopen after a material architecture or environment change.
+
+---
+
+## 29. Experiment protocol contract
+
+Track AD's RXP protocols normalize into:
+
+```text
+ExperimentProtocol
+  protocol_id
+  research_question
+  hypothesis
+  null_hypothesis
+  scope
+  primary_metrics[]
+  secondary_metrics[]
+  controls[]
+  baselines[]
+  independent_variables[]
+  held_constant[]
+  datasets_or_workloads[]
+  tuning_budget
+  seed_policy
+  hardware_requirements
+  stop_rule
+  failure_rule
+  falsification_condition
+  debt_targets[]
+  expected_artifacts[]
+  pre_registered_at
+  protocol_digest
+```
+
+Protocol changes after results are visible require:
+
+- a new version;
+- reason;
+- disclosure of which analyses are confirmatory vs exploratory.
+
+---
+
+## 30. Experiment result bundle contract
+
+Canonical shape:
+
+```text
+ExperimentResultBundle
+  result_id
+  protocol_id
+  protocol_version
+  experiment_manifest
+  code_commit
+  config_digest
+  dataset_manifest
+  model_artifacts[]
+  evaluator_versions[]
+  hardware_manifest
+  software_manifest
+  raw_logs[]
+  checkpoints[]
+  failed_runs[]
+  primary_metrics
+  secondary_metrics
+  uncertainty
+  baseline_parity_review
+  multiple_comparison_count
+  deviations[]
+  decision_state
+  conclusion_scope
+  new_evidence_ids[]
+  opened_debt[]
+  retired_debt[]
+  contradiction_updates[]
+  review
+  signature
+```
+
+Allowed decision states:
+
+- SUPPORTED_IN_SCOPE;
+- PARTIALLY_SUPPORTED;
+- NULL_RESULT;
+- FALSIFIED_IN_SCOPE;
+- INCONCLUSIVE_VARIANCE;
+- INCONCLUSIVE_RESOURCE_LIMIT;
+- INVALID_METHOD;
+- INVALID_BASELINE;
+- INVALID_EVALUATION;
+- REPRODUCTION_FAILED.
+
+"Needs more scale" is not an allowed generic replacement for a null or falsified result.
+
+---
+
+## 31. Tuning and selection budget contract
+
+Every comparative study stores:
+
+```text
+TuningBudget
+  candidate
+  configurations_tried
+  search_algorithm
+  parameter_ranges
+  pilot_runs
+  evaluator_accesses
+  human_interventions
+  failed_runs
+  discarded_runs
+  total_compute
+  total_wall_clock
+```
+
+Baseline and challenger tuning effort must be comparable enough for the claimed conclusion.
+
+If not, the conclusion is explicitly scoped as:
+
+```text
+candidate_best_found_vs_baseline_as_tuned
+```
+
+rather than "candidate is better."
+
+---
+
+## 32. Evidence independence contract
+
+Evidence independence is represented as graph edges.
+
+Possible correlation edges:
+
+- same_authors;
+- same_lab;
+- same_codebase;
+- same_base_model;
+- same_training_data;
+- same_benchmark;
+- same_evaluator;
+- same_provider;
+- same_hardware;
+- direct_derivative_method;
+- copied_result;
+- shared_synthetic_teacher.
+
+Consensus logic discounts correlated evidence rather than counting papers.
+
+---
+
+## 33. Research claim expiry
+
+Research conclusions have operational lifetime.
+
+Canonical fields:
+
+```text
+last_reviewed_at
+review_at
+refresh_class
+expiry_triggers[]
+stale
+stale_reason
+replacement_conclusion
+```
+
+Expiry triggers include:
+
+- source revision;
+- venue/status transition;
+- correction/retraction;
+- stronger baseline;
+- independent counterevidence;
+- local reproduction failure;
+- new model generation;
+- new hardware/runtime generation;
+- benchmark contamination/saturation;
+- production observation outside original scope.
+
+A stale conclusion is retained for lineage but cannot silently justify a new promotion.
+
+---
+
+## 34. Monitorability evidence contract
+
+Monitorability is represented as:
+
+```text
+MonitorabilityEvidence
+  model_artifact
+  training_recipe
+  reasoning_protocol
+  monitor_artifact
+  observation_channels[]
+  task_population
+  threat_population
+  attack_adaptivity
+  detection_rate
+  false_positive_rate
+  false_negative_evidence
+  calibration
+  evasion_results
+  monitor_cost
+  tested_at
+  refresh_at
+```
+
+Monitorability does not inherit across model/training/reasoning changes without evidence.
+
+---
+
+## 35. Research-agent evidence contract
+
+Research agents are principals, not autonomous epistemic authorities.
+
+Every research-agent run records:
+
+```text
+research_agent_id
+model_artifact
+tool_capabilities
+workspace
+experiment_manifest
+source_access
+blind_eval_access = false
+generated_code[]
+generated_data[]
+executed_runs[]
+trajectory_log
+scorer_interactions
+human_interventions
+final_claims[]
+independent_recompute
+reviewer
+```
+
+Forbidden:
+
+- self-marking a result independently reproduced;
+- reading blind promotion answers;
+- modifying evaluator hidden state;
+- silently changing primary metrics;
+- promoting generated training data without lineage;
+- direct production mutation.
+
+---
+
+## 36. Research saturation definition
+
+A research domain is saturated for the current planning epoch only when it has:
+
+- foundational anchor;
+- current frontier evidence;
+- counterevidence/negative evidence;
+- verified source status;
+- explicit contradiction handling;
+- mandatory baseline;
+- local protocol;
+- open research debt;
+- reproduction status;
+- scale/hardware scope;
+- statistical/tuning-budget notes;
+- refresh trigger.
+
+Saturation is a dated snapshot.
+
+It never means "there is no more research to do."
