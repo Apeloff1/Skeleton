@@ -61,10 +61,6 @@ def test_master_plan_indexes_optimizer_and_massive_upgrade_tracks() -> None:
     catalog = (
         root / "docs" / "architecture" / "research-source-catalog.md"
     ).read_text(encoding="utf-8")
-    manual = (
-        root / "docs" / "architecture" / "exotic-architecture-lab.md"
-    ).read_text(encoding="utf-8")
-
     assert "Track Z — Deep internals and optimizer control plane" in plan
     assert "Track AA — Rare massive upgrades and full-stack step changes" in plan
     assert "**Z** — deep internals and optimizer control plane" in index
@@ -102,6 +98,12 @@ def test_machine_index_exposes_optimizer_and_massive_upgrade_invariants() -> Non
 
 
 def test_hostile_gap_audit_is_machine_visible_and_fail_closed() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    audit = (
+        root / "docs" / "architecture" / "masterplan-gap-audit.md"
+    ).read_text(encoding="utf-8")
     docs = architecture_index.CANONICAL_DOCUMENTS
     tracks = architecture_index.CONSTRUCTION_TRACKS
     gaps = architecture_index.P0_HARDENING_GAPS
@@ -207,6 +209,9 @@ def test_exotic_plan_and_research_canon_are_canonical() -> None:
     index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
     catalog = (
         root / "docs" / "architecture" / "research-source-catalog.md"
+    ).read_text(encoding="utf-8")
+    manual = (
+        root / "docs" / "architecture" / "exotic-architecture-lab.md"
     ).read_text(encoding="utf-8")
 
     assert "Track AC — Exotic architecture laboratory" in plan
