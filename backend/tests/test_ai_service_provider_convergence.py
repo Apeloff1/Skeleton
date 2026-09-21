@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from core.ai_provider import ProviderResponse, ProviderUnavailableError
 from services import ai_hub_svc
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class _Provider(Enum):
@@ -117,9 +121,7 @@ async def test_ai_hub_falls_back_without_provider() -> None:
 
 
 def test_legacy_assistant_source_has_no_provider_sdk_or_shadow_runtime() -> None:
-    from pathlib import Path
-
-    source = Path("backend/services/ai_assistant_svc.py").read_text(encoding="utf-8")
+    source = (ROOT / "services/ai_assistant_svc.py").read_text(encoding="utf-8")
 
     assert "from openai import" not in source
     assert "import openai" not in source
@@ -129,9 +131,7 @@ def test_legacy_assistant_source_has_no_provider_sdk_or_shadow_runtime() -> None
 
 
 def test_hub_source_has_no_universal_provider_key_or_legacy_chat_shim() -> None:
-    from pathlib import Path
-
-    source = Path("backend/services/ai_hub_svc.py").read_text(encoding="utf-8")
+    source = (ROOT / "services/ai_hub_svc.py").read_text(encoding="utf-8")
 
     assert "EMERGENT_LLM_KEY" not in source
     assert "emergentintegrations" not in source
