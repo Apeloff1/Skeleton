@@ -35,6 +35,7 @@ python -m skeleton test
 ```
 
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
+Canonical ownership, topology, change lanes, and migration boundaries are mapped in [`docs/ARCHITECTURE_MAP.md`](docs/ARCHITECTURE_MAP.md).
 
 ## Architecture
 

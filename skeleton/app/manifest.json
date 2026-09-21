@@ -37,6 +37,12 @@
       "frontend"
     ]
   },
+  "architecture": {
+    "contract": "machine/architecture.json",
+    "validator": "scripts/check_architecture_map.py",
+    "documentation": "docs/ARCHITECTURE_MAP.md",
+    "tag": "arch-map/v1.3"
+  },
   "runtime": {
     "required_env": [
       "MONGO_URL",
@@ -136,6 +142,10 @@
     "backend/core/canonical_product_policy.py",
     "backend/core/product_control_runtime.py",
     "backend/routes/product_runtime.py",
-    "scripts/check_app_assembly.py"
+    "machine/architecture.json",
+    "docs/ARCHITECTURE_MAP.md",
+    "scripts/check_architecture_map.py",
+    "scripts/check_app_assembly.py",
+    "skeleton/testing/test_architecture_map.py"
   ]
 }

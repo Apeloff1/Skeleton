@@ -10,13 +10,38 @@
     "server": "uvicorn"
   },
   "assembly": {
-    "branch": "integration/app-consolidation",
+    "branch": "integration/architecture-map-v1",
     "base": "main",
     "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
-    "current_status": "application_contract_active",
-    "pull_request": 1883,
+    "current_status": "app_assembly_landed_architecture_ready",
+    "pull_request": 1904,
     "contract": "skeleton/app/manifest.json",
-    "operator": "python -m skeleton app"
+    "operator": "python -m skeleton app",
+    "architecture_contract": "machine/architecture.json",
+    "architecture_branch": "integration/architecture-map-v1",
+    "layers": [
+      {
+        "name": "core-runtime-control-plane",
+        "state": "landed",
+        "ref": "main",
+        "pr": 1901
+      },
+      {
+        "name": "product-shell-deployment",
+        "state": "landed",
+        "ref": "main",
+        "pr": 1902
+      },
+      {
+        "name": "architecture-map",
+        "state": "ready",
+        "ref": "integration/architecture-map-v1",
+        "pr": 1904,
+        "tag": "arch-map/v1.3"
+      }
+    ],
+    "product_shell_pr": 1902,
+    "architecture_pr": 1904
   },
   "entrypoints": {
     "tests": "python -m pytest skeleton/testing -v",
@@ -644,7 +669,7 @@
     "Read this manifest before modifying the repository.",
     "Prefer package-local imports over root-level coupling.",
     "Keep heavy subsystems out of skeleton/__init__.py.",
-    "Use integration/app-consolidation as the assembly workspace.",
+    "Use main as the landed application baseline; use bounded integration/* branches for reconciliation and architecture work.",
     "Integrate behavior and files, not branch names.",
     "Record structural integration decisions here and in machine/README.md.",
     "Do not discard branches with unique commits without reviewing their file-level changes.",
@@ -671,5 +696,12 @@
       "hot",
       "production"
     ]
+  },
+  "architecture": {
+    "contract": "machine/architecture.json",
+    "documentation": "docs/ARCHITECTURE_MAP.md",
+    "validator": "scripts/check_architecture_map.py",
+    "tag": "arch-map/v1.3",
+    "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit"
   }
 }
