@@ -486,7 +486,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-WP-W27` — WP-W27 Forge — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W28` — WP-W28 Learning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W29` — WP-W29 Distributed Runtime — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W30` — WP-W30 Production Hardening — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W30` — WP-W30 Production Hardening — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
 ## Atomic AI Build Queue
 
