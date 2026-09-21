@@ -5,6 +5,12 @@ AI game engine and agent orchestration framework.
 ## Quick Start
 
 ```bash
+# First-time host/runtime setup
+python -m skeleton app preload
+python -m skeleton app setup
+python -m skeleton app install
+# or, before installing the Python package: python scripts/install_app.py
+
 # Inspect canonical topology, then optionally probe live runtime health
 python -m skeleton app status
 python -m skeleton app status --live
