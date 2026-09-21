@@ -138,6 +138,21 @@ def _validate_contract_links(
     if contract.get("architecture_contract") != ARCHITECTURE_PATH.as_posix():
         errors.append("construction architecture_contract path drift")
 
+    semantics = contract.get("relationship_semantics")
+    if not isinstance(semantics, dict):
+        errors.append("relationship_semantics must be an object")
+    else:
+        runtime_dependency = semantics.get("runtime_dependency")
+        acceptance_target = semantics.get("acceptance_target")
+        if not isinstance(runtime_dependency, dict) or runtime_dependency.get("field") != "depends_on":
+            errors.append(
+                "relationship_semantics.runtime_dependency.field must be depends_on"
+            )
+        if not isinstance(acceptance_target, dict) or acceptance_target.get("field") != "validates":
+            errors.append(
+                "relationship_semantics.acceptance_target.field must be validates"
+            )
+
     for key in ("human_manual", "architecture_contract", "runtime_contract"):
         raw = contract.get(key)
         try:
@@ -212,6 +227,20 @@ def _validate_planes(
             elif dependency not in planes:
                 errors.append(
                     f"plane {plane_id} depends on unknown plane {dependency!r}"
+                )
+
+        validates = _nonempty_strings(
+            plane.get("validates", []),
+            label=f"plane {plane_id}.validates",
+            errors=errors,
+            allow_empty=True,
+        )
+        for target in validates:
+            if target == plane_id:
+                errors.append(f"plane {plane_id} must not validate itself")
+            elif target not in planes:
+                errors.append(
+                    f"plane {plane_id} validates unknown plane {target!r}"
                 )
 
         evidence = _nonempty_strings(
