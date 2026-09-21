@@ -21,6 +21,7 @@ _AUTHORITIES = frozenset(
         "authoritative-unbound",
         "conditional-authoritative",
         "derived",
+        "durable-projection",
         "scratch",
         "mixed-transitional",
         "recovery-aid",
@@ -30,7 +31,7 @@ _SOURCE_OF_TRUTH_AUTHORITIES = frozenset(
     {"authoritative", "authoritative-unbound", "conditional-authoritative"}
 )
 _NON_AUTHORITY_CLASSES = frozenset(
-    {"derived", "scratch", "mixed-transitional", "recovery-aid"}
+    {"derived", "durable-projection", "scratch", "mixed-transitional", "recovery-aid"}
 )
 
 
@@ -348,7 +349,7 @@ def _validate_state_domains(
             item.get("derived_from"),
             label=f"state domain {domain_id}.derived_from",
             errors=errors,
-            allow_empty=authority not in {"derived", "mixed-transitional", "recovery-aid"},
+            allow_empty=authority not in {"derived", "durable-projection", "mixed-transitional", "recovery-aid"},
         )
         rebuildable = item.get("rebuildable")
         if not isinstance(rebuildable, bool):
@@ -362,6 +363,15 @@ def _validate_state_domains(
             if rebuildable is not True:
                 errors.append(
                     f"derived state domain {domain_id} must be rebuildable"
+                )
+        if authority == "durable-projection":
+            if not derived_from:
+                errors.append(
+                    f"durable-projection state domain {domain_id} must declare upstream sources"
+                )
+            if source is not False:
+                errors.append(
+                    f"durable-projection state domain {domain_id} must not be source_of_truth"
                 )
         if authority == "scratch":
             if source is not False or rebuildable is not True:
