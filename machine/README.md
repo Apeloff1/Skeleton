@@ -132,6 +132,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Merge wave:** two merge snapshots audited; both are held for controlled reconciliation (115 and 150 files) rather than blindly merged.
 
+- **Archive wave:** both historical snapshots revalidated; unique deltas remain available as recovery/source material and neither is a merge target.
+
 ## Target layout
 
 ```text
