@@ -693,6 +693,68 @@ class RAGService:
 
         return migrated
 
+    def rebuild_projections_from_mongo(self) -> Dict[str, int]:
+        """Rebuild all user-owned semantic projections from canonical Mongo."""
+        inventory = self.state.projection_inventory()
+        rebuilt = {
+            "learning_sessions": 0,
+            "cocoding_context": 0,
+            "feedback": 0,
+            "failed": 0,
+        }
+
+        for row in inventory["learning_sessions"]:
+            ok = self._project_add(
+                "learning_sessions",
+                document=row["content"],
+                metadata={
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "topic": row["topic"],
+                    "duration_minutes": row["duration_minutes"],
+                    "mastery_delta": row["mastery_delta"],
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["session_id"],
+            )
+            rebuilt["learning_sessions" if ok else "failed"] += 1
+
+        for row in inventory["cocoding_context"]:
+            ok = self._project_add(
+                "cocoding_context",
+                document=self._canonical_cocoding_content(row),
+                metadata={
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "pipeline": row["pipeline"],
+                    "snippet_count": len(row.get("code_snippets") or []),
+                    "decision_count": len(row.get("decisions") or []),
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["session_id"],
+            )
+            rebuilt["cocoding_context" if ok else "failed"] += 1
+
+        for row in inventory["feedback"]:
+            ok = self._project_add(
+                "feedback",
+                document=row["content"],
+                metadata={
+                    "feedback_id": row["feedback_id"],
+                    "user_id": row["user_id"],
+                    "feedback_type": row["feedback_type"],
+                    "rating": row.get("rating"),
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["feedback_id"],
+            )
+            rebuilt["feedback" if ok else "failed"] += 1
+
+        return rebuilt
+
     def get_stats(self) -> Dict[str, Any]:
         """Expose canonical authority and rebuildable projection statistics."""
         projection_counts: Dict[str, int] = {}
