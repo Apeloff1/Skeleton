@@ -90,3 +90,51 @@ def test_full_up_command_enables_optional_profile():
 def test_logs_reject_unknown_service():
     with pytest.raises(ValueError, match="unknown service"):
         compose_command("logs", service="not-a-service")
+
+
+def test_http_probe_uses_declared_health_surface(monkeypatch):
+    from skeleton.app.health import probe_url
+
+    class _Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, _size):
+            return b"ok"
+
+    seen = {}
+
+    def fake_urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", fake_urlopen)
+    service = load_manifest().service("skeleton")
+
+    result = probe_url(service, timeout=1.25)
+
+    assert result.ok is True
+    assert result.status == 200
+    assert seen == {
+        "url": "http://localhost:8010/api/v1/health/live",
+        "timeout": 1.25,
+    }
+
+
+def test_default_smoke_profile_has_frontend_backend_and_engine():
+    manifest = load_manifest()
+    probed = {
+        service.name
+        for service in manifest.services
+        if service.name in manifest.default_services
+        and service.public_url
+        and service.health_path
+    }
+
+    assert probed == {"frontend", "backend", "skeleton"}
