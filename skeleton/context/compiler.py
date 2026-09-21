@@ -273,15 +273,22 @@ class ContextCompiler:
             sorted(
                 evidence,
                 key=lambda segment: (
-                    0
+                    (
+                        0,
+                        segment.created_at.timestamp(),
+                        0.0,
+                        0.0,
+                        segment.segment_id,
+                    )
                     if segment.kind
                     in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
-                    else 1,
-                    segment.created_at.timestamp()
-                    if segment.kind
-                    in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
-                    else -segment.priority,
-                    segment.segment_id,
+                    else (
+                        1,
+                        -segment.priority,
+                        -segment.relevance,
+                        -segment.created_at.timestamp(),
+                        segment.segment_id,
+                    )
                 ),
             )
         )
