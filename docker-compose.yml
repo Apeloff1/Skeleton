@@ -184,11 +184,26 @@ networks:
 volumes:
   mongo_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "authoritative"
+      com.skeleton.recovery.order: "10"
   mongo_config:
     driver: local
+    labels:
+      com.skeleton.state.role: "authoritative-support"
+      com.skeleton.recovery.order: "10"
   backend_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "derived"
+      com.skeleton.recovery.order: "90"
   skeleton_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "declared-mixed-operation-authority-and-stream-projection"
+      com.skeleton.recovery.order: "40"
   chroma_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "derived"
+      com.skeleton.recovery.order: "90"
