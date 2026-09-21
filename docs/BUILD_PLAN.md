@@ -9,6 +9,7 @@ This is the current construction sequence for turning Skeleton into a durable, m
 Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)
 Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)
 Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
+Exotic architecture manual: [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md)
 
 ## 0. Construction constitution
 
