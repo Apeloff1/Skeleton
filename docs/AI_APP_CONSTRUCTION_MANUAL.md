@@ -2812,3 +2812,53 @@ The canonical surface is versioned under `/api/v1/conversations`: create/read th
 ### Closure evidence
 
 P0 closure requires multi-turn continuation, tenant/thread isolation, duplicate-submit idempotency, concurrent append ordering, edit/regenerate lineage, operation/result binding, deletion/export propagation, context-provenance preservation, and browser refresh/reconnect reconstruction tests.
+
+## Fully Functional AI Closure: Governed Tool Runtime
+
+The repository currently has two different concepts that must remain distinct: declarative skills and executable tools.
+
+`SkillManifest` is context guidance. It intentionally forbids executable entrypoints. A `ToolManifest` is a separate execution contract exposed to the cognitive loop only after policy admission.
+
+### Canonical target
+
+- skill guidance stays in `skeleton/skills/manifest.py` and `skeleton/skills/registry.py`;
+- executable tool contracts materialize under `skeleton/skills/tool_contract.py`;
+- execution/admission/idempotency materializes under `skeleton/skills/tool_runtime.py`;
+- `backend/services/tool_registry.py` becomes a bounded compatibility facade.
+
+### Required ToolManifest
+
+Every executable tool declares identity/version, description, bounded input/output schema, capabilities, authority class, risk class, side-effect class, idempotency mode, approval policy, timeout, concurrency, network policy, data policy, cost model, result-size limit and enabled state.
+
+The provider only receives the minimal callable projection: tool ID, description and input schema. Credentials, implementation entrypoints, authority tokens, database handles and operator-only metadata never enter model context.
+
+### Execution law
+
+A model proposes a call. The runtime then performs schema validation, data classification, principal/tenant authorization, risk/approval evaluation, security/network/sandbox policy, resource admission, idempotency reservation, adapter execution, output validation, postcondition verification, durable receipt commit and result governance.
+
+Unknown side-effect or idempotency behavior fails closed.
+
+### Legacy convergence findings
+
+`backend/services/tool_registry.py` currently contains several surfaces that cannot become canonical unchanged:
+
+- `llm_chat` owns `EMERGENT_LLM_KEY` and raw model transport; this must be retired as a credential-bearing tool path. Recursive/submodel work belongs to orchestration plus `model-provider`.
+- `compile_code` spawns compiler subprocesses from the backend; canonical execution moves behind a sandbox/executor adapter.
+- `run_code` is already disabled inline but needs a real sandbox ToolManifest/adapter.
+- `package_build` mixes execution and artifact persistence; canonical form requires idempotency plus artifact receipts.
+- `mongo_query` accepts arbitrary collection/filter input; replace it with scoped repository/query tools and explicit allowlists.
+- `web_search` performs direct external I/O; canonical form needs egress policy, timeout, result bounds, provenance and governance.
+
+### Tool receipt
+
+Every proposed action receives a `ToolExecutionReceipt`, including denied and failed calls. It binds operation, execution, turn, call, tool/version, argument digest, authority decision, approval, idempotency key, timing, status, result/postcondition references, usage, stable error code and compensation reference.
+
+A completed `call_id` replays the receipt; it does not repeat the action.
+
+### Nested model rule
+
+A model invocation is not treated as a normal tool adapter. Nested model work is scheduled by orchestration and executed through the canonical provider boundary so routing, privacy, cost, provider availability and receipts remain enforceable.
+
+### Closure
+
+The tool-runtime plane stays `partial` until tool inventory convergence, credential isolation, schema fuzzing, authority/approval, idempotency replay, sandbox, database-scope, network-policy, compatibility-delegation and receipt-lineage tests pass.
