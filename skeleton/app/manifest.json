@@ -29,6 +29,7 @@
       "path": "frontend",
       "kind": "expo",
       "public_url": "http://localhost:3000",
+      "health_path": "/",
       "container_port": 3000,
       "depends_on": ["backend", "skeleton"],
       "canonical": true
