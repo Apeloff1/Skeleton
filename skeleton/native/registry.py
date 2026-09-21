@@ -44,6 +44,7 @@ class NativeAcceleratorRuntimeStatus:
     matrix_calls: int = 0
     elements_processed: int = 0
     results_emitted: int = 0
+    retirement_failures: int = 0
     last_error: str | None = None
 
     @property
@@ -97,6 +98,7 @@ class NativeAcceleratorRegistry:
         self._library_loader = library_loader or AsmVectorAccelerator
         self._instance: Any | None = None
         self._last_error: str | None = None
+        self._retirement_failures = 0
         self._lock = threading.RLock()
 
     @property
@@ -157,7 +159,10 @@ class NativeAcceleratorRegistry:
             if previous is not None and previous is not instance:
                 close = getattr(previous, "close", None)
                 if callable(close):
-                    close()
+                    try:
+                        close()
+                    except Exception:
+                        self._retirement_failures += 1
             return instance
 
     def status(
@@ -181,6 +186,7 @@ class NativeAcceleratorRegistry:
                     source_available=preflight.source_available,
                     compiler_available=preflight.compiler_available,
                     library_available=preflight.library_available,
+                    retirement_failures=self._retirement_failures,
                     last_error=last_error,
                 )
 
@@ -225,6 +231,7 @@ class NativeAcceleratorRegistry:
                     getattr(raw, "elements_processed", 0)
                 ),
                 results_emitted=int(getattr(raw, "results_emitted", 0)),
+                retirement_failures=self._retirement_failures,
                 last_error=last_error,
             )
 
@@ -284,6 +291,7 @@ class NativeAcceleratorRegistry:
                         "matrix_calls": status.matrix_calls,
                         "elements_processed": status.elements_processed,
                         "results_emitted": status.results_emitted,
+                        "retirement_failures": status.retirement_failures,
                     },
                 )
             except Exception as exc:
@@ -306,7 +314,12 @@ class NativeAcceleratorRegistry:
                 return
             close = getattr(instance, "close", None)
             if callable(close):
-                close()
+                try:
+                    close()
+                except Exception as exc:
+                    self._retirement_failures += 1
+                    self._last_error = type(exc).__name__
+                    raise
 
     def __enter__(self) -> "NativeAcceleratorRegistry":
         return self
