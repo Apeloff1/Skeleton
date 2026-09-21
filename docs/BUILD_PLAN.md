@@ -12,6 +12,7 @@ Historical/frontier research catalog: [architecture/research-source-catalog.md](
 Exotic architecture manual: [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md)
 Frontier research atlas: [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md)
 Research experiment protocols: [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md)
+Research saturation accountability: [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md)
 
 ## 0. Construction constitution
 
