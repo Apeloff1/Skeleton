@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.2.0",
-  "architecture_tag": "arch-map/v3.2",
+  "architecture_version": "3.3.0",
+  "architecture_tag": "arch-map/v3.3",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -13,7 +13,9 @@
     "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "construction_validator": "scripts/check_ai_app_construction.py",
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
-    "provider_contract": "skeleton/provider_contract.py"
+    "provider_contract": "skeleton/provider_contract.py",
+    "operation_contract": "skeleton/contracts/operation.py",
+    "stream_contract": "skeleton/frontier/operation_stream.py"
   },
   "objectives": [
     "one product shell",
@@ -31,7 +33,9 @@
     "fail-closed data governance and resource admission before external provider I/O",
     "shared ResourceBudget semantics between admission and model routing",
     "one engine-owned provider runtime for text, image, speech, and synchronous compatibility execution",
-    "application routes contain no provider credentials or direct vendor SDK imports"
+    "application routes contain no provider credentials or direct vendor SDK imports",
+    "one canonical operation identity/state machine across API, orchestration, provider, tool, and stream planes",
+    "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -520,7 +524,12 @@
     "external provider I/O follows validation -> governance -> admission -> architecture receipt -> client execution",
     "model routing cannot widen ResourceBudget cost, output-token, or wall-time ceilings",
     "runtime-model credentials are owned only by skeleton/provider_runtime.py",
-    "undeclared media providers fail closed instead of borrowing another provider credential"
+    "undeclared media providers fail closed instead of borrowing another provider credential",
+    "operation idempotency identity is distinct from tracing identity",
+    "operation terminal states are final",
+    "operation stream sequence is monotonic per operation",
+    "stream overflow backpressures instead of silently dropping retained events",
+    "replay gaps fail closed instead of pretending recovery succeeded"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -548,6 +557,14 @@
       "transport": "HTTPS chat-completions compatible API",
       "contract": "sanitized repository context -> mandatory automation_model receipt -> bounded model call -> sanitized text",
       "security": "HTTPS-only public endpoint; secrets redacted; bounded response; credentials remain in automation client"
+    },
+    {
+      "id": "operation-event-stream",
+      "from": "engine-runtime",
+      "to": "application/product transport adapters",
+      "transport": "transport-neutral ordered operation event envelope; SSE/WebSocket/polling adapters allowed",
+      "contract": "skeleton/frontier/operation_stream.py",
+      "security": "operation scoped; bounded JSON payload; no secret-bearing raw logs; replay cursor validated"
     }
   ]
 }
