@@ -88,3 +88,10 @@ def test_status_changes_require_signed_attributed_history_schema() -> None:
             assert checker._utc(event["at_utc"]) is not None
             assert "from_status" in event
             assert "to_status" in event
+
+
+def test_manual_unbound_attestation_is_not_allowed() -> None:
+    assert "manual_attestation" not in checker.ALLOWED_SIGNATURE_METHODS
+    assert {"github_identity", "git_gpg", "git_ssh", "sigstore", "ci_oidc"} <= (
+        checker.ALLOWED_SIGNATURE_METHODS
+    )
