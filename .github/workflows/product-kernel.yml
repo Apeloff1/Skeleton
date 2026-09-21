@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "backend/core/charter_policy.py"
+      - "backend/core/academy_product.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/product_executor_registry.py"
@@ -29,6 +30,7 @@ on:
     types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/charter_policy.py"
+      - "backend/core/academy_product.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/product_executor_registry.py"
