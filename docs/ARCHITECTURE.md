@@ -259,7 +259,8 @@ Canonical navigation for this layer:
 - [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md) — RXP001–RXP035 controlled experiment designs, falsification conditions, evidence outputs, and research-debt targets;
 - [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md) — 19-domain accountability record separating planning coverage from local reproduction and production evidence;
 - [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md) — HL001–HL110 cross-disciplinary historical foundations;
-- [architecture/research-source-topology.md](architecture/research-source-topology.md) — RS001–RS055 archives, proceedings, artifacts, standards, operational evidence, and source-ingestion policy.
+- [architecture/research-source-topology.md](architecture/research-source-topology.md) — RS001–RS055 archives, proceedings, artifacts, standards, operational evidence, and source-ingestion policy;
+- [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md) — explicit RQ→RDE→RXP→ADR→promotion dependencies and cross-domain blockers.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
@@ -305,4 +306,4 @@ For reasoning and agent research, the evaluated object is the complete inference
 
 Monitorability is a measured, versioned property that can drift with model scale, post-training, reasoning method, and monitor capability. It is therefore re-evaluated rather than assumed to improve monotonically with capability.
 
-The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md, with executable research designs in docs/architecture/frontier-research-experiment-protocols-2026.md. FR, RQ, SV, FD, CX, RDE, and RXP identifiers are research/evidence references, not runtime authorities.
+The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md, with executable research designs in docs/architecture/frontier-research-experiment-protocols-2026.md, historical/source context in the lineage/topology maps, and blocking relationships in docs/architecture/research-dependency-map-2026.md. FR, RQ, SV, FD, CX, RDE, RXP, HL, and RS identifiers are research/evidence references, not runtime authorities.
