@@ -4,6 +4,7 @@
     "name": "Skeleton",
     "version": "16",
     "compose_file": "docker-compose.yml",
+    "hot_compose_file": "docker-compose.hot.yml",
     "modes": {
       "development": {
         "BUILD_TARGET": "development",
@@ -102,6 +103,7 @@
   "required_paths": [
     "pyproject.toml",
     "docker-compose.yml",
+    "docker-compose.hot.yml",
     "Dockerfile",
     "backend/server.py",
     "backend/Dockerfile",
