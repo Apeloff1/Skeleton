@@ -686,6 +686,823 @@ an architecture recommendation.
 
 ---
 
+
+## Track Z — Deep internals and optimizer control plane — 🧪
+
+Goal: make optimization, numerical stability, parameter updates, and training-system internals explicit, measurable, replaceable subsystems rather than hidden framework defaults.
+
+This track is intentionally below ModelPort and above raw kernels. A candidate optimizer is not “better” because it is newer or faster on one benchmark. It must be evaluated by loss/quality per token, wall-clock, memory, communication, stability, reproducibility, checkpoint cost, downstream task quality, and interaction with model scale, batch size, precision, architecture family, and distributed topology.
+
+### Z0. Mandatory optimizer contract — ⬜
+
+Every optimizer implementation MUST expose a common contract:
+
+\`\`\`text
+OptimizerSpec
+OptimizerStateSchema
+ParameterClassPolicy
+StepInput
+StepPlan
+StepTelemetry
+CheckpointCodec
+DistributedStateLayout
+PrecisionPolicy
+FailurePolicy
+PromotionEvidence
+\`\`\`
+
+Required capabilities:
+
+- initialize from an immutable parameter manifest;
+- classify parameters by shape, semantic role, model family, and sharding layout;
+- declare optimizer-state bytes per parameter;
+- declare supported dtypes and accumulator dtypes;
+- declare whether updates are elementwise, matrix/tensor preconditioned, low-rank, orthogonalized, curvature-aware, sign-based, or mixed;
+- expose gradient clipping/scaling semantics;
+- expose weight-decay semantics separately from gradient update semantics;
+- checkpoint and restore bit-for-bit where deterministic execution is supported;
+- migrate optimizer state across compatible sharding/topology changes;
+- emit step-level and window-level telemetry;
+- fail closed on NaN/Inf/corrupt state;
+- support shadow/counterfactual evaluation without committing candidate updates.
+
+**Gate:** no training job depends directly on a framework-specific optimizer object outside the adapter layer.
+
+### Z1. Stable baseline family — ⬜
+
+Keep strong baselines permanently available:
+
+- SGD + momentum/Nesterov;
+- Adam / AdamW;
+- Adafactor;
+- LAMB/LARS where large-batch behavior justifies them.
+
+The baseline family is not deprecated when challengers arrive. It anchors regressions, ablations, recovery, and reproducibility.
+
+**Gate:** every challenger comparison includes at least one tuned stable baseline under the same data, tokens, model, precision, hardware, and stopping criterion.
+
+### Z2. Memory-efficient optimizer family — 🧪
+
+Evaluate:
+
+- 8-bit/block-quantized optimizer states;
+- factored second moments;
+- low-rank gradient projection such as GaLore-style approaches;
+- randomized subspace optimization;
+- optimizer-state offload;
+- optimizer-state sharding;
+- mixed-precision moments;
+- compressed communication for optimizer/gradient state.
+
+Record separately:
+
+- peak device memory;
+- host memory;
+- network traffic;
+- optimizer-state checkpoint bytes;
+- reconstruction/migration cost;
+- quality delta;
+- instability rate.
+
+**Gate:** memory savings cannot be counted as a win if they move the bottleneck into communication, host memory, checkpointing, or quality loss.
+
+### Z3. Structure-aware and higher-order challengers — 🧪
+
+Candidate families:
+
+- Shampoo-style tensor preconditioning;
+- SOAP-style Adam-in-preconditioned-basis methods;
+- Sophia-style lightweight curvature estimation;
+- low-rank curvature sketches;
+- blockwise/quasi-second-order methods;
+- trust-ratio variants;
+- safe-step / trust-region experiments.
+
+Hard requirements:
+
+- amortized preconditioner cost is measured;
+- matrix decomposition/eigendecomposition frequency is explicit;
+- numerical conditioning is monitored;
+- sharded/distributed behavior is defined;
+- fallback path exists when preconditioner state is corrupt or unaffordable.
+
+### Z4. Orthogonalized update family — 🧪
+
+Evaluate Muon-style orthogonalized momentum for compatible matrix parameters while retaining a conventional optimizer for incompatible tensors such as embeddings, biases, scalars, and selected gates.
+
+Required experiments:
+
+- exact parameter-class map;
+- orthogonalization backend comparison;
+- Newton–Schulz iteration count / alternative polar decomposition backend;
+- update norm and spectral behavior;
+- distributed gather/reduce implications;
+- mixed Muon + AdamW state accounting;
+- scale-transfer behavior across width/depth/batch changes;
+- sensitivity to weight decay and momentum.
+
+**Gate:** optimizer assignment by parameter semantic class is explicit and versioned; no shape heuristic silently changes behavior after a model refactor.
+
+### Z5. Sign and parameter-free / schedule-light challengers — 🧪
+
+Evaluate where appropriate:
+
+- Lion-style sign momentum;
+- Prodigy / D-adaptation families;
+- schedule-free AdamW/SGD variants;
+- learned or automatically adapted step-size controllers.
+
+Measure:
+
+- tuning burden;
+- warmup sensitivity;
+- stop-time sensitivity;
+- transfer across model sizes;
+- large-batch behavior;
+- interaction with weight decay;
+- checkpoint/eval mode semantics.
+
+**Gate:** “fewer hyperparameters” is measured as reduced tuning compute and operator burden, not assumed from API surface alone.
+
+### Z6. Optimizer router by parameter class — ⬜
+
+Introduce a versioned \`ParameterOptimizationMap\`.
+
+Possible classes:
+
+- token embeddings;
+- positional/rotary parameters where trainable;
+- attention Q/K/V/O matrices;
+- latent-KV projections;
+- MLP up/down/gate matrices;
+- MoE router;
+- expert matrices;
+- normalization scales;
+- biases;
+- output head;
+- adapters/LoRA;
+- recurrent/SSM state parameters;
+- multimodal projection layers.
+
+Each class declares:
+
+- optimizer family;
+- LR multiplier;
+- weight decay;
+- clipping;
+- precision;
+- sharding;
+- update-frequency policy;
+- frozen/trainable state.
+
+**Massive-upgrade hook:** allow optimizer mixtures inside one model while preserving one atomic global training step.
+
+### Z7. Optimization flight recorder — ⬜
+
+Persist bounded diagnostic windows for:
+
+- global and per-class gradient norm;
+- update norm;
+- update/weight ratio;
+- gradient noise scale estimates;
+- cosine similarity between gradient, momentum, and applied update;
+- loss-scale events;
+- NaN/Inf incidence;
+- clipping fraction;
+- optimizer-state saturation/quantization error;
+- preconditioner condition estimates;
+- Hessian-trace / curvature sketches where economical;
+- per-layer learning progress proxies;
+- dead/exploding expert/router indicators;
+- communication wait time;
+- step-time decomposition.
+
+Data must be sampled/compressed so observability does not become a training bottleneck.
+
+### Z8. Counterfactual optimizer replay — ⬜
+
+For selected windows, retain enough gradient/update evidence to replay alternative optimizer policies offline or in a shadow lane without mutating the authoritative training run.
+
+Uses:
+
+- compare candidate updates against the committed optimizer;
+- diagnose divergence;
+- test LR/WD policy changes;
+- detect whether a new optimizer benefit came from update geometry or secondary hyperparameter changes;
+- reproduce rare catastrophic steps.
+
+**Gate:** replay evidence is explicitly bounded because full-gradient retention at scale is prohibitively expensive.
+
+### Z9. Stability circuit breakers — ⬜
+
+Automatic hold/rollback conditions include:
+
+- non-finite loss/gradient/update;
+- sudden loss explosion;
+- persistent loss plateau beyond declared tolerance;
+- update/weight ratio excursion;
+- gradient norm discontinuity;
+- optimizer-state corruption;
+- precision overflow/underflow;
+- routing collapse in MoE;
+- data-loader/sample corruption;
+- collective communication mismatch;
+- divergence between replicas;
+- checkpoint verification failure.
+
+Actions may include:
+
+\`\`\`text
+warn -> reduce step / recover scaler -> quarantine batch
+     -> restore optimizer checkpoint -> restore full training checkpoint
+     -> pause run for operator/research review
+\`\`\`
+
+No autonomous recovery step may erase the evidence required to explain the failure.
+
+### Z10. Precision-aware optimization — 🧪
+
+Treat precision as part of optimizer design:
+
+- FP32 master-state reference;
+- BF16/FP16 compute;
+- FP8 training paths;
+- FP8 optimizer moments where supported;
+- experimental FP4 paths;
+- stochastic rounding;
+- per-tensor/per-channel scaling;
+- outlier handling;
+- accumulation precision;
+- loss scaling;
+- mantissa/error tracking.
+
+**Gate:** lower precision must pass long-horizon stability tests, not only short benchmark runs.
+
+### Z11. Hyperparameter scaling and transfer — 🧪
+
+Build a reproducible scaling-policy layer for:
+
+- learning rate;
+- warmup;
+- batch size;
+- sequence length;
+- width;
+- depth;
+- active MoE parameters;
+- optimizer family;
+- weight decay;
+- gradient clipping.
+
+Evaluate µP-style transfer and optimizer-specific shape-aware transfer rules as research candidates.
+
+**Gate:** a scaling rule is promoted only when it predicts successful transfer across at least two meaningful scale changes, with failed transfers retained as negative evidence.
+
+### Z12. Data/optimizer co-design — 🧪
+
+Optimization diagnostics must be joinable with:
+
+- data source;
+- curriculum stage;
+- domain mixture;
+- sequence length;
+- packing density;
+- duplicate rate;
+- toxicity/quality filters;
+- synthetic-data provenance.
+
+This permits distinguishing optimizer instability from data phase changes.
+
+### Z13. Batch and sequence adaptation — 🧪
+
+Candidate controller can tune within declared bounds:
+
+- microbatch size;
+- gradient accumulation;
+- global batch;
+- sequence-length curriculum;
+- token packing;
+- activation checkpointing level.
+
+Objective is not simply maximum throughput. Optimize successful learning progress per wall-clock and per resource budget while maintaining quality floors.
+
+### Z14. Distributed optimizer topology — ⬜
+
+Support versioned layouts for:
+
+- data parallel;
+- FSDP/ZeRO-style sharding;
+- tensor parallel;
+- pipeline parallel;
+- context/sequence parallel;
+- expert parallel;
+- combinations of these.
+
+The optimizer adapter must know which state is:
+
+- replicated;
+- sharded;
+- partitioned by tensor dimension;
+- partitioned by expert;
+- offloaded;
+- recomputed.
+
+### Z15. Atomic optimizer checkpoint and migration — ⬜
+
+A checkpoint must bind:
+
+- model parameter version;
+- optimizer spec/version;
+- optimizer state schema;
+- parameter-class map;
+- LR/schedule state;
+- scaler/precision state;
+- RNG state;
+- data cursor;
+- distributed topology;
+- training manifest;
+- evidence digest.
+
+Migration to a new topology or optimizer requires an explicit migration function and verification step.
+
+### Z16. Optimizer promotion gate — ⬜
+
+A challenger may become a default only after:
+
+1. controlled baseline comparison;
+2. equal-token and equal-wall-clock views;
+3. quality-per-compute analysis;
+4. memory and communication accounting;
+5. long-horizon stability;
+6. checkpoint/resume validation;
+7. scale-transfer test;
+8. failure-injection test;
+9. downstream evaluation;
+10. reproducibility on a second seed/configuration;
+11. rollback target;
+12. signed ADR.
+
+**Exit gate for Z:** optimizer choice becomes a versioned, observable, reversible training policy, with no hidden framework default controlling authoritative weight updates.
+
+---
+
+## Track AA — Rare massive upgrades and full-stack step changes — 🧪
+
+Goal: maintain a quarantined path for upgrades that can change the system by an order of magnitude in capability, scale, context, cost, or reliability, while preventing novelty from bypassing evidence.
+
+These are deliberately high-upside, high-complexity candidates. They should be tested as architectural forks, shadow backends, or isolated training programs before they can affect the main runtime.
+
+### AA1. Hardware-native sparse attention — 🧪
+
+Evaluate natively trainable sparse attention designs, including hierarchical token compression/selection patterns, against exact attention.
+
+Measure:
+
+- pretraining FLOPs;
+- forward/backward wall-clock;
+- decode latency;
+- long-context quality;
+- retrieval-like behaviors;
+- kernel occupancy;
+- sparsity overhead;
+- worst-case dense fallback.
+
+**Massive-upgrade condition:** sparse attention must improve end-to-end lifecycle cost, not just theoretical complexity.
+
+### AA2. Hybrid attention + state-space/recurrent core — 🧪
+
+Prototype mixed blocks that combine:
+
+- full/local/sparse attention;
+- selective state-space layers;
+- recurrent memory/state;
+- occasional global attention.
+
+ModelPort must hide the internal family.
+
+Evaluate:
+
+- long-context quality;
+- recurrent-state corruption/recovery;
+- streaming latency;
+- training stability;
+- cache/state size;
+- parallelism limitations.
+
+### AA3. Fine-grained / shared-expert MoE — 🧪
+
+Build a model-internal expert plane with:
+
+- expert parallelism;
+- shared experts;
+- fine-grained specialization;
+- dropless/block-sparse execution;
+- capacity and load telemetry;
+- router collapse detection;
+- expert hot-spot detection;
+- expert checkpoint sharding.
+
+Keep this entirely separate from application/provider/agent routing.
+
+### AA4. Latent/compressed KV architecture — 🧪
+
+Investigate architectural reductions in KV-cache footprint through learned latent projections, grouped/shared KV, compression, quantization, or other cache-aware attention designs.
+
+Required metrics:
+
+- bytes/token;
+- TTFT;
+- inter-token latency;
+- long-context quality;
+- cache reconstruction cost;
+- prefix reuse compatibility;
+- speculative decoding compatibility.
+
+### AA5. 100K→1M+ context training program — 🧪
+
+Context length is a training/system property, not a config toggle.
+
+Program includes:
+
+- sequence/context parallelism;
+- ring/2D attention variants;
+- long-context curriculum;
+- position-scaling strategy;
+- checkpoint/recompute policy;
+- memory-pressure models;
+- retrieval-vs-context routing;
+- needle/aggregation/reasoning evals;
+- cache and serving implications.
+
+No claimed context length is accepted without useful-task quality at that length.
+
+### AA6. FP8-first training stack — 🧪
+
+Build a complete FP8 training candidate:
+
+- matrix compute;
+- gradients;
+- collective communication where supported;
+- optimizer moments;
+- scaling/outlier policy;
+- long-horizon stability probes;
+- BF16 reference lane.
+
+FP8 is promoted only if full-run quality parity/floors and recovery behavior are demonstrated.
+
+### AA7. FP4 experimental training fork — 🧪
+
+Keep FP4 strictly experimental until hardware, numerical methods, and reproducibility mature.
+
+Required:
+
+- mixed-precision escape hatches;
+- outlier compensation;
+- sensitive-layer allowlist;
+- accumulation policy;
+- long-run collapse detection;
+- cross-hardware reproducibility.
+
+### AA8. Topology-aware 6D+ parallelism — 🧪
+
+Treat parallelism as a placement search problem over:
+
+- data;
+- tensor;
+- pipeline;
+- sequence/context;
+- expert;
+- optimizer/state sharding;
+- optional model replicas / heterogeneous devices.
+
+The planner consumes real interconnect topology and profiles rather than assuming a uniform cluster.
+
+### AA9. Communication/computation overlap compiler — 🧪
+
+Schedule:
+
+- reduce-scatter/all-gather;
+- expert all-to-all;
+- tensor collectives;
+- preconditioner work;
+- optimizer steps;
+- checkpoint transfers;
+
+against forward/backward compute to reduce exposed communication.
+
+Require deadlock detection and deterministic debug mode.
+
+### AA10. Elastic training and live topology migration — 🧪
+
+Research restart-safe resizing:
+
+- worker loss;
+- worker addition;
+- topology reshaping;
+- expert repartition;
+- optimizer-state redistribution;
+- data-cursor preservation;
+- RNG/seed semantics.
+
+The canonical state remains checkpoint-based; elasticity cannot create unverifiable weight histories.
+
+### AA11. Asynchronous/lazy checkpoint plane — 🧪
+
+Evaluate staged checkpointing through:
+
+- device → host;
+- host → local durable storage;
+- durable storage → remote/object storage.
+
+Track checkpoint lag and recovery-point objective.
+
+**Gate:** a “completed checkpoint” is not declared until integrity verification and required durability level are satisfied.
+
+### AA12. Training straggler and silent-fault intelligence — ⬜
+
+Detect:
+
+- slow accelerators;
+- network tail events;
+- thermal/power throttling;
+- ECC/hardware faults;
+- dataloader starvation;
+- collective retries;
+- skewed expert load;
+- host-memory pressure;
+- filesystem stalls.
+
+Correlate incidents with optimizer and loss telemetry so performance faults are not misdiagnosed as model instability.
+
+### AA13. Kernel fusion/autotuning compiler — 🧪
+
+Candidate subsystem:
+
+\`\`\`text
+model IR
+ -> shape/dtype/topology profile
+ -> candidate kernels
+ -> correctness oracle
+ -> microbenchmark
+ -> compile/cache
+ -> runtime guard
+ -> fallback
+\`\`\`
+
+Targets include:
+
+- attention;
+- MLP;
+- normalization;
+- RoPE/position operations;
+- MoE dispatch;
+- quantize/dequantize;
+- optimizer transforms;
+- state-space scans.
+
+Never permit benchmark-selected kernels to bypass numerical correctness tests.
+
+### AA14. Dynamic depth / conditional layer execution — 🧪
+
+Investigate token/task-dependent layer skipping or early exit.
+
+Must preserve:
+
+- deterministic full-depth fallback;
+- quality floors;
+- calibration;
+- structured-output correctness;
+- tool-call reliability;
+- adversarial robustness.
+
+### AA15. Multi-token / speculative generation stack — 🧪
+
+Support interchangeable speculative mechanisms:
+
+- draft model;
+- multi-head/token prediction;
+- tree candidates;
+- verifier/acceptance engine.
+
+Track accepted tokens per verification pass, distribution correctness where required, extra memory, and latency under concurrency.
+
+### AA16. Disaggregated prefill/decode serving — 🧪
+
+Separate compute-heavy prefill and memory/bandwidth-heavy decode when workload and hardware justify it.
+
+Design includes:
+
+- KV transfer protocol;
+- placement;
+- affinity;
+- prefix-cache locality;
+- admission control;
+- failure/retry semantics;
+- network saturation handling;
+- autoscaling.
+
+### AA17. KV-centric multi-tier memory fabric — 🧪
+
+Treat KV/cache as movable state across:
+
+- accelerator HBM;
+- host RAM;
+- local high-speed storage;
+- remote cache/storage where latency permits.
+
+Require:
+
+- content/version keying;
+- tenant isolation;
+- invalidation;
+- compression format;
+- integrity checks;
+- eviction cost model;
+- privacy/security policy.
+
+### AA18. Cross-model distillation foundry — 🧪
+
+Create controlled teacher ensembles for:
+
+- logits;
+- rationales/process traces where allowed;
+- tool trajectories;
+- verifier labels;
+- synthetic curriculum;
+- retrieval behavior.
+
+Teacher output is evidence/training data, never production authority.
+
+### AA19. Architecture surgery and transplant lab — 🧪
+
+Research controlled transformations such as:
+
+- dense → MoE expansion;
+- attention block replacement;
+- insertion of recurrent/SSM blocks;
+- KV-compression retrofits;
+- tokenizer/vocabulary extension;
+- width/depth growth;
+- adapter merge/unmerge.
+
+Every transformation needs parameter mapping, initialization rationale, regression suite, and rollback to the source checkpoint.
+
+### AA20. Automated optimizer/architecture co-search — 🧪
+
+Bounded search can propose:
+
+- optimizer family;
+- per-parameter optimizer map;
+- LR/WD;
+- precision;
+- checkpointing level;
+- parallelism layout;
+- kernel profile;
+- model-block variants.
+
+Search is constrained by resource budgets and uses held-out evaluation. It cannot directly promote a candidate.
+
+### AA21. Learned optimizer / meta-optimizer quarantine — 🧪
+
+Explore learned update rules only behind a strict sandbox.
+
+Risks to test:
+
+- scale transfer failure;
+- distribution shift;
+- optimizer reward hacking;
+- hidden state corruption;
+- catastrophic rare steps;
+- poor interpretability;
+- checkpoint incompatibility.
+
+Default promotion bar is higher than for analytic optimizers.
+
+### AA22. Self-measuring architecture — ⬜
+
+Every massive-upgrade candidate must produce a standardized \`UpgradeImpactReport\`:
+
+- capability delta;
+- quality delta;
+- training cost;
+- inference cost;
+- memory delta;
+- energy if available;
+- hardware assumptions;
+- implementation complexity;
+- operational complexity;
+- failure modes;
+- security effect;
+- migration complexity;
+- rollback cost;
+- evidence maturity;
+- confidence/uncertainty;
+- known negative results.
+
+### AA23. Pareto frontier registry — ⬜
+
+Do not collapse all upgrades into a single score.
+
+Maintain fronts for:
+
+- quality vs training FLOPs;
+- quality vs inference cost;
+- quality vs latency;
+- throughput vs latency;
+- context vs memory;
+- reliability vs utilization;
+- portability vs specialization.
+
+A candidate can be superior for one deployment profile and inferior for another.
+
+### AA24. Rare-event stress campaigns — ⬜
+
+Before promotion, inject:
+
+- node loss;
+- partial network partitions;
+- corrupted optimizer shard;
+- stale checkpoint shard;
+- duplicated batch;
+- missing data shard;
+- cache poisoning;
+- non-finite activation;
+- router collapse;
+- all-to-all slowdown;
+- prefill/decode imbalance;
+- cancellation storms;
+- near-OOM pressure;
+- precision-scaler oscillation.
+
+### AA25. Massive-upgrade promotion law — ⬜
+
+A rare massive upgrade requires all of:
+
+1. immutable experiment manifest;
+2. evidence maturity classification;
+3. reproducible baseline;
+4. minimal and full-scale ablation;
+5. systems benchmark;
+6. capability benchmark;
+7. adversarial/failure campaign;
+8. cost accounting;
+9. migration plan;
+10. rollback plan;
+11. shadow deployment where applicable;
+12. canary;
+13. signed architecture decision record;
+14. post-promotion monitors;
+15. scheduled revalidation date.
+
+**Exit gate for AA:** Skeleton can absorb high-upside architectural advances aggressively in research while keeping production evolution slow, observable, reversible, and evidence-bound.
+
+---
+
+# Mandatory plan-item accountability for Z / AA
+
+All new Z and AA work items inherit this record schema:
+
+\`\`\`yaml
+id: Z# | AA#
+status: pending | active | blocked | validated | promoted | rejected
+created_at: 2026-09-21T21:33:00+02:00
+updated_at: <ISO-8601>
+owner: <human-or-authorized-agent>
+evidence:
+  - <test/benchmark/experiment/ADR reference>
+dependencies:
+  - <stable IDs>
+signoff:
+  required: true
+  signer: <identity>
+  signed_at: <ISO-8601>
+  artifact_digest: <digest>
+  decision: accept | reject | supersede
+\`\`\`
+
+Rules:
+
+- checkboxes/status are updated only with evidence;
+- signoff is mandatory for validated/promoted states;
+- timestamps are mandatory for state transitions;
+- a signature binds the artifact/evidence digest, not merely prose;
+- a superseded item retains its full history;
+- rejected experiments remain searchable negative evidence;
+- provider/agent execution must read the canonical plan and dependency contracts before modifying authoritative implementation.
+
+### Planning checkpoint signature
+
+\`\`\`text
+checkpoint_id: PLAN-20260921-INTERNALS-OPTIMIZERS-MASSIVE-UPGRADES
+created_at: 2026-09-21T21:33:00+02:00
+scope: Track Z + Track AA + accountability contract
+status: authored
+signoff_required_for_implementation_claims: true
+authoring_actor: ChatGPT
+production_authority_granted: false
+\`\`\`
+
+---
+
 # Cross-track integration contracts
 
 ## Research → absorption
