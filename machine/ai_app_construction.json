@@ -11,11 +11,12 @@
   "provider_bootstrap": {
     "mandatory": true,
     "mode": "fail_closed",
-    "rule": "Every AI development agent and every credential-bearing AI provider family must load the active architecture and construction contracts before changing or serving the system.",
+    "rule": "Every AI development agent and every credential-bearing AI provider activation must load the active architecture, construction, capability-interface, and manual contracts before changing or serving the system.",
     "must_read": [
       "machine/manifest.json",
       "machine/architecture.json",
       "machine/ai_app_construction.json",
+      "machine/capability_interfaces.json",
       "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ],
     "development_provider_entrypoints": [
