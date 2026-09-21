@@ -29,6 +29,16 @@ def test_native_assembly_sources_and_header_are_package_data() -> None:
     assert "asm/*.h" in setup_cfg
 
 
+def test_packaging_workflow_watches_native_source_tree() -> None:
+    workflow = (
+        ROOT / ".github" / "workflows" / "packaging-runtime-image.yml"
+    ).read_text(encoding="utf-8")
+
+    assert workflow.count('      - "skeleton/native/**"') == 2
+    assert "Verify native Assembly payload in wheel" in workflow
+    assert "skeleton/native/asm/skeleton_asm.h" in workflow
+
+
 def test_runtime_image_excludes_development_payload() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
