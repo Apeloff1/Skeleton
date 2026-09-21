@@ -135,17 +135,24 @@ class NativeAcceleratorRegistry:
         """Explicitly build the native library, then load that exact artifact."""
         self._validate_name(name)
         with self._lock:
+            previous = self._instance
             try:
                 library = self._builder(
                     output_dir=output_dir,
                     compiler=compiler,
                 )
-                instance = self._library_loader(library)
+                instance = self._library_loader(Path(library))
             except Exception as exc:
-                self._last_error = type(exc).__name__
+                if previous is None:
+                    self._last_error = type(exc).__name__
                 raise
+
             self._instance = instance
             self._last_error = None
+            if previous is not None and previous is not instance:
+                close = getattr(previous, "close", None)
+                if callable(close):
+                    close()
             return instance
 
     def status(
