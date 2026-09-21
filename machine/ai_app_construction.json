@@ -25,6 +25,11 @@
         "required": true
       },
       {
+        "provider": "openai-codex",
+        "path": "AGENTS.md",
+        "required": true
+      },
+      {
         "provider": "anthropic-claude",
         "path": "CLAUDE.md",
         "required": true
