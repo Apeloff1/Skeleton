@@ -389,6 +389,50 @@ Work that has merely started must record a UTC `started` event in the append-onl
 
 Unbound/manual attestations are not accepted; signatures must bind to GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC. No retroactive signatures are fabricated. Items that predate the ledger remain unchecked until they receive real evidence and sign-off.
 
+## 21.4 Master build sequence
+
+The canonical middle layer between the 421-volume target and the atomic AIQ queue is `machine/ai_master_build_sequence.json`, documented in `docs/plan/MASTER_BUILD_SEQUENCE.md`.
+
+It groups W00–W30 into eight dependency-aware construction waves without creating a second completion system:
+
+```text
+MBW-00 Authority + contracts
+  -> MBW-01 Runtime spine + durable state + recovery
+       -> MBW-02 Model/memory/retrieval/knowledge/context
+       -> MBW-03 Tools/policy/verification/security
+            -> MBW-04 Cognition/planning/agents/swarms
+                 -> MBW-05 Observability/API/product/desktop
+                 -> MBW-06 Evaluation/research/forge/learning
+                      -> MBW-07 Installer/distributed runtime/production hardening
+```
+
+The sequence is deliberately stricter than a roadmap. Every wave declares entry criteria, concrete deliverables, required evidence modes, exit criteria, stop conditions, allowed overlap, and hard dependencies. All W00–W30 packages have exactly one primary wave owner, every AIQ stage 0–7 is represented, and every critical/high edge obligation resolves to at least one wave through its work-package ownership.
+
+Wave completion is **derived**, never manually asserted. A wave only closes when its completion-bearing work packages, AIQ tasks, vertical slices and high-impact risk obligations satisfy the existing accountability contract: implementation sign-off, independent verification sign-off, UTC timestamp, full git SHA, evidence references and derived checkbox state.
+
+### Promotion stop rules
+
+Promotion must stop when any of these conditions exist:
+
+- target-plan prose conflicts with current fail-closed runtime authority;
+- a model can grant itself tool or policy authority;
+- a side effect lacks idempotency or compensation semantics;
+- retry/replay can duplicate an external effect;
+- derived state is being treated as authoritative;
+- policy or trust labels can disappear through context compression/truncation;
+- a planned test is being cited as passing evidence;
+- durable schema migration/rollback/restore behavior is undefined;
+- a critical risk is hidden behind aggregate green status;
+- production promotion lacks independent verification.
+
+### First construction emphasis
+
+The first depth pass should prioritize MBW-00 and MBW-01 closure quality even when later waves prototype in parallel. This prevents downstream AI behavior from solidifying around ambiguous contracts, weak durable-state ownership or non-recoverable event semantics.
+
+The next major convergence is MBW-02 + MBW-03: intelligence context and privileged action must mature together. Richer reasoning is not a substitute for authorization, and stronger policy is not useful if context compilation can erase or launder trust.
+
+MBW-04 is the point where bounded autonomy becomes legitimate. MBW-05 and MBW-06 can then deepen product/evidence surfaces in parallel. MBW-07 is qualification, not feature accumulation: installer, distributed execution and production hardening must prove that the already-built system survives clean machines, upgrades, rollback, congestion and failure.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
