@@ -1632,8 +1632,9 @@ Run semantic canaries for providers/tools; artifacts declare runtime/kernel/plug
 ### AB35. Historical restore + retention/GC — ⬜
 Restore-test old snapshots; define evidence/provenance retention, compaction and legally required deletion without silently destroying lineage identity.
 
-### AB36. Trust-root bootstrap — ⬜
-Boot verifies keys, policy roots, manifests and trusted code before loading mutable models/plugins/policies.
+### AB36. Trust-root bootstrap and compromise recovery — ⬜
+Boot verifies keys, policy roots, manifests and trusted code before loading mutable models/plugins/policies. Define root-key revocation, replacement trust root, re-sign/revalidation strategy, historical audit verification, partial-rotation recovery and KMS-unavailable bootstrap.
+**Gate:** compromise of a root signing/trust key has a tested containment and re-root procedure.
 
 ### AB37. Combined fault campaigns — ⬜
 Run the audit matrix across state, network, worker, artifact, authority, resource and observability axes.
@@ -1644,6 +1645,11 @@ Requirements:
 - promotion/rollback: state × artifact × observability;
 - distributed training/serving: network × worker × resource;
 - periodic selected three-axis campaigns.
+
+### AB38. Residual race/boundary attack closure — ⬜
+Close G071–G130, including TOCTOU approval races, SSRF/DNS rebinding, path/symlink/archive escapes, dependency confusion, JIT-cache poisoning, accelerator residue, KMS/key-rotation failures, distributed checkpoint atomicity, snapshot consistency, embedding/index version drift, RNG/data-cursor recovery, collective hangs, silent corruption, feature-flag skew, canary representativeness, replay attacks, canonical serialization, speculative-output commit boundaries, provenance loss in compression/summarization, synthetic-data feedback loops, agent impersonation and stale operator actions.
+
+**Gate:** no residual gap may remain an unowned implicit assumption; every item is closed, downgraded with bounded evidence, or explicitly scheduled with a production-readiness restriction.
 
 **Exit gate for AB:** every P0 audit finding has a canonical contract, owner, machine invariant, tests, fault injection, observability, recovery semantics and signed evidence. No subsystem with an applicable open P0 may claim production-grade status.
 
