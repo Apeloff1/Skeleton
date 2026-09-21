@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /imagine — AI Image Generation
  * POST /api/imagine/generate → base64 image(s)
@@ -11,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const SIZES = ['1024x1024', '1792x1024', '1024x1792', '512x512'];
 const PROVIDERS = ['openai', 'gemini'];
 const QUALITIES = ['standard', 'hd'];

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
@@ -11,7 +12,7 @@ import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const Construct3DView = lazyDefault(() => import('../src/components/Construct3DView'));
 import * as Clipboard from 'expo-clipboard';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 const ERAS = [
   { key: '8bit', label: '8-Bit' }, { key: '16bit', label: '16-Bit' },
   { key: 'early3d', label: 'Early 3D' }, { key: '64bit', label: '64-Bit' },
