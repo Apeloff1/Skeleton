@@ -71,9 +71,9 @@ if ($LASTEXITCODE -ne 0) {
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
 Write-Host "==> Building standalone Skeleton.exe"
-& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3"
+& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic==2.13.5" "pydantic-settings==2.15.0"
 if ($LASTEXITCODE -ne 0) {
-    throw "PyInstaller installation failed"
+    throw "PyInstaller/runtime dependency installation failed"
 }
 
 $PyInstallerArgs = @(
