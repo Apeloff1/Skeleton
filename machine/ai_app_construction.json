@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.1.0",
-  "architecture_tag": "arch-map/v3.1",
+  "construction_version": "3.2.0",
+  "architecture_tag": "arch-map/v3.2",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -211,7 +211,12 @@
         "admission decision receipt",
         "single credential-bearing runtime owner",
         "sync/async transport parity",
-        "compatibility surfaces contain no provider credentials"
+        "compatibility surfaces contain no provider credentials",
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse",
+        "governed media operations share provider credentials and policy receipts with text generation"
       ],
       "construction": [
         "provider reads mandatory construction contract",
@@ -222,7 +227,10 @@
         "evaluate data governance before provider client access",
         "evaluate resource admission before provider client access",
         "own provider credentials and transport in skeleton/provider_runtime.py only",
-        "keep backend and Jeeves provider modules as non-credential compatibility facades"
+        "keep backend and Jeeves provider modules as non-credential compatibility facades",
+        "route image generation/edit/variation through the canonical runtime",
+        "route speech synthesis through the canonical runtime",
+        "keep undeclared Gemini/Grok media providers unavailable until formally onboarded"
       ],
       "acceptance": [
         "provider contract gate",
@@ -230,7 +238,10 @@
         "unsafe base URL rejection",
         "empty/invalid output rejection",
         "provider surface discovery proves one runtime credential owner",
-        "Jeeves compatibility source contains no credential or raw provider transport"
+        "Jeeves compatibility source contains no credential or raw provider transport",
+        "image generation/edit/variation boundary tests",
+        "speech synthesis boundary tests",
+        "application media routes contain no provider credentials or vendor SDK imports"
       ],
       "failure_mode": "provider unavailable, no credential leakage"
     },
@@ -1310,7 +1321,7 @@
       "id": "openai",
       "state": "active",
       "adapter": "skeleton/provider_runtime.py:OpenAIProviderAdapter",
-      "protocol": "OpenAI Responses API",
+      "protocol": "OpenAI Responses, Images, and Audio APIs",
       "architecture_read_required": true,
       "construction_manual_read_required": true,
       "activation_receipt_required": true,
@@ -1324,13 +1335,23 @@
         "AI_MAX_RETRIES"
       ],
       "capabilities": [
-        "text-generation"
+        "text-generation",
+        "image-generation",
+        "image-variation",
+        "image-editing",
+        "speech-synthesis"
       ],
       "undeclared_capability_policy": "deny",
       "network_policy": "https-only; no URL credentials; block localhost, metadata endpoints and non-global literal IPs",
       "sync_adapter": "skeleton/provider_runtime.py:OpenAISyncProviderAdapter",
       "compatibility_facade": "backend/core/ai_provider.py",
-      "execution_owner": "skeleton/provider_runtime.py"
+      "execution_owner": "skeleton/provider_runtime.py",
+      "media_contracts": [
+        "ProviderImageRequest",
+        "ProviderImageResponse",
+        "ProviderSpeechRequest",
+        "ProviderSpeechResponse"
+      ]
     }
   ],
   "gap_policy": {
@@ -1489,12 +1510,14 @@
       "plane": "model-provider",
       "priority": "P0",
       "status": "open",
-      "gap": "Runtime provider execution has been promoted into skeleton/provider_runtime.py; closure now depends on proving backend/Jeeves are non-credential facades and repository discovery finds no hidden runtime-model transport.",
+      "gap": "Provider transport and credentials are structurally centralized in skeleton/provider_runtime.py across text, image, speech, backend compatibility, and Jeeves compatibility; closure awaits current-head discovery/SDK-isolation CI evidence.",
       "construction": [
         "promote async runtime provider implementation to skeleton/provider_runtime.py",
         "add dependency-free synchronous adapter under the same governance/admission/receipt boundary",
         "collapse backend/core/ai_provider.py to a compatibility facade",
         "collapse Jeeves network providers to canonical runtime wrappers and explicit undeclared-provider denial",
+        "move image generation, variation, editing, and TTS behind the canonical runtime",
+        "remove route/service ownership of retired universal provider credentials",
         "run provider-surface discovery across backend and engine source"
       ],
       "closure_evidence": [
@@ -1502,8 +1525,11 @@
         "canonical synchronous provider transport regression suite",
         "Jeeves source has no model credentials or raw provider network I/O",
         "provider-surface inventory gate reports only declared credential-bearing owners",
-        "SDK isolation scans backend and skeleton source"
-      ]
+        "SDK isolation scans backend and skeleton source",
+        "media provider boundary regression suite",
+        "application media surfaces contain no direct provider credentials or SDK imports"
+      ],
+      "verification_state": "pending-current-head-ci"
     }
   ],
   "gap_closure_policy": {
@@ -2112,7 +2138,12 @@
       "wave": 1,
       "owners": [
         "skeleton/provider_contract.py",
+        "skeleton/provider_runtime.py",
         "backend/core/ai_provider.py",
+        "backend/core/ai_provider_compat.py",
+        "backend/routes/image_generation.py",
+        "backend/routes/ai_reader.py",
+        "backend/core/expressive_tts.py",
         "skeleton/jeeves/providers.py",
         "skeleton/automation/free_model.py"
       ],
@@ -2123,14 +2154,18 @@
         "receipt-gate automation and Jeeves network providers",
         "inventory every provider-bearing surface and classify it",
         "deny undeclared providers even when credentials exist",
-        "migrate remaining synchronous Jeeves network transport onto one canonical transport"
+        "migrate remaining synchronous Jeeves network transport onto one canonical transport",
+        "move text, image, speech, variation, and edit execution behind skeleton/provider_runtime.py",
+        "remove application-owned universal provider credentials and direct vendor SDK imports"
       ],
       "tests": [
         "shared receipt parity",
         "unsafe endpoint denial",
         "undeclared provider denial",
         "provider surface inventory",
-        "SDK/shadow-runtime isolation"
+        "SDK/shadow-runtime isolation",
+        "media provider boundary regression",
+        "application provider credential isolation"
       ],
       "exit": "no credential-bearing model edge exists outside a declared receipt-governed surface"
     },
@@ -2387,5 +2422,39 @@
       "treating provider/model labels as evidence of actual execution",
       "weakening a validator to make an undeclared architecture pass"
     ]
-  }
+  },
+  "provider_capability_matrix": [
+    {
+      "provider_id": "openai",
+      "family": "runtime_model",
+      "execution_owner": "skeleton/provider_runtime.py",
+      "capabilities": {
+        "text_generation": "active",
+        "image_generation": "active",
+        "image_variation": "active",
+        "image_editing": "active",
+        "speech_synthesis": "active"
+      }
+    },
+    {
+      "provider_id": "gemini",
+      "family": "runtime_model",
+      "execution_owner": null,
+      "capabilities": {
+        "text_generation": "undeclared",
+        "image_generation": "undeclared"
+      },
+      "activation_policy": "deny until declared adapter + receipt + tests exist"
+    },
+    {
+      "provider_id": "grok",
+      "family": "runtime_model",
+      "execution_owner": null,
+      "capabilities": {
+        "text_generation": "undeclared",
+        "image_generation": "undeclared"
+      },
+      "activation_policy": "deny until declared adapter + receipt + tests exist"
+    }
+  ]
 }
