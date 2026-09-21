@@ -2593,6 +2593,11 @@
     },
     "provider_request": {
       "required_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "context_id",
+        "context_digest",
         "instructions",
         "prompt",
         "history",
@@ -2601,17 +2606,25 @@
         "data_class",
         "purpose",
         "tenant_id",
-        "operation_id",
-        "resource_budget"
+        "resource_budget",
+        "tools",
+        "structured_output",
+        "tool_choice",
+        "deadline"
       ],
       "owner_plane": "model-provider"
     },
     "route_decision": {
       "required_fields": [
+        "decision_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
         "selected_endpoint",
         "candidates",
         "rejected",
         "budgets",
+        "reason_codes",
         "routed_at"
       ],
       "owner_plane": "model-routing"
@@ -2619,37 +2632,60 @@
     "evidence": {
       "required_fields": [
         "evidence_id",
-        "source",
-        "content_hash",
-        "retrieved_at",
-        "authority",
-        "provenance"
+        "source_type",
+        "source_id",
+        "content_digest",
+        "provenance",
+        "tenant_id",
+        "data_class",
+        "source_version",
+        "observed_at",
+        "authority_class",
+        "citation_metadata"
       ],
       "owner_plane": "retrieval"
     },
     "tool_receipt": {
       "required_fields": [
-        "tool_id",
+        "receipt_id",
         "operation_id",
-        "authority",
-        "input_hash",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "manifest_version",
+        "arguments_digest",
+        "authority_decision",
+        "approval_id",
+        "idempotency_key",
         "started_at",
         "completed_at",
         "status",
-        "result_ref"
+        "result_ref",
+        "postcondition_ref",
+        "usage",
+        "error_code",
+        "compensation_ref"
       ],
       "owner_plane": "tool-runtime"
     },
     "artifact": {
       "required_fields": [
         "artifact_id",
-        "content_hash",
+        "tenant_id",
+        "owner_id",
+        "kind",
         "media_type",
-        "size",
-        "owner",
-        "tenant",
-        "malware_state",
-        "retention_state"
+        "size_bytes",
+        "content_digest",
+        "storage_ref",
+        "created_at",
+        "data_class",
+        "purpose",
+        "scan_status",
+        "lifecycle_status",
+        "source_operation_id",
+        "provenance"
       ],
       "owner_plane": "artifact-files"
     },
@@ -2669,11 +2705,15 @@
         "source_sha",
         "architecture_tag",
         "construction_version",
+        "schema_catalog_version",
         "tests",
         "evaluations",
         "security",
+        "migrations",
+        "golden_journeys",
         "provenance",
-        "rollback_ref"
+        "rollback_ref",
+        "created_at"
       ],
       "owner_plane": "deployment-release"
     },
@@ -2685,20 +2725,27 @@
         "tenant_id",
         "capability",
         "reason_code",
-        "remaining"
+        "estimate",
+        "reservation",
+        "remaining",
+        "expires_at",
+        "decided_at"
       ],
       "owner_plane": "cost-capacity"
     },
     "provider_transfer_decision": {
       "required_fields": [
         "decision_id",
+        "operation_id",
         "permitted",
         "provider_id",
         "data_class",
         "purpose",
         "tenant_bound",
         "reason_code",
-        "routing_privacy"
+        "routing_privacy",
+        "policy_version",
+        "decided_at"
       ],
       "owner_plane": "governance"
     },
@@ -2739,11 +2786,12 @@
     "tool_call_proposal": {
       "required_fields": [
         "operation_id",
+        "execution_id",
         "turn_id",
         "call_id",
         "tool_id",
         "arguments",
-        "arguments_hash",
+        "arguments_digest",
         "authority_required",
         "approval_required"
       ],
@@ -8063,6 +8111,35 @@
     "status": "active",
     "catalog_version": "1.0.0",
     "path": "machine/ai_runtime_schemas.json",
-    "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review"
+    "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review",
+    "envelope_record_map": {
+      "operation": "OperationEnvelope",
+      "provider_request": "ProviderRequest",
+      "route_decision": "RouteDecision",
+      "evidence": "EvidenceReference",
+      "tool_receipt": "ToolExecutionReceipt",
+      "artifact": "ArtifactRecord",
+      "stream_event": "StreamEvent",
+      "release_evidence": "ReleaseEvidence",
+      "admission_decision": "AdmissionDecision",
+      "provider_transfer_decision": "ProviderTransferDecision",
+      "ai_execution": "AIExecutionRequest",
+      "agent_turn": "AgentTurn",
+      "tool_call_proposal": "ToolCallProposal",
+      "ai_execution_result": "AIExecutionResult",
+      "conversation_thread": "ConversationThread",
+      "conversation_message": "ConversationMessage",
+      "context_envelope": "ContextEnvelope",
+      "provider_response": "ProviderResponse",
+      "provider_tool_call": "ProviderToolCall",
+      "tool_execution_request": "ToolExecutionRequest",
+      "verification_request": "VerificationRequest",
+      "verification_receipt": "VerificationReceipt",
+      "delegated_authority": "DelegatedAuthority",
+      "engine_execution_command": "EngineExecutionCommand",
+      "engine_execution_ack": "EngineExecutionAck",
+      "engine_execution_status": "EngineExecutionStatus",
+      "engine_cancel_command": "EngineCancelCommand"
+    }
   }
 }
