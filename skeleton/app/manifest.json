@@ -4,6 +4,24 @@
     "name": "Skeleton",
     "version": "16",
     "compose_file": "docker-compose.yml",
+    "modes": {
+      "development": {
+        "BUILD_TARGET": "development",
+        "FRONTEND_BUILD_TARGET": "development",
+        "FRONTEND_CONTAINER_PORT": "3000",
+        "ENVIRONMENT": "development",
+        "NODE_ENV": "development",
+        "DEBUG": "false"
+      },
+      "production": {
+        "BUILD_TARGET": "production",
+        "FRONTEND_BUILD_TARGET": "production",
+        "FRONTEND_CONTAINER_PORT": "8080",
+        "ENVIRONMENT": "production",
+        "NODE_ENV": "production",
+        "DEBUG": "false"
+      }
+    },
     "default_services": ["mongo", "skeleton", "backend", "frontend"],
     "full_services": ["mongo", "chroma", "skeleton", "backend", "frontend"]
   },
