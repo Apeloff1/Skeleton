@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * Gamefile Command Center (⌘K-style)
  * --------------------------------------------------------------------------
@@ -26,7 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch } from '../utils/apiController';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 const STORE_KEY = 'cc_active_build_id';
 
 const C = {

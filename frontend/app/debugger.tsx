@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /debugger — AI Debugger
  * Analyse code at quick / standard / deep levels via /api/debugger/analyze
@@ -13,7 +14,7 @@ import { useRouteHistory } from '../utils/routeHistory';
 import { shareResult, copyToClipboard } from '../utils/shareResult';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const LEVELS: { id: 'quick'|'standard'|'deep'; label: string; desc: string }[] = [
   { id: 'quick',    label: 'Quick',    desc: '< 5s · obvious errors' },
   { id: 'standard', label: 'Standard', desc: '< 15s · with fixes' },
