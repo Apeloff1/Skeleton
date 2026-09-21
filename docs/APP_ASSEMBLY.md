@@ -23,10 +23,12 @@ Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
 and can be progressively reconciled behind that boundary.
 
-The canonical displayed application name is **Skeleton**. Expo now uses that
-display name as well. Existing mobile slug, URL scheme, bundle identifier, and
-Android package identifiers remain unchanged in this pass so installed-client
-upgrade compatibility is not broken merely to rename internal history.
+The canonical displayed application name is **Skeleton** and the canonical
+application version is **16.0.0**, matching the Python package and engine API.
+Expo uses the same display name and application version. Existing mobile slug,
+URL scheme, bundle identifier, Android package identifier, iOS build number,
+and Android versionCode remain stable in this pass so identity convergence does
+not silently break installed-client upgrade compatibility.
 
 ## Canonical commands
 
