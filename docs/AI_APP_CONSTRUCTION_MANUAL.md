@@ -1690,3 +1690,253 @@ remain green.
 The P0 stream gap remains open only for transport/client integration: backend
 SSE or WebSocket, heartbeat/idle policy, cancellation bridge, frontend
 reducer/resume, multi-client acknowledgement, and end-to-end recovery evidence.
+
+## 35. Physical structure and assembly law
+
+This section is mandatory for implementation work. Logical capability design is
+not sufficient; every change must land in the physical structure declared by
+`machine/architecture.json -> structural_blueprint`.
+
+The structural checkpoint is `structure-map/v1.0`.
+
+### 35.1 Construction decision sequence
+
+Before creating or moving code, resolve the change in this order:
+
+1. **Capability plane** — identify the existing plane in
+   `machine/ai_app_construction.json`. If no plane owns the capability, the
+   contract must be extended before implementation.
+2. **Runtime zone** — use the plane's structural placement. Do not choose a
+   convenient neighboring root.
+3. **Physical owner** — extend the declared package/module owner unless the
+   architecture change intentionally transfers ownership.
+4. **Composition point** — wire the capability only from an approved
+   composition root when multiple owners must be assembled.
+5. **Cross-zone contract** — if execution crosses a zone boundary, preserve an
+   existing declared interface or add the interface to the architecture first.
+6. **State authority** — determine which plane owns durable truth. Caches,
+   projections and transport buffers remain subordinate.
+7. **Recovery domain** — define failure, restart, retry and degraded behavior
+   according to the plane's recovery domain.
+8. **Evidence** — add focused tests proving placement, contract behavior,
+   authority, failure behavior and any state transition.
+9. **Manifest linkage** — keep architecture, repository and runtime tags aligned.
+10. **Validation** — run architecture validation before dependency-heavy test
+    suites so structural drift fails early.
+
+### 35.2 Plane placement registry
+
+The following registry is generated from the machine contract and is the
+physical destination map for implementation:
+
+| Plane | Zone | Canonical owner | Structural role |
+| --- | --- | --- | --- |
+| `foundation` | `engine` | `skeleton/kernel` | internal-capability |
+| `identity` | `engine` | `skeleton/api` | internal-capability |
+| `configuration-secrets` | `engine` | `skeleton/config` | internal-capability |
+| `model-provider` | `engine` | `skeleton/provider_runtime.py` | provider-boundary |
+| `model-routing` | `application` | `backend/core/model_router.py` | policy-boundary |
+| `prompt-context` | `engine` | `skeleton/context` | internal-capability |
+| `orchestration` | `engine` | `skeleton/intelligence` | internal-capability |
+| `reasoning-verification` | `engine` | `skeleton/intelligence` | internal-capability |
+| `tool-runtime` | `engine` | `skeleton/skills` | internal-capability |
+| `memory` | `engine` | `skeleton/memory` | state-boundary |
+| `retrieval` | `engine` | `skeleton/retrieval` | internal-capability |
+| `data-persistence` | `engine` | `skeleton/persistence` | state-boundary |
+| `jobs-durability` | `engine` | `skeleton/agents` | state-boundary |
+| `artifact-files` | `engine` | `skeleton/artifact_plane` | state-boundary |
+| `application-api` | `application` | `backend` | service-boundary |
+| `engine-api` | `engine` | `skeleton/api` | service-boundary |
+| `product-experience` | `product` | `frontend` | product-shell |
+| `streaming-realtime` | `application` | `backend` | transport-boundary |
+| `security-safety` | `engine` | `skeleton/security` | security-boundary |
+| `governance` | `engine` | `skeleton/vault` | governance-boundary |
+| `resilience` | `engine` | `skeleton/reliability` | internal-capability |
+| `observability` | `engine` | `skeleton/observability` | telemetry-boundary |
+| `evaluation` | `engine` | `skeleton/eval` | evidence-boundary |
+| `feedback-learning` | `engine` | `skeleton/learning` | promotion-boundary |
+| `cost-capacity` | `engine` | `skeleton/intelligence` | admission-boundary |
+| `operator-control` | `application` | `backend/core/product_control_runtime.py` | control-boundary |
+| `deployment-release` | `engine` | `skeleton/deploy` | release-boundary |
+
+Do not create a second owner because an existing owner is large. Split the
+existing owner internally first, then transfer ownership through an explicit
+architecture change if the split deserves a new plane.
+
+### 35.3 Composition discipline
+
+Approved composition roots are:
+
+- `skeleton/app/assembly.py` — Compose declared runtime services and operator topology; never absorb domain business logic.
+- `skeleton/__main__.py` — Dispatch operator commands into owned engine/application surfaces without creating alternate runtimes.
+- `backend/server.py` — Mount application routes, middleware, and shared application dependencies; feature logic remains in owned modules.
+- `frontend/app/_layout.tsx` — Mount product providers, guards, and navigation shell; service ownership remains behind canonical API clients.
+- `skeleton/provider_runtime.py` — Construct credential-bearing runtime provider adapters after governance, admission, and architecture receipt checks.
+- `backend/core/model_router.py` — Select among declared provider capabilities using bounded evidence and budgets without performing provider network I/O.
+
+Composition code should be shallow. It may instantiate, inject, mount, select or
+sequence owned components. It should not contain durable business rules,
+provider-specific transport, cross-tenant state, or hidden fallback behavior.
+
+When a composition root starts accumulating domain behavior, move that behavior
+back into the plane owner and leave only wiring in the composition root.
+
+### 35.4 State ownership discipline
+
+Canonical state authorities are:
+
+- **identity-and-principal** → `identity` → `skeleton/api`
+- **runtime-configuration-and-secrets** → `configuration-secrets` → `skeleton/config`
+- **provider-activation** → `model-provider` → `skeleton/provider_runtime.py`
+- **conversation-and-working-memory** → `memory` → `skeleton/memory`
+- **retrieval-index-and-ranking-state** → `retrieval` → `skeleton/retrieval`
+- **durable-application-records** → `data-persistence` → `skeleton/persistence`
+- **job-checkpoints-and-resume** → `jobs-durability` → `skeleton/agents`
+- **artifact-bytes-and-metadata** → `artifact-files` → `skeleton/artifact_plane`
+- **governance-policy-and-retention** → `governance` → `skeleton/vault`
+- **evaluation-evidence** → `evaluation` → `skeleton/eval`
+- **feedback-experiments-and-promotion** → `feedback-learning` → `skeleton/learning`
+- **quota-budget-and-admission** → `cost-capacity` → `skeleton/intelligence`
+- **release-and-rollback-evidence** → `deployment-release` → `skeleton/deploy`
+
+Rules:
+
+- one state class has one canonical writer-of-record authority;
+- read models may duplicate representation but not authority;
+- caches must be disposable and reconstructable;
+- transport buffers do not become durable operation truth;
+- provider responses become application state only after the owning plane
+  accepts them through its contract;
+- deletion, retention, export and tenant isolation follow the authority owner,
+  not whichever adapter happens to store a copy.
+
+### 35.5 Recovery-domain discipline
+
+#### bootstrap-authority
+
+Planes: `foundation`, `identity`, `configuration-secrets`
+
+Restart scope: engine bootstrap/configuration
+
+Degraded mode: fail closed for authority-bearing work; health may remain diagnostic-only
+
+#### provider-execution
+
+Planes: `model-provider`, `model-routing`, `cost-capacity`
+
+Restart scope: provider/routing workers
+
+Degraded mode: deny or route only to already-declared healthy capacity; never bypass receipts or budgets
+
+#### knowledge-state
+
+Planes: `memory`, `retrieval`, `data-persistence`, `prompt-context`
+
+Restart scope: knowledge and persistence adapters
+
+Degraded mode: bounded stateless mode only where the request contract permits it; never cross tenant boundaries
+
+#### cognition-action
+
+Planes: `orchestration`, `reasoning-verification`, `jobs-durability`, `tool-runtime`, `artifact-files`
+
+Restart scope: operation/job execution
+
+Degraded mode: checkpoint, cancel, or return partial evidence; never silently repeat side effects
+
+#### service-transport
+
+Planes: `application-api`, `engine-api`, `streaming-realtime`, `operator-control`
+
+Restart scope: API/transport process
+
+Degraded mode: health and explicit unavailable responses; resumable operations preserve identity and terminal state
+
+#### product-shell
+
+Planes: `product-experience`
+
+Restart scope: frontend process/session
+
+Degraded mode: preserve local UI state and surface backend/engine degradation without fabricating completion
+
+#### security-governance
+
+Planes: `security-safety`, `governance`
+
+Restart scope: policy/security boundary
+
+Degraded mode: fail closed for protected actions and external transfers
+
+#### quality-release
+
+Planes: `observability`, `resilience`, `evaluation`, `feedback-learning`, `deployment-release`
+
+Restart scope: evidence/promotion control
+
+Degraded mode: freeze promotion and learning mutation while preserving current known-good release
+
+
+A retry or restart policy that crosses one of these domains needs explicit
+evidence that it cannot duplicate side effects, widen authority, lose terminal
+operation state, or bypass a fail-closed policy.
+
+### 35.6 Adding a new capability without creating an island
+
+Use this assembly recipe:
+
+```text
+user/product need
+      ↓
+existing plane? ── no ──> declare plane + dependencies + owner
+      │ yes
+      ↓
+structural placement
+      ↓
+extend canonical owner
+      ↓
+state authority / interface / recovery classification
+      ↓
+composition wiring
+      ↓
+focused tests
+      ↓
+architecture + construction validators
+      ↓
+cross-plane integration evidence
+```
+
+The prohibited shortcut is "temporary parallel ownership." Temporary adapters
+are allowed; temporary second authorities are not.
+
+### 35.7 Moving an existing capability
+
+Physical migration is a controlled ownership transfer:
+
+1. declare the destination owner;
+2. keep the old public contract stable through an adapter;
+3. move one bounded behavior slice;
+4. prove equivalent behavior and failure semantics;
+5. move state authority only after migration and rollback are explicit;
+6. update imports, manifests, package data and CI ownership;
+7. remove the old implementation path;
+8. leave a compatibility facade only when consumers still require it;
+9. remove the facade when all callers have converged.
+
+Never bulk-move a capability merely to make the tree look cleaner. Structure is
+an execution contract, not a cosmetic directory layout.
+
+### 35.8 Structural definition of done
+
+A structural change is complete only when:
+
+- every affected plane still has exactly one owner and one placement;
+- every owner path exists inside its declared zone;
+- cross-zone dependencies are legal in the zone DAG;
+- state authority remains singular;
+- composition roots contain wiring rather than domain ownership;
+- every plane remains assigned to one recovery domain;
+- architecture, repository and runtime manifests report the same structure tag;
+- `python scripts/check_architecture_map.py` passes;
+- focused behavioral tests for the changed plane pass;
+- no transitional root has become a new runtime authority.
