@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from scripts.check_architecture_map import (
     REPO_ROOT,
     _normalized_repo_path,
     _validate_runtime_dag,
+    _validate_structural_blueprint,
     _validate_zone_dag,
     validate_architecture,
 )
@@ -176,3 +178,92 @@ def test_transitional_roots_are_not_canonical_source_inventory() -> None:
     assert "core" in transitional
     assert classify_path("core/activation_security.py") == "first-party"
     assert classify_path("eval/fixtures/example.json") == "fixture"
+
+def test_structural_blueprint_partitions_every_construction_plane() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    blueprint = architecture["structural_blueprint"]
+
+    plane_ids = {plane["id"] for plane in construction["planes"]}
+    placements = blueprint["plane_placements"]
+    placed_ids = [placement["plane"] for placement in placements]
+    recovery_ids = [
+        plane_id
+        for domain in blueprint["recovery_domains"]
+        for plane_id in domain["planes"]
+    ]
+
+    assert blueprint["structure_tag"] == "structure-map/v1.0"
+    assert len(placed_ids) == len(set(placed_ids))
+    assert set(placed_ids) == plane_ids
+    assert len(recovery_ids) == len(set(recovery_ids))
+    assert set(recovery_ids) == plane_ids
+
+
+def test_structural_plane_owners_match_construction_and_zone_roots() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    zones = {zone["id"]: zone for zone in architecture["zones"]}
+    planes = {plane["id"]: plane for plane in construction["planes"]}
+
+    for placement in architecture["structural_blueprint"]["plane_placements"]:
+        plane = planes[placement["plane"]]
+        assert placement["owner"] == plane["owner"]
+        assert (REPO_ROOT / placement["owner"]).exists()
+        assert any(
+            placement["owner"] == root
+            or placement["owner"].startswith(root + "/")
+            for root in zones[placement["zone"]]["roots"]
+        )
+
+
+def test_structural_cross_zone_dependencies_follow_zone_dag() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    zones = {zone["id"]: zone for zone in architecture["zones"]}
+    placements = {
+        placement["plane"]: placement
+        for placement in architecture["structural_blueprint"]["plane_placements"]
+    }
+
+    for plane in construction["planes"]:
+        source_zone = placements[plane["id"]]["zone"]
+        for dependency in plane["depends_on"]:
+            target_zone = placements[dependency]["zone"]
+            if source_zone != target_zone:
+                assert target_zone in zones[source_zone]["may_depend_on"]
+
+
+def test_structural_validator_rejects_owner_outside_declared_zone() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    broken = deepcopy(architecture)
+    placement = next(
+        item
+        for item in broken["structural_blueprint"]["plane_placements"]
+        if item["plane"] == "application-api"
+    )
+    placement["zone"] = "product"
+    zones = {zone["id"]: zone for zone in broken["zones"]}
+    errors: list[str] = []
+
+    _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
+
+    assert errors
+    assert any(
+        "application-api owner backend is outside zone product" in error
+        for error in errors
+    )
+
+
+def test_architecture_summary_reports_deep_structure_counts() -> None:
+    errors, summary = validate_architecture(REPO_ROOT)
+
+    assert errors == []
+    assert summary["structure"] == {
+        "levels": 5,
+        "plane_placements": 27,
+        "composition_roots": 6,
+        "state_authorities": 13,
+        "recovery_domains": 8,
+    }
+
