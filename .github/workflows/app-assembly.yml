@@ -105,7 +105,16 @@ jobs:
           SKL_MONGO_URI: mongodb://admin:assembly-test@mongo:27017/skeleton?authSource=admin
           MONGO_INITDB_ROOT_PASSWORD: assembly-test-password
           JWT_SECRET: assembly-test-jwt-secret-not-for-runtime
-        run: docker compose -f docker-compose.yml config --quiet
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.hot.yml config --quiet
+          BUILD_TARGET=production \
+          FRONTEND_BUILD_TARGET=production \
+          FRONTEND_CONTAINER_PORT=8080 \
+          ENVIRONMENT=production \
+          NODE_ENV=production \
+          docker compose -f docker-compose.yml config --quiet
 
       - name: Verify wheel contains assembly manifest
         run: |
