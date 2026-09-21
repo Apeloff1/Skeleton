@@ -91,7 +91,7 @@ def repair_runtime(root: Path | None = None) -> InstallReceipt:
 def start_runtime(
     root: Path | None = None,
     *,
-    production: bool = False,
+    production: bool = True,
     full: bool = False,
 ) -> InstallReceipt:
     return install_application(
@@ -317,7 +317,7 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             print(_format_receipt(receipt))
         return 0 if receipt.ok else 1
     if args.start:
-        receipt = start_runtime(root, production=args.production, full=args.full)
+        receipt = start_runtime(root, production=not args.development, full=args.full)
         if not args.quiet:
             print(_format_receipt(receipt))
         return 0 if receipt.ok else 1
@@ -345,7 +345,11 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--start", action="store_true")
     mode.add_argument("--stop", action="store_true")
     mode.add_argument("--open", action="store_true")
-    result.add_argument("--production", action="store_true")
+    result.add_argument(
+        "--development",
+        action="store_true",
+        help="start development image stages instead of the installed production topology",
+    )
     result.add_argument("--full", action="store_true")
     result.add_argument("--quiet", action="store_true")
     return result
