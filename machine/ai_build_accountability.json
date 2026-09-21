@@ -16954,7 +16954,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:30:56Z",
+      "last_event_at_utc": "2026-09-21T17:48:59Z",
       "history": [
         {
           "sequence": 1,
@@ -16972,9 +16972,32 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-WP-W00/start.json"
           ]
+        },
+        {
+          "event_type": "evidence_added",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:48:59Z",
+          "git_sha": "2309accde860cc972903013b5ef395903dae2008",
+          "statement": "Fix full edge-case validator success-path NameError and cover main().",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2309accde860cc972903013b5ef395903dae2008",
+          "from_status": "in_progress",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/255f05df7041265f087cb557fef172e59285a8cb",
+            "https://github.com/Apeloff1/Skeleton/commit/2309accde860cc972903013b5ef395903dae2008",
+            "machine/accountability_events/ACC-WP-W00/validator-main-regression-fix.json"
+          ],
+          "sequence": 2
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/255f05df7041265f087cb557fef172e59285a8cb",
+        "https://github.com/Apeloff1/Skeleton/commit/2309accde860cc972903013b5ef395903dae2008",
+        "machine/accountability_events/ACC-WP-W00/validator-main-regression-fix.json"
+      ],
       "baseline_status": "planned"
     },
     {
@@ -18172,7 +18195,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:41:33Z",
+      "last_event_at_utc": "2026-09-21T17:49:42Z",
       "history": [
         {
           "sequence": 1,
@@ -18209,12 +18232,32 @@
             "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
             "machine/accountability_events/ACC-WP-W30/packaging-discovery-fix.json"
           ]
+        },
+        {
+          "event_type": "evidence_added",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:49:42Z",
+          "git_sha": "77277c3ef9acb0b230bafac7500467dbe838e969",
+          "statement": "Fix Product Kernel conversation client nullability at the API result boundary.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/77277c3ef9acb0b230bafac7500467dbe838e969",
+          "from_status": "in_progress",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/77277c3ef9acb0b230bafac7500467dbe838e969",
+            "machine/accountability_events/ACC-WP-W30/product-client-null-contract-fix.json"
+          ],
+          "sequence": 3
         }
       ],
       "evidence": [
         "https://github.com/Apeloff1/Skeleton/commit/225c280b119c9f7ec474c2c97cd25931f75d326d",
         "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
-        "machine/accountability_events/ACC-WP-W30/packaging-discovery-fix.json"
+        "machine/accountability_events/ACC-WP-W30/packaging-discovery-fix.json",
+        "https://github.com/Apeloff1/Skeleton/commit/77277c3ef9acb0b230bafac7500467dbe838e969",
+        "machine/accountability_events/ACC-WP-W30/product-client-null-contract-fix.json"
       ],
       "baseline_status": "planned"
     },
@@ -18485,22 +18528,30 @@
       "id": "ACC-AIQ-S0-GOV-02",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:43:11Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-21T17:47:05Z",
+        "git_sha": "c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/0c75f60eff79e390cde09b4940824b78bab98674",
+          "https://github.com/Apeloff1/Skeleton/commit/239d53c92110348393c5f2d1b14908bda1e3a0a6",
+          "https://github.com/Apeloff1/Skeleton/commit/5a43a0cdc980520c7f8104bc45cef75a007cb837",
+          "https://github.com/Apeloff1/Skeleton/commit/63fca8212521a260a8a62958891ceee0d2162cf3",
+          "https://github.com/Apeloff1/Skeleton/commit/fdd95adaf18aea3919e5147b733d56ccf843b7dc",
+          "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+          "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json"
+        ],
+        "statement": "Implemented fail-closed adapter-backed deletion, retention and tenant-scoped export for governed data.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b"
       },
       "verification_signoff": {
         "signed": false,
@@ -18516,7 +18567,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:43:11Z",
+      "last_event_at_utc": "2026-09-21T17:47:05Z",
       "history": [
         {
           "sequence": 1,
@@ -18534,9 +18585,40 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-AIQ-S0-GOV-02/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:47:05Z",
+          "git_sha": "c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+          "statement": "Implemented fail-closed adapter-backed deletion, retention and tenant-scoped export for governed data.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/0c75f60eff79e390cde09b4940824b78bab98674",
+            "https://github.com/Apeloff1/Skeleton/commit/239d53c92110348393c5f2d1b14908bda1e3a0a6",
+            "https://github.com/Apeloff1/Skeleton/commit/5a43a0cdc980520c7f8104bc45cef75a007cb837",
+            "https://github.com/Apeloff1/Skeleton/commit/63fca8212521a260a8a62958891ceee0d2162cf3",
+            "https://github.com/Apeloff1/Skeleton/commit/fdd95adaf18aea3919e5147b733d56ccf843b7dc",
+            "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+            "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/0c75f60eff79e390cde09b4940824b78bab98674",
+        "https://github.com/Apeloff1/Skeleton/commit/239d53c92110348393c5f2d1b14908bda1e3a0a6",
+        "https://github.com/Apeloff1/Skeleton/commit/5a43a0cdc980520c7f8104bc45cef75a007cb837",
+        "https://github.com/Apeloff1/Skeleton/commit/63fca8212521a260a8a62958891ceee0d2162cf3",
+        "https://github.com/Apeloff1/Skeleton/commit/fdd95adaf18aea3919e5147b733d56ccf843b7dc",
+        "https://github.com/Apeloff1/Skeleton/commit/c6e9968ecca47d9170ae5fa7618b9f50a3074d7b",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-02/implementation.json"
+      ],
       "baseline_status": "pending"
     },
     {
