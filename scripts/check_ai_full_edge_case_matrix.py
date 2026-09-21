@@ -183,6 +183,7 @@ def main() -> int:
         return 1
     matrix = json.loads(FULL.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
+    priority = json.loads(PRIORITY.read_text(encoding="utf-8"))
     print(
         "Full edge-case construction matrix: OK "
         f"({matrix['coverage']['catalog_total']} catalog entries, "
