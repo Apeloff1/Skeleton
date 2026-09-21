@@ -114,6 +114,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Ops/throughput wave:** revalidated supervisor contracts, PR runner, provider/SMB resilience, cockpit tooling, throughput mechanics/pipeline, Ubuntu delivery, and x-agent orchestration; zero-file authority/observability branches remain lineage-only.
 
+- **Held merge waves:** repo-machine-gates (115 files) and safe-1669 (150 files) revalidated; both remain staged for file-level reconciliation rather than blind merge.
+
 ## Target layout
 
 ```text
