@@ -354,7 +354,9 @@ def rebuild_derived_projection(snapshot: Mapping[str, Any]) -> dict[str, Any]:
                     "digest": digest_payload(document),
                 }
             )
-    projected.sort(key=canonical_json)
+    projected.sort(
+        key=lambda row: (str(row["source"]), str(row["record_id"]))
+    )
     return {
         "count": len(projected),
         "digest": digest_payload(projected),
