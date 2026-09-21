@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * app/boot-log.tsx — full boot diagnostic log viewer.
  *
@@ -47,7 +48,7 @@ export default function BootLogScreen() {
   const [sessions, setSessions] = useState<ArchivedSession[]>([]);
   const [openSession, setOpenSession] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
-  const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  const BACKEND = CANONICAL_API_BASE || '';
   const [conn, setConn] = useState<{ name: string; url: string; ok: boolean; status: number; ms: number; err?: string }[]>([]);
   const [testing, setTesting] = useState(false);
 
@@ -92,7 +93,7 @@ export default function BootLogScreen() {
     const lines: string[] = [];
     lines.push('=== BOOT LOG ===');
     lines.push(`platform: ${Platform.OS}`);
-    lines.push(`backend: ${process.env.EXPO_PUBLIC_BACKEND_URL || '(unset)'}`);
+    lines.push(`backend: ${CANONICAL_API_BASE || '(unset)'}`);
     lines.push(`crash_count: ${crash}`);
     lines.push(`last_clean_boot: ${lastClean ? fmt(lastClean) : 'never'}`);
     lines.push('');
@@ -146,7 +147,7 @@ export default function BootLogScreen() {
           <Text style={styles.pillTxt}>last clean: {lastClean ? fmt(lastClean) : 'never'}</Text>
         </View>
       </View>
-      <Text style={styles.backend} numberOfLines={1}>backend: {process.env.EXPO_PUBLIC_BACKEND_URL || '(unset)'}</Text>
+      <Text style={styles.backend} numberOfLines={1}>backend: {CANONICAL_API_BASE || '(unset)'}</Text>
 
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <Text style={styles.section}>Connectivity {testing ? '· testing…' : `· ${conn.filter(c => c.ok).length}/${conn.length} ok`}</Text>

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /asset-genesis — Asset Genesis Forge (2026).
  *
@@ -15,7 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Opt = { id: string; hint: string };
 type Styles = { kinds: Opt[]; styles: Opt[]; palettes: Opt[]; default_pack: string[] };

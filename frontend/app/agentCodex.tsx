@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /agentCodex — Frontend browser for all 28 agent-knowledge collections.
  *
@@ -18,7 +19,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = CANONICAL_API_BASE || '';
 
 type Coll = { slug: string; collection: string; count: number };
 

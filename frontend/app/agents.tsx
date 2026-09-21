@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /agents — Multi-Agent Systems
  * GET /api/agents/systems • POST /api/agents/run/{system_id}
@@ -15,7 +16,7 @@ import { jeevesSpeak } from '../features/Academy/jeevesTts';
 import Skeleton from '../components/UI/Skeleton';
 import RetryBanner from '../components/UI/RetryBanner';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 export default function AgentsScreen() {
   const router = useRouter();
