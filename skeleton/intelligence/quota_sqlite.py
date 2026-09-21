@@ -36,6 +36,8 @@ from skeleton.intelligence.quota import (
 )
 
 
+_USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenant_quota (
     tenant_id TEXT PRIMARY KEY,
@@ -291,6 +293,96 @@ class SqliteTenantQuotaLedger:
             cost_usd=float(row["cost_usd"]),
             tool_calls=int(row["tool_calls"]),
             artifact_bytes=int(row["artifact_bytes"]),
+        )
+
+    @staticmethod
+    def _usage_max(left: QuotaUsage, right: QuotaUsage) -> QuotaUsage:
+        return QuotaUsage(
+            operations=max(left.operations, right.operations),
+            input_tokens=max(left.input_tokens, right.input_tokens),
+            output_tokens=max(left.output_tokens, right.output_tokens),
+            cost_usd=max(left.cost_usd, right.cost_usd),
+            tool_calls=max(left.tool_calls, right.tool_calls),
+            artifact_bytes=max(left.artifact_bytes, right.artifact_bytes),
+        )
+
+    @staticmethod
+    def _metered_usage(
+        conn: sqlite3.Connection,
+        reservation_id: str,
+    ) -> QuotaUsage:
+        row = conn.execute(
+            """
+            SELECT
+                COALESCE(SUM(delta_operations), 0) AS operations,
+                COALESCE(SUM(delta_input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(delta_output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(delta_cost_usd), 0) AS cost_usd,
+                COALESCE(SUM(delta_tool_calls), 0) AS tool_calls,
+                COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes
+            FROM quota_usage_events
+            WHERE reservation_id = ?
+            """,
+            (reservation_id,),
+        ).fetchone()
+        assert row is not None
+        return QuotaUsage(
+            operations=int(row["operations"]),
+            input_tokens=int(row["input_tokens"]),
+            output_tokens=int(row["output_tokens"]),
+            cost_usd=float(row["cost_usd"]),
+            tool_calls=int(row["tool_calls"]),
+            artifact_bytes=int(row["artifact_bytes"]),
+        )
+
+    @staticmethod
+    def _reserved_usage_excluding(
+        conn: sqlite3.Connection,
+        tenant: str,
+        reservation_id: str,
+    ) -> QuotaUsage:
+        row = conn.execute(
+            """
+            SELECT
+                COALESCE(SUM(estimate_operations), 0) AS operations,
+                COALESCE(SUM(estimate_input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(estimate_output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(estimate_cost_usd), 0) AS cost_usd,
+                COALESCE(SUM(estimate_tool_calls), 0) AS tool_calls,
+                COALESCE(SUM(estimate_artifact_bytes), 0) AS artifact_bytes
+            FROM quota_reservations
+            WHERE tenant_id = ? AND reservation_id != ?
+            """,
+            (tenant, reservation_id),
+        ).fetchone()
+        assert row is not None
+        return QuotaUsage(
+            operations=int(row["operations"]),
+            input_tokens=int(row["input_tokens"]),
+            output_tokens=int(row["output_tokens"]),
+            cost_usd=float(row["cost_usd"]),
+            tool_calls=int(row["tool_calls"]),
+            artifact_bytes=int(row["artifact_bytes"]),
+        )
+
+    @staticmethod
+    def _usage_event(row: sqlite3.Row) -> QuotaUsageEvent:
+        return QuotaUsageEvent(
+            event_id=row["event_id"],
+            reservation_id=row["reservation_id"],
+            tenant_id=row["tenant_id"],
+            window_id=row["window_id"],
+            operation_id=row["operation_id"],
+            category=row["category"],
+            delta=QuotaUsage(
+                operations=int(row["delta_operations"]),
+                input_tokens=int(row["delta_input_tokens"]),
+                output_tokens=int(row["delta_output_tokens"]),
+                cost_usd=float(row["delta_cost_usd"]),
+                tool_calls=int(row["delta_tool_calls"]),
+                artifact_bytes=int(row["delta_artifact_bytes"]),
+            ),
+            recorded_at=float(row["recorded_at"]),
         )
 
     def configure(
