@@ -245,6 +245,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     monitorability = architecture_index.MONITORABILITY_RESEARCH_INVARIANTS
     debt = architecture_index.RESEARCH_DEBT_INVARIANTS
     rigor = architecture_index.RESEARCH_EXPERIMENT_RIGOR_INVARIANTS
+    coverage = architecture_index.RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS
 
     assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
     assert checkpoint["tracks"] == ("AD",)
@@ -265,6 +266,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
     assert len(architecture_index.RESEARCH_DEBT_IDS) == 36
     assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 35
+    assert len(architecture_index.FRONTIER_RESEARCH_DOMAINS) == 19
 
     assert invariants["research_source_is_evidence_not_authority"] is True
     assert invariants["contradictory_evidence_is_retained"] is True
@@ -319,6 +321,15 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert rigor["baseline_receives_comparable_tuning_and_kernels"] is True
     assert rigor["multiple_comparisons_are_recorded"] is True
     assert rigor["single_seed_is_not_zero_uncertainty"] is True
+
+    assert coverage["foundational_anchor"] is True
+    assert coverage["current_frontier_source"] is True
+    assert coverage["negative_or_counterevidence"] is True
+    assert coverage["verified_source_status"] is True
+    assert coverage["mandatory_baseline"] is True
+    assert coverage["local_experiment_protocol"] is True
+    assert coverage["research_debt_assessment"] is True
+    assert coverage["refresh_trigger"] is True
 
 
 def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
