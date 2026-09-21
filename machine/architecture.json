@@ -22,7 +22,8 @@
     "state_topology": "machine/state_topology.json",
     "state_topology_validator": "scripts/check_state_topology.py",
     "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
-    "ai_implementation_handoff": "machine/ai_implementation_handoff.json"
+    "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
+    "ai_closure_evidence": "machine/ai_closure_evidence.json"
   },
   "objectives": [
     "one product shell",
@@ -556,7 +557,8 @@
     "mixed-authority and unbound-authority state is transitional and attached to an open P0 gap",
     "authoritative state recovery precedes derived projection rebuild",
     "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest",
-    "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG."
+    "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG.",
+    "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress."
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
