@@ -1,6 +1,9 @@
 name: App Assembly
 
 on:
+  push:
+    branches:
+      - integration/architecture-map-v1
   pull_request:
     branches:
       - main
