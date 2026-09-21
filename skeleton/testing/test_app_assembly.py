@@ -343,8 +343,12 @@ def test_product_shell_health_client_matches_assembly_manifest():
 
     backend = manifest.service("backend")
     skeleton = manifest.service("skeleton")
-    assert f"probe('backend', API_BASE, '{backend.health_path}'" in client
-    assert f"probe('skeleton', SKELETON_API_BASE, '{skeleton.health_path}'" in client
+    assert "getAppBootstrap" in client
+    assert "getAppRuntimeStatus" in client
+    assert f"backend: '{backend.health_path}'" in client
+    assert f"skeleton: '{skeleton.health_path}'" in client
+    assert "bootstrapService(bootstrap, 'backend')" in client
+    assert "bootstrapService(bootstrap, 'skeleton')" in client
     assert "probeAppHealth" in shell
     assert "Application runtime" in shell
     assert "Runtime" in shell
