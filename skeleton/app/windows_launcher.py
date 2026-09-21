@@ -33,12 +33,30 @@ def installation_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _hidden_runner(command, **kwargs):
-    """Run child processes without flashing console windows on Windows."""
+def _hidden_runner(
+    command,
+    *,
+    cwd=None,
+    check: bool = False,
+    capture_output: bool = False,
+    text: bool = False,
+    timeout: float | None = None,
+    env=None,
+):
+    """Run an argument-vector child process without a Windows console flash."""
 
-    if os.name == "nt":
-        kwargs.setdefault("creationflags", getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    return subprocess.run(command, **kwargs)
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        check=check,
+        capture_output=capture_output,
+        text=text,
+        timeout=timeout,
+        env=env,
+        shell=False,
+        creationflags=creationflags,
+    )
 
 
 def _format_preload(report: PreloadReport) -> str:
