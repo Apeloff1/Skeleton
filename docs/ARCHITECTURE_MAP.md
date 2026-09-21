@@ -228,6 +228,7 @@ arch-map/v3.1  Wave 1 governance + resource admission enforced before provider I
 arch-map/v3.2  unified governed text/image/speech provider runtime + media credential convergence
 arch-map/v3.3  canonical operation lifecycle + resumable stream contract
 arch-map/v3.4  durable operation stream store + replay watermark semantics
+arch-map/v3.5  clean dependency DAG + explicit acceptance edges + engine-owned model routing
 arch-map/v3.5  structural ownership/recovery map + bounded reverse-edge semantics
 ```
 
@@ -446,24 +447,37 @@ The repository and runtime manifests carry `structure-map/v1.1` so a build
 cannot silently validate an architecture map while running a differently
 structured application.
 
-### 14.7 Bounded reverse-edge exceptions
+### 14.7 Dependency edges versus acceptance edges
 
-The structural validator does **not** widen the zone DAG to accommodate legacy
-ownership. Reverse edges must be declared individually in
-`structural_blueprint.dependency_exceptions`.
+The live runtime dependency graph is now exception-free. Canonical model routing
+is engine-owned at `skeleton/frontier/model_routing.py`, so engine orchestration,
+verification, resilience, and admission no longer reach upward into the
+application zone.
 
-Three bounded exceptions currently exist:
+Two relationship classes are intentionally different:
 
-- engine orchestration, reasoning verification, resilience, and cost admission
-  consume the provider-neutral routing policy while that policy is still
-  physically owned by `backend/core/model_router.py`; the declared migration
-  target is an engine-owned routing module;
-- deployment/release consumes application API readiness evidence;
-- deployment/release consumes product build/E2E evidence.
+- **runtime dependency** — declared in a plane's `depends_on`; it participates
+  in topological construction order and must follow the zone DAG;
+- **acceptance target** — declared in a plane's `validates` and mirrored in
+  `structural_blueprint.acceptance_edges`; it means a plane consumes evidence
+  about another plane without importing its implementation or taking ownership.
 
-An exception must match a real construction dependency, state its exact
-from/to zones, identify its semantic kind, explain why it exists, and carry a
-removal condition. An exception cannot add a zone to `may_depend_on`, cannot
-create a second owner, and becomes a validation error when it is no longer
-needed.
+Release orchestration therefore validates application, engine API, and product
+experience readiness through acceptance edges. It does not create
+`engine -> application` or `engine -> product` runtime dependencies.
 
+`structural_blueprint.dependency_exceptions` is currently empty. Any future
+reverse edge is treated as architecture debt and should first be redesigned as
+an interface, acceptance edge, or ownership migration rather than normalized as
+a permanent exception.
+
+### 14.8 Canonical model-routing ownership
+
+The model-routing capability plane is owned by
+`skeleton/frontier/model_routing.py` in the engine zone. It is the canonical
+location for provider capability matching, budget constraints, fallback
+planning, routing provenance, and routing evaluation.
+
+`backend/core/model_router.py` remains an application compatibility and policy
+surface during convergence. It may expose application-facing routing helpers,
+but it is not the canonical owner of model-routing state or provider execution.
