@@ -9,6 +9,9 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
     assert payload["schema_version"] == 1
     assert payload["application"]["name"] == "Skeleton"
     assert payload["application"]["version"] == "16.0.0"
+    assert payload["contract"]["bootstrap"] == "/api/app/bootstrap"
+    assert payload["contract"]["status"] == "/api/app/status"
+    assert payload["contract"]["ready"] == "/api/app/ready"
 
     services = {item["name"]: item for item in payload["services"]}
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(services)
@@ -49,10 +52,12 @@ def test_three_layer_bootstrap_contract_is_wired():
     client = (root / "frontend/src/product/appBootstrapClient.ts").read_text(encoding="utf-8")
     health = (root / "frontend/src/product/appHealthClient.ts").read_text(encoding="utf-8")
 
-    assert 'APIRouter(prefix="/api/app"' in route
-    assert '@router.get("/bootstrap")' in route
+    assert 'APIRouter(prefix=_MANIFEST.public_contract["prefix"]' in route
+    assert '@router.get(_MANIFEST.public_contract["bootstrap"])' in route
+    assert '@router.get(_MANIFEST.public_contract["status"])' in route
+    assert '@router.get(_MANIFEST.public_contract["ready"])' in route
     assert '("routes.app_runtime",' in registry
-    assert "'/api/app/bootstrap'" in client
+    assert "DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client
     assert "getAppBootstrap" in health
     assert "bootstrapService" in health
 
