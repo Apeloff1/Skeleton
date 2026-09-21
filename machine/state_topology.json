@@ -101,6 +101,24 @@
       ]
     },
     {
+      "id": "operation-state-unbound",
+      "technology": "canonical OperationRecord state machine with persistence adapter not yet bound",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "unbound",
+      "production_role": "not production-ready; logical authority contract only",
+      "network": "in-process contract",
+      "authentication": "inherits orchestrator authority",
+      "backup": "unimplemented until durable repository is bound",
+      "restore": "unimplemented until durable repository is bound",
+      "migration": "future durable repository must preserve operation schema/state transition compatibility",
+      "evidence": [
+        "skeleton/contracts/operation.py",
+        "skeleton/testing/test_operation_contract.py"
+      ]
+    },
+    {
       "id": "process-memory",
       "technology": "process memory",
       "runtime_service": null,
@@ -292,6 +310,31 @@
       ]
     },
     {
+      "id": "canonical-operation-state",
+      "owner_plane": "orchestration",
+      "physical_store": "operation-state-unbound",
+      "logical_location": "OperationRecord / OperationState contract",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "transitional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "state-transition contract; durable transaction binding pending",
+      "consistency": "legal monotonic state transitions and terminal finality",
+      "retention": "must be defined by durable operation repository",
+      "backup_restore": "unimplemented until persistence binding",
+      "migration": "durable repository schema must preserve operation identity/idempotency/state",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-streaming-protocol",
+      "evidence": [
+        "skeleton/contracts/operation.py",
+        "skeleton/testing/test_operation_contract.py"
+      ]
+    },
+    {
       "id": "operation-event-stream",
       "owner_plane": "streaming-realtime",
       "physical_store": "operation-stream-sqlite",
@@ -407,11 +450,11 @@
     },
     {
       "id": "operation-to-event-stream",
-      "from": "engine-mongo-state",
+      "from": "canonical-operation-state",
       "to": "operation-event-stream",
       "mode": "event-log",
-      "rule": "stream events reflect canonical operation transitions; stream terminal state must agree with operation terminal state",
-      "failure": "do not report resumable durable completion without committed event/state semantics"
+      "rule": "event append and operation transition require a defined atomic/outbox/reconciliation contract; transport events may not invent operation state",
+      "failure": "if operation and event commit cannot be proven consistent, fail/degrade rather than report durable resumable success"
     },
     {
       "id": "authoritative-to-in-memory",
@@ -451,6 +494,7 @@
     "Chroma and in-process indexes are not the sole authority for canonical user, tenant, operation, or governance state",
     "content and swarm logical databases are not included in canonical user-state migration merely because they share Mongo",
     "operation-stream storage cannot claim production durability when running in-memory",
-    "snapshot-files never replace canonical backup/restore"
+    "snapshot-files never replace canonical backup/restore",
+    "authoritative-unbound domains are transitional only, production-ineligible, and must reference an open P0 gap"
   ]
 }
