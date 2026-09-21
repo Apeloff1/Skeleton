@@ -653,15 +653,10 @@ def _media_operation_id(
     content: bytes | str,
     operation_id: str | None,
 ) -> str:
+    del provider_id, purpose, content
     if operation_id is not None and operation_id.strip():
         return operation_id.strip()
-    digest = hashlib.sha256()
-    digest.update(provider_id.encode("utf-8"))
-    digest.update(b"\x1f")
-    digest.update(purpose.encode("utf-8"))
-    digest.update(b"\x1f")
-    digest.update(content if isinstance(content, bytes) else content.encode("utf-8"))
-    return "provider-media-" + digest.hexdigest()[:24]
+    return "provider-media-invocation-" + str(uuid4())
 
 
 def _require_media_policy(
@@ -678,7 +673,8 @@ def _require_media_policy(
     timeout_seconds: float,
     provider_attempts: int,
     output_tokens: int = 1,
-) -> tuple[Any, Any]:
+    admission_runtime: AdmissionRuntime,
+) -> tuple[Any, AdmissionLease, UsageEstimate]:
     if not isinstance(purpose, str) or not purpose.strip():
         raise ProviderPolicyError("provider media purpose is invalid")
     if governance_context is None and (
@@ -716,8 +712,15 @@ def _require_media_policy(
         ) from exc
 
     size_hint = len(content) if isinstance(content, bytes) else len(content.encode("utf-8"))
+    estimate = UsageEstimate(
+        input_tokens=max(1, math.ceil(size_hint / 4)),
+        output_tokens=max(1, output_tokens),
+        cost_usd=estimated_cost,
+        wall_seconds=timeout_seconds,
+        provider_attempts=max(1, provider_attempts),
+    )
     try:
-        admission = require_admission(
+        lease = admission_runtime.admit(
             AdmissionRequest(
                 operation_id=_media_operation_id(
                     provider_id, purpose, content, operation_id
@@ -725,21 +728,14 @@ def _require_media_policy(
                 tenant_id=(tenant_id or "unbound"),
                 capability=purpose,
                 budget=resource_budget,
-                estimate=UsageEstimate(
-                    input_tokens=max(1, math.ceil(size_hint / 4)),
-                    output_tokens=max(1, output_tokens),
-                    cost_usd=estimated_cost,
-                    wall_seconds=timeout_seconds,
-                    provider_attempts=max(1, provider_attempts),
-                ),
-                pressure=RuntimePressure(),
+                estimate=estimate,
             )
         )
-    except AdmissionError as exc:
+    except (AdmissionError, AdmissionRuntimeError) as exc:
         raise ProviderPolicyError(
             "provider media request denied by resource admission"
         ) from exc
-    return governance, admission
+    return governance, lease, estimate
 
 
 def _extract_b64_images(response: Any, *, fallback_prompt: str) -> tuple[dict[str, Any], ...]:
@@ -747,13 +743,19 @@ def _extract_b64_images(response: Any, *, fallback_prompt: str) -> tuple[dict[st
     if not isinstance(data, SequenceABC) or isinstance(data, (str, bytes, bytearray)):
         raise ProviderInvocationError("image provider returned malformed response")
     images: list[dict[str, Any]] = []
-    total = 0
+    total_bytes = 0
     for item in data:
         encoded = getattr(item, "b64_json", None)
         if not isinstance(encoded, str) or not encoded.strip():
             continue
-        total += len(encoded)
-        if total > (_MAX_PROVIDER_MEDIA_BYTES * 2):
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except Exception as exc:
+            raise ProviderInvocationError(
+                "image provider returned invalid base64 payload"
+            ) from exc
+        total_bytes += len(decoded)
+        if total_bytes > _MAX_PROVIDER_MEDIA_BYTES:
             raise ProviderInvocationError("image provider response exceeded size limit")
         images.append(
             {
@@ -767,6 +769,38 @@ def _extract_b64_images(response: Any, *, fallback_prompt: str) -> tuple[dict[st
     if not images:
         raise ProviderInvocationError("image provider returned no usable image")
     return tuple(images)
+
+
+def _image_artifact_bytes(images: Sequence[Mapping[str, Any]]) -> int:
+    total = 0
+    for image in images:
+        encoded = image.get("data")
+        if not isinstance(encoded, str):
+            raise ProviderInvocationError("normalized image payload is invalid")
+        try:
+            total += len(base64.b64decode(encoded, validate=True))
+        except Exception as exc:
+            raise ProviderInvocationError(
+                "normalized image payload is invalid"
+            ) from exc
+    return total
+
+
+def _media_actual_usage(
+    estimate: UsageEstimate,
+    *,
+    wall_seconds: float,
+    artifact_bytes: int,
+) -> UsageEstimate:
+    return UsageEstimate(
+        input_tokens=estimate.input_tokens,
+        output_tokens=estimate.output_tokens,
+        cost_usd=estimate.cost_usd,
+        wall_seconds=max(0.0, float(wall_seconds)),
+        provider_attempts=1,
+        tool_calls=estimate.tool_calls,
+        artifact_bytes=max(0, int(artifact_bytes)),
+    )
 
 
 class OpenAIProviderAdapter(ProviderAdapter):
