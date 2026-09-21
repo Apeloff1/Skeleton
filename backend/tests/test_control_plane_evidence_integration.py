@@ -34,7 +34,7 @@ def test_bound_admission_transitions_from_pending_to_confirmed(tmp_path):
 
 
 def test_unbound_operation_is_visible_as_unbound_evidence(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = ProductControlPlane(tmp_path, bind_native_executors=False)
     admitted = plane.admit(
         capability_id="studio",
         domain="studio",
@@ -49,10 +49,18 @@ def test_unbound_operation_is_visible_as_unbound_evidence(tmp_path):
 
 
 def test_execution_ledger_reconstructs_multiple_operations(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = ProductControlPlane(tmp_path, bind_native_executors=False)
     bound = plane.admit(
         capability_id="studio", domain="studio", action="project.create",
         principal="creator", actor_weight=0, payload={"title": "A"},
+    )
+    plane.executors.register(
+        "studio",
+        "project.create",
+        lambda operation, payload: True,
+        name="test.project.create",
+        effect_class="state",
+        replay_safe=True,
     )
     unbound = plane.admit(
         capability_id="studio", domain="studio", action="build.submit",
