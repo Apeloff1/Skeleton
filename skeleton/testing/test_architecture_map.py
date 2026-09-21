@@ -194,7 +194,7 @@ def test_structural_blueprint_partitions_every_construction_plane() -> None:
         for plane_id in domain["planes"]
     ]
 
-    assert blueprint["structure_tag"] == "structure-map/v1.2"
+    assert blueprint["structure_tag"] == "structure-map/v1.3"
     assert len(placed_ids) == len(set(placed_ids))
     assert set(placed_ids) == plane_ids
     assert len(recovery_ids) == len(set(recovery_ids))
@@ -319,6 +319,8 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "execution_hosts": 4,
         "execution_profiles": 10,
         "plane_execution": 27,
+        "startup_groups": 3,
+        "shutdown_groups": 3,
     }
 
 
@@ -389,5 +391,50 @@ def test_structural_validator_rejects_execution_host_zone_drift() -> None:
 
     assert any(
         "application-api zone application is not allowed by host frontend-client" in error
+        for error in errors
+    )
+
+def test_runtime_lifecycle_covers_nodes_and_respects_dependency_order() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    lifecycle = architecture["structural_blueprint"]["runtime_lifecycle"]
+    runtime_nodes = {
+        node["id"]: node
+        for node in architecture["runtime_nodes"]
+    }
+    startup_order = {
+        node_id: group["order"]
+        for group in lifecycle["startup_groups"]
+        for node_id in group["nodes"]
+    }
+    shutdown_order = {
+        node_id: group["order"]
+        for group in lifecycle["shutdown_groups"]
+        for node_id in group["nodes"]
+    }
+
+    assert set(startup_order) == set(runtime_nodes)
+    assert set(shutdown_order) == set(runtime_nodes)
+    for node_id, node in runtime_nodes.items():
+        for dependency in node["depends_on"]:
+            assert startup_order[dependency] < startup_order[node_id]
+            assert shutdown_order[node_id] < shutdown_order[dependency]
+
+
+def test_structural_validator_rejects_startup_dependency_in_same_group() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    broken = deepcopy(architecture)
+    lifecycle = broken["structural_blueprint"]["runtime_lifecycle"]
+    core = next(group for group in lifecycle["startup_groups"] if group["id"] == "core-services")
+    product = next(group for group in lifecycle["startup_groups"] if group["id"] == "product-shell")
+    core["nodes"].append("frontend")
+    product["nodes"].remove("frontend")
+    zones = {zone["id"]: zone for zone in broken["zones"]}
+    errors: list[str] = []
+
+    _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
+
+    assert any(
+        "startup order violates runtime dependency frontend->backend" in error
+        or "startup order violates runtime dependency frontend->skeleton" in error
         for error in errors
     )
