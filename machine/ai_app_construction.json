@@ -6771,5 +6771,545 @@
       "undeclared provider denial",
       "backend credential removal after engine cutover"
     ]
+  },
+  "functional_ai_acceptance_matrix": {
+    "schema_version": 1,
+    "matrix_version": "1.0.0",
+    "status": "active",
+    "purpose": "Stage-by-stage implementation evidence required to promote fully functional AI contracts from planned to implemented and close their P0 gaps.",
+    "stages": [
+      {
+        "stage": 0,
+        "id": "authority-policy-foundations",
+        "gaps": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry",
+          "gap-cost-admission",
+          "gap-provider-surface-convergence"
+        ],
+        "required_artifacts": [
+          "authoritative repository adapters and migration/index ownership",
+          "governance registry plus decision receipt",
+          "durable/shared quota reservation and usage reconciliation",
+          "provider-surface inventory and SDK/credential isolation report"
+        ],
+        "required_faults": [
+          "authoritative database unavailable",
+          "derived vector/index unavailable",
+          "quota store restart/race",
+          "forbidden/undeclared provider credential present"
+        ],
+        "exit_evidence": [
+          "authoritative-state restore succeeds before projection rebuild",
+          "unknown/restricted transfer fails closed",
+          "restart preserves consumed quota",
+          "CI proves one product runtime provider transport owner"
+        ]
+      },
+      {
+        "stage": 1,
+        "id": "durable-user-and-action-foundations",
+        "gaps": [
+          "gap-conversation-state-authority",
+          "gap-memory-durable-authority",
+          "gap-tool-runtime-convergence"
+        ],
+        "required_artifacts": [
+          "thread/message repositories and conversation API",
+          "canonical memory repository/writeback policy",
+          "ToolManifest registry/runtime and receipt store",
+          "approval and idempotency ledgers"
+        ],
+        "required_faults": [
+          "duplicate message submit",
+          "concurrent thread append",
+          "memory projection loss",
+          "tool side effect crash before receipt",
+          "approval expiry"
+        ],
+        "exit_evidence": [
+          "server reconstructs transcript without client history authority",
+          "canonical memory survives process/vector loss",
+          "side-effecting tool replay does not duplicate action",
+          "approval is bound to exact arguments digest"
+        ]
+      },
+      {
+        "stage": 2,
+        "id": "model-input-output-contracts",
+        "gaps": [
+          "gap-context-compiler-convergence",
+          "gap-provider-interaction-protocol"
+        ],
+        "required_artifacts": [
+          "ContextEnvelope compiler plus source adapters",
+          "provider-neutral structured/tool request-response protocol",
+          "context tokenizer/budget policy",
+          "provider tool/structured output normalization"
+        ],
+        "required_faults": [
+          "oversized context/tool result",
+          "prompt injection inside retrieval/tool content",
+          "provider malformed structured output",
+          "provider returns unoffered tool"
+        ],
+        "exit_evidence": [
+          "same source snapshot/budget produces deterministic context digest",
+          "untrusted content cannot enter trusted instruction tier",
+          "provider-native objects never escape provider boundary",
+          "malformed/unoffered tool output fails before tool runtime"
+        ]
+      },
+      {
+        "stage": 3,
+        "id": "evidence-verification",
+        "gaps": [
+          "gap-verification-evidence-contract"
+        ],
+        "required_artifacts": [
+          "VerificationRequest/Receipt runtime",
+          "claim/evidence association",
+          "tool postcondition verification",
+          "bounded semantic verifier adapter"
+        ],
+        "required_faults": [
+          "unsupported citation",
+          "contradicted claim",
+          "ambiguous tool outcome",
+          "verifier provider failure"
+        ],
+        "exit_evidence": [
+          "material unsupported claims qualify/abstain/block per policy",
+          "actions are not reported completed without postconditions",
+          "self-confidence alone cannot satisfy evidence-required verification",
+          "audit uses observable receipts only, not hidden chain-of-thought"
+        ]
+      },
+      {
+        "stage": 4,
+        "id": "cognitive-transaction",
+        "gaps": [
+          "gap-cognitive-execution-loop"
+        ],
+        "required_artifacts": [
+          "AI execution/turn/checkpoint repository",
+          "bounded execution loop",
+          "wait/resume/cancel",
+          "finalization transaction/outbox"
+        ],
+        "required_faults": [
+          "crash before/after provider call",
+          "crash before/after tool side effect",
+          "budget exhaustion",
+          "cancel race",
+          "restart during finalization"
+        ],
+        "exit_evidence": [
+          "prompt/tool/approval/repair flows resume exactly",
+          "no duplicate external side effects",
+          "terminal state/result/event reconcile exactly once",
+          "all model/tool turns remain under original StopPolicy"
+        ]
+      },
+      {
+        "stage": 5,
+        "id": "process-boundary-cutover",
+        "gaps": [
+          "gap-engine-application-execution-boundary"
+        ],
+        "required_artifacts": [
+          "engine submit/status/cancel/events API",
+          "backend engine client",
+          "service/delegated authority",
+          "runtime credential cutover"
+        ],
+        "required_faults": [
+          "submit timeout with unknown acknowledgement",
+          "engine outage",
+          "backend restart",
+          "stale delegated authority"
+        ],
+        "exit_evidence": [
+          "submit retry returns same operation",
+          "backend shows explicit degraded AI readiness on engine loss",
+          "cross-service trace/operation identity is preserved",
+          "backend no longer requires runtime model provider credentials"
+        ]
+      },
+      {
+        "stage": 6,
+        "id": "realtime-product-delivery",
+        "gaps": [
+          "gap-streaming-protocol"
+        ],
+        "required_artifacts": [
+          "backend authorized stream projection",
+          "frontend operation reducer",
+          "cursor persistence/resync",
+          "approval/cancel UX"
+        ],
+        "required_faults": [
+          "disconnect mid-response",
+          "duplicate/out-of-order event",
+          "cursor beyond compaction window",
+          "slow client",
+          "cancel/complete race"
+        ],
+        "exit_evidence": [
+          "refresh/reconnect converges on canonical transcript/result",
+          "slow client cannot block unrelated operation",
+          "replay gaps trigger authoritative resync",
+          "exactly one terminal state is visible"
+        ]
+      },
+      {
+        "stage": 7,
+        "id": "assembled-proof",
+        "gaps": [
+          "gap-e2e-golden-journeys"
+        ],
+        "required_artifacts": [
+          "deterministic full-stack provider/tool harness",
+          "browser/API E2E suite",
+          "fault injection suite",
+          "release evidence bundle"
+        ],
+        "required_faults": [
+          "provider outage",
+          "engine outage",
+          "Mongo transient failure",
+          "tool ambiguity",
+          "approval expiry",
+          "restart/reconnect"
+        ],
+        "exit_evidence": [
+          "all mandatory golden journeys pass on assembled topology",
+          "all receipts/trace/state ids correlate",
+          "no secret or duplicate side effect appears",
+          "zero open P0 gaps"
+        ]
+      }
+    ],
+    "promotion_rules": [
+      "planned-p0 -> implemented requires declared planned outputs to exist plus focused acceptance tests",
+      "implemented -> gap closed requires closure_evidence and all dependency gaps closed",
+      "closing a lower-stage gap does not waive dependent-stage tests",
+      "breaking a closed lower-stage contract reopens or invalidates dependent closure evidence",
+      "stage-7 mocks may replace external providers/tools but not the frontend/backend/engine/state boundaries being proven"
+    ]
+  },
+  "ai_security_threat_model": {
+    "schema_version": 1,
+    "model_version": "1.0.0",
+    "status": "active",
+    "assets": [
+      "provider credentials",
+      "service/delegated authority",
+      "tenant/user conversation and memory",
+      "tool write/destructive authority",
+      "artifacts/files",
+      "canonical operation/result state",
+      "governance and approval receipts"
+    ],
+    "trust_boundaries": [
+      "browser -> backend",
+      "backend -> engine",
+      "engine -> provider",
+      "engine -> external tool/network",
+      "engine/backend -> durable stores",
+      "retrieval/artifact/tool content -> context compiler"
+    ],
+    "threats": [
+      {
+        "id": "prompt-injection",
+        "controls": [
+          "ContextSegment trust labels",
+          "immutable control/evidence separation",
+          "tool authority independent of text",
+          "untrusted evidence delimiting",
+          "no evidence-to-system trust promotion"
+        ]
+      },
+      {
+        "id": "tool-confused-deputy",
+        "controls": [
+          "principal/tenant/capability authorization",
+          "ToolManifest risk/authority class",
+          "approval bound to arguments digest",
+          "data classification before transfer",
+          "idempotency reservation"
+        ]
+      },
+      {
+        "id": "cross-tenant-data-leak",
+        "controls": [
+          "tenant key mandatory at conversation/memory/repository boundary",
+          "retrieval filters before ranking",
+          "governance registry",
+          "no vector similarity bypass of ACL",
+          "service delegation cannot widen tenant"
+        ]
+      },
+      {
+        "id": "credential-exfiltration",
+        "controls": [
+          "single provider credential owner",
+          "credentials excluded from context/tool projection/logs",
+          "provider-surface discovery",
+          "backend credential removal after engine cutover"
+        ]
+      },
+      {
+        "id": "ssrf-egress-abuse",
+        "controls": [
+          "network tool egress allow policy",
+          "HTTPS/base URL validation",
+          "private/link-local/metadata endpoint denial by default",
+          "bounded redirects/timeouts/result size"
+        ]
+      },
+      {
+        "id": "arbitrary-code-execution",
+        "controls": [
+          "no model code exec in long-lived backend/engine process",
+          "sandbox adapter",
+          "resource/filesystem/network limits",
+          "artifact scan",
+          "no executable fields in SkillManifest"
+        ]
+      },
+      {
+        "id": "replay-and-duplicate-side-effect",
+        "controls": [
+          "operation idempotency",
+          "tool call reservation/fencing",
+          "exact arguments digest",
+          "terminal state fencing",
+          "transactional outbox"
+        ]
+      },
+      {
+        "id": "stream-state-confusion",
+        "controls": [
+          "stream is projection only",
+          "monotonic sequence and event id",
+          "replay-gap fail closed",
+          "canonical snapshot resync"
+        ]
+      },
+      {
+        "id": "approval-spoofing",
+        "controls": [
+          "authenticated decision principal",
+          "approval expiry",
+          "operation/turn/call/arguments binding",
+          "resume reauthorization"
+        ]
+      },
+      {
+        "id": "untrusted-model-verifier",
+        "controls": [
+          "verifier through canonical provider boundary",
+          "structural validation",
+          "deterministic evidence checks remain authority",
+          "self-confidence never sole evidence"
+        ]
+      }
+    ],
+    "invariants": [
+      "model output is never authorization",
+      "retrieved/tool/artifact text is never trusted control data",
+      "client-provided state is never durable authority",
+      "network location is never sufficient authentication",
+      "credentials never enter model-visible context",
+      "safety/security denials cannot be converted to success by retrying the model"
+    ]
+  },
+  "degraded_mode_matrix": {
+    "schema_version": 1,
+    "matrix_version": "1.0.0",
+    "status": "active",
+    "cases": [
+      {
+        "dependency": "runtime model provider",
+        "behavior": "fail/route according to provider policy; no fake AI answer",
+        "may_continue": [
+          "conversation read",
+          "local deterministic features",
+          "status/history"
+        ],
+        "must_not": [
+          "claim AI generation succeeded",
+          "bypass governance/admission"
+        ]
+      },
+      {
+        "dependency": "engine service",
+        "behavior": "backend exposes degraded AI readiness and preserves product/conversation state",
+        "may_continue": [
+          "conversation history",
+          "non-AI product functions"
+        ],
+        "must_not": [
+          "fall back to undeclared local provider runtime"
+        ]
+      },
+      {
+        "dependency": "canonical memory",
+        "behavior": "continue stateless/limited continuity only if capability allows and disclose degraded continuity internally/product-appropriately",
+        "may_continue": [
+          "conversation-bound context",
+          "retrieval not requiring memory"
+        ],
+        "must_not": [
+          "use another tenant/cache as substitute",
+          "pretend memory write persisted"
+        ]
+      },
+      {
+        "dependency": "retrieval/vector projection",
+        "behavior": "fall back to authorized canonical/lexical retrieval where available or qualify insufficient evidence",
+        "may_continue": [
+          "non-retrieval generation"
+        ],
+        "must_not": [
+          "invent citations",
+          "promote stale cache to authority"
+        ]
+      },
+      {
+        "dependency": "tool runtime",
+        "behavior": "answer without action when valid or return typed tool-unavailable result",
+        "may_continue": [
+          "read/generative paths not requiring tool"
+        ],
+        "must_not": [
+          "claim action completed"
+        ]
+      },
+      {
+        "dependency": "governance registry",
+        "behavior": "block governed external transfer/durable write",
+        "may_continue": [
+          "local public/non-governed deterministic paths if policy allows"
+        ],
+        "must_not": [
+          "assume permissive default"
+        ]
+      },
+      {
+        "dependency": "quota/admission store",
+        "behavior": "use conservative fail-closed/defer policy for expensive work",
+        "may_continue": [
+          "cheap local reads/status"
+        ],
+        "must_not": [
+          "treat missing quota as unlimited"
+        ]
+      },
+      {
+        "dependency": "operation event transport",
+        "behavior": "execution may continue if durable operation/event authority remains healthy; client polls/resyncs",
+        "may_continue": [
+          "status/result retrieval"
+        ],
+        "must_not": [
+          "infer operation failure solely from disconnected stream"
+        ]
+      },
+      {
+        "dependency": "authoritative state store",
+        "behavior": "reject/defer canonical writes and protected execution needing that state",
+        "may_continue": [
+          "safe read-only cached status if freshness/authority is explicit"
+        ],
+        "must_not": [
+          "promote cache/vector/browser state to authority"
+        ]
+      }
+    ]
+  },
+  "legacy_ai_cutover_map": {
+    "schema_version": 1,
+    "map_version": "1.0.0",
+    "status": "active",
+    "surfaces": [
+      {
+        "current": "backend/routes/ai.py",
+        "today": "direct feature prompt/history -> provider compatibility call",
+        "target": "conversation API -> backend engine client -> AIExecution",
+        "retire_when": [
+          "conversation authority live",
+          "context compiler live",
+          "engine boundary live"
+        ]
+      },
+      {
+        "current": "backend/services/ai_assistant_svc.py",
+        "today": "feature service constructs ProviderRequest",
+        "target": "capability/objective compatibility adapter into engine execution",
+        "retire_when": [
+          "engine client parity",
+          "all callers migrated"
+        ]
+      },
+      {
+        "current": "backend/core/ai_provider.py",
+        "today": "backend compatibility provider activation surface",
+        "target": "remote engine compatibility client or removed",
+        "retire_when": [
+          "backend->engine cutover complete",
+          "backend provider credentials removed"
+        ]
+      },
+      {
+        "current": "backend/services/tool_registry.py",
+        "today": "flat executable tool dispatch including network/database/build/provider-like tools",
+        "target": "compatibility facade delegating ToolExecutionRequest to canonical skeleton/skills runtime",
+        "retire_when": [
+          "tool inventory migrated",
+          "no privileged I/O remains in facade"
+        ]
+      },
+      {
+        "current": "backend/services/memory_engine.py",
+        "today": "legacy prompt/memory assembly",
+        "target": "memory/context source adapter only",
+        "retire_when": [
+          "ContextCompiler and canonical memory authority live"
+        ]
+      },
+      {
+        "current": "skeleton/context/pipeline.py",
+        "today": "GameForge-specific context pipeline",
+        "target": "domain capability that emits typed context/artifact outputs; not universal provider prompt owner",
+        "retire_when": [
+          "never necessarily removed; ownership narrowed"
+        ]
+      },
+      {
+        "current": "skeleton/contexts",
+        "today": "planning/workorder context fabric",
+        "target": "optional reasoning/context source adapter",
+        "retire_when": [
+          "never necessarily removed; provider prompt ownership prohibited"
+        ]
+      },
+      {
+        "current": "frontend direct engine AI paths",
+        "today": "frontend can address backend and skeleton services",
+        "target": "conversation/assistant product actions through backend; direct engine only for explicitly authorized engine-native features",
+        "retire_when": [
+          "product route registry proves canonical ingress"
+        ]
+      }
+    ],
+    "migration_law": [
+      "adapt before delete",
+      "preserve external compatibility while moving ownership behind canonical contracts",
+      "block new imports/callers to legacy surfaces once replacement exists",
+      "remove credentials/privileged I/O before marking a facade compatibility-only",
+      "delete legacy path only after call graph/source scan and regression tests show zero required callers"
+    ]
   }
 }
