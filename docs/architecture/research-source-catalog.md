@@ -7,6 +7,20 @@ This catalog is the reading and evidence map behind Skeleton's SOTA construction
 
 **Important:** inclusion is not endorsement of every claim. Each item enters the ResearchEvidence pipeline and receives local scope, maturity, replication, contradiction, cost, and reproducibility metadata before it can affect architecture.
 
+## Catalog / atlas authority split
+
+This file is the **long-lived historical and conceptual canon**.
+
+Current dated research status lives in:
+
+- [frontier-research-atlas-2026.md](frontier-research-atlas-2026.md) — FR conclusions, RQ questions, SV source attestations, FD frontier deltas, CX contradictions, and RDE research debt;
+- [frontier-research-experiment-protocols-2026.md](frontier-research-experiment-protocols-2026.md) — RXP local experimental designs;
+- [research-evidence-evolution.md](research-evidence-evolution.md) — evidence/reproduction/promotion schemas.
+
+If venue/status or maturity text in this historical catalog conflicts with a dated SV attestation, the dated attestation controls the **current research-status interpretation** while this catalog remains useful for lineage.
+
+The catalog should avoid becoming a fast-moving news feed. Fast-changing claims belong in the dated atlas so they can expire, be contradicted, or be reverified without rewriting historical research lineage.
+
 ## 1. Sequence-model foundations
 
 | Work | Identifier | Lasting architectural lesson |
