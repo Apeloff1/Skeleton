@@ -54,6 +54,27 @@ python -m skeleton app down
 After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
+## Runtime modes
+
+The canonical Compose file runs application code from built images. Source
+bind-mounts are isolated in `docker-compose.hot.yml`.
+
+```bash
+# Built development images, verified after startup
+python -m skeleton app up
+
+# Development images plus source bind mounts for hot reload
+python -m skeleton app up --hot
+
+# Production backend stage + production Nginx frontend stage
+python -m skeleton app up --production
+```
+
+`--production` and `--hot` are intentionally mutually exclusive. Production
+keeps the public frontend URL at `http://localhost:3000` while mapping that
+host port to Nginx's container port 8080, so the same readiness manifest works
+in both modes.
+
 ## Runtime configuration
 
 Copy `.env.example` to `.env` and set at least:
