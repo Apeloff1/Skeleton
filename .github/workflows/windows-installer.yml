@@ -53,7 +53,7 @@ jobs:
       - name: Install Inno Setup 7
         shell: pwsh
         run: |
-          winget install --id JRSoftware.InnoSetup.7 --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
+          winget install --id JRSoftware.InnoSetup.7 --version 7.1.0 --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
 
       - name: Run Windows installer contract tests
         shell: pwsh
