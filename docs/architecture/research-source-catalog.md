@@ -495,7 +495,76 @@ Default reproduction order for Tier E1:
 
 The point is to find **which abstraction actually changes the Pareto frontier**, not to maximize the number of exotic mechanisms in one model.
 
-## 18. Promotion rule
+
+## 18. 2025–2026 research saturation delta
+
+This section records the dated source delta that materially changed the 2026-09-21 research synthesis. It is deliberately explicit about review state.
+
+| Domain | Work / source | Identifier / status | Evidence use | Caution |
+| --- | --- | --- | --- | --- |
+| reasoning | *Test-Time Scaling in Reasoning LLMs: Inference Regimes, Evaluation, and Reproducibility* | arXiv:2608.04001 / preprint | inference-protocol taxonomy and reproducibility requirements | synthesis/preprint; local protocol reproduction still required |
+| reasoning | *Predicting and improving test-time scaling laws via reward tail-guided search* | arXiv:2602.01485 / preprint | adaptive TTS budget allocation | depends on reward-tail estimation and reward-model quality |
+| verifier | *GenPRM* | arXiv:2504.00891 / preprint | generative process reward models with explicit reasoning/checks | verifier may share policy failure modes |
+| verifier | *Aletheia: What Makes RLVR For Code Verifiers Tick?* | OpenReview:b1VGwhJIzc / ACL ARR 2026 submission | verifier-training ablations and contamination-aware code testbed | submission status; claims remain scoped to studied code/verifier regimes |
+| reasoning | *The Potential of CoT for Reasoning: A Closer Look at Trace Dynamics* | OpenReview:uwuSD63wbe / ICLR 2026 poster | analysis of which trace regions contribute to final answers | math-task scope |
+| optimizer | *SOAP, Muon, and Beyond: Pushing LLM Pretraining Scales* | arXiv:2607.20548 / preprint | multi-billion/trillion-token optimizer scaling, stability and distributed implementation | recent preprint; hardware/configuration specific |
+| optimizer | *Taming Momentum: Rethinking Optimizer States Through Low-Rank Approximation* | ICLR 2026 conference paper | low-rank optimizer-state design (LoRA-Pre) | compare against tuned distributed baselines |
+| data | *Data Mixture Optimization: A Multi-fidelity Multi-scale Bayesian Framework* | OpenReview:Kvsa8ZXd0W / NeurIPS 2025 poster | adaptive data-mixture search across model scale/steps | downstream/task transfer still must be tested |
+| data | *Synthetic Bootstrapped Pretraining* | OpenReview:5CfsI9FoAs / ICLR 2026 conference paper | synthetic bootstrapping under fixed natural-data constraints | synthetic-data method is not evidence that arbitrary synthetic replacement works |
+| data | *ToEdit: How to Synthesize Text Data to Avoid Model Collapse?* | OpenReview:mVCcWCjeEz / ICML 2025 | negative evidence on naive synthetic pretraining and semi-synthetic mitigation | scale/domain dependence remains |
+| data | *Revisiting Multilingual Data Mixtures in Language Model Pretraining* | OpenReview:IKJyRyHpHV / ICLR 2026 rejected submission | scoped counterevidence on simplistic multilingual mixture assumptions | rejected submission; watch/replicate only |
+| architecture | *Native Sparse Attention* | arXiv:2502.11089 | hardware-aligned trainable sparse attention | requires local kernel/quality reproduction |
+| architecture | *Universal YOCO for Efficient Depth Scaling* | arXiv:2604.01220 | recurrent/parameter-shared depth with KV-efficient design | recent frontier work |
+| generation | *Set Diffusion* | arXiv:2607.01775 | flexible any-order token-set diffusion with cache updates | very recent; requires real serving reproduction |
+| generation | *Diffusion LLMs Can Do Faster-Than-AR Inference via Discrete Diffusion Forcing* | arXiv:2508.09192 | AR/diffusion hybrid and parallel decoding | benchmark/workload dependence |
+| memory | *MemoryDocDataSet* | arXiv:2606.04442 | joint conversational-memory + long-document benchmark | synthetic benchmark; judge-quality limits noted |
+| memory | *From Single to Multi-Granularity...* (MemGAS) | OpenReview:i2yIvZARnG / ICLR 2026 poster | multi-granularity conversational memory retrieval | benchmark-specific; needs local state/provenance integration |
+| memory | ICLR 2026 MemAgent research on belief updating | workshop/emerging | highlights distinction between recall and evidence-sensitive belief revision | workshop maturity |
+| retrieval | *LaRA* | arXiv:2502.09977 | RAG vs long-context routing; no universal winner | benchmark/task coverage bounds conclusion |
+| agents | *On Training Large Language Models for Long-Horizon Tasks: An Empirical Study of Horizon Length* | OpenReview:PnHfrCMKtp / ICML 2026 | controlled horizon-length training/evaluation variable | transfer to heterogeneous real workflows requires validation |
+| agents | *SWE-Bench Pro* | OpenReview:9R2iUHhVfr / ICLR 2026 submission | long-horizon professional software-agent evaluation | submission status; retain exact task/version |
+| agents | *ToolTweak* | OpenReview:dQXa5jvpQN / ICLR 2026 submission | manipulation of tool selection through names/descriptions | emerging attack evidence; reproduce locally |
+| agents | *To Infinity and Beyond: Tool-Use Unlocks Length Generalization in State Space Models* | ICLR 2026 oral | interaction between tool use and SSM length generalization | scoped experimental regime |
+| research agents | *FIRE-Bench* | ICML 2026 | scientific-insight rediscovery evaluation | rediscovery != novel autonomous science |
+| research agents | *RExBench* | OpenReview:0xpakqqTbe / withdrawn ICLR 2026 submission | negative evidence on autonomous research-extension implementation | withdrawn; use only as scoped negative evidence |
+| scientific tools | Anthropic, *Paving the way for agents in biology* | official research, 2026 | deterministic retrieval adapters sharply improve scientific-agent data access | domain-specific case study |
+| serving | *SmartGen* | arXiv:2607.28150 | selective KV transfer in disaggregated serving | very recent, workload/network specific |
+| serving | *Towards Load-Aware Prefill Deflection for Disaggregated LLM Serving* | arXiv:2607.02043 | decode-pool prefill deflection under burst load | depends on workload/SLO |
+| serving | *NetKV* | arXiv:2606.03910 | network-aware decode placement | simulator/trace assumptions require deployment reproduction |
+| serving | *Robust KV Cache Management under Output Token Length Uncertainty* | arXiv:2607.16892 | distributionally robust reservation/routing | optimization model assumptions matter |
+| serving | *EVICPRESS* | arXiv:2512.14946 | joint KV compression + eviction | lossy quality model must transfer |
+| interpretability | *Scalable Circuit Learning for Interpreting Large Language Models* | arXiv:2606.16939 | scalable sparse circuit learning | interpretability usefulness must be measured downstream |
+| interpretability | *Language Model Circuits Are Sparse in the Neuron Basis* | arXiv:2601.22594 | counterevidence to SAE-only feature-basis assumptions | task/model scope |
+| formal methods | *PAT-Agent: Autoformalization for Model Checking* | arXiv:2509.23675 | plan/generate/verify/repair loop for formal models | semantic-faithfulness remains distinct from formal validity |
+| formal methods | *Goedel-Prover-V2* | arXiv:2508.03613 | verifier-guided proof self-correction | theorem-proving scope |
+| formal methods | *Hilbert* | arXiv:2509.22819 | informal reasoner + prover + verifier + recursive decomposition | benchmark/formal-domain scope |
+| multimodal/world | *World Action Models: The Next Frontier in Embodied AI* | arXiv:2605.12090 / survey | taxonomy joining predictive world state and action generation | survey evidence, not a single implementation result |
+| multimodal/world | *UI-Oceanus* | OpenReview:dZrf68g4dR / ACL ARR 2026 submission | forward-dynamics pretraining for GUI agents | submission/emerging |
+| multimodal/world | *Do LLMs Build Spatial World Models?* | ICLR 2026 World Models workshop | negative evidence against assuming robust implicit spatial world models | controlled maze scope |
+| calibration | Agentic Confidence Calibration / Holistic Trajectory Calibration | ICLR 2026 submission | trajectory-level calibration rather than final-answer confidence only | emerging/submission |
+| safety | OpenAI, *Evaluating chain-of-thought monitorability* | official research, 2025 | monitorability evaluation framework | monitorability is model/training dependent |
+| safety | OpenAI, *How we monitor internal coding agents for misalignment* | official deployment research, 2026 | production action/trace monitoring as evidence source | organizational deployment specifics |
+| safety | Anthropic, *Agentic Misalignment in Summer 2026* | official alignment research, controlled simulations | concrete agentic failure modes across frontier models | simulations are not deployment incidence estimates |
+| safety/interpretability | Anthropic, *CHIVE* | official research, 2026 | counterfactual behavioral prediction as explanation usefulness test | interpretability tools showed no uplift in the studied setup |
+| multi-agent safety | Google DeepMind multi-agent safety research program | official research agenda, 2026 | multi-agent ecosystem interactions as distinct safety domain | research agenda, not efficacy evidence |
+
+### Delta interpretation
+
+This source delta changes the plan in several specific ways:
+
+1. **Reasoning research must record the full inference protocol.**
+2. **Data research must track synthetic ancestry, diversity and data-side compute.**
+3. **Optimizer research must normalize update scale and include distributed implementation cost.**
+4. **Memory research must separate recall from belief revision.**
+5. **Serving research must elevate network/KV topology to first-order scheduling state.**
+6. **Agent evaluation must stratify by horizon and action state, not only final response.**
+7. **Safety research must monitor action trajectories and monitorability itself.**
+8. **Formal verification is strongest when paired with semantic-equivalence checks.**
+9. **Interpretability must prove downstream diagnostic/predictive utility.**
+10. **Research agents require implementation and reproduction evaluation, not only literature/hypothesis quality.**
+
+## 19. Promotion rule
+
 
 
 The catalog may grow aggressively. Production may not.
