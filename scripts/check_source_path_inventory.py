@@ -98,6 +98,7 @@ FIRST_PARTY_PREFIXES = (
     ".emergent/",
     ".machine/",
     "machine/",
+    "packaging/",
 )
 
 BINARY_SUFFIXES = frozenset(
