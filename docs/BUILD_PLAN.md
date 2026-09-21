@@ -2937,10 +2937,10 @@ Planning checkpoint:
 ```text
 PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 atlas=docs/architecture/frontier-research-atlas-2026.md
-conclusions=FR001..FR114
-research_questions=RQ001..RQ067
-source_verifications=SV001..SV046
-frontier_delta=FD001..FD015
+conclusions=FR001..FR144
+research_questions=RQ001..RQ082
+source_verifications=SV001..SV072
+frontier_delta=FD001..FD031
 experiment_queue=RA001..RI003
 production_authority_granted=false
 research_refresh_required=true
@@ -3167,7 +3167,7 @@ Every contradiction records:
 
 ### AD53. Research-debt registry — ⬜
 
-Maintain RDE001–RDE036.
+Maintain RDE001–RDE046.
 
 Each debt item binds:
 
@@ -3292,7 +3292,7 @@ A retired debt can reopen after:
 
 ### AD61. Research experiment protocol registry — ⬜
 
-Maintain RXP001–RXP050 as canonical experiment designs.
+Maintain RXP001–RXP062 as canonical experiment designs.
 
 Every RXP protocol declares:
 
@@ -3541,9 +3541,9 @@ Maintain durable identifiers, version metadata, checksums/references where permi
 
 ### AD81. Domain-resolved question bank — ⬜
 
-Maintain RQ001–RQ067.
+Maintain RQ001–RQ082.
 
-The first ten questions remain cross-domain frontier questions; RQ011–RQ067 decompose uncertainty across all nineteen Track AD research domains.
+The first ten questions remain cross-domain frontier questions; RQ011–RQ082 decompose uncertainty across all twenty-four Track AD research domains.
 
 Every question records:
 - current answer/status;
@@ -3558,7 +3558,7 @@ Every question records:
 
 ### AD82. Expanded local protocol coverage — ⬜
 
-Maintain RXP001–RXP050.
+Maintain RXP001–RXP062.
 
 The extended protocols add:
 - continual-adapter interference geometry;
@@ -3587,7 +3587,7 @@ Maintain explicit edges:
 RQ -> RDE -> RXP -> evidence -> ADR -> AA/AC candidate -> AB compatibility -> promotion
 ```
 
-For each of the nineteen research domains, record:
+For each of the twenty-four research domains, record:
 - affected construction targets;
 - blocking debt;
 - relevant protocol;
@@ -3595,6 +3595,80 @@ For each of the nineteen research domains, record:
 - cross-domain side effects.
 
 **Gate:** architecture progress cannot be reported as nearly complete while unnamed blocking research/system edges remain hidden.
+
+### AD84. Compression/distillation/pruning research — 🧪
+
+Run RXP051–RXP053 to compare:
+- train-from-scratch families;
+- structured pruning;
+- distillation;
+- quantization;
+- compound compression.
+
+Measure teacher-error inheritance, calibration/safety drift, interpretability/monitorability transfer, real deployment efficiency, and lifecycle cost.
+
+### AD85. Privacy-preserving learning/inference — 🧪
+
+Run RXP054–RXP056.
+
+Map privacy across:
+- raw data;
+- tokens;
+- activations;
+- gradients;
+- adapters;
+- aggregate updates;
+- telemetry;
+- final model.
+
+Evaluate formal privacy accounting together with attack-based validation, utility, communication, client heterogeneity, replay, and continual budget composition.
+
+### AD86. Software-engineering/code-agent science — 🧪
+
+Run RXP057–RXP059.
+
+Separate:
+- environment bootstrap;
+- localization;
+- diagnosis;
+- specification retrieval;
+- patch design;
+- implementation;
+- validation;
+- regression;
+- issue resolution.
+
+**Gate:** visible-test pass alone is not trusted patch completion.
+
+### AD87. Human–AI/operator science — 🧪
+
+Run RXP060 plus repeated-exposure operator simulations.
+
+Evaluate:
+- calibrated reliance;
+- automation bias;
+- uncertainty presentation;
+- confirmation/autonomy boundary;
+- preview/undo/recovery;
+- alarm fatigue;
+- operator workload;
+- correction quality.
+
+"Human in the loop" is not accepted as a safety claim without interface and decision-quality evidence.
+
+### AD88. Causal/counterfactual research — 🧪
+
+Run RXP047, RXP061 and RXP062.
+
+Separate:
+- correlation;
+- intervention;
+- counterfactual reasoning;
+- causal discovery assumptions;
+- world-model transition invariance;
+- shortcut sensitivity.
+
+**Gate:** fluent causal explanation or planning success alone does not establish causal/world-model competence.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
@@ -3670,8 +3744,8 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
 29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
-30. 🧪 Execute the AD high-information experiment queue plus FD001–FD026 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
-31. ⬜ Instantiate RXP001–RXP050 experiment manifests and execute the first-wave protocols in evidence-value order.
+30. 🧪 Execute the AD high-information experiment queue plus FD001–FD031 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
+31. ⬜ Instantiate RXP001–RXP062 experiment manifests and execute the first-wave protocols in evidence-value order.
 32. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
 33. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
