@@ -38,6 +38,11 @@ python scripts/check_ai_full_edge_case_matrix.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_full_edge_case_matrix.py
 
+printf '\n== Master build sequence ==\n'
+python scripts/check_ai_master_build_sequence.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_master_build_sequence.py
+
 printf '\n== Signed build accountability ==\n'
 python scripts/check_ai_build_accountability.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
