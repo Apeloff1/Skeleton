@@ -634,6 +634,8 @@ def audit_public_app_bootstrap_contract() -> None:
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
+    check("public_readiness()" in route, "aggregate app status omits product readiness")
+    check('"product": product_readiness' in route, "aggregate app status product summary missing")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
@@ -707,7 +709,8 @@ def audit_public_product_readiness_contract() -> None:
     check("def public_readiness(" in runtime, "sanitized product readiness projection missing")
     check("const PUBLIC_ROOT = '/api/product';" in client, "frontend public product client root drift")
     check("getProductReadiness" in capability, "capability UI bypasses public readiness client")
-    check("getProductReadiness" in product, "product shell bypasses public readiness client")
+    check("getProductReadiness" not in product, "product shell still duplicates readiness request")
+    check("health?.product?.available" in product, "product shell does not consume runtime product summary")
 
 
 def audit_product_control_contract() -> None:
