@@ -152,6 +152,7 @@
     "backend/routes/app_runtime.py",
     "frontend/src/product/appBootstrapClient.ts",
     "skeleton/app/bootstrap.py",
-    "scripts/check_app_assembly.py"
+    "scripts/check_app_assembly.py",
+    "skeleton/testing/test_app_runtime_contract.py"
   ]
 }
