@@ -1493,12 +1493,12 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State technology and authority are not fully separated: backend RAG stores authoritative-looking user progress/feedback/session records inside local Chroma, canonical OperationRecord state is not yet durably bound, and recovery ordering across authoritative versus derived stores is not proven.",
+      "gap": "State technology and authority are not fully separated: backend RAG still stores authoritative-looking user progress/feedback/session records inside local Chroma; a durable reference OperationEnvelope repository with transactional outbox now exists, but production runtime binding and full authoritative-first recovery remain unproven.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
         "keep Chroma collections as derived searchable projections carrying provenance and authority metadata",
-        "bind canonical OperationRecord state to a durable repository",
+        "bind production runtime orchestration to the durable OperationEnvelope repository or a conformant production backend",
         "define atomic transaction, transactional outbox, or deterministic reconciliation semantics between operation state transitions and durable stream events",
         "make content/swarm/vector/cache/snapshot roles explicit and non-authoritative where declared",
         "define migrations, backup, restore, retention and consistency for each authoritative state domain",
@@ -1514,7 +1514,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "architecture-contract-added"
+      "verification_state": "durable-operation-reference-and-transactional-outbox-added"
     },
     {
       "id": "gap-cost-admission",
@@ -2451,8 +2451,8 @@
         "freeze state-domain/source-of-truth registry",
         "migrate canonical product records out of Chroma into core Mongo",
         "make Chroma/vector/process stores derived-only",
-        "bind OperationRecord to durable repository",
-        "define operation-state to event-log consistency semantics",
+        "bind production orchestration to durable operation repository",
+        "dispatch transactional outbox events into the canonical stream with retry-stable identity",
         "add schema/index migration ownership",
         "define backup/restore order and readiness gates",
         "prove loss/rebuild of all derived stores"
@@ -2465,7 +2465,28 @@
         "backup restore drill",
         "cache/index/snapshot loss recovery"
       ],
-      "exit": "every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled"
+      "exit": "every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled",
+      "progress": {
+        "state": "in_progress",
+        "completed": [
+          "machine-readable state authority topology",
+          "authoritative/derived/scratch/recovery classifications",
+          "durable SQLite OperationEnvelope reference repository",
+          "idempotency identity uniqueness and optimistic version fencing",
+          "terminal operation state persistence",
+          "transactional operation-state plus event-intent outbox",
+          "retry-stable outbox event identity compatible with canonical stream",
+          "operation state reopen/corruption/outbox integration regressions"
+        ],
+        "remaining": [
+          "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
+          "bind production orchestration paths to durable operation repository",
+          "run durable outbox dispatcher as part of runtime lifecycle",
+          "define production backup and retention policy for operation state",
+          "prove Mongo authoritative restore before all derived index rebuilds",
+          "run derived-store loss and rebuild drill"
+        ]
+      }
     },
     {
       "id": "WP-P0-COGNITIVE-LOOP",
