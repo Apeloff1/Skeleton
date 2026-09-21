@@ -459,13 +459,13 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-WP-W00` — WP-W00 Architecture Authority — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W01` — WP-W01 Contract Primitives — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W02` — WP-W02 Kernel & Lifecycle — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W03` — WP-W03 Durable State — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W04` — WP-W04 Events & Streaming Ledger — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W03` — WP-W03 Durable State — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W04` — WP-W04 Events & Streaming Ledger — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W05` — WP-W05 Model Runtime — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W06` — WP-W06 Model Routing — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W07` — WP-W07 Memory — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W08` — WP-W08 Retrieval — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-WP-W09` — WP-W09 Knowledge & Evidence — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W07` — WP-W07 Memory — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W08` — WP-W08 Retrieval — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-WP-W09` — WP-W09 Knowledge & Evidence — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W10` — WP-W10 Context Compiler — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W11` — WP-W11 Cognitive Runtime — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-WP-W12` — WP-W12 Planning — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
@@ -496,7 +496,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-03` — AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-COST-02` — AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-COST-03` — AIQ-S0-COST-03 Add shared cross-process pressure/concurrency coordination and overload shedding. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-PROV-01` — AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
