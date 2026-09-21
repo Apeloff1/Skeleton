@@ -475,6 +475,20 @@ RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS = {
     "refresh_trigger": True,
 }
 
+RESEARCH_MEASUREMENT_INVARIANTS = {
+    "practical_significance_is_reported": True,
+    "paired_comparisons_are_preferred_when_available": True,
+    "benchmark_results_are_stratified_when_material": True,
+    "cold_and_warm_paths_are_separated": True,
+    "tail_latency_and_failure_rate_are_reported": True,
+    "metric_sensitivity_is_recorded": True,
+    "missing_results_are_not_silently_removed": True,
+    "hard_floors_dominate_aggregate_score": True,
+    "blind_benchmark_access_is_audited": True,
+    "analysis_outputs_are_traceable_to_result_bundles": True,
+    "expensive_experiment_has_decision_value_statement": True,
+}
+
 
 
 
@@ -520,6 +534,7 @@ def full_summary() -> Dict[str, Any]:
         "research_debt_invariants": dict(RESEARCH_DEBT_INVARIANTS),
         "research_experiment_rigor_invariants": dict(RESEARCH_EXPERIMENT_RIGOR_INVARIANTS),
         "research_domain_coverage_requirements": dict(RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS),
+        "research_measurement_invariants": dict(RESEARCH_MEASUREMENT_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
