@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from core.ai_provider import ProviderRegistry, ProviderUnavailableError
+from core.ai_provider import OpenAIProviderAdapter, ProviderRegistry, ProviderUnavailableError
 from core.provider_architecture import (
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
@@ -136,3 +136,26 @@ def test_registry_fails_closed_when_architecture_read_fails() -> None:
     assert registry.available is False
     with pytest.raises(ProviderUnavailableError, match="architecture acknowledgement failed"):
         registry.require_active()
+
+
+def test_direct_openai_adapter_cannot_bypass_architecture(monkeypatch) -> None:
+    class _Client:
+        class _Responses:
+            async def create(self, **_kwargs):
+                raise AssertionError("provider I/O must not occur")
+
+        responses = _Responses()
+
+    def deny(_provider_id: str):
+        raise ProviderArchitectureError("missing contract")
+
+    monkeypatch.setattr("core.ai_provider.load_provider_architecture", deny)
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="test-model",
+        client=_Client(),
+    )
+
+    assert adapter.available is False
+    with pytest.raises(ProviderUnavailableError, match="architecture acknowledgement failed"):
+        adapter._get_client()
