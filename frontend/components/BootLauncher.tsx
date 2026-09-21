@@ -384,7 +384,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   }, [phase, welcomeSeen, onReady]);
 
   const handleEnterPress = React.useCallback(async () => {
-    durable('user_enter_hub_press');
+    durable('user_enter_product_press');
     try { await safeSetItem(WELCOME_FLAG_KEY, '1'); } catch {}
     onReady();
   }, [onReady]);
@@ -442,7 +442,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               Hyperscale game-build factory · 600K+ knowledge assets · live RAG
             </Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={handleEnterPress} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Enter the Hub</Text>
+              <Text style={styles.primaryBtnText}>Enter Product</Text>
             </TouchableOpacity>
           </>
         )}
