@@ -80,6 +80,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/jeeves-hub', title: 'Jeeves Hub', category: 'ai' },
   { path: '/jeeves-eq', title: 'Jeeves EQ', category: 'ai' },
   { path: '/jeeves-level', title: 'Jeeves Level', category: 'ai' },
+  { path: '/jeeves-workbench', title: 'Jeeves Workbench', category: 'ai', heavy: true },
   { path: '/jeeves-audio-test', title: 'Jeeves Audio', category: 'ai' },
   { path: '/ai-suggestions', title: 'AI Suggestions', category: 'ai' },
   { path: '/ai-interactions', title: 'AI Interactions', category: 'ai' },
