@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v3.0"
+    "tag": "arch-map/v3.1"
   },
   "runtime": {
     "required_env": [
@@ -158,7 +158,11 @@
     ".cursor/rules/architecture.mdc",
     "skeleton/provider_contract.py",
     "skeleton/testing/test_provider_contract.py",
-    "GEMINI.md"
+    "GEMINI.md",
+    "skeleton/vault/data_governance.py",
+    "skeleton/intelligence/admission.py",
+    "skeleton/testing/test_data_governance.py",
+    "skeleton/testing/test_cost_admission.py"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -168,6 +172,6 @@
     "provider_activation_boundary": "backend/core/ai_provider.py",
     "provider_architecture_loader": "skeleton/provider_contract.py",
     "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
-    "construction_version": "3.0.0"
+    "construction_version": "3.1.0"
   }
 }
