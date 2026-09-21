@@ -440,29 +440,32 @@ class RAGService:
         code_snippets: List[str],
         decisions: List[str]
     ) -> str:
-        """Store co-coding session context."""
-        collection = self._get_collection("cocoding_context")
-        
-        content = f"Context: {context}\n\nCode:\n" + "\n---\n".join(code_snippets)
-        content += "\n\nDecisions:\n" + "\n".join(f"- {d}" for d in decisions)
-        
-        metadata = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "pipeline": pipeline,
-            "snippet_count": len(code_snippets),
-            "decision_count": len(decisions),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[session_id]
+        """Commit co-coding state to Mongo before semantic projection."""
+        row = self.state.put_cocoding_context(
+            session_id=session_id,
+            user_id=user_id,
+            pipeline=pipeline,
+            context=context,
+            code_snippets=code_snippets,
+            decisions=decisions,
+            timestamp=self._utc_now(),
         )
-        
-        return session_id
-    
+        self._project_add(
+            "cocoding_context",
+            document=self._canonical_cocoding_content(row),
+            metadata={
+                "session_id": row["session_id"],
+                "user_id": row["user_id"],
+                "pipeline": row["pipeline"],
+                "snippet_count": len(row["code_snippets"]),
+                "decision_count": len(row["decisions"]),
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["session_id"],
+        )
+        return row["session_id"]
+
     def get_relevant_context(
         self,
         user_id: str,
@@ -470,34 +473,69 @@ class RAGService:
         pipeline: Optional[str] = None,
         limit: int = 3
     ) -> List[Dict]:
-        """Get relevant co-coding context for a query."""
+        """Retrieve via Chroma but validate every hit against Mongo authority."""
         collection = self._get_collection("cocoding_context")
-        
         where_filter = {"user_id": user_id}
         if pipeline:
             where_filter["pipeline"] = pipeline
-        
-        results = collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where_filter
+
+        try:
+            results = collection.query(
+                query_texts=[query],
+                n_results=limit,
+                where=where_filter,
+            )
+        except Exception:
+            results = {}
+
+        contexts: List[Dict] = []
+        ids = (results.get("ids") or [[]])[0] if results else []
+        distances = (results.get("distances") or [[]])[0] if results else []
+
+        for i, projected_id in enumerate(ids):
+            canonical = self.state.get_cocoding_context(
+                str(projected_id),
+                user_id=user_id,
+            )
+            if canonical is None:
+                continue
+            if pipeline and canonical.get("pipeline") != pipeline:
+                continue
+            contexts.append({
+                "content": self._canonical_cocoding_content(canonical),
+                "metadata": {
+                    "session_id": canonical["session_id"],
+                    "user_id": canonical["user_id"],
+                    "pipeline": canonical["pipeline"],
+                    "timestamp": canonical["timestamp"],
+                    "authority": "mongo",
+                },
+                "relevance": 1 - (distances[i] if i < len(distances) else 0),
+            })
+
+        if contexts:
+            return contexts[:limit]
+
+        rows = self.state.list_cocoding_context(
+            user_id,
+            pipeline=pipeline,
+            limit=limit,
         )
-        
-        contexts = []
-        if results["documents"]:
-            for i, doc in enumerate(results["documents"][0]):
-                contexts.append({
-                    "content": doc,
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-                    "relevance": 1 - (results["distances"][0][i] if results["distances"] else 0)
-                })
-        
-        return contexts
-    
-    # =========================================================================
-    # Feedback
-    # =========================================================================
-    
+        return [
+            {
+                "content": self._canonical_cocoding_content(row),
+                "metadata": {
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "pipeline": row["pipeline"],
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                "relevance": 0.0,
+            }
+            for row in rows
+        ]
+
     def store_feedback(
         self,
         user_id: str,
