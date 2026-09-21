@@ -11,6 +11,7 @@ on:
       - "pyproject.toml"
       - "setup.cfg"
       - "skeleton/developer/cli.py"
+      - "skeleton/native/**"
       - "skeleton/testing/test_packaging_contract.py"
       - ".github/workflows/packaging-runtime-image.yml"
   push:
@@ -22,6 +23,7 @@ on:
       - "pyproject.toml"
       - "setup.cfg"
       - "skeleton/developer/cli.py"
+      - "skeleton/native/**"
       - "skeleton/testing/test_packaging_contract.py"
       - ".github/workflows/packaging-runtime-image.yml"
 
