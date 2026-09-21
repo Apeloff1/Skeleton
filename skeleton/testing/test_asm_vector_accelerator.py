@@ -364,6 +364,76 @@ def test_multi_query_matrix_covers_unrolled_body_and_tail(
     assert accelerator.status().calls == 1
 
 
+@pytest.mark.parametrize(
+    "dimensions",
+    [1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33, 63, 64, 65],
+)
+def test_matrix_kernels_match_reference_across_simd_boundaries(
+    tmp_path: Path,
+    dimensions: int,
+) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    query = [
+        float(((index * 7) % 19) - 9) / 6.0
+        for index in range(dimensions)
+    ]
+    second_query = [
+        float(((index * 11) % 23) - 11) / 8.0
+        for index in range(dimensions)
+    ]
+    candidates = [
+        [
+            float(((index * multiplier + offset) % 29) - 14) / 9.0
+            for index in range(dimensions)
+        ]
+        for multiplier, offset in ((3, 1), (5, 7), (13, 2))
+    ]
+    matrix = [
+        value
+        for candidate in candidates
+        for value in candidate
+    ]
+
+    single = accelerator.dot_matrix_f32(
+        query,
+        matrix,
+        rows=len(candidates),
+        dimensions=dimensions,
+    )
+    expected_single = [
+        sum(a * b for a, b in zip(query, candidate))
+        for candidate in candidates
+    ]
+    assert single == pytest.approx(
+        expected_single,
+        rel=5e-5,
+        abs=5e-5,
+    )
+
+    multi = accelerator.dot_queries_matrix_f32(
+        query + second_query,
+        matrix,
+        query_count=2,
+        rows=len(candidates),
+        dimensions=dimensions,
+    )
+    expected_multi = expected_single + [
+        sum(a * b for a, b in zip(second_query, candidate))
+        for candidate in candidates
+    ]
+    assert multi == pytest.approx(
+        expected_multi,
+        rel=5e-5,
+        abs=5e-5,
+    )
+
+
 def test_length_mismatch_is_rejected_before_native_call(tmp_path: Path) -> None:
     status = _supported_preflight(tmp_path)
     if not status.build_ready:
