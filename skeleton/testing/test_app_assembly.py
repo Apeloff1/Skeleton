@@ -349,3 +349,49 @@ def test_expo_dev_ports_are_hot_mode_only():
     for port in ("8081:8081", "19000:19000", "19001:19001", "19002:19002"):
         assert port not in base
         assert port in hot
+
+
+def test_live_status_reports_runtime_health_and_fails_closed(monkeypatch, capsys):
+    from skeleton.app.cli import run_app_cli
+    from skeleton.app.health import ProbeResult
+
+    def fake_probe_application(*, manifest, full, timeout):
+        assert full is False
+        assert timeout == 1.25
+        return (
+            ProbeResult(
+                service="backend",
+                url="http://localhost:8001/api/health",
+                ok=True,
+                status=200,
+                detail="healthy",
+            ),
+            ProbeResult(
+                service="skeleton",
+                url="http://localhost:8010/api/v1/health/live",
+                ok=False,
+                status=503,
+                detail="HTTP error 503",
+            ),
+        )
+
+    monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
+
+    exit_code = run_app_cli(["status", "--live", "--timeout", "1.25", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert payload["runtime_health"]["ok"] is False
+    assert [item["service"] for item in payload["runtime_health"]["results"]] == [
+        "backend",
+        "skeleton",
+    ]
+
+
+def test_live_status_rejects_non_positive_timeout(capsys):
+    from skeleton.app.cli import run_app_cli
+
+    exit_code = run_app_cli(["status", "--live", "--timeout", "0"])
+
+    assert exit_code == 2
+    assert "timeout must be greater than zero" in capsys.readouterr().out
