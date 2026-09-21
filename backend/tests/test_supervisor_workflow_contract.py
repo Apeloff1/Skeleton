@@ -251,4 +251,3 @@ def test_merge_readiness_runs_builder_plane_regressions() -> None:
     )
     for fragment in required:
         assert fragment in source
-
