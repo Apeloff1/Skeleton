@@ -72,7 +72,7 @@ def resolve_under_dir(root: str | os.PathLike[str], *parts: str) -> Path:
 
 def _build_token(value: str | None) -> str:
     if value is None:
-        return str(int(time.time()))
+        return str(time.time_ns())
     return safe_segment(value, what="build_token")[:160]
 
 
