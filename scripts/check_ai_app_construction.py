@@ -138,6 +138,21 @@ def _validate_contract_links(
     if contract.get("architecture_contract") != ARCHITECTURE_PATH.as_posix():
         errors.append("construction architecture_contract path drift")
 
+    state_topology = contract.get("state_topology")
+    if not isinstance(state_topology, dict):
+        errors.append("state_topology must be an object")
+    else:
+        expected_state_links = {
+            "contract": "machine/state_topology.json",
+            "validator": "scripts/check_state_topology.py",
+            "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+        }
+        for key, expected in expected_state_links.items():
+            if state_topology.get(key) != expected:
+                errors.append(f"state_topology.{key} must be {expected!r}")
+            if not (repo_root / expected).exists():
+                errors.append(f"state_topology linked path is missing: {expected}")
+
     semantics = contract.get("relationship_semantics")
     if not isinstance(semantics, dict):
         errors.append("relationship_semantics must be an object")
@@ -1363,7 +1378,14 @@ def _validate_acceptance_gates(
             errors.append(f"acceptance gate {gate_id}.kind must be non-empty")
         if not isinstance(item.get("command"), str) or not item["command"].strip():
             errors.append(f"acceptance gate {gate_id}.command must be non-empty")
-    for required in ("architecture-map", "construction-contract", "provider-bootstrap", "app-assembly"):
+    for required in (
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap",
+        "capability-interfaces",
+        "state-topology",
+        "app-assembly",
+    ):
         if required not in ids:
             errors.append(f"mandatory acceptance gate missing: {required}")
     return ids
