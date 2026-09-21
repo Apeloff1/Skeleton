@@ -18,6 +18,8 @@ import {
 } from '../src/product/productCatalog';
 import { probeAppHealth } from '../src/product/appHealthClient';
 import type { AppHealthSnapshot } from '../src/product/appHealthClient';
+import { getProductReadiness } from '../src/product/productControlClient';
+import type { PublicReadinessReport } from '../src/product/productControlClient';
 
 const PILLARS: readonly { id: ProductPillar; title: string; subtitle: string }[] = [
   { id: 'create', title: 'Create', subtitle: 'Design, generate and ship worlds and playable projects.' },
@@ -37,6 +39,7 @@ export default function ProductShellRoute() {
   const [query, setQuery] = useState('');
   const [health, setHealth] = useState<AppHealthSnapshot | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  const [actionReadiness, setActionReadiness] = useState<PublicReadinessReport | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const isWide = width >= 760;
 
@@ -57,6 +60,22 @@ export default function ProductShellRoute() {
       try { controller?.abort(); } catch {}
     };
   }, [refreshHealth]);
+
+  useEffect(() => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    getProductReadiness(controller?.signal)
+      .then((result) => {
+        if (!controller?.signal.aborted && result.ok && result.data) {
+          setActionReadiness(result.data);
+        }
+      })
+      .catch(() => {
+        // Product navigation remains available when readiness telemetry is offline.
+      });
+    return () => {
+      try { controller?.abort(); } catch {}
+    };
+  }, []);
 
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;
@@ -119,6 +138,10 @@ export default function ProductShellRoute() {
             <Metric
               label="Runtime"
               value={healthLoading && !health ? 'Checking' : health?.ok ? 'Healthy' : health ? 'Degraded' : 'Unknown'}
+            />
+            <Metric
+              label="Actions"
+              value={actionReadiness ? `${actionReadiness.ready_actions}/${actionReadiness.canonical_actions}` : '—'}
             />
           </View>
         </View>
