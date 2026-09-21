@@ -35,6 +35,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_historical_lineage"] == "docs/architecture/research-historical-lineage.md"
     assert documents["research_source_topology"] == "docs/architecture/research-source-topology.md"
     assert documents["research_dependency_map"] == "docs/architecture/research-dependency-map-2026.md"
+    assert documents["research_execution_program"] == "docs/architecture/research-execution-program-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -503,3 +504,32 @@ def test_research_dependency_map_exposes_blocking_edges() -> None:
     assert "Critical research path" in dependency_map
     assert "Promotion-blocker matrix" in dependency_map
     assert "AD83. Research dependency graph" in plan
+
+
+def test_research_execution_program_is_wave_gated() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-EXECUTION-PROGRAM"
+    ]
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["wave_range"] == ("WAVE0", "WAVE13")
+    assert checkpoint["protocol_range"] == ("RXP001", "RXP062")
+    assert checkpoint["domain_count"] == 24
+    assert checkpoint["cheap_falsification_before_scale"] is True
+    assert checkpoint["baseline_before_challenger"] is True
+    assert checkpoint["measurement_before_promotion"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    root = Path(__file__).resolve().parents[2]
+    program = (
+        root / "docs" / "architecture" / "research-execution-program-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+
+    assert "Wave 0 — Measurement substrate" in program
+    assert "Wave 13 — Exotic architecture falsification" in program
+    assert "C5 — expensive frontier confirmation" in program
+    assert "Result-to-plan update" in program
+    assert "AD89. Wave-based research execution program" in plan
+    assert "AD96. Research execution signoff" in plan
