@@ -108,9 +108,9 @@ def test_hostile_gap_audit_is_machine_visible_and_fail_closed() -> None:
 
     assert docs["masterplan_gap_audit"] == "docs/architecture/masterplan-gap-audit.md"
     assert tracks["AB"] == "adversarial_foundations_systemic_hardening"
-    assert len(gaps) == 20
+    assert len(gaps) == 21
     assert gaps[0].startswith("G001_")
-    assert gaps[-1].startswith("G020_")
+    assert gaps[-1].startswith("G084_")
     assert checkpoint["tracks"] == ("AB",)
     assert checkpoint["production_readiness_blocked_by_applicable_open_p0"] is True
     assert checkpoint["production_authority_granted"] is False
@@ -126,6 +126,11 @@ def test_hostile_gap_audit_is_machine_visible_and_fail_closed() -> None:
     assert hardening["distributed_mutation_rejects_stale_writers"] is True
     assert hardening["backup_claim_requires_restore_drill"] is True
     assert hardening["safe_mode_is_required"] is True
+    assert hardening["root_trust_key_compromise_has_reroot_recovery"] is True
+    assert hardening["authorization_is_revalidated_at_commit"] is True
+    assert hardening["signed_objects_use_canonical_serialization"] is True
+    assert hardening["distributed_checkpoint_completion_is_manifest_atomic"] is True
+    assert hardening["partial_or_speculative_output_is_not_committed_output"] is True
 
 
 def test_hostile_gap_audit_and_track_ab_are_canonical_plan_inputs() -> None:
@@ -144,6 +149,6 @@ def test_hostile_gap_audit_and_track_ab_are_canonical_plan_inputs() -> None:
     assert "**AB** — adversarial foundations and systemic hardening" in index
     assert "Adversarial cross-cutting invariants" in frontier
     assert "G001" in audit
-    assert "G070" in audit
+    assert "G130" in audit
     assert "open P0" in audit
     assert "pairwise" in audit
