@@ -48,6 +48,28 @@ jobs:
         run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<9"
       - name: Enforce packaging and runtime-image contracts
         run: python -m pytest -q skeleton/testing/test_packaging_contract.py
+      - name: Verify native Assembly payload in wheel
+        run: |
+          set -euo pipefail
+          python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/wheel" .
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          wheels = glob.glob("$RUNNER_TEMP/wheel/*.whl")
+          assert len(wheels) == 1, wheels
+          with zipfile.ZipFile(wheels[0]) as archive:
+              names = set(archive.namelist())
+          required = {
+              "skeleton/native/asm/x86_64.S",
+              "skeleton/native/asm/aarch64.S",
+              "skeleton/native/asm/skeleton_asm.h",
+              "skeleton/native/asm/README.md",
+          }
+          missing = sorted(required - names)
+          assert not missing, f"native package data missing from wheel: {missing}"
+          print("native-wheel-payload: OK")
+          PY
 
   docker-builds:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
