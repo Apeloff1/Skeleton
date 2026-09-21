@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
@@ -253,59 +254,12 @@ class BuildBody(BaseModel):
 
 @router.post("/web")
 async def build_web(b: BuildBody):
-    files = _gamefiles(b.game_name)
-    safe_name, build_id, workdir = _artifact_build(b.game_name, "web")
-    os.makedirs(workdir, exist_ok=True)
-    payload = {"game": safe_name, "files": files, "built_at": time.time()}
-    with open(_resolve_under_dir(workdir, "game_data.json"), "w") as f:
-        json.dump(payload, f, indent=2)
-    manifest = "".join(f"<li><b>{fn.get('filename','?')}</b> — {fn.get('metadata',{}).get('kind','artifact')}</li>" for fn in files)
-    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{b.game_name} — GameForge Build</title>
-<style>body{{margin:0;font-family:system-ui;background:#0b1220;color:#e2e8f0}}
-.wrap{{max-width:820px;margin:0 auto;padding:24px}}h1{{color:#22c55e}}
-.card{{background:#111827;border-radius:14px;padding:16px;margin:12px 0}}
-canvas{{width:100%;height:320px;background:#0f1830;border-radius:10px;display:block}}</style></head>
-<body><div class="wrap"><h1>🎮 {b.game_name}</h1>
-<div class="card"><canvas id="stage"></canvas></div>
-<div class="card"><h3>Gamefiles ({len(files)})</h3><ul>{manifest or '<li>none yet</li>'}</ul></div>
-<script>
-const c=document.getElementById('stage'),x=c.getContext('2d');c.width=c.clientWidth;c.height=320;
-let t=0;(function loop(){{x.fillStyle='#0f1830';x.fillRect(0,0,c.width,c.height);
-x.fillStyle='#22c55e';const px=(c.width/2)+Math.cos(t/20)*120,py=(c.height/2)+Math.sin(t/15)*80;
-x.beginPath();x.arc(px,py,18,0,7);x.fill();x.fillStyle='#3b82f6';x.font='16px system-ui';
-x.fillText('{b.game_name} — web build running',20,30);t++;requestAnimationFrame(loop);}})();
-fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
-</script></div></body></html>"""
-    with open(_resolve_under_dir(workdir, "index.html"), "w") as f:
-        f.write(html)
-    zip_path = _resolve_under_dir(_ARTIFACTS, f"{build_id}.zip")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(_resolve_under_dir(workdir, "index.html"), "index.html")
-        z.write(_resolve_under_dir(workdir, "game_data.json"), "game_data.json")
-    rec = _register(build_id, safe_name, "web", zip_path)
-    rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["ok"] = True
-    return rec
+    return build_web_artifact(b.game_name)
 
 
 @router.post("/source")
 async def build_source(b: BuildBody):
-    files = _gamefiles(b.game_name)
-    safe_name, build_id, _workdir = _artifact_build(b.game_name, "src")
-    zip_path = _resolve_under_dir(_ARTIFACTS, f"{build_id}.zip")
-    manifest = {"game": safe_name, "file_count": len(files), "built_at": time.time(),
-                "files": [f.get("filename") for f in files]}
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("manifest.json", json.dumps(manifest, indent=2))
-        for fn in files:
-            name = fn.get("filename", "file.txt")
-            z.writestr(f"gamefiles/{name}", str(fn.get("content", "")))
-    rec = _register(build_id, safe_name, "source", zip_path)
-    rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["ok"] = True
-    return rec
+    return build_source_artifact(b.game_name)
 
 
 @router.get("/list")
