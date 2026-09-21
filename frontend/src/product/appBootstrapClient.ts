@@ -43,3 +43,38 @@ export function bootstrapService(
 ): BootstrapService | null {
   return bootstrap?.services.find((service) => service.name === name) ?? null;
 }
+
+
+export type AppRuntimeService = {
+  name: 'backend' | 'skeleton';
+  ok: boolean;
+  status: number | null;
+  latency_ms: number;
+  detail: string;
+};
+
+export type AppRuntimeStatus = {
+  ok: boolean;
+  checked_at: string;
+  application: AppBootstrap['application'];
+  scope: 'public-runtime';
+  services: AppRuntimeService[];
+};
+
+export async function getAppRuntimeStatus(
+  timeoutMs = 2_500,
+  signal?: AbortSignal,
+): Promise<AppRuntimeStatus | null> {
+  const boundedTimeout = Math.max(250, Math.min(timeoutMs, 10_000));
+  const result = await api.get<AppRuntimeStatus>(
+    `/api/app/status?timeout_ms=${encodeURIComponent(String(boundedTimeout))}`,
+    {
+      signal,
+      timeoutMs: boundedTimeout + 500,
+      retries: 0,
+      cacheKey: 'app-runtime-status',
+      cacheTtlMs: 1_000,
+    },
+  );
+  return result.ok && result.data ? result.data : null;
+}
