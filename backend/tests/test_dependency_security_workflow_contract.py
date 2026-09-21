@@ -32,7 +32,7 @@ def test_high_and_critical_vulnerabilities_remain_release_blocking() -> None:
     assert "ignore-unfixed: false" in scan
     assert "exit-code: 1" in scan
     assert "scan-type: image" in scan
-    assert "scan-ref: \${{ matrix.image }}" in scan
+    assert "scan-ref: ${{ matrix.image }}" in scan
 
 
 def test_each_scanned_image_emits_a_retained_cyclonedx_sbom() -> None:
@@ -40,14 +40,14 @@ def test_each_scanned_image_emits_a_retained_cyclonedx_sbom() -> None:
     assert "Generate container CycloneDX SBOM" in job
     assert "format: cyclonedx" in job
     assert (
-        "output: \${{ runner.temp }}/container-\${{ matrix.name }}-sbom.cdx.json"
+        "output: ${{ runner.temp }}/container-${{ matrix.name }}-sbom.cdx.json"
         in job
     )
     assert "Validate generated container SBOM" in job
     assert 'payload.get("bomFormat") != "CycloneDX"' in job
     assert "Retain container SBOM as security evidence" in job
     assert (
-        "name: container-\${{ matrix.name }}-cyclonedx-sbom-\${{ github.sha }}"
+        "name: container-${{ matrix.name }}-cyclonedx-sbom-${{ github.sha }}"
         in job
     )
     assert "if-no-files-found: error" in job
