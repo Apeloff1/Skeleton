@@ -16,6 +16,7 @@ Research saturation accountability: [architecture/research-saturation-checklist-
 Historical research lineage: [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md)
 Research source topology: [architecture/research-source-topology.md](architecture/research-source-topology.md)
 Research dependency map: [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md)
+Research execution program: [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md)
 
 ## 0. Construction constitution
 
@@ -3669,6 +3670,92 @@ Separate:
 - shortcut sensitivity.
 
 **Gate:** fluent causal explanation or planning success alone does not establish causal/world-model competence.
+
+### AD89. Wave-based research execution program — ⬜
+
+Execute Track AD through Waves 0–13 in [research-execution-program-2026.md](architecture/research-execution-program-2026.md).
+
+Ordering law:
+- measurement before interpretation;
+- baseline before challenger;
+- cheap falsification before scale;
+- scale transfer before defaults;
+- systems evidence before production;
+- safety/authority gates before irreversible action.
+
+### AD90. Research compute classes — ⬜
+
+Classify work as C0–C5:
+- C0 metadata/analysis;
+- C1 toy/micro;
+- C2 controlled small-model;
+- C3 medium confirmation;
+- C4 systems-scale;
+- C5 expensive frontier confirmation.
+
+**Gate:** C5 runs require explicit decision value, prerequisites, budget, and abort criteria.
+
+### AD91. Research scheduler — ⬜
+
+Schedule using:
+- open RDE debt;
+- blocked ADR/architecture decision;
+- protocol prerequisites;
+- freshness;
+- compute;
+- reviewer availability;
+- risk;
+- expected information gain.
+
+Priority score cannot bypass prerequisites.
+
+### AD92. Result-to-plan reconciliation — ⬜
+
+After each RXP:
+1. verify artifacts;
+2. classify result state;
+3. update evidence;
+4. update CX;
+5. retire/reopen RDE;
+6. update RQ;
+7. propose ADR if needed;
+8. refresh dependency map;
+9. do not auto-promote production.
+
+### AD93. Research branch stop rules — ⬜
+
+Stop when:
+- central claim is falsified;
+- simpler baseline dominates;
+- systems support erases benefit;
+- AB invariant is violated;
+- gain is operationally equivalent/no material difference;
+- cost exceeds decision value;
+- reproduction fails persistently.
+
+Negative evidence remains durable.
+
+### AD94. Research fast-track — ⬜
+
+Fast-track only for isolated, reversible, checker-verifiable changes with mature baselines/evals and no new authority surface.
+
+### AD95. Research slow-track — ⬜
+
+Slow-track automatically for:
+- mutable inference neural state;
+- new tool authority;
+- privacy-sensitive adaptation;
+- trust-root change;
+- irreversible side effects;
+- distributed state-format change;
+- research-agent autonomy;
+- architecture morph.
+
+### AD96. Research execution signoff — ⬜
+
+Every run binds protocol/manifest/result/evidence/debt/question changes and signed artifact identity.
+
+**Gate:** a completed run without a reproducible result bundle does not advance the research state.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
