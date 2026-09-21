@@ -37,7 +37,7 @@
         "state": "ready",
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
-        "tag": "arch-map/v3.6",
+        "tag": "arch-map/v3.7",
         "structure_tag": "structure-map/v1.3"
       }
     ],
@@ -707,7 +707,7 @@
     "contract": "machine/architecture.json",
     "documentation": "docs/ARCHITECTURE_MAP.md",
     "validator": "scripts/check_architecture_map.py",
-    "tag": "arch-map/v3.6",
+    "tag": "arch-map/v3.7",
     "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit",
     "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling",
     "construction_contract": "machine/ai_app_construction.json",
@@ -715,14 +715,16 @@
     "provider_bootstrap": "fail-closed",
     "provider_contract": "skeleton/provider_contract.py",
     "capability_interface_registry": "machine/capability_interfaces.json",
-    "capability_interface_validator": "scripts/check_capability_interfaces.py"
+    "capability_interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
   },
   "ai_app_construction": {
     "contract": "machine/ai_app_construction.json",
     "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "validator": "scripts/check_ai_app_construction.py",
     "provider_validator": "scripts/check_provider_bootstrap.py",
-    "construction_version": "3.6.0",
+    "construction_version": "3.7.0",
     "provider_rule": "all credential-bearing AI provider families must load and acknowledge the active contracts through skeleton/provider_contract.py before activation; undeclared providers are denied",
     "shared_provider_contract": "skeleton/provider_contract.py",
     "provider_families": [
@@ -738,6 +740,8 @@
     },
     "model_routing_owner": "skeleton/frontier/model_routing.py",
     "interface_registry": "machine/capability_interfaces.json",
-    "interface_validator": "scripts/check_capability_interfaces.py"
+    "interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
   }
 }
