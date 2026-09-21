@@ -247,6 +247,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     debt = architecture_index.RESEARCH_DEBT_INVARIANTS
     rigor = architecture_index.RESEARCH_EXPERIMENT_RIGOR_INVARIANTS
     coverage = architecture_index.RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS
+    measurement = architecture_index.RESEARCH_MEASUREMENT_INVARIANTS
 
     assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
     assert checkpoint["tracks"] == ("AD",)
@@ -332,6 +333,15 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert coverage["research_debt_assessment"] is True
     assert coverage["refresh_trigger"] is True
 
+    assert measurement["practical_significance_is_reported"] is True
+    assert measurement["cold_and_warm_paths_are_separated"] is True
+    assert measurement["tail_latency_and_failure_rate_are_reported"] is True
+    assert measurement["missing_results_are_not_silently_removed"] is True
+    assert measurement["hard_floors_dominate_aggregate_score"] is True
+    assert measurement["blind_benchmark_access_is_audited"] is True
+    assert measurement["analysis_outputs_are_traceable_to_result_bundles"] is True
+    assert measurement["expensive_experiment_has_decision_value_statement"] is True
+
 
 def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     from pathlib import Path
@@ -390,6 +400,7 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "research agent cannot mark its own result reproduced" in atlas.lower()
     assert "AD60. Debt retirement and reopening" in plan
     assert "AD65. Research experiment sequencing" in plan
+    assert "AD72. Experiment decision-value review" in plan
     assert "FD001–FD021" in plan
 
 
