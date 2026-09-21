@@ -731,6 +731,92 @@ def _validate_structural_blueprint(
             + ", ".join(extra_placements)
         )
 
+    exceptions_raw = blueprint.get("dependency_exceptions")
+    if not isinstance(exceptions_raw, list):
+        errors.append("structural_blueprint.dependency_exceptions must be a list")
+        exceptions_raw = []
+    exception_ids: set[str] = set()
+    exception_edges: dict[tuple[str, str], str] = {}
+    declared_exception_edges: set[tuple[str, str]] = set()
+    for index, exception in enumerate(exceptions_raw):
+        label = f"structural_blueprint.dependency_exceptions[{index}]"
+        if not isinstance(exception, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        exception_id = exception.get("id")
+        if not isinstance(exception_id, str) or not exception_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if exception_id in exception_ids:
+            errors.append(f"duplicate dependency exception id: {exception_id}")
+        exception_ids.add(exception_id)
+
+        source_planes = exception.get("source_planes")
+        dependency_plane = exception.get("dependency_plane")
+        from_zone = exception.get("from_zone")
+        to_zone = exception.get("to_zone")
+        kind = exception.get("kind")
+        if not isinstance(source_planes, list) or not source_planes:
+            errors.append(f"dependency exception {exception_id}.source_planes must be non-empty")
+            source_planes = []
+        if dependency_plane not in planes:
+            errors.append(
+                f"dependency exception {exception_id} references unknown dependency plane: "
+                f"{dependency_plane}"
+            )
+        if from_zone not in zones or to_zone not in zones:
+            errors.append(
+                f"dependency exception {exception_id} must reference known from/to zones"
+            )
+        if kind not in {"ownership-migration", "control-observation"}:
+            errors.append(
+                f"dependency exception {exception_id}.kind must be ownership-migration "
+                "or control-observation"
+            )
+        for key in ("rationale", "removal_condition"):
+            if not isinstance(exception.get(key), str) or not exception[key].strip():
+                errors.append(f"dependency exception {exception_id}.{key} must be non-empty")
+        if "target_owner" in exception:
+            try:
+                _normalized_repo_path(exception.get("target_owner"))
+            except ValueError as exc:
+                errors.append(f"dependency exception {exception_id}.target_owner: {exc}")
+
+        for source_plane in source_planes:
+            if source_plane not in planes:
+                errors.append(
+                    f"dependency exception {exception_id} references unknown source plane: "
+                    f"{source_plane}"
+                )
+                continue
+            edge = (source_plane, dependency_plane)
+            prior = exception_edges.get(edge)
+            if prior is not None:
+                errors.append(
+                    f"dependency edge {source_plane}->{dependency_plane} is excepted by "
+                    f"both {prior} and {exception_id}"
+                )
+            else:
+                exception_edges[edge] = exception_id
+            source_placement = placements.get(source_plane)
+            target_placement = placements.get(dependency_plane)
+            if source_placement is not None and source_placement.get("zone") != from_zone:
+                errors.append(
+                    f"dependency exception {exception_id} from_zone drift for {source_plane}: "
+                    f"{source_placement.get('zone')} != {from_zone}"
+                )
+            if target_placement is not None and target_placement.get("zone") != to_zone:
+                errors.append(
+                    f"dependency exception {exception_id} to_zone drift for {dependency_plane}: "
+                    f"{target_placement.get('zone')} != {to_zone}"
+                )
+            dependencies = planes[source_plane].get("depends_on", [])
+            if dependency_plane not in dependencies:
+                errors.append(
+                    f"dependency exception {exception_id} does not match an actual "
+                    f"construction edge {source_plane}->{dependency_plane}"
+                )
+
     for plane_id, plane in planes.items():
         source = placements.get(plane_id)
         if source is None:
@@ -745,10 +831,22 @@ def _validate_structural_blueprint(
                 continue
             allowed = zones.get(source_zone, {}).get("may_depend_on", [])
             if target_zone not in allowed:
+                edge = (plane_id, dependency)
+                if edge in exception_edges:
+                    declared_exception_edges.add(edge)
+                    continue
                 errors.append(
                     f"cross-zone plane dependency {plane_id}({source_zone}) -> "
-                    f"{dependency}({target_zone}) is not allowed by zone DAG"
+                    f"{dependency}({target_zone}) is not allowed by zone DAG "
+                    "and has no bounded dependency exception"
                 )
+
+    unused_exceptions = sorted(set(exception_edges) - declared_exception_edges)
+    for source_plane, dependency_plane in unused_exceptions:
+        errors.append(
+            f"dependency exception {source_plane}->{dependency_plane} is unnecessary; "
+            "the zone DAG already permits the edge or the edge is intra-zone"
+        )
 
     roots_raw = blueprint.get("composition_roots")
     if not isinstance(roots_raw, list):
@@ -875,6 +973,7 @@ def _validate_structural_blueprint(
         "composition_roots": len(composition_ids),
         "state_authorities": len(state_names),
         "recovery_domains": len(recovery_ids),
+        "dependency_exceptions": len(exception_ids),
     }
 
 
@@ -960,6 +1059,7 @@ def main(argv: list[str] | None = None) -> int:
             f"top-level={summary['top_level_paths']}; "
             f"placements={summary['structure'].get('plane_placements', 0)}; "
             f"recovery-domains={summary['structure'].get('recovery_domains', 0)}; "
+            f"dependency-exceptions={summary['structure'].get('dependency_exceptions', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
