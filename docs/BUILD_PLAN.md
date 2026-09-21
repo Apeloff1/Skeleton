@@ -2934,8 +2934,8 @@ PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 atlas=docs/architecture/frontier-research-atlas-2026.md
 conclusions=FR001..FR114
 research_questions=RQ001..RQ010
-source_verifications=SV001..SV036
-frontier_delta=FD001..FD010
+source_verifications=SV001..SV046
+frontier_delta=FD001..FD015
 experiment_queue=RA001..RI003
 production_authority_granted=false
 research_refresh_required=true
@@ -3088,6 +3088,11 @@ Reproduce or operationalize the highest-impact FD findings:
 8. inference-protocol manifests for reasoning;
 9. factorial synthetic-data study;
 10. source-status freshness automation.
+11. prospective-memory trigger/lifecycle benchmark;
+12. action-horizon/subgoal abstraction study;
+13. adversarial tool-metadata selection study;
+14. semantic-faithfulness vs formal-validity verifier split;
+15. research-agent stage-by-stage capability decomposition.
 
 ### AD49. Research claim expiry and revalidation — ⬜
 
