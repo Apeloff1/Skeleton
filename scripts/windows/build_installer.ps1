@@ -66,7 +66,11 @@ $RuntimePaths = @(
     "frontend",
     "skeleton",
     "scripts",
-    "packaging"
+    "packaging",
+    # Historical MasterMap progression snapshots are repository evidence, not
+    # runtime inputs. Some intentionally verbose names breach Win32's legacy
+    # destination-path boundary when installed under a normal user profile.
+    ":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"
 )
 $ArchiveArgs = @(
     "-C", $RepoRoot,
@@ -81,6 +85,31 @@ if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
+
+# Keep the installed runtime portable across ordinary Windows user-profile
+# paths. This is checked before compilation so path regressions fail cheaply
+# and with the exact offending relative path.
+$MaxRuntimeRelativePathChars = 190
+$PathBudgetViolations = @(
+    Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
+        $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
+        if ($relative.Length -gt $MaxRuntimeRelativePathChars) {
+            [PSCustomObject]@{
+                Length = $relative.Length
+                Path = $relative
+            }
+        }
+    }
+)
+if ($PathBudgetViolations.Count -gt 0) {
+    Write-Host "Windows runtime payload path budget exceeded:"
+    $PathBudgetViolations |
+        Sort-Object Length -Descending |
+        Format-Table -AutoSize |
+        Out-String |
+        Write-Host
+    throw "Runtime payload contains paths longer than $MaxRuntimeRelativePathChars characters"
+}
 
 Write-Host "==> Building standalone Skeleton.exe"
 & python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic==2.13.5" "pydantic-settings==2.15.0"
