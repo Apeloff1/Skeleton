@@ -119,3 +119,34 @@ def test_no_new_runtime_root_can_be_implicit() -> None:
     for runtime_root in policy["runtime_roots"]:
         assert runtime_root in roots
         assert roots[runtime_root]["class"] in {"runtime", "accelerator"}
+
+
+def test_runtime_manifest_links_back_to_active_architecture() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    runtime = _load(REPO_ROOT / "skeleton/app/manifest.json")
+
+    assert runtime["architecture"] == {
+        "contract": "machine/architecture.json",
+        "validator": architecture["sources"]["validator"],
+        "documentation": architecture["sources"]["human_map"],
+        "tag": architecture["architecture_tag"],
+    }
+
+
+def test_top_level_policy_is_disjoint_and_materialized() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    policy = architecture["top_level_policy"]
+    categories = (
+        "runtime_roots",
+        "control_roots",
+        "evidence_roots",
+        "transitional_roots",
+        "legacy_root_entrypoints",
+    )
+
+    seen: set[str] = set()
+    for category in categories:
+        for relative in policy[category]:
+            assert relative not in seen
+            seen.add(relative)
+            assert (REPO_ROOT / relative).exists()
