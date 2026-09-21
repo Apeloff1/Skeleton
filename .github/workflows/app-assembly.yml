@@ -11,6 +11,7 @@ on:
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_architecture_map.py"
       - "skeleton/testing/test_ai_app_construction.py"
+      - "skeleton/testing/test_ai_master_plan.py"
       - "skeleton/testing/test_capability_interfaces.py"
       - "skeleton/testing/test_state_topology.py"
       - "skeleton/testing/test_provider_contract.py"
@@ -58,16 +59,19 @@ on:
       - "scripts/check_app_assembly.py"
       - "scripts/check_architecture_map.py"
       - "scripts/check_ai_app_construction.py"
+      - "scripts/check_ai_master_plan.py"
       - "scripts/check_capability_interfaces.py"
       - "scripts/check_state_topology.py"
       - "scripts/check_provider_bootstrap.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
+      - "machine/ai_master_plan.json"
       - "machine/capability_interfaces.json"
       - "machine/state_topology.json"
       - "docs/ARCHITECTURE_MAP.md"
       - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+      - "docs/plan/**"
       - "AGENTS.md"
       - "CLAUDE.md"
       - "GEMINI.md"
@@ -108,6 +112,9 @@ jobs:
 
       - name: Validate AI construction contract
         run: python scripts/check_ai_app_construction.py
+
+      - name: Validate AI master plan
+        run: python scripts/check_ai_master_plan.py
 
       - name: Validate capability interface registry
         run: python scripts/check_capability_interfaces.py
@@ -171,7 +178,7 @@ jobs:
           backend/core/ai_provider.py backend/core/provider_architecture.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
-          scripts/check_ai_app_construction.py scripts/check_capability_interfaces.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -184,6 +191,7 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_architecture_map.py
           skeleton/testing/test_ai_app_construction.py
+          skeleton/testing/test_ai_master_plan.py
           skeleton/testing/test_capability_interfaces.py
           skeleton/testing/test_state_topology.py
           skeleton/testing/test_provider_contract.py
