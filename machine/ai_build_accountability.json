@@ -18265,11 +18265,11 @@
       "id": "ACC-AIQ-S0-STATE-01",
       "type": "queue_task",
       "title": "AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T18:00:23Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -18296,8 +18296,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T18:00:23Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:00:23Z",
+          "git_sha": "8af3c554a0b3aab0c583f34562f3c80ff93488d2",
+          "statement": "Begin AIQ-S0-STATE-01 canonical state-authority migration from Chroma product state to Mongo repositories.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/8af3c554a0b3aab0c583f34562f3c80ff93488d2",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-AIQ-S0-STATE-01/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
