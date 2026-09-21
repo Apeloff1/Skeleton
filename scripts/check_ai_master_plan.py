@@ -45,6 +45,11 @@ def validate(data: dict) -> list[str]:
     elif freeze.get("last_top_level_volume") != EXPECTED_LAST:
         errors.append(f"breadth_freeze.last_top_level_volume must be {EXPECTED_LAST}")
 
+    maturity = data.get("volume_maturity_policy")
+    if not isinstance(maturity, dict):
+        errors.append("volume_maturity_policy must be an object")
+        maturity = {}
+
     volumes = data.get("volumes")
     if not isinstance(volumes, list):
         errors.append("volumes must be a list")
@@ -68,8 +73,20 @@ def validate(data: dict) -> list[str]:
         for field in ("id", "key", "title", "status", "documentation", "implementation_status"):
             if field not in volume:
                 errors.append(f"volume {volume.get('id', '?')} missing {field}")
-        if volume.get("status") not in {"specified", "scaffolded", "implemented", "integrated", "verified", "hardened", "production", "experimental", "deprecated", "retired"}:
+        status = volume.get("status")
+        if status not in {"specified", "scaffolded", "implemented", "integrated", "verified", "hardened", "production", "experimental", "deprecated", "retired"}:
             errors.append(f"volume {volume.get('id', '?')} has invalid status")
+        policy = maturity.get(status, {}) if isinstance(maturity, dict) else {}
+        required = policy.get("required_nonempty_fields", []) if isinstance(policy, dict) else []
+        if not isinstance(required, list):
+            errors.append(f"volume maturity policy {status!r} has invalid required_nonempty_fields")
+            required = []
+        for required_field in required:
+            value = volume.get(required_field)
+            if not isinstance(value, list) or not value:
+                errors.append(
+                    f"volume {volume.get('id', '?')} status {status} requires non-empty {required_field}"
+                )
 
     for path in (INDEX, PLAN):
         if not path.is_file():
@@ -84,7 +101,7 @@ def validate(data: dict) -> list[str]:
 
     if PLAN.is_file():
         text = PLAN.read_text(encoding="utf-8")
-        for marker in ("## 21. P0 build program", "## 22. Vertical-slice acceptance ladder", "## 25. Scope freeze"):
+        for marker in ("## 21. P0 build program", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 25. Scope freeze"):
             if marker not in text:
                 errors.append(f"master plan missing required section: {marker}")
 
