@@ -7766,6 +7766,25 @@
       "human": "docs/plan/EDGE_CASES_HISTORICAL.md",
       "breadth_freeze_compatible": true,
       "policy": "Map cases into existing volumes and promote relevant entries to executable tests/invariants/evidence during implementation."
+    },
+    "p0_edge_case_matrix": {
+      "machine": "machine/ai_p0_edge_case_matrix.json",
+      "human": "docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md",
+      "work_packages": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "policy": "Mapped edge/historical obligations must become executable evidence or explicit accepted risk before hardening."
     }
   }
 }
