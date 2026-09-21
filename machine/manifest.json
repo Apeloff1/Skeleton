@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.4",
+  "schema_version": "4.5",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -438,6 +438,26 @@
         "model routing v3/v4"
       ],
       "note": "existing integration PRs reused; zero-file comparisons remain lineage-only"
+    },
+    "feature_wave": {
+      "new_pr": "#1875 feat/asm-vector-microkernel",
+      "revalidated": [
+        "automerge control plane",
+        "autonomous supervisor",
+        "backlog reasoning adapter",
+        "build-capable automation",
+        "builder plane/control",
+        "repair receipts",
+        "durable checkpoints",
+        "agent squads/studios",
+        "galaxy lifecycle",
+        "Java batch/control/observability/retrieval"
+      ],
+      "lineage_only": [
+        "build-capable automation plane",
+        "build incremental graph"
+      ],
+      "note": "existing integration PRs reused; large/overlapping waves remain staged rather than blindly merged"
     }
   },
   "integrated_domains": [
