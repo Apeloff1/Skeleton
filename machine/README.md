@@ -138,6 +138,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Chore wave:** PR #1877 stages a distinct 4-file small backlog drain; the 0-file housekeeping runner remains lineage only.
 
+- **Validation/docs/perf wave:** PRs #1878–#1882 stage five distinct test, documentation, and performance deltas for controlled consolidation.
+
 ## Target layout
 
 ```text
