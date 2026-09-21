@@ -508,6 +508,27 @@ def audit_product_catalog_alignment() -> None:
     )
 
 
+def audit_public_app_bootstrap_contract() -> None:
+    bootstrap = read("skeleton/app/bootstrap.py")
+    route = read("backend/routes/app_runtime.py")
+    registry = read("backend/core/routes_registry.py")
+    client = read("frontend/src/product/appBootstrapClient.ts")
+
+    check("def public_bootstrap_payload(" in bootstrap, "public bootstrap payload builder missing")
+    check('"health_path": service.health_path' in bootstrap, "bootstrap does not source health paths from manifest")
+    for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
+        check(forbidden not in bootstrap, f"public bootstrap leaks internal field: {forbidden}")
+
+    check('APIRouter(prefix="/api/app"' in route, "public app runtime router prefix drift")
+    check('@router.get("/bootstrap")' in route, "public app bootstrap route missing")
+    check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
+    check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
+
+    check("getAppBootstrap" in client, "frontend app bootstrap client missing")
+    check("'/api/app/bootstrap'" in client, "frontend app bootstrap endpoint drift")
+    check("bootstrapService" in client, "frontend app bootstrap service resolver missing")
+
+
 def audit_product_health_contract() -> None:
     client = read("frontend/src/product/appHealthClient.ts")
     shell = read("frontend/app/product.tsx")
@@ -524,7 +545,11 @@ def audit_product_health_contract() -> None:
         for item in manifest.get("services", [])
         if isinstance(item, dict) and isinstance(item.get("name"), str)
     }
-    for name, base_symbol in (("backend", "API_BASE"), ("skeleton", "SKELETON_API_BASE")):
+    check("getAppBootstrap" in client, "product health no longer consumes canonical app bootstrap")
+    check("bootstrapService" in client, "product health bypasses bootstrap service metadata")
+    check("contractSource: 'bootstrap' | 'fallback'" in client, "health contract provenance missing")
+
+    for name in ("backend", "skeleton"):
         service = services.get(name)
         check(isinstance(service, dict), f"manifest health service missing: {name}")
         if not isinstance(service, dict):
@@ -532,11 +557,16 @@ def audit_product_health_contract() -> None:
         path = service.get("health_path")
         check(isinstance(path, str) and bool(path), f"manifest health path missing: {name}")
         if isinstance(path, str) and path:
-            expected = f"probe('{name}', {base_symbol}, '{path}'"
-            check(expected in client, f"product health client drift for {name}: {path}")
+            fallback_token = f"{name}: {path!r}"
+            check(
+                fallback_token in client,
+                f"health fallback drift for {name}: expected {path}",
+            )
 
     check("probeAppHealth" in shell, "product shell no longer probes whole-app health")
     check("Application runtime" in shell, "product shell runtime health panel missing")
+    check("health.contractSource" in shell, "product shell does not surface bootstrap/fallback provenance")
+    check("health.application.name" in shell, "product shell does not surface canonical application identity")
 
 
 def audit_public_product_readiness_contract() -> None:
@@ -614,6 +644,7 @@ def main() -> int:
     audit_production_ingress()
     audit_launcher_convergence()
     audit_product_catalog_alignment()
+    audit_public_app_bootstrap_contract()
     audit_product_health_contract()
     audit_public_product_readiness_contract()
     audit_product_control_contract()
