@@ -55,6 +55,7 @@ from skeleton.vault.governance_registry import (
     GovernanceRegistry,
     RegisteredProviderTransferDecision,
 )
+from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.lifecycle_adapters import (
     DeletionExecutionResult,
     GovernedExport,
@@ -102,6 +103,7 @@ __all__ = [
     "CanonicalWritePolicy",
     "GovernanceContext",
     "GovernanceRegistry",
+    "GovernanceAuditTimeline",
     "RegisteredProviderTransferDecision",
     "DeletionExecutionResult",
     "GovernedExport",
