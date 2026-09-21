@@ -1,0 +1,1349 @@
+{
+  "schema_version": 1,
+  "catalog_version": "1.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "purpose": "Typed provider-neutral schema catalog for the fully functional AI runtime. These schemas refine, but do not replace, canonical ownership in machine/ai_app_construction.json.",
+  "conventions": {
+    "unknown_fields": "reject by default for command/authority records; additive-compatible readers may ignore explicitly versioned optional response fields",
+    "timestamps": "RFC3339 UTC strings with explicit timezone; persisted writers normalize to UTC",
+    "ids": "opaque stable strings; callers must not infer storage/provider semantics from ID shape",
+    "digests": "lowercase SHA-256 hex over canonical bytes/JSON unless a record explicitly declares another algorithm",
+    "money": "non-negative decimal string plus declared currency when monetary precision is required",
+    "nullability": "fields are non-null unless nullable=true",
+    "arrays": "ordered unless semantics explicitly declare set behavior",
+    "maps": "JSON object with string keys and bounded depth/size",
+    "canonical_json": "UTF-8, deterministic key ordering, no NaN/Infinity, normalized scalar representation",
+    "versioning": "persisted/wire records carry schema_version where their independent evolution requires it"
+  },
+  "scalar_types": {
+    "OpaqueId": {
+      "type": "string",
+      "min_length": 1,
+      "max_length": 192
+    },
+    "TenantId": {
+      "type": "string",
+      "min_length": 1,
+      "max_length": 192
+    },
+    "ActorId": {
+      "type": "string",
+      "min_length": 1,
+      "max_length": 192
+    },
+    "CapabilityId": {
+      "type": "string",
+      "min_length": 1,
+      "max_length": 192
+    },
+    "RFC3339": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "Digest256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "NonNegativeInt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "PositiveInt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "NonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "Probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "JsonObject": {
+      "type": "object",
+      "additional_properties": true
+    },
+    "Ref": {
+      "type": "string",
+      "min_length": 1,
+      "max_length": 2048
+    }
+  },
+  "enums": {
+    "DataClass": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+    ],
+    "OperationState": [
+      "created",
+      "validated",
+      "authorized",
+      "admitted",
+      "queued",
+      "running",
+      "waiting_for_tool",
+      "waiting_for_user",
+      "retrying",
+      "degraded",
+      "completed",
+      "failed",
+      "cancelled"
+    ],
+    "ExecutionState": [
+      "created",
+      "loading",
+      "assembling_context",
+      "routing",
+      "provider_pending",
+      "provider_completed",
+      "classifying_output",
+      "waiting_for_tool_authority",
+      "waiting_for_user",
+      "tool_pending",
+      "tool_completed",
+      "checkpointing",
+      "verifying",
+      "repairing",
+      "finalizing",
+      "completed",
+      "degraded",
+      "failed",
+      "cancelled"
+    ],
+    "FinishReason": [
+      "completed",
+      "tool_calls",
+      "length",
+      "content_filtered",
+      "refusal",
+      "cancelled",
+      "deadline",
+      "provider_error",
+      "unknown"
+    ],
+    "VerificationLevel": [
+      "none",
+      "structural",
+      "evidence",
+      "action",
+      "high_impact"
+    ],
+    "VerificationOutcome": [
+      "verified",
+      "qualified",
+      "abstain",
+      "repair",
+      "block"
+    ],
+    "ConfidenceBand": [
+      "high",
+      "medium",
+      "low",
+      "unknown"
+    ],
+    "ToolReceiptStatus": [
+      "denied",
+      "waiting_approval",
+      "reserved",
+      "running",
+      "succeeded",
+      "failed",
+      "cancelled",
+      "ambiguous",
+      "compensated"
+    ],
+    "ThreadStatus": [
+      "active",
+      "archived",
+      "deleting",
+      "deleted"
+    ],
+    "ArtifactLifecycle": [
+      "pending",
+      "scanning",
+      "ready",
+      "quarantined",
+      "deleting",
+      "deleted",
+      "expired"
+    ],
+    "ErrorCategory": [
+      "validation",
+      "authentication",
+      "authorization",
+      "governance",
+      "admission",
+      "conflict",
+      "dependency_unavailable",
+      "provider",
+      "tool",
+      "verification",
+      "deadline",
+      "cancelled",
+      "corruption",
+      "internal"
+    ]
+  },
+  "records": {
+    "OperationEnvelope": {
+      "schema_version": 1,
+      "owner_plane": "orchestration",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "actor_id": {
+          "type": "ActorId"
+        },
+        "capability": {
+          "type": "CapabilityId"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "deadline": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "idempotency_key": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        },
+        "state": {
+          "type": "OperationState"
+        },
+        "version": {
+          "type": "NonNegativeInt"
+        }
+      },
+      "invariants": [
+        "operation_id != trace_id",
+        "terminal states completed/failed/cancelled never transition",
+        "deadline if present is >= created_at",
+        "version is monotonic"
+      ]
+    },
+    "ResourceBudget": {
+      "schema_version": 1,
+      "owner_plane": "cost-capacity",
+      "fields": {
+        "max_input_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_output_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_total_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_provider_cost": {
+          "type": "string",
+          "nullable": true,
+          "format": "decimal"
+        },
+        "max_tool_cost": {
+          "type": "string",
+          "nullable": true,
+          "format": "decimal"
+        },
+        "max_artifact_bytes": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_storage_bytes": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_wall_seconds": {
+          "type": "NonNegativeNumber",
+          "nullable": true
+        },
+        "max_model_turns": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_tool_calls": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_parallel_tools": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_retries": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "max_repairs": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "limits may be absent but never negative",
+        "downstream components may tighten but never widen the enclosing operation budget"
+      ]
+    },
+    "ConversationThread": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "thread_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "owner_id": {
+          "type": "ActorId"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "updated_at": {
+          "type": "RFC3339"
+        },
+        "status": {
+          "type": "ThreadStatus"
+        },
+        "title": {
+          "type": "string",
+          "max_length": 512
+        },
+        "retention_class": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "version": {
+          "type": "NonNegativeInt"
+        },
+        "active_branch_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "updated_at >= created_at",
+        "version increases on canonical thread mutation",
+        "deleted thread rejects new message append"
+      ]
+    },
+    "ConversationMessage": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "message_id": {
+          "type": "OpaqueId"
+        },
+        "thread_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "author_type": {
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant",
+            "tool",
+            "system-derived"
+          ]
+        },
+        "author_id": {
+          "type": "ActorId",
+          "nullable": true
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant",
+            "tool",
+            "system-derived"
+          ]
+        },
+        "content_ref": {
+          "type": "Ref"
+        },
+        "content_digest": {
+          "type": "Digest256"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "sequence": {
+          "type": "NonNegativeInt"
+        },
+        "operation_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "execution_result_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "supersedes_message_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "branch_id": {
+          "type": "OpaqueId"
+        },
+        "artifact_refs": {
+          "type": "array<Ref>",
+          "max_items": 128
+        },
+        "citation_refs": {
+          "type": "array<Ref>",
+          "max_items": 256
+        },
+        "tool_receipt_refs": {
+          "type": "array<Ref>",
+          "max_items": 256
+        },
+        "data_class": {
+          "type": "DataClass"
+        }
+      },
+      "invariants": [
+        "assistant canonical message requires execution_result_id",
+        "tool canonical message requires at least one tool_receipt_ref",
+        "sequence is monotonic within canonical branch projection",
+        "edit/regenerate creates new message identity rather than mutating content"
+      ]
+    },
+    "ContextSegment": {
+      "schema_version": 1,
+      "owner_plane": "prompt-context",
+      "fields": {
+        "segment_id": {
+          "type": "OpaqueId"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "system_policy",
+            "product_instruction",
+            "operation_objective",
+            "user_message",
+            "assistant_message",
+            "conversation_summary",
+            "memory",
+            "retrieval_evidence",
+            "artifact",
+            "tool_result",
+            "skill_instruction",
+            "tool_schema"
+          ]
+        },
+        "source_type": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "source_id": {
+          "type": "OpaqueId"
+        },
+        "content_ref": {
+          "type": "Ref"
+        },
+        "content_digest": {
+          "type": "Digest256"
+        },
+        "trust_level": {
+          "type": "string",
+          "enum": [
+            "trusted_control",
+            "authorized_user_data",
+            "untrusted_evidence",
+            "derived_untrusted"
+          ]
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "tenant_id": {
+          "type": "TenantId",
+          "nullable": true
+        },
+        "purpose": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "relevance": {
+          "type": "Probability"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "token_estimate": {
+          "type": "NonNegativeInt"
+        },
+        "provenance": {
+          "type": "JsonObject"
+        },
+        "retention_class": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        }
+      },
+      "invariants": [
+        "trust level is assigned by source/policy and cannot be upgraded by content text",
+        "confidential/restricted user data requires tenant_id"
+      ]
+    },
+    "ContextEnvelope": {
+      "schema_version": 1,
+      "owner_plane": "prompt-context",
+      "fields": {
+        "context_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "instruction_segments": {
+          "type": "array<OpaqueId>",
+          "max_items": 512
+        },
+        "evidence_segments": {
+          "type": "array<OpaqueId>",
+          "max_items": 2048
+        },
+        "tool_schema_segments": {
+          "type": "array<OpaqueId>",
+          "max_items": 256
+        },
+        "budget": {
+          "type": "ResourceBudget"
+        },
+        "selected_tokens_estimate": {
+          "type": "NonNegativeInt"
+        },
+        "omitted_segment_ids": {
+          "type": "array<OpaqueId>",
+          "max_items": 4096
+        },
+        "source_snapshot": {
+          "type": "JsonObject"
+        },
+        "context_digest": {
+          "type": "Digest256"
+        },
+        "compiled_at": {
+          "type": "RFC3339"
+        },
+        "compiler_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        }
+      },
+      "invariants": [
+        "context_digest covers selected ordered segment identities/digests plus compiler version and budget-relevant policy",
+        "mandatory control segments cannot be omitted silently"
+      ]
+    },
+    "AIExecutionRequest": {
+      "schema_version": 1,
+      "owner_plane": "orchestration",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "objective": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 65536
+        },
+        "context_policy": {
+          "type": "JsonObject"
+        },
+        "tool_policy": {
+          "type": "JsonObject"
+        },
+        "resource_budget": {
+          "type": "ResourceBudget"
+        },
+        "stop_policy": {
+          "type": "JsonObject"
+        },
+        "checkpoint_ref": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "resource/stop limits are monotonic across resume/retry",
+        "execution_id remains stable for one execution attempt"
+      ]
+    },
+    "AgentTurn": {
+      "schema_version": 1,
+      "owner_plane": "orchestration",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "parent_turn_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "turn_index": {
+          "type": "NonNegativeInt"
+        },
+        "phase": {
+          "type": "ExecutionState"
+        },
+        "context_digest": {
+          "type": "Digest256"
+        },
+        "route_decision_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "provider_request_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "provider_response_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "tool_receipt_ids": {
+          "type": "array<OpaqueId>",
+          "max_items": 1024
+        },
+        "verification_receipt_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "usage_delta": {
+          "type": "JsonObject"
+        },
+        "checkpoint_ref": {
+          "type": "Ref"
+        },
+        "status": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        }
+      },
+      "invariants": [
+        "turn_index strictly increases within execution",
+        "parent_turn_id is null only for root turn",
+        "turn lineage is immutable"
+      ]
+    },
+    "ProviderToolDefinition": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "tool_id": {
+          "type": "OpaqueId"
+        },
+        "description": {
+          "type": "string",
+          "max_length": 4096
+        },
+        "input_schema": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "contains no credential, implementation entrypoint, authority token or database handle"
+      ]
+    },
+    "ProviderToolCall": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "call_id": {
+          "type": "OpaqueId"
+        },
+        "tool_id": {
+          "type": "OpaqueId"
+        },
+        "arguments": {
+          "type": "JsonObject"
+        },
+        "arguments_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "call_id unique within provider response",
+        "tool_id was offered in corresponding ProviderRequest",
+        "arguments_digest is over canonical JSON"
+      ]
+    },
+    "ProviderUsage": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "input_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "output_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "cached_input_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "reasoning_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "total_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "estimated_cost": {
+          "type": "string",
+          "nullable": true,
+          "format": "decimal"
+        },
+        "billed_cost": {
+          "type": "string",
+          "nullable": true,
+          "format": "decimal"
+        },
+        "currency": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 16
+        },
+        "usage_source": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        }
+      },
+      "invariants": [
+        "unknown provider values remain null/unknown and are never fabricated as zero"
+      ]
+    },
+    "ProviderResponse": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "provider": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "model": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "request_id": {
+          "type": "OpaqueId"
+        },
+        "response_id": {
+          "type": "OpaqueId"
+        },
+        "text": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 1000000
+        },
+        "structured_output": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "tool_calls": {
+          "type": "array<ProviderToolCall>",
+          "max_items": 256
+        },
+        "finish_reason": {
+          "type": "FinishReason"
+        },
+        "usage": {
+          "type": "ProviderUsage"
+        },
+        "latency_ms": {
+          "type": "NonNegativeNumber"
+        },
+        "governance_decision_id": {
+          "type": "OpaqueId"
+        },
+        "admission_decision_id": {
+          "type": "OpaqueId"
+        },
+        "data_class": {
+          "type": "DataClass"
+        }
+      },
+      "invariants": [
+        "provider-native SDK objects are not fields",
+        "tool calls are normalized before this record leaves provider boundary"
+      ]
+    },
+    "ToolExecutionRequest": {
+      "schema_version": 1,
+      "owner_plane": "tool-runtime",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "call_id": {
+          "type": "OpaqueId"
+        },
+        "tool_id": {
+          "type": "OpaqueId"
+        },
+        "arguments": {
+          "type": "JsonObject"
+        },
+        "arguments_digest": {
+          "type": "Digest256"
+        },
+        "principal": {
+          "type": "ActorId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "authority_context": {
+          "type": "JsonObject"
+        },
+        "resource_budget": {
+          "type": "ResourceBudget"
+        },
+        "deadline": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        }
+      },
+      "invariants": [
+        "arguments_digest matches canonical arguments and approved proposal"
+      ]
+    },
+    "ToolExecutionReceipt": {
+      "schema_version": 1,
+      "owner_plane": "tool-runtime",
+      "fields": {
+        "receipt_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "call_id": {
+          "type": "OpaqueId"
+        },
+        "tool_id": {
+          "type": "OpaqueId"
+        },
+        "manifest_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "arguments_digest": {
+          "type": "Digest256"
+        },
+        "authority_decision": {
+          "type": "JsonObject"
+        },
+        "approval_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "idempotency_key": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 256
+        },
+        "started_at": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "completed_at": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "status": {
+          "type": "ToolReceiptStatus"
+        },
+        "result_ref": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "postcondition_ref": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "usage": {
+          "type": "JsonObject"
+        },
+        "error_code": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 128
+        },
+        "compensation_ref": {
+          "type": "Ref",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "succeeded requires result_ref unless tool contract declares empty result",
+        "completed call_id replays receipt instead of repeating action",
+        "ambiguous status is never rendered as completed action"
+      ]
+    },
+    "MemoryRecord": {
+      "schema_version": 1,
+      "owner_plane": "memory",
+      "fields": {
+        "memory_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "user_id": {
+          "type": "ActorId",
+          "nullable": true
+        },
+        "namespace": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "preference",
+            "episodic",
+            "semantic",
+            "conversation_summary",
+            "task_outcome",
+            "tool_fact"
+          ]
+        },
+        "content_ref": {
+          "type": "Ref"
+        },
+        "content_digest": {
+          "type": "Digest256"
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "purpose": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "provenance": {
+          "type": "JsonObject"
+        },
+        "authority_class": {
+          "type": "string",
+          "enum": [
+            "user_explicit",
+            "tool_authoritative",
+            "verified_outcome",
+            "derived_summary",
+            "imported"
+          ]
+        },
+        "confidence_band": {
+          "type": "ConfidenceBand"
+        },
+        "retention_class": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "updated_at": {
+          "type": "RFC3339"
+        },
+        "expires_at": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "dedupe_key": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 512
+        },
+        "version": {
+          "type": "NonNegativeInt"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "superseded",
+            "deleting",
+            "deleted",
+            "expired"
+          ]
+        }
+      },
+      "invariants": [
+        "unverified model speculation cannot use an authoritative class",
+        "derived vector/cache entry is not canonical memory identity"
+      ]
+    },
+    "VerificationReceipt": {
+      "schema_version": 1,
+      "owner_plane": "reasoning-verification",
+      "fields": {
+        "verification_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "candidate_ref": {
+          "type": "Ref"
+        },
+        "level": {
+          "type": "VerificationLevel"
+        },
+        "outcome": {
+          "type": "VerificationOutcome"
+        },
+        "reason_codes": {
+          "type": "array<string>",
+          "max_items": 256
+        },
+        "claim_checks": {
+          "type": "array<JsonObject>",
+          "max_items": 2048
+        },
+        "postcondition_checks": {
+          "type": "array<JsonObject>",
+          "max_items": 1024
+        },
+        "evidence_refs": {
+          "type": "array<Ref>",
+          "max_items": 4096
+        },
+        "verifier_route_refs": {
+          "type": "array<Ref>",
+          "max_items": 128
+        },
+        "repair_directive": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "confidence_band": {
+          "type": "ConfidenceBand"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "completed_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "verified at evidence/action/high_impact level requires policy-required check coverage",
+        "receipt stores observable checks/evidence, not hidden chain-of-thought"
+      ]
+    },
+    "AIExecutionResult": {
+      "schema_version": 1,
+      "owner_plane": "orchestration",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "degraded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "final_output": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "verification": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "route_receipts": {
+          "type": "array<Ref>",
+          "max_items": 256
+        },
+        "provider_receipts": {
+          "type": "array<Ref>",
+          "max_items": 256
+        },
+        "tool_receipts": {
+          "type": "array<Ref>",
+          "max_items": 2048
+        },
+        "memory_refs": {
+          "type": "array<Ref>",
+          "max_items": 1024
+        },
+        "artifact_refs": {
+          "type": "array<Ref>",
+          "max_items": 1024
+        },
+        "usage": {
+          "type": "JsonObject"
+        },
+        "stream_terminal_event": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "completed_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "completed requires durable final output/result semantics and required verification",
+        "operation terminal completion may not precede canonical result commit"
+      ]
+    },
+    "DelegatedAuthority": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "service_principal": {
+          "type": "OpaqueId"
+        },
+        "actor_id": {
+          "type": "ActorId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "scopes": {
+          "type": "array<string>",
+          "min_items": 1,
+          "max_items": 256
+        },
+        "capability": {
+          "type": "CapabilityId"
+        },
+        "issued_at": {
+          "type": "RFC3339"
+        },
+        "expires_at": {
+          "type": "RFC3339"
+        },
+        "request_binding": {
+          "type": "Digest256"
+        },
+        "authority_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "expires_at > issued_at",
+        "backend cannot delegate scopes outside service policy",
+        "authority is bound to target request/operation identity"
+      ]
+    },
+    "EngineExecutionCommand": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "operation": {
+          "type": "OperationEnvelope"
+        },
+        "execution_request": {
+          "type": "AIExecutionRequest"
+        },
+        "delegated_authority": {
+          "type": "DelegatedAuthority"
+        },
+        "context_seed_refs": {
+          "type": "array<Ref>",
+          "max_items": 1024
+        },
+        "resource_budget": {
+          "type": "ResourceBudget"
+        },
+        "stream_preferences": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "operation/execution tenant/capability/identity agree with delegated authority",
+        "command does not carry an untrusted full client transcript as authority"
+      ]
+    },
+    "StreamEvent": {
+      "schema_version": 1,
+      "owner_plane": "streaming-realtime",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "event_id": {
+          "type": "OpaqueId"
+        },
+        "sequence": {
+          "type": "NonNegativeInt"
+        },
+        "type": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "timestamp": {
+          "type": "RFC3339"
+        },
+        "payload": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "sequence strictly monotonic per operation",
+        "event_id content is immutable",
+        "no event accepted after terminal event"
+      ]
+    },
+    "AIError": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "error_code": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "category": {
+          "type": "ErrorCategory"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "http_status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "operation_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "trace_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "user_safe_message": {
+          "type": "string",
+          "max_length": 4096
+        },
+        "detail_ref": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "retry_after": {
+          "type": "NonNegativeNumber",
+          "nullable": true
+        },
+        "caused_by": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 128
+        }
+      },
+      "invariants": [
+        "user_safe_message contains no secret/raw stack trace/restricted payload",
+        "retryable reflects semantic policy rather than UI guess"
+      ]
+    }
+  },
+  "cross_record_invariants": [
+    "tenant_id must not change across conversation message -> operation -> execution -> tool/memory/result lineage",
+    "actor/service identities may differ by boundary but delegated authority preserves the initiating actor and tenant",
+    "ContextEnvelope.context_digest binds the exact model-visible source snapshot for AgentTurn",
+    "ProviderToolCall.tool_id must exist in tools offered for the bound ProviderRequest",
+    "ToolExecutionReceipt.arguments_digest must equal ProviderToolCall/ToolCallProposal digest after canonical normalization",
+    "VerificationReceipt selected by AIExecutionResult must verify the same candidate/result lineage",
+    "assistant ConversationMessage.execution_result_id points to the canonical AIExecutionResult used for its content",
+    "completed StreamEvent references a terminal operation whose AIExecutionResult already exists"
+  ]
+}
