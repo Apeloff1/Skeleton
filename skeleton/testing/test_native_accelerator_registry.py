@@ -200,6 +200,40 @@ def test_rebuild_replaces_and_closes_previous_instance(tmp_path: Path) -> None:
     assert registry.get() is replacement
 
 
+def test_rebuild_survives_retired_instance_close_failure(
+    tmp_path: Path,
+) -> None:
+    probe = _preflight(tmp_path)
+
+    class BadCloseAccelerator(_FakeNativeAccelerator):
+        def close(self) -> None:
+            self.close_calls += 1
+            raise RuntimeError("retired close secret")
+
+    first = BadCloseAccelerator(Path(probe.library))
+    replacement_path = tmp_path / "replacement-close.so"
+    replacement_path.write_bytes(b"replacement")
+    replacement = _FakeNativeAccelerator(replacement_path)
+
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: first,
+        preflight_provider=lambda: probe,
+        builder=lambda **_kwargs: replacement_path,
+        library_loader=lambda _path: replacement,
+    )
+    registry.get()
+
+    actual = registry.build_and_get()
+
+    assert actual is replacement
+    assert registry.get() is replacement
+    assert first.close_calls == 1
+    status = registry.status()
+    assert status.healthy is True
+    assert status.last_error is None
+    assert status.retirement_failures == 1
+
+
 def test_failed_rebuild_preserves_healthy_loaded_instance(tmp_path: Path) -> None:
     probe = _preflight(tmp_path)
     first = _FakeNativeAccelerator(Path(probe.library))
@@ -372,6 +406,34 @@ def test_legacy_default_asm_getter_can_explicitly_build_missing_library(
     assert actual is instance
     assert build_calls == 1
     assert registry.initialized() is True
+
+
+def test_active_close_failure_is_recorded_and_fails_health(
+    tmp_path: Path,
+) -> None:
+    probe = _preflight(tmp_path)
+
+    class BadCloseAccelerator(_FakeNativeAccelerator):
+        def close(self) -> None:
+            self.close_calls += 1
+            raise RuntimeError("active close secret")
+
+    instance = BadCloseAccelerator(Path(probe.library))
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: instance,
+        preflight_provider=lambda: probe,
+    )
+    registry.get()
+
+    with pytest.raises(RuntimeError, match="active close secret"):
+        registry.close()
+
+    status = registry.status()
+    assert status.initialized is False
+    assert status.healthy is False
+    assert status.last_error == "RuntimeError"
+    assert status.retirement_failures == 1
+    assert "secret" not in (status.last_error or "")
 
 
 def test_unknown_native_accelerator_names_fail_closed(tmp_path: Path) -> None:
