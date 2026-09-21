@@ -5540,7 +5540,14 @@
       "gap-tool-runtime-convergence",
       "gap-verification-evidence-contract"
     ],
-    "dependency_graph": "functional_ai_dependency_graph"
+    "dependency_graph": "functional_ai_dependency_graph",
+    "required_supporting_contracts": [
+      "functional_ai_dependency_graph",
+      "functional_ai_acceptance_matrix",
+      "ai_security_threat_model",
+      "degraded_mode_matrix",
+      "legacy_ai_cutover_map"
+    ]
   },
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
