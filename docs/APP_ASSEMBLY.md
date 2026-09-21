@@ -43,13 +43,14 @@ python -m skeleton app up --full
 
 # Inspect / operate
 python -m skeleton app ps
+python -m skeleton app smoke
 python -m skeleton app logs backend
 python -m skeleton app logs -f
 python -m skeleton app config
 python -m skeleton app down
 ```
 
-The CLI never uses a shell to construct Docker commands. Service names are
+After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
 ## Runtime configuration
