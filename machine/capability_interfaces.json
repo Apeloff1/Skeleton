@@ -48,7 +48,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "OpenAPI/schema tests",
@@ -91,7 +95,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "route collision gate",
@@ -136,7 +144,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "typecheck",
@@ -170,9 +182,14 @@
         "content hash",
         "metadata",
         "scan state",
-        "retention"
+        "retention",
+        "ArtifactRecord",
+        "artifact lifecycle",
+        "scan/quarantine receipt",
+        "bounded extraction",
+        "authorized artifact reference"
       ],
-      "target_failure_contract": "quarantine artifact",
+      "target_failure_contract": "quarantine/reject unsafe artifacts and preserve canonical lifecycle metadata",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
@@ -186,7 +203,13 @@
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
       "status": "partial"
     },
@@ -405,9 +428,14 @@
         "index",
         "query",
         "ranked evidence",
-        "citation"
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
       ],
-      "target_failure_contract": "return insufficient-evidence result",
+      "target_failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
@@ -421,7 +449,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "status": "partial"
     },
@@ -449,7 +482,13 @@
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
       "target_acceptance": [
         "migration forward/backward tests",
@@ -487,7 +526,13 @@
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
       "target_acceptance": [
         "deletion propagation",
@@ -522,7 +567,13 @@
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -554,7 +605,13 @@
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
       "target_acceptance": [
         "abuse corpus",
@@ -611,9 +668,13 @@
         "lease",
         "checkpoint",
         "retry policy",
-        "dead-letter/recovery"
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy"
       ],
-      "target_failure_contract": "park work with recovery receipt",
+      "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
         "quota exhaustion",
         "load test",
@@ -627,7 +688,11 @@
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "status": "partial"
     },
@@ -647,9 +712,13 @@
         "ModelEndpoint",
         "RouteRequest",
         "RouteDecision",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
       ],
-      "target_failure_contract": "NoRoute with sanitized evidence",
+      "target_failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
       "source_acceptance": [
         "quota exhaustion",
         "load test",
@@ -663,7 +732,12 @@
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "status": "partial"
     },
@@ -685,9 +759,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "quota exhaustion",
         "load test",
@@ -700,7 +779,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     },
@@ -798,7 +882,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "route collision gate",
@@ -830,21 +918,34 @@
         "dataset version",
         "metric",
         "threshold",
-        "promotion verdict"
+        "promotion verdict",
+        "capability baseline",
+        "scenario harness",
+        "golden journey evidence",
+        "regression budget",
+        "flakiness record"
       ],
-      "target_failure_contract": "block promotion",
+      "target_failure_contract": "block promotion when required regression/evidence gates fail",
       "source_acceptance": [
         "clean build",
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "deterministic smoke eval",
         "quality regression gate",
         "safety suite",
-        "latency/cost budget gate"
+        "latency/cost budget gate",
+        "baseline regression detection",
+        "scenario determinism",
+        "golden journey evidence binding",
+        "flakiness quarantine enforcement"
       ],
       "status": "present"
     },
@@ -866,20 +967,34 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "clean build",
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -907,7 +1022,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "provider outage",
@@ -942,7 +1061,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "target_acceptance": [
         "abuse corpus",
@@ -1058,9 +1181,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
@@ -1075,7 +1203,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     },
@@ -1148,9 +1281,14 @@
         "index",
         "query",
         "ranked evidence",
-        "citation"
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
       ],
-      "target_failure_contract": "return insufficient-evidence result",
+      "target_failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
@@ -1166,7 +1304,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "status": "partial"
     },
@@ -1188,19 +1331,33 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "deterministic smoke eval",
         "quality regression gate",
         "safety suite",
-        "latency/cost budget gate"
+        "latency/cost budget gate",
+        "baseline regression detection",
+        "scenario determinism",
+        "golden journey evidence binding",
+        "flakiness quarantine enforcement"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -1234,7 +1391,11 @@
         "deterministic smoke eval",
         "quality regression gate",
         "safety suite",
-        "latency/cost budget gate"
+        "latency/cost budget gate",
+        "baseline regression detection",
+        "scenario determinism",
+        "golden journey evidence binding",
+        "flakiness quarantine enforcement"
       ],
       "target_acceptance": [
         "falsification tests",
@@ -1265,9 +1426,14 @@
         "dataset version",
         "metric",
         "threshold",
-        "promotion verdict"
+        "promotion verdict",
+        "capability baseline",
+        "scenario harness",
+        "golden journey evidence",
+        "regression budget",
+        "flakiness record"
       ],
-      "target_failure_contract": "block promotion",
+      "target_failure_contract": "block promotion when required regression/evidence gates fail",
       "source_acceptance": [
         "experiment isolation",
         "rollback",
@@ -1278,7 +1444,11 @@
         "deterministic smoke eval",
         "quality regression gate",
         "safety suite",
-        "latency/cost budget gate"
+        "latency/cost budget gate",
+        "baseline regression detection",
+        "scenario determinism",
+        "golden journey evidence binding",
+        "flakiness quarantine enforcement"
       ],
       "status": "partial"
     },
@@ -1339,9 +1509,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "experiment isolation",
         "rollback",
@@ -1351,7 +1526,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     },
@@ -1476,7 +1656,11 @@
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "target_acceptance": [
         "migration forward/backward tests",
@@ -1510,7 +1694,11 @@
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -1537,19 +1725,33 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -1834,7 +2036,12 @@
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "target_acceptance": [
         "provider contract gate",
@@ -1873,19 +2080,34 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -1910,7 +2132,12 @@
       "source_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "target_acceptance": [
         "primitive unit suite",
@@ -1976,9 +2203,14 @@
         "release manifest",
         "preflight",
         "health/readiness",
-        "rollback"
+        "rollback",
+        "release evidence bundle",
+        "provider smoke",
+        "canary gate",
+        "rollback plan",
+        "contract compatibility evidence"
       ],
-      "target_failure_contract": "do not promote or rollback",
+      "target_failure_contract": "hold/rollback release while preserving canonical user and operation state",
       "source_acceptance": [
         "admin auth",
         "preflight denial",
@@ -1990,7 +2222,11 @@
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
       "status": "present"
     },
@@ -2012,9 +2248,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "admin auth",
         "preflight denial",
@@ -2024,7 +2265,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -2164,9 +2410,13 @@
         "ModelEndpoint",
         "RouteRequest",
         "RouteDecision",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
       ],
-      "target_failure_contract": "NoRoute with sanitized evidence",
+      "target_failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
       "source_acceptance": [
         "resume tests",
         "cancellation tests",
@@ -2182,7 +2432,12 @@
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "status": "partial"
     },
@@ -2442,9 +2697,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "typecheck",
         "web export",
@@ -2461,7 +2721,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     },
@@ -2554,9 +2819,14 @@
         "index",
         "query",
         "ranked evidence",
-        "citation"
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
       ],
-      "target_failure_contract": "return insufficient-evidence result",
+      "target_failure_contract": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations",
       "source_acceptance": [
         "prompt injection regression suite",
         "budget tests",
@@ -2571,7 +2841,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "status": "partial"
     },
@@ -2591,9 +2866,13 @@
         "ModelEndpoint",
         "RouteRequest",
         "RouteDecision",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
       ],
-      "target_failure_contract": "NoRoute with sanitized evidence",
+      "target_failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
       "source_acceptance": [
         "falsification tests",
         "repair convergence tests",
@@ -2608,7 +2887,12 @@
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "status": "partial"
     },
@@ -2715,9 +2999,13 @@
         "lease",
         "checkpoint",
         "retry policy",
-        "dead-letter/recovery"
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy"
       ],
-      "target_failure_contract": "park work with recovery receipt",
+      "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
         "provider outage",
         "database loss",
@@ -2729,7 +3017,11 @@
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "status": "present"
     },
@@ -2749,9 +3041,13 @@
         "ModelEndpoint",
         "RouteRequest",
         "RouteDecision",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
       ],
-      "target_failure_contract": "NoRoute with sanitized evidence",
+      "target_failure_contract": "return typed no-route/degraded decision; never silently weaken required semantics",
       "source_acceptance": [
         "provider outage",
         "database loss",
@@ -2763,7 +3059,12 @@
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
       "status": "present"
     },
@@ -2785,9 +3086,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "provider outage",
         "database loss",
@@ -2798,7 +3104,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "present"
     },
@@ -2826,7 +3137,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "target_acceptance": [
         "migration forward/backward tests",
@@ -2864,7 +3180,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "target_acceptance": [
         "deletion propagation",
@@ -2907,7 +3228,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -2962,7 +3288,12 @@
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
       "target_acceptance": [
         "provider contract gate",
@@ -3192,9 +3523,13 @@
         "lease",
         "checkpoint",
         "retry policy",
-        "dead-letter/recovery"
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy"
       ],
-      "target_failure_contract": "park work with recovery receipt",
+      "target_failure_contract": "defer/shed bounded new work while preserving committed recovery/finalization",
       "source_acceptance": [
         "slow client",
         "disconnect/reconnect",
@@ -3204,7 +3539,11 @@
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
       "status": "partial"
     },
@@ -3226,9 +3565,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "slow client",
         "disconnect/reconnect",
@@ -3237,7 +3581,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     },
@@ -3368,9 +3717,14 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
-      "target_failure_contract": "service continues but promotion blocked if observability absent",
+      "target_failure_contract": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability",
       "source_acceptance": [
         "schema fuzzing",
         "authority denial",
@@ -3385,7 +3739,12 @@
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
       "status": "partial"
     }
