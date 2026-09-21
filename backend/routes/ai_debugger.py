@@ -94,7 +94,7 @@ async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
         return response.text
     except ProviderError as exc:
         logger.warning("AI debugger provider failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="AI debugger provider unavailable") from None
+        raise HTTPException(status_code=503, detail="AI debugger provider failed") from None
     except HTTPException:
         raise
     except Exception as exc:
