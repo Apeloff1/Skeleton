@@ -2,7 +2,7 @@
   "schema_version": 1,
   "app": {
     "name": "Skeleton",
-    "version": "16",
+    "version": "16.0.0",
     "compose_file": "docker-compose.yml",
     "hot_compose_file": "docker-compose.hot.yml",
     "modes": {
