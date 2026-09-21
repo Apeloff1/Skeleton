@@ -5,7 +5,13 @@ AI game engine and agent orchestration framework.
 ## Quick Start
 
 ```bash
-# Boot the full system
+# Validate the repository-wide application assembly
+python -m skeleton app check
+
+# Build and start frontend + backend + Skeleton API + Mongo
+python -m skeleton app up
+
+# Boot only the in-process Skeleton engine runtime
 python -m skeleton run
 
 # Developer CLI
@@ -16,6 +22,8 @@ python -m skeleton dev health
 # Run tests
 python -m skeleton test
 ```
+
+The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
 
 ## Architecture
 
