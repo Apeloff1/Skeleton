@@ -24,7 +24,6 @@ ALLOWED_SIGNATURE_METHODS = {
     "git_ssh",
     "sigstore",
     "ci_oidc",
-    "manual_attestation",
 }
 SIGNATURE_REF_REQUIRED = {"git_gpg", "git_ssh", "sigstore", "ci_oidc"}
 
@@ -224,13 +223,13 @@ def validate() -> list[str]:
                 errors.append(f"{rid}: changed status requires signed history")
             elif str(history[-1].get("to_status", "")).lower() != status:
                 errors.append(f"{rid}: latest history to_status must match current status")
-        if status in {"in_progress", "evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed"}:
+        if status in {"in_progress", "evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if _utc(started) is None:
                 errors.append(f"{rid}: status {status} requires started_at_utc")
-        if status in {"evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed"}:
+        if status in {"evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if not impl_signed:
                 errors.append(f"{rid}: status {status} requires implementation signoff")
-        if status in {"verified", "hardened", "production", "done", "closed"}:
+        if status in {"verified", "hardened", "production", "done", "closed", "accepted_risk"}:
             if not verify_signed:
                 errors.append(f"{rid}: status {status} requires verification signoff")
 
@@ -242,7 +241,7 @@ def validate() -> list[str]:
             evidence = record.get("evidence")
             if not isinstance(evidence, list) or not evidence:
                 errors.append(f"{rid}: checked item requires ledger evidence")
-            if status not in {"verified", "hardened", "production", "done", "closed"}:
+            if status not in {"verified", "hardened", "production", "done", "closed", "accepted_risk"}:
                 errors.append(f"{rid}: checked item has non-terminal status {status}")
         elif record.get("completed_at_utc") is not None:
             errors.append(f"{rid}: unchecked item cannot have completed_at_utc")
@@ -289,8 +288,8 @@ def validate() -> list[str]:
             errors.append(f"{entry['id']}: catalog checkbox disagrees with ledger")
         if entry.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
             errors.append(f"{entry['id']}: catalog checkbox mark disagrees with ledger")
-        if str(entry.get("status", "")).lower() != str(rec.get("status", "")).lower():
-            errors.append(f"{entry['id']}: catalog status disagrees with ledger")
+        if str(entry.get("accountability_status", "")).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{entry['id']}: catalog accountability_status disagrees with ledger")
 
     for item in priority["items"]:
         rec = record_by_id.get(item.get("accountability_id"))
@@ -303,6 +302,8 @@ def validate() -> list[str]:
             errors.append(f"{item['id']}: priority checkbox disagrees with ledger")
         if item.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
             errors.append(f"{item['id']}: priority checkbox mark disagrees with ledger")
+        if str(item.get("accountability_status", item.get("status", ""))).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{item['id']}: priority accountability status disagrees with ledger")
 
     human = HUMAN.read_text(encoding="utf-8")
     visible = {rid: mark for mark, rid in CHECK_RE.findall(human)}
