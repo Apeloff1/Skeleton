@@ -128,6 +128,7 @@ Target: **one coherent application** for human maintenance and automated machine
 Skeleton/
 ├── machine/              # machine-readable map and automation contract
 ├── skeleton/
+│   ├── app/              # canonical whole-application manifest/launcher
 │   ├── kernel/           # foundational primitives
 │   ├── config/           # configuration
 │   ├── agents/           # orchestration and agent runtime
