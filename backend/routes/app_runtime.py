@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import json
 import os
 import time
 from urllib.error import HTTPError, URLError
@@ -62,14 +63,37 @@ def _probe_engine(timeout_s: float) -> dict[str, object]:
     try:
         with urlopen(request, timeout=timeout_s) as response:
             status = int(getattr(response, "status", 200))
-            response.read(256)
-        ok = 200 <= status < 400
+            body = response.read(4096)
+        identity: dict[str, object] = {}
+        try:
+            decoded = json.loads(body.decode("utf-8"))
+            candidate = decoded.get("application") if isinstance(decoded, dict) else None
+            if isinstance(candidate, dict):
+                identity = candidate
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            identity = {}
+
+        expected = {
+            "name": manifest.name,
+            "version": manifest.version,
+            "component": "engine",
+            "ingress_prefix": engine.ingress_prefix,
+        }
+        identity_ok = all(identity.get(key) == value for key, value in expected.items())
+        ok = 200 <= status < 400 and identity_ok
         return {
             "name": "skeleton",
             "ok": ok,
             "status": status,
             "latency_ms": int((time.monotonic() - started) * 1000),
-            "detail": "healthy" if ok else f"unexpected HTTP status {status}",
+            "detail": (
+                "healthy"
+                if ok
+                else "identity mismatch"
+                if 200 <= status < 400
+                else f"unexpected HTTP status {status}"
+            ),
+            "application": identity,
         }
     except HTTPError as exc:
         return {
